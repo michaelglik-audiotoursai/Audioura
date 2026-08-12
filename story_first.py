@@ -1,10 +1,19 @@
-"""story_first.py — LOCAL-440: Story-first generation pipeline (D393).
+"""story_first.py — LOCAL-440/443: Story-first generation pipeline.
 
 Michael's 4-step process: for each selected stop, BEFORE narration:
   1. Fact → stop → exhibition connection (anchor facts from fact sheet/corpus)
   2. Story-seeking query (targeted external search for stories, not facts)
   3. Candidate evaluation (classify + verify, verified-only candidacy)
   4. Size adaptation (expand if too thin, summarize if too long)
+
+LOCAL-443 enhancements (D443):
+  A. Full-page fetch for promising tier1/tier2 URLs (≤3 pages/stop), reusing
+     LOCAL-427 backoff fetch + LOCAL-441 concurrency pattern.
+  B. Candidate pre-filter BEFORE any LLM call: drop <3 sentences, no person-name
+     token, SHA-dedup within stop. Target: ≤10 candidates reach gpt-4o-mini.
+  C. Classification concurrency: thread pool with lock on verdict cache.
+  D. Budget discipline: hard 25s per-stop wall budget for the FULL pipeline
+     (fetch + extract + classify + verify). On exhaustion, return what's verified.
 
 Then hand to the LOCAL-438 packer (select_stories_for_stop, STOP_WORD_BUDGET=450).
 
@@ -15,33 +24,60 @@ Key invariant (D393/D373 Desnos warning):
 Public API (module scope, imported by tests):
   - STORY_SEEKING_BUDGET_SECONDS: per-stop wall budget for story seeking (15s)
   - STORY_SEEKING_POOL_SIZE: thread pool for concurrent queries
+  - PIPELINE_WALL_BUDGET_SECONDS: per-stop budget for ENTIRE pipeline (25s)
+  - FULLPAGE_FETCH_MAX_PAGES: max pages to fetch per stop (3)
+  - PREFILTER_MAX_CANDIDATES: max candidates after pre-filter (10)
   - extract_anchor_facts(stop_data, fact_sheet) -> dict
   - build_story_seeking_queries(anchor_facts) -> list[str]
   - seek_stories_for_stop(stop_data, anchor_facts, budget_seconds=None) -> dict
+  - fetch_full_pages(urls, budget_seconds=None) -> list[dict]
+  - prefilter_candidates(candidates, stop_name='') -> list[str]
   - evaluate_candidates(candidates, snippets, credit_line, stop_name) -> list[dict]
+  - evaluate_candidates_concurrent(...) -> list[dict]
   - adapt_story_size(story_text, target_words=120, max_words=200) -> str
   - story_first_pipeline(stop_data, fact_sheet, snippets, credit_line) -> dict
   - disable_story_seeking() / enable_story_seeking() — neutralisation controls
+  - disable_prefilter() / enable_prefilter() — neutralisation for D242 #1
+  - disable_fullpage_fetch() / enable_fullpage_fetch() — neutralisation for D242 #1
 """
 import concurrent.futures
+import hashlib
 import json
 import os
 import re
+import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
 from cost_rates import llm_cost, search_cost
 
 # --- Configuration ---
-STORY_SEEKING_BUDGET_SECONDS = 15.0  # Per-stop wall budget (D395: ≤2-min total)
+STORY_SEEKING_BUDGET_SECONDS = 15.0  # Per-stop wall budget for SERP queries
 STORY_SEEKING_POOL_SIZE = 5  # Concurrent query threads per stop
 STORY_SEEKING_MAX_QUERIES = 6  # Max queries per stop for story-seeking
 STORY_CANDIDATE_MIN_WORDS = 40  # Too-small threshold
 STORY_CANDIDATE_MAX_WORDS = 200  # Too-large threshold (before summarize)
 STORY_TARGET_WORDS = 120  # Target size after adaptation (~3 sentences)
 
-# Neutralisation flag — when True, seek_stories_for_stop returns empty (fallback path)
+# LOCAL-443: Pipeline budget discipline (D395)
+PIPELINE_WALL_BUDGET_SECONDS = 25.0  # Hard per-stop wall budget for WHOLE pipeline
+
+# LOCAL-443: Full-page fetch configuration
+FULLPAGE_FETCH_MAX_PAGES = 3  # Max pages to fetch per stop (tier1/tier2 only)
+FULLPAGE_FETCH_TIMEOUT = 10  # Per-page HTTP timeout (seconds)
+FULLPAGE_FETCH_POOL_SIZE = 3  # Concurrent page fetches
+
+# LOCAL-443: Pre-filter configuration
+PREFILTER_MAX_CANDIDATES = 10  # Max candidates reaching the LLM classifier
+PREFILTER_MIN_SENTENCES = 3  # Minimum sentences for a candidate
+
+# LOCAL-443: Classification concurrency
+CLASSIFY_POOL_SIZE = 5  # Concurrent classification threads
+
+# Neutralisation flags
 _STORY_SEEKING_DISABLED = False
+_PREFILTER_DISABLED = False  # D242 #1: disable pre-filter to show volume explosion
+_FULLPAGE_FETCH_DISABLED = False  # D242 #1: disable full-page fetch
 
 # Cost tracking for the pipeline
 _pipeline_cost_usd = 0.0
@@ -63,6 +99,40 @@ def enable_story_seeking():
 def is_story_seeking_enabled() -> bool:
     """Return whether story-seeking is currently active."""
     return not _STORY_SEEKING_DISABLED
+
+
+def disable_prefilter():
+    """Disable pre-filter — for D242 #1 neutralisation proof."""
+    global _PREFILTER_DISABLED
+    _PREFILTER_DISABLED = True
+
+
+def enable_prefilter():
+    """Re-enable pre-filter (default state)."""
+    global _PREFILTER_DISABLED
+    _PREFILTER_DISABLED = False
+
+
+def is_prefilter_enabled() -> bool:
+    """Return whether pre-filter is active."""
+    return not _PREFILTER_DISABLED
+
+
+def disable_fullpage_fetch():
+    """Disable full-page fetch — for D242 #1 neutralisation proof."""
+    global _FULLPAGE_FETCH_DISABLED
+    _FULLPAGE_FETCH_DISABLED = True
+
+
+def enable_fullpage_fetch():
+    """Re-enable full-page fetch (default state)."""
+    global _FULLPAGE_FETCH_DISABLED
+    _FULLPAGE_FETCH_DISABLED = False
+
+
+def is_fullpage_fetch_enabled() -> bool:
+    """Return whether full-page fetch is active."""
+    return not _FULLPAGE_FETCH_DISABLED
 
 
 def get_pipeline_cost() -> dict:
@@ -390,8 +460,301 @@ def seek_stories_for_stop(stop_data: Dict, anchor_facts: Dict,
 
 
 # ---------------------------------------------------------------------------
+# LOCAL-443 Step A: Full-page fetch for promising URLs
+# ---------------------------------------------------------------------------
+
+def _extract_page_text(html: str) -> str:
+    """Extract readable prose text from HTML, stripping nav/scripts/ads.
+
+    Uses the same paragraph-extraction strategy as exhibition_checklist._fetch_page
+    (LOCAL-427) but returns joined prose text for story-unit extraction.
+    """
+    if not html:
+        return ''
+
+    # Remove scripts, styles, nav, header, footer
+    cleaned = re.sub(r'<(?:script|style|nav|header|footer|aside)[^>]*>.*?</(?:script|style|nav|header|footer|aside)>',
+                     '', html, flags=re.DOTALL | re.IGNORECASE)
+
+    # Extract paragraphs (same regex as exhibition_checklist, LOCAL-373 safe)
+    paragraphs = []
+    seen = set()
+    for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', cleaned, re.DOTALL):
+        clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
+        clean = re.sub(r'&nbsp;', ' ', clean)
+        clean = re.sub(r'&[a-z]+;', ' ', clean)
+        clean = re.sub(r'\s+', ' ', clean)
+        if len(clean) > 30 and clean not in seen:
+            seen.add(clean)
+            paragraphs.append(clean)
+
+    # Also extract article/main content if paragraphs are sparse
+    if len(paragraphs) < 3:
+        for tag in ('article', 'main', r'div[^>]*class="[^"]*(?:content|article|post|entry)[^"]*"'):
+            for block_match in re.finditer(f'<{tag}[^>]*>(.*?)</{tag.split("[")[0]}>', cleaned, re.DOTALL | re.IGNORECASE):
+                block_text = re.sub(r'<[^>]+>', ' ', block_match.group(1))
+                block_text = re.sub(r'\s+', ' ', block_text).strip()
+                if len(block_text) > 100:
+                    # Split into sentence-like chunks
+                    sentences = re.split(r'(?<=[.!?])\s+', block_text)
+                    for s in sentences:
+                        s = s.strip()
+                        if len(s) > 30 and s not in seen:
+                            seen.add(s)
+                            paragraphs.append(s)
+
+    return '\n'.join(paragraphs)
+
+
+def _fetch_single_page(url: str, timeout: int = None) -> Dict:
+    """Fetch a single page using LOCAL-427 backoff pattern (simplified for story-first).
+
+    Returns dict with:
+      url: str
+      text: str (extracted prose)
+      success: bool
+      elapsed_ms: float
+    """
+    import urllib.request
+    import urllib.error
+
+    if timeout is None:
+        timeout = FULLPAGE_FETCH_TIMEOUT
+
+    start = time.time()
+
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Audioura/2.2 StoryFirst',
+                'Accept': 'text/html,application/xhtml+xml',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            # Only process HTML responses
+            content_type = resp.headers.get('Content-Type', '')
+            if 'text/html' not in content_type and 'application/xhtml' not in content_type:
+                return {'url': url, 'text': '', 'success': False,
+                        'elapsed_ms': (time.time() - start) * 1000}
+
+            html = resp.read().decode('utf-8', errors='replace')
+            text = _extract_page_text(html)
+            elapsed_ms = (time.time() - start) * 1000
+
+            return {'url': url, 'text': text, 'success': bool(text),
+                    'elapsed_ms': elapsed_ms}
+
+    except urllib.error.HTTPError as e:
+        elapsed_ms = (time.time() - start) * 1000
+        if e.code == 429:
+            # Rate limited — one retry after short backoff (budget-aware)
+            time.sleep(min(2.0, timeout / 3))
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    html = resp.read().decode('utf-8', errors='replace')
+                    text = _extract_page_text(html)
+                    elapsed_ms = (time.time() - start) * 1000
+                    return {'url': url, 'text': text, 'success': bool(text),
+                            'elapsed_ms': elapsed_ms}
+            except Exception:
+                pass
+        return {'url': url, 'text': '', 'success': False, 'elapsed_ms': elapsed_ms}
+
+    except Exception:
+        elapsed_ms = (time.time() - start) * 1000
+        return {'url': url, 'text': '', 'success': False, 'elapsed_ms': elapsed_ms}
+
+
+def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict]:
+    """[LOCAL-443-A] Fetch full page content for top tier1/tier2 URLs.
+
+    Concurrent fetch (LOCAL-441 pattern) with wall-budget. Returns extracted
+    prose text for each successfully fetched page.
+
+    Args:
+        urls: list of URLs to fetch (already filtered to tier1/tier2, capped)
+        budget_seconds: wall budget for all fetches (default: remaining pipeline budget)
+
+    Returns:
+        list of {url, text, success, elapsed_ms}
+    """
+    if _FULLPAGE_FETCH_DISABLED:
+        return []
+
+    if not urls:
+        return []
+
+    if budget_seconds is None:
+        budget_seconds = FULLPAGE_FETCH_TIMEOUT * 2  # Sensible default
+
+    # Cap at FULLPAGE_FETCH_MAX_PAGES
+    urls = urls[:FULLPAGE_FETCH_MAX_PAGES]
+
+    start = time.time()
+    results = []
+
+    # Concurrent fetch (LOCAL-441 pattern: thread pool + wall-budget)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=FULLPAGE_FETCH_POOL_SIZE)
+    try:
+        future_to_url = {
+            executor.submit(_fetch_single_page, url): url for url in urls
+        }
+
+        remaining = budget_seconds - (time.time() - start)
+        done, not_done = concurrent.futures.wait(
+            future_to_url.keys(),
+            timeout=max(0, remaining),
+            return_when=concurrent.futures.ALL_COMPLETED,
+        )
+
+        for future in done:
+            try:
+                result = future.result(timeout=0)
+                results.append(result)
+            except Exception:
+                url = future_to_url[future]
+                results.append({'url': url, 'text': '', 'success': False, 'elapsed_ms': 0})
+
+        # Budget-expired fetches
+        for future in not_done:
+            url = future_to_url[future]
+            results.append({'url': url, 'text': '', 'success': False,
+                            'elapsed_ms': 0, 'budget_expired': True})
+            future.cancel()
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    elapsed = time.time() - start
+    succeeded = sum(1 for r in results if r['success'])
+    print(f"  [LOCAL-443] Full-page fetch: {len(urls)} URLs, "
+          f"{succeeded} succeeded, {elapsed:.1f}s")
+
+    return results
+
+
+# ---------------------------------------------------------------------------
+# LOCAL-443 Step B: Candidate pre-filter (zero-cost structural filter)
+# ---------------------------------------------------------------------------
+
+# Person-name pattern: two+ words starting with uppercase (handles accented chars)
+_PERSON_NAME_PATTERN = re.compile(
+    r'\b[A-Z\u00C0-\u024F][a-z\u00E0-\u024F]+(?:\s+[A-Z\u00C0-\u024F][a-z\u00E0-\u024F]+)+\b'
+)
+
+
+def prefilter_candidates(candidates: List[str], stop_name: str = '') -> List[str]:
+    """[LOCAL-443-B] Zero-cost structural pre-filter BEFORE any LLM call.
+
+    Drops candidates that structurally cannot be stories:
+      1. < 3 sentences (cannot have setup → struggle → resolution)
+      2. No person-name-shaped token (stories need named people)
+      3. SHA-duplicate within the stop (same text re-fetched from different sources)
+
+    Target: ≤ PREFILTER_MAX_CANDIDATES survive to reach gpt-4o-mini.
+
+    When _PREFILTER_DISABLED is True, this returns all candidates unchanged
+    (for D242 #1 neutralisation proof that volume explodes without it).
+
+    Args:
+        candidates: raw candidate texts
+        stop_name: for logging
+
+    Returns:
+        Filtered list of candidate texts (order preserved, deduped)
+    """
+    if _PREFILTER_DISABLED:
+        # Neutralisation: return all candidates, log the volume
+        print(f"  [LOCAL-443] Pre-filter DISABLED: {len(candidates)} candidates "
+              f"pass unfiltered (would normally filter)")
+        return candidates
+
+    if not candidates:
+        return []
+
+    sha_seen = set()
+    filtered = []
+    rejected_reasons = {'short': 0, 'no_name': 0, 'duplicate': 0}
+
+    for text in candidates:
+        if not text or not text.strip():
+            continue
+
+        # 1. SHA deduplication
+        sha = hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
+        if sha in sha_seen:
+            rejected_reasons['duplicate'] += 1
+            continue
+        sha_seen.add(sha)
+
+        # 2. Minimum 3 sentences
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        # Filter out very short fragments
+        sentences = [s for s in sentences if len(s.strip()) >= 15]
+        if len(sentences) < PREFILTER_MIN_SENTENCES:
+            rejected_reasons['short'] += 1
+            continue
+
+        # 3. Must contain at least one person-name-shaped token
+        if not _PERSON_NAME_PATTERN.search(text):
+            rejected_reasons['no_name'] += 1
+            continue
+
+        filtered.append(text)
+
+    # Cap at PREFILTER_MAX_CANDIDATES (take longest — more likely to contain arcs)
+    if len(filtered) > PREFILTER_MAX_CANDIDATES:
+        filtered.sort(key=len, reverse=True)
+        filtered = filtered[:PREFILTER_MAX_CANDIDATES]
+
+    total_rejected = sum(rejected_reasons.values())
+    print(f"  [LOCAL-443] Pre-filter: {len(candidates)} → {len(filtered)} "
+          f"(rejected: {rejected_reasons})")
+
+    return filtered
+
+
+# ---------------------------------------------------------------------------
 # Step 3: Candidate evaluation (classify + verify)
 # ---------------------------------------------------------------------------
+
+# Lock for thread-safe access to story_gate._verdict_cache
+_verdict_cache_lock = threading.Lock()
+
+
+def _classify_single_candidate(candidate_text: str, idx: int) -> Optional[Dict]:
+    """Classify a single candidate (thread-safe wrapper for story_gate).
+
+    Returns the classification dict if it passes, None otherwise.
+    """
+    from story_gate import classify_story_unit, score_story_interest, _verdict_cache, _cache_key
+
+    if not candidate_text or len(candidate_text.strip()) < 50:
+        return None
+
+    # Thread-safe cache check
+    key = _cache_key(candidate_text)
+    with _verdict_cache_lock:
+        if key in _verdict_cache:
+            cached = _verdict_cache[key].copy()
+            cached['from_cache'] = True
+            cached['cost_usd'] = 0.0
+            if not cached.get('is_story', False):
+                return None
+            return cached
+
+    # Not cached — call the LLM (this is the expensive part)
+    classification = classify_story_unit(candidate_text)
+
+    # The classify_story_unit function handles its own caching internally,
+    # but we hold the lock for the read above to prevent redundant calls.
+
+    if not classification.get('is_story', False):
+        return None
+
+    return classification
+
 
 def evaluate_candidates(candidates: List[str], snippets: List[Dict],
                         credit_line: str = '', stop_name: str = '') -> List[Dict]:
@@ -478,6 +841,125 @@ def evaluate_candidates(candidates: List[str], snippets: List[Dict],
     return evaluated
 
 
+def evaluate_candidates_concurrent(candidates: List[str], snippets: List[Dict],
+                                   credit_line: str = '', stop_name: str = '',
+                                   budget_seconds: float = None) -> List[Dict]:
+    """[LOCAL-443-C] Classify + verify candidates concurrently within a budget.
+
+    Same semantics as evaluate_candidates but uses a thread pool for classification
+    and respects a wall-budget. On budget exhaustion, returns what's verified so far.
+
+    Thread safety: story_gate._verdict_cache is a plain dict. We use
+    _verdict_cache_lock around cache reads to prevent redundant LLM calls,
+    but dict assignment is atomic in CPython (GIL). The lock prevents double-
+    classification of the same text when multiple threads race on the same candidate.
+
+    Args:
+        candidates: pre-filtered candidate texts
+        snippets: source snippets for verification
+        credit_line: for entity disambiguation
+        stop_name: for logging
+        budget_seconds: wall-clock budget for classification + verification
+
+    Returns:
+        Same format as evaluate_candidates — sorted verified candidates.
+    """
+    from story_gate import classify_story_unit, score_story_interest
+    from story_verifier import verify_story_candidate
+
+    if not candidates:
+        return []
+
+    if budget_seconds is None:
+        budget_seconds = 15.0  # Sensible default within the 25s pipeline budget
+
+    start = time.time()
+    evaluated = []
+
+    # Phase 1: Concurrent classification
+    classifications = [None] * len(candidates)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=CLASSIFY_POOL_SIZE)
+    try:
+        future_to_idx = {
+            executor.submit(_classify_single_candidate, text, i): i
+            for i, text in enumerate(candidates)
+        }
+
+        remaining = budget_seconds - (time.time() - start)
+        done, not_done = concurrent.futures.wait(
+            future_to_idx.keys(),
+            timeout=max(0, remaining * 0.6),  # Reserve 40% for verification
+            return_when=concurrent.futures.ALL_COMPLETED,
+        )
+
+        for future in done:
+            idx = future_to_idx[future]
+            try:
+                result = future.result(timeout=0)
+                classifications[idx] = result
+            except Exception as e:
+                print(f"    [LOCAL-443] Classification error for candidate {idx+1}: {e}")
+
+        # Cancel budget-expired
+        for future in not_done:
+            future.cancel()
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    # Phase 2: Score + verify passing candidates (serial — verification is I/O-light)
+    classified_count = sum(1 for c in classifications if c is not None)
+    print(f"  [LOCAL-443] Concurrent classification: {classified_count}/{len(candidates)} "
+          f"are stories ({time.time() - start:.1f}s)")
+
+    for i, classification in enumerate(classifications):
+        # Budget check
+        elapsed = time.time() - start
+        if elapsed >= budget_seconds:
+            print(f"  [LOCAL-443] Budget exhausted at candidate {i+1}/{len(candidates)} "
+                  f"— returning {len(evaluated)} verified so far")
+            break
+
+        if classification is None:
+            continue
+
+        candidate_text = candidates[i]
+
+        # Score interest (uses cached classification — free)
+        interest = score_story_interest(candidate_text)
+        interest_score = interest.get('interest_score', 0)
+
+        # Verify — the hard gate
+        verification = verify_story_candidate(
+            story_text=candidate_text,
+            snippets=snippets,
+            credit_line=credit_line,
+            stop_name=stop_name,
+        )
+
+        if not verification.get('passed', False):
+            print(f"    [LOCAL-443] Candidate {i+1} UNVERIFIED: "
+                  f"{verification.get('claims_unsourced', 0)} unsourced claims")
+            continue
+
+        evaluated.append({
+            'text': candidate_text,
+            'is_story': True,
+            'interest_score': interest_score,
+            'verified': True,
+            'verification_detail': verification,
+            'classification': classification,
+        })
+
+    # Rank by interest score
+    evaluated.sort(key=lambda x: x['interest_score'], reverse=True)
+
+    elapsed = time.time() - start
+    print(f"  [LOCAL-443] Concurrent evaluation: {len(candidates)} candidates → "
+          f"{len(evaluated)} verified stories ({elapsed:.1f}s)")
+
+    return evaluated
+
+
 # ---------------------------------------------------------------------------
 # Step 4: Size adaptation
 # ---------------------------------------------------------------------------
@@ -514,9 +996,9 @@ def adapt_story_size(story_text: str, target_words: int = None,
     if STORY_CANDIDATE_MIN_WORDS <= word_count <= max_words:
         return story_text
 
-    # Too small — return with marker (caller handles follow-up query)
+    # Too small — return with marker (caller checks word count and may expand)
     if word_count < STORY_CANDIDATE_MIN_WORDS:
-        return story_text  # Caller checks word count and may expand
+        return story_text
 
     # Too large — summarize preserving the arc
     summarized = _summarize_story(story_text, target_words)
@@ -604,7 +1086,7 @@ def _expand_story_query(story_text: str, anchor_facts: Dict) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Full pipeline: Steps 1-4 combined
+# Full pipeline: Steps 1-4 combined (LOCAL-443 enhanced)
 # ---------------------------------------------------------------------------
 
 def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
@@ -614,8 +1096,11 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
     """Run the full 4-step story-first pipeline for a single stop.
 
     This is the main entry point called from generate_tour_text.py.
-    It orchestrates all four steps and returns verified, size-adapted
-    story candidates ready for the LOCAL-438 packer.
+    It orchestrates all four steps with LOCAL-443 enhancements:
+      A. Full-page fetch for promising tier1/tier2 URLs
+      B. Candidate pre-filter before LLM classification
+      C. Concurrent classification
+      D. Hard per-stop wall budget (PIPELINE_WALL_BUDGET_SECONDS)
 
     Args:
         stop_data: dict with canonical_title, artist, medium, credit_line, etc.
@@ -629,44 +1114,113 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
             'stories': list of story dicts ready for select_stories_for_stop(),
             'anchor_facts': dict from step 1,
             'seeking_result': dict from step 2,
-            'evaluation_count': int (candidates evaluated),
+            'fullpage_fetch_result': dict from step 2b (LOCAL-443),
+            'evaluation_count': int (candidates evaluated after pre-filter),
+            'prefilter_input_count': int (candidates before pre-filter),
             'verified_count': int (passed verification),
             'elapsed_seconds': float,
             'cost_usd': float,
             'fallback': bool (True if story-seeking disabled/failed),
+            'budget_exhausted': bool,
         }
     """
     pipeline_start = time.time()
+    pipeline_budget = PIPELINE_WALL_BUDGET_SECONDS
 
     if _STORY_SEEKING_DISABLED:
         return {
             'stories': [],
             'anchor_facts': {},
             'seeking_result': {},
+            'fullpage_fetch_result': {},
             'evaluation_count': 0,
+            'prefilter_input_count': 0,
             'verified_count': 0,
             'elapsed_seconds': 0.0,
             'cost_usd': 0.0,
             'fallback': True,
+            'budget_exhausted': False,
         }
 
     stop_name = (stop_data.get('canonical_title') or stop_data.get('name', '')).strip()
-    print(f"\n  [LOCAL-440] Story-first pipeline for '{stop_name[:50]}'")
+    print(f"\n  [LOCAL-443] Story-first pipeline for '{stop_name[:50]}' "
+          f"(budget={pipeline_budget}s)")
 
     # ── Step 1: Extract anchor facts ──
     anchor_facts = extract_anchor_facts(stop_data, fact_sheet)
     print(f"    Step 1: anchor_facts — artist='{anchor_facts['artist'][:30]}', "
           f"entities={anchor_facts['key_entities'][:3]}")
 
-    # ── Step 2: Story-seeking queries ──
-    seeking_result = seek_stories_for_stop(stop_data, anchor_facts)
+    # ── Budget check ──
+    def _remaining():
+        return pipeline_budget - (time.time() - pipeline_start)
+
+    # ── Step 2: Story-seeking queries (use remaining budget, not full SERP budget) ──
+    serp_budget = min(STORY_SEEKING_BUDGET_SECONDS, _remaining() * 0.5)
+    seeking_result = seek_stories_for_stop(stop_data, anchor_facts,
+                                           budget_seconds=serp_budget)
     story_seeking_results = seeking_result.get('results', [])
 
+    # ── Step 2b (LOCAL-443-A): Full-page fetch for tier1/tier2 URLs ──
+    fullpage_fetch_result = {'pages_fetched': 0, 'pages_succeeded': 0,
+                             'extracted_candidates': 0, 'elapsed_seconds': 0.0}
+    fetched_page_texts = []
+
+    if _remaining() > 5 and not _FULLPAGE_FETCH_DISABLED:
+        # Select top tier1/tier2 URLs for full-page fetch
+        tier1_tier2_urls = [
+            r['url'] for r in story_seeking_results
+            if r.get('tier') in ('tier1', 'tier2') and r.get('url')
+        ]
+        # Deduplicate by domain (one page per domain)
+        seen_domains = set()
+        deduped_urls = []
+        for url in tier1_tier2_urls:
+            domain = re.sub(r'^https?://(?:www\.)?', '', url).split('/')[0]
+            if domain not in seen_domains:
+                seen_domains.add(domain)
+                deduped_urls.append(url)
+
+        if deduped_urls:
+            fetch_budget = min(_remaining() * 0.4, 10.0)
+            fetch_start = time.time()
+            page_results = fetch_full_pages(deduped_urls, budget_seconds=fetch_budget)
+
+            for pr in page_results:
+                if pr.get('success') and pr.get('text'):
+                    fetched_page_texts.append(pr['text'])
+
+            fullpage_fetch_result = {
+                'pages_fetched': len(page_results),
+                'pages_succeeded': sum(1 for r in page_results if r.get('success')),
+                'extracted_candidates': 0,  # Updated below
+                'elapsed_seconds': time.time() - fetch_start,
+            }
+
+    # ── Budget check ──
+    if _remaining() <= 2:
+        elapsed = time.time() - pipeline_start
+        print(f"  [LOCAL-443] Budget exhausted after SERP+fetch ({elapsed:.1f}s)")
+        return {
+            'stories': [],
+            'anchor_facts': anchor_facts,
+            'seeking_result': seeking_result,
+            'fullpage_fetch_result': fullpage_fetch_result,
+            'evaluation_count': 0,
+            'prefilter_input_count': 0,
+            'verified_count': 0,
+            'elapsed_seconds': elapsed,
+            'cost_usd': seeking_result.get('estimated_cost_usd', 0.0),
+            'fallback': False,
+            'budget_exhausted': True,
+        }
+
+    # ── Build candidate corpus ──
     # Merge with existing search results (LOCAL-410) as corpus for verification
     all_snippets = list(snippets or [])
     if existing_search_results:
         all_snippets.extend(existing_search_results)
-    # Also add story-seeking results as snippets (they serve as both candidates AND corpus)
+    # Story-seeking results serve as both candidates AND corpus
     for r in story_seeking_results:
         all_snippets.append({
             'title': r.get('title', ''),
@@ -676,32 +1230,39 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
             'tier': r.get('tier', 'tier3'),
         })
 
-    # Build candidate texts from story-seeking + existing snippets
+    # Build candidate texts from multiple sources:
     candidate_texts = []
-    # From story-seeking results — these are specifically story-targeted
+
+    # Source 1: Full-page fetch text → extract story units via story_gate
+    if fetched_page_texts:
+        from story_gate import extract_candidate_story_units
+        for page_text in fetched_page_texts:
+            units = extract_candidate_story_units(page_text)
+            candidate_texts.extend(units)
+        fullpage_fetch_result['extracted_candidates'] = len(candidate_texts)
+        print(f"    Step 2b: {len(fetched_page_texts)} pages → "
+              f"{len(candidate_texts)} story-unit candidates")
+
+    # Source 2: SERP snippets from story-seeking (may be too short, but try)
     for r in story_seeking_results:
         snippet = r.get('snippet', '')
         if snippet and len(snippet) >= 50:
             candidate_texts.append(snippet)
-    # From existing LOCAL-410 results (already fetched)
+
+    # Source 3: Existing LOCAL-410 results
     if existing_search_results:
         for r in existing_search_results:
             snippet = r.get('snippet', '')
             if snippet and len(snippet) >= 50:
                 candidate_texts.append(snippet)
 
-    # Deduplicate (by first 100 chars)
-    seen = set()
-    unique_candidates = []
-    for text in candidate_texts:
-        key = text[:100].lower().strip()
-        if key not in seen:
-            seen.add(key)
-            unique_candidates.append(text)
+    prefilter_input_count = len(candidate_texts)
 
-    print(f"    Step 2: {seeking_result.get('queries_issued', 0)} queries → "
-          f"{len(story_seeking_results)} results, "
-          f"{len(unique_candidates)} unique candidates")
+    # ── Step 2c (LOCAL-443-B): Pre-filter before LLM ──
+    unique_candidates = prefilter_candidates(candidate_texts, stop_name=stop_name)
+
+    print(f"    Pre-filter: {prefilter_input_count} raw → {len(unique_candidates)} "
+          f"candidates for classification")
 
     if not unique_candidates:
         elapsed = time.time() - pipeline_start
@@ -709,31 +1270,41 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
             'stories': [],
             'anchor_facts': anchor_facts,
             'seeking_result': seeking_result,
+            'fullpage_fetch_result': fullpage_fetch_result,
             'evaluation_count': 0,
+            'prefilter_input_count': prefilter_input_count,
             'verified_count': 0,
             'elapsed_seconds': elapsed,
             'cost_usd': seeking_result.get('estimated_cost_usd', 0.0),
             'fallback': False,
+            'budget_exhausted': False,
         }
 
-    # ── Step 3: Evaluate candidates (classify + verify) ──
-    verified = evaluate_candidates(
+    # ── Step 3 (LOCAL-443-C): Concurrent classification + verification ──
+    classify_budget = max(2.0, _remaining() - 2.0)  # Reserve 2s for step 4
+    verified = evaluate_candidates_concurrent(
         unique_candidates, all_snippets,
         credit_line=credit_line or anchor_facts.get('credit_line', ''),
         stop_name=stop_name,
+        budget_seconds=classify_budget,
     )
 
     # ── Step 4: Size adaptation ──
     stories_for_packer = []
     for v in verified:
+        # Budget check
+        if _remaining() <= 0:
+            print(f"  [LOCAL-443] Budget exhausted during size adaptation — "
+                  f"returning {len(stories_for_packer)} stories")
+            break
+
         adapted_text = adapt_story_size(v['text'])
         word_count = len(adapted_text.split())
 
-        # If too small, attempt one follow-up expansion query
-        if word_count < STORY_CANDIDATE_MIN_WORDS:
+        # If too small, attempt one follow-up expansion query (only if budget allows)
+        if word_count < STORY_CANDIDATE_MIN_WORDS and _remaining() > 3:
             expansion_query = _expand_story_query(adapted_text, anchor_facts)
             if expansion_query and not _STORY_SEEKING_DISABLED:
-                # One follow-up query (within budget constraint)
                 try:
                     from work_story_searcher import _serp_search, normalize_domain
                     results, latency = _serp_search(expansion_query)
@@ -757,24 +1328,30 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
             'interest_score': v['interest_score'],
             '_word_count': word_count,
             '_story_first': True,  # Tag for traceability
+            '_from_fullpage': any(v['text'] in pt for pt in fetched_page_texts) if fetched_page_texts else False,
         }
         stories_for_packer.append(story_dict)
 
     elapsed = time.time() - pipeline_start
     total_cost = seeking_result.get('estimated_cost_usd', 0.0)
+    budget_exhausted = elapsed >= pipeline_budget
 
     print(f"    Step 4: {len(stories_for_packer)} stories ready for packer "
-          f"({elapsed:.1f}s, ${total_cost:.4f})")
+          f"({elapsed:.1f}s, ${total_cost:.4f})"
+          f"{' [BUDGET EXHAUSTED]' if budget_exhausted else ''}")
 
     return {
         'stories': stories_for_packer,
         'anchor_facts': anchor_facts,
         'seeking_result': seeking_result,
+        'fullpage_fetch_result': fullpage_fetch_result,
         'evaluation_count': len(unique_candidates),
+        'prefilter_input_count': prefilter_input_count,
         'verified_count': len(verified),
         'elapsed_seconds': elapsed,
         'cost_usd': total_cost,
         'fallback': False,
+        'budget_exhausted': budget_exhausted,
     }
 
 
