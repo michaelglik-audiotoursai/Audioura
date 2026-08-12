@@ -344,14 +344,20 @@ class TranslationService:
             
             # Create new tour record
             _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
+            # Track B: this deployment's own track (each of Beta/Storied is a
+            # separate service instance, so a translation always belongs to
+            # whichever track produced it — see tour_orchestrator_service.py).
+            _track = os.getenv('TOUR_TRACK', 'beta').lower()
+            if _track not in ('beta', 'storied'):
+                _track = 'beta'
             cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
-                                       lat, lng, content_language, original_tour_id, tour_content, stops_count)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                       lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
                 translated_name, translated_request, translated_zip_data, original_tour[4],
                 original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content,
-                _original_stops_count
+                _original_stops_count, _track
             ))
             
             new_tour_id = cursor.fetchone()[0]
@@ -1708,14 +1714,17 @@ Say 'What are my options' to hear this help again"""
         try:
             cursor = conn.cursor()
             _fallback_stops_count = original_tour[10] if len(original_tour) > 10 else None
+            _track = os.getenv('TOUR_TRACK', 'beta').lower()
+            if _track not in ('beta', 'storied'):
+                _track = 'beta'
             cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
-                                       lat, lng, content_language, original_tour_id, stops_count)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                       lat, lng, content_language, original_tour_id, stops_count, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
                 translated_name, translated_request, translated_zip_data, original_tour[4],
                 original_tour[5], original_tour[6], target_language, original_tour[0],
-                _fallback_stops_count
+                _fallback_stops_count, _track
             ))
             
             new_tour_id = cursor.fetchone()[0]
