@@ -14536,3 +14536,30 @@ task.**
   `informational — does not block delivery`.
 
 **Cost:** 3 gpt-4o story calls, $0.0791 (vs $0.188 on the pinned run, which retried).
+
+## D374 — `git stash pop` with no stash of your own pops somebody else's
+
+**2026-08-11, 23:4x.** Merging LOCAL-426, LEAD ran
+`git stash push -q -- <three artifact paths>` to clear the way, then `git stash pop`
+after the merge. **The push created nothing** (those paths were not modified at that
+moment), so `pop` took `stash@{0}` — a nine-month-old WIP from
+`kiro/local52-prepush-audit` — and applied it into the working tree, conflicting on
+`db_step2_retrieved_bytes.txt`.
+
+Caught because `pop` printed *"The stash entry is kept in case you need it again"*,
+which only happens on conflict. Recovered with `git checkout HEAD --` on the two
+affected files. **The old stash was NOT dropped** — it is parked work belonging to
+another task and dropping it is not LEAD's call.
+
+**Rules from this, binding on LEAD:**
+- **Never pair a bare `git stash pop` with a conditional `push`.** Capture the
+  result: `git stash push ... && STASHED=1`, and only pop if `STASHED`. Better still,
+  use `git stash create`/`git stash store` and pop **by ref**, never by position.
+- `stash@{0}` is a position, not an identity. This repo carries long-lived parked
+  stashes, so position-based stash commands are unsafe here by default.
+- The `-q` flag hid the "No local changes to save" message that would have made this
+  obvious. **Do not use `-q` on a stash push whose success you are about to rely on.**
+
+Nothing was lost, and the merge itself was unaffected. Recording it because the same
+shape — a cleanup step that silently no-ops, followed by an undo that acts on
+unrelated state — is exactly how the tour-29 deletion is believed to have happened.
