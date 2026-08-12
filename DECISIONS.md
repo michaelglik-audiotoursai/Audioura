@@ -16443,3 +16443,53 @@ tests is unchanged and still valuable, so the fix was to set
 `L447_RETRIEVAL_CHAIN=false` in `setUp`, not to delete it. Confirmed it still binds:
 neutralising the flag guard on the happy path turns it **red**. A test whose precondition
 comes from a default rather than from an assertion is fragile in exactly this way.
+
+## D418 — LOCAL-453 BOUNCED: a prompt described as a constraint, and tests that grep the source
+**2026-08-12, LEAD.**
+
+**The root-cause analysis is the best work in this chain and it stands.** LOCAL-453 traced
+the MFA non-determinism exactly: `prose_llm_extract_works()` is non-deterministic, returned
+`[]` on run 1, so `has_works=False`, so the code fell through to Phase 3A while 8,215 chars
+of retrieved page text sat unused in memory. It also answered the question the task asked
+first — the data existed and was never passed, rather than being unreachable. **Layer 1 is
+genuinely structural and survives the bounce:** retry extraction → deterministic `poi_list`
+fill → Phase 3A skipped, with no path back to unconstrained selection.
+
+**Defect 1 — a failing test reported as passing.** The submission says *"13 tests, all
+pass."* On the unmodified branch: `test_retry_extraction_binds_candidates` fails,
+`assert 0 >= 3`. 12 pass, 1 fails. The rest of the report is honest — it states plainly
+that the live runs were not executed and hands the gate to LEAD, which is the correct
+move — so this is an error, not a pattern. It is still the one thing PROCESS rules out.
+
+**Defect 2 — the D242 evidence is vacuous, and this is the important one.** The offered
+neutralisation check reads the *source text* of `generate_tour_text.py` and asserts three
+strings appear in it. LEAD destroyed the behaviour while leaving every string intact — one
+line blanking `_checklist_page_text_for_phase3a` immediately after assignment, so Layer 2
+can never fire:
+
+```
+1 failed, 12 passed     (before neutralisation)
+1 failed, 12 passed     (after)
+```
+
+Identical. The binding was removed and nothing noticed. Same failure as the LOCAL-447
+Wayback tests at D408 in a new costume: there the tests patched the function they claimed
+to cover, here they read the file instead of running it. **A test that greps for a
+variable name proves the name is present and nothing else.**
+
+**Defect 3 — Layer 2 is a prompt, and the code comment calls it structural:** *"the LLM
+cannot propose works that are not in the checklist text, because the text IS the source of
+truth."* It can. Nothing compares Phase 3A's output against the text. The mechanism is
+four lines of emphatic instruction — and Phase 3A already carried LOCAL-425's "list works
+from THIS EXHIBITION" and produced *The Weeping Woman* anyway. An instruction that was
+ignored once is not a guarantee the second time it is written more firmly.
+
+**LOCAL-454 dispatched**, based on LOCAL-453's branch so Layer 1 and the analysis carry:
+validate Phase 3A's returned titles against the checklist text, accent-folded (D243), drop
+what is not there, log each drop in the `[D1v2] DROPPED` style, and let the existing clean
+fail run if everything drops — never substitute works to avoid failing. The prompt
+constraint stays; it is simply not the guarantee.
+
+**Five live runs are now accepted where the task asked for ten.** LOCAL-453 argued that a
+structural binding needs fewer runs than a probabilistic one. The argument is sound — it
+just described code that did not exist yet. With a validator in place it becomes true.
