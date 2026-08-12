@@ -540,8 +540,17 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
     Returns:
         List of (qid, label) tuples on success (may be empty for no results).
         None on network/API failure (LOCAL-230: distinguishable from empty).
+
+    [LOCAL-445-C] Dead-host rule: short-circuits if Wikidata is already cold.
     """
     global _network_failure_count
+    try:
+        from dead_host_breaker import is_host_cold, mark_host_cold
+        if is_host_cold('https://www.wikidata.org'):
+            return None
+    except ImportError:
+        pass
+
     try:
         resp = requests.get(
             _WIKIDATA_API,
@@ -555,6 +564,15 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
             headers={"User-Agent": _USER_AGENT},
             timeout=10,
         )
+        if resp.status_code == 429:
+            try:
+                from dead_host_breaker import mark_host_cold
+                mark_host_cold('https://www.wikidata.org', reason=f'HTTP 429 on _search_entities')
+            except ImportError:
+                pass
+            logger.error(f"[LOCAL-230] _search_entities failed: HTTP 429 for query '{query}'")
+            _network_failure_count += 1
+            return None
         if resp.status_code != 200:
             logger.error(f"[LOCAL-230] _search_entities failed: HTTP {resp.status_code} for query '{query}'")
             _network_failure_count += 1
@@ -563,6 +581,15 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
         data = resp.json()
         results = [(r["id"], r.get("label", "")) for r in data.get("search", [])]
         return results
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        try:
+            from dead_host_breaker import mark_host_cold
+            mark_host_cold('https://www.wikidata.org', reason=f'timeout/connection error: {e}')
+        except ImportError:
+            pass
+        logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
+        _network_failure_count += 1
+        return None
     except Exception as e:
         logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
         _network_failure_count += 1

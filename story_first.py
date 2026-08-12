@@ -62,6 +62,20 @@ STORY_TARGET_WORDS = 120  # Target size after adaptation (~3 sentences)
 # LOCAL-443: Pipeline budget discipline (D395)
 PIPELINE_WALL_BUDGET_SECONDS = 25.0  # Hard per-stop wall budget for WHOLE pipeline
 
+# LOCAL-445: Tour-level budget for across-stop parallelism
+# The controlling limit: story-first adds ≤ this many seconds to the tour.
+# Per-stop budget (PIPELINE_WALL_BUDGET_SECONDS) remains as inner guard so one
+# pathological stop cannot eat the batch.
+STORY_FIRST_TOUR_BUDGET_SECONDS = float(
+    os.environ.get('STORY_FIRST_TOUR_BUDGET_SECONDS', '40.0')
+)
+# Pool size for across-stop parallelism (all stops run concurrently)
+STORY_FIRST_TOUR_POOL_SIZE = int(
+    os.environ.get('STORY_FIRST_TOUR_POOL_SIZE', '6')
+)
+# Neutralisation flag for across-stop parallelism (D242 #1)
+_ACROSS_STOP_SERIAL = False
+
 # LOCAL-443: Full-page fetch configuration
 FULLPAGE_FETCH_MAX_PAGES = 3  # Max pages to fetch per stop (tier1/tier2 only)
 FULLPAGE_FETCH_TIMEOUT = 10  # Per-page HTTP timeout (seconds)
@@ -133,6 +147,23 @@ def enable_fullpage_fetch():
 def is_fullpage_fetch_enabled() -> bool:
     """Return whether full-page fetch is active."""
     return not _FULLPAGE_FETCH_DISABLED
+
+
+def serialise_across_stops():
+    """[LOCAL-445] Force serial execution of across-stop loop (D242 #1 neutralisation)."""
+    global _ACROSS_STOP_SERIAL
+    _ACROSS_STOP_SERIAL = True
+
+
+def parallelise_across_stops():
+    """[LOCAL-445] Restore parallel execution of across-stop loop (default)."""
+    global _ACROSS_STOP_SERIAL
+    _ACROSS_STOP_SERIAL = False
+
+
+def is_across_stop_parallel() -> bool:
+    """Return whether across-stop parallelism is active."""
+    return not _ACROSS_STOP_SERIAL
 
 
 def get_pipeline_cost() -> dict:
@@ -722,19 +753,31 @@ def prefilter_candidates(candidates: List[str], stop_name: str = '') -> List[str
 # Lock for thread-safe access to story_gate._verdict_cache
 _verdict_cache_lock = threading.Lock()
 
+# [LOCAL-445] Per-key in-flight map: prevents duplicate LLM calls for the same
+# candidate text when multiple threads race on the same key. Under across-stop
+# concurrency, duplicate candidates across stops are common.
+_inflight_events: Dict[str, threading.Event] = {}
+_inflight_results: Dict[str, Optional[Dict]] = {}
+
 
 def _classify_single_candidate(candidate_text: str, idx: int) -> Optional[Dict]:
     """Classify a single candidate (thread-safe wrapper for story_gate).
 
     Returns the classification dict if it passes, None otherwise.
+
+    Thread safety: uses a per-key in-flight map so that when multiple threads
+    race on the same candidate text, only one calls the LLM and the rest wait
+    on its result. This prevents redundant paid gpt-4o-mini calls for duplicate
+    candidates across stops (LOCAL-445-A).
     """
     from story_gate import classify_story_unit, score_story_interest, _verdict_cache, _cache_key
 
     if not candidate_text or len(candidate_text.strip()) < 50:
         return None
 
-    # Thread-safe cache check
     key = _cache_key(candidate_text)
+
+    # Fast path: already cached (no lock contention for reads under GIL)
     with _verdict_cache_lock:
         if key in _verdict_cache:
             cached = _verdict_cache[key].copy()
@@ -744,13 +787,48 @@ def _classify_single_candidate(candidate_text: str, idx: int) -> Optional[Dict]:
                 return None
             return cached
 
-    # Not cached — call the LLM (this is the expensive part)
-    classification = classify_story_unit(candidate_text)
+        # Check if another thread is already classifying this key
+        if key in _inflight_events:
+            event = _inflight_events[key]
+        else:
+            # We are the first — register our in-flight event
+            event = threading.Event()
+            _inflight_events[key] = event
+            event = None  # Signal: we are the caller
 
-    # The classify_story_unit function handles its own caching internally,
-    # but we hold the lock for the read above to prevent redundant calls.
+    if event is not None:
+        # Another thread is classifying this key — wait for it
+        event.wait(timeout=30.0)
+        # Result should now be in cache or _inflight_results
+        with _verdict_cache_lock:
+            if key in _verdict_cache:
+                cached = _verdict_cache[key].copy()
+                cached['from_cache'] = True
+                cached['cost_usd'] = 0.0
+                if not cached.get('is_story', False):
+                    return None
+                return cached
+        # Fallback: event fired but no cache entry (error in caller)
+        return _inflight_results.get(key)
 
-    if not classification.get('is_story', False):
+    # We are the caller — do the LLM call
+    classification = None
+    try:
+        classification = classify_story_unit(candidate_text)
+        # Store result for waiters (in case classify_story_unit's internal cache
+        # isn't visible to them due to mocking or timing)
+        if classification and classification.get('is_story', False):
+            _inflight_results[key] = classification
+        else:
+            _inflight_results[key] = None
+    finally:
+        # Signal waiters regardless of success/failure
+        with _verdict_cache_lock:
+            evt = _inflight_events.pop(key, None)
+        if evt is not None:
+            evt.set()
+
+    if not classification or not classification.get('is_story', False):
         return None
 
     return classification
@@ -849,10 +927,10 @@ def evaluate_candidates_concurrent(candidates: List[str], snippets: List[Dict],
     Same semantics as evaluate_candidates but uses a thread pool for classification
     and respects a wall-budget. On budget exhaustion, returns what's verified so far.
 
-    Thread safety: story_gate._verdict_cache is a plain dict. We use
-    _verdict_cache_lock around cache reads to prevent redundant LLM calls,
-    but dict assignment is atomic in CPython (GIL). The lock prevents double-
-    classification of the same text when multiple threads race on the same candidate.
+    Thread safety: story_gate._verdict_cache is a plain dict. LOCAL-445 added a
+    per-key in-flight map (_inflight_events) so that when multiple threads race
+    on the same candidate text, only one calls the LLM and the rest wait. This
+    prevents redundant paid gpt-4o-mini calls for duplicate candidates across stops.
 
     Args:
         candidates: pre-filtered candidate texts
@@ -1380,3 +1458,169 @@ def _extract_people(text: str) -> List[str]:
     """Extract proper names from text for the packer's specificity scoring."""
     names = re.findall(r'\b[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)+\b', text)
     return list(set(names))[:5]
+
+
+# ---------------------------------------------------------------------------
+# LOCAL-445-A: Across-stop parallelism — batch pipeline
+# ---------------------------------------------------------------------------
+
+def story_first_pipeline_batch(
+    stops: List[Dict],
+    tour_budget_seconds: float = None,
+) -> Dict[str, Dict]:
+    """Run story_first_pipeline for ALL stops concurrently within a tour-level budget.
+
+    Replaces the serial loop in generate_tour_text.py. The per-stop budget
+    (PIPELINE_WALL_BUDGET_SECONDS) remains as an inner guard so one pathological
+    stop cannot eat the batch.
+
+    When _ACROSS_STOP_SERIAL is True (neutralisation for D242 #1 proof), runs
+    the loop serially — a timing test that passes in parallel must fail in serial.
+
+    Args:
+        stops: list of dicts, each with keys:
+            - stop_data: dict for story_first_pipeline
+            - snippets: list of snippet dicts
+            - credit_line: str
+            - existing_search_results: list of dicts
+            - name: str (stop name for result keying)
+        tour_budget_seconds: wall budget for the entire batch (default: STORY_FIRST_TOUR_BUDGET_SECONDS)
+
+    Returns:
+        dict mapping stop_name → pipeline result dict (same shape as story_first_pipeline output)
+    """
+    if tour_budget_seconds is None:
+        tour_budget_seconds = STORY_FIRST_TOUR_BUDGET_SECONDS
+
+    if not stops:
+        return {}
+
+    n_stops = len(stops)
+    results: Dict[str, Dict] = {}
+    batch_start = time.time()
+
+    print(f"\n  [LOCAL-445] Across-stop parallelism: {n_stops} stops, "
+          f"budget={tour_budget_seconds}s, "
+          f"mode={'SERIAL' if _ACROSS_STOP_SERIAL else f'PARALLEL(pool={STORY_FIRST_TOUR_POOL_SIZE})'}")
+
+    def _run_single(stop_entry: Dict) -> Tuple[str, Dict]:
+        """Run pipeline for a single stop (callable from thread pool)."""
+        name = stop_entry['name']
+        # Check tour-level budget before starting
+        elapsed = time.time() - batch_start
+        if elapsed >= tour_budget_seconds:
+            return name, {
+                'stories': [],
+                'anchor_facts': {},
+                'seeking_result': {},
+                'fullpage_fetch_result': {},
+                'evaluation_count': 0,
+                'prefilter_input_count': 0,
+                'verified_count': 0,
+                'elapsed_seconds': 0.0,
+                'cost_usd': 0.0,
+                'fallback': False,
+                'budget_exhausted': True,
+            }
+
+        result = story_first_pipeline(
+            stop_entry['stop_data'],
+            fact_sheet='',
+            snippets=stop_entry.get('snippets', []),
+            credit_line=stop_entry.get('credit_line', ''),
+            existing_search_results=stop_entry.get('existing_search_results', []),
+        )
+        return name, result
+
+    if _ACROSS_STOP_SERIAL:
+        # Neutralised: serial execution (for D242 #1 timing proof)
+        for stop_entry in stops:
+            elapsed = time.time() - batch_start
+            if elapsed >= tour_budget_seconds:
+                name = stop_entry['name']
+                results[name] = {
+                    'stories': [],
+                    'anchor_facts': {},
+                    'seeking_result': {},
+                    'fullpage_fetch_result': {},
+                    'evaluation_count': 0,
+                    'prefilter_input_count': 0,
+                    'verified_count': 0,
+                    'elapsed_seconds': 0.0,
+                    'cost_usd': 0.0,
+                    'fallback': False,
+                    'budget_exhausted': True,
+                }
+                print(f"    [LOCAL-445] Tour budget exhausted — skipping '{name[:40]}'")
+                continue
+            name, result = _run_single(stop_entry)
+            results[name] = result
+    else:
+        # Parallel: thread pool with tour-level budget as the controlling limit
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=STORY_FIRST_TOUR_POOL_SIZE
+        )
+        try:
+            future_to_name = {
+                executor.submit(_run_single, stop_entry): stop_entry['name']
+                for stop_entry in stops
+            }
+
+            remaining = tour_budget_seconds - (time.time() - batch_start)
+            done, not_done = concurrent.futures.wait(
+                future_to_name.keys(),
+                timeout=max(0, remaining),
+                return_when=concurrent.futures.ALL_COMPLETED,
+            )
+
+            for future in done:
+                name = future_to_name[future]
+                try:
+                    _, result = future.result(timeout=0)
+                    results[name] = result
+                except Exception as e:
+                    print(f"    [LOCAL-445] Stop '{name[:40]}' error: {e}")
+                    results[name] = {
+                        'stories': [],
+                        'anchor_facts': {},
+                        'seeking_result': {},
+                        'fullpage_fetch_result': {},
+                        'evaluation_count': 0,
+                        'prefilter_input_count': 0,
+                        'verified_count': 0,
+                        'elapsed_seconds': 0.0,
+                        'cost_usd': 0.0,
+                        'fallback': True,
+                        'budget_exhausted': False,
+                    }
+
+            # Budget-expired futures
+            for future in not_done:
+                name = future_to_name[future]
+                future.cancel()
+                results[name] = {
+                    'stories': [],
+                    'anchor_facts': {},
+                    'seeking_result': {},
+                    'fullpage_fetch_result': {},
+                    'evaluation_count': 0,
+                    'prefilter_input_count': 0,
+                    'verified_count': 0,
+                    'elapsed_seconds': 0.0,
+                    'cost_usd': 0.0,
+                    'fallback': False,
+                    'budget_exhausted': True,
+                }
+                print(f"    [LOCAL-445] Tour budget expired — stop '{name[:40]}' cancelled")
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+    batch_elapsed = time.time() - batch_start
+    total_cost = sum(r.get('cost_usd', 0.0) for r in results.values())
+    total_stories = sum(len(r.get('stories', [])) for r in results.values())
+
+    print(f"\n  [LOCAL-445] Batch complete: {n_stops} stops in {batch_elapsed:.1f}s "
+          f"(budget={tour_budget_seconds}s), "
+          f"stories={total_stories}, cost=${total_cost:.4f}")
+
+    return results
