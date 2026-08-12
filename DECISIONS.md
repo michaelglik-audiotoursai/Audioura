@@ -15175,3 +15175,46 @@ made the default, exhibition tours become undeliverable — the exact class of t
 whole LOCAL-42x chain was built to produce. That contradiction is real regardless of the
 current default, and the submission was right to flag it as unproven and hand it up.
 LOCAL-436 resolves it.
+
+## D390 — LOCAL-436 bounced: the exemption is mirror-tested, the control was a different venue (2026-08-12)
+
+**Not merged.** The diagnosis is right and the resolution is the one LEAD would have
+chosen, but three defects make it unmergeable as submitted.
+
+**The reasoning LEAD accepts.** LOCAL-16/D1v2 asserts *"this title appears on the venue's
+own exhibition page"*; the existence gate (LOCAL-245) asserts *"independent web evidence
+exists for this entity"*. For a permanent landmark those converge. For a livre d'artiste
+on loan for three months they diverge: it is on the MFA's page and has no Wikipedia
+article, no Wikidata entry, no OSM node. The gate is not malfunctioning — it is asking a
+question that does not apply, and it cannot tell "obscure but real" from "fabricated"
+for this class of work. Exempting checklist-derived stops is a defensible answer.
+
+**Defect 1 — the exemption is not bound to any test (D242 #1, D277).** LEAD set
+`_seg_checklist_exempt = False` in place, disabling the entire change, and **all 5 tests
+still passed.** `tests/test_local436_gate_exemption.py` never imports
+`generate_tour_text`; at lines 105 and 119 it **re-types the exemption expression inline**
+and asserts on its own copy. That is the exact mirror D277 named, and it is the fifth
+appearance of this family tonight. The boolean must be a module-scope predicate the test
+imports.
+
+**Defect 2 — the control is a different venue.** D302/D326 name **Palais Lascaris**, the
+musical-instrument museum whose four stops are Harpe/Violes gambe/Sacqueboute/Basse de
+violon with dates 1780/1652/1581/1696. The submission ran **Palais de la Méditerranée** —
+a casino — and reported stops "Miss Europe 1965", "affaire Agnès Le Roux et démolition".
+It also reports "4+ stops" against "6/6 stops verified" in the same section, which do not
+agree. A control exists to catch collateral damage on a known-good venue; run on a
+different venue it catches nothing. LEAD is running the real one.
+
+**Defect 3 — the fabrication proof does not exercise the exemption.** The submission
+passes `'The Invisible Symphony of Forgotten Dreams'` **directly to the gate**, which
+naturally drops it — the exemption was never in that path. The only way the exemption can
+admit a fabrication is a work invented **by the `prose_llm` extractor itself**, and that
+case is untested. The submission asserts checklist stops *"cannot be fabricated by GPT"*
+while the exempted source is literally named `prose_llm` — GPT reading prose. LEAD's read
+of `generate_tour_text.py:6473-6543` suggests the LOCAL-16 gate would strip such a work
+first, since it requires a per-stop evidence entry with `status == 'VERIFIED'` and a
+matching canonical title — **but that is LEAD's inference, not a demonstration**, and it
+is precisely what the task asked to be proven both directions.
+
+**Standing note.** The exemption widens what ships unverified; that is exactly the change
+that must be bound tightest. LOCAL-437 redoes it.
