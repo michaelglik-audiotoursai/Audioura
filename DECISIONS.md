@@ -14662,3 +14662,28 @@ the wall-clock.
 zero-byte log after 15+ minutes, which is what made the run look stuck in the first
 place. Run it as `python3 -u run_tests.py > <log> 2>&1 &` and read the log for
 progress, rather than waiting on a pipe that reveals nothing until the end.
+
+## D378 — post-427 suite is 207/243; the one new failure is a live-network flake (2026-08-12)
+
+`python3 -u run_tests.py` on `dec229d`: **207 passed / 36 failed of 243**. Compared
+name-by-name against D375's baseline run (203/235 of 238, `53d7721`) rather than by
+count, because the denominators are not comparable.
+
+- **Exactly one name fails now that passed then: `tests/run_local293_verification.py`.**
+  Zero names went the other way.
+- It **passes 3/3 standalone** (`exit=0`), and it contains **zero references** to
+  `exhibition_checklist`, `_fetch_page`, `check_part4`, or `generate_tour_text` — none
+  of the modules LOCAL-427 or D376 touched. It queries Wikidata SPARQL and Wikipedia
+  live, failed once at 23.1s against a 60s timeout, and has recovered. **Flake, not
+  regression.** No task raised.
+- The denominator moved 238 → 243 for a boring reason, now confirmed rather than
+  assumed: five test files ran that the baseline never saw
+  (`test_local425_exhibition_discovery`, `test_local427_fetch_backoff`,
+  `tests/test_local424_call_site_binding`, `tests/test_local424_claim_extraction`,
+  `tests/test_local426_third_party_provenance`) plus one rename,
+  `tests/run_local183_stop_corpus_wiring.py` → `tests/run_local183_evidence.py`.
+
+**Method note worth keeping:** compare failure *names*, never failure *counts*. Two
+runs of this suite can differ in denominator through added files and renames alone,
+and a count comparison would have read "+1 failure" as a regression while hiding that
+nothing previously green had broken.
