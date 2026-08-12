@@ -66,22 +66,84 @@ _YEAR_CLAIM_RE = re.compile(
     r'\b(1[0-9]{3}|20[0-2][0-9])\b'
 )
 
-# Person + predicate claims: "Boris Fridman, a Boston-based collector"
+# Person + predicate claims: "Boris Fridman, a dedicated collector of artist books"
+# Matches: ProperName + comma + article + descriptor containing a ROLE NOUN anywhere.
 _PERSON_DESCRIPTOR_RE = re.compile(
     r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)+)'  # multi-word proper noun
     r',?\s+'
     r'(?:a\s+|an\s+|the\s+)?'
-    r'([A-Za-zà-ÿ\-]+(?:\s+[A-Za-zà-ÿ\-]+){0,5}?)'  # descriptor
-    r'(?:\s+(?:who|that|from|based|collector|publisher|printer|patron|donor|artist))',
+    r'((?:[A-Za-zà-ÿ\-]+\s+){0,6}?'  # up to 6 words before the role noun
+    r'(?:collector|publisher|printer|patron|donor|artist|architect|sculptor'
+    r'|designer|engraver|composer|dealer|curator|founder|director'
+    r'|printmaker|lithographer|poet|writer|painter|illustrator)'
+    r'(?:\s+[A-Za-zà-ÿ\-]+){0,5})',  # up to 5 words after (e.g. "of artist books")
     re.MULTILINE
 )
 
-# Attribution claims: "donated this work to X in YEAR"
+# Attribution claims: "donated this work to X", "generously donated..."
 _DONATION_CLAIM_RE = re.compile(
-    r'(?:donated|gave|gifted|bequeathed)\s+(?:this\s+(?:work|piece|edition|portfolio|print)\s+)?'
-    r'(?:to\s+(?:the\s+)?(\w[\w\s]{2,40}?))?'
-    r'(?:\s+in\s+(\d{4}))?',
-    re.IGNORECASE
+    r'(?:\w+\s+)?'  # optional adverb like "generously"
+    r'(?:donated|gave|gifted|bequeathed)\s+'
+    r'(?:this\s+(?:work|piece|edition|portfolio|print|book|volume)\s+)?'
+    r'(?:to\s+(?:the\s+)?(.{2,60}?))?'  # recipient (greedy-ish, up to 60 chars)
+    r'(?:\.\s*$|\s+in\s+(\d{4})|(?=\s*[,.]))',  # end at period, year, or comma
+    re.IGNORECASE | re.MULTILINE
+)
+
+# Commission/print attribution: "X commissioned Y", "printed by X"
+_ATTRIBUTION_CLAIM_RE = re.compile(
+    r'(?:'
+    # Pattern 1: Subject + verb + object — "Louis Broder commissioned Miro"
+    # Also handles appositive: "Louis Broder, a publisher, commissioned Miro"
+    r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)*)'
+    r'(?:,\s*[^,]{0,80},\s*|\s+)'  # optional appositive in commas, or whitespace
+    r'(?:commissioned|published|printed|produced|created|engraved|'
+    r'funded|sponsored|patronized|acquired|assembled)\s+'
+    r'(.{2,60}?)'
+    r'|'
+    # Pattern 2: "printed/published by X" — passive attribution
+    r'(?:printed|published|produced|created|engraved|commissioned|lithographed)\s+'
+    r'(?:by\s+(?:the\s+)?(?:renowned\s+|famous\s+|celebrated\s+)?)'
+    r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)*)'
+    r')'
+    r'(?:\s|[,.]|$)',
+    re.MULTILINE
+)
+
+# Institutional claims: "enhances the museum's collection of X",
+# "home to the largest collection of Y", "houses N works"
+_INSTITUTIONAL_CLAIM_RE = re.compile(
+    r'(?:'
+    # Pattern 1: verb + possessive + "collection/holdings" + qualifier
+    r'(?:enhances?|enriches?|complements?|augments?|adds?\s+to)\s+'
+    r"(?:the\s+)?(?:\w+'s\s+)?"
+    r'(?:extensive\s+|permanent\s+|renowned\s+|significant\s+|important\s+)?'
+    r'(?:collection|holdings|archive|repository)\s+'
+    r'(?:of\s+(.{2,60}?))'
+    r'|'
+    # Pattern 2: "one of the [largest|finest|most important] collections of X"
+    r'(?:one\s+of\s+the\s+)?'
+    r'(?:largest|finest|most\s+\w+|premier|leading)\s+'
+    r'(?:collection|holdings|archive|repository)\s+'
+    r'(?:of\s+(.{2,60}?))'
+    r'|'
+    # Pattern 3: "known for its/the collection of X"
+    r'(?:known|renowned|famous|celebrated)\s+for\s+'
+    r'(?:its|the|their)\s+'
+    r'(?:collection|holdings)\s+'
+    r'(?:of\s+(.{2,60}?))'
+    r')'
+    r'(?:\.|,|\s*$)',
+    re.IGNORECASE | re.MULTILINE
+)
+
+# "Known for" descriptor applied to proper nouns: "renowned Mourlot Freres",
+# "known for his dedication to X"
+_KNOWN_FOR_RE = re.compile(
+    r'(?:known|renowned|famous|celebrated|noted)\s+'
+    r'(?:for\s+(?:his|her|its|their)\s+)?'
+    r'(.{5,80}?)(?:\.|,|$)',
+    re.IGNORECASE | re.MULTILINE
 )
 
 # Location descriptor: "Boston-based", "New York collector"
@@ -118,73 +180,144 @@ def extract_claims(story_text: str) -> List[Claim]:
     Load-bearing = a specific assertion that could be true or false:
       - Numbers (edition sizes, lithograph counts)
       - Years/dates
-      - Person + descriptor (location, role, affiliation)
-      - Donation/gift claims with dates or recipients
+      - Person + role/descriptor ("a visionary publisher", "a dedicated collector")
+      - Attribution ("X commissioned Y", "printed by X")
+      - Donation/gift claims with recipients
+      - Institutional claims ("enhances the museum's collection of X")
     """
     claims = []
+    # Track matched text spans to avoid duplicate claims from overlapping patterns
+    _seen_spans = set()
     sentences = re.split(r'(?<=[.!?])\s+', story_text.strip())
 
+    def _add_claim(claim: Claim, span_text: str) -> None:
+        """Add a claim if we haven't already captured this exact span."""
+        norm_span = span_text.strip().lower()
+        if norm_span not in _seen_spans:
+            _seen_spans.add(norm_span)
+            claims.append(claim)
+
     for sentence in sentences:
-        # Numeric claims
+        # Numeric claims: "15 lithographs", "40 color lithographs"
         for match in _NUMERIC_CLAIM_RE.finditer(sentence):
-            claims.append(Claim(
+            _add_claim(Claim(
                 claim_type='numeric',
                 text=match.group(0),
                 value=match.group(1).replace(',', ''),
                 subject=match.group(2),
                 context=sentence,
-            ))
+            ), match.group(0))
 
-        # Edition claims
+        # Edition claims: "edition of 220", "set of 10"
         for match in _EDITION_CLAIM_RE.finditer(sentence):
-            claims.append(Claim(
+            _add_claim(Claim(
                 claim_type='numeric',
                 text=match.group(0),
                 value=match.group(1).replace(',', ''),
                 subject='edition',
                 context=sentence,
-            ))
+            ), match.group(0))
 
-        # Year claims
+        # Year claims: "in 1971", "published in 2003"
         for match in _YEAR_CLAIM_RE.finditer(sentence):
             year = match.group(1)
             # Only count as a claim if it's in a factual context
             # (not just "Miró (1893-1983)" biography)
-            surrounding = sentence[max(0, match.start()-20):match.end()+20]
             if re.search(r'(?:in|published|printed|donated|created|produced|established|founded)\s+' + year,
                         sentence, re.IGNORECASE):
-                claims.append(Claim(
+                text = f"in {year}" if f"in {year}" in sentence else year
+                _add_claim(Claim(
                     claim_type='year',
-                    text=f"in {year}" if f"in {year}" in sentence else year,
+                    text=text,
                     value=year,
                     subject='',
                     context=sentence,
-                ))
+                ), text)
 
-        # Location descriptor claims
+        # Person + role descriptor: "Louis Broder, a visionary publisher known for..."
+        for match in _PERSON_DESCRIPTOR_RE.finditer(sentence):
+            person = match.group(1)
+            descriptor = match.group(2).strip()
+            if descriptor:
+                _add_claim(Claim(
+                    claim_type='person_descriptor',
+                    text=match.group(0).strip(),
+                    value=descriptor,
+                    subject=person,
+                    context=sentence,
+                ), match.group(0))
+
+        # Attribution claims: "X commissioned Y", "printed by X"
+        for match in _ATTRIBUTION_CLAIM_RE.finditer(sentence):
+            # Group 1+2 = active voice (Subject commissioned Object)
+            # Group 3 = passive voice (printed by Subject)
+            if match.group(1) and match.group(2):
+                subject = match.group(1).strip()
+                obj = match.group(2).strip().rstrip(',.')
+                _add_claim(Claim(
+                    claim_type='attribution',
+                    text=match.group(0).strip(),
+                    value=f"{subject} → {obj}",
+                    subject=subject,
+                    context=sentence,
+                ), match.group(0))
+            elif match.group(3):
+                agent = match.group(3).strip()
+                # Extract the verb for context
+                verb_match = re.search(
+                    r'(printed|published|produced|created|engraved|commissioned|lithographed)',
+                    match.group(0), re.IGNORECASE
+                )
+                verb = verb_match.group(1) if verb_match else 'attributed'
+                _add_claim(Claim(
+                    claim_type='attribution',
+                    text=match.group(0).strip(),
+                    value=f"{verb} by {agent}",
+                    subject=agent,
+                    context=sentence,
+                ), match.group(0))
+
+        # Donation/gift claims: "generously donated this work to the Museum of Fine Arts"
+        for match in _DONATION_CLAIM_RE.finditer(sentence):
+            recipient = match.group(1)
+            year = match.group(2)
+            if recipient or year:
+                value = recipient.strip().rstrip(',.') if recipient else ''
+                if year:
+                    value = f"{value} in {year}" if value else year
+                _add_claim(Claim(
+                    claim_type='donation',
+                    text=match.group(0).strip(),
+                    value=value,
+                    subject=recipient.strip().rstrip(',.') if recipient else '',
+                    context=sentence,
+                ), match.group(0))
+
+        # Institutional claims: "enhances the museum's extensive collection of X"
+        for match in _INSTITUTIONAL_CLAIM_RE.finditer(sentence):
+            # Any of the three groups could be the collection descriptor
+            descriptor = match.group(1) or match.group(2) or match.group(3)
+            if descriptor:
+                descriptor = descriptor.strip().rstrip(',.')
+                _add_claim(Claim(
+                    claim_type='institutional',
+                    text=match.group(0).strip(),
+                    value=descriptor,
+                    subject='institution',
+                    context=sentence,
+                ), match.group(0))
+
+        # Location descriptor claims: "Boston-based", "a New York collector"
         for match in _LOCATION_DESCRIPTOR_RE.finditer(sentence):
             location = match.group(1) or match.group(2)
             if location:
-                claims.append(Claim(
+                _add_claim(Claim(
                     claim_type='location_descriptor',
                     text=match.group(0),
                     value=location,
                     subject='',
                     context=sentence,
-                ))
-
-        # Donation claims with dates
-        for match in _DONATION_CLAIM_RE.finditer(sentence):
-            recipient = match.group(1)
-            year = match.group(2)
-            if year:
-                claims.append(Claim(
-                    claim_type='donation_date',
-                    text=match.group(0),
-                    value=year,
-                    subject=recipient or '',
-                    context=sentence,
-                ))
+                ), match.group(0))
 
     return claims
 
@@ -320,7 +453,10 @@ def _snippet_supports_claim(claim: Claim, snippet_text: str) -> bool:
     For numeric claims: the exact number must appear in the snippet.
     For year claims: the year must appear in a relevant context.
     For location descriptors: the location must appear near the person.
-    For donation dates: year must appear with donation context.
+    For donation claims: recipient or year must appear with donation context.
+    For attribution claims: the subject must appear with the attributed action.
+    For person_descriptor claims: the person and a role-related word must co-occur.
+    For institutional claims: the collection/holdings descriptor must appear.
     """
     snip_lower = snippet_text.lower()
     snip_norm = _normalize(snippet_text)
@@ -352,12 +488,7 @@ def _snippet_supports_claim(claim: Claim, snippet_text: str) -> bool:
 
     elif claim.claim_type == 'location_descriptor':
         # The location must appear AS A DESCRIPTOR of a person, not just anywhere.
-        # "Boston-based collector" requires the snippet to say "Boston-based" or
-        # "[City]-based" or "a [City] collector" — not just mention the city name
-        # in any context (e.g. "Museum of Fine Arts, Boston" doesn't support
-        # "Boston-based collector").
         location_lower = _normalize(claim.value)
-        # Check for explicit descriptor patterns in snippet
         descriptor_patterns = [
             rf'{location_lower}[- ]based',
             rf'(?:a|the)\s+{location_lower}\s+(?:collector|dealer|publisher|patron|printer)',
@@ -370,10 +501,77 @@ def _snippet_supports_claim(claim: Claim, snippet_text: str) -> bool:
         return False
 
     elif claim.claim_type == 'donation_date':
-        # Year must appear AND donation/gift context must exist
+        # Legacy type — year must appear AND donation/gift context must exist
         if claim.value not in snippet_text:
             return False
         return bool(re.search(r'donat|gift|gave|bequeath', snip_lower))
+
+    elif claim.claim_type == 'donation':
+        # New broader donation type: recipient or year must appear with donation context
+        has_donation_context = bool(re.search(r'donat|gift|gave|bequeath|present', snip_lower))
+        if not has_donation_context:
+            return False
+        # If we have a recipient, it must appear in the snippet
+        if claim.subject:
+            subject_norm = _normalize(claim.subject)
+            # Allow partial match — "Museum of Fine Arts" matches "Museum of Fine Arts, Boston"
+            subject_words = subject_norm.split()
+            if len(subject_words) >= 2:
+                # Check if at least the key content words appear together
+                return subject_norm in snip_norm or all(
+                    w in snip_norm for w in subject_words if len(w) > 3
+                )
+            return subject_norm in snip_norm
+        return True  # Generic donation claim, context alone suffices
+
+    elif claim.claim_type == 'attribution':
+        # The subject (person/house) must appear in the snippet, AND
+        # the action verb or relationship must be present
+        subject_norm = _normalize(claim.subject)
+        if subject_norm not in snip_norm:
+            # Try surname only (last word of subject)
+            surname = subject_norm.split()[-1] if subject_norm.split() else ''
+            if not surname or surname not in snip_norm:
+                return False
+        # Check for the attribution verb
+        attribution_verbs = r'commission|publish|print|produc|creat|engrav|lithograph'
+        return bool(re.search(attribution_verbs, snip_lower))
+
+    elif claim.claim_type == 'person_descriptor':
+        # The person must appear AND a role-related word from the descriptor must appear
+        subject_norm = _normalize(claim.subject)
+        # Try full name or surname
+        if subject_norm not in snip_norm:
+            surname = subject_norm.split()[-1] if subject_norm.split() else ''
+            if not surname or surname not in snip_norm:
+                return False
+        # Check if the role word from the descriptor appears
+        role_words = re.findall(
+            r'collector|publisher|printer|patron|donor|artist|architect|sculptor'
+            r'|designer|engraver|composer|dealer|curator|founder|director'
+            r'|printmaker|lithographer|poet|writer|painter|illustrator',
+            claim.value.lower()
+        )
+        if role_words:
+            return any(role in snip_lower for role in role_words)
+        # Fallback: check if at least 2 content words from the descriptor appear
+        desc_words = [w for w in _normalize(claim.value).split() if len(w) > 3]
+        if desc_words:
+            matches = sum(1 for w in desc_words if w in snip_norm)
+            return matches >= min(2, len(desc_words))
+        return False
+
+    elif claim.claim_type == 'institutional':
+        # The collection descriptor must appear (or key content words from it)
+        desc_norm = _normalize(claim.value)
+        if desc_norm in snip_norm:
+            return True
+        # Partial match: key words from the descriptor
+        desc_words = [w for w in desc_norm.split() if len(w) > 3]
+        if desc_words:
+            matches = sum(1 for w in desc_words if w in snip_norm)
+            return matches >= min(2, len(desc_words))
+        return False
 
     return False
 
