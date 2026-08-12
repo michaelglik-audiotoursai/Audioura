@@ -16553,3 +16553,57 @@ silently seizes the fleet.
 **LEAD is letting LOCAL-454 finish** rather than killing it mid-acceptance — it is ~17
 minutes in and its five live runs are the entire point of the task. The canonical
 generator is restored immediately after. The structural fix goes in LOCAL-455.
+
+## D420 — Two salvages, a self-inflicted re-dispatch, and port 5000 back
+**2026-08-12, LEAD.**
+
+**LEAD caused a re-dispatch by writing ABANDONED without parking the task file.** The
+recovery protocol (CLAUDE.md) says an abandoned task is re-claimed on the next scan — it
+did exactly that, and `new_kiro_session_is_required_LOCAL-452.md` was picked up again at
+19:08:57 on the premise D419 had already corrected. Two docker-touching tasks were then
+running at once, which is what caused the original incident. **Writing ABANDONED and
+leaving the task file in the dispatcher glob are contradictory acts when a successor task
+already exists.** Stopped the rerun, parked the file as
+`PARKED_kiro_task_LOCAL-452_SUPERSEDED_by_455.md`.
+
+Killing the dispatcher was not enough: `kiro-cli-chat` pid 42946 survived in the LOCAL-452
+worktree, spending money on corrected instructions. CLAUDE.md already warns that detached
+workers survive a restart; they also survive killing their dispatcher. **`pkill -P` on the
+dispatcher pid does not reach them** — locate by `cwd` with `lsof -a -p <pid> -d cwd` and
+kill directly.
+
+**LOCAL-454 stopped at ~37 minutes and salvaged as `5ac25c6` (PARTIALLY VERIFIED).** It
+had completed **2 of 5** required live runs, 21 minutes apart, with nothing committed. At
+that pace port 5000 would have stayed wrong another hour, so LEAD stopped it rather than
+waiting as promised in D419 — the earlier estimate of "10–15 minutes more" was wrong.
+
+Its code work is real and worth keeping: post-hoc validation of Phase 3A candidates
+against the checklist text, dropping with logged reasons, handling the all-dropped case,
+plus a **D243 ligature fix** for characters NFKD does not decompose, and 18 tests. The
+evidence LEAD did capture is encouraging — both completed runs produced identical correct
+stops (*Le Lézard aux plumes d'or* / *Moses and Monotheism* / *Au Soleil du Plafond*) and
+**zero** occurrences of the three banned works. Unverified: tests unrun by LEAD, no D242
+neutralisation, 3 runs missing.
+
+**Port 5000 is restored and verified.** `local-454-tour-generator-1` removed,
+`audioura-tour-generator-1` rebuilt at HEAD and recreated:
+
+```
+docker ps --filter publish=5000   audioura-tour-generator-1
+/health code_sha                  35cb1d4
+git rev-parse --short HEAD        35cb1d4
+D417 default ON                   True
+  Musée Picasso            10285 chars  stop_corpus
+  Île Sainte-Marguerite    13500 chars  wikipedia_live
+```
+
+Note the first `up -d` alone was **not** enough — it reused the `ce61b01` image, so the
+container came back without D417. `code_sha` caught it immediately, which is the first
+time that check has paid for itself in the way D410 predicted.
+
+**LOCAL-455 un-parked, with one addition made before releasing it.** As written it would
+have rebuilt the fleet *from its own worktree* — the identical hazard it exists to fix,
+with no guard yet in place. It now carries an explicit preamble: builds and `docker run`
+without `-p` are fine from a worktree; every `docker-compose up/down/recreate` must run
+from `~/Audioura`, and if fleet-wide verification is genuinely needed, hand that step to
+LEAD. Only one docker-touching task runs at a time until the guard exists.
