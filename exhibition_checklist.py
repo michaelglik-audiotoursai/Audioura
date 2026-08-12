@@ -577,6 +577,90 @@ def _search_exhibition_works_from_web(
     return [], ''
 
 
+def _fetch_from_wayback(url: str, timeout: int = 20) -> Tuple[str, List[Tuple[str, str]]]:
+    """[LOCAL-429] Fetch a page from the Wayback Machine when the live site is
+    behind a Cloudflare challenge that no headless-free client can pass.
+
+    Uses the Wayback CDX API to find the most recent snapshot, then fetches the
+    raw archived page. Returns (text, links) in the same format as _fetch_page,
+    or ('', []) if no snapshot exists.
+    """
+    from urllib.parse import quote as _url_quote
+
+    wayback_url = f"https://web.archive.org/web/2/{url}"
+    try:
+        resp = requests.get(
+            wayback_url,
+            headers={'User-Agent': 'Audioura/2.2 ExhibitionChecker'},
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        if resp.status_code != 200:
+            print(f"  [LOCAL-429] Wayback Machine returned {resp.status_code} for {url}")
+            return '', []
+
+        html = resp.text
+        if not html or len(html) < 200:
+            print(f"  [LOCAL-429] Wayback Machine returned empty/tiny page for {url}")
+            return '', []
+
+        # The Wayback Machine response is valid — extract text and links
+        # same as _fetch_page does below
+        links = []
+        for m in re.finditer(r'<a\s+[^>]*href=["\']([^"\']{1,300})["\'][^>]*>(.*?)</a>', html, re.DOTALL):
+            href = m.group(1)
+            link_text = re.sub(r'<[^>]+>', '', m.group(2)).strip()
+            if link_text and len(link_text) < 200:
+                # Strip Wayback Machine URL prefix from links
+                if '/web/' in href and 'web.archive.org' in href:
+                    # e.g. /web/20260812.../https://www.mfa.org/foo -> /foo
+                    _wb_match = re.search(r'/web/\d+[^/]*/(.+)', href)
+                    if _wb_match:
+                        href = _wb_match.group(1)
+                        if not href.startswith('http'):
+                            href = '/' + href.split('/', 3)[-1] if '/' in href else href
+                links.append((link_text, href))
+
+        paragraphs = []
+        _seen_paragraphs = set()
+        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
+            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
+            if clean and len(clean) > 20 and clean not in _seen_paragraphs:
+                _seen_paragraphs.add(clean)
+                paragraphs.append(clean)
+
+        # Also extract heading text
+        headings = []
+        for h_match in re.finditer(r'<h[1-6][^>]*>(.+?)</h[1-6]>', html, re.DOTALL):
+            clean = re.sub(r'<[^>]+>', '', h_match.group(1)).strip()
+            if clean and len(clean) > 3:
+                headings.append(clean)
+
+        # Also extract list items (credit lines often in <li>)
+        list_items = []
+        for li_match in re.finditer(r'<li[^>]*>(.+?)</li>', html, re.DOTALL):
+            clean = re.sub(r'<[^>]+>', '', li_match.group(1)).strip()
+            if clean and len(clean) > 20 and clean not in _seen_paragraphs:
+                _seen_paragraphs.add(clean)
+                list_items.append(clean)
+
+        # Combine: headings first, then paragraphs, then list items
+        text = '\n'.join(headings + paragraphs + list_items)
+
+        if text:
+            print(f"  [LOCAL-429] ✓ Wayback Machine success: {url} ({len(text)} chars)")
+            logger.info(f"exhibition_checklist: Wayback Machine provided {len(text)} chars for {url}")
+        else:
+            print(f"  [LOCAL-429] Wayback Machine page had no extractable text for {url}")
+
+        return text, links
+
+    except Exception as e:
+        print(f"  [LOCAL-429] Wayback Machine fetch failed for {url}: {e}")
+        logger.debug(f"exhibition_checklist: Wayback Machine failed for {url}: {e}")
+        return '', []
+
+
 def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]]:
     """Fetch a page and return (text, links). Reuses story_miner pattern.
 
@@ -621,6 +705,23 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
                 break  # success — fall through to parsing
 
             elif resp.status_code == 429 or resp.status_code >= 500:
+                # [LOCAL-429] Cloudflare managed challenge — not a rate limit.
+                # cf-mitigated: challenge means the server requires JS execution
+                # (Turnstile). Retrying will never succeed — skip to Wayback fallback.
+                if resp.headers.get('cf-mitigated') == 'challenge':
+                    print(f"  [LOCAL-429] Cloudflare challenge on {url} — "
+                          f"retries will not help, trying Wayback Machine")
+                    logger.info(
+                        f"exhibition_checklist: Cloudflare challenge on {url} "
+                        f"— skipping retries, trying archive.org fallback")
+                    _wb_text, _wb_links = _fetch_from_wayback(url)
+                    if _wb_text:
+                        _cache_put(url, _wb_text, _wb_links)
+                        return _wb_text, _wb_links
+                    # Wayback also failed — cache the failure and bail
+                    _cache_put(url, '', [])
+                    return '', []
+
                 # Transient failure — compute wait with Retry-After priority
                 retry_after = resp.headers.get('Retry-After')
                 if retry_after:
