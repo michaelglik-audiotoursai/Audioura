@@ -15276,3 +15276,31 @@ caught by the former before the latter is ever consulted.
 
 **Env vars were stated for every number** (the D389 standing check, first submission to
 comply unprompted). 85/85 targeted green post-merge.
+
+## D392 — Michael's rulings on story selection (2026-08-12, his words paraphrased)
+
+Michael reviewed the D386 threshold question and ruled:
+
+1. **Min 3 story sentences per stop is here to stay.** The fix is content supply, not the
+   bar. The classifier is not loosened (D376 reaffirmed).
+2. **Story selection is a packing problem, not a count problem.** Per stop: take the
+   verified-story pool, sort by quality, pack greedily into the per-stop size budget.
+   The number of stories used is whatever fits — one, two, three — coincidental, not a
+   target. A story that passed the filters is legitimate by definition; lower rank only
+   means evaluated worse, never "not a story".
+3. **Exception:** a single story that is far the best may exceed the budget by up to
+   50% and be used alone. (His example: budget 100, best story 125 → take it.)
+4. Later, story quality gets adjusted by measured listener preferences — explicitly a
+   separate future task (the swipe/personalization work, stop_metrics class_* columns).
+
+**LEAD's verification of the premise:** there is currently NO per-stop word ceiling —
+only the 120-word floor (LOCAL-393) — LOCAL-72 removed the cap deliberately. Measured
+delivery on committed artifacts: 169–459 words/stop. The packing design therefore
+introduces the budget as a named module constant, initialised from the measured high end
+(~450) so day-one behaviour does not shrink, overridable by Michael.
+
+**Quality measurement status:** per-stop source-weighted score exists
+(`corpus_source_quality.compute_quality_score`, museum_official 3.0 > wikipedia 2.5 >
+web_search 0.5). Per-STORY score does not exist but all ingredients do: source
+provenance, verification outcome, specificity (person+date+consequence). LOCAL-438
+builds it plus the packing selector; beat-supply enrichment is a separate follow-up.
