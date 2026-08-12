@@ -1,16 +1,207 @@
 """
 RAG Retriever — lightweight knowledge-fetch utilities for Storied tour generation.
 No OpenAI calls. Fetches factual summaries from public APIs to ground tour narratives.
+
+LOCAL-447: DB-first path — checks stop_corpus for existing Wikipedia content before
+any network call. If the content was previously fetched and stored, we serve it from
+the DB with zero network overhead. This implements D403a step 1 (own DB first).
+
+LOCAL-447: Wayback fallback — when Wikimedia is cold (per dead_host_breaker), attempts
+to fetch the archived Wikipedia article from web.archive.org. Content sourced from the
+archive is labelled with provenance (is_from_archive, wayback_snapshot_timestamp).
 """
 import requests
 import logging
+import re
+import unicodedata
+from datetime import datetime, timezone
 from urllib.parse import quote
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
+# ─── Accent folding (D243) ───────────────────────────────────────────────────
+
+def _strip_accents(text: str) -> str:
+    """Remove accents for matching (D243 pattern)."""
+    nfkd = unicodedata.normalize('NFKD', text)
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+
+# ─── DB-first lookup (LOCAL-447, D403a step 1) ──────────────────────────────
+
+def _fetch_from_stop_corpus(topic: str) -> Optional[str]:
+    """Check stop_corpus for existing Wikipedia content matching this topic.
+
+    Returns the concatenated passage text if found, None otherwise.
+    Uses accent-folded matching so "Île Sainte-Marguerite" matches "Ile Sainte-Marguerite".
+    """
+    try:
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'tests'))
+        from db_connection import get_connection
+    except Exception:
+        return None
+
+    topic_folded = _strip_accents(topic).lower().strip()
+    if not topic_folded:
+        return None
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT stop_title, passages_json, source_pages
+            FROM stop_corpus
+            WHERE passages_json IS NOT NULL
+              AND source_pages::text LIKE '%%wikipedia%%'
+        """)
+        rows = cur.fetchall()
+        conn.close()
+
+        import json
+        for stop_title, passages_json, source_pages in rows:
+            title_folded = _strip_accents(stop_title).lower().strip()
+            # Match: exact folded match, or topic is contained in title or vice versa
+            if title_folded == topic_folded:
+                pass  # exact match
+            elif topic_folded in title_folded or title_folded in topic_folded:
+                pass  # containment match
+            else:
+                continue
+
+            # Found a match — extract Wikipedia-sourced passages
+            passages = json.loads(passages_json) if isinstance(passages_json, str) else passages_json
+            sources = json.loads(source_pages) if isinstance(source_pages, str) else source_pages
+
+            # Verify at least one source is Wikipedia
+            has_wiki_source = any(
+                s.get('type') == 'wikipedia' or 'wikipedia.org' in s.get('url', '')
+                for s in (sources if isinstance(sources, list) else [])
+            )
+            if not has_wiki_source:
+                continue
+
+            # Extract text from passages
+            texts = []
+            for p in (passages if isinstance(passages, list) else []):
+                if isinstance(p, dict):
+                    text = p.get('text', '')
+                elif isinstance(p, str):
+                    text = p
+                else:
+                    continue
+                if text and len(text) > 20:
+                    texts.append(text)
+
+            if texts:
+                combined = '\n'.join(texts)
+                logger.info(f"DB-first: served '{topic}' from stop_corpus ({len(combined)} chars, 0 network calls)")
+                return combined
+
+        return None
+
+    except Exception as e:
+        logger.debug(f"DB-first lookup failed for '{topic}': {e}")
+        return None
+
+
+# ─── Wayback fallback (LOCAL-447, D403a step 2) ─────────────────────────────
+
+def _parse_wayback_timestamp(url_or_ts: str) -> Optional[datetime]:
+    """Parse a Wayback Machine timestamp (YYYYMMDDHHmmss) from a URL or raw string.
+    
+    Reused from exhibition_checklist.py per task spec.
+    """
+    m = re.search(r'/web/(\d{14})/', url_or_ts)
+    if not m:
+        m = re.match(r'^(\d{14})$', url_or_ts.strip())
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), '%Y%m%d%H%M%S').replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _fetch_from_wayback_wikipedia(topic: str, timeout: float = 12.0) -> Optional[dict]:
+    """Fetch the archived Wikipedia article from Wayback Machine.
+
+    Only called when Wikimedia is cold (per dead_host_breaker.is_host_cold).
+    
+    Returns dict with keys:
+        'text': str — extracted lead section
+        'is_from_archive': True
+        'wayback_snapshot_timestamp': str — YYYYMMDDHHmmss
+        'snapshot_age_days': int
+    Or None if no usable snapshot exists.
+    
+    NOTE (LOCAL-447 measurement): Coverage is very low (7%) and latency is high
+    (median 9.6s). This path exists only as a last resort when Wikimedia is down,
+    not as a reliable substitute.
+    """
+    encoded = quote(topic.strip().replace(' ', '_'), safe='')
+    article_url = f"https://en.wikipedia.org/wiki/{encoded}"
+    wayback_url = f"https://web.archive.org/web/2/{article_url}"
+
+    try:
+        resp = requests.get(
+            wayback_url,
+            headers={'User-Agent': 'Audioura/2.2 (LOCAL-447 wayback-fallback)'},
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        if resp.status_code != 200:
+            return None
+
+        # Parse snapshot timestamp
+        final_url = resp.url if isinstance(resp.url, str) else str(resp.url)
+        snapshot_dt = _parse_wayback_timestamp(final_url)
+        snapshot_ts_str = snapshot_dt.strftime('%Y%m%d%H%M%S') if snapshot_dt else ''
+        age_days = (datetime.now(timezone.utc) - snapshot_dt).days if snapshot_dt else None
+
+        html = resp.text
+        if not html or len(html) < 500:
+            return None
+
+        # Extract lead section (before first <h2>)
+        lead_html = re.split(r'<h2', html, maxsplit=1)[0]
+
+        paragraphs = []
+        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', lead_html, re.DOTALL):
+            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
+            clean = re.sub(r'\[\d+\]', '', clean).strip()
+            if clean and len(clean) > 30:
+                paragraphs.append(clean)
+
+        lead_text = '\n'.join(paragraphs)
+        if not lead_text or len(lead_text) < 50:
+            return None
+
+        logger.info(f"Wayback fallback: served '{topic}' from archive "
+                    f"(snapshot {snapshot_ts_str}, age {age_days}d, {len(lead_text)} chars)")
+
+        return {
+            'text': lead_text,
+            'is_from_archive': True,
+            'wayback_snapshot_timestamp': snapshot_ts_str,
+            'snapshot_age_days': age_days,
+        }
+
+    except Exception as e:
+        logger.debug(f"Wayback fallback failed for '{topic}': {e}")
+        return None
+
+
 def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
     """Fetch a plain-text summary from Wikipedia's REST API.
+
+    LOCAL-447 retrieval chain (D403a):
+      1. Own DB (stop_corpus) — zero network cost, accent-folded match
+      2. Live Wikipedia REST/Action API — existing path
+      3. Wayback archived article — only when Wikimedia is cold (dead_host_breaker)
 
     Args:
         topic: The Wikipedia article title (e.g. "Marc Chagall").
@@ -21,11 +212,65 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
         The 'extract' field (plain text) from the Wikipedia summary response.
         Returns empty string on 404, redirect loops, network errors, or if
         the topic doesn't exist — never raises.
+        
+        When content is from the archive, the return value is still a plain string
+        (backwards compatible). Use fetch_wikipedia_summary_with_provenance() if
+        you need the archive metadata.
+    """
+    result = fetch_wikipedia_summary_with_provenance(topic, sentences)
+    return result.get('text', '') if result else ''
+
+
+def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> dict:
+    """Fetch Wikipedia summary with provenance metadata.
+
+    LOCAL-447: Full retrieval chain with provenance tracking.
+
+    Returns:
+        dict with keys:
+            'text': str — the summary text
+            'source': str — 'stop_corpus', 'wikipedia_live', or 'wayback_archive'
+            'is_from_archive': bool — True if content came from Wayback
+            'wayback_snapshot_timestamp': str — only if from archive
+            'snapshot_age_days': int or None — only if from archive
+        Returns empty dict on total failure.
     """
     if not topic or not topic.strip():
-        return ""
+        return {}
 
-    # URL-encode the topic (spaces → underscores is Wikipedia convention)
+    # ─── Step 1: DB-first (LOCAL-447, D403a step 1) ──────────────────────────
+    db_content = _fetch_from_stop_corpus(topic)
+    if db_content:
+        return {
+            'text': db_content,
+            'source': 'stop_corpus',
+            'is_from_archive': False,
+            'wayback_snapshot_timestamp': '',
+            'snapshot_age_days': None,
+        }
+
+    # ─── Step 2: Check if Wikimedia is cold ──────────────────────────────────
+    try:
+        from dead_host_breaker import is_host_cold, mark_host_cold
+        wikimedia_cold = is_host_cold('en.wikipedia.org')
+    except ImportError:
+        wikimedia_cold = False
+
+    if wikimedia_cold:
+        # Skip live Wikipedia entirely — go straight to Wayback
+        logger.info(f"Wikipedia: Wikimedia is cold, skipping live fetch for '{topic}'")
+        wayback_result = _fetch_from_wayback_wikipedia(topic)
+        if wayback_result:
+            return {
+                'text': wayback_result['text'],
+                'source': 'wayback_archive',
+                'is_from_archive': True,
+                'wayback_snapshot_timestamp': wayback_result.get('wayback_snapshot_timestamp', ''),
+                'snapshot_age_days': wayback_result.get('snapshot_age_days'),
+            }
+        return {}
+
+    # ─── Step 3: Live Wikipedia (existing path) ──────────────────────────────
     encoded_topic = quote(topic.strip().replace(" ", "_"), safe="")
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_topic}"
 
@@ -40,39 +285,87 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
             allow_redirects=True,
         )
 
+        if response.status_code == 429:
+            # Rate limited — mark Wikimedia cold, try Wayback
+            try:
+                mark_host_cold('en.wikipedia.org', '429 rate limit')
+            except Exception:
+                pass
+            logger.warning(f"Wikipedia: 429 for '{topic}', marked cold, trying Wayback")
+            wayback_result = _fetch_from_wayback_wikipedia(topic)
+            if wayback_result:
+                return {
+                    'text': wayback_result['text'],
+                    'source': 'wayback_archive',
+                    'is_from_archive': True,
+                    'wayback_snapshot_timestamp': wayback_result.get('wayback_snapshot_timestamp', ''),
+                    'snapshot_age_days': wayback_result.get('snapshot_age_days'),
+                }
+            return {}
+
         if response.status_code == 404:
             logger.info(f"Wikipedia: no article found for '{topic}'")
-            # Try the action API as fallback (broader search)
-            return _fetch_via_action_api(topic)
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                return {'text': action_result, 'source': 'wikipedia_live',
+                        'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                        'snapshot_age_days': None}
+            return {}
 
         if response.status_code != 200:
             logger.warning(f"Wikipedia API returned {response.status_code} for '{topic}' | URL: {url} | body[:200]: {response.text[:200]}")
-            return _fetch_via_action_api(topic)
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                return {'text': action_result, 'source': 'wikipedia_live',
+                        'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                        'snapshot_age_days': None}
+            return {}
 
         data = response.json()
         extract = data.get("extract", "")
 
         if not extract:
             logger.info(f"Wikipedia: empty extract for '{topic}'")
-            return _fetch_via_action_api(topic)
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                return {'text': action_result, 'source': 'wikipedia_live',
+                        'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                        'snapshot_age_days': None}
+            return {}
 
         # If summary is too short, try action API for richer content
         if len(extract) < 500:
             richer = _fetch_via_action_api(topic)
             if richer and len(richer) > len(extract):
-                return richer
+                extract = richer
 
-        return extract
+        return {'text': extract, 'source': 'wikipedia_live',
+                'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None}
 
     except requests.Timeout:
         logger.warning(f"Wikipedia: timeout fetching '{topic}'")
-        return ""
+        # Timeout — mark cold, try Wayback
+        try:
+            mark_host_cold('en.wikipedia.org', 'timeout')
+        except Exception:
+            pass
+        wayback_result = _fetch_from_wayback_wikipedia(topic)
+        if wayback_result:
+            return {
+                'text': wayback_result['text'],
+                'source': 'wayback_archive',
+                'is_from_archive': True,
+                'wayback_snapshot_timestamp': wayback_result.get('wayback_snapshot_timestamp', ''),
+                'snapshot_age_days': wayback_result.get('snapshot_age_days'),
+            }
+        return {}
     except requests.RequestException as e:
         logger.warning(f"Wikipedia: request error for '{topic}': {e}")
-        return ""
+        return {}
     except (ValueError, KeyError) as e:
         logger.warning(f"Wikipedia: parse error for '{topic}': {e}")
-        return ""
+        return {}
 
 
 def fetch_poi_rag_context(

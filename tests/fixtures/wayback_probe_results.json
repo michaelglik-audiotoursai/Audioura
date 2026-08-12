@@ -1,0 +1,524 @@
+{
+  "probe_timestamp": "2026-08-12T19:46:49.091734+00:00",
+  "n_titles": 30,
+  "summary": {
+    "wikipedia_coverage": "14/30",
+    "wayback_wiki_coverage": "2/30",
+    "wayback_rest_coverage": "0/30",
+    "median_snapshot_age_days": 3441.5,
+    "median_wiki_latency_s": 0.13158607482910156,
+    "median_wayback_latency_s": 9.58358359336853,
+    "content_same": 2,
+    "content_degraded": 0,
+    "content_wrong": 0,
+    "viable": false,
+    "reasons": [
+      "Coverage too low: only 2/30 titles have Wayback snapshots",
+      "Latency too high: median 9.6s exceeds 5s timeout budget"
+    ]
+  },
+  "per_title": [
+    {
+      "stop_title": "Le Village de grand-m\u00e8re",
+      "venue_name": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+      "candidates_tried": [
+        "Le Village de grand-m\u00e8re",
+        "Le Village de grand-mere",
+        "Le Village"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "Gay Village is a neighbourhood delineated by Saint Catherine Street East and Atateken Street in the Ville-Marie borough of Montreal, Quebec, Canada.",
+      "wikipedia_latency": 0.6496748924255371,
+      "wayback_wiki_has_snapshot": true,
+      "wayback_wiki_snapshot_age_days": 3409,
+      "wayback_wiki_latency": 11.361039161682129,
+      "wayback_wiki_lead": "Montreal's Gay Village (often simply known as \"the Village\", French, Le Village gai or simply Le Village) is located mainly on St. Catherine Street East and extends along Amherst Street in the Ville-Marie borough.\nThe entire Village is bordered approximately by St. Hubert Street to the west, De Lorimier Avenue to the east, Sherbrooke Street to the north and Ren\u00e9 L\u00e9vesque Boulevard to the south, making it the largest gay village in North America in terms of area. It is served by the Berri-UQAM, Beaudry and Papineau metro stations.\nOriginally a poor working-class area, the Centre-Sud neighbourhood became increasingly attractive to the gay and lesbian community after the migration of many gay businesses from other parts of the city. The area has become considerably gentrified, due in part to significant investment from the various levels of all governments. All three levels of government are aggressively promoting Montreal's gay life as a tourist attraction. In recognition of the Village's importance to the city, the Ville-Marie borough has displayed a rainbow flag in its council chambers and redecorated the entrance to the Beaudry Metro station with rainbow pillars. The Village is specifically marked on official city maps as \"Le Village\".",
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": "same"
+    },
+    {
+      "stop_title": "Place Mass\u00e9na",
+      "venue_name": "walking tour in Nice, france",
+      "candidates_tried": [
+        "Place Mass\u00e9na",
+        "Place Massena"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "The Place Mass\u00e9na is a historic square in Nice, Alpes-Maritimes, France. It was named for Andr\u00e9 Mass\u00e9na. Its layout was designed by Joseph Vernier in 1843-1844.",
+      "wikipedia_latency": 0.12483406066894531,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 10.636880874633789,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Caf\u00e9 de Turin",
+      "venue_name": "Old Nice, Nice, France",
+      "candidates_tried": [
+        "Caf\u00e9 de Turin",
+        "Cafe de Turin",
+        "Caf\u00e9",
+        "Cafe"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "A coffeehouse, coffee shop, or caf\u00e9, is an establishment that serves various types of coffee drinks like espresso, latte, americano and cappuccino, as well as other beverages. An espresso bar specializes in serving espresso and espresso-based drinks. Some coffeehouses may serve iced coffee among other cold drinks, as well as non-caffeinated drinks. A coffeehouse may also serve food, such as light snacks, sandwiches, muffins, cakes, breads, pastries or doughnuts. Many doughnut shops in Canada and the U.S. serve coffee to accompany doughnuts, so these can also be classified as coffee shops, although doughnut shops tend to be more casual and serve cheaper fare. In continental Europe, some caf\u00e9s even serve alcoholic drinks, and in West Asia, coffeehouses may offer a flavored tobacco smoked through a hookah, called shisha in most varieties of Arabic or nargile in Levantine Arabic, Greek, and Turkish.",
+      "wikipedia_latency": 0.13454222679138184,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 8.068785905838013,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Tir, s\u00e9ance 26 juin 1961",
+      "venue_name": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+      "candidates_tried": [
+        "Tir, s\u00e9ance 26 juin 1961",
+        "Tir, seance 26 juin 1961"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 2.860011100769043,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Le Suquet (Old Town) of Cannes",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Le Suquet (Old Town) of Cannes"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 2.922952175140381,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "\u00celes de L\u00e9rins",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "\u00celes de L\u00e9rins",
+        "Iles de Lerins",
+        "\u00celes",
+        "Iles"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "The L\u00e9rins Islands are a group of five Mediterranean islands off the French Riviera, in Cannes. The two largest islands in this group are \u00cele Sainte-Marguerite and \u00cele Saint-Honorat. The smaller \u00celot Saint-Ferr\u00e9ol, \u00celot de la Tradeli\u00e8re and \u00celot de l'Ilon are uninhabited. \nAdministratively, the islands belong to the commune of Cannes.",
+      "wikipedia_latency": 0.09943914413452148,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 5.851635932922363,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Donations et d\u00e9p\u00f4ts",
+      "venue_name": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+      "candidates_tried": [
+        "Donations et d\u00e9p\u00f4ts",
+        "Donations et depots"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 3.7299551963806152,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Le Vieux Four",
+      "venue_name": "restaurant tour in Old Nice (Vieux Nice), France",
+      "candidates_tried": [
+        "Le Vieux Four"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 6.395735025405884,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Temp\u00eate \u00e0 Nice",
+      "venue_name": "Musee Matisse",
+      "candidates_tried": [
+        "Temp\u00eate \u00e0 Nice",
+        "Tempete a Nice",
+        "Temp\u00eate",
+        "Tempete"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "Temp\u00eate Football Club is a professional football club based in Saint-Marc, Haiti. The club was founded in 1970 and competes in Haiti's top league, Ligue Ha\u00eftienne.",
+      "wikipedia_latency": 0.410494327545166,
+      "wayback_wiki_has_snapshot": true,
+      "wayback_wiki_snapshot_age_days": 3474,
+      "wayback_wiki_latency": 7.806128025054932,
+      "wayback_wiki_lead": "Temp\u00eate Football Club is a professional football club based in Saint-Marc, Haiti. The club was founded in 1970 and competes in Haiti's top league, Ligue Ha\u00eftienne.",
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": "same"
+    },
+    {
+      "stop_title": "Domaine du Rayol",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Domaine du Rayol",
+        "Domaine"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "The Domaine du Rayol, also known as the Jardin botanique du Rayol and the Parc botanique \u00e0 Rayol-Canadel-sur-Mer, is a botanical garden and arboretum located on the Avenue des Belges, Rayol-Canadel-sur-Mer, Var, Provence-Alpes-C\u00f4te d'Azur, France. It is listed as a Remarkable Garden of France by the Committee of Parks and Gardens of the Ministry of Culture of France. It is open to the public, with an admission fee.",
+      "wikipedia_latency": 0.12320089340209961,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 9.56612515449524,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "La mari\u00e9e sous l'arbre",
+      "venue_name": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+      "candidates_tried": [
+        "La mari\u00e9e sous l'arbre",
+        "La mariee sous l'arbre"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 6.859884977340698,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Ch\u00e2teau de la Ch\u00e8vre d'Or",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Ch\u00e2teau de la Ch\u00e8vre d'Or",
+        "Chateau de la Chevre d'Or"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 4.806525945663452,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Mus\u00e9e Picasso",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Mus\u00e9e Picasso",
+        "Musee Picasso"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "Mus\u00e9e Picasso Paris is an art gallery located in the H\u00f4tel Sal\u00e9 on the Rue de Thorigny, in the Marais district of Paris, France, dedicated to the work of the Spanish artist Pablo Picasso (1881\u20131973). The museum collection includes more than 5,000 works of art including paintings, sculptures, drawings, ceramics, prints, engravings, and notebooks, as well as tens of thousands of archived pieces from Picasso's personal repository, including the artist's photographic archive, personal papers, correspondence, and author manuscripts. A large portion of items were donated by Picasso's family after his death, in accord with the wishes of the artist, who lived in France from 1905 to 1973.",
+      "wikipedia_latency": 0.13464689254760742,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 9.810194253921509,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "March\u00e9 Forville",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "March\u00e9 Forville",
+        "Marche Forville"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 4.256437063217163,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Kannon, le bodhisattva de la compassion",
+      "venue_name": "Musee des Arts Asiatiques (Asian Art Museum), Nice, France",
+      "candidates_tried": [
+        "Kannon, le bodhisattva de la compassion",
+        "Kannon, le bodhisattva"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 3.743335247039795,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "The Carousel",
+      "venue_name": "Mus\u00e9e d'art na\u00eff (Museum of Na\u00efve Art), Nice, France",
+      "candidates_tried": [
+        "The Carousel"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 9.428669929504395,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Villefranche-sur-Mer",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Villefranche-sur-Mer"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "Villefranche-sur-Mer is a seaside resort town in the Alpes-Maritimes department in the Provence-Alpes-C\u00f4te d'Azur region on the French Riviera. It is located just east of Nice and southwest of the Principality of Monaco, which is west of the French-Italian border. Its name translates into \"Free City on Sea\" in Old French.",
+      "wikipedia_latency": 0.885653018951416,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 9.590499639511108,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Adoration of the Shepherds",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "candidates_tried": [
+        "Adoration of the Shepherds"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "The Adoration of the Shepherds is the traditional name for a New Testament episode in the story of Jesus's nativity, which is the subject of many works of art. In it shepherds are near witnesses to Jesus's birth in Bethlehem, arriving soon after he is actually born. The episode is recounted, or at least implied, in the Gospel of Luke and follows on from the annunciation to the shepherds, in which the shepherds are summoned by an angel to the scene of the birth. Like the episode preceding it, the adoration is a common subject in art, where it is often combined with the Adoration of the Magi. In such cases it is typically just referred to by the latter title.",
+      "wikipedia_latency": 0.12836980819702148,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 9.819021224975586,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Ponkapoag Golf Course",
+      "venue_name": "biking tour in Norwood, MA 02062, USA",
+      "candidates_tried": [
+        "Ponkapoag Golf Course"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 3.080129861831665,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Promenade Maurice Rouvier",
+      "venue_name": "French Riviera walking area",
+      "candidates_tried": [
+        "Promenade Maurice Rouvier"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 3.6363792419433594,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Chapelle Saint-Pierre",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Chapelle Saint-Pierre"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 2.7566189765930176,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Saint-Paul de Vence",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Saint-Paul de Vence",
+        "Saint-Paul"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "Saint-Paul-de-Vence is a commune in the Alpes-Maritimes department in the Provence-Alpes-C\u00f4te d'Azur region of Southeastern France. One of the oldest medieval towns on the French Riviera, Saint-Paul-de-Vence is well known for its modern and contemporary art museums and galleries such as the Fondation Maeght, and for the 17th-century Saint Charles-Saint Claude chapel, which in 2012\u20132013 was decorated with murals by French artist Paul Conte.",
+      "wikipedia_latency": 0.11291718482971191,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 4.879249095916748,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Vieux Port (Old Port) of Cannes",
+      "venue_name": "French Riviera cycling tour, France",
+      "candidates_tried": [
+        "Vieux Port (Old Port) of Cannes"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 2.524195909500122,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Guitar by Antonio de Torres (Almeria, 1884)",
+      "venue_name": "Palais Lascaris",
+      "candidates_tried": [
+        "Guitar by Antonio de Torres (Almeria, 1884)",
+        "Guitar by Antonio"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 2.9258601665496826,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Fort Carre d'Antibes",
+      "venue_name": "French Riviera walking area",
+      "candidates_tried": [
+        "Fort Carre d'Antibes"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 3.901921033859253,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Artist in his studio",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "candidates_tried": [
+        "Artist in his studio"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "The Artist in his Studio is the title of an oil painting on panel created by Rembrandt in 1629. The Museum of Fine Arts in Boston, Massachusetts currently holds the painting. The painting depicts an artist standing on the left side of his studio, gazing at an easel on the right side of his studio. The artist is notably standing across the room from the easel, which is turned away from the viewer. The artist's studio depicted in the painting is likely Rembrandt's own studio. Scholars have debated whether the artist represents Rembrandt himself or his student, Gerrit Dou. Rembrandt did not sign his work, but art historians are confident in attributing this work to him because its color scheme and technique resemble those of other works by Rembrandt during this period.",
+      "wikipedia_latency": 0.1321110725402832,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 6.147013902664185,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Still Life",
+      "venue_name": "Musee Matisse",
+      "candidates_tried": [
+        "Still Life"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "A still life is a work of art depicting mostly inanimate subject matter, typically commonplace objects which are either natural or human-made.",
+      "wikipedia_latency": 0.13405609130859375,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 7.625509023666382,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "Madame Monet wearing a kimono",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "candidates_tried": [
+        "Madame Monet wearing a kimono"
+      ],
+      "wikipedia_found": false,
+      "wikipedia_extract": null,
+      "wikipedia_latency": null,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 5.076736211776733,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "A More Perfect Union",
+      "venue_name": "National Constitution Center, Philadelphia PA",
+      "candidates_tried": [
+        "A More Perfect Union"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "\"A more perfect Union\" refers to a phrase in the preamble to the United States Constitution that begins with \"in order to form\". Toward a more perfect union is a related stock phrase in American political discourse.",
+      "wikipedia_latency": 0.12017393112182617,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 6.0033159255981445,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    },
+    {
+      "stop_title": "The Wedding",
+      "venue_name": "Mus\u00e9e d'art na\u00eff (Museum of Na\u00efve Art), Nice, France",
+      "candidates_tried": [
+        "The Wedding"
+      ],
+      "wikipedia_found": true,
+      "wikipedia_extract": "The Wedding may refer to:",
+      "wikipedia_latency": 0.13106107711791992,
+      "wayback_wiki_has_snapshot": false,
+      "wayback_wiki_snapshot_age_days": null,
+      "wayback_wiki_latency": 7.915380001068115,
+      "wayback_wiki_lead": null,
+      "wayback_rest_has_snapshot": false,
+      "content_verdict": null
+    }
+  ]
+}
