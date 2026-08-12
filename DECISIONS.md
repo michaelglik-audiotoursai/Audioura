@@ -15574,3 +15574,28 @@ labeled legend. Recorded into PARKED_kiro_task_LOCAL-442.md; LOCAL-440's candida
 evaluation will be held to it at review. Companion to D373 (Desnos): "the most
 satisfying payloads are the most fabricated" — the controversy rule widens what is
 TELLABLE without widening what is ASSERTABLE.
+
+## D400 — LOCAL-440 merged but GATED OFF: honest regression stays out of the live path (2026-08-12)
+
+**Merged `9379fd4`, guard at `2aaac95`.** The story-first pipeline (Michael's D393
+4-step) is architecturally correct — verified-only candidacy enforced (LEAD
+neutralised the verification gate: 2 red, 25 green restored), 107 related tests
+green, module-scope API, honest submission ("Unproven short of 3/3, handing to
+LEAD"). But its own live acceptance showed gate rate unchanged (1/3 MFA) and
+Palais wall time REGRESSED 336s → 535s — violating the task's own criterion and
+D395. Cause: per-candidate gpt-4o-mini classification (17–62 candidates/stop,
+serial); the SERP snippets (~150 chars) cannot hold a 3-sentence arc, so the
+pipeline finds URLs, not stories. Stop 1 passes only via a lucky Wikipedia snippet.
+
+**Ruling: merge the architecture, gate the live path.** `L440_STORY_FIRST` env
+flag, default false, at the generate_tour_text call site (module default stays
+enabled so the 25 tests keep their semantics). LOCAL-443 (full-page fetch of top
+tier1/2 URLs + zero-cost candidate pre-filter + concurrent classification, ≤336s
+Palais bar) earns the right to flip it — parked behind LOCAL-442, which is now
+dispatched (Michael's obligation ledger, fixture-complete after his in-session
+calibration).
+
+Pattern note: this is the third task in the chain whose honest negative result
+was more valuable than a fake pass — 431 ("not yet"), 440 ("no improvement, here
+is why"), and the gate they respect is the live-artifact rule. Keep writing tasks
+that name an acceptable failure report.
