@@ -8984,6 +8984,107 @@ Exempt: navigation directions ("Turn left", "Continue past").
             import traceback
             traceback.print_exc()
 
+    # -------- [LOCAL-440] Story-first pipeline: seek + verify + size-adapt --------
+    # Michael's 4-step process (D393): for each stop, BEFORE narration, seek stories
+    # specifically (not just facts), verify them against sources, adapt size, then
+    # hand to the LOCAL-438 packer. Story-seeking runs concurrent under a per-stop budget.
+    _local440_results = {}  # stop_name → pipeline result dict
+    _local440_total_cost = 0.0
+    _local440_total_elapsed = 0.0
+    if (_storied_mode and tour_category == 'museum'
+            and os.environ.get('GENERATION_TIER', 'plus') != 'free'):
+        try:
+            from story_first import story_first_pipeline, is_story_seeking_enabled
+            if is_story_seeking_enabled():
+                print(f"\n  [LOCAL-440] Story-first pipeline — processing {len(poi_list)} stops...")
+                for _sf_idx, _sf_poi in enumerate(poi_list):
+                    _sf_name = _sf_poi.get('name', '')
+                    _sf_stop_data = {
+                        'canonical_title': _sf_name,
+                        'artist': _sf_poi.get('artist', ''),
+                        'medium': _sf_poi.get('medium', ''),
+                        'credit_line': _sf_poi.get('credit_line', ''),
+                        'publisher': _sf_poi.get('publisher', ''),
+                        'venue_name': _museum_venue_name or location.split(',')[0].strip(),
+                        'exhibition_name': _sf_poi.get('exhibition_name', ''),
+                        'venue_city': location.split(',')[1].strip() if ',' in location else '',
+                        'venue_lang': 'en',
+                        'english_title': _sf_poi.get('english_title', _sf_name),
+                    }
+                    # Enrich from exhibition checklist
+                    if _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                        _sf_matched = match_work_for_stop(_sf_name, _exhibition_checklist_result.works)
+                        if _sf_matched:
+                            for _sf_field in ('publisher', 'credit_line', 'medium', 'artist'):
+                                if not _sf_stop_data.get(_sf_field):
+                                    _sf_stop_data[_sf_field] = _sf_matched.get(_sf_field, '')
+
+                    # Gather existing snippets for this stop (from LOCAL-410)
+                    _sf_snippets = []
+                    if _DIRECT_SNIPPETS_PER_STOP:
+                        _sf_snippets = (_DIRECT_SNIPPETS_PER_STOP.get(_sf_name, [])
+                                        or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sf_idx}__", []))
+
+                    _sf_result = story_first_pipeline(
+                        _sf_stop_data,
+                        fact_sheet='',  # Fact sheet from spine (if available)
+                        snippets=_sf_snippets,
+                        credit_line=_sf_stop_data.get('credit_line', ''),
+                        existing_search_results=_sf_snippets,
+                    )
+                    _local440_results[_sf_name] = _sf_result
+                    _local440_total_cost += _sf_result.get('cost_usd', 0.0)
+                    _local440_total_elapsed += _sf_result.get('elapsed_seconds', 0.0)
+
+                    _sf_stories = _sf_result.get('stories', [])
+                    print(f"    Stop {_sf_idx+1} '{_sf_name[:40]}': "
+                          f"verified_stories={len(_sf_stories)} "
+                          f"elapsed={_sf_result.get('elapsed_seconds', 0):.1f}s "
+                          f"cost=${_sf_result.get('cost_usd', 0):.4f}")
+
+                    # [LOCAL-440] Merge story-first results into cached elements
+                    # so the LOCAL-438 packer can include them in selection
+                    if _sf_stories:
+                        from work_story_searcher import normalize_work_key, work_stories_get
+                        _sf_wk = normalize_work_key(_sf_name, _sf_stop_data.get('artist', ''))
+                        _sf_cached = work_stories_get(_sf_wk)
+                        if _sf_cached and _sf_cached.get('elements'):
+                            # Append story-first results to existing cached elements
+                            _sf_cached['elements'].extend(_sf_stories)
+                        else:
+                            # No existing cache — store directly
+                            # (The packer integration at S25/line ~8644 will pick these up)
+                            pass
+                        # Also inject into _DIRECT_SNIPPETS_PER_STOP for Phase 5 prompt
+                        for _sf_story in _sf_stories:
+                            _sf_snippet = {
+                                'title': f"[Story-first] {', '.join(_sf_story.get('people', [])[:2])}",
+                                'snippet': _sf_story['text'][:300],
+                                'url': _sf_story.get('source_domain', ''),
+                                'tier': 'tier1',
+                                '_story_first': True,
+                            }
+                            if _sf_name in _DIRECT_SNIPPETS_PER_STOP:
+                                _DIRECT_SNIPPETS_PER_STOP[_sf_name].insert(0, _sf_snippet)
+                            elif f"__stop_{_sf_idx}__" in _DIRECT_SNIPPETS_PER_STOP:
+                                _DIRECT_SNIPPETS_PER_STOP[f"__stop_{_sf_idx}__"].insert(0, _sf_snippet)
+                            else:
+                                _DIRECT_SNIPPETS_PER_STOP[_sf_name] = [_sf_snippet]
+
+                print(f"\n  [LOCAL-440] Story-first complete: "
+                      f"total_elapsed={_local440_total_elapsed:.1f}s, "
+                      f"total_cost=${_local440_total_cost:.4f}")
+                _verified_total = sum(r.get('verified_count', 0) for r in _local440_results.values())
+                print(f"  [LOCAL-440] Verified stories found: {_verified_total} across {len(poi_list)} stops")
+            else:
+                print(f"\n  [LOCAL-440] Story-seeking DISABLED — fallback to current behaviour")
+        except ImportError as _sf440_err:
+            print(f"  [LOCAL-440] story_first import failed — story-first pipeline DISABLED: {_sf440_err}")
+        except Exception as _sf440_err:
+            print(f"  [LOCAL-440] Story-first pipeline error (non-fatal): {_sf440_err}")
+            import traceback
+            traceback.print_exc()
+
     # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
     # [LOCAL-295] Refactored: returns a classification tuple instead of bare bool.
     #   ("placeholder", reason)  — true placeholder echo, should retry/reject
