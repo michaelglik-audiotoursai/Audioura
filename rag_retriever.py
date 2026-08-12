@@ -6,9 +6,14 @@ LOCAL-447: DB-first path — checks stop_corpus for existing Wikipedia content b
 any network call. If the content was previously fetched and stored, we serve it from
 the DB with zero network overhead. This implements D403a step 1 (own DB first).
 
-LOCAL-447: Wayback fallback — when Wikimedia is cold (per dead_host_breaker), attempts
-to fetch the archived Wikipedia article from web.archive.org. Content sourced from the
-archive is labelled with provenance (is_from_archive, wayback_snapshot_timestamp).
+LOCAL-448: Correctness fixes to LOCAL-447:
+  - Defect 1: Containment match removed. Only exact accent-folded matching is used.
+    The old `topic in title or title in topic` served wrong corpus (fabrication vector).
+  - Defect 2: DB connection uses production pattern (psycopg2 + env vars), not tests/.
+    Import failure is now logged at WARNING (not silently swallowed).
+  - Defect 3: Wayback fallback removed from production chain. LOCAL-447 measurement
+    proved it unfit (7% coverage, 9.6s median, wrong articles). Function retained
+    for probe/fixture evidence only.
 """
 import os
 import requests
@@ -53,31 +58,61 @@ def _strip_accents(text: str) -> str:
     return ''.join(c for c in nfkd if not unicodedata.combining(c))
 
 
-# ─── DB-first lookup (LOCAL-447, D403a step 1) ──────────────────────────────
+# ─── DB-first lookup (LOCAL-447, D403a step 1; LOCAL-448 correctness fix) ────
+
+def _get_db_connection():
+    """Get a production DB connection using the same pattern as other services.
+
+    LOCAL-448 (Defect 2): Production code must NOT import from tests/.
+    Uses direct psycopg2 with env vars, same as generate_tour_text_service.py.
+    Inside Docker: DB_HOST=postgres-2, DB_PORT=5432 (from DATABASE_URL env).
+    Outside Docker (host): DB_HOST=localhost, DB_PORT=5433 (mapped port).
+    """
+    import psycopg2
+    # Parse DATABASE_URL if available (set in docker-compose-master.yml)
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        return psycopg2.connect(database_url)
+    # Fallback to individual env vars (same defaults as generate_tour_text_service.py)
+    return psycopg2.connect(
+        host=os.environ.get("DB_HOST", "postgres-2"),
+        port=os.environ.get("DB_PORT", "5432"),
+        dbname=os.environ.get("DB_NAME", "audiotours"),
+        user=os.environ.get("DB_USER", "admin"),
+        password=os.environ.get("DB_PASSWORD", "password123"),
+    )
+
 
 def _fetch_from_stop_corpus(topic: str) -> Optional[str]:
     """Check stop_corpus for existing Wikipedia content matching this topic.
 
     Returns the concatenated passage text if found, None otherwise.
-    Uses accent-folded matching so "Île Sainte-Marguerite" matches "Ile Sainte-Marguerite".
+
+    LOCAL-448 (Defect 1): Only exact accent-folded matching is used.
+    The previous containment match (`topic in title or title in topic`) served
+    the WRONG stop's corpus — e.g. "The Dream" inside "The Dream of Saint Ursula
+    by Carpaccio" returned a completely unrelated museum's content. A wrong DB
+    hit puts false content into a tour; a missed hit costs one network call.
+    When in doubt, return None.
+
+    LOCAL-448 (Defect 2): Uses production DB connection pattern, not tests/ import.
+    Import failure is logged at WARNING (not silently swallowed).
     """
-    try:
-        import sys
-        import os
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'tests'))
-        from db_connection import get_connection
-    except Exception:
+    if not _l447_enabled():
         return None
 
-    if not _l447_enabled():
+    try:
+        conn = _get_db_connection()
+    except Exception as e:
+        logger.warning(f"DB-first: cannot connect to database: {e}")
         return None
 
     topic_folded = _strip_accents(topic).lower().strip()
     if not topic_folded:
+        conn.close()
         return None
 
     try:
-        conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
             SELECT stop_title, passages_json, source_pages
@@ -91,15 +126,12 @@ def _fetch_from_stop_corpus(topic: str) -> Optional[str]:
         import json
         for stop_title, passages_json, source_pages in rows:
             title_folded = _strip_accents(stop_title).lower().strip()
-            # Match: exact folded match, or topic is contained in title or vice versa
-            if title_folded == topic_folded:
-                pass  # exact match
-            elif topic_folded in title_folded or title_folded in topic_folded:
-                pass  # containment match
-            else:
+            # LOCAL-448: EXACT accent-folded match ONLY.
+            # No substring/containment — that serves wrong corpus.
+            if title_folded != topic_folded:
                 continue
 
-            # Found a match — extract Wikipedia-sourced passages
+            # Found an exact match — extract Wikipedia-sourced passages
             passages = json.loads(passages_json) if isinstance(passages_json, str) else passages_json
             sources = json.loads(source_pages) if isinstance(source_pages, str) else source_pages
 
@@ -131,16 +163,26 @@ def _fetch_from_stop_corpus(topic: str) -> Optional[str]:
         return None
 
     except Exception as e:
-        logger.debug(f"DB-first lookup failed for '{topic}': {e}")
+        logger.warning(f"DB-first lookup failed for '{topic}': {e}")
         return None
 
 
-# ─── Wayback fallback (LOCAL-447, D403a step 2) ─────────────────────────────
+# ─── Wayback fallback (LOCAL-447, D403a step 2) — REMOVED FROM CHAIN ─────────
+#
+# LOCAL-448 (Defect 3): Wayback is removed from the active retrieval chain.
+# LOCAL-447 measurement proved it unfit: 7% coverage, median 9.6s (over 5s budget),
+# both hits the wrong article. Wiring it puts a ~10s stall back on the failure
+# path LOCAL-445 made instant (~77s on an 8-stop tour for 9-year-stale content
+# 7% of the time).
+#
+# The probe (wayback_wikipedia_probe.py) and its fixture remain as evidence that
+# settled the question. The parsing code below is retained for reference and for
+# the probe to use, but is NOT called from the production retrieval chain.
 
 def _parse_wayback_timestamp(url_or_ts: str) -> Optional[datetime]:
     """Parse a Wayback Machine timestamp (YYYYMMDDHHmmss) from a URL or raw string.
     
-    Reused from exhibition_checklist.py per task spec.
+    Retained for wayback_wikipedia_probe.py reference. Not used in production chain.
     """
     m = re.search(r'/web/(\d{14})/', url_or_ts)
     if not m:
@@ -156,19 +198,16 @@ def _parse_wayback_timestamp(url_or_ts: str) -> Optional[datetime]:
 def _fetch_from_wayback_wikipedia(topic: str, timeout: float = 12.0) -> Optional[dict]:
     """Fetch the archived Wikipedia article from Wayback Machine.
 
-    Only called when Wikimedia is cold (per dead_host_breaker.is_host_cold).
-    
-    Returns dict with keys:
-        'text': str — extracted lead section
-        'is_from_archive': True
-        'wayback_snapshot_timestamp': str — YYYYMMDDHHmmss
-        'snapshot_age_days': int
-    Or None if no usable snapshot exists.
-    
-    NOTE (LOCAL-447 measurement): Coverage is very low (7%) and latency is high
-    (median 9.6s). This path exists only as a last resort when Wikimedia is down,
-    not as a reliable substitute.
+    LOCAL-448: REMOVED FROM PRODUCTION CHAIN. This function is retained for the
+    probe/fixture evidence but is never called from fetch_wikipedia_summary_with_provenance().
+
+    LOCAL-447 measurement rejected it:
+      - 7% coverage (2/30 titles)
+      - Median 9.6s latency (over 5s budget)
+      - Both hits returned the WRONG article
     """
+    # LOCAL-448: This function is no longer called from the production chain.
+    # It remains here only so wayback_wikipedia_probe.py can still import it.
     if not _l447_enabled():
         return None
 
@@ -254,21 +293,23 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
 def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> dict:
     """Fetch Wikipedia summary with provenance metadata.
 
-    LOCAL-447: Full retrieval chain with provenance tracking.
+    LOCAL-448 retrieval chain (simplified — Wayback removed):
+      1. Own DB (stop_corpus) — zero network cost, exact accent-folded match
+      2. Live Wikipedia REST/Action API — existing path
 
     Returns:
         dict with keys:
             'text': str — the summary text
-            'source': str — 'stop_corpus', 'wikipedia_live', or 'wayback_archive'
-            'is_from_archive': bool — True if content came from Wayback
-            'wayback_snapshot_timestamp': str — only if from archive
-            'snapshot_age_days': int or None — only if from archive
+            'source': str — 'stop_corpus' or 'wikipedia_live'
+            'is_from_archive': bool — always False (Wayback removed)
+            'wayback_snapshot_timestamp': str — always '' (Wayback removed)
+            'snapshot_age_days': int or None — always None (Wayback removed)
         Returns empty dict on total failure.
     """
     if not topic or not topic.strip():
         return {}
 
-    # ─── Step 1: DB-first (LOCAL-447, D403a step 1) ──────────────────────────
+    # ─── Step 1: DB-first (LOCAL-447, D403a step 1; LOCAL-448 fixed) ─────────
     db_content = _fetch_from_stop_corpus(topic)
     if db_content:
         return {
@@ -279,7 +320,15 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
             'snapshot_age_days': None,
         }
 
-    # ─── Step 2: Check if Wikimedia is cold ──────────────────────────────────
+    # ─── Step 2: Live Wikipedia (existing path) ──────────────────────────────
+    # LOCAL-448 (Defect 3): Wayback removed entirely. When Wikimedia is cold or
+    # returns 429, we fall through to the action API (pre-LOCAL-447 behaviour).
+    # This avoids the ~10s stall that Wayback imposed for 9-year-stale content
+    # with 7% coverage and wrong articles.
+
+    encoded_topic = quote(topic.strip().replace(" ", "_"), safe="")
+    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_topic}"
+
     try:
         from dead_host_breaker import is_host_cold, mark_host_cold
         wikimedia_cold = is_host_cold('en.wikipedia.org')
@@ -287,22 +336,12 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
         wikimedia_cold = False
 
     if wikimedia_cold:
-        # Skip live Wikipedia entirely — go straight to Wayback
-        logger.info(f"Wikipedia: Wikimedia is cold, skipping live fetch for '{topic}'")
-        wayback_result = _fetch_from_wayback_wikipedia(topic)
-        if wayback_result:
-            return {
-                'text': wayback_result['text'],
-                'source': 'wayback_archive',
-                'is_from_archive': True,
-                'wayback_snapshot_timestamp': wayback_result.get('wayback_snapshot_timestamp', ''),
-                'snapshot_age_days': wayback_result.get('snapshot_age_days'),
-            }
+        # LOCAL-449: Cold means STOP. The breaker contract says short-circuit
+        # immediately with zero network calls. Calling _fetch_via_action_api here
+        # would hit the same dead host (en/fr.wikipedia.org share the Wikimedia
+        # rate-limit bucket) — that's 20s of dead wait on the default path.
+        logger.info(f"Wikipedia: Wikimedia is cold, short-circuiting for '{topic}'")
         return {}
-
-    # ─── Step 3: Live Wikipedia (existing path) ──────────────────────────────
-    encoded_topic = quote(topic.strip().replace(" ", "_"), safe="")
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_topic}"
 
     try:
         response = requests.get(
@@ -316,29 +355,17 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
         )
 
         if response.status_code == 429:
-            # Rate limited — mark Wikimedia cold, try Wayback
+            # Rate limited — mark cold, fall through to action API
             try:
                 mark_host_cold('en.wikipedia.org', '429 rate limit')
             except Exception:
                 pass
-            logger.warning(f"Wikipedia: 429 for '{topic}', marked cold, trying Wayback")
-            if not _l447_enabled():
-                # Pre-LOCAL-447 behaviour: 429 fell through to the action API.
-                action_result = _fetch_via_action_api(topic)
-                if action_result:
-                    return {'text': action_result, 'source': 'wikipedia_live',
-                            'is_from_archive': False, 'wayback_snapshot_timestamp': '',
-                            'snapshot_age_days': None}
-                return {}
-            wayback_result = _fetch_from_wayback_wikipedia(topic)
-            if wayback_result:
-                return {
-                    'text': wayback_result['text'],
-                    'source': 'wayback_archive',
-                    'is_from_archive': True,
-                    'wayback_snapshot_timestamp': wayback_result.get('wayback_snapshot_timestamp', ''),
-                    'snapshot_age_days': wayback_result.get('snapshot_age_days'),
-                }
+            logger.warning(f"Wikipedia: 429 for '{topic}', marked cold, trying action API")
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                return {'text': action_result, 'source': 'wikipedia_live',
+                        'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                        'snapshot_age_days': None}
             return {}
 
         if response.status_code == 404:
@@ -383,20 +410,13 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
 
     except requests.Timeout:
         logger.warning(f"Wikipedia: timeout fetching '{topic}'")
-        # Timeout — mark cold, try Wayback
         try:
             mark_host_cold('en.wikipedia.org', 'timeout')
         except Exception:
             pass
-        wayback_result = _fetch_from_wayback_wikipedia(topic)
-        if wayback_result:
-            return {
-                'text': wayback_result['text'],
-                'source': 'wayback_archive',
-                'is_from_archive': True,
-                'wayback_snapshot_timestamp': wayback_result.get('wayback_snapshot_timestamp', ''),
-                'snapshot_age_days': wayback_result.get('snapshot_age_days'),
-            }
+        # LOCAL-449: A timeout means the host is dead. We just marked it cold —
+        # calling _fetch_via_action_api would hit the same dead Wikimedia bucket
+        # (en/fr.wikipedia.org). Short-circuit immediately.
         return {}
     except requests.RequestException as e:
         logger.warning(f"Wikipedia: request error for '{topic}': {e}")
@@ -504,13 +524,22 @@ def _fetch_via_action_api(topic: str) -> str:
     
     Returns the complete article extract — much richer than the REST summary endpoint.
     Also tries French Wikipedia for French museums.
+    
+    LOCAL-449: Consults dead_host_breaker per-host inside the loop. All Wikimedia
+    hosts share one rate-limit bucket, so if any is cold, all are skipped.
     """
     import requests as _req
+    from dead_host_breaker import is_host_cold, mark_host_cold
     if not topic or not topic.strip():
         return ""
     
     # Try English Wikipedia first (full text, no char limit)
     for wiki_host in ['en.wikipedia.org', 'fr.wikipedia.org']:
+        # LOCAL-449 fix #3: consult breaker per-host before making any request.
+        # The Wikimedia bucket rule means a cold en.wikipedia.org covers fr. too.
+        if is_host_cold(wiki_host):
+            logger.info(f"Wikipedia action API: {wiki_host} is cold, skipping")
+            continue
         try:
             response = _req.get(
                 f"https://{wiki_host}/w/api.php",
@@ -528,6 +557,10 @@ def _fetch_via_action_api(topic: str) -> str:
                 },
                 timeout=10,
             )
+            
+            if response.status_code == 429:
+                mark_host_cold(wiki_host, '429 rate limit in action API')
+                continue
             
             if response.status_code != 200:
                 continue
@@ -551,6 +584,9 @@ def _fetch_via_action_api(topic: str) -> str:
                     if extract and len(extract) > 200:
                         logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
                         return extract
+        except _req.Timeout:
+            mark_host_cold(wiki_host, 'timeout in action API')
+            continue
         except Exception as e:
             logger.warning(f"Wikipedia action API error ({wiki_host}) for '{topic}': {e}")
             continue

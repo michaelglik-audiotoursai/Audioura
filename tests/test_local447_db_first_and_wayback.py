@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """test_local447_db_first_and_wayback.py — LOCAL-447 acceptance tests.
 
+LOCAL-448 update: Wayback tests removed (Defect 3 — Wayback removed from chain).
+DB-first tests updated to use production DB connection pattern (Defect 2).
+
 Tests:
   1. DB-first path serves content from stop_corpus with zero network calls.
   2. The DB-first path goes RED when neutralised to a no-op (D242 standing check 1).
-  3. Wayback fallback is gated on is_host_cold() (does not fire when Wikimedia is live).
-  4. Wayback fallback fires when Wikimedia is cold and provides provenance.
-  5. Backwards compatibility: fetch_wikipedia_summary returns a plain string.
+  3. Backwards compatibility: fetch_wikipedia_summary returns a plain string.
+  4. Wayback is NOT called from the chain (LOCAL-448, Defect 3).
 """
 import json
 import os
@@ -31,14 +33,27 @@ class TestDBFirstPath(unittest.TestCase):
 
     def test_db_first_serves_known_title_zero_network(self):
         """DB-first path serves 'Île Sainte-Marguerite' from stop_corpus without network."""
-        from rag_retriever import fetch_wikipedia_summary_with_provenance
+        from rag_retriever import fetch_wikipedia_summary_with_provenance, _fetch_from_stop_corpus
 
-        # Patch requests.get to fail loudly if called (proves zero network)
-        with patch('rag_retriever.requests.get') as mock_get:
-            mock_get.side_effect = AssertionError(
-                "Network call made! DB-first path should have served this."
-            )
-            result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
+        # Mock the DB connection to return a known row
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [
+            ('Île Sainte-Marguerite',
+             json.dumps([{'text': 'The island of Sainte-Marguerite is the largest of the Lérins Islands, '
+                          'located off the coast of Cannes in the French Riviera. It is famous for '
+                          'Fort Royal, where the Man in the Iron Mask was imprisoned. ' * 3}]),
+             json.dumps([{'type': 'wikipedia', 'url': 'https://en.wikipedia.org/wiki/Ile_Sainte-Marguerite'}])),
+        ]
+
+        with patch('rag_retriever._get_db_connection', return_value=mock_conn):
+            # Patch requests.get to fail loudly if called (proves zero network)
+            with patch('rag_retriever.requests.get') as mock_get:
+                mock_get.side_effect = AssertionError(
+                    "Network call made! DB-first path should have served this."
+                )
+                result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
 
         self.assertIsInstance(result, dict)
         self.assertEqual(result['source'], 'stop_corpus')
@@ -50,10 +65,20 @@ class TestDBFirstPath(unittest.TestCase):
         """DB-first matches accent-folded titles (D243)."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
 
-        with patch('rag_retriever.requests.get') as mock_get:
-            mock_get.side_effect = AssertionError("Network call — DB should serve this")
-            # Try without accents — should still match via folding
-            result = fetch_wikipedia_summary_with_provenance('Ile Sainte-Marguerite')
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [
+            ('Île Sainte-Marguerite',
+             json.dumps([{'text': 'The island of Sainte-Marguerite content here for testing purposes ' * 3}]),
+             json.dumps([{'type': 'wikipedia', 'url': 'https://en.wikipedia.org/wiki/Ile_Sainte-Marguerite'}])),
+        ]
+
+        with patch('rag_retriever._get_db_connection', return_value=mock_conn):
+            with patch('rag_retriever.requests.get') as mock_get:
+                mock_get.side_effect = AssertionError("Network call — DB should serve this")
+                # Try without accents — should still match via folding
+                result = fetch_wikipedia_summary_with_provenance('Ile Sainte-Marguerite')
 
         self.assertIsInstance(result, dict)
         self.assertEqual(result['source'], 'stop_corpus')
@@ -70,41 +95,52 @@ class TestDBFirstPath(unittest.TestCase):
 
         # Neutralise the DB-first path
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
-            # Now requests.get should be called (network path)
-            # We mock it to return a 404 to prove the fallback chain proceeds
-            mock_resp = MagicMock()
-            mock_resp.status_code = 404
-            mock_resp.json.return_value = {}
+            # Ensure Wikimedia is NOT cold (so the REST path fires)
+            with patch('dead_host_breaker.is_host_cold', return_value=False):
+                # Now requests.get should be called (network path)
+                mock_resp = MagicMock()
+                mock_resp.status_code = 404
+                mock_resp.json.return_value = {}
 
-            with patch('rag_retriever.requests.get', return_value=mock_resp) as mock_get:
-                result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
+                with patch('rag_retriever.requests.get', return_value=mock_resp) as mock_get:
+                    with patch('rag_retriever._fetch_via_action_api', return_value=''):
+                        result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
 
-            # The network WAS called — proof the DB-first path was the only
-            # thing preventing network calls
-            self.assertTrue(mock_get.called,
-                            "Network was NOT called even with DB-first neutralised — "
-                            "test cannot distinguish working from broken")
+                # The network WAS called — proof the DB-first path was the only
+                # thing preventing network calls
+                self.assertTrue(mock_get.called,
+                                "Network was NOT called even with DB-first neutralised — "
+                                "test cannot distinguish working from broken")
 
     def test_backwards_compat_returns_string(self):
         """fetch_wikipedia_summary() returns a plain string (not dict)."""
         from rag_retriever import fetch_wikipedia_summary
 
-        with patch('rag_retriever.requests.get') as mock_get:
-            mock_get.side_effect = AssertionError("Network call — DB should serve this")
-            result = fetch_wikipedia_summary('Île Sainte-Marguerite')
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [
+            ('Île Sainte-Marguerite',
+             json.dumps([{'text': 'The island of Sainte-Marguerite content about the island ' * 3}]),
+             json.dumps([{'type': 'wikipedia', 'url': 'https://en.wikipedia.org/wiki/Ile_Sainte-Marguerite'}])),
+        ]
+
+        with patch('rag_retriever._get_db_connection', return_value=mock_conn):
+            with patch('rag_retriever.requests.get') as mock_get:
+                mock_get.side_effect = AssertionError("Network call — DB should serve this")
+                result = fetch_wikipedia_summary('Île Sainte-Marguerite')
 
         self.assertIsInstance(result, str)
         self.assertGreater(len(result), 50)
 
 
-class TestWaybackFallback(unittest.TestCase):
-    """Tests for the Wayback Machine fallback path."""
+class TestWaybackRemoved(unittest.TestCase):
+    """LOCAL-448: Wayback is removed from the production retrieval chain."""
 
     def test_wayback_not_called_when_wikimedia_live(self):
-        """Wayback is NOT invoked when Wikimedia is healthy (live path works)."""
+        """Wayback is NOT invoked when Wikimedia is healthy."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
 
-        # Mock a successful Wikipedia response
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'extract': 'Test artist biography here.'}
@@ -117,87 +153,71 @@ class TestWaybackFallback(unittest.TestCase):
         mock_wb.assert_not_called()
         self.assertEqual(result['source'], 'wikipedia_live')
 
-    def test_wayback_called_when_wikimedia_cold(self):
-        """Wayback IS invoked when dead_host_breaker says Wikimedia is cold."""
+    def test_wayback_not_called_when_wikimedia_cold(self):
+        """LOCAL-448/449: Wayback NOT invoked even when Wikimedia is cold.
+        LOCAL-449: Cold means STOP — no action API either, returns {}."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
-
-        wayback_data = {
-            'text': 'Archived biography of the artist.',
-            'is_from_archive': True,
-            'wayback_snapshot_timestamp': '20250115120000',
-            'snapshot_age_days': 210,
-        }
 
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
             with patch('dead_host_breaker.is_host_cold', return_value=True):
-                with patch('rag_retriever._fetch_from_wayback_wikipedia',
-                           return_value=wayback_data) as mock_wb:
-                    result = fetch_wikipedia_summary_with_provenance('Some Artist')
+                with patch('rag_retriever._fetch_from_wayback_wikipedia') as mock_wb:
+                    with patch('rag_retriever._fetch_via_action_api') as mock_action:
+                        result = fetch_wikipedia_summary_with_provenance('Some Artist')
 
-        mock_wb.assert_called_once_with('Some Artist')
-        self.assertEqual(result['source'], 'wayback_archive')
-        self.assertTrue(result['is_from_archive'])
-        self.assertEqual(result['wayback_snapshot_timestamp'], '20250115120000')
-        self.assertEqual(result['snapshot_age_days'], 210)
+        mock_wb.assert_not_called()
+        # LOCAL-449: Cold means stop — no action API, returns empty
+        mock_action.assert_not_called()
+        self.assertEqual(result, {})
 
-    def test_wayback_called_on_429(self):
-        """Wayback is invoked when Wikipedia returns 429 (rate limit)."""
+    def test_wayback_not_called_on_429(self):
+        """LOCAL-448: Wayback NOT invoked on 429 — falls to action API."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
-        import dead_host_breaker
-
-        # Reset cold hosts for clean test
-        dead_host_breaker.reset_cold_hosts()
+        try:
+            import dead_host_breaker
+            dead_host_breaker.reset_cold_hosts()
+        except Exception:
+            pass
 
         mock_resp = MagicMock()
         mock_resp.status_code = 429
         mock_resp.text = 'Too Many Requests'
 
-        wayback_data = {
-            'text': 'Archived content from wayback.',
-            'is_from_archive': True,
-            'wayback_snapshot_timestamp': '20260101000000',
-            'snapshot_age_days': 30,
-        }
-
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
             with patch('rag_retriever.requests.get', return_value=mock_resp):
-                with patch('rag_retriever._fetch_from_wayback_wikipedia',
-                           return_value=wayback_data) as mock_wb:
-                    result = fetch_wikipedia_summary_with_provenance('Test Title')
+                with patch('rag_retriever._fetch_from_wayback_wikipedia') as mock_wb:
+                    with patch('rag_retriever._fetch_via_action_api', return_value='Fallback'):
+                        result = fetch_wikipedia_summary_with_provenance('Test Title')
 
-        mock_wb.assert_called_once()
-        self.assertEqual(result['source'], 'wayback_archive')
-        self.assertTrue(result['is_from_archive'])
+        mock_wb.assert_not_called()
 
-        # Clean up
-        dead_host_breaker.reset_cold_hosts()
-
-    def test_provenance_label_present(self):
-        """Archive-sourced content carries provenance label (acceptance criterion)."""
-        from rag_retriever import fetch_wikipedia_summary_with_provenance
-
-        wayback_data = {
-            'text': 'The Palais Lascaris is a 17th-century palace in Nice.',
-            'is_from_archive': True,
-            'wayback_snapshot_timestamp': '20251201143022',
-            'snapshot_age_days': 254,
-        }
-
-        with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
-            with patch('dead_host_breaker.is_host_cold', return_value=True):
-                with patch('rag_retriever._fetch_from_wayback_wikipedia',
-                           return_value=wayback_data):
-                    result = fetch_wikipedia_summary_with_provenance('Palais Lascaris')
-
-        # Provenance must be present and correct
-        self.assertTrue(result['is_from_archive'])
-        self.assertEqual(result['wayback_snapshot_timestamp'], '20251201143022')
-        self.assertEqual(result['snapshot_age_days'], 254)
-        self.assertEqual(result['source'], 'wayback_archive')
+        try:
+            import dead_host_breaker
+            dead_host_breaker.reset_cold_hosts()
+        except Exception:
+            pass
 
 
 class TestDBFirstIntegration(unittest.TestCase):
     """Integration test — requires live DB connection."""
+
+    def setUp(self):
+        """Set host-side DB env vars for _get_db_connection() to find the DB."""
+        self._orig_env = {}
+        for key in ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'):
+            self._orig_env[key] = os.environ.get(key)
+        os.environ['DB_HOST'] = 'localhost'
+        os.environ['DB_PORT'] = '5433'
+        os.environ['DB_NAME'] = 'audiotours'
+        os.environ['DB_USER'] = 'admin'
+        os.environ['DB_PASSWORD'] = 'password123'
+
+    def tearDown(self):
+        """Restore original env vars."""
+        for key, val in self._orig_env.items():
+            if val is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = val
 
     def test_live_db_first_no_network(self):
         """Live integration: DB-first serves stop_corpus content without network.
