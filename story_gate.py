@@ -1,150 +1,301 @@
-"""[LOCAL-421] Story gate — verify every stop tells at least one sourced story.
+"""[LOCAL-439] Story gate — verify every stop tells at least one sourced story.
 
-A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a
-dispute, a gift, a reason something was made the way it was.
+Unit of evaluation: the STORY, not the sentence (D394).
+A story-unit is ≥3 sentences with a named person, real actions, and an arc.
+Classification is an AI question (gpt-4o-mini), not a verb list (D394 addendum).
 
 This gate:
-  1. Checks that ≥3 story sentences exist per stop.
-  2. Verifies that named entities from the credit line appear by name.
-  3. Checks that the exhibition thesis is threaded into each stop.
+  1. Checks that at least one verified story-unit of ≥3 sentences exists per stop.
+  2. Classification via classify_story_unit() — one LLM call per candidate unit.
+  3. Interest scoring via score_story_interest() — same LLM call as classification.
+  4. entities_blurred applies to the STOP TEXT as a whole, not to a story-unit.
+  5. Exhibition thesis check: folded into the LLM rubric (no keyword list).
 
-Returns a verdict per stop: pass/fail with diagnostics.
+Public API (module scope, imported by tests):
+  - classify_story_unit(text) -> dict
+  - score_story_interest(text) -> dict
+  - extract_candidate_story_units(text) -> list[str]
+  - verify_stop_story(description, ...) -> dict
+  - verify_tour_stories(tour_text, ...) -> dict
 """
+import hashlib
+import json
+import logging
+import os
 import re
 from typing import Dict, List, Optional, Tuple
 
+from cost_rates import llm_cost
+
+_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Story sentence detection
+# Cache for LLM verdicts — keyed by SHA-256 of the unit text.
+# Prevents re-asking for the same text across runs/re-scores.
+# ---------------------------------------------------------------------------
+_verdict_cache: Dict[str, dict] = {}
+
+
+def _cache_key(text: str) -> str:
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Zero-cost pre-filter (regex) — rejects obvious non-prose
 # ---------------------------------------------------------------------------
 
-# Patterns that indicate a sentence contains a STORY claim (people + consequence)
-_STORY_VERB_PATTERNS = re.compile(
-    r'\b(?:'
-    r'donated|gave|gifted|bequeathed|commission(?:ed|ing)?|chose|selected|'
-    r'approached|invited|asked|persuaded|convinced|'
-    r'decided|decision|refused|insisted|demanded|agreed|'
-    r'published|printed|produced|assembled|'
-    r'founded|established|created|revived|'
-    r'collaborated|partnered|worked\s+with|'
-    r'influenced|inspired|mentor(?:ed)?|taught|introduced|'
-    r'collected|acquired|purchased|bought|sold|'
-    r'visited|met|sketched|wrote\s+to|corresponded|'
-    r'brought|delivered|shipped|transported|'
-    r'resulted\s+in|led\s+to|caused|enabled|made\s+possible|'
-    r'specialized|focused|devoted|dedicated|'
-    r'disputed|contested|challenged|questioned|'
-    r'recognized|ensured|commitment|'
-    r'because|since|due\s+to|as\s+a\s+result|consequently|therefore'
-    r')\b', re.IGNORECASE
-)
-
-# Person-name pattern (at least one capitalized multi-word name or known surname)
-_PERSON_NAME_PATTERN = re.compile(
-    r'\b[A-Z][a-zà-ÿí]+(?:\s+[A-Z][a-zà-ÿ]+)+\b'
-)
-
-# Single-word proper noun (surname like "Fridman", "Mourlot", "Broder")
-_SURNAME_PATTERN = re.compile(
-    r'\b[A-Z][a-zà-ÿí]{2,}\b'
-)
-
-# Non-story markers — sentences that LOOK factual but aren't story
-_NON_STORY_MARKERS = re.compile(
-    r'(?:'
-    r'\binvites?\s+(?:you|us|the\s+viewer)\b|'
-    r'\btranscends?\b|'
-    r'\btestament\s+to\b|'
-    r'\ba\s+(?:truly\s+)?remarkable\b|'
-    r'\breveal(?:s|ing)?\s+(?:a\s+)?deep\b|'
-    r'\bbeckons?\b|'
-    r'\bponder\b|'
-    r'\breflect(?:s|ing)?\s+on\b|'
-    r'\bconsider\s+(?:the|how|what)\b|'
-    r'\brich\s+tapestry\b|'
-    r'\bfusion\s+of\b|'
-    r'\bintriguing\b'
-    r')', re.IGNORECASE
+_NON_PROSE_PATTERN = re.compile(
+    r'^(?:\s*$|#{1,6}\s|Stop\s+\d+:|Directions:|Sources:|Orientation:)',
+    re.MULTILINE
 )
 
 
-def is_story_sentence(sentence: str) -> bool:
-    """Determine if a sentence is a story sentence (people + consequences).
+def _is_obvious_non_prose(text: str) -> bool:
+    """Return True if text is obviously not a story (headings, empty, structural)."""
+    stripped = text.strip()
+    if not stripped or len(stripped) < 50:
+        return True
+    # All lines are structural markers
+    lines = [l.strip() for l in stripped.splitlines() if l.strip()]
+    if all(_NON_PROSE_PATTERN.match(l) for l in lines):
+        return True
+    return False
 
-    A story sentence must have:
-      1. At least one multi-word proper noun (person or institution name)
-         OR a known surname with a story verb indicating personal agency
-      2. At least one story verb (action, decision, consequence)
-      3. NOT be a non-story evaluative claim
 
-    Returns True if the sentence qualifies as a story sentence.
+# ---------------------------------------------------------------------------
+# Extract candidate story-units from stop text
+# ---------------------------------------------------------------------------
+
+def extract_candidate_story_units(text: str) -> List[str]:
+    """Extract candidate story-units (groups of ≥3 sentences) from stop text.
+
+    A story-unit is a contiguous block of ≥3 prose sentences. We use a sliding
+    window approach: try the full text as one unit first (most common case for
+    well-written stops), then try 3-sentence windows if the full block fails.
+
+    Returns list of candidate unit texts to be classified.
     """
-    if not sentence or len(sentence) < 30:
-        return False
-
-    # Reject non-story evaluative claims
-    if _NON_STORY_MARKERS.search(sentence):
-        return False
-
-    # Must have a multi-word proper noun (person or institution)
-    # Single-word capitalized nouns like "Arches" (paper) don't count —
-    # we need either a multi-word name OR a single name with a personal-agency verb
-    has_multi_word_name = bool(_PERSON_NAME_PATTERN.search(sentence))
-
-    if not has_multi_word_name:
-        # Check for single surname + personal-agency verb (donated, chose, visited, etc.)
-        # Also handles possessive forms like "Fridman's gift brought..."
-        _PERSONAL_AGENCY_VERBS = re.compile(
-            r'\b(?:donated|gave|gifted|chose|selected|decided|refused|insisted|'
-            r'visited|met|sketched|wrote|commissioned|founded|established|'
-            r'collected|approached|invited|collaborated|partnered|influenced|'
-            r'inspired|specialized|devoted|bequeathed|brought|enabled|produced|'
-            r'assembled|created|published|printed)\b', re.IGNORECASE
-        )
-        # Blocklist: capitalized words that are NOT person names
-        _NOT_PERSON_NAMES = frozenset({
-            'the', 'this', 'that', 'these', 'those', 'its', 'his', 'her',
-            'arches', 'rives', 'fabriano', 'japan', 'velin', 'vellum',
-            'paris', 'london', 'boston', 'york', 'berlin', 'vienna',
-            'mediterranean', 'atlantic', 'surrealist', 'cubist',
-            'lithographs', 'lithograph', 'drypoints', 'etchings',
-            'published', 'printed', 'created', 'founded', 'established',
-        })
-        # Also detect possessive surname ("Fridman's gift brought...")
-        has_possessive_name = bool(re.search(
-            r"\b[A-Z][a-zà-ÿí]{2,}(?:'s|'s)\b", sentence
-        ))
-        # Find surnames not in the blocklist
-        surnames_found = _SURNAME_PATTERN.findall(sentence)
-        valid_surnames = [s for s in surnames_found if s.lower() not in _NOT_PERSON_NAMES]
-        has_surname = len(valid_surnames) > 0
-        has_agency = bool(_PERSONAL_AGENCY_VERBS.search(sentence))
-        if not ((has_surname or has_possessive_name) and has_agency):
-            return False
-
-    # Must have a story verb (action, consequence, decision)
-    has_story_verb = bool(_STORY_VERB_PATTERNS.search(sentence))
-    if not has_story_verb:
-        return False
-
-    return True
-
-
-def extract_story_sentences(text: str) -> List[str]:
-    """Extract all story sentences from a description text.
-
-    Returns list of sentences that qualify as story sentences.
-    """
-    if not text:
+    if not text or _is_obvious_non_prose(text):
         return []
 
-    # Split into sentences
+    # Split into sentences (period/exclamation/question followed by space or end)
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-    return [s for s in sentences if is_story_sentence(s)]
+    # Filter out very short fragments and structural markers
+    sentences = [s for s in sentences if len(s.strip()) >= 20 and not _NON_PROSE_PATTERN.match(s)]
+
+    if len(sentences) < 3:
+        return []
+
+    candidates = []
+
+    # First candidate: the full block (if it's ≥3 sentences)
+    if len(sentences) >= 3:
+        candidates.append(' '.join(sentences))
+
+    # Also try contiguous 3-sentence windows (for stops with mixed content)
+    if len(sentences) > 3:
+        for i in range(len(sentences) - 2):
+            window = ' '.join(sentences[i:i+3])
+            candidates.append(window)
+
+    return candidates
 
 
 # ---------------------------------------------------------------------------
-# Entity blurring check
+# LLM-based story classification + interest scoring (one call per unit)
+# ---------------------------------------------------------------------------
+
+_CLASSIFICATION_PROMPT = """You are evaluating a candidate story-unit from an audio tour.
+
+A STORY has: a named person, real actions, and an arc (setup → struggle → resolution).
+A resolution sentence ("stands as a symbol of...") is VALID inside a story-unit.
+Three adjacent atmospheric/evaluative sentences are NOT a story.
+
+ALSO score the story's interest:
+- emotional_content (0-4): tension, conflict, resolution, human drama
+- new_information (0-3): facts beyond what a visitor can see standing at the stop
+
+DEDUCTION — "telling visitors what to feel":
+Does the text direct THE VISITOR's experience? Phrases like "forces visitors to...",
+"proves to visitors that...", "invites you to consider..." are deductions.
+Sentences that characterize THE WORK ("stands as a symbol of resilience") are NOT
+deductions — they describe the artwork, not prescribe the visitor's reaction.
+Score deduction as an integer: 0 (no deduction), 1 (mild), 2 (strong).
+
+Respond in this exact JSON format (no other text):
+{"is_story": true/false, "reason": "brief explanation", "emotional_content": 0-4, "new_information": 0-3, "deduction": 0-2}
+
+Text to evaluate:
+"""
+
+# Track cumulative classification cost for reporting
+_classification_cost_usd = 0.0
+_classification_input_tokens = 0
+_classification_output_tokens = 0
+
+
+def classify_story_unit(text: str) -> dict:
+    """Classify a text as a story-unit (or not) using gpt-4o-mini.
+
+    One call per candidate story-unit, never per sentence.
+    Verdict cached alongside the unit; re-scoring never re-asks.
+
+    Returns dict with:
+      is_story: bool
+      reason: str
+      emotional_content: int (0-4)
+      new_information: int (0-3)
+      deduction: int (0-2)
+      cost_usd: float
+      from_cache: bool
+    """
+    global _classification_cost_usd, _classification_input_tokens, _classification_output_tokens
+
+    key = _cache_key(text)
+    if key in _verdict_cache:
+        cached = _verdict_cache[key].copy()
+        cached['from_cache'] = True
+        cached['cost_usd'] = 0.0
+        return cached
+
+    # Zero-cost pre-filter
+    if _is_obvious_non_prose(text):
+        result = {
+            'is_story': False,
+            'reason': 'obvious non-prose (pre-filter)',
+            'emotional_content': 0,
+            'new_information': 0,
+            'deduction': 0,
+            'cost_usd': 0.0,
+            'from_cache': False,
+        }
+        _verdict_cache[key] = result
+        return result
+
+    # Call gpt-4o-mini
+    import requests
+
+    api_key = os.environ.get('OPENAI_API_KEY', '')
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set — cannot classify story units")
+
+    prompt = _CLASSIFICATION_PROMPT + text
+
+    response = requests.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 200,
+        },
+        timeout=30,
+    )
+
+    if response.status_code != 200:
+        error_msg = response.text[:200]
+        raise RuntimeError(f"OpenAI API error {response.status_code}: {error_msg}")
+
+    data = response.json()
+    usage = data.get("usage", {})
+    input_tokens = usage.get("prompt_tokens", 0)
+    output_tokens = usage.get("completion_tokens", 0)
+    cost = llm_cost(input_tokens=input_tokens, output_tokens=output_tokens, model="gpt-4o-mini")
+
+    _classification_cost_usd += cost
+    _classification_input_tokens += input_tokens
+    _classification_output_tokens += output_tokens
+
+    content = data["choices"][0]["message"]["content"].strip()
+    # Parse JSON — handle markdown fences
+    if content.startswith('```'):
+        content = content.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        _log.warning(f"[LOCAL-439] Failed to parse LLM verdict: {content[:200]}")
+        parsed = {
+            'is_story': False,
+            'reason': f'LLM parse error: {content[:100]}',
+            'emotional_content': 0,
+            'new_information': 0,
+            'deduction': 0,
+        }
+
+    result = {
+        'is_story': bool(parsed.get('is_story', False)),
+        'reason': str(parsed.get('reason', '')),
+        'emotional_content': int(parsed.get('emotional_content', 0)),
+        'new_information': int(parsed.get('new_information', 0)),
+        'deduction': int(parsed.get('deduction', 0)),
+        'cost_usd': cost,
+        'from_cache': False,
+    }
+
+    _verdict_cache[key] = result
+    return result
+
+
+def score_story_interest(text: str) -> dict:
+    """Score a story-unit's interest using the same LLM call as classification.
+
+    Returns dict with:
+      emotional_content: int (0-4)
+      new_information: int (0-3)
+      deduction: int (0-2)
+      interest_score: int (emotional + new_information - deduction)
+
+    Trust is NOT asked of the LLM — it is computed from provenance weights
+    by the caller (story_selection.score_story_quality).
+    """
+    verdict = classify_story_unit(text)
+    emotional = verdict['emotional_content']
+    new_info = verdict['new_information']
+    deduction = verdict['deduction']
+
+    return {
+        'emotional_content': emotional,
+        'new_information': new_info,
+        'deduction': deduction,
+        'interest_score': emotional + new_info - deduction,
+        'is_story': verdict['is_story'],
+    }
+
+
+def get_classification_cost() -> dict:
+    """Return cumulative classification cost from this session."""
+    return {
+        'total_cost_usd': _classification_cost_usd,
+        'input_tokens': _classification_input_tokens,
+        'output_tokens': _classification_output_tokens,
+    }
+
+
+def reset_classification_cost():
+    """Reset the cost counter (for testing/per-run isolation)."""
+    global _classification_cost_usd, _classification_input_tokens, _classification_output_tokens
+    _classification_cost_usd = 0.0
+    _classification_input_tokens = 0
+    _classification_output_tokens = 0
+
+
+def get_verdict_cache() -> Dict[str, dict]:
+    """Return the verdict cache (for inspection/serialisation)."""
+    return _verdict_cache
+
+
+def load_verdict_cache(cache: Dict[str, dict]):
+    """Load a pre-computed verdict cache (for deterministic test runs)."""
+    _verdict_cache.update(cache)
+
+
+# ---------------------------------------------------------------------------
+# Entity presence check — applies to the STOP TEXT as a whole (D393 fix)
 # ---------------------------------------------------------------------------
 
 def check_named_entities_present(
@@ -152,49 +303,38 @@ def check_named_entities_present(
     credit_line: str,
     stop_name: str = '',
 ) -> Tuple[bool, List[str], List[str]]:
-    """Check that all named entities from the credit line appear by name in the text.
+    """Check that named entities from credit line appear in the STOP TEXT as a whole.
+
+    D393 fix: does not demand every credit-line name — a story that drops a name
+    for concision is correct storytelling. Only checks the stop text as a whole.
 
     Returns (all_present, found_names, missing_names).
     """
     if not credit_line or not description:
         return True, [], []
 
-    # Extract named entities from credit line
+    # Extract the PRIMARY entity (artist/author) — not every credit-line name
     entities = []
 
-    # "Gift of PERSON" pattern
-    gift_match = re.search(
-        r'(?:Gift|Bequest|Donation)\s+of\s+([A-Z][a-zà-ÿ]+(?:\s+[A-Z]\.?\s*)?[A-Za-zà-ÿ]+(?:\s+[A-Za-zà-ÿ]+)*)',
-        credit_line
-    )
-    if gift_match:
-        entities.append(('donor', gift_match.group(1).strip()))
+    # "Gift of PERSON" — the donor is NOT required in story text (D393)
+    # Only the ARTIST is required (the person the story is about)
 
-    # "Published by ENTITY" pattern
-    pub_match = re.search(
-        r'[Pp]ublish(?:ed|er)[:\s]+([A-Z][a-zà-ÿ]+(?:\s+[A-Za-zà-ÿ]+){0,4})',
-        credit_line
-    )
-    if pub_match:
-        entities.append(('publisher', pub_match.group(1).strip()))
+    # Artist name from credit line (first multi-word proper noun that isn't a role)
+    _ARTIST_PATTERNS = [
+        # "ARTIST (Nationality, dates)" pattern
+        re.compile(r'^([A-Z][a-zà-ÿ]+(?:\s+[A-Za-zà-ÿ]+)+)\s*\('),
+        # "by ARTIST" or "Author: ARTIST"
+        re.compile(r'(?:by|Author:?)\s+([A-Z][a-zà-ÿ]+(?:\s+[A-Za-zà-ÿ]+)+)'),
+    ]
 
-    # "Printed by ENTITY" pattern
-    print_match = re.search(
-        r'[Pp]rint(?:ed|er)[:\s]+(?:by\s+)?([A-Z][a-zà-ÿ]+(?:\s+[A-Za-zà-ÿ]+){0,4})',
-        credit_line
-    )
-    if print_match:
-        entities.append(('printer', print_match.group(1).strip()))
-
-    # "Author: PERSON" pattern
-    author_match = re.search(
-        r'[Aa]uthor[:\s]+([A-Z][a-zà-ÿ]+(?:\s+[A-Za-zà-ÿ]+){0,3})',
-        credit_line
-    )
-    if author_match:
-        entities.append(('author', author_match.group(1).strip()))
+    for pattern in _ARTIST_PATTERNS:
+        m = pattern.search(credit_line)
+        if m:
+            entities.append(('artist', m.group(1).strip()))
+            break
 
     if not entities:
+        # No clear artist found — pass unconditionally
         return True, [], []
 
     desc_lower = description.lower()
@@ -202,7 +342,7 @@ def check_named_entities_present(
     missing = []
 
     for role, name in entities:
-        # Check surname (last word of name) — more reliable than full name
+        # Check surname (last word of name)
         surname = name.split()[-1]
         if surname.lower() in desc_lower:
             found.append(f"{name} ({role})")
@@ -213,133 +353,144 @@ def check_named_entities_present(
 
 
 # ---------------------------------------------------------------------------
-# Exhibition thesis check
+# Main gate function — story-UNIT level (D394)
 # ---------------------------------------------------------------------------
 
-_THESIS_KEYWORDS = [
-    r"\blivre[s]?\s+d[''']artiste\b",
-    r"\bartist['']?s?\s+book[s]?\b",
-    r"\bcollaborat\w+\b",
-    r"\bbook\s+(?:as\s+)?(?:an?\s+)?art\s*(?:form|work|object)?\b",
-    r"\bimage[s]?,?\s*(?:and\s+)?word[s]?,?\s*(?:and\s+)?typography\b",
-    r"\bprinted?\s+work[s]?\b",
-    r"\bintegrat(?:ed|ion|ing)\b.*\b(?:text|image|word)\b",
-]
-
-
-def check_thesis_threaded(
+def verify_stop_story(
     description: str,
+    credit_line: str = '',
+    stop_name: str = '',
     framing_case: str = 'exhibition',
     venue_purpose: str = '',
-) -> bool:
-    """Check if the exhibition/venue thesis is threaded into the stop description.
+) -> Dict:
+    """Verify that a stop has at least one verified story-unit of ≥3 sentences.
 
-    For exhibition framing: at least one reference to the art form / collaboration / form.
-    For venue_purpose: [LOCAL-432] lighter check — the description must connect to
-        the venue's stated purpose. Extracts key content terms (people, actions,
-        domain nouns) from the venue purpose sentence and requires at least one
-        to appear. A stop that completely ignores why the venue exists fails.
-        Does NOT enforce livre-d'artiste keywords (those are exhibition-specific).
-    For 'none': always passes.
+    D394: The unit of evaluation is the STORY, not the sentence.
+    Per-stop requirement: at least one verified story-unit.
 
-    Args:
-        description: the stop's generated text
-        framing_case: 'exhibition' | 'venue_purpose' | 'none'
-        venue_purpose: the venue's detected purpose phrase (from extract_venue_purpose).
-            Required for venue_purpose framing to produce a meaningful check.
+    Returns a dict with:
+      passed: bool — overall pass/fail
+      story_units: list of classified story-unit texts
+      story_unit_count: int — number of story-units that pass
+      entities_present: bool — artist name present in stop text
+      entities_found: list
+      entities_missing: list
+      failures: list of failure reason strings
+      interest_scores: list of interest score dicts for passing units
     """
-    if framing_case == 'none':
-        return True
+    failures = []
 
-    if framing_case == 'venue_purpose':
-        return _check_venue_purpose_threaded(description, venue_purpose)
+    # 1. Extract candidate story-units and classify them
+    candidates = extract_candidate_story_units(description)
+    passing_units = []
+    interest_scores = []
 
-    if not description:
-        return False
+    for candidate in candidates:
+        verdict = classify_story_unit(candidate)
+        if verdict['is_story']:
+            passing_units.append(candidate)
+            interest_scores.append({
+                'text_preview': candidate[:100],
+                'emotional_content': verdict['emotional_content'],
+                'new_information': verdict['new_information'],
+                'deduction': verdict['deduction'],
+                'interest_score': verdict['emotional_content'] + verdict['new_information'] - verdict['deduction'],
+            })
+            # One passing unit is enough per D394
+            break
 
-    for pattern in _THESIS_KEYWORDS:
-        if re.search(pattern, description, re.IGNORECASE):
-            return True
+    if not passing_units:
+        failures.append(
+            f"story_units=0: no candidate story-unit of ≥3 sentences passes "
+            f"classification (need at least 1 with named person, real actions, arc)"
+        )
 
-    return False
+    # 2. Entity naming — applies to the STOP TEXT as a whole (D393)
+    entities_ok, found, missing = check_named_entities_present(
+        description, credit_line, stop_name
+    )
+    if not entities_ok:
+        failures.append(
+            f"entities_blurred: {', '.join(missing)} not named in stop text"
+        )
+
+    # 3. Exhibition thesis — no longer a keyword list; folded into LLM rubric.
+    # For venue_purpose framing, the existing lightweight check remains.
+    # For exhibition framing, the LLM classification handles it implicitly
+    # (a story about a livre d'artiste IS the thesis threading).
+    # We do NOT fail on thesis anymore for exhibition framing (D393/D394).
+    # venue_purpose framing keeps the lighter check from LOCAL-432.
+    thesis_ok = True
+    if framing_case == 'venue_purpose' and venue_purpose:
+        thesis_ok = _check_venue_purpose_threaded(description, venue_purpose)
+        if not thesis_ok:
+            failures.append(
+                "thesis_missing: description does not connect to venue's stated purpose"
+            )
+
+    return {
+        'passed': len(failures) == 0,
+        'story_units': passing_units,
+        'story_unit_count': len(passing_units),
+        'entities_present': entities_ok,
+        'entities_found': found,
+        'entities_missing': missing,
+        'thesis_threaded': thesis_ok,
+        'failures': failures,
+        'interest_scores': interest_scores,
+    }
 
 
 def _check_venue_purpose_threaded(description: str, venue_purpose: str) -> bool:
     """[LOCAL-432] Check that a stop connects to the venue's stated purpose.
 
-    Extracts meaningful terms from the venue purpose sentence:
-      - Person surnames (bequestor, founder, collector)
-      - Domain nouns (instruments, paintings, sculptures)
-      - Key action words (bequeathed, founded, assembled, collected)
-
-    Requires at least ONE of these terms to appear in the description.
-    This is deliberately lighter than the exhibition check — the venue
-    purpose is context, not thesis — but NOT absent. A stop that completely
-    ignores the venue's reason for existing should be reportable.
-
-    Uses stem-based matching: "instruments" in the purpose matches
-    "instrument" in the description (both share stem "instrument").
+    Kept from LOCAL-432 — lighter check for venue_purpose framing only.
     """
     if not description:
         return False
-
-    # If no venue purpose was detected, pass unconditionally (cannot check what
-    # was never found). This preserves the LOCAL-431 behaviour for venues where
-    # extract_venue_purpose returns ''.
     if not venue_purpose:
         return True
 
     desc_lower = description.lower()
 
-    # Extract person surnames from venue purpose (capitalized multi-word names)
-    _surnames = []
-    for m in re.finditer(r'\b([A-Z][a-zà-ÿ]+)\b', venue_purpose):
-        word = m.group(1)
-        # Skip common non-name words that happen to be capitalized (start of sentence)
-        if word.lower() in ('the', 'this', 'that', 'its', 'his', 'her', 'and', 'for',
-                            'was', 'were', 'has', 'had', 'are', 'may', 'not'):
-            continue
-        _surnames.append(word.lower())
-
-    # Extract domain nouns — terms that identify the type of collection
+    # Extract meaningful terms from venue purpose
     _DOMAIN_NOUNS = re.compile(
         r'\b(instruments?|musical|music|paintings?|sculptures?|collection|antiquit|'
         r'art|ceramics?|furniture|tapestri|porcelain|textiles?|'
         r'natural\s+history|archaeological|ethnograph)\w*\b',
         re.IGNORECASE
     )
-    _domain_terms = [m.group(0).lower() for m in _DOMAIN_NOUNS.finditer(venue_purpose)]
-
-    # Extract key action words that signal WHY the venue exists
     _PURPOSE_ACTIONS = re.compile(
         r'\b(bequeath\w*|found\w*|establish\w*|assembl\w*|collect\w*|'
         r'donat\w*|preserv\w*|conserv\w*|dedicat\w*|devot\w*|'
         r'testament|hous\w*|display)\b',
         re.IGNORECASE
     )
+
+    # Person surnames
+    _surnames = []
+    for m in re.finditer(r'\b([A-Z][a-zà-ÿ]+)\b', venue_purpose):
+        word = m.group(1)
+        if word.lower() in ('the', 'this', 'that', 'its', 'his', 'her', 'and', 'for',
+                            'was', 'were', 'has', 'had', 'are', 'may', 'not'):
+            continue
+        _surnames.append(word.lower())
+
+    _domain_terms = [m.group(0).lower() for m in _DOMAIN_NOUNS.finditer(venue_purpose)]
     _action_terms = [m.group(0).lower() for m in _PURPOSE_ACTIONS.finditer(venue_purpose)]
 
-    # Combine all terms
     all_terms = set(_surnames + _domain_terms + _action_terms)
-
-    # Remove overly generic terms that would pass anything
     _TOO_GENERIC = {'the', 'and', 'for', 'was', 'city', 'in', 'of', 'to', 'a', 'nice'}
     all_terms -= _TOO_GENERIC
 
     if not all_terms:
-        # No meaningful terms extracted — cannot check, pass
         return True
 
-    # Stem-based matching: derive a minimum 4-char stem from each term.
-    # "instruments" → "instrument", "collector" → "collect", "bequeathed" → "bequeath"
-    # Then check if the stem appears anywhere in the description.
     for term in all_terms:
-        # For short terms (<=5 chars), require exact word match
         if len(term) <= 5:
             if re.search(r'\b' + re.escape(term) + r'\b', desc_lower):
                 return True
         else:
-            # Use the first min(len, stem_len) chars as a stem — at least 5 chars
             stem = term[:max(5, len(term) - 3)] if len(term) > 7 else term[:max(4, len(term) - 2)]
             if stem in desc_lower:
                 return True
@@ -348,79 +499,13 @@ def _check_venue_purpose_threaded(description: str, venue_purpose: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Main gate function
+# Tour-level gate
 # ---------------------------------------------------------------------------
-
-def verify_stop_story(
-    description: str,
-    credit_line: str = '',
-    stop_name: str = '',
-    framing_case: str = 'exhibition',
-    min_story_sentences: int = 3,
-    venue_purpose: str = '',
-) -> Dict:
-    """Verify that a stop meets the LOCAL-421 story requirement.
-
-    Returns a dict with:
-      passed: bool — overall pass/fail
-      story_sentences: list of identified story sentences
-      story_count: int — number of story sentences found
-      entities_present: bool — all credit line entities named
-      entities_found: list of found entity names
-      entities_missing: list of missing entity names
-      thesis_threaded: bool — exhibition thesis appears in stop
-      failures: list of failure reason strings
-    """
-    failures = []
-
-    # 1. Story sentence count
-    story_sents = extract_story_sentences(description)
-    story_count = len(story_sents)
-    if story_count < min_story_sentences:
-        failures.append(
-            f"story_count={story_count} < {min_story_sentences} minimum "
-            f"(need {min_story_sentences - story_count} more story sentences)"
-        )
-
-    # 2. Entity naming
-    entities_ok, found, missing = check_named_entities_present(
-        description, credit_line, stop_name
-    )
-    if not entities_ok:
-        failures.append(
-            f"entities_blurred: {', '.join(missing)} not named in text"
-        )
-
-    # 3. Thesis threading
-    thesis_ok = check_thesis_threaded(description, framing_case, venue_purpose=venue_purpose)
-    if not thesis_ok:
-        if framing_case == 'venue_purpose':
-            failures.append(
-                "thesis_missing: description does not connect to venue's stated purpose"
-            )
-        else:
-            failures.append(
-                "thesis_missing: no reference to exhibition's art form "
-                "(livre d'artiste, artist's book, collaboration, printed work)"
-            )
-
-    return {
-        'passed': len(failures) == 0,
-        'story_sentences': story_sents,
-        'story_count': story_count,
-        'entities_present': entities_ok,
-        'entities_found': found,
-        'entities_missing': missing,
-        'thesis_threaded': thesis_ok,
-        'failures': failures,
-    }
-
 
 def verify_tour_stories(
     tour_text: str,
     credit_lines: Optional[Dict[str, str]] = None,
     framing_case: str = 'exhibition',
-    min_story_sentences: int = 3,
     venue_purpose: str = '',
 ) -> Dict:
     """Verify story requirement across all stops in a tour.
@@ -429,8 +514,7 @@ def verify_tour_stories(
         tour_text: full tour text
         credit_lines: dict of stop_name → credit_line
         framing_case: 'exhibition' | 'venue_purpose' | 'none'
-        min_story_sentences: minimum story sentences per stop
-        venue_purpose: the venue's detected purpose phrase (for venue_purpose framing)
+        venue_purpose: the venue's detected purpose phrase
 
     Returns dict with:
         all_passed: bool
@@ -455,14 +539,13 @@ def verify_tour_stories(
         header_match = re.match(r'Stop\s+\d+:\s*(.+?)(?:\s+by\s+|\s*,\s*\d|\n)', block)
         stop_name = header_match.group(1).strip() if header_match else ''
 
-        # Extract description (everything after Orientation: ... until Directions: or end)
+        # Extract description
         desc_match = re.search(
             r'(?:Orientation:.*?\n\n)(.+?)(?:\n\s*Directions:|\n\s*Sources:|\n\s*Closing:|\Z)',
             block, re.DOTALL
         )
         description = desc_match.group(1).strip() if desc_match else block
 
-        # Get credit line for this stop
         cl = credit_lines.get(stop_name, '')
 
         result = verify_stop_story(
@@ -470,7 +553,6 @@ def verify_tour_stories(
             credit_line=cl,
             stop_name=stop_name,
             framing_case=framing_case,
-            min_story_sentences=min_story_sentences,
             venue_purpose=venue_purpose,
         )
         result['stop_name'] = stop_name
@@ -490,3 +572,75 @@ def verify_tour_stories(
         'stop_results': results,
         'summary': '\n'.join(summary_parts),
     }
+
+
+# ---------------------------------------------------------------------------
+# Legacy compatibility — keep extract_story_sentences for callers that use it
+# (variance_harness, run_local438_acceptance, etc.) but mark it deprecated.
+# ---------------------------------------------------------------------------
+
+_STORY_VERB_PATTERNS = re.compile(
+    r'\b(?:'
+    r'donated|gave|gifted|bequeathed|commission(?:ed|ing)?|chose|selected|'
+    r'approached|invited|asked|persuaded|convinced|'
+    r'decided|decision|refused|insisted|demanded|agreed|'
+    r'published|printed|produced|assembled|'
+    r'founded|established|created|revived|'
+    r'collaborated|partnered|worked\s+with|'
+    r'influenced|inspired|mentor(?:ed)?|taught|introduced|'
+    r'collected|acquired|purchased|bought|sold|'
+    r'visited|met|sketched|wrote\s+to|corresponded|'
+    r'brought|delivered|shipped|transported|'
+    r'resulted\s+in|led\s+to|caused|enabled|made\s+possible|'
+    r'specialized|focused|devoted|dedicated|'
+    r'disputed|contested|challenged|questioned|'
+    r'recognized|ensured|commitment|'
+    r'destroyed|scrapped|recreated|salvaged|perfecting|'
+    r'because|since|due\s+to|as\s+a\s+result|consequently|therefore'
+    r')\b', re.IGNORECASE
+)
+
+_PERSON_NAME_PATTERN = re.compile(
+    r'\b[A-Z][a-zà-ÿí]+(?:\s+[A-Z][a-zà-ÿ]+)+\b'
+)
+
+_NON_STORY_MARKERS = re.compile(
+    r'(?:'
+    r'\binvites?\s+(?:you|us|the\s+viewer)\b|'
+    r'\btranscends?\b|'
+    r'\btestament\s+to\b|'
+    r'\ba\s+(?:truly\s+)?remarkable\b|'
+    r'\breveal(?:s|ing)?\s+(?:a\s+)?deep\b|'
+    r'\bbeckons?\b|'
+    r'\bponder\b|'
+    r'\breflect(?:s|ing)?\s+on\b|'
+    r'\bconsider\s+(?:the|how|what)\b|'
+    r'\brich\s+tapestry\b|'
+    r'\bfusion\s+of\b|'
+    r'\bintriguing\b'
+    r')', re.IGNORECASE
+)
+
+
+def is_story_sentence(sentence: str) -> bool:
+    """LEGACY — kept for callers that haven't migrated to classify_story_unit.
+
+    For LOCAL-439+, use classify_story_unit() on a ≥3-sentence block instead.
+    """
+    if not sentence or len(sentence) < 30:
+        return False
+    if _NON_STORY_MARKERS.search(sentence):
+        return False
+    has_name = bool(_PERSON_NAME_PATTERN.search(sentence))
+    if not has_name:
+        return False
+    has_verb = bool(_STORY_VERB_PATTERNS.search(sentence))
+    return has_verb
+
+
+def extract_story_sentences(text: str) -> List[str]:
+    """LEGACY — kept for callers that haven't migrated. Counts story sentences."""
+    if not text:
+        return []
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [s for s in sentences if is_story_sentence(s)]

@@ -157,35 +157,78 @@ def _get_specificity_score(story: Dict) -> float:
     return score
 
 
+def _compute_trust_score(story: Dict) -> float:
+    """Compute trust score (0–5) from the best corroborating source.
+
+    Rescales existing provenance weights (3.0/2.5/2.0/0.5) onto 0–5 range.
+    Provenance 3.0 (museum_official) → trust 5.0
+    Provenance 2.5 (wikipedia) → trust 4.17
+    Provenance 2.0 (external_verified) → trust 3.33
+    Provenance 0.5 (web_search) → trust 0.83
+
+    Linear rescale: trust = provenance * (5.0 / 3.0)
+    """
+    provenance = _get_source_provenance_score(story)
+    # Rescale from 0–3.0 range to 0–5 range
+    trust = round(provenance * (5.0 / 3.0), 2)
+    return min(5.0, trust)
+
+
 def score_story_quality(story: Dict) -> float:
     """Score a story's quality for packing selection.
 
+    LOCAL-439 (D393/D394 third addendum): additive with ranged axes.
+
     Composition:
-      quality = provenance_weight + verification_weight + specificity_score
+      quality = trust (0–5) + emotional_content (0–4) + new_information (0–3) - deduction
 
     Components:
-      - Source provenance (0.5–3.0): reuses corpus_source_quality's weighting
-      - Verification outcome (0.5–2.0): documented > disputed > reported > legend
-      - Specificity (0.0–3.0): +1 per signal (named person, date, consequence)
+      - Trust (0–5): computed from best corroborating source provenance weight.
+        NOT asked of the LLM. Rescaled from provenance weights 3.0/2.5/2.0/0.5.
+      - Emotional content (0–4): from LLM classification (story_gate.score_story_interest)
+      - New information beyond the visible (0–3): from LLM classification
+      - Deduction (0–2): "telling visitors what to feel" penalty
 
-    Range: 1.0–8.0 (theoretical max provenance 3.0 + verification 2.0 + specificity 3.0)
+    Verification remains the hard gate beneath the score — unverifiable stories
+    are excluded by the pipeline, not scored low.
 
-    Tie-breaking: when two stories score identically, select_stories_for_stop
-    breaks ties by word count (shorter first — fits more material) then by
-    text content hash (deterministic).
+    Range: -2 to 12 (theoretical; practical range 0–12)
+
+    If no LLM interest scores are available (story lacks '_interest' field),
+    falls back to the legacy specificity heuristic for backward compatibility.
 
     Args:
         story: dict with at minimum 'text'; optionally 'source_domain',
-               'source_type', 'corroboration_status', 'people', 'dates'.
+               'source_type', '_interest' (from score_story_interest).
 
     Returns:
         float quality score (higher is better)
     """
-    provenance = _get_source_provenance_score(story)
-    verification = _get_verification_score(story)
-    specificity = _get_specificity_score(story)
+    trust = _compute_trust_score(story)
 
-    return round(provenance + verification + specificity, 2)
+    # Get interest scores — either pre-computed or compute now
+    interest = story.get('_interest')
+    if interest is None:
+        # Try to compute from text via LLM (will use cache if available)
+        text = story.get('text', '')
+        if text and len(text) >= 50:
+            try:
+                from story_gate import score_story_interest
+                interest = score_story_interest(text)
+                # Don't mutate the input dict
+            except Exception:
+                interest = None
+
+    if interest is not None:
+        emotional = interest.get('emotional_content', 0)
+        new_info = interest.get('new_information', 0)
+        deduction = interest.get('deduction', 0)
+        return round(trust + emotional + new_info - deduction, 2)
+    else:
+        # Fallback: legacy specificity heuristic (no LLM available)
+        verification = _get_verification_score(story)
+        specificity = _get_specificity_score(story)
+        return round(trust + verification + specificity, 2)
 
 
 def select_stories_for_stop(
