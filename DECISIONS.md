@@ -15462,3 +15462,29 @@ is removed, not patched.
 Michael, on seeing the pricing: "you are right and I was wrong. Please use the cheapest
 4.0." **gpt-4o-mini is confirmed** as the story-classification and interest-scoring
 model. No open question remains on the LOCAL-439 spec.
+
+## D395 — the 10-minute tour is 38 serial timeouts; ≤2 min is the target (2026-08-12)
+
+**Michael's requirement: fresh tour generation in ≤2 minutes.** He asked how "40
+seconds became 15 minutes" — the premise needed correcting and the number needed a
+profile, not a guess.
+
+**Correction:** a storied museum tour was never 40s. The 40–45s impression covers the
+early phases (LEAD's profiler: 45s from function entry to narration start). Full runs
+have been ~10 min for weeks (Palais 595s, MFA 560s in LOCAL-437) — unremarked because
+nobody had made latency a requirement.
+
+**The profile (Palais run, measured):** 46 Wikidata P856 external lookups executed
+SERIALLY in `work_story_searcher.py`, of which **38 timed out** at 8–15s each — **5 to
+9.5 minutes of pure waiting**, the dominant cost of the whole run. Story retries (7
+gpt-4o calls), Overpass errors (8×2 attempts) and SERP (12) are all far smaller. The
+pipeline does not think for ten minutes; it sleeps through dead servers one at a time.
+
+**Plan:**
+1. **LOCAL-441 (dispatched)** — concurrent lookups + one global batch budget (~20s) in
+   `work_story_searcher.py` only; unanswered lookups take the existing timeout semantics
+   (tier3/INCONCLUSIVE). Changes WHEN we give up, never WHAT we accept (D376 guarded).
+   Scoped to avoid file collision with LOCAL-439, which runs concurrently.
+2. Per-stop parallel narration after LOCAL-440 restructures the generation loop.
+3. Noted: app users mostly hit DB/cache; this cost is first-generation only. The ≤2 min
+   target still stands for fresh generation.
