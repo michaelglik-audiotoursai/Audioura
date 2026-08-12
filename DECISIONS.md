@@ -15242,3 +15242,37 @@ It does not un-bounce LOCAL-436 — defects 1 and 3 are about whether the change
 and whether it can admit a fabrication, and neither is answered by a clean control.
 LOCAL-437 still has to bind the predicate and run the `prose_llm` fabrication case.
 Recorded so LOCAL-437 need not spend a live run re-establishing it.
+
+## D391 — the gate exemption is merged; the contradiction from D389 is resolved (2026-08-12)
+
+**Merged `9365e79`.** LOCAL-437 fixed all three defects that bounced LOCAL-436, and the
+difference between the two submissions is a working demonstration of what "bound" means.
+
+- **Defect 1 (mirror) fixed.** `should_exempt_from_existence_gate(deterministic_fill_used,
+  exhibition_stops_source)` is at module scope, called from the gate site at
+  `generate_tour_text.py:7056`, and **imported by the test**. LEAD neutralised it in place
+  to `return False`: **3 red, 6 pass** (the negative cases keep passing, which is the
+  both-directions binding). Restored: 9/9.
+- **Defect 2 (wrong venue) fixed.** The control is Palais Lascaris this time — 4/4 stops,
+  1780/1652/1581/1696 intact, 4/4 coordinates, under `enforce`, numbers internally
+  consistent. Matches LEAD's own D390-addendum run. Palais stops take the gate normally
+  (`8/8 verified, dropping 0`) — the exemption does not touch the control venue.
+- **Defect 3 (proof bypassed the exemption) fixed, and D390's inference is now a
+  demonstration.** A fabricated work ("The Invisible Symphony of Forgotten Dreams") was
+  injected into the checklist result on the `prose_llm` path and the pipeline run end to
+  end under enforce. **LOCAL-372's page-grounding stripped it before the gate**:
+  `title_appears_in_page()` requires ≥70% word overlap with the venue page, and an
+  invented title has none. The three real works survive the same check. The defense chain
+  is structural: the extractor's input IS the page text, and grounding verifies against
+  that same text — an invented title cannot carry page evidence. (The test monkeypatches
+  `find_exhibition_checklist` to *inject the input scenario*; the code under test —
+  grounding and exemption — runs for real downstream. That is injection, not a mirror.)
+
+**Outcome for the product:** MFA Unbound delivers **3/3 under `enforce`** — the mode that
+previously dropped all three stops (D389). The two-verifiers contradiction is resolved:
+exhibition works are verified by page-grounding (the check that applies), permanent
+collections by the existence gate (the check that applies to them), and a fabrication is
+caught by the former before the latter is ever consulted.
+
+**Env vars were stated for every number** (the D389 standing check, first submission to
+comply unprompted). 85/85 targeted green post-merge.
