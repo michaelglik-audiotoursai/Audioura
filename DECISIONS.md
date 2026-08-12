@@ -14563,3 +14563,26 @@ another task and dropping it is not LEAD's call.
 Nothing was lost, and the merge itself was unaffected. Recording it because the same
 shape — a cleanup step that silently no-ops, followed by an undo that acts on
 unrelated state — is exactly how the tour-29 deletion is believed to have happened.
+
+## D375 — all 35 suite failures are pre-existing; none came from D370 or the 424/425/426 merges
+
+**2026-08-11, 23:4x.** `run_tests.py` reports **203 passed / 35 failed of 238** and
+exits 0. LEAD ran every one of the 35 against a worktree at `656c9ca` (the commit
+immediately before the D370 wiring): **35 of 35 fail there too, 0 pass.** They are
+pre-existing, and "regression" was never the right word for them.
+
+This closes an item LEAD had explicitly flagged as unsettled twice. Two corrections
+worth keeping:
+
+- An earlier LEAD claim of *"exit 0, so nothing broke"* was wrong to state as
+  settled — the runner exits 0 with 35 failures. **Read the summary line, not the
+  exit code.**
+- The first attempt at this comparison reported all 52 files failing, because it used
+  `timeout 180 python3 ...` and macOS has no `timeout`. Nothing launched.
+  `perl -e 'alarm N; exec @ARGV'` is the portable substitute and is what produced
+  this result.
+
+The 35 are dominated by `tests/run_local*` live-generation and A/B scripts that need
+services or spend money; `run_tests.py` includes them in the count but not in its
+exit status. **A green exit is not a green suite here** — anyone quoting a number
+should quote 203/238 and say which 35.
