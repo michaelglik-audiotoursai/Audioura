@@ -15390,3 +15390,23 @@ of a story* scores as a failure.
 
 **Acceptance fixture for LOCAL-439 (updated):** Michael's 3-sentence Miró story passes
 as ONE story-unit; the three-sentence atmospheric filler case fails as zero units.
+
+### D394 addendum — story classification is an AI question, not a verb list (Michael, 2026-08-12)
+
+Michael's ruling on the mechanism: a closed story-verb list can never be complete — it
+has already missed maker verbs (LOCAL-432) and struggle verbs (D393), and each patch
+relocates the blind spot. **"Is this a story?" is a question for an AI, and since it is
+not a hard question, the cheapest model possible.**
+
+Implementation constraints (LEAD's, recorded for LOCAL-439):
+- Model: **gpt-4o-mini** (already in the repo's pricing table and in use for light
+  calls), `temperature=0`. The story *generation* pass stays gpt-4o per D370 — only
+  classification goes to the cheap tier.
+- **One call per story-unit**, never per sentence (D394): judge the arc whole; few calls.
+- Verdict cached alongside the story so re-scoring never re-asks; tests mock the LLM
+  layer with one live run as evidence (existing D242 pattern).
+- The prompt rubric IS the D392/D393/D394 definition: named person, real actions, an
+  arc; emotion and beyond-the-visible are PROs; prescribing feelings is a CON; a
+  resolution sentence is valid inside a unit but is not a story alone.
+- The regex classifier may remain only as a zero-cost pre-filter for obvious non-prose
+  (headings, empty strings) — never as the verdict.
