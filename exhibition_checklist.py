@@ -2329,10 +2329,6 @@ def find_exhibition_checklist(
                 best_match_title = exhibition_name
                 best_match_score = 1.0
                 print(f"  [LOCAL-429] Direct exhibition detail page via web search ({len(_search_text)} chars)")
-                # Add to listing pages so later code can reference it
-                exhibition_listing_pages.append({
-                    'url': _search_url, 'text': _search_text, 'links': _search_links
-                })
             else:
                 # The direct URL also needs Wayback
                 _wb_text, _wb_links = _fetch_from_wayback(_search_url)
@@ -2340,11 +2336,8 @@ def find_exhibition_checklist(
                     best_match_url = _search_url
                     best_match_title = exhibition_name
                     best_match_score = 1.0
-                    # Cache it so the detail fetch below hits cache
+                    # Cache it so the detail fetch below (Step 3) hits cache
                     _cache_put(_search_url, _wb_text, _wb_links)
-                    exhibition_listing_pages.append({
-                        'url': _search_url, 'text': _wb_text, 'links': _wb_links
-                    })
                     print(f"  [LOCAL-429] Exhibition detail from Wayback ({len(_wb_text)} chars)")
                 else:
                     # Try third-party as final resort
