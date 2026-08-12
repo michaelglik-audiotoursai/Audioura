@@ -5216,38 +5216,35 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
             # ─── LOCAL-364: Try exhibition checklist FIRST ─────────────────────
             if _det_entity and _det_entity.official_url:
-                # [LOCAL-370] Build search term from the FULL user phrase, not from
-                # the LLM's `requirements` field which may silently truncate artist
-                # names. The user typed something like:
-                #   "Picasso, Miró, Dalí: Unbound exhibition at MFA, Boston, MA"
-                # We strip the venue suffix (" at MFA, Boston, MA") to get:
-                #   "Picasso, Miró, Dalí: Unbound exhibition"
-                # This is always richer than `requirements` which non-deterministically
-                # may return only "Unbound exhibition".
-                _exh_name_for_search = location
-                # Strip " at <venue>" suffix using the venue_name from intent
-                _venue_name_for_strip = _exhibition_scope.get('venue_name', '')
-                if _venue_name_for_strip:
-                    # Try "at VENUE" pattern (handles "at MFA, Boston, MA")
-                    _at_pattern = re.compile(
-                        r'\s+at\s+' + re.escape(_venue_name_for_strip.split(',')[0].strip()) + r'\b.*$',
-                        re.IGNORECASE
-                    )
-                    _stripped = _at_pattern.sub('', _exh_name_for_search)
-                    if _stripped and _stripped != _exh_name_for_search:
-                        _exh_name_for_search = _stripped.strip()
-                    elif ',' in location and _venue_name_for_strip.split(',')[0].strip().lower() in location.lower():
-                        # Fallback: try splitting on the venue name occurrence
-                        _vn_lower = _venue_name_for_strip.split(',')[0].strip().lower()
-                        _loc_lower = location.lower()
-                        _idx = _loc_lower.find(_vn_lower)
-                        if _idx > 0:
-                            # Walk back to find " at " before the venue name
-                            _pre = location[:_idx].rstrip()
-                            if _pre.lower().endswith(' at'):
-                                _exh_name_for_search = _pre[:-3].strip()
-                            else:
-                                _exh_name_for_search = _pre.rstrip(',').strip()
+                # [LOCAL-425] Use module-scope extract_exhibition_name for robust
+                # extraction. The previous regex approach failed when the intent's
+                # venue_name ("Museum of Fine Arts, Boston") didn't match the
+                # abbreviation in the user's string ("MFA").
+                from exhibition_checklist import extract_exhibition_name as _extract_exh_name
+                _exh_name_for_search = _extract_exh_name(location)
+
+                # If extraction returned the full location unchanged, try the old
+                # venue-name-based approach as fallback
+                if _exh_name_for_search == location:
+                    _venue_name_for_strip = _exhibition_scope.get('venue_name', '')
+                    if _venue_name_for_strip:
+                        _at_pattern = re.compile(
+                            r'\s+at\s+' + re.escape(_venue_name_for_strip.split(',')[0].strip()) + r'\b.*$',
+                            re.IGNORECASE
+                        )
+                        _stripped = _at_pattern.sub('', _exh_name_for_search)
+                        if _stripped and _stripped != _exh_name_for_search:
+                            _exh_name_for_search = _stripped.strip()
+                        elif ',' in location and _venue_name_for_strip.split(',')[0].strip().lower() in location.lower():
+                            _vn_lower = _venue_name_for_strip.split(',')[0].strip().lower()
+                            _loc_lower = location.lower()
+                            _idx = _loc_lower.find(_vn_lower)
+                            if _idx > 0:
+                                _pre = location[:_idx].rstrip()
+                                if _pre.lower().endswith(' at'):
+                                    _exh_name_for_search = _pre[:-3].strip()
+                                else:
+                                    _exh_name_for_search = _pre.rstrip(',').strip()
 
                 # Fallback: if stripping left us with nothing or just whitespace,
                 # use requirements, then location
@@ -5678,6 +5675,33 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         pass  # Fall through to normal Phase 3A GPT call below
 
     if not _deterministic_fill_used:
+        # [LOCAL-425] Exhibition-aware Phase 3A: when an exhibition is named but
+        # the checklist/creator-filter couldn't supply works, override the
+        # museum constraint to ask for EXHIBITION works specifically, not the
+        # venue's permanent highlights.
+        if _exhibition_scope is not None and _museum_venue_constraint:
+            _exh_name_display = _exhibition_scope.get('requirements', '') or location
+            # Also try to use the cleaner extracted name
+            try:
+                from exhibition_checklist import extract_exhibition_name as _p3a_exh_name
+                _exh_name_display = _p3a_exh_name(location)
+            except ImportError:
+                pass
+            _museum_venue_name_p3a = _exhibition_scope.get('venue_name', '').split(',')[0].strip()
+            _museum_venue_constraint = (
+                f"\nCRITICAL CONSTRAINT — THIS IS A NAMED EXHIBITION TOUR:\n"
+                f"- The user is requesting a tour of the exhibition '{_exh_name_display}' "
+                f"at '{_museum_venue_name_p3a}'.\n"
+                f"- List the {total_stops} most notable ARTWORKS that are part of THIS SPECIFIC "
+                f"EXHIBITION — not the museum's permanent collection highlights.\n"
+                f"- Each stop MUST be named after an ARTWORK in the exhibition.\n"
+                f"- Only include works you are confident are IN THIS EXHIBITION.\n"
+                f"- Do NOT list the museum's iconic permanent-collection works unless they are "
+                f"explicitly part of this exhibition.\n"
+                f"- Do NOT fabricate artwork names.\n"
+            )
+            print(f"  [LOCAL-425] Phase 3A constraint overridden for exhibition: '{_exh_name_display}'")
+
         # [LOCAL-329] Include "reason" in the JSON schema for restaurant/walking tours
         # so the LLM returns notability reasons at selection time.
         if tour_category == 'restaurant':
