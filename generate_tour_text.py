@@ -5432,6 +5432,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [LOCAL-426] ⚠️  THIRD-PARTY SOURCE — works came from "
                           f"{_exhibition_checklist_result.content_url}, "
                           f"NOT from {_exhibition_checklist_result.exhibition_url}")
+                elif getattr(_exhibition_checklist_result, 'is_from_archive', False):
+                    _wb_ts = getattr(_exhibition_checklist_result, 'wayback_snapshot_timestamp', '?')
+                    _wb_age = getattr(_exhibition_checklist_result, 'wayback_age_days', '?')
+                    print(f"  [LOCAL-430] 📦 ARCHIVED SOURCE — venue's own words via web.archive.org "
+                          f"(snapshot: {_wb_ts}, age: {_wb_age} days)")
+                    print(f"    Original URL: {_exhibition_checklist_result.exhibition_url}")
+                    print(f"    Content URL: {_exhibition_checklist_result.content_url}")
 
                 # Handle result
                 if _exhibition_checklist_result.is_closed:
