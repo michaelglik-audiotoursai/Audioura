@@ -12830,7 +12830,12 @@ REWRITE RULES (all mandatory):
     # Post-draft per-stop obligation audit. Runs gpt-4o-mini per stop to identify
     # unfulfilled obligations (pointers that are never dereferenced).
     # Gated by L444_OBLIGATION_AUDIT env (default ON for audit, OFF for repair loop).
-    _obligation_audit_enabled = os.environ.get('L444_OBLIGATION_AUDIT', 'true').lower() != 'false'
+    # [LEAD D404] Default flipped to OFF. LEAD measured the audit at mean 4.06s/stop
+    # live (3 calls: 3.50/5.81/2.86s) = ~24s added on a 6-stop tour, ~32s on 8 —
+    # serial, on the default path, while D395/D402 are actively fighting wall time.
+    # The calls are trivially parallelisable across stops; LOCAL-445 owns that and
+    # the phase timers that will prove the cost. Flip on there, not here.
+    _obligation_audit_enabled = os.environ.get('L444_OBLIGATION_AUDIT', 'false').lower() == 'true'
     _obligation_repair_enabled = os.environ.get('L444_OBLIGATION_REPAIR', 'false').lower() == 'true'
 
     if _obligation_audit_enabled:
