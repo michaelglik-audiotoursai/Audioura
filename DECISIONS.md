@@ -16607,3 +16607,52 @@ with no guard yet in place. It now carries an explicit preamble: builds and `doc
 without `-p` are fine from a worktree; every `docker-compose up/down/recreate` must run
 from `~/Audioura`, and if fleet-wide verification is genuinely needed, hand that step to
 LEAD. Only one docker-touching task runs at a time until the guard exists.
+
+## D421 — LOCAL-454's 18 tests pass with the validator fully neutralised
+
+**2026-08-12, LEAD-run, no docker required.** LOCAL-456 was written to have LEAD run
+LOCAL-454's tests and perform a D242 neutralisation. Both are now done, and the result
+changes LOCAL-456's scope.
+
+**The tests pass — all 18, in 0.17s** (`tests/test_local454_validate_phase3a_against_checklist.py`
+at `5ac25c6`). That was the easy half.
+
+**The neutralisation shows they prove nothing about the validator.** The validator's only
+load-bearing line is the assignment that installs the filtered list:
+
+```python
+poi_list = _validated_pois
+```
+
+Delete it — keep every comment, every log line, the `title_appears_in_page` call, the
+guard, the drop counter, the clean-fail branch — and hallucinated candidates flow straight
+through to the tour. Verbatim result:
+
+```
+neutralised: poi_list assignment removed
+18 passed, 1 warning in 0.23s
+```
+
+`generate_tour_text.py` was restored from backup immediately; `git status` clean.
+
+**Why they miss it.** The suite has three shapes and none executes the validator:
+`title_appears_in_page` tested in isolation (that function is fine, and untouched by the
+neutralisation); `open(source_path).read()` plus `find()` on marker strings
+(`'[LOCAL-454] DROPPED' in source`, guard-condition greps, a `phase3a < validator <
+transport` ordering check); and a class named `TestValidatorNeutralisation` whose own
+docstring claims *"calls the ACTUAL code path — not a mock, not a source grep"* while its
+body does exactly the two things it disclaims. **D418 bounced LOCAL-453 for source-grep
+tests one task earlier.** The same defect reappeared in its successor, now wearing the
+name of the check it defeats.
+
+**Ruling.** The validator's placement inside `generate_tour_text()` — a function that
+needs an API key, a DB, and a network to reach — is what forces the greps. Extract the
+block into a module-scope function, `validate_candidates_against_checklist(poi_list,
+checklist_text) -> list`, called from the same place. Then a test can pass it a list and
+assert on what comes back, and deleting the assignment goes red. LOCAL-456 must do this
+extraction first and re-prove the neutralisation against the new suite; its remaining live
+runs are worth nothing until a test can fail.
+
+**Standing check #1 paid for itself again** (`CLAUDE.md`): break the production code,
+confirm a test goes red. Two minutes, no port, no fleet, no API spend — and it caught a
+suite that had already been counted as evidence in a commit message.

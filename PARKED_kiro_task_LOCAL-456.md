@@ -44,25 +44,50 @@ Stop 3: Au Soleil du Plafond
 Banned works — *The Weeping Woman*, *The Farm*, *The Persistence of Memory* — **zero
 occurrences** across both. Two for two. You need three more.
 
-## What to do
+## LEAD has now done steps 1 and 2, and the answer changes your job (D421)
 
-### 1. Run the tests and paste the real output
+**The 18 tests pass** — `18 passed, 1 warning in 0.17s`, LEAD-run at `5ac25c6`. Do not
+redo this except as a regression after your changes.
 
-All 18, verbatim. If any fail, fix them or explain the assertion is wrong and change it —
-do not delete. LOCAL-453 claimed "13 tests, all pass" when one failed (D418); that is the
-error this instruction exists to prevent.
+**They also pass with the validator completely neutralised.** LEAD deleted the validator's
+one load-bearing line —
 
-### 2. A D242 neutralisation that binds to behaviour
+```python
+poi_list = _validated_pois
+```
 
-**Source-grep tests do not count.** LOCAL-453 offered tests that read
-`generate_tour_text.py` and asserted strings were present; LEAD destroyed the behaviour
-while leaving every string intact and the results were byte-identical before and after
-(D418). If any of your 18 tests work that way, they are not the evidence.
+— leaving every comment, log line, guard, counter and the `title_appears_in_page` call
+untouched. Hallucinated candidates then flow straight into the tour. Result: `18 passed`.
+The file was restored from backup immediately.
 
-The check LEAD will run: **neutralise the validator so it drops nothing** — leave every
-string, comment and variable name in place — and require a test to go **red**. Do that
-yourself first and paste the before/after counts. Then do the same for the ligature
-expansion: break it and show a test notice.
+They miss it because none of them executes the validator. The suite is
+`title_appears_in_page` in isolation (a different function, and unaffected by the
+neutralisation), plus `open(source_path).read()` and `find()` on marker strings — and the
+class named `TestValidatorNeutralisation` claims in its own docstring to be *"not a mock,
+not a source grep"* while its body is exactly that. **This is the defect D418 bounced
+LOCAL-453 for, one task earlier.**
+
+### 1. Extract the validator so a test can reach it — do this first
+
+The validator is inline in `generate_tour_text()`, a function needing an API key, a DB and
+network. That is *why* the tests grep. Fix the cause:
+
+```python
+def validate_candidates_against_checklist(poi_list, checklist_text) -> list:
+```
+
+Module scope, pure, no I/O; the same drop logging; called from exactly where the block
+sits now, so behaviour is unchanged. Then rewrite the suite to call it with a list and
+assert on what comes back.
+
+### 2. Re-prove the neutralisation against the new suite
+
+Delete the assignment that installs the filtered list, run the tests, show **red**. Then
+restore and show green. Paste both, verbatim, with counts. Do the same for the ligature
+expansion: break `œ`→`oe` and show a test notice.
+
+**Nothing else in this task is worth doing until a test can fail.** Live runs against a
+suite that cannot detect a neutralised validator are not evidence.
 
 ### 3. Three more live runs
 
@@ -87,9 +112,11 @@ work around it, and say what you found. Three runs should cost ~10 minutes, not 
 
 ## Acceptance
 
-- 18 tests run by you, output pasted.
+- `validate_candidates_against_checklist` at module scope, called from where the inline
+  block sits now, behaviour unchanged.
+- The rewritten suite run by you, output pasted.
 - Neutralisation before/after counts for both the validator and the ligature fix, each
-  showing red.
+  showing red — against the rewritten suite, not the one you inherited.
 - Three live runs, table as above, no banned works.
 - Regression: `test_sq4_merge.py`, `test_palais_fix_lead_fixture.py`,
   `test_local12_fact_retrieval_fix.py`, and the 447–451 suites (76 tests).
