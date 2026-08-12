@@ -759,6 +759,63 @@ def _address_matches_location(address, loc):
             return True
     return False
 
+
+def strip_llm_json_fences(text: str) -> str:
+    """Strip markdown code fences and surrounding prose from an LLM response.
+
+    LLMs (especially GPT-4o) intermittently wrap JSON in ```json ... ``` fences
+    or embed it in conversational prose.  This function extracts the JSON payload
+    so that json.loads succeeds regardless of wrapping.
+
+    Strategy:
+      1. If the text already starts with '{' or '[', return as-is (no stripping needed).
+      2. Strip ```json or ``` fences (single or triple backtick variants).
+      3. If that still doesn't yield leading '{'/']', try to find the first '{' or '['
+         and return from there to the matching last '}' or ']'.
+    """
+    stripped = text.strip()
+
+    # Fast path: already valid JSON start
+    if stripped and stripped[0] in ('{', '['):
+        return stripped
+
+    # Strip triple-backtick fences: ```json\n...\n``` or ```\n...\n```
+    import re as _re
+    fence_pattern = _re.compile(
+        r'^```(?:json|JSON)?\s*\n?(.*?)\n?\s*```\s*$',
+        _re.DOTALL
+    )
+    m = fence_pattern.search(stripped)
+    if m:
+        inner = m.group(1).strip()
+        if inner and inner[0] in ('{', '['):
+            return inner
+
+    # Strip single-backtick wrapping (less common but observed)
+    if stripped.startswith('`') and stripped.endswith('`'):
+        inner = stripped.strip('`').strip()
+        if inner and inner[0] in ('{', '['):
+            return inner
+
+    # Last resort: find the first { or [ and last } or ]
+    first_brace = -1
+    for i, ch in enumerate(stripped):
+        if ch in ('{', '['):
+            first_brace = i
+            break
+
+    if first_brace >= 0:
+        # Find matching close
+        open_ch = stripped[first_brace]
+        close_ch = '}' if open_ch == '{' else ']'
+        last_close = stripped.rfind(close_ch)
+        if last_close > first_brace:
+            return stripped[first_brace:last_close + 1]
+
+    # Nothing worked — return original (json.loads will fail with a clear error)
+    return stripped
+
+
 def analyze_tour_intent(user_request, api_key):
     """
     Enhanced AI-based intent analysis to detect specialized themes like books, movies, products.
@@ -850,7 +907,11 @@ Examples:
                 result = response.json()
                 intent_text = result["choices"][0]["message"]["content"]
                 print(f"Intent analysis response: {intent_text}")
-                parsed = json.loads(intent_text)
+                # Strip markdown fences / surrounding prose (GPT-4o intermittently wraps JSON)
+                cleaned_text = strip_llm_json_fences(intent_text)
+                if cleaned_text != intent_text:
+                    print(f"  [INTENT] Stripped LLM fences from response")
+                parsed = json.loads(cleaned_text)
                 
                 # Check for null venue_name when request implies a venue
                 if (_request_implies_venue and 
@@ -866,6 +927,7 @@ Examples:
                 return None
         except json.JSONDecodeError as e:
             print(f"Intent analysis JSON parse error (attempt {_intent_attempt + 1}/{_MAX_INTENT_RETRIES}): {e}")
+            print(f"  [INTENT] Raw response that failed parse: {repr(intent_text)}")
             if _intent_attempt < _MAX_INTENT_RETRIES - 1:
                 print(f"  Retrying intent analysis...")
                 continue  # Retry
