@@ -15019,3 +15019,44 @@ data — it is blocked on someone stating what a good stop sounds like.
 path does not reach the checklist integration before BLOCKER4b rejects the Phase 3A stops
 as address-scattered. Infrastructure, not refusal. One venue is a thin basis for a
 product-wide gate decision, so this stays open.
+
+## D387 — correction to D386: mfa.org is NOT unreachable; the pin is stale (2026-08-12)
+
+**D386 recorded "mfa.org still 429s" as the reason MFA Unbound went unmeasured. That is
+wrong, and LEAD repeated it from the submission without checking it.** Verified on
+`f4a2bbc` just now:
+
+```
+[LOCAL-429] Cloudflare challenge on https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+            — retries will not help, trying Wayback Machine
+[LOCAL-430] Wayback snapshot timestamp: 20260812064828 (age: 0 days)
+[LOCAL-429] ✓ Wayback Machine success: 8215 chars
+```
+
+The page comes back in full, through the exact path LOCAL-429 and LOCAL-430 built and
+that D381/D382 recorded as working. The 429 is real and the venue is still reachable —
+those two facts stopped being the same thing three tasks ago.
+
+**What actually happened:** `run_local433_mfa_unbound_variance.py` was written from
+`run_mfa_unbound_pinned.py`, which predates the Wayback fallback. Its header still says
+*"mfa.org returns HTTP 429, so without the pin..."*, and it monkeypatches
+`find_exhibition_checklist` wholesale — so the live run never reaches `_fetch_page` and
+the Wayback path cannot engage. The submission then reported the pin's premise as a
+finding about the venue.
+
+**Two lessons, and the second is LEAD's:**
+
+1. **A helper written around a limitation outlives the limitation.** The pin was correct
+   when written and became a bypass of the fix. Anything named `*_pinned*` or carrying a
+   "because X is broken" header needs re-reading whenever X is fixed. `grep -rn "429"` over
+   the runners is a five-second check that would have caught this.
+2. **LEAD verified the hard claim and waved through the easy one.** D386 checked the
+   statistics by recomputing them from raw JSON, and accepted "the venue is unreachable"
+   because it matched what LEAD already believed from D373/D381. The claim that agrees
+   with you is the one that gets checked least. Standing check #3 — re-run the agent's
+   number against a case whose answer you already know — applies hardest to the claims
+   that sound obviously right.
+
+**Consequence:** MFA Unbound variance is *not* blocked on infrastructure. BLOCKER4b's
+address-scatter rejection may itself be an artefact of the pin bypassing normal stop
+discovery. LOCAL-434 measures it through the real pipeline.
