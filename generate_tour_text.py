@@ -5294,6 +5294,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                 print(f"  [LOCAL-364] Result: {_exhibition_checklist_result}")
 
+                # [LOCAL-426] Log provenance clearly: where the content actually came from
+                if getattr(_exhibition_checklist_result, 'is_third_party', False):
+                    print(f"  [LOCAL-426] ⚠️  THIRD-PARTY SOURCE — works came from "
+                          f"{_exhibition_checklist_result.content_url}, "
+                          f"NOT from {_exhibition_checklist_result.exhibition_url}")
+
                 # Handle result
                 if _exhibition_checklist_result.is_closed:
                     # Exhibition has closed — do NOT tour it (LOCAL-365)
@@ -5339,13 +5345,21 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                     _path_label = _exhibition_checklist_result.path.upper()
                     print(f"  [LOCAL-364/368] ✓ {_path_label} PATH: {len(poi_list)} works from exhibition page")
-                    print(f"    Source: {_exhibition_checklist_result.exhibition_url}")
+                    # [LOCAL-426] Show the actual content source, not the venue URL
+                    _display_source = (getattr(_exhibition_checklist_result, 'content_url', '')
+                                       or _exhibition_checklist_result.exhibition_url)
+                    print(f"    Source: {_display_source}")
+                    if getattr(_exhibition_checklist_result, 'is_third_party', False):
+                        print(f"    Venue: {_exhibition_checklist_result.exhibition_url} (unreachable)")
                     print(f"    Shape: {_exhibition_checklist_result.page_shape}")
                     print(f"    Stops from exhibition {_path_label.lower()}:")
                     for p in poi_list[:total_stops]:
                         _w = next((w for w in _checklist_works if w['title'] == p['name']), {})
                         _artist_info = f" (by {_w['artist']})" if _w.get('artist') else ''
-                        print(f"      - {p['name']}{_artist_info}")
+                        # [LOCAL-426] Show per-work source_url if different from venue
+                        _work_source = _w.get('source_url', '')
+                        _source_tag = f" [source: {_work_source}]" if _work_source else ''
+                        print(f"      - {p['name']}{_artist_info}{_source_tag}")
 
             # ─── LOCAL-364/362 FALLBACK: creator filter ────────────────────────
             # If checklist retrieval failed (no exhibition page found, prose-only,
