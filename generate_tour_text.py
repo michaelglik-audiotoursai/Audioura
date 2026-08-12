@@ -8641,9 +8641,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     if _storied_mode and tour_category == 'museum':
         try:
             from story_element_extractor import apply_tour_diversity, select_stop_elements
+            from story_selection import select_stories_for_stop, STOP_WORD_BUDGET
             from work_story_searcher import normalize_work_key, work_stories_get
             
-            # Pre-compute selections for all stops
+            # Pre-compute selections for all stops using quality-sorted packing (LOCAL-438)
             _all_selections = []
             _selection_names = []
             for poi in poi_list:
@@ -8652,9 +8653,21 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _wk = normalize_work_key(poi_name, _artist_for_sel)
                 _cached = work_stories_get(_wk)
                 if _cached and _cached.get('elements'):
-                    _sel = select_stop_elements(_cached['elements'], max_selected=3)
+                    # [LOCAL-438] Route through quality-sorted packing selector
+                    _packed = select_stories_for_stop(_cached['elements'], budget=STOP_WORD_BUDGET)
+                    # Convert packing result to selection format expected downstream
+                    _packed_set = set(id(p) for p in _packed)
+                    _runners = [e for e in _cached['elements'] if id(e) not in _packed_set]
+                    _sel = {
+                        'selected_elements': _packed,
+                        'runner_up_elements': _runners[:2],
+                    }
                     _all_selections.append(_sel)
                     _selection_names.append(poi_name)
+                    if _packed:
+                        _packed_words = sum(e.get('_word_count', len(e.get('text', '').split())) for e in _packed)
+                        print(f"  [LOCAL-438] Stop '{poi_name[:40]}': packed {len(_packed)} stories, "
+                              f"{_packed_words}w / {STOP_WORD_BUDGET}w budget")
                 else:
                     _all_selections.append({'selected_elements': [], 'runner_up_elements': []})
                     _selection_names.append(poi_name)
@@ -9799,20 +9812,27 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # status-appropriate instructions: documented→fact, reported→attribution,
         # legend→"the story goes…", disputed→both sides with sources.
         # [LOCAL-37] Uses diversity-adjusted selections when available.
+        # [LOCAL-438] Fallback uses quality-sorted packing instead of rank-and-cap.
         if tour_category == 'museum' and poi_name and artist:
             try:
                 from work_story_searcher import normalize_work_key, work_stories_get
-                from story_element_extractor import select_stop_elements
+                from story_selection import select_stories_for_stop, STOP_WORD_BUDGET
                 from three_class_retrieval import classify_element, CLASS_DETAILS, CLASS_HISTORIC, CLASS_SOCIAL
                 
                 # [LOCAL-37] Use pre-computed diversity-adjusted selection if available
                 _b6_selection = _diversity_adjusted_selections.get(poi_name) if _diversity_adjusted_selections else None
                 if not _b6_selection:
-                    # Fallback to direct cache read
+                    # [LOCAL-438] Fallback: quality-sorted packing from cache
                     _b6_work_key = normalize_work_key(poi_name, artist)
                     _b6_cached = work_stories_get(_b6_work_key)
                     if _b6_cached and _b6_cached.get('elements'):
-                        _b6_selection = select_stop_elements(_b6_cached['elements'], max_selected=3)
+                        _packed = select_stories_for_stop(_b6_cached['elements'], budget=STOP_WORD_BUDGET)
+                        _packed_set = set(id(p) for p in _packed)
+                        _runners = [e for e in _b6_cached['elements'] if id(e) not in _packed_set]
+                        _b6_selection = {
+                            'selected_elements': _packed,
+                            'runner_up_elements': _runners[:2],
+                        }
                 
                 if _b6_selection:
                     _b6_selected = _b6_selection.get('selected_elements', [])
