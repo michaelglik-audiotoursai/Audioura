@@ -16408,3 +16408,38 @@ session). All three tracked as task #6 in this session's task list.
 authorized networks by default (correct). Migrations were applied by
 temporarily authorizing this machine's IP, running the SQL, then immediately
 clearing authorized networks again — verified empty both times.
+
+## D417 — `L447_RETRIEVAL_CHAIN` defaults ON
+**2026-08-12, LEAD.** D414 committed to flipping this the moment the release gate was
+settled. The gate is met (81.2 at N=8) and `storied` is pushed, so it is flipped.
+
+The flag has been OFF since D408 for one reason: the DB path could lose content.
+DB-first served **8%** of live for Île Sainte-Marguerite; live-first served **7%** of the
+DB for Musée Picasso. Either ordering was a coin flip on any given title. LOCAL-451
+replaced ordering with selection, and selection cannot lose — it returns the richer of
+live and `stop_corpus`, so the path is strictly additive. That was the stated condition
+and it is met.
+
+Implemented as a default change in `_l447_enabled()`, not as a compose env var, so it
+holds on the host, in the container, and in every worktree without 21 services needing to
+agree. **Kill switch: `L447_RETRIEVAL_CHAIN=false`.**
+
+**Verified on storied HEAD after the Track B merge, not on the branch where D414 measured it:**
+
+| title | default (now ON) | `=false` |
+|---|---|---|
+| Île Sainte-Marguerite | 13,500 live | 13,500 live |
+| Musée Picasso | **10,285 stop_corpus** | 688 live |
+| Port Grimaud | **1,158 stop_corpus** | 554 live |
+
+LOCAL-449's floors are unaffected: cold host 0.0s / 0 network calls, first timeout
+5.0s / 1 call. Regression: 76 tests green across the 447–451 suites, plus sq4_merge,
+palais_fix_lead_fixture, local12_fact_retrieval.
+
+**One test needed its precondition made explicit, and this is worth recording.**
+`TestFlagOFFByteIdentical.test_flag_off_no_db_consult` established "flag off" by
+*unsetting* the variable — which meant OFF before and means ON now. The property it
+tests is unchanged and still valuable, so the fix was to set
+`L447_RETRIEVAL_CHAIN=false` in `setUp`, not to delete it. Confirmed it still binds:
+neutralising the flag guard on the happy path turns it **red**. A test whose precondition
+comes from a default rather than from an assertion is fragile in exactly this way.

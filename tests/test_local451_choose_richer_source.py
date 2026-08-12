@@ -392,9 +392,12 @@ class TestFlagOFFByteIdentical(unittest.TestCase):
     def setUp(self):
         import dead_host_breaker
         dead_host_breaker.reset_cold_hosts()
-        # Save and clear flag
+        # D417: the default is now ON, so "flag off" must be stated explicitly.
+        # Unsetting the variable used to mean OFF; it now means ON. The property
+        # under test is unchanged — with the chain disabled, the DB is never
+        # consulted — only the way the precondition is established.
         self._orig = os.environ.get('L447_RETRIEVAL_CHAIN')
-        os.environ.pop('L447_RETRIEVAL_CHAIN', None)
+        os.environ['L447_RETRIEVAL_CHAIN'] = 'false'
 
     def tearDown(self):
         import dead_host_breaker

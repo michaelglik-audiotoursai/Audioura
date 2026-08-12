@@ -58,8 +58,17 @@ logger = logging.getLogger(__name__)
 # D400/D402/D404 — unproven wiring does not ride on the default path.
 
 def _l447_enabled() -> bool:
-    """True when the LOCAL-447 retrieval chain is explicitly enabled."""
-    return os.environ.get('L447_RETRIEVAL_CHAIN', '').strip().lower() in ('1', 'true', 'yes')
+    """True unless the LOCAL-447 retrieval chain is explicitly disabled.
+
+    D417: default flipped from OFF to ON. It was OFF from D408 because the DB path
+    could lose content — DB-first served 8% of live for one title, live-first served
+    7% of the DB for another. LOCAL-451 replaced ordering with selection, so the path
+    is now strictly additive: it returns the richer of live and stop_corpus and can
+    never be worse than live alone (D414).
+
+    Kill switch: L447_RETRIEVAL_CHAIN=false (or 0/no).
+    """
+    return os.environ.get('L447_RETRIEVAL_CHAIN', 'true').strip().lower() in ('1', 'true', 'yes')
 
 
 # ─── Accent folding (D243) ───────────────────────────────────────────────────
