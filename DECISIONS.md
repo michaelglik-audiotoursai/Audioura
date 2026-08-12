@@ -14412,3 +14412,39 @@ SERP. A full gpt-4 swap would have been ~30×; it was never the right experiment
 **Separately, seen twice:** `prose_llm_extract_works` returned 1 work instead of 3
 on both gpt-4o runs, so both delivered a single stop. Unrelated to the story model —
 extraction variance, and it needs its own task.
+
+### D370 amendment — implemented 2026-08-11 22:2x, and it needed a second edit
+
+D370 was recorded at 19:3x but never wired; `grep TOUR_STORY_MODEL` found nothing
+in the tree until now. Every MFA artifact on disk, including
+`TOUR_MFA_UNBOUND_EVAL.txt`, is therefore a gpt-3.5-era output — the decision was
+not in force for any of them.
+
+Wiring it exposed a second defect the decision text did not anticipate. The model
+line and the cost line are 65 lines apart:
+
+```
+10077  "model": story_pass_model(),                       # now gpt-4o
+10142  call_cost = _tour_llm_cost(tokens_used)            # read TOUR_LLM_MODEL
+```
+
+Changing only the model would have billed a gpt-4o call at gpt-3.5-turbo rates —
+precisely the failure `_tour_llm_cost`'s own docstring warns about, and Subscribed
+charges the user 5× that number. `_tour_llm_cost` now takes an optional `model`
+and the story-pass call site passes the model it actually used.
+
+**Generalisable:** a model switch is never one line. Cost accounting reads model
+config independently, and the two drift silently because nothing fails loudly when
+they disagree. Grep for every reader of the variable being narrowed, not just the
+call site being changed.
+
+Binding: `test_d370_story_pass_model.py`, 7 tests. The two call-site tests parse
+`generate_tour_text.py` with `ast` and assert the shape of the real
+`description_data` literal — not a mirror, not an `inspect.getsource` substring
+(D277). Both production edits were reverted and confirmed red (D242 check 1).
+
+**Correction to a LEAD claim made minutes earlier in the same session:** a full
+`test_*.py` sweep was reported using `timeout 180 python3 ...`. macOS has no
+`timeout` binary, so every invocation failed to launch and all 52 files were
+reported as failing. That sweep result was meaningless. `run_tests.py` is the
+runner that exists for this; use it.
