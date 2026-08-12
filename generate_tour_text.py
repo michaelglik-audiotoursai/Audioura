@@ -10684,39 +10684,94 @@ Write the story FIRST, then add physical description if space allows.
                             and description and not description.startswith('[')
                             and _attempt < _max_retries):
                         try:
-                            from story_gate import extract_story_sentences
+                            from story_gate import extract_story_sentences, is_story_sentence
                             _l431_story_sents = extract_story_sentences(description)
                             _l431_story_count = len(_l431_story_sents)
                             if _l431_story_count < 3:
-                                # Build a retry supplement that names the gap and shows the shape
+                                # [LOCAL-432] Build a retry supplement that:
+                                # 1. Names the exact deficit count
+                                # 2. Shows rejected sentences with reasons
+                                # 3. Names available people from beats
                                 _l431_needed = 3 - _l431_story_count
+                                import re as _l432_re
+
+                                # Identify rejected sentences and why they failed
+                                _l432_all_sents = _l432_re.split(r'(?<=[.!?])\s+', description.strip())
+                                _l432_rejected = []
+                                for _s in _l432_all_sents:
+                                    if _s and len(_s) >= 30 and not is_story_sentence(_s):
+                                        # Diagnose why it failed
+                                        from story_gate import _STORY_VERB_PATTERNS, _PERSON_NAME_PATTERN, _NON_STORY_MARKERS
+                                        _has_name = bool(_PERSON_NAME_PATTERN.search(_s))
+                                        _has_verb = bool(_STORY_VERB_PATTERNS.search(_s))
+                                        _is_eval = bool(_NON_STORY_MARKERS.search(_s))
+                                        if _is_eval:
+                                            _reason = "evaluative/promotional — replace with action"
+                                        elif not _has_name and not _has_verb:
+                                            _reason = "no named person, no story verb"
+                                        elif not _has_name:
+                                            _reason = "no named person (add a surname)"
+                                        elif not _has_verb:
+                                            _reason = "no story verb (add what they DID)"
+                                        else:
+                                            _reason = "fails classifier (missing consequence)"
+                                        _l432_rejected.append((_s[:120], _reason))
+
+                                # Collect available people from beats for this stop
+                                _l432_people_block = ""
+                                if (_story_beats_per_stop and idx < len(_story_beats_per_stop)
+                                        and _story_beats_per_stop[idx]):
+                                    _l432_beat_people = []
+                                    for _b in _story_beats_per_stop[idx]:
+                                        if _b['role'] not in ('circumstance', 'stakes'):
+                                            _l432_beat_people.append(
+                                                f"  • {_b['person']} — {_b['action']}")
+                                    if _l432_beat_people:
+                                        _l432_people_block = (
+                                            "\nAVAILABLE PEOPLE (from sourced research — use these):\n"
+                                            + "\n".join(_l432_beat_people[:4]) + "\n"
+                                        )
+
+                                # Build the rejected-sentences block (max 4 examples)
+                                _l432_rejected_block = ""
+                                if _l432_rejected:
+                                    _l432_rejected_lines = []
+                                    for _text, _reason in _l432_rejected[:4]:
+                                        _l432_rejected_lines.append(
+                                            f"  ✗ \"{_text}...\" — {_reason}")
+                                    _l432_rejected_block = (
+                                        "\nYOUR SENTENCES THAT FAILED (do NOT repeat these shapes):\n"
+                                        + "\n".join(_l432_rejected_lines) + "\n"
+                                    )
+
                                 _l431_retry_msg = (
-                                    f"STORY SENTENCE DEFICIT: your text has only {_l431_story_count} "
-                                    f"story sentence(s) — need at least 3.\n\n"
-                                    "A story sentence = a named person (full name or surname) + a STORY VERB "
+                                    f"STORY SENTENCE DEFICIT: you wrote {_l431_story_count} story "
+                                    f"sentence(s) but the minimum is 3. You need EXACTLY "
+                                    f"{_l431_needed} more.\n"
+                                    f"{_l432_rejected_block}"
+                                    f"{_l432_people_block}\n"
+                                    "A PASSING story sentence = a named person (surname) + a STORY VERB "
                                     "(commissioned, donated, chose, published, founded, insisted, collaborated, "
-                                    "established, specialized, assembled, refused, persuaded, visited, met) + "
-                                    "a material consequence.\n\n"
-                                    "WHAT FAILS:\n"
-                                    "  • \"Dalí's surrealistic style shines through\" — no story verb, no consequence\n"
-                                    "  • \"invites you to consider the intersection\" — no person, no action\n"
-                                    "  • \"transcends the physical boundaries\" — evaluative, not narrative\n"
-                                    "  • \"a testament to their collaboration\" — no named person, no specific action\n\n"
+                                    "established, specialized, assembled, refused, persuaded, visited, met, "
+                                    "produced, crafted, created) + "
+                                    "a material consequence or result.\n\n"
                                     "WHAT PASSES:\n"
-                                    "  • \"Dalí chose Freud's text because he considered Freud foundational to Surrealism.\"\n"
-                                    "  • \"Broder commissioned this work from Miró as part of a campaign to revive the livre d'artiste.\"\n"
+                                    "  • \"Schnitzer specialized in ceremonial brass for the Bavarian court, producing this instrument in 1581.\"\n"
+                                    "  • \"Fischer published a study of this specific instrument in the Historic Brass Society Journal in 1989.\"\n"
                                     "  • \"Tériade commissioned Gris to illustrate the poems, resulting in 11 lithographs.\"\n\n"
-                                    f"Rewrite the FULL description with at least {_l431_needed} MORE sentences "
-                                    "of the PASSES form. Each must name a person and state what they did. "
-                                    "Keep all existing verified facts. Replace evaluative claims with narrative ones."
+                                    f"Rewrite the FULL description. It MUST contain at least 3 total "
+                                    f"story sentences — {_l431_story_count} you already have plus "
+                                    f"{_l431_needed} new ones. Each new sentence must name a specific "
+                                    "person by surname and state what they did with a concrete outcome. "
+                                    "Keep all existing verified facts. Replace evaluative prose with narrative."
                                 )
                                 description_data["messages"].append({
                                     "role": "user",
                                     "content": _l431_retry_msg,
                                 })
                                 description_data["temperature"] = min(0.7 + 0.1 * (_attempt + 1), 0.95)
-                                print(f"  [LOCAL-431] Stop {stop_num}: STORY RETRY — "
-                                      f"story_count={_l431_story_count} < 3, "
+                                print(f"  [LOCAL-432] Stop {stop_num}: STORY RETRY — "
+                                      f"story_count={_l431_story_count} < 3, need {_l431_needed} more, "
                                       f"retrying (attempt {_attempt+2}/{_max_retries+1})")
                                 continue  # retry within the _attempt loop
                         except ImportError:
