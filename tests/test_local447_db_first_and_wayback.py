@@ -131,9 +131,12 @@ class TestDBFallbackPath(unittest.TestCase):
         dead_host_breaker.reset_cold_hosts()
 
     def test_live_wins_when_wikimedia_healthy(self):
-        """When Wikimedia is healthy, live content is served (not DB).
+        """When Wikimedia is healthy and live content is richer, live is served.
 
-        LOCAL-450: This is the core design assertion — live first, DB only as fallback.
+        LOCAL-450: Original assertion was "DB not consulted". LOCAL-451 changes
+        the design to content-based selection — DB IS consulted for comparison,
+        but live wins when it has more content. Updated assertion: source is
+        'wikipedia_live' and live content is returned.
         """
         from rag_retriever import fetch_wikipedia_summary_with_provenance
         import dead_host_breaker
@@ -143,12 +146,12 @@ class TestDBFallbackPath(unittest.TestCase):
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'extract': 'Rich live content from Wikipedia about the island ' * 10}
 
+        # DB returns shorter content — live should win on length
         with patch('rag_retriever.requests.get', return_value=mock_resp):
-            with patch('rag_retriever._fetch_from_stop_corpus') as mock_db:
+            with patch('rag_retriever._fetch_from_stop_corpus', return_value='Short DB text'):
                 result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
 
-        # DB fallback should NOT have been consulted
-        mock_db.assert_not_called()
+        # LOCAL-451: live wins because it is richer (content-based selection)
         self.assertEqual(result['source'], 'wikipedia_live')
         self.assertIn('Rich live content', result['text'])
 
