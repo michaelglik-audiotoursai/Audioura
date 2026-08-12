@@ -13420,7 +13420,16 @@ RULES:
                         # "<fact> at <stop name>", verify the fact is in THAT stop's
                         # description, not a different stop. Catches the bug where
                         # "Moses and Monotheism" content is attributed to "Au Soleil du Plafond".
-                        for _p4s in _p4_stop_data:
+                        # [LOCAL-428] DISABLED at merge. The ±80-char window below
+                        # false-fails the Part 4 the prompt itself asks for: a 1-2
+                        # sentence connective naming one date from each of two stops
+                        # puts BOTH dates inside BOTH windows, so each date looks
+                        # misattributed. Failure omits Part 4 entirely (see the
+                        # `_p4_success` else-branch) — i.e. this deletes exactly the
+                        # cross-stop callbacks the rubric pays +50% for. Re-enable
+                        # only with sentence-scoped clause splitting and a test that
+                        # goes red when it is neutralised. See D376.
+                        for _p4s in ([] if True else _p4_stop_data):
                             _sn_lower = _p4s['name'].lower()
                             # Find position of stop name in Part 4 text
                             _sn_pos = _p4_lower.find(_sn_lower)
