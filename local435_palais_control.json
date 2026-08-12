@@ -1,0 +1,24 @@
+{
+  "task": "LOCAL-435",
+  "control": "palais_lascaris",
+  "location": "Palais Lascaris, Nice",
+  "stops_generated": 4,
+  "dates_found": [
+    "1780",
+    "1652",
+    "1581",
+    "1696"
+  ],
+  "dates_missing": [],
+  "per_stop_counts": {
+    "Harpe by Naderman (Paris, 1780)": 1,
+    "Sacqueboute t\u00e9nor by Anton Schnitzer (Nuremberg, 1581)": 1,
+    "Violes gambe by William Turner (Londres, 1652)": 0,
+    "Basse de violon by Paolo Antonio Testore (Milan, 1696)": 1
+  },
+  "checks_passed": 3,
+  "checks_total": 3,
+  "elapsed": 514.5025548934937,
+  "verdict": "PASS",
+  "measured_at": "2026-08-12T08:27:47"
+}
