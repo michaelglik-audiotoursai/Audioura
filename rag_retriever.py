@@ -293,9 +293,14 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
 def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> dict:
     """Fetch Wikipedia summary with provenance metadata.
 
-    LOCAL-448 retrieval chain (simplified — Wayback removed):
-      1. Own DB (stop_corpus) — zero network cost, exact accent-folded match
-      2. Live Wikipedia REST/Action API — existing path
+    LOCAL-450 retrieval chain (DB-as-fallback, not DB-first):
+      1. Live Wikipedia REST/Action API — best content, governed by breaker
+      2. Own DB (stop_corpus) — fallback when live yields nothing (cold or empty)
+
+    The inversion from LOCAL-448's DB-first order is deliberate: LEAD measured
+    that stop_corpus content is 8–87% of live content for 2 of 3 titles.
+    DB-first was a quality regression that saved 0.3–0.5s. The DB's real value
+    is serving stops when Wikimedia is unreachable (breaker cold).
 
     Returns:
         dict with keys:
@@ -309,22 +314,8 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
     if not topic or not topic.strip():
         return {}
 
-    # ─── Step 1: DB-first (LOCAL-447, D403a step 1; LOCAL-448 fixed) ─────────
-    db_content = _fetch_from_stop_corpus(topic)
-    if db_content:
-        return {
-            'text': db_content,
-            'source': 'stop_corpus',
-            'is_from_archive': False,
-            'wayback_snapshot_timestamp': '',
-            'snapshot_age_days': None,
-        }
-
-    # ─── Step 2: Live Wikipedia (existing path) ──────────────────────────────
-    # LOCAL-448 (Defect 3): Wayback removed entirely. When Wikimedia is cold or
-    # returns 429, we fall through to the action API (pre-LOCAL-447 behaviour).
-    # This avoids the ~10s stall that Wayback imposed for 9-year-stale content
-    # with 7% coverage and wrong articles.
+    # ─── Step 1: Live Wikipedia (REST, then action API) ──────────────────────
+    # Governed by the breaker. When Wikimedia is cold, skip to step 2 (DB).
 
     encoded_topic = quote(topic.strip().replace(" ", "_"), safe="")
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_topic}"
@@ -336,11 +327,20 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
         wikimedia_cold = False
 
     if wikimedia_cold:
-        # LOCAL-449: Cold means STOP. The breaker contract says short-circuit
-        # immediately with zero network calls. Calling _fetch_via_action_api here
-        # would hit the same dead host (en/fr.wikipedia.org share the Wikimedia
-        # rate-limit bucket) — that's 20s of dead wait on the default path.
-        logger.info(f"Wikipedia: Wikimedia is cold, short-circuiting for '{topic}'")
+        # LOCAL-449: Cold means zero network calls. LOCAL-450: but consult the DB
+        # before giving up — a local copy needs no network and turns a dead end
+        # into a served stop.
+        logger.info(f"Wikipedia: Wikimedia is cold, trying stop_corpus for '{topic}'")
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            logger.info(f"DB-fallback: served '{topic}' from stop_corpus ({len(db_content)} chars, 0 network calls)")
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
         return {}
 
     try:
@@ -366,6 +366,17 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
                 return {'text': action_result, 'source': 'wikipedia_live',
                         'is_from_archive': False, 'wayback_snapshot_timestamp': '',
                         'snapshot_age_days': None}
+            # Action API also failed (breaker blocks it) — try DB
+            db_content = _fetch_from_stop_corpus(topic)
+            if db_content:
+                logger.info(f"DB-fallback: served '{topic}' from stop_corpus after 429 ({len(db_content)} chars)")
+                return {
+                    'text': db_content,
+                    'source': 'stop_corpus',
+                    'is_from_archive': False,
+                    'wayback_snapshot_timestamp': '',
+                    'snapshot_age_days': None,
+                }
             return {}
 
         if response.status_code == 404:
@@ -414,12 +425,32 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
             mark_host_cold('en.wikipedia.org', 'timeout')
         except Exception:
             pass
-        # LOCAL-449: A timeout means the host is dead. We just marked it cold —
-        # calling _fetch_via_action_api would hit the same dead Wikimedia bucket
-        # (en/fr.wikipedia.org). Short-circuit immediately.
+        # LOCAL-449: Timeout means the host is dead. LOCAL-450: consult DB
+        # before returning {} — same zero-network-call guarantee (DB is local).
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            logger.info(f"DB-fallback: served '{topic}' from stop_corpus after timeout ({len(db_content)} chars)")
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
         return {}
     except requests.RequestException as e:
         logger.warning(f"Wikipedia: request error for '{topic}': {e}")
+        # Network error — try DB as fallback
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            logger.info(f"DB-fallback: served '{topic}' from stop_corpus after network error ({len(db_content)} chars)")
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
         return {}
     except (ValueError, KeyError) as e:
         logger.warning(f"Wikipedia: parse error for '{topic}': {e}")

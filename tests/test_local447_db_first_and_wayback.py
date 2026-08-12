@@ -4,11 +4,16 @@
 LOCAL-448 update: Wayback tests removed (Defect 3 — Wayback removed from chain).
 DB-first tests updated to use production DB connection pattern (Defect 2).
 
+LOCAL-450 update: DB-first → DB-fallback. Tests now verify DB serves content when
+live fails (cold host), not before live runs. Assertions encoding the old ordering
+are updated; no tests are deleted.
+
 Tests:
-  1. DB-first path serves content from stop_corpus with zero network calls.
-  2. The DB-first path goes RED when neutralised to a no-op (D242 standing check 1).
-  3. Backwards compatibility: fetch_wikipedia_summary returns a plain string.
-  4. Wayback is NOT called from the chain (LOCAL-448, Defect 3).
+  1. DB fallback serves content from stop_corpus when live is cold (zero network).
+  2. The DB fallback goes RED when neutralised to a no-op (D242 standing check 1).
+  3. Live wins when Wikimedia is healthy (not DB).
+  4. Backwards compatibility: fetch_wikipedia_summary returns a plain string.
+  5. Wayback is NOT called from the chain (LOCAL-448, Defect 3).
 """
 import json
 import os
@@ -28,12 +33,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 os.environ.setdefault('AUDIOURA_DB_TARGET', 'production')  # read-only, safe
 
 
-class TestDBFirstPath(unittest.TestCase):
-    """Tests for the DB-first (stop_corpus) lookup in fetch_wikipedia_summary."""
+class TestDBFallbackPath(unittest.TestCase):
+    """Tests for the DB-fallback (stop_corpus) lookup in fetch_wikipedia_summary.
 
-    def test_db_first_serves_known_title_zero_network(self):
-        """DB-first path serves 'Île Sainte-Marguerite' from stop_corpus without network."""
-        from rag_retriever import fetch_wikipedia_summary_with_provenance, _fetch_from_stop_corpus
+    LOCAL-450: DB is no longer first — it is consulted when live yields nothing.
+    These tests verify the DB path serves content when live fails (cold host,
+    timeout, network error). The assertions that encoded "DB before network"
+    are updated to encode "DB when network fails".
+    """
+
+    def test_db_fallback_serves_known_title_when_cold(self):
+        """Cold branch serves 'Île Sainte-Marguerite' from stop_corpus with zero network calls."""
+        from rag_retriever import fetch_wikipedia_summary_with_provenance
+        import dead_host_breaker
+        dead_host_breaker.reset_cold_hosts()
+        dead_host_breaker.mark_host_cold('en.wikipedia.org', 'test')
 
         # Mock the DB connection to return a known row
         mock_conn = MagicMock()
@@ -51,7 +65,7 @@ class TestDBFirstPath(unittest.TestCase):
             # Patch requests.get to fail loudly if called (proves zero network)
             with patch('rag_retriever.requests.get') as mock_get:
                 mock_get.side_effect = AssertionError(
-                    "Network call made! DB-first path should have served this."
+                    "Network call made! Cold branch with DB fallback should have served this."
                 )
                 result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
 
@@ -61,9 +75,14 @@ class TestDBFirstPath(unittest.TestCase):
         self.assertIn('Sainte-Marguerite', result['text'])
         self.assertGreater(len(result['text']), 100)
 
-    def test_db_first_accent_folded_match(self):
-        """DB-first matches accent-folded titles (D243)."""
+        dead_host_breaker.reset_cold_hosts()
+
+    def test_db_fallback_accent_folded_match_when_cold(self):
+        """DB fallback matches accent-folded titles when live is cold (D243)."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
+        import dead_host_breaker
+        dead_host_breaker.reset_cold_hosts()
+        dead_host_breaker.mark_host_cold('en.wikipedia.org', 'test')
 
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -76,7 +95,7 @@ class TestDBFirstPath(unittest.TestCase):
 
         with patch('rag_retriever._get_db_connection', return_value=mock_conn):
             with patch('rag_retriever.requests.get') as mock_get:
-                mock_get.side_effect = AssertionError("Network call — DB should serve this")
+                mock_get.side_effect = AssertionError("Network call — cold branch should use DB")
                 # Try without accents — should still match via folding
                 result = fetch_wikipedia_summary_with_provenance('Ile Sainte-Marguerite')
 
@@ -84,54 +103,75 @@ class TestDBFirstPath(unittest.TestCase):
         self.assertEqual(result['source'], 'stop_corpus')
         self.assertGreater(len(result.get('text', '')), 50)
 
-    def test_db_first_goes_red_when_neutralised(self):
+        dead_host_breaker.reset_cold_hosts()
+
+    def test_db_fallback_goes_red_when_neutralised(self):
         """D242 standing check: test FAILS if _fetch_from_stop_corpus is a no-op.
 
-        This test verifies the DB-first path is actually wired and working.
-        If someone neutralises _fetch_from_stop_corpus to always return None,
-        the test goes red because the network mock will fire.
+        LOCAL-450: With cold host, the DB fallback is the only path that serves
+        content. Neutralising it → the cold branch returns {} instead of content.
         """
         from rag_retriever import fetch_wikipedia_summary_with_provenance
+        import dead_host_breaker
+        dead_host_breaker.reset_cold_hosts()
+        dead_host_breaker.mark_host_cold('en.wikipedia.org', 'test')
 
-        # Neutralise the DB-first path
+        # Neutralise the DB fallback path
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
-            # Ensure Wikimedia is NOT cold (so the REST path fires)
-            with patch('dead_host_breaker.is_host_cold', return_value=False):
-                # Now requests.get should be called (network path)
-                mock_resp = MagicMock()
-                mock_resp.status_code = 404
-                mock_resp.json.return_value = {}
+            with patch('rag_retriever.requests.get') as mock_get:
+                mock_get.side_effect = AssertionError("Network call in cold branch!")
+                result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
 
-                with patch('rag_retriever.requests.get', return_value=mock_resp) as mock_get:
-                    with patch('rag_retriever._fetch_via_action_api', return_value=''):
-                        result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
+        # With DB neutralised + cold host, we get {} — proof the DB fallback
+        # is what would have served content
+        self.assertEqual(result, {},
+                         "Expected {} when DB fallback is neutralised and host is cold — "
+                         "test cannot distinguish working from broken")
 
-                # The network WAS called — proof the DB-first path was the only
-                # thing preventing network calls
-                self.assertTrue(mock_get.called,
-                                "Network was NOT called even with DB-first neutralised — "
-                                "test cannot distinguish working from broken")
+        dead_host_breaker.reset_cold_hosts()
+
+    def test_live_wins_when_wikimedia_healthy(self):
+        """When Wikimedia is healthy, live content is served (not DB).
+
+        LOCAL-450: This is the core design assertion — live first, DB only as fallback.
+        """
+        from rag_retriever import fetch_wikipedia_summary_with_provenance
+        import dead_host_breaker
+        dead_host_breaker.reset_cold_hosts()
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'extract': 'Rich live content from Wikipedia about the island ' * 10}
+
+        with patch('rag_retriever.requests.get', return_value=mock_resp):
+            with patch('rag_retriever._fetch_from_stop_corpus') as mock_db:
+                result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
+
+        # DB fallback should NOT have been consulted
+        mock_db.assert_not_called()
+        self.assertEqual(result['source'], 'wikipedia_live')
+        self.assertIn('Rich live content', result['text'])
+
+        dead_host_breaker.reset_cold_hosts()
 
     def test_backwards_compat_returns_string(self):
         """fetch_wikipedia_summary() returns a plain string (not dict)."""
         from rag_retriever import fetch_wikipedia_summary
+        import dead_host_breaker
+        dead_host_breaker.reset_cold_hosts()
 
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.return_value = [
-            ('Île Sainte-Marguerite',
-             json.dumps([{'text': 'The island of Sainte-Marguerite content about the island ' * 3}]),
-             json.dumps([{'type': 'wikipedia', 'url': 'https://en.wikipedia.org/wiki/Ile_Sainte-Marguerite'}])),
-        ]
+        # With live healthy, we get live content as a string
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'extract': 'The island of Sainte-Marguerite content about the island ' * 3}
 
-        with patch('rag_retriever._get_db_connection', return_value=mock_conn):
-            with patch('rag_retriever.requests.get') as mock_get:
-                mock_get.side_effect = AssertionError("Network call — DB should serve this")
-                result = fetch_wikipedia_summary('Île Sainte-Marguerite')
+        with patch('rag_retriever.requests.get', return_value=mock_resp):
+            result = fetch_wikipedia_summary('Île Sainte-Marguerite')
 
         self.assertIsInstance(result, str)
         self.assertGreater(len(result), 50)
+
+        dead_host_breaker.reset_cold_hosts()
 
 
 class TestWaybackRemoved(unittest.TestCase):
@@ -198,7 +238,11 @@ class TestWaybackRemoved(unittest.TestCase):
 
 
 class TestDBFirstIntegration(unittest.TestCase):
-    """Integration test — requires live DB connection."""
+    """Integration test — requires live DB connection.
+    
+    LOCAL-450: renamed from "DB-first" but tests the same underlying DB read.
+    The integration test now exercises the fallback path (cold → DB serves).
+    """
 
     def setUp(self):
         """Set host-side DB env vars for _get_db_connection() to find the DB."""
@@ -219,11 +263,11 @@ class TestDBFirstIntegration(unittest.TestCase):
             else:
                 os.environ[key] = val
 
-    def test_live_db_first_no_network(self):
-        """Live integration: DB-first serves stop_corpus content without network.
+    def test_live_db_fallback_serves_when_cold(self):
+        """Live integration: DB fallback serves stop_corpus content when host is cold.
         
-        This is the acceptance criterion: a live run showing the DB-first path
-        serving a summary with zero network calls.
+        LOCAL-450: This is the acceptance criterion — a live run showing the DB
+        fallback path serving a summary when the cold branch is taken.
         """
         try:
             from db_connection import check_db_available
@@ -233,6 +277,9 @@ class TestDBFirstIntegration(unittest.TestCase):
             self.skipTest("Cannot check DB availability")
 
         from rag_retriever import fetch_wikipedia_summary_with_provenance
+        import dead_host_breaker
+        dead_host_breaker.reset_cold_hosts()
+        dead_host_breaker.mark_host_cold('en.wikipedia.org', 'test')
 
         # Get a title we know is in stop_corpus with Wikipedia source
         from db_connection import get_connection
@@ -251,10 +298,10 @@ class TestDBFirstIntegration(unittest.TestCase):
 
         title = row[0]
 
-        # Fetch with network blocked
+        # Fetch with network blocked — cold branch should consult DB
         with patch('rag_retriever.requests.get') as mock_get:
             mock_get.side_effect = AssertionError(
-                f"Network call for '{title}' — DB-first should serve this!"
+                f"Network call for '{title}' — cold branch should use DB fallback!"
             )
             result = fetch_wikipedia_summary_with_provenance(title)
 
@@ -262,7 +309,9 @@ class TestDBFirstIntegration(unittest.TestCase):
                          f"Expected stop_corpus source for '{title}', got '{result.get('source')}'")
         self.assertGreater(len(result.get('text', '')), 20,
                            f"Expected substantial text for '{title}'")
-        print(f"\n  ✓ DB-first served '{title}' ({len(result['text'])} chars, 0 network calls)")
+        print(f"\n  ✓ DB-fallback served '{title}' ({len(result['text'])} chars, 0 network calls)")
+
+        dead_host_breaker.reset_cold_hosts()
 
 
 if __name__ == '__main__':
