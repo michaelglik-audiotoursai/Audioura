@@ -15410,3 +15410,23 @@ Implementation constraints (LEAD's, recorded for LOCAL-439):
   resolution sentence is valid inside a unit but is not a story alone.
 - The regex classifier may remain only as a zero-cost pre-filter for obvious non-prose
   (headings, empty strings) — never as the verdict.
+
+### D393/D394 second addendum — score composition order (Michael, 2026-08-12)
+
+Michael's ruling on the interest/trust composition:
+1. Provenance weights **stay exactly as they are** (museum_official 3.0 … web_search 0.5).
+2. Ranking order: **trust (highest) > emotional content > new-information-beyond-the-
+   visible**, with "telling visitors what to feel" as a penalty deduction.
+3. The feel-telling penalty is Michael's own criterion from his walkthrough — his Con on
+   candidate #3 ("Unbounding the Book": "tells visitors what they need to want and
+   feel", e.g. "forces visitors to look closely…", "It proves to visitors that…"). It
+   demotes candidates that instruct the visitor's experience; his final story is clean
+   of it. A sentence that characterizes the WORK ("stands as a symbol of resilience")
+   is not a violation; a sentence that directs the VISITOR is.
+
+LEAD design note, recorded for LOCAL-439: the trust component scores the **best
+corroborating source found during verification**, not the discovery source. Verification
+remains the hard gate; a web-search-discovered story corroborated against a museum or
+Wikipedia source carries the corroborating source's weight. Without this, "trust first"
+would let any dry catalogue line permanently outrank any story not born on the venue
+page, defeating story selection entirely — the discovery channel is not the evidence.
