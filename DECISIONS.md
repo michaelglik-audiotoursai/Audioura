@@ -15832,3 +15832,62 @@ prompt-tuning until the numbers look good is forbidden. Nothing is wired into
 `generate_tour_text.py` by this task. The only shape LEAD would later consider merging:
 LLM output enters at web_search tier or below, never asserted without corroboration from
 a fetched source, labelled in provenance as model-memory.
+
+## D407 — LOCAL-446 merged: an LLM is not a Wikimedia substitute. Michael's question is answered, no. (2026-08-12)
+
+**Merged `d45a880`.** Measurement only — nothing wired into `generate_tour_text.py`, as
+the task required. The answer to Michael's question is no on both axes he asked about.
+
+**LEAD did not take the submission's tables on trust.** Every headline number was
+recomputed from the raw per-call data in `measurement_results.json`, independently of
+`run_measurement.py`'s own grading, and they reproduce exactly:
+
+    QID correct/wrong   gpt-4o-mini  0/34      gpt-4o  6/34
+    median latency      4o-mini 1861ms   4o 1922ms   Wikimedia (healthy) 108ms
+    confident-and-wrong 74 (4o-mini)     53 (4o)
+
+**Not faster:** 17× slower than healthy Wikimedia, and LOCAL-445's breaker already makes
+the failure path ~0ms, so the honest comparison is 0ms-and-absent vs ~2000ms-and-possibly
+-fabricated. **Not accurate:** 27–35% error on the long tail, which is precisely where
+the pipeline needs help. **No guard exists:** D373 requires corroboration from a fetched
+source, and the substitute is only wanted when that source is down — the requirement
+cannot be met by construction. That is the durable finding, independent of model quality.
+
+**The fabrication finding is not an artifact of a leading prompt.** The system prompt is
+genuinely abstention-friendly — five explicit rules stating null is always preferable to
+a guess, "an incorrect answer is a failure". The models fabricated QIDs anyway, at high
+stated confidence, on 34/34 and 28/34 gradeable entities. Every grading shortcut LEAD
+found (word-overlap for extracts, substring match for generic fields) leans in the LLM's
+favour, so "unusable" is the conservative reading.
+
+**Correction 1 — the fixture's 6 null-QID rows are a harvest defect, not non-notability.**
+The submission says "6 entities had no Wikidata match (very obscure or non-notable)".
+That is wrong and must not be quoted. The rows are Musée Matisse Nice, Musée National
+Marc Chagall, Musée Picasso Paris, La Joie de Vivre, The Dance, Colline du Château —
+the first three are plainly notable. Cause: `harvest_ground_truth.py:103`
+`wbsearchentities` with `language=en`, the full composite French string, and no
+accent-fold or shorter-name retry. LEAD verified live: `Musée Picasso` → `Q743206`,
+while `Musée Matisse Nice` → `[]` even with `language=fr`. **This is D243 again, in a
+new location** — standing check #4 caught it. Same defect for the "15 entities had no
+Wikipedia article (French local landmarks)" line.
+
+**Correction 2 — "abstained: 6" in both QID tables is not model abstention.**
+`run_measurement.py:73-74` returns `abstained` when ground truth is None, i.e.
+ungradeable. Among gradeable rows **both models abstained on QID exactly zero times.**
+The submission's prose says this correctly ("the model never abstains on QIDs"); the
+table contradicts it. Quote the prose.
+
+Neither correction rescues the LLM — both leaned in its favour. The 6 ungradeable rows
+drew confident QIDs from both models (4o-mini emitted one for all 6, 4o for 5), so
+repairing the fixture can only raise the fabrication count, never lower it.
+
+**D242 check #1 has no target here** — the task shipped no production change, so there is
+nothing to revert and no test that could go red. The substitute LEAD applied: independent
+recomputation of every headline from raw data, a live Wikidata check of the ground truth,
+and a read of the prompt for bias. Noted as a gap: `_compare_field` is logic the whole
+conclusion rests on and it has no test. Accepted because QID grading is exact string
+match, which LEAD recomputed by hand.
+
+**Consequence for the retrieval chain (D403a):** step 2 of the corrected order — the
+Wayback copy of the failed Wikipedia page — is now the only unexplored substitute, and
+it too rests on no evidence. LOCAL-447 measures it before wiring anything.
