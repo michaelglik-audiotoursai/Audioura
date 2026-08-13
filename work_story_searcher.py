@@ -239,15 +239,20 @@ def _check_wikidata_p856(domain: str) -> str:
         else:
             mark_host_cold('https://query.wikidata.org', reason=f'HTTP {e.code} during P856 check for {domain}')
         print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
-        return 'tier3'
+        # [LOCAL-459] R1: "could not verify" ≠ "untrustworthy". Timeout/error
+        # is a fact about our network, not about the domain. Return 'unverified'
+        # so the ranker can apply a lighter penalty.
+        return 'unverified'
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         # Timeout or network error — mark cold
         mark_host_cold('https://query.wikidata.org', reason=f'timeout/network error for {domain}: {e}')
         print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
-        return 'tier3'
+        # [LOCAL-459] R1: same — network failure ≠ domain untrustworthiness
+        return 'unverified'
     except Exception as e:
         print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
-        return 'tier3'  # Fail → tier3, never tier1, never skipped
+        # [LOCAL-459] R1: same — unknown failure, domain status genuinely unknown
+        return 'unverified'
 
 
 def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
@@ -301,13 +306,14 @@ def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
                 results[domain] = future.result(timeout=0)
             except Exception as e:
                 print(f"  [LOCAL-441] P856 exception for {domain}: {e}")
-                results[domain] = 'tier3'
+                # [LOCAL-459] R1: exception during lookup = unverified, not tier3
+                results[domain] = 'unverified'
 
-        # Budget-expired lookups → tier3 (same treatment as timeout)
+        # Budget-expired lookups → unverified (LOCAL-459 R1: not tier3)
         for future in not_done:
             domain = future_to_domain[future]
-            print(f"  [LOCAL-441] P856 budget-expired for {domain} → tier3")
-            results[domain] = 'tier3'
+            print(f"  [LOCAL-441] P856 budget-expired for {domain} → unverified")
+            results[domain] = 'unverified'
             future.cancel()
     finally:
         # shutdown(wait=False, cancel_futures=True) — don't block on still-running threads
@@ -315,9 +321,10 @@ def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
 
     elapsed = time.time() - batch_start
     resolved = sum(1 for v in results.values() if v == 'tier1')
+    unverified = sum(1 for v in results.values() if v == 'unverified')
     expired = len(not_done)
     print(f"  [LOCAL-441] Batch complete: {elapsed:.1f}s, "
-          f"{resolved} tier1, {len(results) - resolved} tier3, "
+          f"{resolved} tier1, {unverified} unverified, "
           f"{expired} budget-expired")
 
     return results
