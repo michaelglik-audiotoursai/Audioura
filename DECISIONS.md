@@ -17238,3 +17238,60 @@ something new is no longer punished for not repeating the title.
 **Standing rule this earns:** a task may not modify the fixture it is being judged against.
 If the fixture is wrong, say so and stop. Fixtures LEAD supplies are evidence, and evidence
 is not an input to be tuned.
+
+## D433 — the sweep: 9 stops need a story, 3 can source one
+
+**2026-08-13, LEAD, at Michael's instruction** ("run story generation across the other
+stops in this exhibit and on other tours, and see whether real stories come out").
+`story_sweep.py` built to run the whole chain per stop: production-style record → S2 →
+live S3 through the LOCAL-459 ranker → Q1 need → Q2 availability. 9 stops, 3 tours, $0.035.
+
+```
+tour                     stop                        needs   sourceable   verdict
+MFA Unbound              Le Lézard aux plumes d'or    YES    none         SILENCE
+MFA Unbound              Moses and Monotheism         YES    Dalí, Freud  WRITE
+MFA Unbound              Au Soleil du Plafond         YES    Juan Gris    WRITE
+Fruitlands Museum        Hudson River from Fort P.    YES    none         SILENCE
+Fruitlands Museum        The Brothers (1883)          YES    none         SILENCE
+Fruitlands Museum        The Print Room               YES    none         SILENCE
+Beacon Hill walking      Massachusetts State House    YES    none         SILENCE
+Beacon Hill walking      Cheers Beacon Hill           YES    none         SILENCE
+Beacon Hill walking      Louisburg Square             YES    named        WRITE
+```
+
+**9 of 9 need a story. 3 of 9 can source one.** The ranker fix is real and necessary and
+it is not sufficient. Two of the three wins are the MFA stops the fix was built for; the
+third, Louisburg Square, is an independent confirmation on a walking tour.
+
+**Stop 3's story is the one Michael asked for by name in his review** — he wrote "who is
+Rosenberg?" against the delivered text. The corpus now carries it:
+
+> "This book was originally planned by L. Rosenberg ca. 1916-1917. Gris died in 1927,
+> having finished only half of the intended …"
+
+Person, date, action, consequence. That is the shape D429 set as the bar, arriving from
+retrieval rather than from memory.
+
+**What the six failures lack, counted across handles:** `consequence` is missing most
+often (36 of the ~60 handle-checks), then `action`, then `person`. The corpora are not
+empty — every stop kept 5 snippets — they are **catalogue**. Museum collection pages
+(nga.gov, moma.org, metmuseum.org) return accession records: title, date, medium,
+dimensions. Nobody does anything and nothing is at stake. Stop 1 is the sharpest case: its
+record is the most complete of all nine (8/9 fields, checklist-matched) and it still
+returns SILENCE, because what came back was five catalogue entries for Miró prints.
+
+**So the binding constraint has moved.** It was the record (D426), then the ranker (D430);
+now it is **what the sources are**. A ranker can only order what retrieval returns, and
+retrieval is returning catalogues because the queries ask about objects. The queries that
+worked ask about people doing things — LOCAL-421's why-shaped queries, and the R5
+page-fetch that LOCAL-459 specified and did not deliver in a testable form.
+
+**A defect in LEAD's own sweep, found by the data:** it assessed only FLAT and DANGLING
+handles and reported "sourceable: NONE" for stop 3 — while **Juan Gris, its protagonist,
+sat at MENTIONED and was SOURCEABLE the whole time**. Two sentences about someone is not
+"already has a story", it is the cheapest place to put one. Targets are now every handle
+that is not DEVELOPED. Stop 3 flipped SILENCE → WRITE on that one-line change, which is a
+useful reminder that a negative result is a claim about the instrument first.
+
+**Not dispatched.** Next move is Michael's: the evidence says fetch pages rather than rank
+snippets, and that is the R5 half of LOCAL-459 that was never honestly proven.
