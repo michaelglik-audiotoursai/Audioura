@@ -1,0 +1,48 @@
+{
+  "tour_file": "TOUR_MFA_20260812_2030.txt",
+  "stop_index": 1,
+  "stop": {
+    "canonical_title": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+    "local_title": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+    "artist": "Joan Miró",
+    "venue_name": "Museum of Fine Arts, Boston",
+    "venue_city": "Boston",
+    "venue_lang": "en",
+    "exhibition_name": "Picasso, Miro, Dali: Unbound",
+    "publisher": "Louis Broder",
+    "collaborator": "",
+    "credit_line": "Gift of Boris Fridman"
+  },
+  "tour_prose": "\"Le Lézard aux plumes d’or\" is an exquisite illustrated book, a masterwork by Joan Miró created in 1971.The choice of publisher’s vellum as the medium adds a luxurious sheen and durability to the pages, enhancing the vibrancy of the colors. This work was published by Louis Broder, a renowned figure in the world of artist's books, who was committed to the creation of limited editions that demanded close collaboration between artist, poet, and Mourlot Frères. Boris Fridman, a dedicated collector, recognized the significance of this collaboration and generously donated it to the Museum of Fine Arts, Boston. As you take in this work, consider the mythic narratives and surreal transformations that inspired Miró — a thread that ties back to ancient stories of metamorphosis and change.",
+  "tour_orientation": "The Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA delves into the transformative power of the livre d'artiste, showcasing revolutionary books as artworks deeply collaborative in nature. In Gallery 184, the extraordinary Spanish artists' creations challenge traditional boundaries, merging images, words, and typography. Witness the captivating Le Lézard aux plumes d’or (The Lizard with Golden Feathers), the enigmatic Moses and Monotheism, and the illuminating Au Soleil du Plafond. Explore how art and belief intertwine, inviting reflection on the journey from creation to enlightenment. At Le Lézard aux plumes d’or, contemplate Miró's inspiration from ancient stories of metamorphosis. Later, delve into Freud's theory on Moses's Egyptian origins at Moses and Monotheism, followed by Gris's enduring influence in Au Soleil du Plafond. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Stand directly in front of \"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" and focus on the intricate interplay of images and text. This position allows you to appreciate the harmony between Miró's vibrant lithographs and the text, printed on the Louis Broder’s vellum, which lends a tactile depth to the artwork.",
+  "queries": [
+    "\"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" Joan Miró story visitors Picasso, Miro, Dali: Unbound",
+    "\"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" Gift of Boris Fridman history story",
+    "\"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" Joan Miró",
+    "\"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" history",
+    "Louis Broder Joan Miró",
+    "Boris Fridman collection",
+    "Boris Fridman \"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" donation why",
+    "Joan Miró \"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" why created motivation",
+    "Museum of Fine Arts, Boston Joan Miró donation history"
+  ],
+  "story_beats": [],
+  "refinement_queries": [],
+  "coverage": {
+    "passage_count": 0,
+    "content_words": [
+      "lezard",
+      "plumes",
+      "lizard",
+      "golden",
+      "feathers"
+    ],
+    "subject_in_passages": false,
+    "subject_match_words": [],
+    "venue_only_count": 0,
+    "verdict": "EMPTY",
+    "has_subject_role": false,
+    "has_creator_role": false,
+    "has_venue_role": false
+  }
+}

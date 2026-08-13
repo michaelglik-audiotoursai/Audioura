@@ -16656,3 +16656,114 @@ runs are worth nothing until a test can fail.
 **Standing check #1 paid for itself again** (`CLAUDE.md`): break the production code,
 confirm a test goes red. Two minutes, no port, no fleet, no API spend — and it caught a
 suite that had already been counted as evidence in a commit message.
+
+## D422 — LOCAL-455 died the same way LOCAL-452 did, and its port guard is inert
+
+**2026-08-12.** The worker died at ~71 minutes with **zero commits** — LOCAL-452 died at
+62. Two consecutive attempts at the same task, ~133 minutes of paid runtime, nothing
+committed by either. Salvaged by LEAD as `486f9b5`, labelled UNVERIFIED.
+
+**The dispatcher re-claimed it 10 minutes later** (20:29:20, pid 11612, worker 11648)
+because it wrote its own ABANDONED record without the task file being parked. This is the
+exact D420 failure, and D420 was written about it earlier the same day. Stopped, and the
+file parked as `PARKED_kiro_task_LOCAL-455_r2_failed.md` **in the same action**.
+
+**What it produced, and what is wrong with it.**
+
+`build.sh` is sound: it exports `GIT_SHA=$(git rev-parse --short HEAD)` before calling
+compose build and refuses to run from a worktree. Keep it.
+
+`worktree_compose_guard.sh` is a wrapper that refuses `compose up/start/run` from under
+`~/audioura-worktrees`. Nothing invokes it. Opt-in guards do not guard.
+
+`docker-compose.override.yml` is **inert, and LEAD proved it three ways**:
+
+1. **It is never loaded.** Compose auto-merges `docker-compose.override.yml` only with a
+   default `docker-compose.yml`, and **no such file exists in this repo** — every compose
+   file is `docker-compose-<name>.yml`. The incident command was
+   `-f docker-compose-master.yml`. Run from inside the worktree:
+
+   ```
+   docker compose -f docker-compose-master.yml config | grep -c network_mode
+   0
+   ...  tour-generator still renders  ports: published "5000"
+   ```
+
+2. **`tour-generator` is not in its service list** — the one service mapping `5000:5000`,
+   the one that caused the incident.
+
+3. **8 of its 15 service names do not exist** in `docker-compose-master.yml`
+   (`coordinates`, `news-generator`, `news-processor`, `news-orchestrator`,
+   `newsletter-processor`, `polly-tts`, `tour-editing`, `tour-generation-modernized`).
+   14 port-publishing services are uncovered.
+
+Port 5000 survived both runs. **The task-file prohibition held; the code did not exist to
+hold anything.** Whoever picks this up next must prove the guard by making it refuse a
+real attempt — D418's rule, unchanged.
+
+## D423 — the story material is real and never touches the object; and an instrument lies
+
+**2026-08-12 20:36, `TOUR_MFA_20260812_2030.txt`**, 3 stops, 6,562 chars, 181.6s, $0.1191,
+`code_sha 35cb1d4`. Generated for Michael and LEAD to review the *same* file — the previous
+confusion came from two tours of the same exhibition seven hours apart, each with its own
+review (`ca59ca8` and `d7f8e68`). One tour, one review, matching name stems, repo root.
+
+**Michael's read, confirmed:** *"nothing points to the stop, but there are stories… no
+obvious correlation with the stop though they are about the stop."*
+
+Story beats are real and correctly assigned — Boris Fridman / Louis Broder / Mourlot
+Frères on stop 1, Dalí / Freud / Torf on stop 2, Juan Gris / Pierre Reverdy on stop 3, and
+LEAD verified all 8 appear in the delivered text. **None is tied to the object in the
+case.** Broder arrives as "a renowned figure in the world of artist's books" rather than as
+the maker of *this* vellum and *these* 40 lithographs. Body sentences describing the
+physical object: stop 1 → 1, stop 2 → 0, stop 3 → 0. Stop 3 has no orientation at all, for
+the third consecutive generation.
+
+**An instrument in this run is lying.** `[LOCAL-390] FINAL beat verification` reports
+`beats_in_output=3/3/2, dropped=[]`; `[LOCAL-410] CHAIN INSTRUMENTATION` reports
+`beats_in_delivered_text=0` for all three stops, same run, same text. LEAD settled it by
+grepping the delivered text: **8/8 beat people present, so LOCAL-390 is right and LOCAL-410
+reports a false zero.** On the strength of that 0 LEAD nearly published a claim that the
+validation gates were deleting the stories. They are not. `beats_in_delivered_text` has
+been quoted as evidence before and must not be until it is fixed.
+
+**The action plan from `MFA_UNBOUND_EVALUATION_LEAD.md` (18:05) is 0 of 5 dispatched.**
+Publisher-appositive corruption, Hogarth conflation, orientation on every stop,
+first-mention rule, length balance — none. Everything went to that document's *footnote*
+(the non-determinism) via LOCAL-453/454/456, plus the fleet chain LOCAL-452/455. Three of
+the five defects are still visible in tonight's tour, and stop 3's garbled sentence is now
+in its third distinct form.
+
+## D424 — `story_lab.py`: the story pipeline, one subroutine at a time
+
+Michael, 2026-08-12: *"can you isolate in the code the subroutines that create the stories
+… so we can run and improve each subroutine … One subroutine at the time."* Built as
+`story_lab.py`, six stages in his order, each reading and writing one JSON state file so a
+stage can be run, inspected, hand-edited, and the next stage run on the edit.
+
+```
+S1 fact->stop->exhibition   the stop record        S4 the right size   corpus_coverage
+S2 making the query         synthesize_queries     S5 writing          beats + snippet block
+S3 result + evaluation      search + snippet_ranker S6 validation      the gates
+```
+
+**It earned its keep on the first run.** Six of stop 1's nine queries are exact-phrase
+searches on `"Le Lézard aux plumes d'or (The Lizard with Golden Feathers)"` — a string that
+exists nowhere on the internet, because the English gloss is **our own addition**.
+`generate_tour_text.py:4000` already has `_strip_parenthetical_translation()` and it returns
+the correct bare title; it is simply not applied to the stop record before queries are
+built. Production confirms the glossed title reaches the searcher:
+`[work_stories] MISS for le lezard aux plumes dor the lizard with`. Stop 1 spent 9 queries
+for 55 results; stops 2 and 3, whose titles carry no gloss, spent 4 each. `corpus_coverage`
+then hunts for `lizard`/`golden`/`feathers` in French sources for the same reason.
+
+**Limitation, stated rather than hidden:** S5 cannot run the writer. The story-writing
+prompt is inline in `generate_tour_text()`, a **10,443-line** function, so it is not
+callable. S5 shows only what feeds it. Extracting that prompt into a real subroutine is the
+highest-value refactor for the work Michael wants to do next, and it is the same structural
+cause as D421 — code that cannot be called can only be tested by grepping its source.
+
+**Deliberately not dispatched while Michael is out.** The parenthetical-title fix is
+written up and parked rather than sent to a worker. Not for approval — for sequencing: he
+asked to drive the story-generation work jointly when he returns, and rewriting the
+pipeline underneath that session would waste it. One rename dispatches it.
