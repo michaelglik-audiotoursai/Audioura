@@ -12446,8 +12446,50 @@ REWRITE RULES (all mandatory):
             print(f"  [LOCAL-385] ERROR: prose entity grounding gate failed (non-fatal): {_peg_err}")
     else:
         if tour_category == 'museum':
-            print(f"\n  [LOCAL-385] Prose entity grounding gate SKIPPED "
-                  f"(no exhibition scope — unscoped museum tours are not gated)")
+            # [LOCAL-458] D3: distinguish empty corpus from no scope
+            if _exhibition_checklist_result and not getattr(_exhibition_checklist_result, 'page_text', ''):
+                print(f"\n  [LOCAL-458] entity gate SKIPPED: corpus=0 chars (retrieval returned no page text)")
+            else:
+                print(f"\n  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)")
+
+    # -------- [LOCAL-458] PHASE 5.158b: Role-claim gate --------
+    # Detects ROLE→AGENT claims (e.g. "published by The Hogarth Press") where
+    # the agent is INVENTED: stop-record slot is empty AND agent is absent from
+    # the grounding corpus. Drops sentences containing invented role claims.
+    # Same scope as the person gate: exhibition-scoped museum tours only.
+    if (tour_category == 'museum' and _exhibition_checklist_result
+            and getattr(_exhibition_checklist_result, 'page_text', '')):
+        _rcg_corpus = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+        _rcg_works = getattr(_exhibition_checklist_result, 'works', None) or []
+        print(f"\n  [LOCAL-458] PHASE 5.158b: Role-claim gate...")
+        try:
+            from stop_claim_audit import apply_role_claim_gate_to_poi_list
+            _rcg_stats = apply_role_claim_gate_to_poi_list(
+                poi_list,
+                _exhibition_checklist_result,
+                _rcg_corpus,
+            )
+            print(f"  [LOCAL-458] entity gate: corpus={len(_rcg_corpus)} chars, "
+                  f"{_rcg_stats['role_claims_detected']} role claims, "
+                  f"{_rcg_stats['entities_checked']} entities, "
+                  f"{_rcg_stats['claims_dropped']} dropped")
+            if _rcg_stats['drop_log']:
+                for _rl in _rcg_stats['drop_log']:
+                    print(f"    [LOCAL-458] field={_rl['field']} stop='{_rl['stop'][:30]}' "
+                          f"role={_rl['role']} agent='{_rl['agent']}' "
+                          f"reason='{_rl['reason']}'")
+                    for _ds in _rl['dropped_sentences']:
+                        print(f"      dropped: \"{_ds[:100]}\"")
+        except ImportError as _rcg_err:
+            print(f"  [LOCAL-458] WARNING: stop_claim_audit not importable — gate skipped ({_rcg_err})")
+        except Exception as _rcg_err:
+            print(f"  [LOCAL-458] ERROR: role-claim gate failed (non-fatal): {_rcg_err}")
+    else:
+        if tour_category == 'museum':
+            if _exhibition_checklist_result and not getattr(_exhibition_checklist_result, 'page_text', ''):
+                print(f"\n  [LOCAL-458] entity gate SKIPPED: corpus=0 chars (retrieval returned no page text)")
+            else:
+                print(f"\n  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)")
 
     # -------- [LOCAL-384] PHASE 5.159: Form-claim gate --------
     # The model repeatedly infers physical form from titles (e.g. "Au Soleil du
