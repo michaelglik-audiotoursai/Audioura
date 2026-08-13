@@ -16767,3 +16767,49 @@ cause as D421 — code that cannot be called can only be tested by grepping its 
 written up and parked rather than sent to a worker. Not for approval — for sequencing: he
 asked to drive the story-generation work jointly when he returns, and rewriting the
 pipeline underneath that session would waste it. One rename dispatches it.
+
+## D425 — the Hogarth attribution is fabricated, and the checklist path is non-deterministic at the source
+
+**2026-08-12, settled by LEAD against the archived page the run actually used.**
+
+`web.archive.org/web/20260812064828/https://www.mfa.org/exhibition/picasso-miro-dali-unbound`,
+HTTP 200, 103,995 chars:
+
+```
+Hogarth      0 occurrences
+Tériade      0 occurrences
+Torf         1   "Lois B. and Michael K. Torf Gallery (Gallery 184)"
+Broder       2   "published by Louis Broder, printed by Mourlot Frères, Paris, 1971.
+                  Illustrated book with 40 color lithographs …; publisher's vellum. Gift of …"
+1974         1   "as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism"
+```
+
+**D420-era claim corrected.** `MFA_UNBOUND_EVALUATION_LEAD.md` said the Hogarth sentence
+"is sourced — it traces back to the MFA page — which makes this a *reading* error, not a
+hallucination." **False.** The page names no publisher for the Dalí edition at all. "The
+Hogarth Press" is parametric, has survived every gate for four consecutive generations, and
+in tonight's run was promoted from "produced this edition" to "Commissioned by". A
+fabricated attribution in the system whose headline claim is that it refuses to fabricate.
+
+**Tériade is unsourced too** — 0 occurrences. Stop 3's Tériade credit is probably correct
+in fact, but it arrived by the same mechanism that produced the Hogarth error. A right
+answer from an ungrounded process is not evidence the process works.
+
+**Also withdrawn:** LEAD flagged "Gallery 184" vs "Torf Gallery" as an internal
+contradiction. The page reads *"Lois B. and Michael K. Torf Gallery (Gallery 184)"*. Same
+room. The tour was right; the reviewer was not.
+
+**The retrieval path is non-deterministic at the source, not just in the LLM.** The same
+`find_exhibition_checklist` call, 59 minutes apart:
+
+```
+20:36  Cloudflare → Wayback 200 → exhibition page, 8,215 chars, path=prose_llm, works=3
+21:35  Cloudflare → Wayback 503 → web search → airmail.news, path=third_party, works=3,
+                                                             page_text = 0 chars
+```
+
+Both "succeed" and both return the same three works, but on the second path **`page_text`
+is empty**. Everything reading it — `exhibition_thesis` framing, `story_beat_injector`
+mining, and LOCAL-454's entire post-hoc checklist validator — silently has no evidence.
+This is upstream of the whole LOCAL-453/454/456 chain, which has been treating candidate
+selection as the source of the variance. LOCAL-456 must not assume `page_text` exists.

@@ -228,6 +228,67 @@ prompt.
 
 ---
 
+## Q8 — "Why are the file names different? MFA_UNBOUND_FOR_REVIEW.txt vs TOUR_MFA_UNBOUND_20260812.txt — which one am I supposed to reference?"
+
+Two different tours of the same exhibition, seven hours apart, each with its own review.
+Not duplicates.
+
+| | morning | evening |
+|---|---|---|
+| tour | `TOUR_MFA_UNBOUND_20260812.txt` 5,769 ch | `tours/MFA_UNBOUND_FOR_REVIEW.txt` 6,207 ch |
+| review | `ASSESSMENT_MFA_UNBOUND_20260812.md` | `MFA_UNBOUND_EVALUATION_LEAD.md` |
+| commit | `ca59ca8` | `d7f8e68` |
+
+Michael had the evening tour open next to the morning tour's review. Both are committed,
+so neither can vanish. Fixed going forward by generating **one** tour whose review shares
+its name stem, in the repo root, with no second copy: `TOUR_MFA_20260812_2030.txt` and
+`TOUR_MFA_20260812_2030_REVIEW.md`.
+
+## Q9 — "You wrote 'the action plan' — is it done?"
+
+**No. Zero of the five.** The five prose fixes from `MFA_UNBOUND_EVALUATION_LEAD.md`
+(publisher-appositive corruption, Hogarth conflation, orientation on every stop,
+first-mention rule for people, per-stop length balance) were never dispatched. Everything
+went to that document's *footnote* — the candidate non-determinism — via LOCAL-453/454/456,
+plus the fleet chain LOCAL-452/455 which burned two 60-70 minute runs and committed
+nothing. Three of the five defects are still visible in tonight's tour. Recorded as D423.
+
+## Q10 — "Nothing points to the stop, but there are stories — the opposite of what it used to be. The stories are not very good, but they are stories and they are factual. But no obvious correlation with the stop though they are about the stop."
+
+Confirmed, and measurable. The beats are real and correctly assigned — Boris Fridman /
+Louis Broder / Mourlot Frères on stop 1, Dalí / Freud / Torf on stop 2, Gris / Reverdy on
+stop 3 — and all 8 people appear in the delivered text. **None is attached to the object in
+the case.** Broder arrives as "a renowned figure in the world of artist's books" instead of
+as the maker of *this* vellum and *these* 40 lithographs. Body sentences describing the
+physical object: stop 1 → 1, stop 2 → 0, stop 3 → 0.
+
+Also found while checking: `[LOCAL-410] beats_in_delivered_text=0` contradicts
+`[LOCAL-390] beats_in_output=3/3/2` in the same run. LOCAL-390 is right. We have been
+quoting a broken instrument. D423.
+
+## Q11 — "Isolate in the code the subroutines that create the stories, so we can run and improve each one. One subroutine at a time."
+
+Built as `story_lab.py`, six stages in Michael's order, one JSON state file per run so a
+stage can be run, inspected, hand-edited, and the next stage run on the edit:
+
+```
+S1 fact -> stop -> exhibition    S4 the right size (learn more if thin)
+S2 making the query              S5 writing
+S3 result + evaluation           S6 validation
+```
+
+First run found that 6 of stop 1's 9 queries exact-phrase-search
+`"Le Lézard aux plumes d'or (The Lizard with Golden Feathers)"` — a string that exists
+nowhere, because the English gloss is our own addition.
+`generate_tour_text.py:4000 _strip_parenthetical_translation()` already returns the correct
+bare title and is simply not applied. Written up as LOCAL-457, parked until the joint
+session so the pipeline is not rewritten underneath it.
+
+**One honest limitation:** S5 cannot run the writer. The story prompt is inline in
+`generate_tour_text()`, a 10,443-line function, so it is not callable. Extracting it is the
+next piece of work. D424.
+
+
 ## Incidents worth remembering from 2026-08-12
 
 **A task worktree seized port 5000 for about an hour.** LOCAL-454 ran `docker-compose up`
@@ -247,3 +308,70 @@ at 37 min), both with an hour of uncommitted work. Task files now say: commit as
 anything works — partial and committed beats complete and lost.
 
 ---
+
+at 08/12/2026 19:53 
+❯ Is it a good time to do /clear + restart?
+
+Good timing question — but one thing has to happen first, and it's the rule I put in CLAUDE.md this afternoon: today's exchanges aren't in the conversation log yet.
+
+  Pushed to storied, ran 1 shell command
+
+[Storied_Tours]@08/12/2026|19:58
+
+Yes — now is a good time, and I've just made it safe. The one thing that would have been lost is written to disk: today's Q4–Q7 and the three incidents are in STORIED_COMMUNICATION_02.MD, committed and pushed (afae00d). That was the rule I added to CLAUDE.md this afternoon, and I'd have been the first to break it.
+
+State right now:
+
+uncommitted changes    none
+unpushed commits       0        (origin/storied == storied == afae00d)
+port 5000              audioura-tour-generator-1, healthy, code-current
+in flight              LOCAL-455 only (26 min), one worker
+audio_tours            31 real rows, no ROW LOSS
+
+What survives the clear: everything that matters. The LOCAL-455 worker is a detached process — it keeps running, writes its own COMPLETED record to kiro_sessions_ran.md, and a fresh session picks it up from disk. Both salvage commits, all task files, D409–D420, the parked LOCAL-456 — all on disk and pushed.
+
+What dies: the review loop. ScheduleWakeup is session-scoped, so no one will review LOCAL-455 until you re-arm it. That's the normal pattern, not a problem.
+
+On return, three lines:
+
+1. restart — rebuilds git state, row counts, queue, scores from disk
+2. resume continuous dev
+3. Tell it: check port 5000 first — docker ps --filter publish=5000 must show audioura-tour-generator-1, not a local-4xx container
+
+The one flag I'd raise before you go: the worktree port guard doesn't exist yet — that's what LOCAL-455 is building. Its task file explicitly forbids docker-compose up from a worktree, but LOCAL-454 did exactly that an hour ago (before the prohibition existed) and took port 5000 for an hour. So there's a small, real chance you come back to a seized port. It's cheap to fix — the restore is three commands and it's written into the resume instructions — but it's a genuine unattended risk rather than zero.
+
+If you'd rather not carry that risk, say so and I'll touch .continuous_dev/PAUSE and stop LOCAL-455 before you clear; the cost is ~26 minutes of its work, which I'd salvage the way I salvaged the last two. My recommendation is to let it run — it's the task that closes this hole permanently, and the failure mode is recoverable in minutes.
+
+One more thing worth knowing: this session is long, and long high-context sessions are the expensive kind against the weekly ceiling. Clearing now is the cheaper path regardless of the queue.
+
+  Settings  Status   Config   Usage   Stats
+
+   Session
+
+ Total cost:            $37.18
+ Total duration (API):  49m 38s                                                                                                  Total duration (wall): 3h 27m 3s                                                                                         Total code changes:    1411 lines added, 8 lines removed
+ Usage by model:
+        claude-opus-5:  4.5k input, 200.0k output, 57.4m cache read, 347.6k cache write ($37.18)
+     claude-haiku-4-5:  635 input, 14 output, 0 cache read, 0 cache write ($0.0007)
+
+ Current session
+ ████████                                           16% used
+ Resets 11:30pm (America/New_York)
+
+ Current week (all models)
+ ████████████████████▌                              41% used                                                                     Resets Aug 18 at 12am (America/New_York)                                                                                   +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+ What's contributing to your limits usage?                                                                                     Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+
+ Last 24h · these are independent characteristics of your usage, not a breakdown
+
+ 78% of your usage was at >150k context
+  Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.                                                                                           
+ 45% of your usage came from sessions active for 8+ hours
+  These are often background/loop sessions. Continuous usage can add up quickly so make sure it is intentional.                                                                                                                                                                                                                               Skills                  % of usage
+ /claude-api                     2%
+                                                                                                                                d to day · w to week                                                                                                        
+ Usage credits
+ ████████████████████████████████████████████▉      89% used                                                                  $112.49 / $125.00 spent · Resets Sep 1 (America/New_York)
+
+

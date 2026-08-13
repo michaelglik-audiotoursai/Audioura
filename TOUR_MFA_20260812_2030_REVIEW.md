@@ -125,16 +125,31 @@ that *"handpicked by Tériade, the Louis Broder"*). Three different corruptions,
 position, and this one came from the 3-attempt fallback path. A recurring failure in one
 slot is a template defect.
 
-**2. The Hogarth attribution is now worse** — blocking, fourth occurrence.
+**2. The Hogarth attribution is fabricated** — blocking, fourth occurrence. **Settled while
+you were out, and it is worse than I said at 18:05.**
 
 > "Commissioned by The Hogarth Press, this collaboration was published to merge Freud's
 > profound theories with Dalí's vivid surrealism."
 
-Hogarth published Freud's English *text* in 1939. It did not commission the 1974
-Dalí-illustrated edition. Earlier runs said Hogarth "produced this edition"; this run
-promotes it to commissioner. **This is the one defect I asked you to check last time and I
-still have not verified it against the MFA's own page** — if the MFA says Hogarth, the
-error is theirs and we are reporting faithfully. Worth settling before anyone writes code.
+At 18:05 I wrote that this sentence "is sourced — it traces back to the MFA page — which
+makes this a *reading* error, not a hallucination." **That was wrong.** I fetched the
+archived MFA exhibition page the run actually used
+(`web.archive.org/web/20260812064828/…/picasso-miro-dali-unbound`, HTTP 200, 103,995 chars):
+
+```
+Hogarth      0 occurrences
+```
+
+The page says only: *"as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and
+Monotheism"*. **No publisher is named anywhere.** So "The Hogarth Press" did not come from
+the source — the model supplied it from memory, and every gate passed it, four generations
+running. That makes it a fabricated attribution in a system whose main claim this summer is
+that it refuses to fabricate. It is the most serious thing in this tour.
+
+Related and unsourced: **Tériade appears 0 times on that page too.** Stop 3's Tériade
+credit is probably true — he did publish *Au Soleil du Plafond* in 1955 — but it did not
+come from the checklist either. We got a right answer by the same mechanism that gave us a
+wrong one.
 
 **3. Stop 3 has no orientation.** Same as last time. Cheap, and it is the difference
 between an audio guide and an essay.
@@ -153,10 +168,10 @@ listener what to conclude and calls the ventures "unprecedented" with nothing be
 This is exactly the population LOCAL-416 was written to re-read under your standard — and
 LOCAL-416 has been parked since before this chain started.
 
-**5. An internal contradiction about where you are standing.** Stop 1 says **Gallery 184**;
-stop 2 says **the Torf Gallery**. Both cannot be the frame unless they are the same room,
-which nothing in the run establishes. A listener walking between them is being told two
-different things.
+**5. ~~An internal contradiction about where you are standing.~~ WITHDRAWN — I was wrong.**
+I flagged stop 1's **Gallery 184** against stop 2's **Torf Gallery** as a contradiction.
+The MFA's own page says: *"Lois B. and Michael K. Torf Gallery (Gallery 184)"*. Same room,
+both names correct. The tour is right and my objection was not.
 
 **6. `"printed on the Louis Broder's vellum"`** — stop 1. The vellum is not Broder's; it is
 publisher's vellum, and Broder was the publisher. Same appositive-fusion mechanism as
@@ -223,14 +238,34 @@ refactor on the board for what you want to do.
 
 ---
 
+## One more thing I found, and it may matter more than the prose
+
+**The same command takes a different retrieval path run to run.** At 20:36 the checklist
+came from the Wayback snapshot of the MFA page — 8,215 characters of real exhibition text,
+which is where stop 1's publisher, printer, credit line and medium came from. At 21:35 I
+ran the identical retrieval and Wayback returned **503**, so it fell through to a
+third-party source (`airmail.news`) and returned the same three works with
+**`page_text` = 0 characters**.
+
+Everything downstream that reads `page_text` — the exhibition-thesis framing, the story
+beat mining, and LOCAL-454's whole post-hoc checklist validator — gets nothing on that
+path. It does not fail; it quietly has no evidence to work with. That is a plausible
+explanation for a chunk of the run-to-run variance we have been chasing since LOCAL-453,
+and it is upstream of everything in the prose list above.
+
+---
+
 ## What I want you to check when you are back
 
-1. **Is the Hogarth attribution actually ours or the MFA's?** One look at the museum's own
-   page settles a defect that has now survived four generations.
-2. **Gallery 184 or Torf Gallery?** If they are the same room, defect 5 evaporates.
-3. **Does stop 1 read better to you than stop 3?** It is the shortest and has the fewest
-   named people, and I think it is the best of the three — which would say something about
+1. **Does stop 1 read better to you than stop 3?** It is the shortest, has the fewest named
+   people, and I think it is the best of the three — which would say something useful about
    how much material a stop actually needs.
-4. **The correlation question is yours to define.** I can see that Broder is introduced as
+2. **The correlation question is yours to define.** I can see that Broder is introduced as
    a biography rather than as the maker of the object in the case. Tell me what the right
-   version of that sentence sounds like and I will make the gate enforce it.
+   version of that sentence sounds like — one worked example, the way you did with the
+   1967 destroyed edition — and I will make a gate enforce it.
+3. **Where do you want to start in `story_lab`?** My vote is S2, because it is free,
+   deterministic, and already has a real bug sitting in it.
+
+Two questions I left for you at 18:05 I answered myself instead — Hogarth (ours, fabricated)
+and Gallery 184 vs Torf (same room, my error). Both are folded into the defect list above.
