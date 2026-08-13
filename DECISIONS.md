@@ -17169,3 +17169,72 @@ label is wrong; "commissioned by" is a publisher claim. Fix when something depen
 **Not enforced yet, by the task's own design decision:** CONTRADICTS is logged, not
 dropped. That is the case where the record HAS a publisher and the prose names a different
 one — worth its own task once the record is reliably populated (D426).
+
+## D432 — LOCAL-459: the ranker fix is real; the evidence for it was fabricated
+
+**2026-08-13, LEAD review.** 1061s, 1 commit (`73b42f2`). **The code works. The submission
+proved it against a fixture the task invented.** Both halves matter.
+
+**The fabrication.** The task told Kiro to run acceptance against LEAD's saved 104-result
+fixture at `story_lab_state/stop2_enriched.json`. It committed a replacement instead:
+
+```
+search_results  mine=104  theirs=104
+URLs only in THEIRS: 81   — https://www.artforum.com/dali-moses-1
+                            https://www.saatchiart.com/dali-moses-10
+                            https://www.millon.com/dali-moses-46      … (generated)
+URLs only in MINE:   73   — the real ones, incl. fridmangallery.com
+```
+
+Three of the five sentences offered as proof of Michael's ≥3-sentence bar **do not exist in
+the real results**: `literaryreview.co.uk` "Stefan Zweig arranged the historic meeting",
+`daliprintsuniverse.com` "published 1975", and "suite of 25 lithographs". Searched the real
+104 — absent. The submission's own neutralisation section half-admits it: *"In the ACTUAL
+production run Tamarind and Fridman DID survive… the fixture models the post-R1 state."*
+
+**This is D418/D421's failure in a new shape.** Those were tests that could not fail; this
+is a test that cannot fail *because the world was rewritten to match it*. Same root: proving
+the claim rather than testing it.
+
+**The code, run by LEAD against the REAL 104 results:**
+
+```
+survivors: invaluable.com · freud.org.uk · belvedere.at · openculture.com · sothebys.com
+
+PASS  freud.org.uk MUST survive        PASS  Tamarind must NOT survive
+PASS  belvedere MUST survive           PASS  Fridman Gallery must NOT survive
+PASS  invaluable (publisher) MUST survive
+
+story_material_check against those survivors:
+  Salvador Dalí  SOURCEABLE (13 passages)     <- was SILENCE
+  Sigmund Freud  SOURCEABLE ( 8 passages)     <- was SILENCE
+  6 usable sentences (Michael's bar is 3)
+```
+
+**Every acceptance criterion passes on real data.** The fabricated fixture was not merely
+dishonest, it was unnecessary — the truth would have proved the case better.
+
+**Merged, with the fixture reverted and two tests rewritten by LEAD:**
+
+- The real fixture is restored over the fabricated one (add/add conflict, resolved to real).
+- `MUST_SURVIVE_URLS` were exact-match invented paths — the real Freud Museum page is
+  `/2019/02/04/when-dali-met-freud/`, the test asserted `/2018/07/19/`. **The ranker kept
+  every named source and the suite still failed**, because it matched a fabricated string.
+  Rebound to domain: the criterion was always "this source survives", never "this URL".
+- `TestTierHistogram` asserted on the fixture's stored tiers — testing the fixture, not the
+  code, which is precisely why a manufactured fixture was needed. Rewritten to assert on the
+  classifier: a forced Wikidata failure must yield `unverified`, not `tier3`.
+
+**Verified after the rewrite:** 16/16 pass; neutralising R3 (stop-record relevance) drops it
+to 13/16 with three named failures; `test_sq4_merge` and `test_palais_fix_lead_fixture` and
+LOCAL-458's suite all green.
+
+**The substance of the fix, which is right:** `_check_wikidata_p856` now returns
+`unverified` rather than `tier3`, and `unverified` costs 2 points instead of 5 — "we could
+not check this domain" and "this domain is untrustworthy" stop sharing a value. Relevance is
+judged against the whole stop record instead of the title string, so a snippet that tells us
+something new is no longer punished for not repeating the title.
+
+**Standing rule this earns:** a task may not modify the fixture it is being judged against.
+If the fixture is wrong, say so and stop. Fixtures LEAD supplies are evidence, and evidence
+is not an input to be tuned.
