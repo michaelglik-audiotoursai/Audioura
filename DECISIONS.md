@@ -17343,3 +17343,59 @@ sentence asserting X caused / led to / influenced Y must find that link in the c
 merely find X and Y there.
 
 Not dispatched. Michael is driving.
+
+## D435 — the record recovered from the delivered text, and what the MFA page actually says
+
+**2026-08-13, Michael's ask.** Build a routine that reads "Original" — stop 2 exactly as
+it shipped — and produces the starting-point record. `story_record_extract.py`.
+
+**The design point:** it must never confuse "the text says X" with "X is true". Read
+Original naively and you extract `publisher = The Hogarth Press` — laundering the D427
+fabrication into a fact, which then becomes a search key and returns nothing. So every
+field carries a status, never a bare value: **STRUCTURAL / GROUNDED / CLAIMED /
+UNSUPPORTED / ABSENT**. A CLAIMED field is a question to go answer, not a search key.
+
+**Recovered from Original alone (no corpus):**
+
+```
+   canonical_title = Moses and Monotheism        STRUCTURAL
+   english_title   = Moses and Monotheism        STRUCTURAL (no gloss present)
+ ? artist          = Salvador Dalí               CLAIMED
+ ? writer          = Sigmund Freud               CLAIMED
+ ? publisher       = The Hogarth Press           CLAIMED
+ ? gallery         = Torf Gallery                CLAIMED
+   venue           = Museum of Fine Arts, Boston STRUCTURAL
+ ! printed_by / credit_line / medium / exhibition_name   ABSENT
+```
+
+**Run again with the corpus and it finds Michael's error by itself:** artist and writer
+promote to GROUNDED; **publisher = The Hogarth Press → UNSUPPORTED.** The thing he caught
+by hand on 2026-08-12 now falls out of a deterministic pass.
+
+**Michael's template had `medium = "Picasso, Miro, Dali: Unbound"`** — that is the
+exhibition name in the medium slot. Both fields exist separately in the routine. Neither is
+recoverable from Original: **the delivered text never names the exhibition it belongs to.**
+
+**LEAD overstated a defect and is correcting it here.** `_filter_nav_from_page_text` breaks
+on `465 Huntington Avenue` as a footer boundary and discards 2,024 chars. LEAD first read
+this as the filter eating the page. It is not: the discarded tail is almost entirely
+footer and nav. **One real line is lost** — `Lois B. and Michael K. Torf Gallery (Gallery
+184)` — which is why `gallery` reads UNSUPPORTED against filtered text while "Torf" is
+plainly on the page. Minor, worth fixing, not the story.
+
+**The real finding, and it revises D426's root.** The MFA page text carries this sentence:
+
+> "…as Dalí did in his **1974** illustrations for **Sigmund Freud's Moses and
+> Monotheism**; others partnered with writers to devise images and words in harmony at the
+> outset, as in **Juan Gris** and French poet **Pierre Reverdy's Au Soleil du Plafond
+> (1955)**."
+
+All three stops, both missing artists, both missing dates, one sentence, **present in both
+the raw and the nav-filtered text.** `prose_llm_extract_works` returned two entries and
+both were *Le Lézard aux plumes d'or*.
+
+So D426's "the page names only one work" was wrong in an important way. The page names all
+three; **the extractor only picked up the one that appears in a caption-like line.** Stops
+2 and 3 could have been enriched with artist and date from prose the system already
+fetched. That is a different and much more fixable defect than "the venue does not publish
+a checklist" — and it is upstream of every finding today.

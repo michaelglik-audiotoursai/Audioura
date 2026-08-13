@@ -1,0 +1,47 @@
+{
+  "canonical_title": {
+    "value": "Moses and Monotheism",
+    "status": "STRUCTURAL",
+    "source": "stop heading"
+  },
+  "english_title": {
+    "value": "Moses and Monotheism",
+    "status": "STRUCTURAL",
+    "source": "title is already English — no gloss present"
+  },
+  "address": {
+    "value": "465 Huntington Ave, Boston, MA 02115",
+    "status": "STRUCTURAL",
+    "source": "address line"
+  },
+  "coordinates": {
+    "value": "42.3384, -71.0879",
+    "status": "STRUCTURAL",
+    "source": "coordinates line"
+  },
+  "venue": {
+    "value": "Museum of Fine Arts, Boston",
+    "status": "STRUCTURAL",
+    "source": "Directions line"
+  },
+  "publisher": {
+    "value": "The Hogarth Press",
+    "status": "UNSUPPORTED",
+    "source": "This exhibit showcases how artists like Dalí, in collaboration with publishers such as The Hogarth Press, transformed books into art forms through deeply integrated visual and textual partnerships."
+  },
+  "artist": {
+    "value": "Salvador Dalí",
+    "status": "GROUNDED",
+    "source": "In 1974, Salvador Dalí embarked on a collaborative journey by illustrating Sigmund Freud's seminal work, \"Moses and Monotheism."
+  },
+  "writer": {
+    "value": "Sigmund Freud",
+    "status": "GROUNDED",
+    "source": "In 1974, Salvador Dalí embarked on a collaborative journey by illustrating Sigmund Freud's seminal work, \"Moses and Monotheism."
+  },
+  "gallery": {
+    "value": "Torf Gallery",
+    "status": "UNSUPPORTED",
+    "source": "The exhibition at the Torf Gallery, where these rare works are displayed, highlights the synergy between text and image, a central theme in the curated selection at the Museum."
+  }
+}
