@@ -89,6 +89,25 @@ expansion: break `œ`→`oe` and show a test notice.
 **Nothing else in this task is worth doing until a test can fail.** Live runs against a
 suite that cannot detect a neutralised validator are not evidence.
 
+### 2b. The validator's input is not always there — do not assume it is (D425)
+
+LEAD ran `find_exhibition_checklist` for this exhibition twice, 59 minutes apart:
+
+```
+20:36  Cloudflare → Wayback 200 → MFA exhibition page, 8,215 chars, path=prose_llm, works=3
+21:35  Cloudflare → Wayback 503 → web search → airmail.news, path=third_party, works=3,
+                                                             page_text = 0 chars
+```
+
+Both "succeed" and both return the same three works. On the second path
+**`_checklist_page_text_for_phase3a` is empty, so your validator never runs at all** — it
+is guarded by `if _checklist_page_text_for_phase3a:`. A run where it silently does nothing
+looks identical, in the output, to a run where every candidate passed.
+
+Your extracted function must distinguish three outcomes, and the tests must cover all
+three: **validated and kept**, **validated and dropped**, **not validated — no page text**.
+The third is currently invisible and it may be common.
+
 ### 3. Three more live runs
 
 Same MFA request, five total including LEAD's two. Every run produces a tour; every stop
