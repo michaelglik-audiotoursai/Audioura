@@ -17295,3 +17295,51 @@ useful reminder that a negative result is a claim about the instrument first.
 
 **Not dispatched.** Next move is Michael's: the evidence says fetch pages rather than rank
 snippets, and that is the R5 half of LOCAL-459 that was never honestly proven.
+
+## D434 — the writer: grounded, shaped, and still inventing causation
+
+**2026-08-13, LEAD + Michael.** Michael chose to start improving generation; LEAD picked
+stop 2 because it is the only stop where the writer can be worked on without also fixing
+retrieval — one variable at a time (D433: stop 1 would force both).
+
+**`story_writer.py`** — the writer sees the corpus and nothing else, and every proper noun
+and every year in its output is checked back against that same corpus. Ungrounded ⇒
+REJECTED, not published. Refusal is a success; the model may reply `INSUFFICIENT`.
+
+**First output was ACCEPTED and was mediocre**, closing:
+
+> "The object in the case represents this ongoing dialogue between art and the subconscious."
+
+That is the empty closer Michael flagged in his own review — and it passed the
+"ties to the object" gate **by echoing the prompt's own vocabulary back at it.** A gate
+that accepts its own instructions as evidence is not a gate. Fixed: the last sentence must
+carry a concrete physical property or a number, and the empty closers ("represents",
+"embodies", "ongoing dialogue", "serves as a reminder", "transformative power") are banned
+outright.
+
+**Second output, ACCEPTED:**
+
+> In July of 1938, a 34-year-old Salvador Dalí, a devoted follower of Freud, finally met
+> the 81-year-old Sigmund Freud in London, marking their first and only encounter. This
+> meeting was as surreal as Dalí's art, leaving a lasting impression on both the artist and
+> the psychoanalyst. Years later, Dalí would channel his fascination with Freud into his
+> work, culminating in the creation of "Moses and Monotheism" in 1974-75. The piece was
+> printed by Arts Litho, Torrents, Wolfensberger and published by Editions Art & Valeur
+> S.A., Paris.
+
+Four sentences, the ages come from the corpus line "Freud was 81, Dali 34", and it ends on
+the **correct publisher** — the fact the shipped tour got wrong.
+
+**The hole that remains, stated plainly rather than claimed as a win:** the validator checks
+NAMES and DATES. It does not check ASSERTED CAUSATION. "Years later, Dalí would channel his
+fascination with Freud into his work, **culminating in**…" is a causal claim no source
+makes; so is "leaving a lasting impression on both". Every entity in those sentences is
+grounded and the sentences are still partly invented.
+
+**This is the same failure shape as D427 one level up.** Hogarth was an invented *entity*;
+these are invented *relations between grounded entities*. The entity gate cannot see them
+by construction — every name checks out. The next routine is a claim-level check: a
+sentence asserting X caused / led to / influenced Y must find that link in the corpus, not
+merely find X and Y there.
+
+Not dispatched. Michael is driving.
