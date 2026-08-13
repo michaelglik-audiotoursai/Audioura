@@ -16813,3 +16813,359 @@ is empty**. Everything reading it — `exhibition_thesis` framing, `story_beat_i
 mining, and LOCAL-454's entire post-hoc checklist validator — silently has no evidence.
 This is upstream of the whole LOCAL-453/454/456 chain, which has been treating candidate
 selection as the source of the variance. LOCAL-456 must not assume `page_text` exists.
+
+## D426 — the stop record for stop 2 is empty in every field, and LOCAL-423 is unreachable
+
+**2026-08-13, LEAD, with Michael driving S2.** Michael asked for the starting point the
+system built for **Moses and Monotheism** — his `?` fields for artist, publisher,
+credit_line, medium. Full write-up: `STOP2_S1_STARTING_POINT.md`.
+
+**Every one is empty, and so is `artist`.** Three independent causes, each verified:
+
+**1. The MFA page names exactly one work, and it is not stop 2.** Re-ran
+`find_exhibition_checklist('https://www.mfa.org', 'Picasso, Miró, Dalí: Unbound')` live.
+Exhibition matched at score 1.00, page fetched, `path=prose_llm`, **works=2 — both the
+same object**: `Le Lézard aux plumes d'or` and the same title again with `(detail)`.
+`match_work_for_stop('Moses and Monotheism', works)` → NO MATCH.
+
+This is the review in one line. **Stop 1 is the only stop the checklist can enrich**,
+because it is the only work the page names — and it is the stop Michael scored 4/5 on
+stories, against 3/5 and 1/5 for stops 2 and 3. The quality gap between his stops is not
+a writing gap. Stops 2 and 3 came from the POI LLM's parametric memory with nothing
+verifying them against the venue — the same vacuum that produced the fabricated Hogarth
+attribution in D425.
+
+**2. `poi['artist']` is never assigned.** Initialised to `""` at
+`generate_tour_text.py:4977` and `:8172`; grep over all 12,679 lines returns those two
+initialisers and read sites only. The sole filling path is the LOCAL-419 checklist
+enrichment at `:8871`, which needs a match. No match → no artist, permanently. "Salvador
+Dalí" is absent from the stop record of a stop about Salvador Dalí.
+
+**3. `exhibition_name` never reaches the stop record — so LOCAL-423 has never run in
+production.** `synthesize_queries` reads it at `work_story_searcher.py:440` and gates two
+queries on it at `:452`. `generate_tour_text.py:8879` omits the key entirely; `:9031`
+reads it off a POI dict that has no such field; nothing anywhere assigns it. The
+exhibition name is resolved at `:5479` and used to fetch the checklist — it is simply
+never carried forward. **Those two queries are Michael's own Step 2 framing** ("what
+story can be told to visitors of {exhibition} about {work}"), implemented and unreachable
+since LOCAL-423 landed.
+
+**Measured effect at S2**, deterministic and free (`story_lab_state/stop2_prod.json` vs
+`stop2_enriched.json`):
+
+```
+production record  →  3 queries, none naming a person
+                      #3 is "Museum of Fine Arts, Boston  donation history" — the double
+                      space is where the donor name should be
+Michael's facts    → 16 queries, incl. why-shaped ones: "Boris Fridman 'Moses and
+                      Monotheism' donation why", "Sigmund Freud Salvador Dalí relationship
+                      why collaborated", "Salvador Dalí 'Moses and Monotheism' why created"
+```
+
+**The material Michael marked missing was never searched for.** S3 did not discard it;
+S2 never asked. Any diagnosis that blames the writing pass or the gates for stops 2 and 3
+is looking in the wrong stage.
+
+**Fix order:** (1) plumb `exhibition_name` into both stop-record constructions — one line,
+free to verify; (2) `artist` unreachable without a checklist match; (3) the checklist can
+only enrich stops the venue page names — 1 of 3 here, and the real ceiling.
+
+Nothing dispatched. The story path stays Michael's per the standing reminder.
+
+## D427 — the word "The" is why the Hogarth fabrication survived validation
+
+**2026-08-13, LEAD, Michael driving S2.** Michael asked why validation did not catch
+"Commissioned by The Hogarth Press". Answer: no gate was ever looking at it, and one
+gate came within a determiner of doing so.
+
+**`prose_entity_grounding_gate` is a PERSON gate.** `_PERSON_MULTI_WORD` matches
+leftmost-longest, so it consumes `"The Hogarth Press"` as a single candidate;
+`_looks_like_person_name` then rejects it because `words[0].lower() == 'the'` is in
+`_NON_NAME_OPENERS` (:76). The bare `"Hogarth Press"` inside that span is never offered
+separately, so it is never grounding-checked. Measured:
+
+```
+extract_person_names(delivered stop 2 text)      -> Salvador Dalí, Sigmund Freud, Torf Gallery
+same text, "The Hogarth Press" -> "Hogarth Press" -> Salvador Dalí, Sigmund Freud,
+                                                     Hogarth Press, Torf Gallery
+```
+
+**The article shielded it.** Drop the determiner and the same gate detects the entity.
+Publishers, presses, workshops and foundations are exactly the class that idiomatically
+takes "The", so the blind spot is aligned with the claim type most likely to be invented.
+
+**CORRECTED — the determiner is the ONLY reason.** LEAD first wrote that empty `page_text`
+was a second, independent cause. Ran the real gate against the real corpus: **`page_text` =
+4,536 chars, and it contains Dalí, Freud, Torf and Picasso** (not Hogarth). The gate ran,
+detected 3 persons, grounded all 3, dropped 0 sentences — correctly. Dalí and Freud were
+never at risk. Nothing but the article saved Hogarth.
+
+**What empty `page_text` actually does, separately:** the call site at
+`generate_tour_text.py:12413` gates on `and getattr(_exhibition_checklist_result,
+'page_text', '')`, so an empty corpus **skips the gate entirely** — and the `else` branch
+prints `"SKIPPED (no exhibition scope — unscoped museum tours are not gated)"`, which names
+the wrong cause. A run that lost its corpus is indistinguishable in the log from a run that
+never had a scope. Calling the function directly with an empty corpus behaves differently
+again: `check_person_grounded` returns False *before* consulting `stop_artist_names`
+(:178-198), so it flags everyone — verified, `check_person_grounded('Joan Miró', '',
+{'Joan Miró'})` → False. Three behaviours, one empty string, no log line that separates them.
+
+**Built: `stop_claim_audit.py`** — deterministic, free, no API calls. Takes delivered stop
+prose plus the stop record and classifies every claim by *where it could have come from*:
+RECORD / EVIDENCE / INVENTED / CONTRADICTS. It audits ROLE→AGENT assignments (published by,
+commissioned by, printed by, illustrated by, gift of, …) rather than person names, because
+the failure was an organisation. Article-led spans are kept in both forms so nothing hides
+behind a determiner.
+
+Run on the delivered stop 2 against its real record:
+
+```
+publisher   = The Hogarth Press   INVENTED     stop record publisher is EMPTY
+illustrator = Salvador Dalí       INVENTED     stop record artist is EMPTY
+entities    Sigmund Freud, Hogarth Press, Torf Gallery — none in record or corpus
+evidence corpus: 0 chars
+```
+
+**Falsifiability proven both ways** (standing check 1): against the enriched record the
+same routine returns 0 unsupported and marks all four role claims RECORD; against the
+enriched record the Hogarth sentence returns CONTRADICTS with both values named.
+
+**With the real 4,536-char corpus attached, the audit isolates exactly one claim:**
+
+```
+publisher   = The Hogarth Press   INVENTED   record empty, absent from corpus
+illustrator = Salvador Dalí       EVIDENCE   present in corpus
+Sigmund Freud, Torf Gallery       EVIDENCE   present in corpus
+```
+
+One fabrication, precisely located, no false positives. The earlier all-INVENTED reading
+was LEAD running the audit with `evidence=''` because the state file held no snippets —
+the routine was right, its corpus was empty. **This is the same empty-corpus failure the
+gate has, reproduced by hand within the hour**, which is the argument for making the corpus
+size a printed number on every run rather than an implicit argument.
+
+Still true from D426: the stop *record* supplied none of this. Dalí is grounded in the
+retrieved page, not in the record — so the artist field being permanently empty remains a
+real defect, it just is not what let Hogarth through.
+
+**Correction to Michael's review, worth stating because it was about to become ground
+truth:** his message names Tériade (Éditions Verve) as the true publisher of *Moses and
+Monotheism*. Tériade is stop 3's publisher — *Au Soleil du Plafond*, 1955, per his own
+review §4. His §3 gives *Moses and Monotheism* as **Art et Valeur S.A. (Paris/Nice), 1974**,
+which matches the 1974 date in the delivered prose. Cross-stop publisher swap: the same
+error class the tour made, made by hand, which is a fair measure of how easy it is.
+
+## D428 — "additional story" detection, and the two questions that must never merge
+
+**2026-08-13, LEAD + Michael, joint session.** Michael opened the additional-story work:
+the system should notice a stop would benefit from a new story and go get one. Approved,
+with one binding amendment.
+
+**The amendment: two questions, never one.**
+
+1. *Does this stop need another story?* — a property of the delivered text.
+2. *Is there material for one?* — a property of the corpus.
+
+They must be able to disagree, and "needs one, nothing can source it" must be a legal
+output producing **silence, not prose**. Merged, they are a fabrication engine — which is
+precisely D427, where an empty `publisher` slot got filled with "The Hogarth Press".
+`story_opportunity_scan.py` therefore proposes and never supplies.
+
+**Built `story_opportunity_scan.py`** — deterministic, free. Implements Michael's own
+review metric verbatim ("words without follow up"): every handle the text names, how many
+sentences develop it, and whether any run carries an action and a consequence.
+
+**v1 was wrong and Michael's score caught it.** It returned NO on stop 2 — a stop he
+scored 3/5 for weak stories. Two defects, both LEAD's:
+
+- **`because` and `so that` counted as stakes.** They are how exposition explains itself.
+  *"Dalí chose this text because he considered Freud's exploration rich terrain"* is a
+  motive the writer attributed, not a cost anyone paid. Stakes now means risked, refused,
+  lost, survived, only, never, too late.
+- **The arc test checked the whole text, not the run.** Any stop whose subject is named
+  throughout passed — i.e. every stop. The run itself must carry the load now, and only a
+  proper noun can carry one (a title cannot be the protagonist).
+
+**A third defect surfaced from the control, not the fixture:** run detection required the
+literal name in every sentence, so *"Broder refused… **He** printed only seventy-five…
+Broder died…"* scored 1. **Good prose names a person once and then says "he", so the
+routine ranked well-written narration below clumsy narration.** Added pronoun bridging: a
+sentence continues the current subject when it carries a pronoun and names no competing
+person. Proper nouns only — "the exhibition" is never "he".
+
+**Falsifiability proven on the axis that matters** (standing check 1) — same person, same
+3-sentence run, stakes the only difference:
+
+```
+"Broder had refused three other painters… He printed only seventy-five copies, and
+ would not sell them… Broder died in 1970 with most of the edition in his apartment."
+    -> NO  (3 consecutive sentences, action and something at stake)
+
+"Broder was a publisher in Paris. He worked during the twentieth century.
+ Broder published books with illustrations."
+    -> YES (agency=0 stakes=0 — someone is described, nothing is risked)
+
+delivered stop 2
+    -> YES (4-sentence run on Salvador Dalí, agency=2 stakes=0 — exposition, not a story)
+```
+
+Stop 2's live opportunities: Torf Gallery, books, archives, exhibition, gallery — each
+named once and dropped. Next routine is availability: which of these the corpus can
+actually source. Nothing generated until that exists.
+
+## D429 — both routines exist; stop 2's answer is SILENCE
+
+**2026-08-13, LEAD + Michael.** Michael asked whether the two routines of D428 were
+actually written and what they return for the delivered stop 2. Routine 1 existed;
+routine 2 did not — LEAD had asked Michael to confirm the bar instead of building to it,
+which is the deferral RULE ZERO prohibits. Built now.
+
+**`story_material_check.py`** — the availability half. Bar, all three from the corpus and
+none from memory: a named **person**, a specific **action**, a **consequence** (risked,
+refused, lost, survived, only/never/first/last). Short of all three is PARTIAL, and
+**PARTIAL authorises another search, not a sentence.**
+
+**The answer for stop 2, real MFA corpus, 4,536 chars:**
+
+```
+Q1 needs another story?   YES — longest run 4 sentences (Salvador Dalí),
+                                agency=2 stakes=0. Exposition, not a story.
+Q2 can the corpus source one?
+     Torf Gallery    0 passages   NO MATERIAL
+     books           0 passages   NO MATERIAL
+     archives        0 passages   NO MATERIAL
+     gallery         0 passages   NO MATERIAL
+     exhibition      4 passages   PARTIAL — lacks action, consequence
+
+VERDICT: SILENCE
+```
+
+**The two questions disagreed on the first real case, exactly as designed.** The stop
+needs a story; nothing available can source one; the output is silence. Had these been one
+question, this is the stop that produced "The Hogarth Press".
+
+**Three defects found while building, all by controls rather than by the fixture:**
+
+- **Nav text was being read as a cast of characters.** Raw `page_text` is mostly menu, so
+  the check reported people named "Getting Here" and "Studio Art Classes". Fixed by reusing
+  `exhibition_checklist._filter_nav_from_page_text` rather than re-guessing.
+- **Middle initials made donors invisible.** `_PROPER_SPAN` breaks on the "B." in "Lois B.
+  Torf". Donors and collectors carry middle initials far more often than artists do — so
+  the pattern failed precisely in the donor case, which is the one Michael keeps asking for
+  (Boris Fridman, stop 1). Own pattern here.
+- **Pronoun bridging was fixed in routine 1 and not carried into routine 2.** The
+  consequence usually lands in the *next* sentence, which names nothing: "…a collector who
+  refused to break up the set. **She** would not sell a single sheet." A literal-match
+  window drops exactly the clause that makes it a story.
+
+**Falsifiability proven both directions** (standing check 1), same stop, corpus the only
+variable:
+
+```
+MFA page corpus                     -> SILENCE  (0 sourceable)
+control corpus carrying Lois B. Torf
+  refusing to break up the set      -> WRITE    (Torf Gallery SOURCEABLE)
+```
+
+**Known rough edges, unhidden:** "The Torf" is emitted as a person alongside "Lois B.
+Torf"; "gallery" and "Torf Gallery" are counted as separate handles. Both are noise in the
+handle list, neither changes a verdict. Fix when they do.
+
+## D430 — the material for stop 2's story was retrieved and then thrown away by the ranker
+
+**2026-08-13, LEAD + Michael.** Michael agreed to build create-and-validate routines on the
+stop 2 text. Routine 2 had returned SILENCE, so LEAD ran S3 live on the enriched 16-query
+record first — a generator with no material is the machine that wrote "The Hogarth Press".
+
+**16 queries, 104 results, $0.0160, 8.2s. The ranker kept 5 and demoted 96 tier3.**
+
+**What it kept:** Tamarind Lithography Workshop (founded 1960, unrelated), **Fridman
+Gallery, a contemporary New York gallery founded 2013 — not Boris Fridman the donor**, a
+"Coming Attractions: July 19 Through August 3" listing, a Dalí iconography paper, and the
+Wikipedia article on the book.
+
+**What it discarded:**
+
+```
+invaluable.com  "It was printed by Arts Litho, Torrents, Wolfensberger and was
+                 published by Editions Art & Valeur S.A., Paris."     score 12, tier3
+freud.org.uk    "Salvador Dalí's first and only encounter with Sigmund Freud was
+                 fittingly bizarre. The pair met on 19 July 1938 at Freud's home
+                 in London."                                          score 10, tier3
+belvedere.at    "In London in 1938 Salvador Dalí finally met Sigmund Freud, who had
+                 recently fled Vienna – the first and only meeting."  score 10, tier3
+```
+
+**The first of those is the correct publisher — the exact fact Michael caught as wrong.**
+The system retrieved it and cut it. The other two are a story with a person, a date, an
+action and a consequence: the only meeting between the two men, in exile, a year before
+Freud died. That is the 3-sentence emotionally-loaded story Michael asked for twice.
+
+**Measured both ways, same stop, corpus the only variable:**
+
+```
+against the 5 KEPT snippets       -> SILENCE   (0 sourceable)
+against all 104 RETRIEVED         -> Salvador Dalí  SOURCEABLE (109 passages)
+                                     Sigmund Freud  SOURCEABLE (53 passages)
+```
+
+**This settles which bug we have.** `story_lab`'s own S3 text poses the question — material
+missing, or material thrown away? For stop 2 it is thrown away, by `rank_and_cap_snippets`,
+via a tier policy that demoted 96 of 104 and a cap of 5. Nothing downstream of the ranker
+can recover it, and no amount of prompt work on the writer will.
+
+**A defect in LEAD's routine 1, found by this:** it offered only DANGLING handles, so it
+pointed at *gallery, archives, books* — signage — while the story this stop needs attaches
+to its own protagonist. Added a **FLAT** state: named repeatedly, shown acting, nothing at
+stake *within the run*. A flat protagonist is the best place to attach a story, not a
+finished one; the listener already knows who it is. Stop 2's Dalí and Freud are both FLAT
+and both SOURCEABLE.
+
+Also fixed: state was judged on stakes scattered anywhere across six sentences while the
+verdict was judged on stakes inside the three-sentence run. That is why the handle table
+said DEVELOPED and the verdict said exposition — for the same handle, in the same run.
+State is now assigned from the run.
+
+**Next is the ranker, not the writer.** No task dispatched — the story path is Michael's.
+
+## D431 — LOCAL-458 merged: the article shield is closed, verified independently
+
+**2026-08-13, LEAD review.** 559s, 1 commit (`bdd913b`), submission present. Verified by
+effect, not by `exit=0`.
+
+**Independent checks, all run by LEAD, not read from the report:**
+
+```
+suite as shipped                        7 passed, 0 failed
+LEAD neutralised the gate itself        6 passed, 1 FAILED   <- it can go red
+production caller                       generate_tour_text.py:12466 imports and calls it
+test_sq4_merge.py                       ALL TESTS PASSED
+test_palais_fix_lead_fixture.py         23/23 assertions hold
+```
+
+**The real case, LEAD's own fixture, not the task's:** delivered stop 2 prose + the real
+4,536-char MFA corpus + the empty production record →
+
+```
+role_claims_detected 1   sentences_dropped 2   1515 -> 1184 chars
+Hogarth present? False    Dalí kept? True    Freud kept? True    Torf kept? True
+```
+
+**The fabrication is removed and nothing grounded is harmed.** That second half is the
+part that matters — a gate that fixes Hogarth by flattening Dalí and Freud is a regression.
+
+**LEAD's process error, recorded because it cost real work:** the task told Kiro
+"`stop_claim_audit.py` already exists, do not rebuild it" — **but LEAD never committed it**,
+so the worktree, branched from `storied@1ffdc87`, could not see it. Kiro rebuilt it from
+the description. Two different files under one name. Resolved by keeping both: the shipped
+production gate keeps `stop_claim_audit.py`; LEAD's hand-driven instrument is renamed
+`story_claim_lab.py` and the story_lab workflow is unchanged. **An uncommitted file does
+not exist as far as a dispatched task is concerned** — commit before citing it in a task.
+
+**Nit, not a bounce:** the drop log labels "Commissioned by X" as `role=credit_line`
+(`_ROLE_TO_RECORD_FIELD` maps `commissioned` → `credit_line`). Behaviour is right, the
+label is wrong; "commissioned by" is a publisher claim. Fix when something depends on it.
+
+**Not enforced yet, by the task's own design decision:** CONTRADICTS is logged, not
+dropped. That is the case where the record HAS a publisher and the prose names a different
+one — worth its own task once the record is reliably populated (D426).

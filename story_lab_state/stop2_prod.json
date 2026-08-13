@@ -3,16 +3,21 @@
   "stop_index": 2,
   "stop": {
     "canonical_title": "Moses and Monotheism",
-    "local_title": "Moses and Monotheism",
     "artist": "",
-    "venue_name": "Museum of Fine Arts, Boston",
     "venue_city": "Boston",
     "venue_lang": "en",
-    "exhibition_name": "Picasso, Miro, Dali: Unbound",
+    "venue_name": "Museum of Fine Arts, Boston",
     "publisher": "",
-    "collaborator": "",
-    "credit_line": ""
+    "credit_line": "",
+    "medium": "",
+    "english_title": "Moses and Monotheism"
   },
   "tour_prose": "In 1974, Salvador Dalí embarked on a collaborative journey by illustrating Sigmund Freud's seminal work, \"Moses and Monotheism.\" Dalí chose this text because he considered Freud’s exploration of the origins of monotheism as rich terrain for his surrealist imagination. Commissioned by The Hogarth Press, this collaboration was published to merge Freud's profound theories with Dalí’s vivid surrealism. The result was a series of illustrations that transformed complex psychoanalytic discourse into visual art. The exhibition at the Torf Gallery, where these rare works are displayed, highlights the synergy between text and image, a central theme in the curated selection at the Museum. Freud, known as the father of psychoanalysis, wrote \"Moses and Monotheism\" later in his career, proposing that Moses was Egyptian, not Hebrew, and suggesting that Moses introduced monotheistic beliefs to the Israelites. Dalí’s illustrations not only capture Freud’s innovative ideas but also offer a surrealist interpretation of history’s psychological undercurrents. This exhibit showcases how artists like Dalí, in collaboration with publishers such as The Hogarth Press, transformed books into art forms through deeply integrated visual and textual partnerships. This approach, often found in archives, demonstrates the transformative power of book art. The convergence of narrative and imagery in this exhibit prompts reflection on how journeys from obscurity to enlightenment could be depicted in unexpected ways elsewhere.",
-  "tour_orientation": "Stand before the display of \"Moses and Monotheism,\" where Dalí’s illustrations illuminate Freud’s text. From this vantage point, the interplay of image and typography becomes clear, revealing how Dalí visually interpreted Freud's psychoanalytic revelations."
+  "tour_orientation": "Stand before the display of \"Moses and Monotheism,\" where Dalí’s illustrations illuminate Freud’s text. From this vantage point, the interplay of image and typography becomes clear, revealing how Dalí visually interpreted Freud's psychoanalytic revelations.",
+  "label": "stop2_production_faithful",
+  "queries": [
+    "\"Moses and Monotheism\" Museum of Fine Arts, Boston",
+    "\"Moses and Monotheism\" Museum of Fine Arts, Boston history",
+    "Museum of Fine Arts, Boston  donation history"
+  ]
 }
