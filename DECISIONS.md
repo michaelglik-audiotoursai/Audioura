@@ -17399,3 +17399,57 @@ three; **the extractor only picked up the one that appears in a caption-like lin
 2 and 3 could have been enriched with artist and date from prose the system already
 fetched. That is a different and much more fixable defect than "the venue does not publish
 a checklist" — and it is upstream of every finding today.
+
+## D436 — LOCAL-461 merged: the interrogation matrix, and LEAD nearly bounced correct code
+
+**2026-08-13.** 913s, 1 commit (`44e5848`), three new files, **no fixture touched** — the
+first task since D432 to respect that rule, and it was stated in the task because of D432.
+
+**Michael corrected LEAD's reading first, and LOCAL-460 was withdrawn for it.** LEAD had
+read `canonical_title` as the containing set and told Michael his own template was wrong.
+It was not: *"canonical_title is the stop/exhibit name, medium is the exhibition name, and
+venue is the location where the medium is displayed."* LEAD had conflated **exhibit** (the
+object) with **exhibition** (the show) and written that into a dispatched task. Caught at
+9 minutes, 0 commits, task parked in the same action (D420). Nothing wasted but the error
+was LEAD's and it was avoidable.
+
+**The reference case, verified by LEAD against the real tour file:**
+
+```
+canonical_title = Moses and Monotheism            STRUCTURAL  rung=exhibit
+english_title   = Moses and Monotheism            STRUCTURAL
+artist          = Salvador Dalí                   CLAIMED
+publisher       = The Hogarth Press               CLAIMED     <- false, and correctly CLAIMED
+printed_by      = —                               ABSENT
+credit_line     = Sigmund Freud                   DERIVED
+medium          = Picasso, Miro, Dali: Unbound    STRUCTURAL
+venue           = Museum of Fine Arts, Boston     STRUCTURAL
+```
+
+**LEAD nearly bounced this as a spec violation.** The first run returned
+`canonical_title = 'Picasso, Miro, Dali: Unbound'`, rung `exhibition` — precisely the
+inversion LOCAL-460 was withdrawn for. The cause was LEAD's input, not the code:
+`ORIGINAL_stop2.txt` opens `top 2:` (Michael's typo, preserved verbatim), the heading parse
+misses, and the ladder falls through to the next rung. Against `TOUR_MFA_20260812_2030.txt`
+it is exact. **The fallback is the right behaviour and it records the rung, so a caller can
+tell a tight scope from a desperate one.** Third time today an instrument, not the subject,
+produced the alarming reading (D430's FLAT handles, D432's fixture, this).
+
+**Generalisation holds across all three tour types** — the point of the acceptance set:
+
+```
+Fruitlands (museum, no exhibition)  rung=exhibit on all 3; medium ABSENT, correctly
+Beacon Hill (walking)               rung=exhibit on all 3; printed_by ABSENT, correctly
+```
+
+`printed_by` ABSENT on a walking tour is the correct answer, not a gap — the task said so
+and the routine did not invent a filler.
+
+**Falsifiability, run by LEAD not read from the report:** neutralise `build_matrix` to
+return `{}` → **20 failed, 1 passed**. Restored → 21 passed. Regressions all green:
+`test_sq4_merge`, `test_palais_fix_lead_fixture`, LOCAL-458 (7/7), LOCAL-459 (16/16).
+
+**Two nits, logged not bounced:** `venue` is ABSENT on all three Fruitlands stops though
+the museum name is available in the tour context; and Fruitlands stop 3's
+`canonical_title` carries a stray quote from the tour's own heading. Neither changes a
+status.
