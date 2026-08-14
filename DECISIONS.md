@@ -18020,3 +18020,44 @@ LEAD's own measuring tool rather than the subject under test.** D444 (gate disco
 D446 (false CONFIRM), and now D447 all landed inside one working day. The standing check
 "check the instrument first" should be promoted from a lesson to the first step of any
 quality claim.
+
+## D448 — Gemini's first section is almost entirely TRUE; the validator flagged the true parts
+
+**2026-08-14. Michael: "I liked Gemini stories. So I wonder what is wrong with them and
+want to go one-by-one."** Took section 1 (the 1938 meeting) claim by claim, against
+both instruments.
+
+**Our validator flagged three sentences — July 1938, "World War II", "Maresfield
+Gardens" — and all three are TRUE.** It passed six, including "Dalí is nervous", the
+"spiritual father" quote, "Dalí sketches Freud", and the snail-shell gloss, none of
+which is in the stop text either. They passed only because they contain no unrecognised
+capitalised token or year. This is D447's mechanism seen at sentence resolution.
+
+**Independent check against sources — five claims CONFIRMED with carrier sentences:**
+the 19 July 1938 meeting; Freud fleeing Nazi-occupied Vienna with Anna; 20 Maresfield
+Gardens; Dalí sketching Freud during the visit (*Portrait of Sigmund Freud*); Dalí
+comparing Freud's cranium to a snail.
+
+**So what is actually wrong with the passage is narrow:** atmospheric invention written
+in the same voice as fact ("London is sweltering", "Dalí is nervous"), and one real
+remark embellished into an unsourced interpretation ("hard on the outside, but
+containing a soft, vulnerable center"). The facts are sound. **The prose does not mark
+which sentences are load-bearing** — and our validator, which exists to mark exactly
+that, marks the wrong ones.
+
+**Two verifier weaknesses measured, one fixed earlier today and one left open.**
+
+The year requirement causes false negatives: "Freud lived at Maresfield Gardens" was
+UNVERIFIED with `year=1938` and CONFIRMED with the year dropped, because sources state
+the address without that date in the same sentence. Same shape for the snail remark.
+
+**A third false positive of the D446 family:** "Dalí called Freud his spiritual father"
+CONFIRMED against *"He is named after his father, Salvador Dalí Cusí"* — Dalí's actual
+father. The one word carrying the claim, "spiritual", is absent from the carrier;
+"Freud" + "father" already satisfies the half-the-content-words rule.
+
+**Measured before changing anything, and deliberately NOT landed:** raising the bar to
+two-thirds removes that false positive and costs **three of the five true confirmations
+above** — the Dalí sketch, Maresfield Gardens, and the snail all fall below it. Worse
+instrument, so no change. The rule needs the claim's DISTINGUISHING term, not a
+fraction of its terms. Recorded as open.

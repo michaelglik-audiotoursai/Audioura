@@ -405,3 +405,98 @@ who took Dali to Freud (Stefan Zweig in one, Leonard Woolf in the other), and
 things would still have work to do on this text. The finding is only that THIS
 validator is not doing that work, and that its verdict has been read all day as
 though it were.
+
+
+==============================================================================
+SECTION 1 OF GEMINI'S STORY, CLAIM BY CLAIM
+==============================================================================
+
+Michael, 2026-08-14: "I liked Gemini stories. So I wonder what is wrong with
+them and want to go one-by-one. So what could not we validate the first story?"
+
+Two different questions, and they give opposite answers.
+
+--- WHAT OUR VALIDATOR SAID (corpus = the stop text) -------------------------
+
+verdict REJECTED. It flagged three sentences:
+
+    [UNSUPPORTED]  Imagine it is July 1938.
+                     -> year '1938' not in source material
+    [UNSUPPORTED]  London is sweltering, and the shadow of World War II is
+                   lengthening.
+                     -> person 'World War' not in source material
+    [UNSUPPORTED]  Two men are sitting in a room in Maresfield Gardens.
+                     -> person 'Maresfield Gardens' not in source material
+
+and passed six, including every one of these:
+
+    [GROUNDED]     ...who has just fled Nazi-occupied Vienna.
+    [GROUNDED]     Dali is nervous.
+    [GROUNDED]     He considers Freud his "spiritual father."
+    [GROUNDED]     During this meeting, Dali sketches Freud.
+    [GROUNDED]     He notices Freud's skull and later remarks that it looks
+                   like a "snail shell" - hard on the outside, but containing
+                   a soft, vulnerable center.
+
+None of those six is in the stop text either. They passed because they contain
+no capitalised token and no year that the checker did not already recognise.
+
+--- WHAT THE SOURCES SAY (independent check, story_leads.verify) -------------
+
+CONFIRMED, with a carrier sentence quoted from a source:
+
+  July 1938, Dali met Freud in London
+      "Salvador Dali was a passionate admirer of Sigmund Freud and finally met
+       him in London on July 19th 1938."
+  Freud fled Nazi-occupied Vienna for London
+      "In 1938, Sigmund Freud, the father of psychoanalysis, fled Nazi-occupied
+       Vienna for London, accompanied by his devoted daughter, Anna Freud."
+  Maresfield Gardens
+      "...died in this house at 20 Maresfield Gardens in Hampstead."
+  Dali sketched Freud during the meeting
+      "During the visit, Dali sketched Freud, and the resulting artwork
+       Portrait of Sigmund Freud..."
+  Dali compared Freud's cranium to a snail
+      "That Freud reminded him of a snail thus becomes enormously significant."
+
+NOT CONFIRMED:
+
+  "London is sweltering"              atmosphere, not a claim anyone can check
+  "Dali is nervous"                   an interior state; UNVERIFIED
+  "his spiritual father"              see the false positive below
+  "hard on the outside, but
+   containing a soft, vulnerable
+   center"                            Gemini's GLOSS on the snail remark. The
+                                      sources support "snail". They do not
+                                      support the shell-and-vulnerability
+                                      reading.
+
+--- SO WHAT IS ACTUALLY WRONG WITH IT ---------------------------------------
+
+Almost nothing factual. Five of the section's claims are confirmable from
+sources, and the three our validator rejected are all TRUE. What is wrong is
+narrower than it looked:
+
+  1. Atmospheric invention is written in the same voice as fact. "London is
+     sweltering" and "Dali is nervous" are indistinguishable in tone from
+     "he met Freud on July 19th 1938". A listener cannot tell which is which.
+  2. One real remark is embellished into an interpretation ("soft, vulnerable
+     center") that no source makes.
+  3. Our validator flags the true specifics and passes the invention. It is
+     backwards on this passage, exactly as Michael suspected.
+
+--- A THIRD FALSE POSITIVE IN verify(), FOUND WHILE DOING THIS ---------------
+
+  CONFIRMED   "Dali called Freud his spiritual father"
+  evidence    "He is named after his father, Salvador Dali Cusi."
+
+That is Dali's ACTUAL father. The word doing all the work in the claim --
+"spiritual" -- is absent from the carrier. The check requires half the content
+words, and "Freud" + "father" is already half.
+
+Measured before changing anything: raising the bar to two-thirds removes this
+false positive and costs three of the five true confirmations above (the Dali
+sketch, Maresfield Gardens, and the snail all fall below the new bar). That is
+a worse instrument, so it was NOT landed. Recorded as an open weakness: the
+rule needs to require the claim's DISTINGUISHING word, not a fraction of its
+words. Counting is still not reading.
