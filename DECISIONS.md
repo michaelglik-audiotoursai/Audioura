@@ -18061,3 +18061,58 @@ two-thirds removes that false positive and costs **three of the five true confir
 above** — the Dalí sketch, Maresfield Gardens, and the snail all fall below it. Worse
 instrument, so no change. The rule needs the claim's DISTINGUISHING term, not a
 fraction of its terms. Recorded as open.
+
+## D449 — Should section 1 pass? YES on truth, NO as a stop story. And the one real reason is the object
+
+**2026-08-14, Michael: "should it pass, and if so what is our evaluation for it?"**
+Ran the full stack on the passage against two corpora — the stop text it was judged
+against before, and the sources that actually confirm it (D448's five carrier
+sentences).
+
+```
+                              validate            H / D / S  index   shape
+against the stop text     REJECTED  6/9 grounded  21/ 0/30     43    FAIL
+against its real sources  REJECTED  8/9 grounded  21/ 0/30     52    FAIL
+```
+
+**On truth it should pass.** Against the right corpus 8 of 9 sentences are grounded,
+and the single rejection is `"World War"` classified as a **person** — the D447 parsing
+bug, not a finding. Five of its claims are independently confirmed with quoted carrier
+sentences. **The truth verdict against it was an artifact of judging it against the
+wrong corpus.**
+
+**Two of the three shape failures are also instrument defects.**
+
+`stakes=0` is false. Measured:
+
+```
+stakes=0  "Freud fled Nazi-occupied Vienna in 1938"
+stakes=1  "Miró decided to destroy the lithographs"
+```
+
+**A man fleeing the Nazis registers no stakes; "destroy" does.** `_STAKES` sees
+destruction and refusal but not flight, exile, persecution or loss of home. Ninth
+instrument defect of the week.
+
+`sentences=9` is true but only means this is a SECTION of a longer piece, not a stop
+story. Not a defect in the writing.
+
+**The one failure that is real, and it decides the answer: it never reaches the
+object.** `ends_on_object=False`, `concrete_in_last=[]`, `Detail=0`. The visitor is
+standing in front of Dalí's illustrations and the passage never mentions them — no
+medium, no count, no year of the thing in the case. It is a superb scene about a
+meeting in Hampstead that could be told in any room in the world. **This is exactly
+the complaint Michael has had since 2026-08-12 and it is unchanged.**
+
+**Ruling: it passes as MATERIAL, not as a stop story.** It is the best raw material the
+project has produced — true, sourced, peopled, dated. What it needs is the last move
+it never makes: land on the object. Plus two unmarked inventions ("London is
+sweltering", "Dalí is nervous") that read in the same voice as the verified facts, and
+one unsourced gloss ("soft, vulnerable center").
+
+**Decision on the instrument defects: NOT patching them one at a time.** Nine have been
+found in two days, and widening `_STAKES` or the entity classifier by regex, mid-flight
+and without a fixture set that can fail, is how instruments drift into agreeing with
+whoever last edited them. They get one consolidated repair pass with a known-answer
+fixture built FIRST. Recorded rather than deferred: this is the sequencing call, and the
+numbers above should not be quoted until it happens.
