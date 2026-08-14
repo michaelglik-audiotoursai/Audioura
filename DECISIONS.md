@@ -17963,3 +17963,60 @@ CONFIRMED, the 1993 retrospective UNVERIFIED.
 
 **Standing lesson, now seven for seven this week:** every "confirmation" this week that
 was checked by hand turned out to be the instrument agreeing with itself.
+
+## D447 — Michael was right about the validator: it rejects the true specifics and passes the vague filler
+
+**2026-08-14, his words: "I have a feeling that it is our validator that is
+misbehaving."** He is right, and it is the most consequential finding of the day
+because every verdict quoted to him — including this morning's `TRUE_TO_SOURCES` on
+three separate stories — rests on it.
+
+**Sent Gemini's 30-sentence answer through `validate_story` against the same corpus
+(the stop text). It flagged 5. All five are true.**
+
+```
+July 1938                                   the Dalí-Freud meeting        TRUE
+the shadow of World War II                                                TRUE
+Maresfield Gardens                          Freud's London house          TRUE
+Virginia and Leonard Woolf founded Hogarth                                TRUE
+Hogarth published Moses and Monotheism 1939                               TRUE
+```
+
+The 25 it PASSED include every sentence that says nothing checkable. **That is the
+mechanism, not a coincidence:** the validator asks "does this capitalised token appear
+in the source text?", so a sentence carrying no new name and no new year *cannot* fail.
+**The vaguer the sentence, the safer it is.** That is why GPT-4o's bland answer passed
+10 of 11 and this far more informative one passes 25 of 30. The gradient points
+directly at the output Michael rejected as "not a story at all".
+
+**It also cannot see invented places, numbers, or reversals.** Probe against a corpus
+containing "1974" but not "Barcelona":
+
+```
+GROUNDED   In 1974, Salvador Dali illustrated the work in Barcelona.
+GROUNDED   In 1974, Salvador Dali illustrated the work on the surface of the moon.
+GROUNDED   In 1974, Salvador Dali illustrated the work using 47 copper plates.
+GROUNDED   In 1974, Salvador Dali refused to illustrate the work.
+```
+
+An invented city, an absurd location, an invented plate count, and a **reversed fact**
+all pass. So **`TRUE_TO_SOURCES` means "contains no unfamiliar name or year"**. It has
+never meant the sentence is true.
+
+It is not inert — it correctly caught Napoleon Bonaparte, an invented 1802, and Leonard
+Woolf. The defect is *what it fires on*, not that it never fires.
+
+**Two parsing bugs, visible in the same output:** `World War` and `Maresfield Gardens`
+classified as `kind='person'`; `When The Hogarth Press` classified as an organization
+with the leading "When" swallowed into the name.
+
+**What this does not say:** Gemini's answer is not thereby true. Two runs of it
+disagreed on who took Dalí to Freud, and `verify` confirms neither. A correct validator
+would still have work to do on that text. The finding is that this one is not doing
+that work — and that its verdict has been read all day as though it were.
+
+**Running total: eight instrument failures in two days, and every single one has been
+LEAD's own measuring tool rather than the subject under test.** D444 (gate disconnected),
+D446 (false CONFIRM), and now D447 all landed inside one working day. The standing check
+"check the instrument first" should be promoted from a lesson to the first step of any
+quality claim.

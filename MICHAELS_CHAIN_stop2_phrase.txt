@@ -213,3 +213,195 @@ WHAT THIS RUN EXPOSES — four defects, in order of severity
    which is a question about what is POSSIBLE, and the model answered that
    question correctly -- it described what a story could be built from rather
    than telling one.
+
+==============================================================================
+ROUTINE 2, SAME QUERY, DIFFERENT MODEL — gemini-3-flash-preview
+==============================================================================
+
+Michael, 2026-08-14: "before we change the query, can you get the query
+results from Gemini on the very same question?" The query below is byte-
+identical to the one GPT-4o was given above. Nothing else was changed.
+
+  30 sentences, 3831 chars
+
+    To tell the story of **Salvador Dalí, The Hogarth Press, and Freud’s
+    *Moses and Monotheism*** within the context of the MFA Boston’s *Unbound*
+    exhibit, you must weave a tale of three "exiles" meeting at the crossroads
+    of a crumbling Europe.
+
+    This is a story about how the subconscious mind was finally "unbound" from
+    the printed page.
+
+    ***
+
+    ### The Story: The Cracked Snail and the Prophet
+
+    **1. The Meeting of the Giants (London, 1938)**
+    Imagine it is July 1938. London is sweltering, and the shadow of World War
+    II is lengthening. Two men are sitting in a room in Maresfield Gardens.
+    One is **Sigmund Freud**, the father of psychoanalysis, who has just fled
+    Nazi-occupied Vienna. The other is **Salvador Dalí**, the flamboyant
+    prince of Surrealism, who has spent his entire career trying to paint the
+    inside of Freud’s dreams.
+
+    Dalí is nervous. He considers Freud his "spiritual father." During this
+    meeting, Dalí sketches Freud. He notices Freud’s skull and later remarks
+    that it looks like a "snail shell"—hard on the outside, but containing a
+    soft, vulnerable center. This sketch is the "imagery" that begins our
+    convergence.
+
+    **2. The Narrative: *Moses and Monotheism***
+    At that very moment, Freud is finishing his final, most controversial
+    book: ***Moses and Monotheism***. In this narrative, Freud performs a
+    "psychoanalysis of history." He argues that Moses was not Jewish, but an
+    Egyptian nobleman who was murdered by his followers—a trauma that Freud
+    believed shaped the Jewish psyche forever.
+
+    It is a story of a "murdered father," a theme that Dalí—who had a
+    notoriously volatile relationship with his own father—was obsessed with.
+
+    **3. The Vessel: The Hogarth Press**
+    Enter **The Hogarth Press**, the avant-garde publishing house founded by
+    **Virginia and Leonard Woolf**. The Woolfs were the bridge between radical
+    literature and radical science. They were the primary English publishers
+    of Freud.
+
+    When The Hogarth Press published *Moses and Monotheism* in 1939, they
+    weren't just printing a history book; they were releasing a psychological
+    bomb. The Hogarth Press provided the *narrative* framework—the physical,
+    printed word—that allowed these dangerous, "unbound" ideas to circulate in
+    the English-speaking world.
+
+    **4. The Convergence in the Exhibit**
+    As you walk through *Picasso, Miro, Dali: Unbound*, look at Dalí’s prints.
+    You are seeing the visual manifestation of the "Hogarth-Freud" era.
+
+    *   **The Narrative:** Freud’s *Moses* tells us that our identity is built
+    on hidden traumas and ancient myths.
+    *   **The Imagery:** Dalí’s etchings and lithographs show us bodies that
+    are drawers (hiding secrets), landscapes that melt (the instability of
+    memory), and religious icons distorted by desire.
+
+    **5. Why "Unbound"?**
+    The exhibit is called *Unbound* because, for Dalí, the book was never just
+    a container for text. Influenced by the intellectual freedom fostered by
+    The Hogarth Press and the psychological depth of Freud’s *Moses*, Dalí
+    treated the page as a laboratory.
+
+    In this gallery, the "narrative" of Freud’s Moses (the search for the
+    father, the origin of belief) and the "imagery" of Dalí’s hand (the
+    double-images, the paranoiac-critical method) collide. Dalí doesn't just
+    illustrate a story; he "unbinds" it, letting the subconscious spill out of
+    the margins and into the room.
+
+    ***
+
+    ### Summary for Visitors:
+    "When you look at Dalí’s work here, remember that he was the visual
+    architect for the ideas published by The Hogarth Press. While the Woolfs
+    were printing Freud’s theory that Moses was a hidden, murdered Egyptian,
+    Dalí was painting the 'hidden' parts of the human soul. They were both
+    working to prove the same thing: that what we see on the surface—whether
+    in a book or a human face—is only a fraction of the truth. These prints
+    are the evidence of that explosion of the mind."
+
+==============================================================================
+ROUTINE 3 ON THE GEMINI ANSWER — validated the same way
+==============================================================================
+
+  VERDICT: REJECTED
+  25 of 30 sentences GROUNDED
+
+  [UNSUPPORTED_ENTITY]
+      The Meeting of the Giants (London, 1938)**
+      Imagine it is July 1938.
+        findings: [{'kind': 'year', 'value': '1938', 'why': 'not in source
+        material'}]
+  [UNSUPPORTED_ENTITY]
+      London is sweltering, and the shadow of World War II is lengthening.
+        findings: [{'kind': 'person', 'value': 'World War', 'why': 'not in
+        source material'}]
+  [UNSUPPORTED_ENTITY]
+      Two men are sitting in a room in Maresfield Gardens.
+        findings: [{'kind': 'person', 'value': 'Maresfield Gardens', 'why':
+        'not in source material'}]
+  [UNSUPPORTED_ENTITY]
+      The Vessel: The Hogarth Press**
+      Enter **The Hogarth Press**, the avant-garde publishing house founded by
+      **Virginia and Leonard Woolf**.
+        findings: [{'kind': 'person', 'value': 'Leonard Woolf', 'why': 'not in
+        source material'}]
+  [UNSUPPORTED_ENTITY]
+      When The Hogarth Press published *Moses and Monotheism* in 1939, they
+      weren't just printing a history book; they were releasing a
+      psychological bomb.
+        findings: [{'kind': 'organization', 'value': 'When The Hogarth Press',
+        'why': 'not in source material'}, {'kind': 'year', 'value': '1939',
+        'why': 'not in source material'}]
+
+
+==============================================================================
+MICHAEL WAS RIGHT: THE VALIDATOR IS THE PROBLEM
+==============================================================================
+
+His words, 2026-08-14: "I have a feeling that it is our validator that is
+misbehaving." It is. Two separate ways.
+
+--- 1. IT REJECTS THE TRUE SPECIFICS AND PASSES THE VAGUE FILLER -------------
+
+Of Gemini's 30 sentences it flagged 5. Every one of the five carries real,
+checkable, and — as far as LEAD can tell by hand — TRUE content:
+
+    July 1938 . . . . . . . . . . . the Dali-Freud meeting. True.
+    the shadow of World War II  . . True.
+    Maresfield Gardens  . . . . . . Freud's London house. True.
+    Virginia and Leonard Woolf
+      founded the Hogarth Press . . True.
+    Hogarth published Moses and
+      Monotheism in 1939  . . . . . True.
+
+The 25 it PASSED include every sentence that says nothing checkable. This is
+not a coincidence, it is the mechanism: the validator asks "does this
+capitalized token appear in the source text?", so a sentence with no new names
+and no new years cannot fail. THE VAGUER THE SENTENCE, THE SAFER IT IS.
+
+That is also why GPT-4o's bland answer passed 10 of 11 sentences and this one
+passes 25 of 30 while being far more informative. The gradient points at
+exactly the output Michael rejected as "not a story at all".
+
+--- 2. IT CANNOT SEE INVENTED PLACES, NUMBERS, OR REVERSALS ------------------
+
+Probe, corpus = the stop text, which contains "1974" but not "Barcelona":
+
+    GROUNDED   In 1974, Salvador Dali illustrated the work in Barcelona.
+    GROUNDED   In 1974, Salvador Dali illustrated the work on the surface of
+               the moon.
+    GROUNDED   In 1974, Salvador Dali illustrated the work using 47 copper
+               plates.
+    GROUNDED   In 1974, Salvador Dali refused to illustrate the work.
+
+An invented city, an absurd location, an invented count of plates, and a
+REVERSED FACT all pass. It checks person-like capitalised names and years.
+Places, numbers, materials, quantities and negation are unchecked.
+
+So "TRUE_TO_SOURCES" means: contains no unfamiliar name or year. It does not
+mean the sentence is true, and it never did.
+
+It CAN fail — proven, it caught Napoleon Bonaparte, an invented 1802, and
+Leonard Woolf. The failure is not that it never fires. It is WHAT it fires on.
+
+--- 3. TWO PARSING BUGS VISIBLE IN THE OUTPUT ABOVE --------------------------
+
+    "World War"           classified as kind='person'
+    "Maresfield Gardens"  classified as kind='person'
+    "When The Hogarth Press"  classified as kind='organization' — the leading
+                              "When" was swallowed into the entity name
+
+--- WHAT THIS DOES NOT SAY ---------------------------------------------------
+
+It does NOT say Gemini's answer is true. Two runs of that model disagreed on
+who took Dali to Freud (Stefan Zweig in one, Leonard Woolf in the other), and
+`story_leads.verify` cannot confirm either. A validator that checked the right
+things would still have work to do on this text. The finding is only that THIS
+validator is not doing that work, and that its verdict has been read all day as
+though it were.
