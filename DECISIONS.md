@@ -17735,3 +17735,72 @@ of them imports either changed module.
 depleted" on every current model, so cross-model agreement — the strongest available
 signal — still cannot be measured. Options A (add ~$5-10 prepay) and B (Vertex AI on
 existing GCloud credits) are written up in `AUTONOMY_20260813_gym.md`.
+
+## D442 — redundancy between stories is per-EVENT, not per-PERSON (Michael's ruling)
+
+**2026-08-14, Michael, answering the design question D441 left open.** Two stories in
+one tour must not be identical or cover the same event with the same people. But
+**two stories about the same PERSON are fine, possibly beneficial.** So a person
+already occupying another matrix slot must NOT be struck off the credit_line ladder
+for that reason alone — which is exactly what `_pick_credit_line`'s exclude list does,
+and why stop 1's story keyword is the common noun "book" while Louis Broder, Joan Miró
+and Mourlot Frères are all excluded.
+
+**The consequence he named, and it is the harder half:** allowing repeat people means
+redundancy has to be detected properly — same group of people, at the same event, or
+doing the same activity. That check does not exist yet. Removing the exclusion without
+building it trades a keyword bug for a duplicate-story bug.
+
+Not yet implemented. Recorded so the exclusion is not "fixed" naively.
+
+## D443 — a phrase as credit_line does not test the idea, because credit_line only feeds RETRIEVAL
+
+**2026-08-14, Michael's Note 2, measured rather than argued.** His proposal: a story
+keyword need not be one word. Take the sentence
+
+> "The convergence of narrative and imagery in this exhibit prompts reflection on how
+> journeys from obscurity to enlightenment could be depicted in unexpected ways
+> elsewhere."
+
+Part 3 ("unexpected ways elsewhere") is the most general and least interesting — it is
+"the book" of this sentence. Part 1 ("The convergence of narrative and imagery in this
+exhibit") is the most STOP-SPECIFIC, so make that the credit_line. **The observation
+underneath it is correct and worth keeping: the closing sentences of a stop are
+consistently vaguer than the factual ones at the beginning and middle.**
+
+Ran it. Stop 2, live, both arms, `--credit-line` override added to `story_pipeline.py`:
+
+```
+                credit_line                       corpus  index  H / D / S   sources
+PHRASE    "The convergence of narrative…"      3885 ch     67   44/ 0/42   academia.edu, artnet
+BASELINE  "Sigmund Freud"                       984 ch     57   51/ 6/45   freud.org.uk, mfa.org
+```
+
+**The phrase scored higher and produced the worse story.** Both arms wrote the SAME
+story — Dalí meets Freud in 1938, illustrates Moses and Monotheism in 1974 — because
+the ladder, the sourceable set and the chosen subject were byte-identical in both runs.
+Only retrieval differed. The baseline's specifics ("in July of 1938", "at Freud's home
+in London", "a fittingly bizarre experience") became, in the phrase arm, "a work that
+reflects his ongoing engagement with psychoanalytic themes" and "showcasing Dalí's
+continued exploration of complex ideas". Detail fell 6 → 0.
+
+**Three findings, in order of importance.**
+
+1. **The experiment cannot test the hypothesis, and that is the real result.**
+   `credit_line` is one ingredient of a SEARCH QUERY. The story's subject is
+   `sourceable[0]`, taken from the handle ladder, and the ladder never sees
+   `credit_line`. So this measures "is a phrase a good web query" — no: it lost
+   freud.org.uk, the Freud Museum's own site, for academia.edu. **Michael's idea belongs
+   at SUBJECT SELECTION, not at credit_line.**
+2. **`valuation_index` rewarded the vaguer story, 67 to 57.** It is
+   sentences + agency + stakes + groundedness, with no penalty for vagueness, so four
+   vague sentences over a big corpus beat three specific ones over a small one. Sixth
+   instrument failure of this kind — check the instrument first.
+3. **One run per arm, and run-to-run variance is real:** the same baseline scored 65 in
+   the D43x sweep and 57 today, on identical inputs. No two-arm difference under ~10
+   points should be believed from a single pair.
+
+**What Michael's "which part carries the value" test is actually for:** ranking the
+CLAUSES of a sentence by stop-specificity, so the specific one is what gets developed
+and the "unexpected ways elsewhere" tail is what gets cut. That is a new routine and it
+sits upstream of subject selection, not inside the query builder.

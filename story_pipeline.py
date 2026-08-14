@@ -142,8 +142,20 @@ def search_the_question(matrix, question, drop_unverified=False):
     return rec, raw, kept, res.get('estimated_cost', 0) or 0
 
 
-def run_stop(stop_text, tour_context, tour_type, live=True):
+def run_stop(stop_text, tour_context, tour_type, live=True, credit_line=''):
+    """Run one stop end to end.
+
+    `credit_line` overrides the story keyword the matrix derived. Michael's
+    proposal, 2026-08-14: a keyword need not be one word or one name. The most
+    STOP-SPECIFIC clause of a sentence — "The convergence of narrative and imagery
+    in this exhibit" — is a better seed than the most general one ("unexpected ways
+    elsewhere"), and better than a bare common noun ("book"). This parameter is how
+    that gets measured rather than argued.
+    """
     m = build_matrix(stop_text, tour_type=tour_type, tour_context=tour_context)
+    if credit_line:
+        m['credit_line'] = {'value': credit_line, 'status': 'DERIVED',
+                            'source': 'override/experiment', 'rung': ''}
     req = request_to_ai(m)
     out = {'matrix': m, 'request': req['request'],
            'unverified': req.get('unverified_terms', []), 'cost': 0.0}
@@ -292,6 +304,9 @@ def main():
     p.add_argument('--tour-type', default='museum')
     p.add_argument('--live', action='store_true')
     p.add_argument('--out', default='')
+    p.add_argument('--credit-line', default='',
+                   help='Override the derived story keyword. A phrase is allowed '
+                        'and is the point — see run_stop().')
     a = p.parse_args()
 
     full = open(a.tour, encoding='utf-8').read()
@@ -302,7 +317,8 @@ def main():
         if not sel:
             continue
         print(f"\n{'=' * 78}\nSTOP {n}\n{'=' * 78}")
-        r = run_stop(sel[0], full, a.tour_type, a.live)
+        r = run_stop(sel[0], full, a.tour_type, a.live,
+                     credit_line=a.credit_line)
         r['stop'] = n
         r['title'] = slot(r['matrix'], 'canonical_title')
         rows.append(r)
