@@ -18116,3 +18116,76 @@ and without a fixture set that can fail, is how instruments drift into agreeing 
 whoever last edited them. They get one consolidated repair pass with a known-answer
 fixture built FIRST. Recorded rather than deferred: this is the sequencing call, and the
 numbers above should not be quoted until it happens.
+
+## D450 — MICHAEL'S RULING: descriptions and stories are judged by different rules
+
+**2026-08-14, in his words, binding.**
+
+**The stop/exhibit DESCRIPTION must be accurate and relevant.** The listener is looking
+at the object while hearing it. An incorrect or irrelevant description is worse than a
+dull one, because the listener cannot find what we describe and stops trusting us. *"We
+are doing it well and I want to keep it that way."* This is a hard gate and unchanged.
+
+**The STORY is judged differently. It does NOT have to be relevant or confirmed in
+sources — only free of falsehood and of contradiction with sources.** *"We absolutely
+should not publish a story with wrong facts."* Unconfirmed is not disqualifying.
+Contradicted is.
+
+**Why the "stakes=0" complaint was the wrong yardstick.** Michael on
+*"Sigmund Freud, the father of psychoanalysis, who has just fled Nazi-occupied
+Vienna"*: that sentence **makes Freud a human being, alive, shows his state of mind and
+engages the listener's emotions.** That is the story's job. Measuring it for "stakes
+markers" was applying a description-shaped ruler to a story.
+
+**On the object: a weakness, not a bar.** He agrees the passage never reaching the
+object is a real weakness. It is not prohibitive, because a bridging sentence fixes it
+— *"Dalí and Freud met only once, in London, in July 1938"* tells the listener the
+story is about the connection between the author and the illustrator of the work in
+front of them. **His ruling: if we find no better story, this story beats none.**
+
+### What this changes in the machinery — it explains why the validator felt backwards
+
+`validate_story` was built as a **must-be-confirmed** gate: anything absent from the
+corpus is `UNSUPPORTED` and the story is `REJECTED`. That is a DESCRIPTION gate, and
+D447/D448 are it misapplied to stories — it rejected five true, sourced sentences for
+being absent from the stop text.
+
+Under this ruling the story gate is **must-not-be-contradicted**, which is a different
+and harder test: absence of evidence must stop being a rejection, and we must actively
+look for refutation.
+
+### And that requires the opposite query shape — measured, not argued
+
+Gemini asserted, in a section headed "Key Talking Points for Guides", that
+**Leonard Woolf accompanied Dalí to meet Freud**. Two runs of the same model
+contradicted each other on this (Stefan Zweig in one, Leonard Woolf in the other).
+
+**Confirmation search** — "did Leonard Woolf accompany Dalí" — returned nothing
+conclusive, and this morning's `verify()` even CONFIRMED it against a sentence that
+never mentions Woolf (D446).
+
+**One open question — "who accompanied Salvador Dalí to meet Sigmund Freud in London
+1938" — refuted it immediately:**
+
+```
+"The meeting was brokered by Stefan Zweig, who was present, together with Dalí's
+ friend and patron Edward James…"
+"Dalí arrived accompanied by his wife Gala and his patron and friend Edward James…"
+"Dalí was accompanied by the writer Stefan Zweig, who had arranged the meeting."
+"…at the urging of Austrian writer Stefan Zweig and the poet Edward James…"
+```
+
+Four independent sources. **Leonard Woolf appears in none.** The claim is false and one
+search proves it.
+
+**The principle, and it is the actionable half of this ruling: to enforce "no
+falsehood", ask the OPEN question, not the yes/no question.** "Who accompanied Dalí"
+finds the answer and thereby refutes the claim; "did Woolf accompany Dalí" cannot
+distinguish a false claim from a poorly-indexed true one. Every false-positive in
+`verify()` this week — the 1993 retrospective, Leonard Woolf, "spiritual father" — is
+a yes/no search that found agreement-shaped noise.
+
+**Bonus, same search:** Dalí's snail remark is confirmed verbatim — *"Freud's cranium
+is a snail! His brain is in the form…"* So the remark is sourced and Gemini's
+"hard on the outside, but containing a soft, vulnerable center" is confirmed to be its
+own gloss, exactly as D448 suspected.
