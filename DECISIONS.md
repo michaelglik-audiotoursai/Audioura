@@ -17637,3 +17637,55 @@ was destroyed" — and then verifies THAT, which is a much narrower and more rep
 search than "tell me about Joan Miró", which returns 59 passages and no consequence.
 
 Stop 1 remains SILENCE. Spend to date ~$0.42 of $10.
+
+## D440 — lead-then-verify works, and GPT-4o is a bad lead generator for this
+
+**2026-08-13/14, at Michael's instruction to try a different model.** Built
+`story_leads.py`: ask a model for specific dated events, verify each with one narrow
+search, keep only what a source confirms. Providers are pluggable; the runner uses every
+one it has a key for. **No `GEMINI_API_KEY` in `.env`** — only OpenAI and Serper — so the
+first run is single-provider.
+
+**GPT-4o proposed 6 events for stop 1. The verifier confirmed 0.** They were not near
+misses:
+
+```
+1971  "Joan Miró created the SCULPTURE Le Lézard aux plumes d'or"   <- it is a BOOK
+1986  "the MFA acquired Le Lézard aux plumes d'or"                  <- gifted by Boris
+                                                                       Fridman in 2021
+1972/1993/2004/2011  exhibition-history claims, none confirmable
+```
+
+**The verifier is not simply rejecting everything** — proven by feeding it Meta.AI's claim:
+
+```
+CONFIRMED    1967  "Miró decided to destroy the lithographs for technical reasons"
+             evidence: "In 1967 Miró executed a series of lithographs to illustrate his
+             poem… For technical reasons, Miró decided to destroy the lithographs"
+UNVERIFIED   1986  the MFA acquisition claim
+UNVERIFIED   1852  Mourlot founded on rue de Chabrol  <- true, but the query shape
+                                                         did not confirm it; see below
+```
+
+**This vindicates Michael's instinct about trying a different model, and sharpens it.**
+Meta.AI produced a lead that verifies on the first search. GPT-4o produced six that do not,
+including calling a livre d'artiste a sculpture. Same task, same prompt shape, wildly
+different lead quality. **The lead generator and the writer are different jobs and should
+not be assumed to want the same model.**
+
+**Cost, looked up not recalled:** Gemini 2.5 Flash $0.15/$1.25 per 1M vs GPT-4o
+$2.50/$10.00 — ~17x cheaper in, ~8x out. Gemini 2.5 retires 2026-10-16; 3.5 Flash is
+$1.50/$9.00, still under GPT-4o but narrowly. At our volume ($0.45 for the whole day) cost
+is not the reason to switch — **disagreement between models is**, because that is what sent
+LEAD to the sources over the 1967 question in the first place.
+
+**Known weakness, recorded not hidden:** the Mourlot 1852 claim is TRUE — LEAD confirmed it
+directly earlier the same evening — and the verifier marked it UNVERIFIED, because `verify`
+appends the work title to every query and "Le Lézard aux plumes d'or" is irrelevant to when
+Mourlot was founded. **Claims about a COLLABORATOR need a query built around the
+collaborator, not the work.** That is a false negative, which is the safe direction to fail,
+but it will silence true material.
+
+**To finish this:** Michael adds `GEMINI_API_KEY` to `.env` and the second provider engages
+with no code change. Until then the strongest available signal — two models independently
+proposing the same dated event — cannot be measured.
