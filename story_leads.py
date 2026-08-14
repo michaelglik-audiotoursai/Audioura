@@ -88,12 +88,21 @@ def _openai(prompt: str, model: str = 'gpt-4o') -> str:
     return r.json()['choices'][0]['message']['content']
 
 
-def _gemini(prompt: str, model: str = 'gemini-2.5-flash') -> str:
+def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     """Google Gemini. ~17x cheaper on input than gpt-4o, ~8x on output.
 
-    NOTE: Gemini 2.5 retires 2026-10-16. Successor 3.5 Flash is $1.50/$9.00 per
-    1M — still under gpt-4o but only just. Re-measure before October.
+    NOTE: Gemini 2.5 retires 2026-10-16, so the default is `gemini-flash-latest`
+    rather than a pinned 2.5. Michael's key (verified 2026-08-14) exposes 38
+    models incl. gemini-3-flash-preview.
+
+    `grounded=True` turns on Grounding with Google Search — the toggle that was
+    already ON in Michael's AI Studio console, and the likeliest reason his Google
+    answer beat ours. The model searches and cites inside the call instead of
+    reciting. It does NOT replace `validate_story`: Google's "tragic mood holding
+    sway over Miró's psyche" came out of a grounded console session, so grounded
+    output is still a hypothesis until our own verifier checks it.
     """
+    model = model or os.environ.get('GEMINI_MODEL', 'gemini-flash-latest')
     import requests
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not key:
@@ -102,7 +111,8 @@ def _gemini(prompt: str, model: str = 'gemini-2.5-flash') -> str:
         f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
         headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
         json={'contents': [{'parts': [{'text': prompt}]}],
-              'generationConfig': {'temperature': 0.2, 'maxOutputTokens': 600}},
+              'generationConfig': {'temperature': 0.2, 'maxOutputTokens': 600},
+              **({'tools': [{'google_search': {}}]} if grounded else {})},
         timeout=60)
     r.raise_for_status()
     d = r.json()
@@ -112,7 +122,12 @@ def _gemini(prompt: str, model: str = 'gemini-2.5-flash') -> str:
         return ''
 
 
-PROVIDERS = {'openai': _openai, 'gemini': _gemini}
+def _gemini_grounded(prompt: str) -> str:
+    return _gemini(prompt, grounded=True)
+
+
+PROVIDERS = {'openai': _openai, 'gemini': _gemini,
+             'gemini_grounded': _gemini_grounded}
 
 
 def available_providers() -> List[str]:
@@ -121,6 +136,7 @@ def available_providers() -> List[str]:
         out.append('openai')
     if os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY'):
         out.append('gemini')
+        out.append('gemini_grounded')
     return out
 
 
@@ -187,16 +203,33 @@ def verify(lead: Dict, work: str, subject: str) -> Dict:
     # page that merely repeats the title is not confirmation.
     substantive = any(_AGENCY_VERB.search(s.get('snippet') or '')
                       or _STAKES.search(s.get('snippet') or '') for s in res)
-    ok = year_ok and len(content) >= max(2, len(terms) // 3) and substantive
+    # The evidence must be ONE sentence carrying the claim — not content words
+    # scattered across eight unrelated results. Measured 2026-08-14: the claim
+    # "included in a retrospective exhibition at the MFA in 1993" was CONFIRMED
+    # against an AUCTION LISTING, because 'Lézard' appeared on one page and '1993'
+    # on another. Nothing anywhere mentioned a retrospective. A verifier that
+    # accepts a claim no single source makes is the failure it exists to prevent.
+    def _carries(sn):
+        f = _fold(sn or '')
+        if not f:
+            return False
+        if lead['year'] and lead['year'] not in (sn or ''):
+            return False
+        need = [t for t in terms if len(t) > 4]
+        hit = sum(1 for t in need if _fold(t) in f)
+        return hit >= max(2, (len(need) + 1) // 2) and (
+            _AGENCY_VERB.search(sn) or _STAKES.search(sn))
+
+    carrier = next((s.get('snippet') for s in res if _carries(s.get('snippet'))), '')
+    ok = bool(carrier)
 
     return {**lead, 'query': q, 'results': len(res),
             'matched_terms': content[:6], 'year_confirmed': year_ok,
             'substantive': substantive,
             'status': 'CONFIRMED' if ok else 'UNVERIFIED',
-            'citations': [s.get('domain', '') for s in res[:3]],
-            'evidence': next((s.get('snippet') for s in res
-                              if s.get('snippet') and (_AGENCY_VERB.search(s['snippet'])
-                                                       or _STAKES.search(s['snippet']))), '')}
+            'citations': [s.get('domain', '') for s in res
+                          if _carries(s.get('snippet'))][:3],
+            'evidence': carrier}
 
 
 def run(subject: str, work: str, venue: str, providers: List[str] = None,

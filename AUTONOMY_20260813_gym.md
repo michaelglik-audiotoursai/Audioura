@@ -88,20 +88,39 @@ set. Nothing on this machine can spend money until someone types.
 
 **Total spend for the whole session: ~$0.45 of the $10 ceiling.**
 
-## THE ONE THING MICHAEL DOES TOMORROW
+## GEMINI — DONE AND BLOCKED, 2026-08-14 10:5x
 
-Get a free Gemini key at **aistudio.google.com** → Get API key → create → copy.
-Add one line to `~/Audioura/.env`:
+**Key obtained and verified working** (prefix `AQ.Ab8…`, a newer format than `AIza`;
+HTTP 200 on the models endpoint, 38 models). It is in `.env` and `story_leads.py` picks it
+up automatically as two providers, `gemini` and `gemini_grounded`.
+
+**BLOCKED ON BILLING, and LEAD's advice the previous night was WRONG.** There is no usable
+free tier on this key:
 
 ```
-GEMINI_API_KEY=AIza...
+gemini-2.5-flash        404  "no longer available to new users"
+gemini-2.5-flash-lite   404  "no longer available to new users"
+gemini-flash-latest     429  "Your prepayment credits are depleted"
+gemini-3-flash-preview  429  "Your prepayment credits are depleted"
 ```
 
-Verify without exposing it: `grep -c '^GEMINI_API_KEY=' ~/Audioura/.env` → expect `1`.
+The 2.5 pricing LEAD researched ($0.15/$1.25) is moot — those models are closed to new
+accounts. "Free tier covers this at zero cost" was wrong; the account is prepay with a zero
+balance.
 
-His GCloud credits do NOT work on AI Studio keys (Google split the billing on 2026-03-02);
-they work on Vertex AI, same models, different door. Free tier covers this experiment at
-zero cost — do not do the GCP setup to answer a question the free tier answers.
+**Michael's decision, not taken yet:**
+- **A** — add ~$5-10 prepay at ai.studio/projects. The whole two-day session cost $0.45
+  across every model, so this covers months. Works immediately.
+- **B** — Vertex AI, to spend existing GCloud credits. Same models, different endpoint,
+  needs a GCP project + `gcloud auth application-default login`. ~20 lines in
+  `story_leads.py`.
+
+Google's docs note that on a prepay account, promotional Cloud credits are consumed BEFORE
+prepaid funds — so adding a balance may activate credits he already has.
+
+**Until one of those happens, `gemini` and `gemini_grounded` return 429 and the runner
+falls back to OpenAI alone.** Cross-model agreement — the strongest signal available —
+cannot be measured.
 
 ## RESUME SEQUENCE
 
@@ -114,14 +133,21 @@ Then, in order:
    `python3 story_leads.py --subject "Joan Miró" --work "Le Lézard aux plumes d'or" --venue "Museum of Fine Arts, Boston"`
    The measurement that matters: does Gemini propose the 1967 destruction that GPT-4o
    missed, and do the two agree on anything?
-2. **Fix the collaborator-query defect (D440).** `verify()` appends the work title to every
+2. **FIXED 2026-08-14: `verify()` false positive.** It accepted a claim when content words
+   appeared ANYWHERE across eight results — "included in a 1993 retrospective at the MFA"
+   was CONFIRMED against an AUCTION LISTING, because the title was on one page and 1993 on
+   another. Nothing mentioned a retrospective. Now ONE source sentence must carry the whole
+   claim: the year, at least half the content words, and an action or consequence. Re-tested
+   both ways — the 1993 claim now UNVERIFIED, Meta's 1967 claim still CONFIRMED with its
+   carrier sentence quoted.
+3. **Fix the collaborator-query defect (D440).** `verify()` appends the work title to every
    query, so "Mourlot founded 1852" was marked UNVERIFIED against a query about a book it
    has nothing to do with. TRUE claim, false negative. Claims about a collaborator need a
    query built around the collaborator.
-3. **Fix the title-fragment filter (D439).** It compares against `canonical_title` only, so
+4. **Fix the title-fragment filter (D439).** It compares against `canonical_title` only, so
    "At Le Lézard" and the ENGLISH gloss fragments ("The Lizard", "Golden Feathers") survive
    and burn every credit_line substitution. Louis Broder is never reached.
-4. **Then re-run the nine** with `story_pipeline.py` and record the table in `DECISIONS.md`.
+5. **Then re-run the nine** with `story_pipeline.py` and record the table in `DECISIONS.md`.
 
 ## STATE AT PAUSE
 
