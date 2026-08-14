@@ -17916,3 +17916,50 @@ answer to the wrong question.
 ("someone does something, something is at stake, the last sentence names a physical
 property"). That prompt is used by `story_pipeline`, not by this chain. The two chains
 ask for different things, and only one of them asks for a story.
+
+## D446 — Michael was right: the query is fine. Gemini told a story from it; GPT-4o did not
+
+**2026-08-14. Michael pushed back on D445's headline** — "'The query never asks for a
+story' is a matter of speaking. Before we change the query, can you get the query
+results from Gemini on the very same question?" **He was right and the claim was
+wrong.** Gemini's key now works (the 429 that blocked it this morning has cleared;
+`gemini-2.5-flash` is 404 to new accounts, `gemini-flash-latest` and
+`gemini-3-flash-preview` both answer).
+
+Identical query, no prompt change, temperature 0.4. Full text in
+`GEMINI_SAME_QUERY_stop2.txt`.
+
+**gemini-3-flash-preview told a story.** Named people, a date, a place, an event, a
+quote: *"imagine a rainy afternoon in London, July 1938. A young, flamboyant Salvador
+Dalí is nervously waiting to meet his idol…"* GPT-4o, given the same words, produced
+eleven sentences about what a story could be built from. **So the phrasing was not the
+blocker. The model was.** D445's fourth finding is withdrawn; the other three stand.
+
+**The trade this reveals is the real result, and it is not free.** Two runs of the
+SAME Gemini model disagreed on who took Dalí to Freud — the truncated first run said
+**Stefan Zweig**, the full run said **Leonard Woolf** and put it in its "Key Talking
+Points" as fact. One of those is wrong. Gemini buys story SHAPE at the price of
+fabrication risk; GPT-4o's non-story is at least inert. This is exactly the disagreement
+D440 said we could not measure without a second provider, and the first thing it
+measured was a contradiction inside one provider.
+
+### The verifier falsely CONFIRMED the Woolf claim, and that is D441's fix still leaking
+
+Fed "Leonard Woolf accompanied Dalí to meet Freud, 1938", `verify()` returned
+**CONFIRMED** on this carrier sentence:
+
+> "Salvador Dalí met Freud in London in 1938, Freud appeared more receptive to …
+> Moses and Monotheism."
+
+**Leonard Woolf is not in it.** The year matched, more than half the content words
+matched, an agency verb was present — and the actual assertion, the only part anyone
+would repeat to a visitor, was never checked. Same failure class as the 1993
+retrospective: counting words is not reading a sentence.
+
+**Fixed:** when a claim names a principal, that name (surname is enough) must appear in
+the carrier sentence. Both Gemini claims now correctly return UNVERIFIED, and this
+morning's three known-answer cases do not regress — Mourlot 1852 CONFIRMED, Miró 1967
+CONFIRMED, the 1993 retrospective UNVERIFIED.
+
+**Standing lesson, now seven for seven this week:** every "confirmation" this week that
+was checked by hand turned out to be the instrument agreeing with itself.

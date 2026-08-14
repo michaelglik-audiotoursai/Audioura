@@ -232,12 +232,27 @@ def verify(lead: Dict, work: str, subject: str) -> Dict:
     # against an AUCTION LISTING, because 'Lézard' appeared on one page and '1993'
     # on another. Nothing anywhere mentioned a retrospective. A verifier that
     # accepts a claim no single source makes is the failure it exists to prevent.
+    # THE NAMED PARTY MUST BE IN THE CARRIER SENTENCE. Measured 2026-08-14, and it
+    # is the same failure as the 1993 one in a new place: Gemini claimed "Leonard
+    # Woolf accompanied Dalí to meet Freud in London, 1938", and this function
+    # CONFIRMED it against
+    #     "Salvador Dalí met Freud in London in 1938, Freud appeared more
+    #      receptive to ... Moses and Monotheism."
+    # which does not mention Leonard Woolf at all. The year matched, the content
+    # words matched, an agency verb was present — and the actual assertion, the
+    # only part anyone would repeat to a visitor, went unchecked. Counting words
+    # is not reading a sentence.
     def _carries(sn):
         f = _fold(sn or '')
         if not f:
             return False
         if lead['year'] and lead['year'] not in (sn or ''):
             return False
+        if principal:
+            # Surname is enough — sources write "Woolf" as often as "Leonard Woolf".
+            parts = [p for p in _fold(principal).split() if len(p) > 3]
+            if parts and not any(p in f for p in parts):
+                return False
         need = [t for t in terms if len(t) > 4]
         hit = sum(1 for t in need if _fold(t) in f)
         return hit >= max(2, (len(need) + 1) // 2) and (
