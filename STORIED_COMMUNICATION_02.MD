@@ -375,3 +375,36 @@ One more thing worth knowing: this session is long, and long high-context sessio
  ████████████████████████████████████████████▉      89% used                                                                  $112.49 / $125.00 spent · Resets Sep 1 (America/New_York)
 
 
+
+---
+
+at 08/14/2026 11:0x
+❯ Note 1: multiple stories about the same person are not prohibitive — but then
+  redundancy means same people at the same event or doing the same activity.
+  Note 2: the same test we use to judge whether a sentence has value applies to
+  picking a credit_line. In "The convergence of narrative and imagery in this exhibit
+  prompts reflection on how journeys from obscurity to enlightenment could be depicted
+  in unexpected ways elsewhere", Part 3 is the most general ("the book" of the
+  sentence); Part 1 is the most stop-specific and so the most interesting. Make Part 1
+  the credit_line — note it is more than one word — and run it.
+
+[Storied_Tours]@08/14/2026|11:17
+
+Ran both arms live on stop 2. **The phrase scored higher (67 vs 57) and produced the
+worse story**, and the reason matters more than the number: both arms wrote the SAME
+story from a byte-identical ladder, sourceable set and subject. `credit_line` only
+feeds RETRIEVAL — the story's subject is picked from the handle ladder, which never
+sees it. So the run measured "is a phrase a good web query": no, it lost freud.org.uk
+for academia.edu, and Detail fell 6 → 0.
+
+The idea is right; it is wired to the wrong place. Clause-specificity belongs at
+SUBJECT SELECTION, upstream, not in the query builder.
+
+Two side findings: `valuation_index` has no vagueness penalty, so it preferred four
+vague sentences to three specific ones — sixth instrument failure of this shape. And
+the same baseline scored 65 in the earlier sweep and 57 today on identical inputs, so
+single-run differences under ~10 points are noise.
+
+Note 1 recorded as D442: a person must not be struck off the keyword ladder merely for
+occupying another slot, but the same-people/same-event redundancy check has to exist
+before that exclusion is removed. Full evidence in D442/D443.
