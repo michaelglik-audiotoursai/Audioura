@@ -17587,3 +17587,53 @@ precisely the distinction D435 drew between CLAIMED and GROUNDED.
 **Incidental, and worth knowing:** `_serp_search` returns `(results, latency_ms)`, not
 `(results, cost)`. LEAD's probe printed latency with a dollar sign and briefly read 1080ms
 as $1080. The instrument again — fifth time today.
+
+## D439 — Michael's credit_line substitution was never wired in; it is now, and it is not enough alone
+
+**2026-08-13.** Michael asked why the pipeline does not substitute `credit_line` when a
+query returns nothing, noting "book" was too general. **He was right, and it was not a
+suggestion — it was his own routine 2 rule, implemented in
+`request_and_structure.structure_ai_output` and never called by `story_pipeline`.** The
+pipeline searched once, tried one fallback, and gave up.
+
+**The data he intuited:**
+
+```
+Le Lézard   credit_line = "book"           -> SILENCE
+Moses       credit_line = "Sigmund Freud"  -> STORY
+Au Soleil   credit_line = "Pierre Reverdy" -> STORY
+```
+
+**Both successes were handed a PERSON. The failure was handed a generic noun.** And
+`Louis Broder` — the publisher the entire Miró story turns on — sat at position 10 in the
+unused ladder.
+
+**Wired in:** on no sourceable handle, walk the ladder, substitute `collaborator`, search
+again, merge corpora, re-assess. Measured on stop 1: corpus **1,064 → 6,224 chars** over
+four substitutions. Breadth works.
+
+**It did not flip stop 1, and the honest reasons are three of LEAD's own instruments:**
+
+1. **The title-fragment filter failed.** It compared against `canonical_title` only, so
+   "At Le Lézard" (leading preposition) and "The Lizard" / "Golden Feathers" (from the
+   ENGLISH gloss) survived. All four substitutions were spent on fragments of the stop's
+   own title, which cannot be story subjects because they ARE the object. Louis Broder was
+   never tried. **Unfixed.**
+2. **`_STAKES` had no vocabulary for destruction.** Every marker was CONTRAST — only,
+   never, despite. It could not see the best consequence in the whole tour: "For technical
+   reasons, Miró decided to DESTROY the lithographs." Destroying your own edition is not a
+   contrast, it is the outcome. Extended with destroyed/pulped/abandoned/unfinished/
+   posthumous/started over. **Fixed.**
+3. **The retrieval is non-deterministic and it bit again (D425).** The direct probe that
+   verified Meta's claim returned "Miró decided to destroy the lithographs". A near-identical
+   query minutes later returned 1,613 chars containing `1967` and **not one occurrence of
+   `destroy`.** The fact is on the internet, we retrieved it once, and could not retrieve it
+   again on demand.
+
+**That third point is the argument for D438's lead-generation, sharpened.** Hoping a
+keyword query surfaces the right sentence is a lottery we have now lost once with the
+answer already in hand. Lead-generation pins the specific claim first — "the 1967 edition
+was destroyed" — and then verifies THAT, which is a much narrower and more repeatable
+search than "tell me about Joan Miró", which returns 59 passages and no consequence.
+
+Stop 1 remains SILENCE. Spend to date ~$0.42 of $10.

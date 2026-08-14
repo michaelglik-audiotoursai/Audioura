@@ -46,6 +46,7 @@ from request_and_structure import request_to_ai        # noqa: E402
 from snippet_ranker import rank_and_cap_snippets       # noqa: E402
 from story_opportunity_scan import measure, verdict    # noqa: E402
 from story_material_check import assess, load_corpus   # noqa: E402
+from story_opportunity_scan import _fold               # noqa: E402
 from validate_story import validate_story              # noqa: E402
 from evaluate_story import evaluate_story              # noqa: E402
 import story_writer                                     # noqa: E402
@@ -147,9 +148,25 @@ def run_stop(stop_text, tour_context, tour_type, live=True):
     # running because it never asked about them. FLAT first: an established
     # subject carrying no stakes is the best place to attach a story (D433).
     _rank = {'FLAT': 0, 'MENTIONED': 1, 'DANGLING': 2}
+    _title_fold = _fold(slot(m, 'canonical_title'))
+
+    def _is_title_fragment(surface):
+        # "Le Lézard", "The Lizard", "Golden Feathers", "At Le Lézard" — all
+        # pieces of the stop's own title. They cannot be story SUBJECTS because
+        # they ARE the object. They filled 7 of stop 1's top 10 handles and pushed
+        # Louis Broder — the publisher the whole story is about — down to 10th.
+        f = _fold(surface)
+        return bool(_title_fold) and (f in _title_fold or _title_fold in f)
+
+    def _is_person(h):
+        return h['kind'] == 'proper noun' and not _is_title_fragment(h['surface'])
+
     targets = [h['surface'] for h in
-               sorted((h for h in meas['handles'] if h['state'] != 'DEVELOPED'),
-                      key=lambda h: (_rank.get(h['state'], 3), -h['sentences']))]
+               sorted((h for h in meas['handles']
+                       if h['state'] != 'DEVELOPED' and not _is_title_fragment(h['surface'])),
+                      key=lambda h: (0 if _is_person(h) else 1,
+                                     _rank.get(h['state'], 3), -h['sentences']))]
+    out['ladder'] = targets[:10]
     mats = [assess(h, corpus) for h in targets[:8]]
     sourceable = [r['handle'] for r in mats if r['state'] == 'SOURCEABLE']
     out['sourceable'] = sourceable
@@ -181,6 +198,44 @@ def run_stop(stop_text, tour_context, tour_type, live=True):
             mats = [assess(h, corpus) for h in targets[:8]]
             sourceable = [r['handle'] for r in mats if r['state'] == 'SOURCEABLE']
             out['sourceable'] = sourceable
+
+    if not sourceable:
+        # MICHAEL'S RULE (routine 2, 2026-08-13): "If the information is less than 3
+        # sentences, go back to matrix building and substitute credit_line with the
+        # next word and call Request_to_AI." It was implemented in
+        # request_and_structure.structure_ai_output and never wired in here.
+        #
+        # Measured: stop 1's credit_line was "book" -> SILENCE. Stops 2 and 3 got
+        # "Sigmund Freud" and "Pierre Reverdy" -> STORY. The two that worked were
+        # handed a PERSON. Walking the ladder is how a generic noun gets replaced
+        # by one.
+        out['substitutions'] = []
+        for nxt in targets[:4]:
+            if _fold(nxt) == _fold(slot(m, 'credit_line')):
+                continue
+            rec3 = dict(rec, collaborator=nxt)
+            from work_story_searcher import search_stories_for_stop as _s3
+            res3 = _s3(rec3, tour_type='contained',
+                       generation_tier=os.environ.get('GENERATION_TIER', 'plus'))
+            out['cost'] += res3.get('estimated_cost', 0) or 0
+            kept3, _ = rank_and_cap_snippets(res3.get('results', []), rec3['artist'],
+                                             work_title=rec3['canonical_title'],
+                                             stop_record=rec3)
+            add = '\n'.join((x.get('title', '') + '. ' + (x.get('snippet') or ''))
+                             for x in kept3)
+            out['substitutions'].append({'credit_line': nxt, 'kept': len(kept3)})
+            if not add.strip():
+                continue
+            with open(corpus_path, 'a', encoding='utf-8') as fh:
+                fh.write('\n' + add)
+            corpus = load_corpus([corpus_path], {})
+            out['corpus_chars'] = len(corpus)
+            mats = [assess(h, corpus) for h in targets[:8]]
+            sourceable = [r['handle'] for r in mats if r['state'] == 'SOURCEABLE']
+            if sourceable:
+                out['sourceable'] = sourceable
+                out['credit_line_used'] = nxt
+                break
 
     if not sourceable:
         out['status'] = 'SILENCE'

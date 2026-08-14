@@ -106,7 +106,15 @@ _STAKES = re.compile(
     r'\b(only|never|no one|nothing|until|despite|although|even though|'
     r'the last|the only|the first|for the first time|would not|could not|'
     r'had to|refused|in the end|by then|too late|instead of|but not|'
-    r'at the cost|risked|forced)\b', re.IGNORECASE)
+    r'at the cost|risked|forced|'
+    # Outright destructive and final outcomes. The list above is all CONTRAST —
+    # only, never, despite — and could not see the single best consequence in the
+    # whole MFA tour: "For technical reasons, Miró decided to DESTROY the
+    # lithographs." Destroying your own edition is not a contrast, it is the
+    # consequence. Stop 1 stayed SILENCE with that sentence sitting in its corpus.
+    r'destroyed|destroy|pulped|burned|burnt|abandoned|scrapped|cancelled|'
+    r'canceled|unfinished|incomplete|posthumous(?:ly)?|left\s+half|'
+    r'started\s+over|began\s+again|withdrew|withdrawn|lost)\b', re.IGNORECASE)
 
 
 def _fold(t: str) -> str:
