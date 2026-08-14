@@ -1,11 +1,11 @@
-# RESTART briefing — generated 2026-08-13 11:26 EDT
+# RESTART briefing — generated 2026-08-14 10:36 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     1ffdc87 Pending reminders: the story pipeline is Michael's to drive; where to start the joint session
-unpushed 5 commits
-dirty    9 files
+HEAD     cf540dc verify(): one source sentence must carry the whole claim; Gemini blocked on billing
+unpushed 30 commits
+dirty    1 files
 ```
 
 ## Production safety
@@ -22,12 +22,12 @@ ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 in flight:
 
 last 6 dispatcher events:
-   - ABANDONED | task=new_kiro_session_is_required_LOCAL-452.md | id=TLOCAL-452 | branch=LOCAL-452-fleet-provenance | wor
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-452.md | at=2026-08-12T19:08:57-04:00 | base=storied | dispatche
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-455.md | at=2026-08-12T19:26:10-04:00 | base=LOCAL-452-fleet-pro
-   - ABANDONED | task=new_kiro_session_is_required_LOCAL-455.md | at=2026-08-12T20:29:19-04:00 | reason=worker_died | dea
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-455.md | at=2026-08-12T20:29:20-04:00 | base=LOCAL-452-fleet-pro
-   - ABANDONED | task=new_kiro_session_is_required_LOCAL-455.md | id=TLOCAL-455 | branch=LOCAL-455-fleet-provenance-r2 | 
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-462.md | at=2026-08-13T20:00:15-04:00 | base=storied | dispatche
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-463.md | at=2026-08-13T20:00:15-04:00 | base=storied | dispatche
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-464.md | at=2026-08-13T20:00:15-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-462.md | id=TLOCAL-462 | branch=LOCAL-462-request-and-structure 
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-463.md | id=TLOCAL-463 | branch=LOCAL-463-validate-story | base=
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-464.md | id=TLOCAL-464 | branch=LOCAL-464-evaluate-story | base=
 ```
 
 ## Re-dispatchable (last status ABANDONED — a bounce awaiting pickup)
@@ -44,6 +44,7 @@ last 6 dispatcher events:
   - PARKED_kiro_task_LOCAL-455_r2_failed.md
   - PARKED_kiro_task_LOCAL-456.md
   - PARKED_kiro_task_LOCAL-457.md
+  - PARKED_kiro_task_LOCAL-460_wrong_spec.md
 
 ## Honest tour scores (corpus-loaded scorer, recompute — do not quote from memory)
 ```

@@ -56,6 +56,39 @@ def slot(m, k):
     return ((m.get(k) or {}).get('value') or '').strip()
 
 
+# Articles and prepositions carry no identity, so they must not make a surface
+# look like a title fragment on their own, nor stop one from matching.
+_TITLE_STOP = {'the', 'and', 'with', 'from', 'for', 'les', 'des', 'aux',
+               'une', 'his', 'her', 'its'}
+
+
+def _title_toks(s):
+    return {t for t in re.findall(r"[a-z0-9']+", _fold(s))
+            if len(t) > 2 and t not in _TITLE_STOP}
+
+
+def title_fragment_test(canonical, english=''):
+    """Predicate: is this handle a piece of the stop's OWN title?
+
+    "Le Lézard", "The Lizard", "Golden Feathers", "At Le Lézard" — all pieces of
+    the stop's own title. They cannot be story SUBJECTS because they ARE the
+    object. They filled 7 of stop 1's top 10 handles and pushed Louis Broder — the
+    publisher the whole story is about — down to 10th.
+
+    D439: the substring form of this test compared against `canonical_title`
+    ALONE, so the ENGLISH gloss fragments and anything with a leading preposition
+    slipped through and burned every credit_line substitution. Token containment
+    against BOTH titles catches all four shapes.
+    """
+    title_set = _title_toks(canonical) | _title_toks(english)
+
+    def _is_fragment(surface):
+        toks = _title_toks(surface)
+        return bool(title_set) and bool(toks) and toks <= title_set
+
+    return _is_fragment
+
+
 def search_the_question(matrix, question, drop_unverified=False):
     """Interrogate the internet with the matrix, not with the model's memory.
 
@@ -148,15 +181,8 @@ def run_stop(stop_text, tour_context, tour_type, live=True):
     # running because it never asked about them. FLAT first: an established
     # subject carrying no stakes is the best place to attach a story (D433).
     _rank = {'FLAT': 0, 'MENTIONED': 1, 'DANGLING': 2}
-    _title_fold = _fold(slot(m, 'canonical_title'))
-
-    def _is_title_fragment(surface):
-        # "Le Lézard", "The Lizard", "Golden Feathers", "At Le Lézard" — all
-        # pieces of the stop's own title. They cannot be story SUBJECTS because
-        # they ARE the object. They filled 7 of stop 1's top 10 handles and pushed
-        # Louis Broder — the publisher the whole story is about — down to 10th.
-        f = _fold(surface)
-        return bool(_title_fold) and (f in _title_fold or _title_fold in f)
+    _is_title_fragment = title_fragment_test(slot(m, 'canonical_title'),
+                                             slot(m, 'english_title'))
 
     def _is_person(h):
         return h['kind'] == 'proper noun' and not _is_title_fragment(h['surface'])

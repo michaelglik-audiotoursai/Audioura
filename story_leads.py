@@ -187,22 +187,45 @@ def merge_leads(all_leads: List[Dict]) -> List[Dict]:
 
 # ── verification ─────────────────────────────────────────────────────────────
 
+_ENTITY = re.compile(r"\b[A-ZÀ-Þ][\wà-ÿ'’\-]+(?:\s+[A-ZÀ-Þ][\wà-ÿ'’\-]+)*")
+
+
+def _principal(claim: str, work: str, subject: str) -> str:
+    """The named party a claim is ABOUT, when that is not the subject or the work.
+
+    D440: `verify()` appended the work title to every query, so the TRUE claim
+    "Mourlot was founded in 1852 on rue de Chabrol" was searched as
+    `Joan Miró "Le Lézard aux plumes d'or" 1852 Mourlot founded…` — a query about a
+    book the printing house predates by a century. It came back UNVERIFIED. A claim
+    about a COLLABORATOR needs a query built around the collaborator.
+    """
+    known = _fold(work + ' ' + subject)
+    for e in _ENTITY.findall(claim or ''):
+        f = _fold(e)
+        if len(f) < 4 or f in known:
+            continue
+        # A name already inside the subject/work is not a separate party.
+        if all(tok in known.split() for tok in f.split()):
+            continue
+        return e
+    return ''
+
+
 def verify(lead: Dict, work: str, subject: str) -> Dict:
-    """One narrow search per claim. This is the repeatable part."""
+    """One narrow search per claim, two at most. This is the repeatable part."""
     from work_story_searcher import _serp_search
     terms = [w for w in re.findall(r"[A-Za-zà-ÿ'’\-]{4,}", lead['claim'])][:8]
-    q = f'{subject} "{work}" {lead["year"]} {" ".join(terms)}'.strip()
-    res, _ = _serp_search(q)
-    blob = ' '.join((s.get('title', '') + ' ' + (s.get('snippet') or '')) for s in res)
-    fb = _fold(blob)
 
-    content = [t for t in terms if len(t) > 4 and _fold(t) in fb]
-    year_ok = (not lead['year']) or (lead['year'] in blob)
-    # A claim is confirmed when its distinctive words AND its year both appear,
-    # and at least one source sentence carries an action or a consequence — a
-    # page that merely repeats the title is not confirmation.
-    substantive = any(_AGENCY_VERB.search(s.get('snippet') or '')
-                      or _STAKES.search(s.get('snippet') or '') for s in res)
+    # Query shapes, most likely first. The work-anchored shape is right for claims
+    # about the object; it is actively wrong for claims about a collaborator, so
+    # when the claim names a third party we ask about THEM first. The second shape
+    # is only paid for when the first finds no carrier sentence.
+    q_work = f'{subject} "{work}" {lead["year"]} {" ".join(terms)}'.strip()
+    principal = _principal(lead['claim'], work, subject)
+    queries = [q_work]
+    if principal:
+        rest = [t for t in terms if _fold(t) not in _fold(principal)]
+        queries.insert(0, f'"{principal}" {lead["year"]} {" ".join(rest)}'.strip())
     # The evidence must be ONE sentence carrying the claim — not content words
     # scattered across eight unrelated results. Measured 2026-08-14: the claim
     # "included in a retrospective exhibition at the MFA in 1993" was CONFIRMED
@@ -220,13 +243,29 @@ def verify(lead: Dict, work: str, subject: str) -> Dict:
         return hit >= max(2, (len(need) + 1) // 2) and (
             _AGENCY_VERB.search(sn) or _STAKES.search(sn))
 
-    carrier = next((s.get('snippet') for s in res if _carries(s.get('snippet'))), '')
-    ok = bool(carrier)
+    asked, res, carrier, q = [], [], '', queries[0]
+    for cand in queries:
+        q, res = cand, _serp_search(cand)[0]
+        asked.append(cand)
+        carrier = next((s.get('snippet') for s in res
+                        if _carries(s.get('snippet'))), '')
+        if carrier:
+            break
 
-    return {**lead, 'query': q, 'results': len(res),
+    blob = ' '.join((s.get('title', '') + ' ' + (s.get('snippet') or '')) for s in res)
+    fb = _fold(blob)
+    content = [t for t in terms if len(t) > 4 and _fold(t) in fb]
+    year_ok = (not lead['year']) or (lead['year'] in blob)
+    # Recorded for diagnosis only: a page that merely repeats the title is not
+    # confirmation, so `substantive` never decides the status on its own.
+    substantive = any(_AGENCY_VERB.search(s.get('snippet') or '')
+                      or _STAKES.search(s.get('snippet') or '') for s in res)
+
+    return {**lead, 'query': q, 'queries_asked': asked, 'principal': principal,
+            'results': len(res),
             'matched_terms': content[:6], 'year_confirmed': year_ok,
             'substantive': substantive,
-            'status': 'CONFIRMED' if ok else 'UNVERIFIED',
+            'status': 'CONFIRMED' if carrier else 'UNVERIFIED',
             'citations': [s.get('domain', '') for s in res
                           if _carries(s.get('snippet'))][:3],
             'evidence': carrier}

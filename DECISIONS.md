@@ -17689,3 +17689,49 @@ but it will silence true material.
 **To finish this:** Michael adds `GEMINI_API_KEY` to `.env` and the second provider engages
 with no code change. Until then the strongest available signal — two models independently
 proposing the same dated event — cannot be measured.
+
+## D441 — the two known verifier defects are closed; both were the instrument, not the subject
+
+**2026-08-14, resuming the D439/D440 punch list.** Items 3 and 4 of the gym brief's
+resume sequence. Neither touches `generate_tour_text.py`'s story path, so neither
+crosses Michael's "I am driving the story pipeline" reservation.
+
+**#3 — collaborator queries (`story_leads.verify`).** `verify()` appended the quoted
+work title to EVERY query, so the true claim "Mourlot was founded in 1852 on rue de
+Chabrol" was searched as `Joan Miró "Le Lézard aux plumes d'or" 1852 Mourlot founded…`
+— a query about a book the printing house predates by a century — and came back
+UNVERIFIED. Now `_principal()` pulls the named third party out of the claim, and when
+one exists the entity-anchored query is asked FIRST, work-anchored second and only if
+the first finds no carrier sentence. Common case still costs one search.
+
+Re-tested on three claims whose answers were already known:
+
+```
+CONFIRMED   1852  Mourlot founded on rue de Chabrol   was a FALSE NEGATIVE, now fixed
+                  carrier: "Mourlot Studios was a commercial print shop founded in
+                  1852 by the Mourlot family and located in Paris, France."
+                  1 query — the principal-first ordering paid for itself
+CONFIRMED   1967  Miró decided to destroy the lithographs      unchanged, still right
+UNVERIFIED  1993  retrospective at the MFA                     unchanged, still right
+```
+
+**#4 — title-fragment filter (`story_pipeline`).** It compared surfaces against
+`canonical_title` by SUBSTRING, so it caught "Le Lézard" and missed everything else.
+Measured against the old code: of four real fragments it caught 1 of 4 — "The Lizard",
+"Golden Feathers" and "At Le Lézard" all survived, which is how they filled 7 of stop
+1's top 10 handles and pushed Louis Broder to 10th. Now token containment against
+canonical AND english title. 7 fragments caught, 7 real people kept, 0 failures.
+
+**The filter was extracted to a module-level `title_fragment_test()` so it could be
+tested at all** — it was a closure inside a network-calling function, i.e. untestable
+except by spending money. Standing check #1 was run properly: the same test against the
+old logic goes red on 3 of 4 cases, so it is a test that can fail.
+
+**Regression: 50 pass / 11 fail, and all 11 fail IDENTICALLY on the pre-change tree**
+(verified by stashing both files and re-running the 11). Pre-existing, unrelated, none
+of them imports either changed module.
+
+**Still blocked, and it is Michael's call:** Gemini returns 429 "prepayment credits are
+depleted" on every current model, so cross-model agreement — the strongest available
+signal — still cannot be measured. Options A (add ~$5-10 prepay) and B (Vertex AI on
+existing GCloud credits) are written up in `AUTONOMY_20260813_gym.md`.
