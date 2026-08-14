@@ -142,15 +142,24 @@ def search_the_question(matrix, question, drop_unverified=False):
     return rec, raw, kept, res.get('estimated_cost', 0) or 0
 
 
-def run_stop(stop_text, tour_context, tour_type, live=True, credit_line=''):
+def run_stop(stop_text, tour_context, tour_type, live=True, credit_line='',
+             subject_is_credit_line=False, tag=''):
     """Run one stop end to end.
 
     `credit_line` overrides the story keyword the matrix derived. Michael's
     proposal, 2026-08-14: a keyword need not be one word or one name. The most
     STOP-SPECIFIC clause of a sentence — "The convergence of narrative and imagery
     in this exhibit" — is a better seed than the most general one ("unexpected ways
-    elsewhere"), and better than a bare common noun ("book"). This parameter is how
-    that gets measured rather than argued.
+    elsewhere"), and better than a bare common noun ("book").
+
+    `subject_is_credit_line` makes the story be ABOUT the keyword. Without it the
+    keyword only shapes RETRIEVAL and the writer's subject still comes from the
+    handle ladder — which is why the first run of this experiment returned a story
+    about Salvador Dalí and did not test the proposal at all.
+
+    `tag` distinguishes the corpus file between runs of the same stop. Without it
+    both arms of an A/B write to a path keyed on the stop title alone and the
+    second silently overwrites the first one's evidence.
     """
     m = build_matrix(stop_text, tour_type=tour_type, tour_context=tour_context)
     if credit_line:
@@ -179,8 +188,11 @@ def run_stop(stop_text, tour_context, tour_type, live=True, credit_line=''):
     out['retrieved'], out['kept'] = len(raw), len(kept)
     out['domains'] = [s.get('domain', '') for s in kept]
 
-    corpus_path = os.path.join(HERE, 'story_lab_state',
-                               f"pipe_{re.sub(r'[^a-z0-9]+', '_', slot(m, 'canonical_title').lower())[:40]}.txt")
+    corpus_path = os.path.join(
+        HERE, 'story_lab_state',
+        f"pipe_{re.sub(r'[^a-z0-9]+', '_', slot(m, 'canonical_title').lower())[:40]}"
+        f"{('_' + re.sub(r'[^a-z0-9]+', '_', tag.lower())[:24]) if tag else ''}.txt")
+    out['corpus_path'] = corpus_path
     with open(corpus_path, 'w', encoding='utf-8') as fh:
         fh.write('\n'.join((s.get('title', '') + '. ' + (s.get('snippet') or '')) for s in kept))
     corpus = load_corpus([corpus_path], {})
@@ -279,7 +291,7 @@ def run_stop(stop_text, tour_context, tour_type, live=True, credit_line=''):
         out['status'] = 'SILENCE'
         return out
 
-    subject = sourceable[0]
+    subject = slot(m, 'credit_line') if subject_is_credit_line else sourceable[0]
     res = story_writer.write_story(rec, corpus, subject, attempts=2)
     out['subject'] = subject
     out['writer_status'] = res['status']
@@ -304,6 +316,12 @@ def main():
     p.add_argument('--tour-type', default='museum')
     p.add_argument('--live', action='store_true')
     p.add_argument('--out', default='')
+    p.add_argument('--subject-is-credit-line', action='store_true',
+                   help='Write the story ABOUT the credit_line, not about the '
+                        'top handle from the ladder.')
+    p.add_argument('--tag', default='',
+                   help='Distinguish this run\'s corpus file from another run of '
+                        'the same stop.')
     p.add_argument('--credit-line', default='',
                    help='Override the derived story keyword. A phrase is allowed '
                         'and is the point — see run_stop().')
@@ -318,7 +336,9 @@ def main():
             continue
         print(f"\n{'=' * 78}\nSTOP {n}\n{'=' * 78}")
         r = run_stop(sel[0], full, a.tour_type, a.live,
-                     credit_line=a.credit_line)
+                     credit_line=a.credit_line,
+                     subject_is_credit_line=a.subject_is_credit_line,
+                     tag=a.tag)
         r['stop'] = n
         r['title'] = slot(r['matrix'], 'canonical_title')
         rows.append(r)
