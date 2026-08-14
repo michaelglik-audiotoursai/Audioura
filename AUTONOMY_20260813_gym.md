@@ -76,3 +76,62 @@ stops retrieve CATALOGUE — accession number, medium, dimensions, nobody doing 
 Everything above is on disk. `bash restart.sh`, read this file and the D42x-D43x block of
 `DECISIONS.md`, then continue at step 1. The three task files are in flight; check
 `kiro_sessions_ran.md` for their terminal records before re-dispatching anything.
+
+
+---
+
+# PAUSED 2026-08-14 00:3x — Michael asleep
+
+**Break exception in force (CLAUDE.md).** Nothing is armed: no ScheduleWakeup, no
+CronCreate, no dispatcher, no kiro workers, dispatcher queue empty, `.continuous_dev/PAUSE`
+set. Nothing on this machine can spend money until someone types.
+
+**Total spend for the whole session: ~$0.45 of the $10 ceiling.**
+
+## THE ONE THING MICHAEL DOES TOMORROW
+
+Get a free Gemini key at **aistudio.google.com** → Get API key → create → copy.
+Add one line to `~/Audioura/.env`:
+
+```
+GEMINI_API_KEY=AIza...
+```
+
+Verify without exposing it: `grep -c '^GEMINI_API_KEY=' ~/Audioura/.env` → expect `1`.
+
+His GCloud credits do NOT work on AI Studio keys (Google split the billing on 2026-03-02);
+they work on Vertex AI, same models, different door. Free tier covers this experiment at
+zero cost — do not do the GCP setup to answer a question the free tier answers.
+
+## RESUME SEQUENCE
+
+`/clear`, then `restart`, then read this file and the D42x-D44x block of `DECISIONS.md`.
+
+Then, in order:
+
+1. **Re-run stop 1 with both providers** — no code change needed, `story_leads.py` uses
+   every provider it has a key for:
+   `python3 story_leads.py --subject "Joan Miró" --work "Le Lézard aux plumes d'or" --venue "Museum of Fine Arts, Boston"`
+   The measurement that matters: does Gemini propose the 1967 destruction that GPT-4o
+   missed, and do the two agree on anything?
+2. **Fix the collaborator-query defect (D440).** `verify()` appends the work title to every
+   query, so "Mourlot founded 1852" was marked UNVERIFIED against a query about a book it
+   has nothing to do with. TRUE claim, false negative. Claims about a collaborator need a
+   query built around the collaborator.
+3. **Fix the title-fragment filter (D439).** It compares against `canonical_title` only, so
+   "At Le Lézard" and the ENGLISH gloss fragments ("The Lizard", "Golden Feathers") survive
+   and burn every credit_line substitution. Louis Broder is never reached.
+4. **Then re-run the nine** with `story_pipeline.py` and record the table in `DECISIONS.md`.
+
+## STATE AT PAUSE
+
+- `storied` @ HEAD, ~30 commits unpushed (field-test gate, unchanged).
+- Merged today: LOCAL-458 (role-claim gate), 459 (ranker), 461 (matrix), 462/463/464
+  (request+structure, validate, evaluate). 61 tests green.
+- 3 of 9 stops produce validated stories: Moses and Monotheism (65), Au Soleil du Plafond
+  (77), Louisburg Square (55).
+- Michael's open decision, NOT answered: is a story about the CATEGORY acceptable when it
+  lands on the object? Evidence is in `STORY_ROUTINES_WALKTHROUGH.md`. **He may not need to
+  answer it** — D438 suggests the four "category" stops are really retrieval failures.
+- Standing: 6 instrument failures today, every one of them LEAD's own measuring tool rather
+  than the subject. Check the instrument first.
