@@ -17862,3 +17862,57 @@ stop, reproduced offline from the saved corpus — no search re-run, so it costs
 and describes the exact run on disk. `STORY_TRACE_stop2_phrase_subject.txt` is the
 first output. This should be the default way to answer "what happened", instead of
 reading scores.
+
+## D445 — Michael's own chain, traced end to end: four defects, and the query never asks for a story
+
+**2026-08-14. Michael asked, twice, to see all four of HIS routines' outputs — matrix,
+the query built from it, the AI's answer, validation, and the >5-sentences summarise
+step.** `story_pipeline.py` is not that chain; it interrogates the internet and makes
+the writer work from retrieved passages. His chain sends the query to the AI and the
+AI's answer IS the story. Built `michaels_chain.py` to run exactly his order and print
+every stage. Full trace: `MICHAELS_CHAIN_stop2_phrase.txt`.
+
+**1. Routine 4 ran although Routine 3 said REJECTED.** His rule is "if VALID *and*
+more than 5 sentences, summarise into 3". `structure_ai_output` never receives the
+validation verdict — there is no valid/invalid branch in the chain at all. It
+summarised a rejected answer and returned `status=OK`.
+
+**2. The sentence counter was wrong, and it drives every rule he wrote.** Routine 4
+reported 2 sentences for a summary that is plainly 3. `split_sentences` could not split
+after a sentence ending in a quotation mark, because the character before the space is
+`"` and the lookbehind demanded `[.!?]`:
+
+```
+Freud's "Moses and Monotheism." He did it in 1974.   -> counted as ONE
+```
+
+Museum stops are full of quoted titles. This feeds the >5 rule, the <3 rule,
+`shape_check`'s "exactly 3 or 4 sentences", and `evaluate_story`'s sentence score.
+**Fixed**; 50/61 regression unchanged, same 11 pre-existing failures verified against
+baseline. Under his own rule the 2-count should have triggered a credit_line
+substitution and did not. Abbreviations ("Mr. Smith went to Washington.") still split
+wrongly — pre-existing, confirmed present in the old regex too, not fixed.
+
+**3. Validation is circular in this chain.** With no retrieval there is no independent
+corpus, so the answer is checked against the stop text the query was built FROM. The
+single sentence flagged `UNSUPPORTED_ENTITY` — Leonard and Virginia Woolf founding The
+Hogarth Press — is the only genuinely new fact in the answer, and it is true. As wired,
+the validator penalises the one thing worth having and passes ten sentences that
+restate the stop back to itself.
+
+**4. The query never asks for a story.** `Request_to_AI` produces:
+
+> "What story **can be told** to visitors of Picasso, Miro, Dali: Unbound + Museum of
+> Fine Arts, Boston : regarding Moses and Monotheism about The convergence of narrative
+> and imagery in this exhibit in connection with Salvador Dalí and The Hogarth Press?"
+
+That is a question about what is POSSIBLE, and GPT-4o answered it correctly — eleven
+sentences describing what a story could be built from. **It was never asked to tell
+one.** This is the most likely single cause of "I do not see this as a story at all",
+and it is upstream of every other defect: no gate, keyword or corpus can rescue an
+answer to the wrong question.
+
+**Related and still true:** `story_writer`'s SYSTEM prompt DOES demand a story
+("someone does something, something is at stake, the last sentence names a physical
+property"). That prompt is used by `story_pipeline`, not by this chain. The two chains
+ask for different things, and only one of them asks for a story.

@@ -124,7 +124,21 @@ def _fold(t: str) -> str:
 
 
 def split_sentences(text: str) -> List[str]:
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z"“\'])', text.strip())
+    # The closing quote must be allowed AFTER the terminator. Museum stops are full
+    # of quoted titles, and `Freud's "Moses and Monotheism." He did it in 1974.`
+    # counted as ONE sentence because the character before the space is `"`, not `.`.
+    #
+    # That miscount is not cosmetic — this function feeds Michael's ">5 summarize"
+    # and "<3 substitute" rules, `shape_check`'s "exactly 3 or 4 sentences", and
+    # `evaluate_story`'s sentence_score. Measured 2026-08-14: a summary that is
+    # plainly three sentences was counted as two and returned as OK, when two should
+    # have triggered a credit_line substitution.
+    #
+    # Two lookbehinds rather than one optional group: Python requires each to be
+    # fixed-width, and this keeps the closing quote attached to its own sentence
+    # (re.split would otherwise consume it).
+    parts = re.split(r'(?:(?<=[.!?])|(?<=[.!?]["”’\'»]))\s+(?=[A-Z"“‘\'«])',
+                     text.strip())
     return [p.strip() for p in parts if p.strip()]
 
 
