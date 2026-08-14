@@ -17453,3 +17453,81 @@ return `{}` → **20 failed, 1 passed**. Restored → 21 passed. Regressions all
 the museum name is available in the tour context; and Fruitlands stop 3's
 `canonical_title` carries a stray quote from the tour's own heading. Neither changes a
 status.
+
+## D437 — the chain runs end to end; 3 of 9 stops now produce VALIDATED stories
+
+**2026-08-13 evening, autonomous run while Michael was at the gym. $10 ceiling; ~$0.33
+spent.** LOCAL-462/463/464 verified and merged (each suite neutralised by LEAD personally:
+462 → 12/16 fail, 463 → 3/4 fail, 464 → 4/4 fail; no fixture touched by any of the three,
+the first clean run since D432). 61 tests green across the whole story stack.
+
+**`Validate_Story` works on the case it was built for**, unprompted:
+
+```
+D434 story  sentence 1 GROUNDED · 2 UNSUPPORTED_RELATION · 3 UNSUPPORTED_RELATION · 4 GROUNDED
+Original    "Commissioned by The Hogarth Press…"  UNSUPPORTED_ENTITY
+```
+
+**`Evaluate_Story` does not normalise**, as required: sums of 138, 41 and 24 across three
+test stories. Never 100.
+
+**Run 1 of the chain was wired wrong and had to be.** `Request_to_AI`'s question went to a
+bare LLM and the answer was validated against our corpus — REJECTED, necessarily, because
+the answer came from model memory which has no overlap with the corpus by construction. It
+also asserted "The Hogarth Press" as fact: the term entered as a CLAIMED value in the
+question and came back as a finding. **That is D427 closing a loop on itself** — an
+invention we shipped, fed back as a query, returned as confirmation. `story_pipeline.py`
+routes the question through SEARCH instead. The model's recall is never evidence.
+
+**Four wrong turns, all measured rather than reasoned:**
+
+1. **Dropping CLAIMED terms from the search took MFA from 2/3 to 0/3.** `artist = Salvador
+   Dalí` is CLAIMED and is also the most productive query term we have. An unverified term
+   BELONGS in the search — searching is how you verify it. What is forbidden is treating
+   the result as confirmation, which is `validate_story`'s job downstream.
+2. **A name collision on `credit_line` cost two full runs.** In Michael's matrix it is the
+   STORY KEYWORD ("Sigmund Freud"); in `work_story_searcher` it is the museum credit line
+   ("Gift of Boris Fridman"), regex-mined for a donor. The keyword generated no queries at
+   all. It maps to `collaborator`, which drives exactly the "{collaborator} {artist}
+   relationship why collaborated" query that found the Dalí-Freud meeting.
+3. **`targets[:8]` took the eight WEAKEST handles.** The list is sorted ascending, so the
+   pipeline asked about `Address`, `Huntington Ave` and `books` while Salvador Dalí and
+   Sigmund Freud sat at positions 13 and 14 — **both SOURCEABLE with 11 passages each.**
+   Three consecutive runs reported SILENCE because the pipeline never asked. Fourth time
+   today the instrument produced the alarming reading.
+4. **`_AGENCY_VERB` had no verbs of building or civic life.** Tuned on museum material —
+   refused, printed, donated — it scored every building in Boston as having no agency.
+   Louisburg Square was PARTIAL missing 'action' against a corpus reading "designed by
+   Charles Bulfinch and completed in 1798".
+
+**Two improvements that each moved the number:**
+
+- **Anti-causation rule in the writer.** Stop 3 was REJECTED for "leading to the creation
+  of" — the D434 pattern, caught automatically. Forbidding unsupported causal connectives
+  flipped it REJECTED → STORY.
+- **Second-pass search** when nothing is sourceable: drop the principal, ask about the
+  subject itself. On Beacon Hill `artist` resolves to Charles Bulfinch and his biography
+  crowded out the square's own story.
+
+**The nine, after:**
+
+```
+Le Lézard aux plumes d'or    SILENCE
+Moses and Monotheism         STORY     val 65   H54 D14 S57
+Au Soleil du Plafond         STORY     val 77   H35 D15 S65
+Hudson River from Fort P.    SILENCE
+The Brothers (1883)          SILENCE
+The Print Room               SILENCE
+Massachusetts State House    SILENCE
+Cheers Beacon Hill           SILENCE
+Louisburg Square             STORY     val 55   H12 D0  S0
+```
+
+**3 of 9 — the same count as D433's "sourceable", but these are validated stories, not
+potential.** D433 had 0 validated. The six SILENCE stops still fail for the D433 reason:
+they retrieve catalogue, and `consequence` is what is missing.
+
+**Honest defect, not hidden:** Louisburg Square's story opens "stands as a testament to its
+storied past" — and `stands as` IS in the writer's banned-phrase list, so the ban did not
+fire. Its scores (H12 D0 S0) are near-zero against a valuation index of 55, so the index
+and the type scores disagree. Both are unfixed and both are the next thing to look at.

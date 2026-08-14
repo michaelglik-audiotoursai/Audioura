@@ -85,7 +85,14 @@ _AGENCY_VERB = re.compile(
     r'\b(chose|refused|insisted|fought|persuaded|paid|bought|sold|gave|donated|'
     r'destroyed|burned|hid|smuggled|fled|died|survived|founded|abandoned|'
     r'commissioned|rejected|demanded|begged|waited|returned|met|quarrelled|'
-    r'quarreled|broke|swore|promised|betrayed|saved|rescued|inherited)\b',
+    r'quarreled|broke|swore|promised|betrayed|saved|rescued|inherited|'
+    # Walking tours and civic places. The list above was tuned on museum material
+    # — refused, printed, donated — and scored every building in Boston as having
+    # no agency. Louisburg Square came back PARTIAL missing 'action' against a
+    # corpus that said "designed by Charles Bulfinch and completed in 1798".
+    r'designed|built|constructed|completed|erected|rebuilt|demolished|'
+    r'named|renamed|laid|opened|closed|settled|occupied|marched|voted|'
+    r'petitioned|sheltered|hid|escaped|elected|appointed|resigned)\b',
     re.IGNORECASE)
 
 # Consequence / stakes markers — the difference between a fact and a story.

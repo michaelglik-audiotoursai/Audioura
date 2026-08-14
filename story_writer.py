@@ -73,6 +73,11 @@ year it was made, what it was printed on. Not its significance. Not what it \
 "represents" or "embodies" or "reflects". A visitor can see the object; tell them \
 something true about the one they are looking at.
 - Use at least one specific number, age or date from the source.
+- **Never assert that one thing CAUSED or LED TO another unless the source says so.**
+Do not write "culminating in", "leading to", "which inspired", "as a result", \
+"paving the way", "this influenced". Two facts sitting near each other in the source \
+are not a causal chain. State what happened; let the listener draw the line. This is \
+the single most common reason a story is thrown away.
 - No "imagine", no "picture this", no second person, no rhetorical questions.
 - Never write the words "the object in the case", "this exhibit", "this exhibition", \
 "ongoing dialogue", "serves as a reminder", or "the transformative power of". Those \
