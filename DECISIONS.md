@@ -17531,3 +17531,59 @@ they retrieve catalogue, and `consequence` is what is missing.
 storied past" — and `stands as` IS in the writer's banned-phrase list, so the ban did not
 fire. Its scores (H12 D0 S0) are near-zero against a valuation index of 55, so the index
 and the type scores disagree. Both are unfixed and both are the next thing to look at.
+
+## D438 — Meta.AI was right, our retrieval was wrong, and the fix is not to loosen the gates
+
+**2026-08-13.** Michael put the same question to Meta.AI and Google that our pipeline asks,
+and both returned far richer answers than our SILENCE. He asked: "Could it be that we are
+dealing with a very poor AI?"
+
+**No — and LEAD tested it rather than arguing.** The load-bearing claims are checkable, so
+LEAD checked them with three direct Serper queries (~$0.003):
+
+```
+A  "In 1967 Miró executed a series of lithographs to illustrate his poem 'Le lézard
+    aux plumes d'or'. For technical reasons, Miró decided to destroy the lithographs…"
+    -> VERIFIED, two independent sources, ONE query.       Meta.AI was RIGHT.
+B  Mourlot, rue Chabrol, 1852                              -> VERIFIED.
+C  Google's "wrote the text by hand directly onto the lithographic stones"
+    -> NOT FOUND.
+```
+
+**Meta and Google contradict each other** on why the book appeared in 1971: Meta says a
+destroyed edition; Google says four years of patient technical experimentation. The sources
+support Meta. Google also offers "the darker, tragic mood holding sway over Miró's psyche"
+— unfalsifiable by construction, and exactly what the gates exist to remove.
+
+**So the diagnosis is not model quality. It is that our writer is deliberately blindfolded
+and we handed it the wrong corpus.** Same class of model on both sides. Meta and Google
+answer from full parametric memory; `story_writer` may use *only* the retrieved corpus, and
+for stop 1 that corpus was five SERP teasers of accession records — "color etching and
+aquatint on wove paper mounted to cardboard · Accession ID 2010.73.1".
+
+**The 1967 destruction is findable in a single query and our pipeline never asked.** That is
+a retrieval failure, not an intelligence failure. Note also that Michael himself cited "the
+1967 destroyed edition" as his worked example of a good story days ago — the fact was known
+to him, present on the internet, and absent from every corpus we built.
+
+**Meta's answer would have been REJECTED by our validator** — correctly, since our corpus
+did not contain it. Garbage corpus in, silence out. The validator is not the problem and
+loosening it would reintroduce D427.
+
+**The synthesis, and it is the design to build:** use the LLM as a **lead generator**, then
+verify claim by claim.
+
+1. Ask the model what story exists (it knows the 1967 destruction).
+2. Decompose the answer into atomic claims.
+3. Search each claim independently — one query each, as demonstrated above.
+4. Keep what verifies, drop what does not. Google's handwriting claim drops; Meta's 1967
+   destruction survives with two citations.
+
+That gets Meta's depth under our discipline, and it inverts the current order: today we
+retrieve then write; this retrieves what the model tells us to look for. The model becomes
+a hypothesis generator whose output is evidence for nothing until checked — which is
+precisely the distinction D435 drew between CLAIMED and GROUNDED.
+
+**Incidental, and worth knowing:** `_serp_search` returns `(results, latency_ms)`, not
+`(results, cost)`. LEAD's probe printed latency with a dollar sign and briefly read 1080ms
+as $1080. The instrument again — fifth time today.
