@@ -1,0 +1,320 @@
+==============================================================================
+TRACE — stop 2: Moses and Monotheism
+credit_line : 'The convergence of narrative and imagery in this exhibit'
+subject     : 'The convergence of narrative and imagery in this exhibit'
+==============================================================================
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 1 — interrogation_matrix — WHAT TO ASK ABOUT
+══════════════════════════════════════════════════════════════════════════════
+
+─── INPUT: the stop text as delivered to the listener ────────────────────────
+  Stop 2: Moses and Monotheism
+
+  Address: 465 Huntington Ave, Boston, MA 02115
+
+  Coordinates: 42.3384, -71.0879
+
+  Orientation: Stand before the display of "Moses and Monotheism," where
+  Dalí’s illustrations illuminate Freud’s text. From this vantage point, the
+  interplay of image and typography becomes clear, revealing how Dalí visually
+  interpreted Freud's psychoanalytic revelations.
+
+  In 1974, Salvador Dalí embarked on a collaborative journey by illustrating
+  Sigmund Freud's seminal work, "Moses and Monotheism." Dalí chose this text
+  because he considered Freud’s exploration of the origins of monotheism as
+  rich terrain for his surrealist imagination. Commissioned by The Hogarth
+  Press, this collaboration was published to merge Freud's profound theories
+  with Dalí’s vivid surrealism. The result was a series of illustrations that
+  transformed complex psychoanalytic discourse into visual art. The exhibition
+  at the Torf Gallery, where these rare works are displayed, highlights the
+  synergy between text and image, a central theme in the curated selection at
+  the Museum. Freud, known as the father of psychoanalysis, wrote "Moses and
+  Monotheism" later in his career, proposing that Moses was Egyptian, not
+  Hebrew, and suggesting that Moses introduced monotheistic beliefs to the
+  Israelites. Dalí’s illustrations not only capture Freud’s innovative ideas
+  but also offer a surrealist interpretation of history’s psychological
+  undercurrents. This exhibit showcases how artists like Dalí, in
+  collaboration with publishers such as The Hogarth Press, transformed books
+  into art forms through deeply integrated visual and textual partnerships.
+  This approach, often found in archives, demonstrates the transformative
+  power of book art. The convergence of narrative and imagery in this exhibit
+  prompts reflection on how journeys from obscurity to enlightenment could be
+  depicted in unexpected ways elsewhere.
+
+
+  Directions: Your final stop in Museum of Fine Arts, Boston: Au Soleil du
+  Plafond.
+
+─── OUTPUT: the matrix ───────────────────────────────────────────────────────
+  canonical_title    Moses and Monotheism                                   STRUCTURAL
+  english_title      Moses and Monotheism                                   STRUCTURAL
+  artist             Salvador Dalí                                          CLAIMED
+  publisher          The Hogarth Press                                      CLAIMED
+  printed_by                                                                ABSENT
+  medium             Picasso, Miro, Dali: Unbound                           STRUCTURAL
+  venue              Museum of Fine Arts, Boston                            STRUCTURAL
+  credit_line        The convergence of narrative and imagery in this exh   DERIVED
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 2 — Request_to_AI — THE QUESTION
+══════════════════════════════════════════════════════════════════════════════
+
+─── OUTPUT: the question put to the internet ─────────────────────────────────
+  What story can be told to visitors of Picasso, Miro, Dali: Unbound + Museum
+  of Fine Arts, Boston : regarding Moses and Monotheism about The convergence
+  of narrative and imagery in this exhibit in connection with Salvador Dalí
+  and The Hogarth Press?
+
+─── terms in that question that NOTHING has verified ─────────────────────────
+  Salvador Dalí, The Hogarth Press
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 3 — SEARCH + rank — INTERROGATE THE INTERNET
+══════════════════════════════════════════════════════════════════════════════
+
+─── the queries actually issued (regenerated deterministically) ──────────────
+  · "Moses and Monotheism" Salvador Dalí story visitors Picasso, Miro, Dali: Unbound
+  · "Moses and Monotheism" Salvador Dalí
+  · "Moses and Monotheism" history
+  · The Hogarth Press Salvador Dalí
+  · The convergence of narrative and imagery in this exhibit Salvador Dalí
+  · The convergence of narrative and imagery in this exhibit Salvador Dalí relationship why collaborated
+  · Salvador Dalí "Moses and Monotheism" why created motivation
+  · Museum of Fine Arts, Boston Salvador Dalí donation history
+
+  retrieved 47 results -> ranker kept 5
+  sources kept: academia.edu, artnet.com, academia.edu, thedali.org, en.wikipedia.org
+
+─── OUTPUT: the corpus — THE ONLY FACTS THE WRITER MAY USE ───────────────────
+  (/Users/micha/Audioura/story_lab_state/pipe_moses_and_monotheism_phrase_subject.txt)
+
+    (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ....
+    Miró, Arp, Ernst and Picasso had been useful models while Dalí's ... Moses
+    and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
+    Moses and Monotheism by Salvador Dalí on artnet. View Moses and Monotheism
+    by Salvador Dalí on artnet. Browse upcoming and past auction lots by
+    Salvador Dalí.
+    Art as therapy: Salvador Dalí in the light of psychoanalysis (Book
+    chapter). Salvador Dalí (1904-1986) is discussed, in his life, writings
+    and art, in the light of psychoanalysis, especially the work of Winnicott,
+    Freud and Lacan.
+    'Dalí: Disruption + Devotion,' a New Exhibition at The ... - Dali Museum.
+    Rather than rejecting tradition, the exhibition argues that Dalí
+    continuously returned to it, reworking classical compositions, religious
+    ...
+    Moses and Monotheism - Wikipedia. Moses and Monotheism is a 1939 book
+    about the origins of monotheism written by Sigmund Freud, the founder of
+    psychoanalysis. It is Freud's final original ...
+    (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ....
+    Miró, Arp, Ernst and Picasso had been useful models while Dalí's ... Moses
+    and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
+    Erich Fromm's silence on Freud's Moses - Taylor & Francis. Freud began
+    writing Moses and Monotheism in 1934, at the age of 78. The first two
+    parts, 'Moses an Egyptian' and 'If Moses was an Egyptian ...
+    Joan Miró Exhibitions: Current, Upcoming & Past Shows - Mutual Art.
+    Picasso, Miró, Dali: Unbound ... Some artists interpreted foundational
+    texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and
+    Monotheism ...
+    Picasso, Miró, Dali: Unbound | Exhibitions. Some artists interpreted
+    foundational texts, as Dalí did in his 1974 illustrations for Sigmund
+    Freud's Moses and Monotheism; others partnered with writers to ...
+    Museum of Fine Arts, Boston. In 2018, the museum received the largest and
+    most significant gift of Chinese paintings and calligraphy in its history:
+    the Wan-go H. C.
+    Salvador Dalí. The artist, author, critic, impresario, and provocateur
+    Salvador Dalí burst onto the art scene in 1929 and rarely left the public
+    eye until his death six ...
+    Dalí's Religious Models: the Iconography of Martyrdom and .... Miró, Arp,
+    Ernst and Picasso had been useful models while Dalí's ... Moses and
+    Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
+    Moses and Monotheism by Salvador Dalí on artnet. View Moses and Monotheism
+    by Salvador Dalí on artnet. Browse upcoming and past auction lots by
+    Salvador Dalí.
+    Art as therapy: Salvador Dalí in the light of psychoanalysis .... Salvador
+    Dalí (1904-1986) is discussed, in his life, writings and art, in the light
+    of psychoanalysis, especially the work of Winnicott, Freud and Lacan.
+    Salvador Dalí. Salvador Dalí. Spanish, 1904 - 1989. Salvador Dalí was one
+    of the most prolific and talented surrealist artists of the 20th century.
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 3b — story_opportunity_scan + material check — WHO IS THERE TO WRITE ABOUT
+══════════════════════════════════════════════════════════════════════════════
+  needs additional story: True — the longest run (4 sentences, Salvador Dalí) has agency=2 stakes=0 — someone is described, but nothing is risked, refused or lost. That is exposition, not a story.
+
+─── the ladder the subject is normally taken from ────────────────────────────
+  · Salvador Dalí
+  · Sigmund Freud
+  · The Hogarth Press
+  · Torf Gallery
+  · illustrations
+  · book
+  · collaboration
+  · books
+  · archives
+  · exhibition
+
+─── material check against the corpus ────────────────────────────────────────
+  Salvador Dalí                              SOURCEABLE
+  Sigmund Freud                              PARTIAL
+  The Hogarth Press                          NO MATERIAL
+  Torf Gallery                               NO MATERIAL
+  illustrations                              PARTIAL
+  book                                       PARTIAL
+  collaboration                              NO MATERIAL
+  books                                      NO MATERIAL
+
+  SOURCEABLE: ['Salvador Dalí']
+  subject the writer was given: 'The convergence of narrative and imagery in this exhibit'
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 4 — story_writer — WRITE FROM THE CORPUS AND NOTHING ELSE
+══════════════════════════════════════════════════════════════════════════════
+
+─── passages_about('The convergence of narrative and imagery in this exhibit') — what the writer was actually shown 
+  NONE MATCHED — so the writer fell back to the WHOLE corpus.
+  The subject narrowed nothing.
+
+─── the exact prompt sent to the model ───────────────────────────────────────
+  [SYSTEM]
+    You write one short story for a museum audio tour. A visitor is standing
+    in front of the object right now, with headphones on.
+
+    ABSOLUTE RULE: every fact you state must appear in the SOURCE MATERIAL
+    below. You know a great deal about art history. None of it may be used
+    here. If the source does not say it, it does not go in the story — no
+    dates, no names, no places, no motives, no publishers. This is not a style
+    preference; a story containing one unsourced fact is thrown away entirely.
+
+    THE SHAPE:
+    - Exactly 3 or 4 sentences.
+    - Someone does something. Something is at stake, refused, lost, risked or
+    final.
+    - The LAST sentence must name a PHYSICAL PROPERTY of the thing in front of
+    the listener that appears in the source — what it is made of, how many
+    there are, what year it was made, what it was printed on. Not its
+    significance. Not what it "represents" or "embodies" or "reflects". A
+    visitor can see the object; tell them something true about the one they
+    are looking at.
+    - Use at least one specific number, age or date from the source.
+    - **Never assert that one thing CAUSED or LED TO another unless the source
+    says so.**
+    Do not write "culminating in", "leading to", "which inspired", "as a
+    result", "paving the way", "this influenced". Two facts sitting near each
+    other in the source are not a causal chain. State what happened; let the
+    listener draw the line. This is the single most common reason a story is
+    thrown away.
+    - No "imagine", no "picture this", no second person, no rhetorical
+    questions.
+    - Never write the words "the object in the case", "this exhibit", "this
+    exhibition", "ongoing dialogue", "serves as a reminder", or "the
+    transformative power of". Those are the phrases that survive when a writer
+    has nothing to say.
+
+    If the source material cannot support three sentences of this shape, reply
+    with exactly: INSUFFICIENT
+
+
+  [USER]
+    OBJECT IN THE CASE: Moses and Monotheism
+    VENUE: Museum of Fine Arts, Boston
+    SUBJECT OF THE STORY: The convergence of narrative and imagery in this
+    exhibit
+
+    SOURCE MATERIAL (the only facts you may use):
+    -----------------------------------------
+    (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ....
+    Miró, Arp, Ernst and Picasso had been useful models while Dalí's ... Moses
+    and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
+    Moses and Monotheism by Salvador Dalí on artnet. View Moses and Monotheism
+    by Salvador Dalí on artnet. Browse upcoming and past auction lots by
+    Salvador Dalí.
+    Art as therapy: Salvador Dalí in the light of psychoanalysis (Book
+    chapter). Salvador Dalí (1904-1986) is discussed, in his life, writings
+    and art, in the light of psychoanalysis, especially the work of Winnicott,
+    Freud and Lacan.
+    'Dalí: Disruption + Devotion,' a New Exhibition at The ... - Dali Museum.
+    Rather than rejecting tradition, the exhibition argues that Dalí
+    continuously returned to it, reworking classical compositions, religious
+    ...
+    Moses and Monotheism - Wikipedia. Moses and Monotheism is a 1939 book
+    about the origins of monotheism written by Sigmund Freud, the founder of
+    psychoanalysis. It is Freud's final original ...
+    (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ....
+    Miró, Arp, Ernst and Picasso had been useful models while Dalí's ... Moses
+    and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
+    Erich Fromm's silence on Freud's Moses - Taylor & Francis. Freud began
+    writing Moses and Monotheism in 1934, at the age of 78. The first two
+    parts, 'Moses an Egyptian' and 'If Moses was an Egyptian ...
+    Joan Miró Exhibitions: Current, Upcoming & Past Shows - Mutual Art.
+    Picasso, Miró, Dali: Unbound ... Some artists interpreted foundational
+    texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and
+    Monotheism ...
+    Picasso, Miró, Dali: Unbound | Exhibitions. Some artists interpreted
+    foundational texts, as Dalí did in his 1974 illustrations for Sigmund
+    Freud's Moses and Monotheism; others partnered with writers to ...
+    Museum of Fine Arts, Boston. In 2018, the museum received the largest and
+    most significant gift of Chinese paintings and calligraphy in its history:
+    the Wan-go H. C.
+    Salvador Dalí. The artist, author, critic, impresario, and provocateur
+    Salvador Dalí burst onto the art scene in 1929 and rarely left the public
+    eye until his death six ...
+    Dalí's Religious Models: the Iconography of Martyrdom and .... Miró, Arp,
+    Ernst and Picasso had been useful models while Dalí's ... Moses and
+    Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
+    Moses and Monotheism by Salvador Dalí on artnet. View Moses and Monotheism
+    by Salvador Dalí on artnet. Browse upcoming and past auction lots by
+    Salvador Dalí.
+    Art as therapy: Salvador Dalí in the light of psychoanalysis .... Salvador
+    Dalí (1904-1986) is discussed, in his life, writings and art, in the light
+    of psychoanalysis, especially the work of Winnicott, Freud and Lacan.
+    Salvador Dalí. Salvador Dalí. Spanish, 1904 - 1989. Salvador Dalí was one
+    of the most prolific and talented surrealist artists of the 20th century.
+    -----------------------------------------
+
+    Write the story.
+
+─── OUTPUT: the story ────────────────────────────────────────────────────────
+    Salvador Dalí, a prolific surrealist artist, created illustrations for
+    Sigmund Freud's "Moses and Monotheism" in 1974, interpreting the
+    foundational text through his unique lens. Freud's book, completed in
+    1939, explores the origins of monotheism and was his final original work.
+    Dalí's engagement with the text reflects his continuous return to
+    classical compositions and religious themes. The piece you see is part of
+    a series of illustrations Dalí crafted for this 1974 project.
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 5 — Validate_Story — IS EVERY SENTENCE IN THE SOURCES
+══════════════════════════════════════════════════════════════════════════════
+  verdict: TRUE_TO_SOURCES
+
+  [GROUNDED]
+      Salvador Dalí, a prolific surrealist artist, created illustrations for
+      Sigmund Freud's "Moses and Monotheism" in 1974, interpreting the
+      foundational text through his unique lens.
+  [GROUNDED]
+      Freud's book, completed in 1939, explores the origins of monotheism and
+      was his final original work.
+  [GROUNDED]
+      Dalí's engagement with the text reflects his continuous return to
+      classical compositions and religious themes.
+  [GROUNDED]
+      The piece you see is part of a series of illustrations Dalí crafted for
+      this 1974 project.
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 6 — Evaluate_Story — WHAT KIND OF STORY IS IT
+══════════════════════════════════════════════════════════════════════════════
+  historic           24
+  detail             0
+  social             30
+  valuation_index    55
+
+─── what those numbers were counted from ─────────────────────────────────────
+  {"historic": {"years_found": ["1939", "1974"], "year_count": 2, "sequence_words": [], "state_changes": [], "year_sentences": 3, "sequence_sentences": 0, "change_sentences": 0}, "detail": {"materials": [], "dimensions": [], "processes": [], "counts": [], "physical_descriptions": [], "material_sentences": 0, "dimension_sentences": 0, "process_sentences": 0}, "social": {"people_found": ["Salvador Dalí", "Sigmund Freud"], "people_count": 2, "social_verbs": [], "relational_phrases": [], "multi_person_sentences": 1, "social_verb_sentences": 0}, "valuation": {"sentence_count": 4, "sentence_score": 30, "agency_hits": 1, "agency_score": 10, "stakes_hits": 0, "stakes_score": 0, "groundedness_bonus": 15, "grounded_fraction": 1.0}}
+
+══════════════════════════════════════════════════════════════════════════════
+ROUTINE 7 — shape_check — DID IT MEET THE SHAPE THE SYSTEM PROMPT DEMANDS
+══════════════════════════════════════════════════════════════════════════════
+  passed: False
+  {"sentences": 4, "banned_phrases": [], "concrete_in_last": [], "agency": 1, "stakes": 0, "ends_on_object": false}

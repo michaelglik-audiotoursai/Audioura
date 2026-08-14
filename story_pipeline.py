@@ -305,7 +305,25 @@ def run_stop(stop_text, tour_context, tour_type, live=True, credit_line='',
     out['bad_sentences'] = [s['text'][:90] for s in v['sentences'] if s['status'] != 'GROUNDED']
     e = evaluate_story(out['story'], m, corpus)
     out['scores'] = {k: e[k] for k in ('historic', 'detail', 'social', 'valuation_index')}
-    out['status'] = 'STORY' if v['verdict'] == 'TRUE_TO_SOURCES' else 'REJECTED'
+    # THE WRITER'S OWN VERDICT WAS BEING DISCARDED. `write_story` returns
+    # status=REJECTED when `shape_check` fails — no agency, no stakes, or a last
+    # sentence that names no physical property of the object. This line read only
+    # `validate_story`'s GROUNDING verdict, so a paragraph the writer had already
+    # thrown away was reported as STORY and scored.
+    #
+    # Measured 2026-08-14, all three arms of the credit_line experiment:
+    #     writer_status=REJECTED   pipeline_status=STORY   (x3)
+    # Michael read one of them and said "I do not see this as a story at all". The
+    # system agreed with him; the verdict was dropped one line later. Every score
+    # reported that day was computed on rejected output.
+    out['shape'] = res.get('shape', {})
+    out['shaped'] = res.get('shaped', False)
+    if v['verdict'] != 'TRUE_TO_SOURCES':
+        out['status'] = 'REJECTED_UNGROUNDED'
+    elif res['status'] != 'ACCEPTED':
+        out['status'] = 'REJECTED_SHAPE'
+    else:
+        out['status'] = 'STORY'
     return out
 
 

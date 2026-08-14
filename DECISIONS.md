@@ -17804,3 +17804,61 @@ continued exploration of complex ideas". Detail fell 6 → 0.
 CLAUSES of a sentence by stop-specificity, so the specific one is what gets developed
 and the "unexpected ways elsewhere" tail is what gets cut. That is a new routine and it
 sits upstream of subject selection, not inside the query builder.
+
+## D444 — the quality gate was disconnected: the writer rejected all three stories and the pipeline shipped them as STORY
+
+**2026-08-14. Michael read Arm C and said "I do not see this as a story at all," then
+asked for every routine's output. The trace answers him: the system agreed with him,
+and the verdict was discarded one line later.**
+
+`story_writer.write_story` returns `status='REJECTED'` when `shape_check` fails — no
+agency verb, no stakes, or a last sentence naming no physical property of the object.
+`run_stop` stored that as `writer_status` and then computed:
+
+```python
+out['status'] = 'STORY' if v['verdict'] == 'TRUE_TO_SOURCES' else 'REJECTED'
+```
+
+`v` is `validate_story` — **grounding only**. So a paragraph that is perfectly sourced
+and completely inert passes. Measured across all three arms of the credit_line
+experiment:
+
+```
+                writer_status   pipeline_status   shape
+phrase_subject  REJECTED        STORY             agency 1, stakes 0, ends_on_object False
+phrase_run      REJECTED        STORY             agency 1, stakes 1, ends_on_object False
+base_run        REJECTED        STORY             agency 0, stakes 1, ends_on_object True
+```
+
+**Three for three.** Every score reported to Michael on 2026-08-14 — 67, 57, 55 — was
+computed on output the writer had already thrown away. Fixed: status is now
+`REJECTED_UNGROUNDED` / `REJECTED_SHAPE` / `STORY`, and `shape` is carried out.
+
+**This is the seventh instrument failure in two days and the worst of them.** The
+others reported a wrong number. This one reported a wrong VERDICT, which is why the
+"3 of 9 stops produce validated stories" line in the gym brief cannot be trusted
+either — those nine were scored by the same disconnected gate and must be re-run.
+
+### Two further defects the trace exposed, both smaller
+
+**`passages_about()` matched nothing for a phrase subject.** The trace prints
+`NONE MATCHED — the writer fell back to the WHOLE corpus`. So making the phrase the
+subject narrowed nothing: the writer saw the same corpus it would have seen anyway,
+with one extra line in the prompt. **Arm C did not really test Michael's proposal
+either** — the subject was inert. A phrase subject needs a passage selector that works
+on phrases, or the proposal cannot be measured at all.
+
+**Two of the eight queries were built from the phrase**, and they are junk:
+
+```
+The convergence of narrative and imagery in this exhibit Salvador Dalí
+The convergence of narrative and imagery in this exhibit Salvador Dalí relationship why collaborated
+```
+
+`synthesize_queries` drops `collaborator` into a slot meant for a person's name.
+
+**Tooling built:** `story_trace.py` prints every routine's input and output for one
+stop, reproduced offline from the saved corpus — no search re-run, so it costs nothing
+and describes the exact run on disk. `STORY_TRACE_stop2_phrase_subject.txt` is the
+first output. This should be the default way to answer "what happened", instead of
+reading scores.
