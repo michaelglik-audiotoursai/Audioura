@@ -756,3 +756,84 @@ combination worth being deliberate about.
 **The cause is fixed.** Every task file since LOCAL-300 states `/usr/bin/python3`
 as fact plus a no-`find` rule, and LOCAL-300 completed on its first attempt with
 no scanning. Nothing queued needs access beyond the repo.
+
+---
+
+## Q-2026-08-14-1 — Why is stop 1 silent when the material is there?
+
+Its `credit_line` — the story keyword, the person a story gets built around — is the
+common noun **"book"**. Every person the stop names is struck off the ladder for
+already occupying another matrix slot: Miró is the `artist`, Mourlot the `printed_by`,
+and Louis Broder — the publisher the whole story is about — the `publisher`.
+
+Proven, not inferred: with the real exclude list `_pick_credit_line` returns
+`('book', MENTIONED)`; drop `publisher` alone and the same call returns
+`('Louis Broder', MENTIONED)`. **The better the matrix does its job, the worse the
+keyword gets.** Not fixed — see D442 for why removing the exclusion needs a
+same-people/same-event redundancy check first. Evidence: D441, D442.
+
+## Q-2026-08-14-2 — Is our "TRUE_TO_SOURCES" verdict worth anything?
+
+**Less than its name suggests, and for two independent reasons.**
+
+`validate_story` asks only whether a capitalised token or a year appears in the source
+text. So it cannot see an invented place, an invented number, or a reversed fact — all
+four of these PASS against a corpus containing "1974":
+
+```
+GROUNDED   ...illustrated the work in Barcelona.
+GROUNDED   ...illustrated the work on the surface of the moon.
+GROUNDED   ...illustrated the work using 47 copper plates.
+GROUNDED   ...refused to illustrate the work.
+```
+
+And its gradient runs backwards for stories: a sentence carrying no new name and no new
+year *cannot* fail, so **the vaguer the sentence, the safer it is.** Of Gemini's 30
+sentences it flagged 5 and all five were true.
+
+Separately, `story_pipeline` was reporting `STORY` for output `story_writer` had already
+REJECTED — the writer's verdict was computed and then discarded. Fixed. Evidence: D444,
+D447, D448.
+
+## Q-2026-08-14-3 — Can the validator be made to pass a good story and catch a false one?
+
+**Partly, and the honest answer is "better, not finished."** `story_validator.py`
+implements Michael's D450 gate: a story is rejected only when a source names a
+DIFFERENT answer to the same question, never for being unconfirmed.
+
+Measured over three runs each:
+
+```
+Gemini section 1 (true, good)                     PASSES         3/3   as required
+"Leonard Woolf accompanied Dalí…" (false)         CONTRADICTED   3/3   as required
+"Stefan Zweig accompanied Dalí…" (true)           SUPPORTED      3/3
+"Boris Fridman gave Le Lézard… to the MFA" (true) CONTRADICTED   3/3   WRONG
+```
+
+The first three are what Michael asked for. **The fourth is a false rejection and it is
+not solved:** the open question drifts to Alexander Calder's *Lizard*, the actor never
+appears, and absence is read as refutation. A relevance guard was added and did not fix
+it. So the gate is trustworthy when the search lands on the right subject and untrustworthy
+when it does not, and it cannot yet tell those two cases apart.
+
+Also fixed en route, shared by both instruments: `World War` and `Maresfield Gardens`
+were classified as PEOPLE, a bare surname was classified as nobody (so "Dalí sketches
+Freud" scored zero multi-person sentences), and "Salvador Dalí" plus a later "Dalí"
+counted as two humans. Evidence: D450, D451.
+
+## Q-2026-08-14-4 — What are the three independent scores for Gemini's section 1?
+
+```
+historic  31     dates and the consequence of acts
+detail     0     facts broken into facts — material, count, process, dimension
+social    50     people, their emotions and their conduct toward each other
+```
+
+Independent 0–100, not a total. The reading is honest: the passage is a scene between
+two men (social), anchored on one date and one state change — Freud fleeing Vienna
+(historic) — and says nothing whatever about the physical object (detail 0).
+
+Both `historic` and `social` were undercounted before today. `fled` scored no state
+change while `destroy` did, so exile read as no event; and `admired`, `considers`,
+`sketches`, `remarks` were absent from the social verbs even though D450 names emotions
+and friendships as the axis. Evidence: D449, D451.

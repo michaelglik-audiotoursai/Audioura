@@ -78,7 +78,10 @@ _STATE_CHANGE = re.compile(
     r'moved|transitioned|replaced|superseded|overthrew|was renamed|'
     r'was completed|was published|was founded|was established|opened|closed|'
     r'collapsed|emerged|began|ended|concluded|ceased|died|was born|'
-    r'arrived|departed|left|returned|was finished|was destroyed)\b',
+    r'arrived|departed|left|returned|was finished|was destroyed|'
+    # A man fleeing the Nazis changes state. Measured 2026-08-14: `fled`
+    # scored nothing while `destroy` scored, so exile read as no event.
+    r'fled|fleeing|escaped|emigrated|exiled|deported|expelled|took refuge)\b',
     re.IGNORECASE
 )
 
@@ -152,7 +155,12 @@ _SOCIAL_VERB = re.compile(
     r'commissioned|patronised|patronized|supported|opposed|criticized|'
     r'praised|dedicated|inspired|encouraged|discouraged|forbidden|'
     r'betrayed|reconciled|reconciled with|confided|confided in|'
-    r'competed|rivalled|rivaled|championed|denounced|celebrated|mourned)\b',
+    r'competed|rivalled|rivaled|championed|denounced|celebrated|mourned|'
+    # D450: social is 'people, their emotions, friendships, gossips'.
+    # Admiration, nerves and reverence are the axis, not decoration.
+    r'admired|adored|idolised|idolized|revered|worshipped|feared|'
+    r'considers|considered|regarded|called|sketched|sketches|remarks|'
+    r'remarked|whispered|greeted|welcomed|received|sat for|posed for)\b',
     re.IGNORECASE
 )
 
@@ -179,8 +187,20 @@ def _unique_years(text: str) -> List[str]:
     return sorted(set(_YEAR_RE.findall(text)))
 
 
-def _count_distinct_people(text: str) -> List[str]:
-    """Count distinct proper-noun person names in text."""
+def _count_distinct_people(text: str, known: List[str] = None) -> List[str]:
+    """Count distinct proper-noun person names in text.
+
+    Delegates to `story_validator.named_people`, which is the shared and corrected
+    implementation. The local regex counted `World War` and `Maresfield Gardens` as
+    PEOPLE and counted a bare surname as nobody, so "Dali sketches Freud" scored
+    ZERO multi-person sentences (D449). Both instruments had the same bug; they now
+    share one answer.
+    """
+    try:
+        from story_validator import named_people
+        return named_people(text, known or [])
+    except Exception:
+        pass
     raw = _PERSON_NAME.findall(text)
     # Deduplicate by last-name token (case-insensitive)
     seen = set()

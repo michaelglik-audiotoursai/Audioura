@@ -408,3 +408,10 @@ single-run differences under ~10 points are noise.
 Note 1 recorded as D442: a person must not be struck off the keyword ladder merely for
 occupying another slot, but the same-people/same-event redundancy check has to exist
 before that exclusion is removed. Full evidence in D442/D443.
+
+---
+
+## CLOSED 2026-08-14 — continued in `STORIED_COMMUNICATION_03.MD`
+
+Maintenance of this file lapsed after the 11:17 entry and Michael caught it. Volume 03
+opens at that point and carries the rest of 2026-08-14. Nothing further is appended here.

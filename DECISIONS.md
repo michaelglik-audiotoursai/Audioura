@@ -18189,3 +18189,83 @@ a yes/no search that found agreement-shaped noise.
 is a snail! His brain is in the form…"* So the remark is sourced and Gemini's
 "hard on the outside, but containing a soft, vulnerable center" is confirmed to be its
 own gloss, exactly as D448 suspected.
+
+## D451 — the D450 story gate, built and measured: three tests pass, one control fails
+
+**2026-08-14, Michael: "we need to change the validator routines so that it passes
+through this story, correctly pinpoints errors / hallucinations on the stories we know
+are not true — this way we know that the validator is working better instead of not
+working at all."** That second clause is the whole specification: a gate that passes
+everything is not an improvement over a gate that rejects everything.
+
+`story_validator.py` implements D450. A sentence is rejected only when sources name a
+DIFFERENT answer to the same question. Unconfirmed is ALLOWED. Sentences with no
+falsifiable content (weather, interior states, interpretive framing) are classified
+ATMOSPHERE and allowed — under D450 they are what makes Freud a living person.
+
+**Measured, three runs each:**
+
+```
+Gemini section 1 (true, and Michael likes it)      PASSES         3/3   required
+"Leonard Woolf accompanied Dalí…"  (FALSE)         CONTRADICTED   3/3   required
+"Stefan Zweig accompanied Dalí…"   (true)          SUPPORTED      3/3
+"Boris Fridman gave Le Lézard… to the MFA" (true)  CONTRADICTED   3/3   WRONG
+```
+
+**The first three are what he asked for. The fourth is a false rejection and it is not
+solved.** The open question drifts to Alexander Calder's *Lizard* — a different artwork
+— the actor never appears, and absence gets read as refutation. A relevance guard
+(requiring retrieved snippets to contain an anchor from the claim) was added and did
+NOT fix it, because the drifted results do mention the work.
+
+**So the gate is trustworthy when the search lands on the right subject and
+untrustworthy when it does not, and it cannot yet tell those two cases apart.** Stated
+plainly rather than buried: this is the same failure family as every instrument defect
+this week, and it would be dishonest to call the validator done.
+
+**Two design findings worth keeping.**
+
+*The signal is the actor's absence, not the alternative's frequency.* Requiring the
+alternative twice caught the false Woolf claim only 2 runs in 3 even with two pooled
+queries — Stefan Zweig came back every time, sometimes in one snippet and sometimes in
+two. Frequency of the right answer is an artifact of which eight results the engine
+returned. The actor being in NONE of ~16 snippets about exactly that role is not.
+
+*A role-verb filter on snippets destroys the best evidence.* Requiring one threw away
+"at the urging of Austrian writer Stefan Zweig and the poet Edward James, Freud agreed
+to a meeting in London in July 1938" — the single most informative result in the set.
+
+### Person detection: one bug, both instruments, four ways wrong
+
+`validate_story` AND `evaluate_story` independently got this wrong, and now share
+`story_validator.named_people`:
+
+```
+"World War", "Maresfield Gardens"     classified as PEOPLE
+"When The Hogarth Press"              an organization, with "When" inside the name
+"Dalí sketches Freud"                 ZERO people — a bare surname counted as nobody,
+                                      so it scored 0 multi-person sentences
+"Salvador Dalí" + a later "Dalí"      counted as TWO humans, inflating Social
+```
+
+### The three scores, repaired, for Gemini section 1
+
+```
+historic  31     dates and the consequence of acts
+detail     0     facts broken into facts — material, count, process, dimension
+social    50     people, their emotions and their conduct toward each other
+```
+
+`historic` and `social` were both undercounted before today. `fled` scored no state
+change while `destroy` did, so a man fleeing the Nazis read as no event (D449); and
+`admired`, `considers`, `sketches`, `remarks` were missing from the social verbs even
+though D450 names emotions and friendships as that axis. `detail 0` is correct and
+unchanged — the passage says nothing about the physical object, which is exactly the
+weakness Michael already ruled non-prohibitive.
+
+Regression 50/61 throughout, same 11 pre-existing failures verified against baseline.
+
+**Communication files:** maintenance of `STORIED_COMMUNICATION_02.MD` lapsed after
+11:17 and Michael caught it. Volume 02 is closed with a pointer;
+`STORIED_COMMUNICATION_03.MD` carries the rest of 2026-08-14 and is maintained with
+`ANSWERS.MD` (Q-2026-08-14-1 through -4).
