@@ -144,3 +144,35 @@ Built `story_validator.py` — the D450 gate. See ANSWERS.MD Q-2026-08-14-3 for
 the result, including the one control it still fails.
 
 **Three scores for Gemini section 1: historic 31, detail 0, social 50.**
+
+### 21:3x — three questions about the new gate
+
+❯ *"1. Are all Gemini stories pass our validator? Could it be that some of Gemini
+stories actually have incorrect facts in them? 2. Why does the validator wrongly
+reject a true obscure claim (and what claim?) about Boris Friedman. 3. How can we
+decide how much false rejection is acceptable?"*
+
+**1.** No. The full 30-sentence story is REJECTED — but the number that matters is
+that only **5 of 30 sentences were checked at all**. Both contradictions are
+spurious: unstripped markdown made the wrong word the actor, giving the queries
+"who printed Salvador Dali" and "who founded Salvador Dali". The one real claim in
+that sentence — the Woolfs founding The Hogarth Press, which is true — was never
+tested. **And yes, Gemini does produce false facts:** the Leonard Woolf claim is
+refuted by four sources naming Stefan Zweig and Edward James.
+
+**2.** Not a threshold problem. `named_people` counts "Le Lezard" and "Fine Arts"
+as PEOPLE, the query is built from them and becomes *"who gave Le Lezard Fine Arts
+2021"*, which cannot find Boris Fridman — so results drift to Alexander Calder's
+*Lizard*, Fridman is absent, and absence is read as refutation. The gate asked a
+broken question and then believed the silence.
+
+**3.** Don't set a tolerance — the errors are asymmetric. A false acceptance is
+**silent** (an untrue sentence in a visitor's ears, never reported); a false
+rejection is **loud and recoverable** (we see it, and under D450 we can ship the
+story flagged). Make "no usable evidence" a first-class verdict so a contradiction
+is only pronounced when the search demonstrably landed on target. Then require
+**100% on a labelled FALSE set** before shipping and drive false rejections down by
+fixing the question, never by lowering the bar. Track **false-rejection rate at
+zero false-acceptance** — today 1 in 3, and D453 shows the cause is a broken query.
+
+Full evidence: D452, D453, D454.
