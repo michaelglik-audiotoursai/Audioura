@@ -164,6 +164,30 @@ needs to tell them apart at a glance.
 A restarted session inherits its name from this table by the directory and work it
 picks up. If a new track is added, name it here first.
 
+# ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
+
+**Michael's request, 2026-08-16.** He asked where a tester's bug was filed while we
+were mid-thread on the story validator. LEAD treated it as a work item — searched
+ClickUp, built a worktree, wrote a briefing, edited this file — and the two threads
+became hard to tell apart in the logs. He was asking a question, not opening a task.
+
+**Two prefixes. Either can be used alone or together.**
+
+| prefix | meaning |
+|---|---|
+| `ASK:` | **Answer only.** No tool calls, no files changed, nothing committed. If it cannot be answered without investigating, say so and stop — do not investigate. |
+| `SIDE:` | **Different topic from the current thread.** Log it under its own heading in the conversation file so the threads stay separable. |
+
+`ASK SIDE: where did Yuri file that bug?` → one paragraph, no worktree, no commits.
+
+**Default when neither prefix is present: RULE ZERO still applies** — act, do not
+stall. The prefixes are how Michael switches that off for one message.
+
+**LEAD's obligation:** if a message looks like it might be a question rather than a
+task, and acting on it would create files, branches or commits, say what you are
+about to do in one line before doing it. A question mistaken for a task costs real
+tokens and muddles the record; a task mistaken for a question costs one round trip.
+
 # THE CONVERSATION FILES — append before moving on, or they die again
 
 Three files, three jobs. **Read `STORIED_COMMUNICATION_02.MD` at session start.**
