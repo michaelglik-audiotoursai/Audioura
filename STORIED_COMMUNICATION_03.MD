@@ -233,3 +233,40 @@ story's falsifiable sentences is a statement about 13% of the story.
 
 **Build order:** the labelled fixture (~30 claims) first and unskippable; then
 question formation; then markdown stripping and entity typing; then tiers 2 and 3.
+
+### — five questions on the tiers; and a correction to an earlier answer
+
+❯ *"1. What is good about Tier 0... if 'tier 1 cannot currently return a single
+accepted story'? 2. Is [question formation] the primary what should we be working on
+or something else? 3. Please detail 'Regression 50/61, same 11 pre-existing
+failures'. 4. Tier 3 — the '+' — could you give me an example? It could be
+miscommunication... 5. What is fixture?"*
+
+**CORRECTION FIRST (D457).** I listed "20 Maresfield Gardens" as one of five confirmed
+true claims in Gemini's section 1. **It is false.** The story says the MEETING happened
+there; the meeting was at **39 Elsworthy Road**, and the Freuds moved to Maresfield
+Gardens in September 1938, two months later. I verified *"Freud lived at Maresfield
+Gardens"* — true — and reported it as the claim. Section 1 has four true claims and one
+false one; my "passes on truth" verdict is withdrawn.
+
+**1.** Tier 0 is a different product surface. It ships today — 31 tours, field-tested —
+and stories are additive, so tier 1's state says nothing about it. Its quality rests
+on Michael's field judgement, not on a measurement LEAD has run. It is in the spec so
+story work does not regress it.
+
+**2. No — and the answer changed after measuring (D458).** Gemini with Google Search
+grounding returns per-sentence citations: **83% of sentences carry a cited source,
+against 13% for our post-hoc gate.** Sources included freud.org.uk. It was also more
+ACCURATE — it placed the meeting at 39 Elsworthy Road, which is exactly what the
+ungrounded version got wrong. **The architecture is the primary work; question
+formation is demoted to the fallback for uncited sentences.**
+
+**3.** Seven of the eleven are environmental (services down, container paths and
+hostnames used from the host, no API key). Four are real: local413 ranking (3 of 8),
+local441 concurrent lookups, contained_regression, local445 parallelism. All eleven
+verified failing identically before the day's changes.
+
+**4.** "+" was Michael's own notation, read as "beyond tier 2". Worked example given.
+
+**5.** A fixture is a fixed set of test cases with known right answers, kept in the
+repo, used to measure whether an instrument works.
