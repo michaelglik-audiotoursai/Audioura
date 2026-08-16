@@ -344,3 +344,33 @@ commit (its briefing) and zero Storied work. Because `main` is an ancestor of
 
 `beta/yuri-bugs` needs deleting from origin — Michael's call, command supplied.
 Recorded as **D459**.
+
+### 11:5x — the Windows startup file
+
+❯ *"Can you create a startup shell to run on Windows Claude called Beta-Bugs_Fixing.md,
+that explains to Claude on Windows all it needs to know to identify problems, create
+tasks in ClickUp from Yury's MDs and assign them to Kiro and then run internal Kiro as
+you do here in the continuous development model to make sure the bugs (if there are
+any: Yury can be wrong!) are fixed?"*
+
+`Beta-Bugs_Fixing.md` written and pushed on `fix/yuri-audio-and-map`. Windows: start
+Claude, say *read Beta-Bugs_Fixing.md*.
+
+**Three things checking turned up, all handled in the file.**
+
+1. **The Kiro machinery is not on the Beta line.** `kiro_dispatcher.py`, `restart.sh`
+   and `.continuous_dev/` exist only on `storied`. Committing them to this branch
+   would carry Storied tooling into `main` on merge, so the file shows how to fetch
+   the dispatcher into the working directory under `.git/info/exclude` instead —
+   never `git add`.
+2. **The Beta ClickUp lists are different IDs from the Storied ones in `CLAUDE.md`.**
+   Beta 🟩 Mobile — Kiro is `1000410000000730`, not `1000410000000734`. Read live from
+   the workspace rather than trusted from the doc.
+3. **The Windows path looks mistyped** — `eclipseyour routine-workspace` reads like a
+   mangled `eclipse-workspace`. The file uses it as given but opens with a `dir /s /b`
+   discovery command so a wrong path costs nothing.
+
+Michael's "Yury can be wrong" is built in as the first step: reproduce before opening
+a task, and return one of three verdicts — CONFIRMED / NOT REPRODUCIBLE / WORKS AS
+DESIGNED. The `#0` label for current location is flagged as Yury's suggestion, not a
+defect.
