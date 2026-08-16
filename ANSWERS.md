@@ -16,6 +16,14 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q-2026-08-16-4 — How to ask a side question without derailing the session](#q202608164)
+- [Q-2026-08-16-3 — Is the Beta briefing pushed so Windows can fetch it?](#q202608163)
+- [Q-2026-08-16-2 — After /clear + restart, can the validator work continue?](#q202608162)
+- [Q-2026-08-16-1 — Did LEAD start working on Yuri's bugs? Should I clear?](#q202608161)
+- [Q-2026-08-14-4 — What are the three independent scores for section 1?](#q202608144)
+- [Q-2026-08-14-3 — Can the validator pass a good story and catch a false one?](#q202608143)
+- [Q-2026-08-14-2 — Is our TRUE_TO_SOURCES verdict worth anything?](#q202608142)
+- [Q-2026-08-14-1 — Why is stop 1 silent when the material is there?](#q202608141)
 - [Q24 — Are the docker services working correctly now? Were they broken before?](#q24)
 - [Q23 — Are we ready to continue working on the Storied release? **Answered: yes, pushed**](#q23)
 - [Q22 — Explain "the fleet can't be verified by asking it"](#q22)
@@ -40,6 +48,68 @@ the terminal scroll.**
 - [Q3 — What does the $0.53 translation cost consist of?](#q3)
 - [Q2 — Why am I suddenly getting permission requests from Kiro?](#q2)
 - [Q1 — What has been done over the three days?](#q1)
+
+---
+
+## Code map — clickable
+
+**How to use these in VS Code:** in the editor, **Cmd+Click** the link. In the preview
+(**Cmd+Shift+V**) a single click works. Plain text like `story_validator.py:85` is only
+clickable in a terminal, never in a markdown file — that is why the earlier version
+highlighted but did nothing.
+
+Line numbers drift as files change. If a link lands in the wrong place, the function
+name is still right — search for it.
+
+### The story gate (D450–D455)
+
+- [`named_people()`](story_validator.py#L85) — who counts as a person. Fixed four ways: `World War` and `Maresfield Gardens` were people, a bare surname was nobody, and `Salvador Dalí` + a later `Dalí` were two humans
+- [`classify()`](story_validator.py#L169) — UNFALSIFIABLE / CHECKABLE / UNCHECKED_FACTUAL
+- [`open_question()`](story_validator.py#L210) — asks *who did it*, never *did X do it*
+- [`contradiction_check()`](story_validator.py#L215) — SUPPORTED / CONTRADICTED / NO_USABLE_EVIDENCE
+- [`validate()`](story_validator.py#L313) — the gate itself
+
+### Michael's four routines (D445)
+
+- [`request_to_ai()`](request_and_structure.py#L98) — routine 1, builds the query from the matrix
+- [`structure_ai_output()`](request_and_structure.py#L198) — routine 4, the >5-sentences summarise rule
+- [`ask_openai()`](michaels_chain.py#L51) — routine 2, calls the model
+- [`main()`](michaels_chain.py#L66) — runs all four in his order and prints every stage
+
+### The matrix and the story keyword (D441)
+
+- [`build_matrix()`](interrogation_matrix.py#L637) — the interrogation matrix
+- [`_pick_credit_line()`](interrogation_matrix.py#L418) — picks the story keyword; the exclude list is why stop 1 got `book` instead of Louis Broder
+- [`extract_stops()`](interrogation_matrix.py#L96) — splits a tour into stops
+
+### Scoring (D451)
+
+- [`evaluate_story()`](evaluate_story.py#L401) — the three independent 0–100 axes
+- [`_score_historic()`](evaluate_story.py#L221) — dates and consequence; `fled` now counts as a state change
+- [`_score_detail()`](evaluate_story.py#L259) — material, count, process, dimension
+- [`_score_social()`](evaluate_story.py#L300) — people, emotions, conduct
+- [`_count_distinct_people()`](evaluate_story.py#L190) — delegates to `named_people()`
+
+### Lead generation and verification (D440, D446)
+
+- [`verify()`](story_leads.py#L214) — one narrow search per claim, two at most
+- [`_principal()`](story_leads.py#L193) — the named party a claim is *about*
+- [`_gemini()`](story_leads.py#L91) — Gemini, with `grounded=True` for Google Search grounding
+- [`available_providers()`](story_leads.py#L133) — every provider we have a key for
+
+### The old description gate (D447 — backwards for stories, correct for descriptions)
+
+- [`validate_story()`](validate_story.py#L442) — must-be-confirmed; use for DESCRIPTIONS, not stories
+- [`split_sentences()`](story_opportunity_scan.py#L126) — could not split after a quotation mark until 2026-08-14
+
+### Tools
+
+- [`story_trace.py`](story_trace.py) — every routine's input and output for one stop, offline, free
+- [`story_worksheet.py`](story_worksheet.py) — the credit_line worksheet
+- [`story_pipeline.py`](story_pipeline.py) — the retrieve-then-write chain
+- [`STORY_GATE_TIERS.md`](STORY_GATE_TIERS.md) — the tier spec and measurement set
+- [`STORIED_COMMUNICATION_03.MD`](STORIED_COMMUNICATION_03.MD) — the conversation
+- [`DECISIONS.md`](DECISIONS.md) — the rulings and their evidence
 
 ---
 
@@ -759,6 +829,7 @@ no scanning. Nothing queued needs access beyond the repo.
 
 ---
 
+<a name="q202608141"></a>
 ## Q-2026-08-14-1 — Why is stop 1 silent when the material is there?
 
 Its `credit_line` — the story keyword, the person a story gets built around — is the
@@ -772,6 +843,7 @@ Proven, not inferred: with the real exclude list `_pick_credit_line` returns
 keyword gets.** Not fixed — see D442 for why removing the exclusion needs a
 same-people/same-event redundancy check first. Evidence: D441, D442.
 
+<a name="q202608142"></a>
 ## Q-2026-08-14-2 — Is our "TRUE_TO_SOURCES" verdict worth anything?
 
 **Less than its name suggests, and for two independent reasons.**
@@ -795,6 +867,7 @@ Separately, `story_pipeline` was reporting `STORY` for output `story_writer` had
 REJECTED — the writer's verdict was computed and then discarded. Fixed. Evidence: D444,
 D447, D448.
 
+<a name="q202608143"></a>
 ## Q-2026-08-14-3 — Can the validator be made to pass a good story and catch a false one?
 
 **Partly, and the honest answer is "better, not finished."** `story_validator.py`
@@ -821,6 +894,7 @@ were classified as PEOPLE, a bare surname was classified as nobody (so "Dalí sk
 Freud" scored zero multi-person sentences), and "Salvador Dalí" plus a later "Dalí"
 counted as two humans. Evidence: D450, D451.
 
+<a name="q202608144"></a>
 ## Q-2026-08-14-4 — What are the three independent scores for Gemini's section 1?
 
 ```
@@ -840,6 +914,7 @@ and friendships as the axis. Evidence: D449, D451.
 
 ---
 
+<a name="q202608161"></a>
 ## Q-2026-08-16-1 — Did LEAD start working on Yuri's bugs? Should the session be cleared?
 
 **No. Zero mobile files were touched** — verified: `git log --name-only` over the last
@@ -859,6 +934,7 @@ work item.
 expensive kind against the weekly ceiling. Everything is committed. See
 Q-2026-08-16-2 for exactly what a fresh session recovers.
 
+<a name="q202608162"></a>
 ## Q-2026-08-16-2 — After `/clear` + `restart`, can the validator work continue?
 
 **Yes, and nothing of substance is held only in context.** A fresh session recovers it
@@ -883,6 +959,7 @@ threshold — it is that grounded generation returns per-sentence citations at *
 coverage against our 13% (D458), so the architecture is the next move, not question
 formation.
 
+<a name="q202608163"></a>
 ## Q-2026-08-16-3 — Is the Beta briefing pushed so the Windows machine can fetch it?
 
 **Yes.** `beta/yuri-bugs` is on origin at `2d0d92a` and
@@ -898,6 +975,7 @@ and today's commits are lab tooling rather than tour-pipeline changes, so the ga
 original reason does not obviously apply to them. **LEAD did not push `storied`** —
 Michael's call, and it is one command either way.
 
+<a name="q202608164"></a>
 ## Q-2026-08-16-4 — How to ask a side question without derailing the session
 
 Two prefixes, usable alone or together, now recorded in `CLAUDE.md`:

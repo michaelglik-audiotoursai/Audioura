@@ -195,7 +195,7 @@ Three files, three jobs. **Read `STORIED_COMMUNICATION_02.MD` at session start.*
 | File | Holds |
 |---|---|
 | `STORIED_COMMUNICATION_02.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. |
-| `ANSWERS.MD` | the same answers, indexed and numbered for lookup months later. Includes LEAD-raised items, not only Michael's questions. |
+| `ANSWERS.MD` | the same answers, indexed and numbered for lookup months later, plus a **Code map** of clickable links into the source. Includes LEAD-raised items, not only Michael's questions. **One file — there is no QUESTIONS.MD** (tried 2026-08-16, merged back the same day; two overlapping indexes is what killed Volume 01). |
 | `DECISIONS.md` | binding rulings plus the evidence. LEAD only. Tasks must never edit it. |
 
 **The rule: when Michael asks a real question, append the exchange to
