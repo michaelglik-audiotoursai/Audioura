@@ -325,3 +325,22 @@ inside the file, three spot-checked to land on the named function.
 
 `CLAUDE.md` now records that there is ONE file and why, and its session-start pointer
 moved from volume 02 to volume 03.
+
+### 11:2x — Windows commands for Yuri's bugs, and a branch cut from the wrong base
+
+❯ *"Can you provide the exact commands I need to run on Windows computer to start
+Claude.AI session dedicated to fix Yury's bugs in Beta on GCloud and on/in Storied as
+the fixes should work on both... Storied fixes and changes should not get into Beta on
+GCloud."*
+
+**Checking that constraint found a mistake LEAD made an hour earlier.**
+`beta/yuri-bugs` was cut from `storied`, not from the Beta base, and pushed — so it
+carries **1861 commits ahead of main**, including all 51 field-test-gated Storied
+commits. Merging it into Beta would ship the whole story-pipeline rewrite to GCloud.
+
+**Corrected:** `fix/yuri-audio-and-map`, cut from `origin/main`. Verified to carry one
+commit (its briefing) and zero Storied work. Because `main` is an ancestor of
+`storied`, the same branch merges cleanly into both tracks.
+
+`beta/yuri-bugs` needs deleting from origin — Michael's call, command supplied.
+Recorded as **D459**.

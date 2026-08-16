@@ -18553,3 +18553,53 @@ runs; it just stops guessing what question to ask.
 5. Question formation — demoted. It is the fallback for sentences arriving with no
    citation, not the main path.
 6. Tiers 2 and 3.
+
+## D459 — INCIDENT: `beta/yuri-bugs` was cut from `storied` and pushed, carrying 1865 Storied commits to origin
+
+**2026-08-16.** Michael asked for Windows commands to fix Yuri's bugs "in Beta on
+GCloud and in Storied", with the constraint *"Storied fixes and changes should not get
+into Beta on GCloud."* Checking that constraint exposed a mistake LEAD had made an hour
+earlier.
+
+`beta/yuri-bugs` was created with `git worktree add ... -b beta/yuri-bugs storied` — **cut
+from `storied`, not from the Beta base** — and pushed to origin. Measured:
+
+```
+git log --oneline main..beta/yuri-bugs | wc -l      1861
+commits matching story_validator / STORY_GATE / D45x   16
+git rev-list --left-right --count origin/main...storied   0  1865
+```
+
+**Two consequences, both stated plainly.**
+
+1. **Merging it into Beta would drag the entire story-pipeline rewrite into GCloud** —
+   precisely the thing `TRACK_B_STORIED_VS_BETA.md` exists to prevent: *"the point of
+   Beta is that it does not move while Storied churns."*
+2. **It put all 51 field-test-gated `storied` commits onto origin under another ref.**
+   The gate was not bypassed deliberately, and `origin/storied` itself is untouched, but
+   the content is on the remote and that was not LEAD's call to make.
+
+**Corrected.** `fix/yuri-audio-and-map` cut from `origin/main` — the Beta base, and an
+ancestor of `storied`, so the same branch merges cleanly into both. Verified clean:
+
+```
+git log --oneline origin/main..fix/yuri-audio-and-map    1   (the briefing only)
+storied-work commits on it                               0
+```
+
+Merge topology, which is the whole point:
+
+```
+main    <- fix/yuri-audio-and-map     Beta on GCloud gets the fix
+storied <- fix/yuri-audio-and-map     Storied gets the SAME fix
+storied -> main                       NEVER
+```
+
+**`beta/yuri-bugs` must be deleted from origin.** Left in place it is a loaded gun: any
+merge of it into `main` ships Storied to Beta. LEAD did not delete it — deleting a
+pushed branch is Michael's call — and the command is in the answer.
+
+**The general rule this earns:** a branch's base is a decision about *what ships with
+it*, not a convenience. Cutting from the branch you happen to be standing on is how
+unrelated work travels. For a fix that must reach two tracks, cut from their common
+ancestor.
