@@ -270,3 +270,39 @@ verified failing identically before the day's changes.
 
 **5.** A fixture is a fixed set of test cases with known right answers, kept in the
 repo, used to measure whether an instrument works.
+
+### 10:5x — did you start on Yuri's bugs, and how do I ask a side question
+
+❯ *"1. I am confused: did you start working on Yury's bugs already? Should I clear
+this session to save tokens now? 2. If I clear this session + restart will we be able
+to continue our discussion to fix validator...? 3. I want to do this from Windows
+computer, please make sure that BETA_MOBILE_START_HERE.md is pushed to the origin...
+4. Next time if I need you in this session to concentrate on one question, but need to
+ask something else, how can I do it: because this time you decided to investigate and
+now I am confused what conversation belongs to what. 5. Please have QUESTIONS.MD and
+STORIED_COMMUNICATION_03.MD current..."*
+
+**1. No — zero mobile files touched**, verified against the git log. LEAD located the
+reports (ClickUp **DMs**, channel `2ky4d0u8-919`, not tasks — that is why every search
+missed them) and set up an isolated worktree plus a briefing for another session. **Yes,
+clear now** — this session is long, and long sessions are the expensive kind.
+
+**2. Yes.** `restart.sh`, then D440–D458, `STORY_GATE_TIERS.md`, this file,
+`QUESTIONS.MD`/`ANSWERS.MD`. Code committed: `story_validator.py`, `michaels_chain.py`,
+`story_trace.py`, `story_worksheet.py`, repaired `evaluate_story.py`. Where it stands:
+gate passes the good story and catches the known hallucination, coverage 13%, one true
+obscure claim still falsely rejected, and D458 says the next move is grounded
+generation (83% citation coverage), not question formation.
+
+**3. Pushed and verified** — `beta/yuri-bugs` at `2d0d92a` on origin, file reads back.
+**But `storied` has 51 unpushed commits containing ALL of the validator work**, so none
+of it is reachable from Windows. Gated on the field test; today's commits are lab
+tooling, not tour-pipeline changes. Not pushed — Michael's call, one command either way.
+
+**4. New convention, now in `CLAUDE.md`:** `ASK:` = answer only, no tools, no commits.
+`SIDE:` = different topic, logged separately. Combinable. Without a prefix RULE ZERO
+still applies. LEAD also now owes a one-line warning before turning something that
+might be a question into files and branches.
+
+**5. Done** — `QUESTIONS.MD` created as a pointer index (not a duplicate of
+`ANSWERS.MD`), and answers Q-2026-08-16-1..4 written.
