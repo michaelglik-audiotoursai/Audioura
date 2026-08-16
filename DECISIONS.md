@@ -18474,3 +18474,82 @@ claims, without which nothing above is measurable; (2) question formation, to mo
 coverage off 13%; (3) markdown stripping and entity typing, the cause of both current
 false positives (D452) and of the Fridman false rejection (D453); (4) tier 2; (5) tier 3
 wiring.
+
+## D457 — CORRECTION: the Maresfield Gardens claim is FALSE, and I confirmed a paraphrase
+
+**2026-08-16.** In D448 I listed "20 Maresfield Gardens" among five CONFIRMED true claims
+in Gemini's section 1. **That was wrong, and it is the exact error this week has been
+about.**
+
+Gemini's sentence is *"Two men are sitting in a room in Maresfield Gardens"* — a claim
+about **where the July 1938 meeting happened**. What `verify()` confirmed was
+*"Freud lived at Maresfield Gardens in Hampstead London"* — a different claim, which is
+true. The sources are explicit:
+
+```
+"1938: On July 19, a meeting takes place between Dalí and Freud at Freud's FIRST
+ address in London, 39 Elsworthy Road, in the presence of Stefan [Zweig]"
+"The Freuds moved into the property at 20 Maresfield Gardens (having initially
+ briefly stayed at a flat at 39 Elsworthy Road, Primrose Hill) in SEPTEMBER 1938"
+```
+
+**The meeting was at 39 Elsworthy Road. The Freuds moved to Maresfield Gardens two
+months later.** So section 1 carries four true claims and one false one, and under D450
+it must NOT ship unmodified. My earlier "it passes on truth" verdict is withdrawn.
+
+I verified a paraphrase and reported it as the claim — the same failure as the 1993
+retrospective (D446) and "spiritual father" (D448), committed by me in my own analysis
+rather than by the code. The rule that catches it: **the claim tested must be the claim
+written, word for word, not a nearby true statement.**
+
+The same search corroborates the Woolf refutation independently: Stefan Zweig is named
+as present.
+
+## D458 — grounded generation gives 83% citation coverage against our 13%. That, not question formation, is the primary work
+
+**Michael, 2026-08-16: "Is [question formation] the primary what should we be working on
+or something else?"** Measured rather than argued, and the answer changed my
+recommendation.
+
+`gemini-flash-latest` with Google Search grounding returns the story **with per-sentence
+citations already attached** — `groundingChunks` (the sources) and `groundingSupports`
+(a text segment mapped to the chunks that support it).
+
+```
+                                    sentences   with a cited source   coverage
+gemini-flash-latest + grounding          6              5               83%
+our post-hoc open-question gate         23              3               13%
+```
+
+Sources returned included **freud.org.uk** and **freud-museum.at** — the Freud Museum's
+own sites, exactly the authority our own retrieval lost when it drifted to academia.edu
+(D443).
+
+**And the grounded answer was more ACCURATE, not merely better cited.** It placed the
+meeting at *"39 Elsworthy Road"* — correct — where the ungrounded generation said
+Maresfield Gardens, which D457 shows is false.
+
+**So the architecture is the primary work, not question formation.** Our 13% is the cost
+of a choice: generate unsourced prose, then reverse-engineer an open question for every
+sentence and hope retrieval lands. Grounded generation inverts it — the model does the
+retrieval, and our verification budget goes to the one thing we are good at: checking
+that a cited source actually carries the sentence (`_carries`, hardened three times on
+2026-08-14).
+
+**This does not retire the gate.** Grounding is not truth: Google's *"tragic mood holding
+sway over Miró's psyche"* came out of a grounded console session (D440). A citation makes
+a claim CHECKABLE, which is precisely what we lacked for 87% of sentences. The gate still
+runs; it just stops guessing what question to ask.
+
+**Revised build order, superseding D456's:**
+
+1. **Grounded generation** — take `groundingSupports`, attach each sentence to its
+   sources. This is the coverage fix, and it is a client change, not a research problem.
+2. **The labelled fixture** (~30 claims). Still unskippable; now measures a gate that has
+   something to check.
+3. **Verify sentence against ITS OWN cited source** — reuse `_carries`, with D457's rule:
+   the claim tested is the claim written.
+4. Markdown stripping and entity typing (D452, D453).
+5. Question formation — demoted. It is the fallback for sentences arriving with no
+   citation, not the main path.
+6. Tiers 2 and 3.
