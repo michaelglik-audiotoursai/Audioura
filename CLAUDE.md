@@ -190,11 +190,12 @@ tokens and muddles the record; a task mistaken for a question costs one round tr
 
 # THE CONVERSATION FILES — append before moving on, or they die again
 
-Three files, three jobs. **Read `STORIED_COMMUNICATION_02.MD` at session start.**
+Three files, three jobs. **Read `STORIED_COMMUNICATION_03.MD` at session start** —
+volume 02 is CLOSED (2026-08-14) and carries a pointer forward.
 
 | File | Holds |
 |---|---|
-| `STORIED_COMMUNICATION_02.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. |
+| `STORIED_COMMUNICATION_03.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. Volumes 01 and 02 are closed; open 04 only if this one becomes unsearchable. |
 | `ANSWERS.MD` | the same answers, indexed and numbered for lookup months later, plus a **Code map** of clickable links into the source. Includes LEAD-raised items, not only Michael's questions. **One file — there is no QUESTIONS.MD** (tried 2026-08-16, merged back the same day; two overlapping indexes is what killed Volume 01). |
 | `DECISIONS.md` | binding rulings plus the evidence. LEAD only. Tasks must never edit it. |
 

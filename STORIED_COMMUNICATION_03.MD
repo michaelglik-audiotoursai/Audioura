@@ -306,3 +306,22 @@ might be a question into files and branches.
 
 **5. Done** — `QUESTIONS.MD` created as a pointer index (not a duplicate of
 `ANSWERS.MD`), and answers Q-2026-08-16-1..4 written.
+
+### 11:0x — one file, and make the links work
+
+❯ *"I confused things -- Sorry, I want to have only one file: ANSWERS.MD. Please
+combine ANSWERS.MD and QUESTIONS.MD into ANSWERS.MD and remove Answers.md. In
+ANSWERS.MD I want links to function: in my VS Code they are highlit but nothing
+happens when I click on them. Let me know when I should do /clear+restart"*
+
+Done. `QUESTIONS.MD` is gone and its index folded into `ANSWERS.MD`'s existing
+Contents block, using the same `<a name>` anchors the older entries already use.
+
+**Why the links did nothing:** they were plain text. VS Code only follows real
+markdown links — `[name](file.py#L85)`. The new **Code map** section in `ANSWERS.MD`
+uses that form throughout: **Cmd+Click** in the editor, single click in the preview
+(**Cmd+Shift+V**). All 30 links verified — every file exists, every line number is
+inside the file, three spot-checked to land on the named function.
+
+`CLAUDE.md` now records that there is ONE file and why, and its session-start pointer
+moved from volume 02 to volume 03.
