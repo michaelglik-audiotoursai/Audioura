@@ -18374,3 +18374,60 @@ queries. **So the work is in retrieval and entity typing, not in a tolerance dia
 4. The single number worth tracking: **false-rejection rate at zero false-acceptance.**
    Today, on six cases, that is 1 in 3 — and D453 shows the cause is a broken query,
    which is fixable without touching any threshold.
+
+## D455 — MICHAEL'S RULING: prefer false rejection. Two tiers. And the measurement that follows
+
+**2026-08-14, his words:** *"it is better to accept false rejection — meaning reject the
+correct claim than accept the incorrect one. We can create a logic of going from claim
+to claim and getting the best story which is accepted. If no such story, then we need to
+use AI and SERP and Gemini to verify rejections in case they are false to get the
+required number of stories."*
+
+**The design he specified, and it is the right shape:**
+
+- **Tier 1 — strict and cheap.** Walk the candidate claims, gate each one, take the best
+  story that is ACCEPTED. Doubt rejects. This supersedes D454's "measure false-rejection
+  rate at zero false-acceptance" as the operating policy: the rate still matters as a
+  diagnostic, but it is no longer a dial to balance.
+- **Tier 2 — expensive, and only on a shortfall.** If tier 1 yields too few stories,
+  re-examine the REJECTED ones with multiple models and searches (SERP + Gemini + GPT) to
+  rescue the false rejections. Cost is paid only when we are short.
+
+This makes the Fridman-style false rejection (D453) a tier-2 problem rather than a
+blocker, which is why the ruling is worth having.
+
+### Implementing it exposed the real bottleneck, and it is not the threshold
+
+The two-way split silently ALLOWED every sentence it could not form a question about —
+25 of 30 on a real story. **That is the exact opposite of this ruling: the gate's
+dominant behaviour was unexamined acceptance.** So `classify()` is now three-way:
+
+```
+UNFALSIFIABLE      weather, interior states, interpretation — ALLOWED by D450
+CHECKABLE          a named party in a role we can turn into an open question
+UNCHECKED_FACTUAL  asserts something falsifiable and we could NOT form the question
+```
+
+and the verdict gains `HELD_UNCHECKED`. Measured:
+
+```
+                     verdict              coverage   checked / falsifiable
+full Gemini story    REJECTED_FALSEHOOD     0.13         3 of 23
+Gemini section 1     HELD_UNCHECKED         0.00         0 of 5
+```
+
+**Section 1 — the story Michael likes and ruled should pass — now HOLDS, because we can
+form an open question for none of its five factual sentences.** `fled`, `sketches`,
+`considers` and a bare date are all outside the 30-word role-verb list.
+
+**This is not a reason to loosen the rule. It is the measurement that names the
+priority.** Tier 1 as specified cannot yet return a single accepted story, and tier 2
+would therefore be doing 100% of the work — the expensive path running always, which is
+precisely what the two-tier design exists to avoid.
+
+**So the next work is question formation, not thresholds:** claims of the form
+"X fled Y", "X is the Nth/only/first Z", "X said Q of Y", and bare dated events all need
+an open-question shape. Coverage is the number to drive — from 13% upward — and it is
+measured, cheap to re-measure, and currently the binding constraint on everything else.
+
+Regression 50/61 throughout, same 11 pre-existing failures.

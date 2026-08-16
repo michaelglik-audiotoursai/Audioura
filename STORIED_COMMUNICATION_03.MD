@@ -176,3 +176,31 @@ fixing the question, never by lowering the bar. Track **false-rejection rate at
 zero false-acceptance** — today 1 in 3, and D453 shows the cause is a broken query.
 
 Full evidence: D452, D453, D454.
+
+### 21:5x — MICHAEL'S RULING on false rejection: prefer it, and rescue in a second tier
+
+❯ *"it is better to accept false rejection — meaning reject the correct claim than
+accept the incorrect one. We can create a logic of going from claim to claim and
+getting the best story which is accepted. If no such story, then we need to use AI
+and SERP and Gemini to verify rejections in case they are false to get the required
+number of stories."*
+
+Recorded as **D455**. Tier 1 strict and cheap: walk the claims, take the best
+ACCEPTED story, doubt rejects. Tier 2 expensive and only on a shortfall: re-examine
+the rejections with several models and searches to rescue the false ones.
+
+**Implementing it exposed the real bottleneck.** The old gate silently allowed every
+sentence it could not form a question about — 25 of 30 — which is the opposite of
+this ruling. Now three-way: UNFALSIFIABLE (allowed), CHECKABLE, UNCHECKED_FACTUAL
+(held). Measured:
+
+```
+full Gemini story   REJECTED_FALSEHOOD   coverage 0.13   3 of 23 checked
+Gemini section 1    HELD_UNCHECKED       coverage 0.00   0 of 5  checked
+```
+
+**Section 1 — the story you like — now HOLDS**, because we cannot form an open
+question for any of its five factual sentences: `fled`, `sketches`, `considers` and
+a bare date are all outside the role-verb list. Not a reason to loosen the rule; it
+names the priority. **The binding constraint is question formation, not the
+threshold.** Coverage is the number to drive up. Evidence: D455.

@@ -160,16 +160,47 @@ _ROLE_VERB = re.compile(
     r'destroyed|refused|translated|edited|photographed)\b', re.IGNORECASE)
 
 
+# Numbers, quantities and places are factual content even with no person or year.
+_HARD_FACT = re.compile(
+    r'\b(\d+|first|last|only|final|primary|published|founded|printed|born|died|'
+    r'murdered|commissioned|translated|edition|volume|copies)\b', re.IGNORECASE)
+
+
 def classify(sentence: str, known: List[str]) -> Dict:
-    """ATMOSPHERE (allowed, unfalsifiable) or CHECKABLE (has a factual assertion)."""
+    """Three kinds, not two — and the third is the one that matters.
+
+    D455 (Michael): "it is better to accept false rejection — meaning reject the
+    correct claim than accept the incorrect one."
+
+    The two-way split silently ALLOWED anything it could not form a question about,
+    which on a real 30-sentence story was 25 of 30. That is the opposite of his
+    ruling: the gate's dominant behaviour was unexamined acceptance. So:
+
+      UNFALSIFIABLE     weather, interior states, interpretation. ALLOWED by D450 —
+                        these are what make Freud a living person, not a label.
+      CHECKABLE         a named party in a role we can turn into an open question.
+      UNCHECKED_FACTUAL asserts something falsifiable, and we could NOT form the
+                        question. Under D455 this must NOT pass silently.
+    """
     people = named_people(sentence, known)
     has_year = bool(_YEAR.search(sentence))
     role = _ROLE_VERB.search(sentence)
-    if (people and role) or has_year:
+    year = _YEAR.search(sentence).group(1) if has_year else ''
+
+    if people and role:
         return {'kind': 'CHECKABLE', 'people': people,
-                'relation': role.group(1).lower() if role else '',
-                'year': (_YEAR.search(sentence).group(1) if has_year else '')}
-    return {'kind': 'ATMOSPHERE', 'people': people, 'relation': '', 'year': ''}
+                'relation': role.group(1).lower(), 'year': year}
+
+    factual = has_year or bool(_HARD_FACT.search(sentence)) or bool(people)
+    # "Dalí is nervous" names a person but asserts nothing falsifiable. Naming
+    # somebody must not by itself make a sentence checkable, or every atmospheric
+    # line about a real person gets held forever.
+    atmospheric = bool(_ATMOSPHERE.search(sentence)) and not has_year \
+        and not _HARD_FACT.search(sentence)
+    if factual and not atmospheric:
+        return {'kind': 'UNCHECKED_FACTUAL', 'people': people,
+                'relation': '', 'year': year}
+    return {'kind': 'UNFALSIFIABLE', 'people': people, 'relation': '', 'year': year}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -303,8 +334,22 @@ def validate(story: str, subject: str = '', known: Optional[List[str]] = None,
         rows.append(row)
 
     contradicted = [r for r in rows if r['status'] == 'CONTRADICTED']
-    return {'verdict': 'REJECTED_FALSEHOOD' if contradicted else 'PASSES',
-            'contradicted': len(contradicted), 'sentences': rows}
+    unchecked = [r for r in rows if r['kind'] == 'UNCHECKED_FACTUAL']
+    checkable = [r for r in rows if r['kind'] == 'CHECKABLE']
+    factual = len(unchecked) + len(checkable)
+    coverage = (len(checkable) / factual) if factual else 1.0
+
+    # D455: a falsifiable sentence we never checked is not an acceptance. It is an
+    # open question, and the tier-2 rescue is where it gets answered — not here.
+    if contradicted:
+        verdict = 'REJECTED_FALSEHOOD'
+    elif unchecked:
+        verdict = 'HELD_UNCHECKED'
+    else:
+        verdict = 'PASSES'
+    return {'verdict': verdict, 'contradicted': len(contradicted),
+            'unchecked': len(unchecked), 'coverage': round(coverage, 2),
+            'sentences': rows}
 
 
 def report(res: Dict) -> None:
