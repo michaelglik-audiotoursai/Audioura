@@ -18431,3 +18431,46 @@ an open-question shape. Coverage is the number to drive — from 13% upward — 
 measured, cheap to re-measure, and currently the binding constraint on everything else.
 
 Regression 50/61 throughout, same 11 pre-existing failures.
+
+## D456 — the tier specification and the measurement set
+
+**2026-08-16, Michael: "What are the tiers 1, 2, + and how do we measure the results?"**
+Written up in full as `STORY_GATE_TIERS.md`. Summary and the parts that are rulings:
+
+**Tier 0 — the DESCRIPTION gate.** Accurate AND relevant, no held state. Not part of the
+story pipeline; listed so it is not broken. Live and working.
+
+**Tier 1 — cheap, strict, always runs.** Open questions only, never yes/no. Three
+sentence classes (UNFALSIFIABLE allowed, CHECKABLE checked, UNCHECKED_FACTUAL held) and
+three verdicts (PASSES / HELD_UNCHECKED / REJECTED_FALSEHOOD). Partially built,
+**coverage 13%**.
+
+**Tier 2 — expensive, only on a shortfall.** Re-form the question, re-retrieve across
+phrasings and engines, adjudicate **on citations only**. Not built.
+
+> **The hard rule in tier 2:** models generate questions and find sources; they never
+> rule on truth. Gemini produced the Leonard Woolf claim — asking Gemini whether Woolf
+> was there turns the rescue tier into the fabrication tier. A rescue is valid only when
+> it yields a source sentence a human could read.
+
+**Tier 3 — the "+".** In order: widen the subject; ship the weaker verifiable story;
+ship description-only (SILENCE is acceptable); human queue with sources attached. The
+human queue is the ONLY path by which an unverified claim may ship, and it ships because
+a person decided. **Never lower the bar on the FALSE set to make the numbers work.**
+
+**Measurement, three levels.** Per story: coverage, verdict, Historic/Detail/Social,
+object connection. Per gate, against a labelled fixture: false acceptance on the FALSE
+set (**target 0, non-negotiable**), false rejection on the TRUE set, verdict stability
+over 3 runs. Per tour: tier-2 invocation rate, tier-2 rescue yield, cost, and stops
+shipping with no story.
+
+**Coverage is listed first deliberately: it bounds every other number.** A verdict
+computed over 13% of a story's falsifiable sentences is a statement about 13% of the
+story, and quoting it as a verdict on the story would be the same class of error as
+every instrument failure recorded this week.
+
+**Build order — the fixture is first and cannot be skipped:** (1) ~30 labelled TRUE/FALSE
+claims, without which nothing above is measurable; (2) question formation, to move
+coverage off 13%; (3) markdown stripping and entity typing, the cause of both current
+false positives (D452) and of the Fridman false rejection (D453); (4) tier 2; (5) tier 3
+wiring.

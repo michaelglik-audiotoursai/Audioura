@@ -204,3 +204,32 @@ question for any of its five factual sentences: `fled`, `sketches`, `considers` 
 a bare date are all outside the role-verb list. Not a reason to loosen the rule; it
 names the priority. **The binding constraint is question formation, not the
 threshold.** Coverage is the number to drive up. Evidence: D455.
+
+## 2026-08-16
+
+### — what are the tiers, and how do we measure
+
+❯ *"What are the tiers 1, 2, + and how do we measure the results?"*
+
+Written in full as `STORY_GATE_TIERS.md`; recorded as **D456**.
+
+**Tier 0** description gate — accurate AND relevant, live, not to be touched.
+**Tier 1** cheap, strict, always runs; open questions only; PASSES / HELD_UNCHECKED /
+REJECTED_FALSEHOOD. Partially built, coverage 13%.
+**Tier 2** expensive, only on a shortfall: re-form the question, re-retrieve, and
+**adjudicate on citations only** — models find sources, they never rule on truth.
+Not built.
+**Tier 3 (+)** widen the subject → ship the weaker verifiable story → ship
+description-only → human queue with sources. The human queue is the only path by
+which an unverified claim ships.
+
+**Measured at three levels.** Per story: coverage, verdict, Historic/Detail/Social,
+object connection. Per gate against a labelled fixture: false acceptance on the FALSE
+set (target 0, non-negotiable), false rejection on the TRUE set, stability over 3
+runs. Per tour: tier-2 invocation rate, rescue yield, cost, stops with no story.
+
+**Coverage is first because it bounds everything else** — a verdict over 13% of a
+story's falsifiable sentences is a statement about 13% of the story.
+
+**Build order:** the labelled fixture (~30 claims) first and unskippable; then
+question formation; then markdown stripping and entity typing; then tiers 2 and 3.
