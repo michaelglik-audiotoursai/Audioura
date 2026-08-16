@@ -159,6 +159,7 @@ needs to tell them apart at a glance.
 |---|---|
 | **Storied_Tours** | This one. Tour generation quality — the story pipeline, gates, `generate_tour_text.py`, the LOCAL-4xx chain. Runs on the Mac Mini. |
 | **GCloud_Storied** | Track B — the Storied vs Beta selector: mobile app, GCloud services, DB `track` discriminator. Spec in `TRACK_B_STORIED_VS_BETA.md`. Runs on the Windows machine. |
+| **Beta_Mobile** | Beta-track mobile app bugs from testers. Runs on the Mac Mini in the worktree `~/audioura-worktrees/beta-mobile`, branch `beta/yuri-bugs` — deliberately NOT in `~/Audioura`, so it cannot disturb Storied_Tours' working tree. Briefing: `BETA_MOBILE_START_HERE.md` in that worktree. Opened 2026-08-16 for Yury Makedonov's two reports. |
 
 A restarted session inherits its name from this table by the directory and work it
 picks up. If a new track is added, name it here first.
