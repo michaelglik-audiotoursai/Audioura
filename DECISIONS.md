@@ -18269,3 +18269,108 @@ Regression 50/61 throughout, same 11 pre-existing failures verified against base
 11:17 and Michael caught it. Volume 02 is closed with a pointer;
 `STORIED_COMMUNICATION_03.MD` carries the rest of 2026-08-14 and is maintained with
 `ANSWERS.MD` (Q-2026-08-14-1 through -4).
+
+## D452 — the gate's real numbers on a full story: 17% coverage, and both rejections spurious
+
+**2026-08-14, Michael's three questions.** Ran `story_validator` over Gemini's complete
+30-sentence story rather than the hand-picked section.
+
+**Q1 — do all Gemini stories pass? No, and the detail matters more than the verdict.**
+
+```
+VERDICT  REJECTED_FALSEHOOD
+  ATMOSPHERE / ALLOWED        25      never checked at all
+  CHECKABLE  / CONTRADICTED    2      BOTH SPURIOUS
+  CHECKABLE  / ALLOWED         2
+  CHECKABLE  / SUPPORTED       1
+```
+
+**Coverage is 5 of 30 sentences — 17%.** `classify()` marks a sentence CHECKABLE only
+when it contains a named person AND a verb from a 30-word list, or a year. Everything
+else is ATMOSPHERE and allowed unexamined. Among the 25 unchecked are real, checkable
+assertions: *"They were the primary English publishers of Freud"*, *"He argues that
+Moses was not Jewish, but an Egyptian nobleman who was murdered by his followers"*,
+*"While the Woolfs were printing Freud's theory…"*. A gate that inspects one sentence in
+six is closer to "not working" than the old one was.
+
+**Both CONTRADICTED verdicts are false positives, and neither is about a real claim:**
+
+```
+"This is a story about how the subconscious mind was finally 'unbound' from the
+ printed page."                          ->  query: "who printed Salvador Dali"
+"...the avant-garde publishing house founded by Virginia and Leonard Woolf."
+                                         ->  query: "who founded Salvador Dali"
+```
+
+Two causes. Markdown is not being stripped, so headers and `**bold**` runs merge into
+sentences and `c['people'][0]` picks the wrong actor. And when a sentence has no second
+person, `context` falls back to the subject, producing "who founded Salvador Dali" —
+a question nobody asked. **The one real claim in that sentence — the Woolfs founding
+The Hogarth Press, which is TRUE — was never tested.**
+
+**Yes, Gemini stories do contain false facts.** Proven independently: the first
+generation asserted, under "Key Talking Points for Guides", that Leonard Woolf
+accompanied Dalí to meet Freud. Four sources name Stefan Zweig and Edward James; Woolf
+appears in none (D450). Two runs of the same model contradicted each other on it.
+
+## D453 — why the Boris Fridman claim is falsely rejected: the query is built from misclassified entities
+
+**Q2.** The claim is *"Boris Fridman gave Le Lézard aux plumes d'or to the Museum of
+Fine Arts in 2021"* — true; the MFA acquisition was a gift from Boris Fridman in 2021
+(D440). Traced end to end:
+
+```
+people found : ['Boris Fridman', 'Le Lezard', 'Fine Arts']   <- two are not people
+context      : 'Le Lezard Fine Arts 2021'
+QUERY        : who gave Le Lezard Fine Arts 2021
+```
+
+**The work title is truncated to "Le Lezard", "Museum of" is dropped, and "Fine Arts"
+is treated as a person.** That query cannot find Boris Fridman, so results drift to
+Alexander Calder's *Lizard*; Fridman is absent; absence is read as refutation.
+
+Two distinct bugs underneath:
+
+1. **`named_people` still admits title and venue fragments.** `arts` is not in the
+   disqualifying tails, and `Le Lezard` survives because the leading `le` is stripped
+   leaving a single token.
+2. **The known-list is self-reinforcing.** `validate()` builds `known` from
+   `named_people(story)`, so a wrongly-detected name becomes a "known surname" that
+   licenses itself on the next pass. Errors compound instead of washing out.
+
+**So the false rejection is not a threshold problem at all.** The threshold was never
+reached on good evidence — the gate asked a broken question and then believed the
+silence.
+
+## D454 — how much false rejection is acceptable: the wrong dial, and what to do instead
+
+**Q3, and this is a ruling rather than a survey.**
+
+**Do not set a tolerance.** The two errors are asymmetric in kind, not just in size:
+
+- **A false acceptance puts an untrue sentence in a visitor's ears.** It is silent —
+  nobody reports it, and we would never learn.
+- **A false rejection costs a story.** It is loud — we see SILENCE in the logs, and
+  under D450 we can still ship the story flagged rather than delete it.
+
+Tuning a single threshold trades one against the other blindly. The structure that
+actually works is a **three-way verdict where refusing to answer is a first-class
+outcome**: SUPPORTED / CONTRADICTED / **NO_USABLE_EVIDENCE**, with the last one ALLOWED
+under D450. Then a contradiction is only ever pronounced when the search demonstrably
+landed on the right subject and named someone else — a strong condition — and every
+other case degrades to "we do not know", which costs nothing.
+
+That verdict already exists in `contradiction_check` and is defeated by D453's mangled
+queries. **So the work is in retrieval and entity typing, not in a tolerance dial.**
+
+**The measurable decision rule, for when we do need a number:**
+
+1. Keep a labelled fixture of claims known TRUE and known FALSE. Six exist today
+   (Woolf/Zweig/Fridman/Mourlot/Miró-1967/1993-retrospective); it needs ~30.
+2. **Require 100% on the FALSE set before shipping.** A gate that misses a known
+   hallucination is not a gate.
+3. Then measure the false-rejection rate on the TRUE set and drive it down **by
+   improving the question asked**, never by lowering the bar on the false set.
+4. The single number worth tracking: **false-rejection rate at zero false-acceptance.**
+   Today, on six cases, that is 1 in 3 — and D453 shows the cause is a broken query,
+   which is fixable without touching any threshold.
