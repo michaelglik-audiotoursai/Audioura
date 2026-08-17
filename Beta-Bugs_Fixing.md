@@ -6,7 +6,7 @@ briefing. Work top to bottom.
 > ## ⛔ ORDER MATTERS — read this before anything
 >
 > **The merge / version-bump / tag sequence in §7 is the LAST step, not the first.**
-> As of 2026-08-17 `fix/yuri-audio-and-map` contains **two markdown files and zero
+> As of 2026-08-17 `beta-staging` contains **two markdown files and zero
 > code changes**. Merging it into `main` now would tag a Beta release for
 > documentation. §§3–6 come first: verify, derive, implement, test. Only then §7.
 
@@ -42,11 +42,11 @@ git status
 ```
 
 Expected: remote `michaelglik-audiotoursai/Audioura`, branch
-**`fix/yuri-audio-and-map`**. If not:
+**`beta-staging`**. If not:
 
 ```bat
 git fetch origin
-git checkout fix/yuri-audio-and-map
+git checkout beta-staging
 git pull
 ```
 
@@ -57,7 +57,7 @@ The Windows laptop has Docker running **Storied** images. This branch is cut fro
 downgrade procedure.
 
 ```bat
-git checkout fix/yuri-audio-and-map
+git checkout beta-staging
 docker-compose -f docker-compose-master.yml down
 docker-compose -f docker-compose-master.yml build tour-generator
 docker-compose -f docker-compose-master.yml up -d
@@ -82,7 +82,7 @@ you are on `storied` or on the abandoned `beta/yuri-bugs` — stop and re-checko
 ```
 main  ──●──────────────  "Beta" IS main. This is what ships to Play + TestFlight.
          \
-          ●  fix/yuri-audio-and-map   <- YOU ARE HERE. Only the bug fixes.
+          ●  beta-staging   <- YOU ARE HERE. The maintenance line. Only the bug fixes.
          /
 storied ●──────────────  Next release. 1865 commits ahead of main.
 ```
@@ -93,10 +93,27 @@ storied ●──────────────  Next release. 1865 commit
   It carries the whole story-pipeline rewrite; merging it into `main` would ship all of
   it to Beta testers. `TRACK_B_STORIED_VS_BETA.md`: *"the point of Beta is that it does
   not move while Storied churns."*
-- **Ignore `beta/yuri-bugs`.** It was cut from `storied` by mistake on 2026-08-16 and
-  carries 1861 commits of Storied work. Do not branch from it or merge it.
+- **`beta/yuri-bugs` is gone.** It was cut from `storied` by mistake on 2026-08-16 and
+  carried 1861 commits of Storied work. Michael deleted it from origin on 2026-08-17.
+  If you see it in a stale local clone, do not branch from it or merge it.
+- **`fix/yuri-audio-and-map` is this branch's former name.** Same commits. If your
+  checkout is on it, switch: `git fetch origin && git checkout beta-staging`.
 - This branch is cut from `main`, so the same fix merges into **both** tracks. That is
   the entire reason it exists.
+
+### Why the branch is called beta-staging (Michael's plan, 2026-08-17)
+
+`beta-staging` is a **temporary maintenance line**, not a permanent third track. It
+exists so Yuri can verify the fixes against a staging backend before anything touches
+the live Beta that other testers are using. Its whole life:
+
+```
+cut from main -> fixes land here -> Yuri verifies -> merge to main -> DELETE
+```
+
+**It must be merged into `main` before it is deleted.** "Beta-staging goes away" and
+"the fixes ship" are the same step; if the branch is deleted without the merge, the
+fixes are lost. See §7.
 
 ---
 
@@ -122,6 +139,25 @@ first tour generated fine and the content seemed relevant.
 > * Current location is shown on a map but has no number whatsoever.
 
 The app is Flutter: **`audio_tour_app/`**, code in `audio_tour_app/lib/`.
+
+---
+
+### Both bugs look client-side — confirm this early, it sets your scope
+
+LEAD's read of the two reports, 2026-08-17: **neither needs a backend change.**
+
+- **Bug 1** is the audio player controller — whether tapping a new stop stops the
+  current player before starting the next, or spawns a second instance.
+- **Bug 2** is how the client indexes two lists that come from the *same* server
+  payload. The likely single cause is the map counting "your location" as pin #1 while
+  the audio list starts at the first real stop.
+
+**This is a diagnosis from the reports, not a proven fact — confirm it in the code
+before you rely on it.** If you find yourself needing to change a service under
+`development/` or a database column, stop and tell Michael: that breaks the assumption
+this whole plan is built on, and it changes what Beta-Staging has to be.
+
+If it holds, the fix is entirely inside `audio_tour_app/lib/`.
 
 ---
 
@@ -187,7 +223,7 @@ Each task description must start with `**Agent:** Mobile Kiro` and state:
 
 - the reproduction steps YOU verified (not Yury's paraphrase)
 - the expected vs actual behaviour
-- the branch: `fix/yuri-audio-and-map`
+- the branch: `beta-staging`
 - acceptance criteria, testable
 - the test plan
 - a `## PROCESS` section — **a task file without one produces `exit=0` and zero
@@ -237,7 +273,7 @@ Create it before you walk away, so nothing spends money unattended.
 `exit=0` from Kiro means nothing. Verify by effect:
 
 ```bat
-git rev-list --count origin/fix/yuri-audio-and-map..HEAD
+git rev-list --count origin/beta-staging..HEAD
 ```
 
 must be ≥ 1, the submission doc must exist, and **the behaviour must actually have
@@ -251,15 +287,47 @@ changed on a device**.
 
 ---
 
-## 7. STEP FIVE — merge and deploy
+## 7. STEP FIVE — verify on staging, THEN merge and deploy
 
-Per `BRANCH_MODEL.md`, which is on this branch — read it.
+> ⛔ **This section changed on 2026-08-17.** The old version merged straight into
+> `main`, which ships to the live Beta backend. Michael's new rule: **Yuri verifies on
+> Beta-Staging first.** Do not merge to `main` until §7b passes.
+
+### 7a. Ship the build to Yuri, pointed at Beta-Staging
+
+Stay on `beta-staging`. Bump the version and build:
+
+```bat
+:: bump audio_tour_app/pubspec.yaml  2.1.1+18  ->  2.1.1+19   (see note below)
+git commit -am "2.1.1+19: Yuri's two fixes"
+git push origin beta-staging
+bash build_flutter_clean.sh
+```
+
+Testers still on **2.1.1+18** keep talking to GCloud-Beta and are unaffected. Only
+**2.1.1+19** points at GCloud-Beta-Staging. That is the whole isolation mechanism —
+the app version, not the branch.
+
+**Prove environment parity BEFORE Yuri tests.** A regression report is worthless if
+GCloud-Beta-Staging is simply configured differently from GCloud-Beta. Deploy
+Beta-Staging from the *same commit `main` is on*, run the same smoke test against both
+endpoints, and confirm identical results. Only then deploy the fix on top. Without
+this you cannot tell a broken fix from a broken environment.
+
+### 7b. Yuri's verdict
+
+He must confirm **both**:
+1. The two reported bugs are gone.
+2. Nothing else regressed — the tour list, playback, map, and download all behave as
+   they do on his 2.1.1+18 build.
+
+Point 2 is the reason this step exists. Ask him to compare, not to judge in isolation.
+
+### 7c. Only after 7b passes — merge, tag, dissolve
 
 ```bat
 git checkout main
-git merge --no-ff fix/yuri-audio-and-map
-:: bump audio_tour_app/pubspec.yaml  2.1.1+18  ->  2.1.1+19   (see note below)
-:: test
+git merge --no-ff beta-staging
 git tag -a beta-2.1.1+19 -m "Yuri: concurrent audio + map numbering"
 git push origin main --follow-tags
 ```
@@ -273,6 +341,20 @@ git merge main
 
 **Do not `git push origin storied`.** It has ~51 unpushed commits behind a field-test
 gate that is Michael's to lift.
+
+Finally, redeploy GCloud-Beta from `main` and delete the maintenance line:
+
+```bat
+git push origin --delete beta-staging
+git branch -d beta-staging
+```
+
+**Delete only after the merge to `main` has been pushed.** Verify first:
+`git log --oneline origin/main..beta-staging` must print nothing.
+
+Keep the **GCloud-Beta-Staging environment** — only the *branch* is temporary. The
+environment is worth having for the next fix; rebuilding it costs more than leaving
+it running.
 
 ### The version number — confirmed, not a guess
 
