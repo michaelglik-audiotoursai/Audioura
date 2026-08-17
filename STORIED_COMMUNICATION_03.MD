@@ -453,3 +453,44 @@ the runbook and must be asked for deliberately.
 
 A troubleshooting table closes the task, including "Claude starts reading `story_*.py`
 → it is on the wrong branch, stop it".
+
+### 11:1x — SIDE (Beta): the branch deleted, and "Beta" meant two things
+
+❯ Michael ran `git push origin --delete beta/yuri-bugs` — **done, D459 closed.**
+
+❯ *"Why then you said 'the fix has to reach Beta or he [Yury] never gets it'?"*
+
+**He was right and I was wrong.** I conflated the Play **Beta track** (how Yuri
+receives a build) with **GCloud-Beta** (the backend the build talks to). Yuri gets
+2.1.1+19 through the track; +19 points at GCloud-Beta-Staging; testers on +18 keep
+hitting GCloud-Beta untouched. **The app version is the isolation mechanism, not the
+branch.** D460 — and it bans writing "Beta" unqualified from here on.
+
+❯ *"I think we should create a new branch Beta-Staging... is it a good plan? I want to
+make sure that testing Beta-Staging we do not miss unexpected regressions that are
+working fine now in Beta."*
+
+**Good plan, adopted, one gap and one caveat.** D461.
+
+- **Built it:** `beta-staging` pushed — 5 commits above `origin/main`, all markdown,
+  **zero Storied work, measured.** Renamed from `fix/yuri-audio-and-map`, which keeps
+  the Windows briefings. `Beta-Bugs_Fixing.md` rewritten for the new flow.
+- **The gap:** "beta-staging will go away" must be **merge to `main`, then delete** —
+  deleting without merging loses the fixes. Guarded in §7c.
+- **The caveat:** both bugs read as **client-side** (player controller; client
+  indexing two lists off one server payload). If so, no backend change is needed and
+  GCloud-Beta-Staging is not on the critical path for *these* fixes. Flagged as a
+  diagnosis to confirm, not a fact.
+- **His regression worry, answered:** two sources, and the obvious one is the smaller.
+  *Code* is bounded by keeping the diff small. *Environment* is the one that gets
+  missed — a hand-built staging env drifts from GCloud-Beta in secrets, env vars, DB.
+  **Mitigation is a baseline:** deploy staging from `main`'s own commit, smoke-test
+  both endpoints, confirm identical, *then* deploy the fix. Same lesson as the
+  `prepush-baseline` worktree — a regression is a claim about two trees. And Yuri must
+  be asked to **compare** +18 with +19, not judge +19 alone.
+- **Open:** does +19 hard-code the staging URL or expose a selector? Recommend
+  hard-coded — a user-facing selector is the unwritten TRACK_B three-way feature and
+  does not belong on a bug-fix build.
+
+**ClickUp `wdvrdaxmqb` updated** — phase D was "merge to main", which ships to
+GCloud-Beta; put on hold, phases A–C unchanged.
