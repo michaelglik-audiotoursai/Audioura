@@ -1,0 +1,377 @@
+# Local mirror of the Beta stack that runs on Cloud Run.
+#
+# Purpose: reproduce and verify tour-generation behaviour on this laptop without
+# touching production. Same source, same call chain, same generated HTML.
+#
+# Deliberate differences from Cloud Run (see SUBMISSION_BETA_BUGS.md):
+#   - Postgres runs locally instead of Cloud SQL. No production data is touched.
+#   - Tours are written to ./tours instead of the Cloudflare R2 bucket.
+#   - billing-killswitch is omitted: it is a Cloud Function with no Dockerfile.
+#
+# Everything else matches: GENERATION_MODE defaults to 'thread', which is what
+# Beta actually uses (the cloud service does not set the variable).
+#
+# Container names are load-bearing. The services default their peer URLs to
+# these exact names (tour_orchestrator_service.py:24-29), so the chain wires
+# itself with no env overrides. Do not rename them.
+#
+#   docker-compose -f docker-compose-beta-local.yml up -d
+#
+# Requires OPENAI_API_KEY in .env.
+
+services:
+
+  # ---------- data ----------
+  postgres-2:
+    image: postgres:15-alpine
+    container_name: development-postgres-2-1
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d audiotours"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- tour generation chain ----------
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    container_name: development-tour-generator-1
+    ports:
+      - "5000:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+
+  # Built from Dockerfile.cloudrun: Dockerfile.orchestrator copies only
+  # tour_orchestrator_service.py and omits entitlements.py, so the quota check
+  # fails closed with ModuleNotFoundError and every generation returns 503.
+  # Pre-existing breakage, left alone; cloudrun copies all *.py.
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: development-tour-orchestrator-1
+    command: python tour_orchestrator_service.py
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - JOB_STORE_MODE=memory
+      - GENERATION_MODE=thread
+    volumes:
+      - ./tours:/app/tours
+    depends_on:
+      - postgres-2
+      - tour-generator
+      - coordinates-fromai
+    restart: unless-stopped
+
+  # The HTML builder. This is the service that produced Yury's tour page,
+  # and where the concurrent-audio fix lives.
+  tour-generation-modernized:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: tour-generation-modernized-1
+    command: python tour_generation_modernized.py
+    ports:
+      - "5021:5021"
+    environment:
+      - PORT=5021
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+
+  # Built from Dockerfile.cloudrun, not Dockerfile.tour-worker: the latter pins
+  # psycopg2-binary==2.9.1 via requirements.txt, which has no Python 3.11 wheel
+  # and fails its source build on pg_config. Pre-existing breakage, left alone.
+  # Unused in GENERATION_MODE=thread anyway; present for parity.
+  tour-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: development-tour-worker-1
+    command: python tour_worker_service.py
+    # Host 5045: port 5040 is held by a Windows svchost service on this machine.
+    ports:
+      - "5045:5040"
+    environment:
+      - PORT=5040
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    volumes:
+      - ./tours:/app/tours
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  polly-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile.polly-tts
+    container_name: polly-tts-1
+    ports:
+      - "5018:5018"
+    environment:
+      - PORT=5018
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=us-east-1
+    restart: unless-stopped
+
+  coordinates-fromai:
+    build: ./coordinates_fromAI
+    container_name: development-coordinates-fromai-1
+    ports:
+      - "5006:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+
+  translation-service:
+    build: ./translation-service
+    container_name: translation-service-1
+    ports:
+      - "5030:5030"
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+
+  # ---------- support ----------
+  user-api-2:
+    build: ./user-tracking
+    container_name: development-user-api-2-1
+    ports:
+      - "5003:5000"
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  tour-update:
+    build: ./tour-update-service
+    container_name: development-tour-update-1
+    ports:
+      - "5004:5001"
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  map-delivery:
+    build: ./map_delivery
+    container_name: development-map-delivery-1
+    ports:
+      - "5005:5005"
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  treats:
+    build:
+      context: .
+      dockerfile: Dockerfile.treats
+    container_name: development-treats-1
+    ports:
+      - "5007:5006"
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  tour-id-resolution:
+    build:
+      context: .
+      dockerfile: Dockerfile.tour-id-resolution
+    container_name: tour-id-resolution-1
+    ports:
+      - "5025:5025"
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+
+  # Regenerates a tour's HTML after an edit — carries the same audio fix.
+  tour-editing-phase2:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: tour-editing-phase2-1
+    command: python tour_editing_phase2.py
+    ports:
+      - "5022:5022"
+    environment:
+      - PORT=5022
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+
+  # ---------- news / newsletter ----------
+  # Built from Dockerfile.cloudrun: Dockerfile.news-generator copies only its own
+  # service file and omits entitlements.py, which it imports. Same pre-existing
+  # single-file-COPY problem as the orchestrator. Left alone; cloudrun copies all.
+  news-generator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: news-generator-1
+    command: python news_generator_service.py
+    ports:
+      - "5010:5010"
+    environment:
+      - PORT=5010
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  news-processor-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-processor
+    container_name: news-processor-1
+    ports:
+      - "5011:5011"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  # Built from Dockerfile.cloudrun: omits entitlements.py, so the news quota
+  # check fails closed and every article generation is denied. See above.
+  news-orchestrator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: news-orchestrator-1
+    command: python news_orchestrator_service.py
+    ports:
+      - "5012:5012"
+    environment:
+      - PORT=5012
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  # Built from Dockerfile.cloudrun: Dockerfile.newsletter-processor copies only
+  # newsletter_processor_service.py and omits apple_podcasts_processor.py, which
+  # that service imports — it crash-loops on ModuleNotFoundError from a clean
+  # build. Pre-existing breakage, left alone; cloudrun copies all *.py.
+  newsletter-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudrun
+    container_name: newsletter-processor-1
+    command: python newsletter_processor_service.py
+    ports:
+      - "5017:5017"
+    environment:
+      - PORT=5017
+      - FLASK_ENV=production
+      - DB_HOST=postgres-2
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  newsletter-link-extractor:
+    build:
+      context: .
+      dockerfile: Dockerfile.newsletter-link-extractor
+    container_name: newsletter-link-extractor-1
+    ports:
+      - "5014:5014"
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+
+  background-article-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.background-article-processor
+    container_name: background-article-processor-1
+    ports:
+      - "5015:5015"
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  simple-news-search:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple-news-search
+    container_name: simple-news-search-1
+    ports:
+      - "5016:5016"
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+  # ---------- edge ----------
+  # Fronts api.audioura.com in the cloud. The app does not need it in local
+  # mode (it calls services directly by port), but it is here for parity.
+  api-gateway:
+    build: ./api-gateway
+    container_name: development-api-gateway-1
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: development_default
