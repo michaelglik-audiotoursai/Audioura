@@ -15,18 +15,16 @@ and must not pull them in. If you find yourself reading `story_*.py`, `DECISIONS
 
 ## 0. Where you are
 
-Michael's Windows checkout:
-
-```
-C:\Users\micha\eclipseyour routine-workspace\AudioTours\development
-```
-
-**That path may be mistyped** (it looks like `eclipse-workspace` was mangled). If `cd`
-fails, find the real one instead of guessing:
+Michael's Windows checkout — confirmed by him on 2026-08-17:
 
 ```bat
-dir /s /b C:\Users\micha\*AudioTours* 2>nul | findstr /i "development$"
+cd /d "C:\Users\micha\eclipse-workspace\AudioTours\development"
 ```
+
+`...\AudioTours\development` **is the git clone root** — there is no `development/`
+folder inside the repository (verified against `origin/main`). So after that `cd` you
+are at the top of the repo, and `audio_tour_app/` sits directly beneath you. Use
+`cd /d` so the drive and directory change together.
 
 Then confirm you are in the right repository and on the right branch:
 
