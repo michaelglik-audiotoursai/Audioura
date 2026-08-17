@@ -65,8 +65,10 @@ Temp/
 !requirements-tour-processor.txt
 !requirements-news.txt
 !requirements-newsletter.txt
+!requirements*.txt
 !story_type_taxonomy.json
 !source_tier_rules.json
+!docker-compose-master.yml
 !templates/
 !templates/**
 !*_fixed.py

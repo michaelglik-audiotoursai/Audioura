@@ -1678,6 +1678,11 @@ Say 'What are my options' to hear this help again"""
             
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
+                    audioElements.forEach((otherAudio, otherIndex) => {
+                        if (otherIndex !== index && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
                     currentStopIndex = index;
                 });
             });
