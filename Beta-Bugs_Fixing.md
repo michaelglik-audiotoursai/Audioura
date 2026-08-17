@@ -3,6 +3,13 @@
 Michael starts Claude and says **"read Beta-Bugs_Fixing.md"**. This file is the whole
 briefing. Work top to bottom.
 
+> ## ⛔ ORDER MATTERS — read this before anything
+>
+> **The merge / version-bump / tag sequence in §7 is the LAST step, not the first.**
+> As of 2026-08-17 `fix/yuri-audio-and-map` contains **two markdown files and zero
+> code changes**. Merging it into `main` now would tag a Beta release for
+> documentation. §§3–6 come first: verify, derive, implement, test. Only then §7.
+
 **You are the `Beta_Bugs` session.** Begin every reply with
 `[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time.
 
@@ -42,6 +49,31 @@ git fetch origin
 git checkout fix/yuri-audio-and-map
 git pull
 ```
+
+### Downgrade the local services from Storied to Beta
+
+The Windows laptop has Docker running **Storied** images. This branch is cut from
+`main`, so checking it out and rebuilding *is* the downgrade — there is no separate
+downgrade procedure.
+
+```bat
+git checkout fix/yuri-audio-and-map
+docker-compose -f docker-compose-master.yml down
+docker-compose -f docker-compose-master.yml build tour-generator
+docker-compose -f docker-compose-master.yml up -d
+docker ps
+curl http://localhost:5000/health
+```
+
+Confirm you are on Beta code before testing anything:
+
+```bat
+git log --oneline -1
+git log --oneline origin/main..HEAD
+```
+
+The second command should list only this branch's own commits. If it lists hundreds,
+you are on `storied` or on the abandoned `beta/yuri-bugs` — stop and re-checkout.
 
 ---
 
@@ -123,8 +155,20 @@ stated as a finding is not.
 
 ## 4. STEP TWO — create the ClickUp tasks
 
-Only for reports you marked `CONFIRMED` or `WORKS AS DESIGNED`. A `NOT REPRODUCIBLE`
-report gets a comment back to Michael, not a task.
+**THE TWO TASKS ALREADY EXIST — do not create duplicates.** Created 2026-08-17 in
+🟩 Mobile — Kiro (Beta):
+
+| task | id | url |
+|---|---|---|
+| BETA-1 — two audios play concurrently | `wdvrdaxmq2` | https://app.clickup.com/t/wdvrdaxmq2 |
+| BETA-2 — audio/map numbering off by one | `wdvrdaxmq3` | https://app.clickup.com/t/wdvrdaxmq3 |
+
+Both already carry the verify-first step, acceptance criteria, test plan and a
+`## PROCESS` section. **Read them, work them, comment your verdict on them.** Create a
+new task only for something neither covers.
+
+If a report turns out `NOT REPRODUCIBLE`, comment that verdict on its task with your
+evidence and move it to 🔵 Claude — Review — do not silently close it.
 
 **Use the BETA space, not Storied.** These IDs were read from the live workspace on
 2026-08-16 — note they differ from the ones in the Mac Mini's `CLAUDE.md`, which are
@@ -214,7 +258,7 @@ Per `BRANCH_MODEL.md`, which is on this branch — read it.
 ```bat
 git checkout main
 git merge --no-ff fix/yuri-audio-and-map
-:: bump the version in audio_tour_app/pubspec.yaml, e.g. 2.1.1+19
+:: bump audio_tour_app/pubspec.yaml  2.1.1+18  ->  2.1.1+19   (see note below)
 :: test
 git tag -a beta-2.1.1+19 -m "Yuri: concurrent audio + map numbering"
 git push origin main --follow-tags
@@ -229,6 +273,19 @@ git merge main
 
 **Do not `git push origin storied`.** It has ~51 unpushed commits behind a field-test
 gate that is Michael's to lift.
+
+### The version number — confirmed, not a guess
+
+`origin/main` currently reads `version: 2.1.1+18`, and the only Beta tag is
+`beta-2.1.1+18`. So the next Beta build is **`2.1.1+19`**.
+
+Only the build number moves. That follows `BRANCH_MODEL.md`'s own worked example, and
+it is what Google Play requires — the **versionCode must increase** for a new upload;
+the version *name* may stay. `2.1.2+19` would also be defensible for a user-visible
+fix, but the documented convention wins unless Michael says otherwise.
+
+For reference, `storied` is on `2.2.1+1` — a different line entirely. Never copy a
+version between the two.
 
 **Never force-push `main`. Never move an existing `beta-*` tag.** The current frozen
 Beta is `beta-2.1.1+18` at commit `700d579`.
