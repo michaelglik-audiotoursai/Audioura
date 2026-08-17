@@ -179,6 +179,46 @@ not a defect. Per §8 it was left alone and is Michael's call.
 
 ---
 
+## BETA-3 — tour mislabelled "Museum Tour" — `wdvrdaxmub` (Storied, deferred)
+
+### Verdict: `CONFIRMED` (cosmetic) — deferred to the Storied release, no Beta change
+
+Third report from the same DM. Michael's hypothesis was put to the test rather than
+accepted, at his request.
+
+**Cause — confirmed.** `audio_tour_app/lib/screens/tour_generator_screen.dart:112`
+defaults `tourType` to `'museum'` when the request contains none of
+`walking`/`walk`/`museum`/`park`/`exhibit`. Yury's *"Toronto Ravines And Other Green
+Spaces"* says "green spaces", not "parks", so it fell through to that default.
+
+**Functionality is not lost — verified by execution, not by reading.**
+`get_coordinate_requirement(location, tour_type)` accepts `tour_type` but **never reads
+it**; the decision is regex on the *location string*:
+
+| location | tour_type | requirement |
+|---|---|---|
+| Toronto Ravines And Other Green Spaces | `museum` | `ALL_STOPS` |
+| Toronto Ravines And Other Green Spaces | `walking` | `ALL_STOPS` |
+| Museum of Fine Arts Boston | `museum` | `FIRST_STOP_ONLY` |
+
+Identical either way, so Yury's tour got per-stop coordinates and a working map. Museum
+tours in the archive carry stop-1-only coordinates because their **location** matched a
+single-building pattern, not because of the label.
+
+The wrong label costs only: the visible wording, a 🏛️ instead of 🚶 map icon, and a
+museum-flavoured narration prompt (Yury judged the content relevant).
+
+**But it is not harmless in general.** Storied's own comment records that the `'museum'`
+default caused transport tours to produce *"museum stops 25 miles away"*. Yury's tour got
+off lightly. If a report ever arrives where the label costs real functionality, that is a
+higher-severity bug than this one.
+
+**Already fixed on `storied`** (`utils/tour_request_parser.dart`, `[LOCAL-358]`/`[LOCAL-363]`):
+the default became `''` — an honest "no signal" — with tests asserting it. Deferred
+accordingly; `main` must not move while Storied churns.
+
+---
+
 ## Separate finding — not one of Yury's bugs
 
 **`generate_tour_text.py:10` imports a module that is not tracked in git.**
