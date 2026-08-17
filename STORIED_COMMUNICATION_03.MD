@@ -418,3 +418,38 @@ downgrade. Two commands included to prove you are on Beta code before testing.
 environment plus a three-way mobile selector (beta / Beta-Staging / Storied), which
 extends `TRACK_B_STORIED_VS_BETA.md` from two values to three. Needs its own decision
 and its own task before anyone builds it.
+
+### 11:0x — Michael's step-by-step runbook
+
+❯ *"please summarize my steps here in a numbered list with most details possible; for
+example, I do not understand what that means -- what I must actually do when you write
+things like '1. Downgrade Docker to Beta checkout this branch, rebuild' I need to have
+an action for it. After that Please create a task for me in ClickUp in Beta Space and
+assign it to me with these exact steps..."*
+
+**Fair criticism — "downgrade Docker" is a description, not an action.** Rewritten as
+literal commands, six phases, every step something he types.
+
+Created **[`wdvrdaxmqb`](https://app.clickup.com/t/wdvrdaxmqb)** in 👤 Michael (Beta
+space, `1000410000000731`), assigned to Michael.
+
+| phase | what he does |
+|---|---|
+| **A** | put the laptop on Beta: `cd /d`, fetch, checkout, **prove it is not storied**, `docker-compose down/build/up`, health check |
+| **B** | `claude` → *read Beta-Bugs_Fixing.md* → wait. It should only stop for the `#0` decision |
+| **C** | bump `2.1.1+18` → `2.1.1+19`, `bash build_flutter_clean.sh`, get the `.aab` onto his phone, test both fixes |
+| **D** | only after C passes: merge to `main`, tag `beta-2.1.1+19`, push with `--follow-tags`, forward-merge into `storied` — **never push storied** |
+| **E** | Play Console → Closed testing → upload → roll out to Yuri |
+| **F** | Beta-Staging — **explicitly out of scope**, needs its own decision |
+
+**Facts verified rather than assumed while writing it:** `PLAY_BUILD_AND_UPLOAD_RUNBOOK.md`
+and `build_flutter_clean.sh` are both present on the Beta line; the build command is
+`bash build_flutter_clean.sh`; the bundle lands at
+`…\development\audioura-release.aab`, not under `audio_tour_app/build/`.
+
+**One honest gap flagged in the task:** an `.aab` cannot be sideloaded, so his own
+phone test needs either Play Internal testing or a debug APK — the APK route is not in
+the runbook and must be asked for deliberately.
+
+A troubleshooting table closes the task, including "Claude starts reading `story_*.py`
+→ it is on the wrong branch, stop it".
