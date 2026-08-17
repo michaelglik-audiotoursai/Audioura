@@ -366,9 +366,12 @@ Claude, say *read Beta-Bugs_Fixing.md*.
 2. **The Beta ClickUp lists are different IDs from the Storied ones in `CLAUDE.md`.**
    Beta 🟩 Mobile — Kiro is `1000410000000730`, not `1000410000000734`. Read live from
    the workspace rather than trusted from the doc.
-3. **The Windows path looks mistyped** — `eclipseyour routine-workspace` reads like a
-   mangled `eclipse-workspace`. The file uses it as given but opens with a `dir /s /b`
-   discovery command so a wrong path costs nothing.
+3. **The Windows path looked mistyped** — `eclipseyour routine-workspace` read like a
+   mangled `eclipse-workspace`. **Michael confirmed it on 2026-08-17:** the real path
+   is `C:\Users\micha\eclipse-workspace\AudioTours\development`. Corrected in the
+   file; the discovery command is gone. Also corrected there: that path IS the git
+   clone root, not a subfolder inside the repo — verified against `origin/main`, which
+   has no tracked `development/` directory.
 
 Michael's "Yury can be wrong" is built in as the first step: reproduce before opening
 a task, and return one of three verdicts — CONFIRMED / NOT REPRODUCIBLE / WORKS AS
