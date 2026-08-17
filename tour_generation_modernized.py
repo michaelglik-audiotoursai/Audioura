@@ -266,6 +266,11 @@ def generate_html_with_external_audio(tour_data):
             // Track current playing audio
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
+                    audioElements.forEach((otherAudio, otherIndex) => {
+                        if (otherIndex !== index && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
                     currentStopIndex = index;
                 });
             });
