@@ -18603,3 +18603,72 @@ pushed branch is Michael's call — and the command is in the answer.
 it*, not a convenience. Cutting from the branch you happen to be standing on is how
 unrelated work travels. For a fix that must reach two tracks, cut from their common
 ancestor.
+
+## D460 — "Beta" names two different things, and conflating them produced a wrong objection
+
+**2026-08-17.** LEAD told Michael that holding the Yuri fix out of Beta would mean
+*"Yuri's bugs stay unfixed for him."* **That was wrong, and Michael caught it.**
+
+The word *Beta* is used for two unrelated things on this project:
+
+| term | what it is | who moves it |
+|---|---|---|
+| **Beta** (the track) | Google Play **closed testing** — how a tester receives an app build | a Play Console upload |
+| **GCloud-Beta** | the **backend environment** the app talks to | a `gcloud run deploy` |
+
+Yuri gets the fix through the *track*: he installs **2.1.1+19**, which points at
+**GCloud-Beta-Staging**. Testers still on **2.1.1+18** point at GCloud-Beta and are
+untouched. So the fix reaches Yuri while the GCloud-Beta backend never changes. LEAD's
+objection assumed the app build and the backend move together. They do not — **the app
+version is the isolation mechanism, not the branch.**
+
+**Vocabulary rule from here on:** never write "Beta" unqualified. Write **Beta track**
+(Play) or **GCloud-Beta** (environment). `main` is the branch; it feeds both, which is
+exactly why the two got confused.
+
+## D461 — `beta-staging`: a temporary maintenance line, cut from `main`, dissolved by merging
+
+**2026-08-17. Michael's plan, adopted.** `beta/yuri-bugs` deleted from origin by
+Michael (D459 closed). `beta-staging` created from `origin/fix/yuri-audio-and-map` and
+pushed: **5 commits above `origin/main`, all markdown, zero Storied work — measured.**
+
+```
+main    <- beta-staging     after Yuri verifies. Then DELETE beta-staging.
+storied <- main             forward-merge, as always
+storied -> main             NEVER
+```
+
+**The dissolution step is a merge, not a deletion.** Michael's phrasing was
+"beta-staging will go away"; if the branch is deleted without merging to `main` the
+fixes are lost. Written into §7c of `Beta-Bugs_Fixing.md` with the guard
+`git log --oneline origin/main..beta-staging` must print nothing before deleting.
+
+**Both of Yuri's bugs read as client-side** — the audio player controller, and the
+client indexing two lists off one server payload. If that holds, **no backend change is
+needed and GCloud-Beta-Staging is not on the critical path for these two fixes at all.**
+Stated in the briefing as a diagnosis to confirm in code, not a fact. Michael was told
+plainly and chose to build Beta-Staging anyway; that is a reasonable call — it buys a
+rehearsal of the environment before a fix that *does* need one.
+
+**The regression risk Michael named has two sources, and only one is obvious.**
+
+1. *Code* — bounded by keeping the diff small. `git diff main..beta-staging --stat`
+   before Yuri tests; anything beyond the two fixes and the version bump is a smell.
+2. *Environment* — **the one that gets missed.** A hand-built GCloud-Beta-Staging will
+   differ from GCloud-Beta in env vars, secrets, DB, and service versions. A tester
+   reporting "broken in staging" may be hitting config drift, not the fix.
+
+**The mitigation is a baseline, and it is the same lesson as the `prepush-baseline`
+worktree: a regression is a claim about two trees.** Deploy Beta-Staging from the commit
+`main` is already on, smoke-test both endpoints, confirm identical results — *then*
+deploy the fix. Without that step a bug report cannot distinguish a broken fix from a
+broken environment. And Yuri must be asked to **compare** 2.1.1+18 against 2.1.1+19,
+not to judge +19 in isolation.
+
+**Keep the GCloud-Beta-Staging environment after dissolution; only the branch is
+temporary.** Rebuilding it for the next fix costs more than leaving it running.
+
+**Open, not decided:** whether 2.1.1+19 hard-codes the Beta-Staging URL or exposes a
+selector. LEAD recommends **hard-coded** (or a build-time flag) — it delivers exactly
+the isolation Michael described. A user-facing selector is the three-way TRACK_B
+feature, which is unwritten and does not belong on a bug-fix build.
