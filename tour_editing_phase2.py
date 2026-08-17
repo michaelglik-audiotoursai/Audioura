@@ -876,6 +876,11 @@ def create_clean_html(tour_path, final_stops):
                 
                 // Update currentStopIndex when manually played
                 audioElement.addEventListener('play', function() {
+                    audioElements.forEach(function(otherAudio, otherIndex) {
+                        if (otherIndex !== i && otherAudio && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
                     currentStopIndex = i;
                 });
             }
