@@ -18672,3 +18672,44 @@ temporary.** Rebuilding it for the next fix costs more than leaving it running.
 selector. LEAD recommends **hard-coded** (or a build-time flag) — it delivers exactly
 the isolation Michael described. A user-facing selector is the three-way TRACK_B
 feature, which is unwritten and does not belong on a bug-fix build.
+
+## D462 — The Beta forward-merge landed clean on Storied; the "same bug elsewhere" was live code
+
+**2026-08-17.** `origin/storied` moved `afae00d` → `0ac89b3` (BETA-1 concurrent-audio fix
+forward-merged from `main`, plus a `.dockerignore` fix and a local Beta compose file).
+Merged into local `storied`: **11 files, 1468 insertions, zero deletions.** A merge that
+only adds cannot have damaged anything — that diff shape is the verification, not a
+substitute for it. Safety tag `pre-beta-merge-20260817` = `e56be4c` cut beforehand.
+
+**The Beta session flagged one thing it deliberately did not fix and asked whether it was
+dead code: `build_web_page_fixed.py:183`. It is not dead.** Traced, not assumed:
+
+```
+Dockerfile.tour-processor      COPY build_web_page_fixed.py .
+text_to_index_fixed.py:6       from build_web_page_fixed import generate_website
+tour_generation_service.py:48  from text_to_index_fixed import main
+Dockerfile.tour-processor:47   CMD ["python", "tour_generation_service.py"]
+audioura-tour-processor-1      running, /health 200
+```
+
+Fixed as `a1f5d9f`, then **rebuilt the image and read the fix back from inside the running
+container.** Committing a fix to a file that four indirections away reaches a container is
+not the same as the container having it — D242's live-artifact discipline applied to a
+five-line change.
+
+**Two things worth keeping beyond this merge.**
+
+1. **`!*_fixed.py` in `.dockerignore` is load-bearing in a way its comment understates.**
+   The comment says it is there for `enhanced_tour_templates_fixed`. In fact `build_*.py`
+   excludes `build_web_page_fixed.py`, so that one line is also the only reason
+   `tour-processor` builds at all. Taking `main`'s side on that conflict would have
+   removed it silently. The Beta session took Storied's side and was right.
+2. **A grep reported a false absence again (D242 check 3).** `build_web_page.py` already
+   had the pause pattern at :205–208, written `other.pause()`; searching the merged
+   identifier `otherAudio.pause()` said it was missing. Three of these now: the French
+   fact audit, the all-negative check, and this. **Search for the behaviour, not for the
+   identifier the other branch happened to use.**
+
+**Not pushed.** Local `storied` is 66 ahead of `origin/storied` and still behind the
+iPhone field-test gate; the fixed file exists only on `storied`, so `main` is owed
+nothing. No `storied` → `main` merge was made or proposed (D459/D461 stand).

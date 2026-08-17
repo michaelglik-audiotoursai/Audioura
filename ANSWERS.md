@@ -993,3 +993,32 @@ obligation:** if a message might be a question rather than a task, and acting wo
 create files, branches or commits, say so in one line first. A question mistaken for a
 task costs tokens and muddles the record; a task mistaken for a question costs one round
 trip.
+
+<a name="q202608171"></a>
+## Q-2026-08-17-1 — Verify the Beta forward-merge on Storied (ClickUp `wdvrdaxnbw`)
+
+**Merged clean, nothing damaged, and the one open item is fixed and live.**
+`git merge origin/storied` → **11 files, 1468 insertions, zero deletions** — the shape of
+the diff is the proof: no existing Storied file was modified or removed. Safety tag
+`pre-beta-merge-20260817` = `e56be4c`. Merge base `afae00d`, as the task said. Local was
+64 unpushed, not the 51 in `BRANCH_MODEL.md` — the extra 13 are LEAD session commits.
+
+| ask | outcome |
+|---|---|
+| `.dockerignore` conflict | resolution correct. `!*_fixed.py` preserved — and it matters more than stated: `build_*.py` excludes `build_web_page_fixed.py`, so that line is the only thing keeping `tour-processor` buildable. `!requirements*.txt` now duplicated; harmless. |
+| `[LOCAL-323]` cost attribution | intact — 5 refs, signature and the `args=(...)` thread call unchanged. |
+| regression suites | `test_sq4_merge.py` ALL PASSED · `test_palais_fix_lead_fixture.py` 23/23. |
+| `build_web_page_fixed.py:183` | **live, not dead code** — fixed as `a1f5d9f`, live-verified. |
+
+**The liveness trace, because "is it dead code" was the whole question:**
+`Dockerfile.tour-processor` COPYs it → `text_to_index_fixed.py:6` imports `generate_website`
+→ `tour_generation_service.py:48` imports that → `CMD python tour_generation_service.py`
+→ `audioura-tour-processor-1` running, `/health` 200. Image rebuilt, container recreated,
+and the fix read back **from inside the container**, not from the source tree.
+
+**A grep lied again (D242 check 3).** `build_web_page.py` already had the pause pattern at
+:205–208 written as `other.pause()`; searching for `otherAudio.pause()` reported it absent.
+
+**Not pushed.** Local `storied` is 66 ahead of `origin/storied`, still behind the iPhone
+field-test gate; the fix touches a Storied-only file so it owes `main` nothing. No
+`storied` → `main` merge made or proposed.

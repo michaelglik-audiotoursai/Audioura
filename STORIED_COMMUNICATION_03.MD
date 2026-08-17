@@ -494,3 +494,23 @@ working fine now in Beta."*
 
 **ClickUp `wdvrdaxmqb` updated** — phase D was "merge to main", which ships to
 GCloud-Beta; put on hold, phases A–C unchanged.
+
+### 13:1x — Michael: verify the Beta forward-merge on Storied local
+
+❯ *"We fixed one problem at Beta Yury reported and pushed it not only into Beta, but
+also into Storied. We created a Task for you in Storied space in ClickUp for
+verification... can you please find your task verify and update Storied local to make
+sure everything is in order."*
+
+**Done. [`wdvrdaxnbw`](https://app.clickup.com/t/wdvrdaxnbw) verified and closed.**
+Full outcome in [ANSWERS.MD Q-2026-08-17-1](ANSWERS.MD#q202608171) and D462.
+
+- **Merged clean** — 11 files, **1468 insertions, zero deletions**. Nothing of Storied's
+  was modified. Safety tag `pre-beta-merge-20260817` cut first.
+- **`.dockerignore` resolution correct**, `[LOCAL-323]` intact, both regression suites
+  green.
+- **The one item the Beta session left open — `build_web_page_fixed.py:183` — is live
+  code, not dead.** Traced Dockerfile → import → import → running container. Fixed
+  (`a1f5d9f`), image rebuilt, and verified **from inside the container**.
+- **Not pushed** — 66 ahead of `origin/storied`, still behind the field-test gate. The
+  file is Storied-only so `main` is owed nothing. No `storied` → `main` merge.
