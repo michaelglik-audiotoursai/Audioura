@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-17 11:04 EDT
+# RESTART briefing — generated 2026-08-17 13:13 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     0e012d6 STORIED_COMMUNICATION_03: log Michael's runbook task wdvrdaxmqb
-unpushed 60 commits
+HEAD     302e01e STORIED_COMMUNICATION_03: log the Beta-Staging plan and the Beta-track correction
+unpushed 63 commits
 dirty    1 files
 ```
 
