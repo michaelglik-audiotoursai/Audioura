@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-14 10:36 EDT
+# RESTART briefing — generated 2026-08-17 11:04 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     cf540dc verify(): one source sentence must carry the whole claim; Gemini blocked on billing
-unpushed 30 commits
+HEAD     0e012d6 STORIED_COMMUNICATION_03: log Michael's runbook task wdvrdaxmqb
+unpushed 60 commits
 dirty    1 files
 ```
 
@@ -13,7 +13,7 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      530
+cost_ledger rows:      548
 ```
 ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 
