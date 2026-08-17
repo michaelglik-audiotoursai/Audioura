@@ -377,3 +377,44 @@ Michael's "Yury can be wrong" is built in as the first step: reproduce before op
 a task, and return one of three verdicts — CONFIRMED / NOT REPRODUCIBLE / WORKS AS
 DESIGNED. The `#0` label for current location is flagged as Yury's suggestion, not a
 defect.
+
+## 2026-08-17
+
+### — Michael's plan for the Beta fix: confirmed with one order correction
+
+❯ *"please confirm that I need on Windows computer do the following: Ask Kiro to do the
+following: git checkout main / git merge --no-ff fix/yuri-audio-and-map / bump version
+/ tag / push ... then start Claude and ask him to run Beta-Bugs_Fixing.md"*
+
+**The steps are right; the ORDER is inverted.** `fix/yuri-audio-and-map` holds **two
+markdown files and zero code changes** — verified `git diff --name-only origin/main..`
+returns 0 non-`.md` files. Merging and tagging now would ship a Beta release for
+documentation. Claude + `Beta-Bugs_Fixing.md` runs FIRST (verify → derive → implement
+→ test); the merge/tag/push is the last step. An ⛔ ORDER MATTERS block is now the
+first thing in that file.
+
+**Version — he asked, and he was right that I never logged it.** `origin/main` is
+`version: 2.1.1+18`, the only tag is `beta-2.1.1+18`, so the next Beta build is
+**`2.1.1+19`** — build number only, per `BRANCH_MODEL.md` and Google Play's rule that
+versionCode must increase while the version name may stay. `storied` is on `2.2.1+1`,
+a separate line; never copy a version between them. **I had given `2.1.1+19` in chat as
+an example and never wrote it to disk — that is the gap he caught, and it is fixed
+here and in `Beta-Bugs_Fixing.md`.**
+
+**Two ClickUp tasks created** in 🟩 Mobile — Kiro (**Beta** space, `1000410000000730`
+— NOT the Storied list): `wdvrdaxmq2` (concurrent audio) and `wdvrdaxmq3` (numbering).
+Both lead with "verify it is a bug — Yury can be wrong" and three allowed verdicts.
+
+**Correction to his wording:** he asked to assign them to *Claude_Storied*. These are
+Beta bugs and must not enter a Storied queue — that is the mixing `TRACK_B` exists to
+prevent. They are assigned to the Beta Mobile Kiro queue, reviewed in 🔵 Claude —
+Review (Beta).
+
+**Docker downgrade added** to the startup file: the Windows laptop runs Storied images,
+and since this branch is cut from `main`, checking it out and rebuilding IS the
+downgrade. Two commands included to prove you are on Beta code before testing.
+
+**Beta-Staging (his step 6) is NOT covered** by any of this — it is a new GCloud
+environment plus a three-way mobile selector (beta / Beta-Staging / Storied), which
+extends `TRACK_B_STORIED_VS_BETA.md` from two values to three. Needs its own decision
+and its own task before anyone builds it.
