@@ -18891,3 +18891,57 @@ impossibility (Dalí/Freud 1974) is still caught.
 confident falsehood — and none was reachable by reading the gate's own verdict. The drop
 log said "died in 1887" and the fact that this was checkable against a known lifespan is
 what exposed it. **Read what a gate threw away, not what it kept.**
+
+## D467 — The iteration curve plateaus because the scorer cannot see the object, not because the material runs out
+
+**2026-08-18. Michael asked for the baseline written up, the missing pieces broken down,
+and a chart of the evaluation index over iterations on one stop — MFA Unbound, stop 2,
+*Moses and Monotheism* — "so I can see when we stop improving and investigate."**
+
+Baseline: `STORY_BASELINE.md`. Harness: `story_iteration_chart.py`. Chart:
+`STORY_ITERATION_CHART.md`. Eight iterations, one focus fact each, 80 SERP queries.
+
+```
+ 1  40   2  51   3  61   4  39   5  49   6  51   7  51   8  51
+ best     40      51      61      61      61      61      61      61
+```
+
+**It plateaus at iteration 3 and five further iterations buy nothing.** Two things about
+that flat stretch are not what anyone predicted.
+
+**The gates are not the constraint here. 0 of 8 stories lost a single sentence.** The
+"gates are eating the stories" reading — which LEAD nearly published on a false zero
+(D423) — does not hold for this stop under this loop. Whatever is capping the score is
+upstream of validation.
+
+**The cap is the metric.** `valuation_index` is
+`sentence_count*10 (≤30) + agency*10 (≤30) + stakes*12 (≤25) + grounded_fraction*15`
+(`evaluate_story.py:342`). Measured consequences:
+
+1. **The object is not in the formula.** `detail` — does a sentence name a physical
+   property of the thing in the case — is computed and never added. That is measure 4 in
+   `STORY_GATE_TIERS.md` and the known weakness of D449, and the index is blind to it.
+2. **Sentences past the third are free.** `3 * 10` already caps that term, so Michael's
+   "3–5 sentences, more for the best one" is scored as though every story were three.
+3. **Groundedness punishes specificity, and this is the finding.** Re-running the
+   best iteration with `SNIPPET_CAP_PER_STOP` raised 5 → 20 (79 raw results are retrieved
+   and 5 survive the cap, every iteration — 94% discarded) moved **`detail` 0 → 29** and
+   **`historic` 46 → 66**: the story finally said *"drypoints and lithographs on
+   sheepskin"*, an actual property of the object. **The index fell 61 → 50**, because the
+   new proper nouns are absent from the museum's own exhibition page.
+
+**(3) is this morning's mission in a second instrument.** D466 fixed a gate that treated
+absence of evidence as proof of falsehood; the scorer does the same thing one layer up
+and calls it groundedness. A story is penalised for containing facts the museum's
+webpage does not happen to mention. **The two defects are the same mistake, and fixing
+only the gates would have left the scorer quietly enforcing it.**
+
+**What this does NOT license.** Do not raise the snippet cap as a fix — 20 scored worse
+on the metric we currently have, and until the metric counts the object we cannot tell a
+better story from a worse one. **Order is forced: fix the index first, then re-run the
+chart, then tune retrieval.** Any tuning done before the index counts `detail` is tuning
+against a number we already know is wrong.
+
+**Standing check that earned its keep:** #3, run the instrument against a case whose
+answer is already known. The cap experiment was one run and $0.04, and it inverted the
+conclusion the eight-iteration curve was about to support.
