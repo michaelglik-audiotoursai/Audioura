@@ -14329,12 +14329,31 @@ RULES:
                             _p4_verification_log.append(
                                 f"FAIL: only {_p4_stops_referenced} stop(s) referenced by name, need ≥2")
 
+                        # [LOCAL-481] Strip the label artifact before verifying.
+                        # Delivered runs contained "At this work: Le Lézard aux
+                        # plumes d'or (…), you'll delve into a collaborative
+                        # masterpiece." The prompt asks for "<fact> at <stop name>"
+                        # and the model answers with a label. Spoken aloud, "at this
+                        # work colon" is nonsense. Cheaper to remove deterministically
+                        # than to add another prompt rule the model may ignore.
+                        # The preposition keeps its original case: replacing with a
+                        # literal "At " produced "Then, At Au Soleil du Plafond".
+                        _p4_text = re.sub(
+                            r'\b(at|in)\s+th(?:is|e)\s+(?:work|stop|piece|item)\s*:\s*',
+                            lambda m: m.group(1) + ' ', _p4_text,
+                            flags=re.IGNORECASE).strip()
+
                         # Check for vague language (R10-style)
                         _vague_patterns = [
                             r'\bmore stories\b', r'\bmany tales\b', r'\bmany more\b',
                             r'\brich history\b', r'\bfascinating\b', r'\bhints at\b',
                             r'\bmore awaits\b', r'\bstories await\b', r'\bmore to discover\b',
                             r'\bmore wonders\b', r'\bcountless\b', r'\bexplore the history\b',
+                            # [LOCAL-481] Observed in delivered runs and just as empty
+                            # as the twelve above: a "preview" that previews nothing.
+                            r'\bcollaborative masterpiece\b', r'\bdelve into\b',
+                            r'\bunravel the depths\b', r'\bwitness how\b',
+                            r'\btranscend(?:s)? time\b', r'\bunseen layers\b',
                         ]
                         for _vp in _vague_patterns:
                             if re.search(_vp, _p4_text, re.IGNORECASE):

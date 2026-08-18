@@ -19414,3 +19414,32 @@ conclusions in D472/D474 lean harder on one run than they should.
 a single run as evidence that a change worked.** The per-stop indices swing 10-20 points
 run to run on identical code; nothing smaller than that is a signal. This is also why the
 lab iteration chart used a running best over eight iterations rather than a single score.
+
+## D481 — The tour preview was previewing nothing, and labelling it out loud
+
+**2026-08-18.** Delivered runs contained, in the opening orientation:
+
+> "At this work: Le Lézard aux plumes d'or (The Lizard with Golden Feathers), you'll
+> delve into a collaborative masterpiece. Then, at this work: Au Soleil du Plafond,
+> witness how creative endeavors transcend time's limitations."
+
+Two faults in one sentence, and Part 4 already has a verifier that should have caught the
+second.
+
+**The label.** The prompt asks for the format `"<fact> at <stop name>"` and the model
+answers with a literal label — `at this work: <name>`. Spoken aloud that is "at this work
+colon", which is nonsense to a listener. Removed deterministically rather than by adding
+another prompt rule the model may ignore. **The first version of the fix replaced the
+label with a literal `"At "` and produced "Then, At Au Soleil du Plafond"** — the
+preposition now keeps its original case.
+
+**The emptiness.** "a collaborative masterpiece", "delve into", "witness how creative
+endeavors transcend time's limitations" are exactly as empty as the twelve phrases the
+vague-language verifier already rejects ("rich history", "fascinating", "more to
+discover"). A preview that previews nothing is the failure that list exists to prevent;
+it simply had not been shown these particular phrasings. Six added.
+
+Same shape as D478 and D479: **a blocklist only rejects what somebody has already seen
+it reject.** Worth noting that the durable version of this check is the one D479 built
+for organisations — ask whether a specific fact is present, rather than whether a known
+bad phrase is absent. Recorded as the direction for Part 4 when it is next touched.
