@@ -19366,3 +19366,51 @@ the D243 accent lesson for the fourth time today** (after `_is_well_known`, the
 runs. Enumerating patterns is losing a race against a generative model — the same
 structural point as D476. The durable answer is to check the **claim** (agent X in role Y
 for this work) rather than the **string**, and that is now the top item on the gate work.
+
+## D479 — Ground the ORGANISATION, not the role-claim grammar
+
+**2026-08-18.** Three shapes of the Hogarth Press fabrication escaped
+`stop_claim_audit` on three separate release runs, each closed by adding a pattern
+(passive was covered; active → D473; em-dash parenthetical → D478). **Enumerating
+patterns is a losing race against a generative model** — the same structural point D476
+made about the retry teaching the model to paraphrase.
+
+`apply_org_grounding_gate` (PHASE 5.158c) asks a question with no grammar in it:
+
+> Is this organisation grounded in the stop record or the corpus **at all**?
+
+One check covers all three forms and every form nobody has thought of. It is the
+organisation-shaped sibling of `apply_prose_entity_grounding_gate`, which has only ever
+handled PERSON names — "The Hogarth Press" opens with "The", so `_looks_like_person_name`
+correctly rejects it as a person, **and then nothing else ever looked at it.** That
+blind spot is why an organisation could be asserted freely for months.
+
+Verified against the real MFA page text: Hogarth ungrounded, **Mourlot Frères grounded**,
+the venue exempt, bare marker words ("the press covered the opening") not treated as
+organisations, grounded prose untouched. `test_local479` 10/10, 7 of them false-rejection
+guards.
+
+**Stated plainly: this gate will produce some false rejections.** A true publisher absent
+from a thin museum page reads exactly like an invented one — `Éditions Verve` is probably
+real for *Au Soleil du Plafond* and is not in the corpus. That is the D455 trade (prefer
+false rejection on facts), and it is **only acceptable because LOCAL-474 exists**: with a
+retry loop a wrong drop costs one regeneration instead of the stop's story. The two
+changes are load-bearing for each other, which is worth remembering before anyone
+disables one of them.
+
+## D480 — Single tour runs are too noisy to judge from, and I was doing exactly that
+
+**Measured 2026-08-18:** run 3 scored mean 50, run 4 scored mean 39, on near-identical
+code. Earlier the same day I reported a 36 → 37 change and a 37 → 50 change as if each
+were a result. **A single generation is a sample, not a measurement**, and several
+conclusions in D472/D474 lean harder on one run than they should.
+
+`VARIANCE_3RUNS.log` records repeated runs. The first such batch was itself contaminated
+— it was launched before the PHASE 5.158c wiring, so run 1 used different code from runs
+2 and 3. Recorded rather than quietly discarded, because it is the same class of error:
+**changing the system while measuring it.**
+
+**Rule going forward: report a mean and a range over at least three runs, and never quote
+a single run as evidence that a change worked.** The per-stop indices swing 10-20 points
+run to run on identical code; nothing smaller than that is a signal. This is also why the
+lab iteration chart used a running best over eight iterations rather than a single score.

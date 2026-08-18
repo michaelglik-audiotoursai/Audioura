@@ -1,0 +1,8 @@
+=== VARIANCE RUN 1 ===
+GENERATED 5631 chars in 115.2s -> TOUR_MFA_RELEASE_20260818_1614.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   60    12    40    57
+ 2  Au Soleil du Plafond                           49     0    43    30
+ 3  Moses and Monotheism                           33    12    35    60
+    MEAN                                           47     8    39    49
+  stops with detail == 0 (no object named): 0 of 3
+=== VARIANCE RUN 2 ===

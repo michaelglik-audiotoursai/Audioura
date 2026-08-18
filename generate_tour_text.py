@@ -12609,6 +12609,38 @@ REWRITE RULES (all mandatory):
             else:
                 print(f"\n  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)")
 
+    # -------- [LOCAL-479] PHASE 5.158c: Organisation grounding gate --------
+    # The grammar-independent sibling of 5.158b. The Hogarth Press fabrication
+    # escaped the role-claim gate on three separate runs in three constructions
+    # (passive, active, em-dash parenthetical), each fixed by adding a pattern —
+    # a losing race against a generative model. This asks only whether the
+    # organisation is grounded anywhere at all, which no rephrasing can dodge.
+    # Same scope and same bar as 5.158b: exhibition-scoped museum tours, and an
+    # org absent from BOTH the record and the corpus is the only thing that drops.
+    if (tour_category == 'museum' and _exhibition_checklist_result
+            and getattr(_exhibition_checklist_result, 'page_text', '')):
+        _org_corpus = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+        print(f"\n  [LOCAL-479] PHASE 5.158c: Organisation grounding gate...")
+        try:
+            from prose_entity_grounding_gate import apply_org_grounding_gate
+            _org_stats = apply_org_grounding_gate(
+                poi_list, _org_corpus,
+                exempt=[location, _exhibition_name if '_exhibition_name' in dir() else ''],
+            )
+            print(f"  [LOCAL-479] orgs detected={_org_stats['orgs_detected']} "
+                  f"grounded={_org_stats['orgs_grounded']} "
+                  f"ungrounded={_org_stats['orgs_ungrounded']} "
+                  f"sentences_dropped={_org_stats['sentences_dropped']}")
+            for _ol in _org_stats['drop_log']:
+                print(f"    [LOCAL-479] field={_ol['field']} stop='{_ol['stop'][:30]}' "
+                      f"org='{_ol['org']}' — ungrounded")
+                for _od in _ol['dropped_sentences']:
+                    print(f"      dropped: \"{_od[:100]}\"")
+        except ImportError as _org_err:
+            print(f"  [LOCAL-479] WARNING: org gate not importable — skipped ({_org_err})")
+        except Exception as _org_err:
+            print(f"  [LOCAL-479] ERROR: org gate failed (non-fatal): {_org_err}")
+
     # -------- [LOCAL-384] PHASE 5.159: Form-claim gate --------
     # The model repeatedly infers physical form from titles (e.g. "Au Soleil du
     # Plafond" → "ceiling mural"). Five prompt-level rounds failed. This gate

@@ -1372,3 +1372,133 @@ def apply_numeric_claim_gate(
             stats['stops_affected'] += 1
 
     return stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-479] ORGANISATION GROUNDING — the durable answer to the Hogarth problem
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# The Hogarth Press fabrication escaped `stop_claim_audit` on three separate runs
+# in three grammatical forms — passive, active, and an em-dash parenthetical
+# (D473, D478). Each escape was fixed by adding a pattern. That is a losing race:
+# patterns are enumerable and a generative model's phrasings are not.
+#
+# This gate asks a different question. Not "does the prose contain a role-claim
+# construction naming an agent" but simply:
+#
+#     Is this ORGANISATION grounded in the stop record or the corpus at all?
+#
+# The answer does not depend on grammar, so all three forms — and every form
+# nobody has thought of — are covered by one check. It is the organisation-shaped
+# sibling of `apply_prose_entity_grounding_gate`, which has only ever handled
+# PERSON names: "The Hogarth Press" opens with "The", so `_looks_like_person_name`
+# correctly rejects it as a person and then nothing else ever looked at it.
+#
+# Deliberately conservative about false rejections, which is what the whole
+# 2026-08-18 session has been removing:
+#   - the venue and exhibition names are exempt
+#   - well-known institutions are exempt
+#   - matching is ACCENT-FOLDED (D243, hit four times on 2026-08-18)
+#   - an org named nowhere in the corpus AND nowhere in the record is the only
+#     thing that drops, which is the same bar `stop_claim_audit` uses
+
+_ORG_MARKER_RE = re.compile(
+    r'\b(?:Press|Éditions|Editions|Frères|Freres|Verve|Gallery|Galerie|Museum|'
+    r'Musée|Atelier|Imprimerie|Workshop|Studio|Studios|Foundation|Institute|'
+    r'Publishing|Publishers|Publisher|Books|Bibliothèque|Society|Academy|'
+    r'Company|Editions?)\b', re.IGNORECASE)
+
+_ORG_SPAN_RE = re.compile(
+    r'\b((?:The\s+)?[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ\'’\-]+(?:\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ\'’\-]+){0,3})')
+
+_WELL_KNOWN_ORGS = {
+    'museum of fine arts', 'the louvre', 'louvre', 'moma', 'museum of modern art',
+    'tate', 'tate modern', 'the metropolitan museum of art', 'the met',
+    'guggenheim', 'centre pompidou', 'prado', 'rijksmuseum', 'uffizi',
+    'british museum', 'national gallery', 'smithsonian',
+}
+
+
+def _fold_org(s: str) -> str:
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', (s or '').lower())
+                   if unicodedata.category(c) != 'Mn').strip()
+
+
+def extract_organisation_names(text: str) -> List[str]:
+    """Capitalised spans that carry an organisation marker word."""
+    out, seen = [], set()
+    for m in _ORG_SPAN_RE.finditer(text or ''):
+        span = m.group(1).strip()
+        if not _ORG_MARKER_RE.search(span):
+            continue
+        # A bare marker on its own ("Press", "Museum") is not a name.
+        if len(span.split()) < 2:
+            continue
+        key = _fold_org(span)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(span)
+    return out
+
+
+def check_org_grounded(org: str, page_text: str, record_values: List[str],
+                       exempt: List[str] = None) -> bool:
+    """Grounded if the org appears in the corpus, the stop record, or an exemption."""
+    f = _fold_org(org)
+    if not f:
+        return True
+    bare = re.sub(r'^the\s+', '', f)
+    if f in _WELL_KNOWN_ORGS or bare in _WELL_KNOWN_ORGS:
+        return True
+    for k in _WELL_KNOWN_ORGS:
+        if k in f or f in k:
+            return True
+    for e in (exempt or []):
+        ef = _fold_org(e)
+        if ef and (ef in f or f in ef or bare in ef):
+            return True
+    haystack = _fold_org(page_text or '') + ' ' + ' '.join(
+        _fold_org(v) for v in (record_values or []) if v)
+    return bool(f and (f in haystack or bare in haystack))
+
+
+def apply_org_grounding_gate(poi_list: List[Dict], page_text: str,
+                             exempt: List[str] = None) -> Dict:
+    """Drop sentences asserting an organisation that nothing grounds.
+
+    Returns stats. Mirrors `apply_prose_entity_grounding_gate`'s contract.
+    """
+    stats = {'orgs_detected': 0, 'orgs_grounded': 0, 'orgs_ungrounded': 0,
+             'sentences_dropped': 0, 'stops_affected': 0, 'ungrounded': [],
+             'drop_log': []}
+    for poi in poi_list or []:
+        record_values = [poi.get(f, '') for f in
+                         ('publisher', 'credit_line', 'printer', 'donor',
+                          'artist', 'collaborator', 'writer')]
+        affected = False
+        for field in ('description', 'orientation'):
+            text = poi.get(field) or ''
+            if not text or text.startswith('['):
+                continue
+            for org in extract_organisation_names(text):
+                stats['orgs_detected'] += 1
+                if check_org_grounded(org, page_text, record_values, exempt):
+                    stats['orgs_grounded'] += 1
+                    continue
+                stats['orgs_ungrounded'] += 1
+                if org not in stats['ungrounded']:
+                    stats['ungrounded'].append(org)
+                new_text, dropped = remove_person_from_text(text, org)
+                if dropped:
+                    poi[field] = new_text
+                    text = new_text
+                    affected = True
+                    stats['sentences_dropped'] += len(dropped)
+                    stats['drop_log'].append({
+                        'stop': poi.get('name', ''), 'field': field,
+                        'org': org, 'dropped_sentences': dropped})
+        if affected:
+            stats['stops_affected'] += 1
+    return stats
