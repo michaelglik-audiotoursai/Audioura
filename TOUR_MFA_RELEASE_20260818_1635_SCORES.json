@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 176.1464810371399,
+  "chars": 5812,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "index": 54,
+      "historic": 0,
+      "detail": 15,
+      "social": 84,
+      "text": "Within \"Le Lézard aux plumes d’or,\" Joan Miró creates a vibrant world through 40 color lithographs, merging myth with surrealism. The renowned Parisian publisher Louis Broder commissioned this project, choosing Miró for his unparalleled ability to transform pages into realms of imagination. This choice was not merely aesthetic; Broder was dedicated to advancing the collaborative art form, where artist, publisher, and printer work in unison, as evidenced by the involvement of Mourlot Frères, famed for their exquisite lithographic prints. This synergy ensured that Miró’s imaginative lithographs were brought to life with precision and vibrancy. Adding to the evolving narrative of art books, Boris Fridman donated this piece to the Museum of Fine Arts, Boston, enhancing its collection of 20th-century avant-garde works. Through such contributions, the exhibition argues for the revolutionary nature of books as integrated art forms, where the format and content are deliberated and executed collectively.",
+      "orientation": "In the heart of Boston, you are about to explore the Picasso, Miro, Dali: Unbound exhibition at the MFA. Three extraordinary works by Spanish artists await you in Gallery 184: Le Lézard aux plumes d’or (The Lizard with Golden Feathers), Moses and Monotheism, and Au Soleil du Plafond. These livre d'artiste, revolutionary in their form and collaborative in creation, rarely grace public view. Discover how the intersection of images, words, and typography unveils the divine and mystical, reflecting different cultural expressions of the transcendent. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Stand where natural light spills onto \"Le Lézard aux plumes d’or (The Lizard with Golden Feathers).\" Here, the luminescence accentuates the intricate textures of the Louis Broder’s vellum, offering a tactile sense of richness that is vital to understanding the piece's depth."
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "index": 28,
+      "historic": 24,
+      "detail": 6,
+      "social": 15,
+      "text": "Navigate the intricate paths of \"Moses and Monotheism,\" authored by Sigmund Freud in 1939. Freud's work delved into the origins of monotheism, proposing radical ideas that Moses was Egyptian rather than Hebrew. Salvador Dalí illustrated the text in 1974, merging his surrealist vision with Freud’s controversial ideas. Dalí was captivated by Freud's theories, seeing them as essential to the Surrealist movement. The Hogarth Press published this collaboration, reinforcing the integration of image and text, a core argument of this exhibition. Displayed in these works, normally archived, highlight the transformative collaboration between Freud and Dalí. Dalí's vision prompts contemplation of the broader implications and how contemporary artists might explore themes like the sun, often a symbol of divinity.",
+      "orientation": "Stand closely by the display of \"Moses and Monotheism\" to appreciate how the interplay of text and illustration creates a unified narrative, offering a perspective otherwise missed from afar."
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "index": 47,
+      "historic": 18,
+      "detail": 42,
+      "social": 30,
+      "text": "In 1955, Éditions Verve published this evocative livre d'artiste. Notably, the printing was completed by Mourlot Frères, renowned for their exceptional lithographic prints. The book includes 11 lithographs printed on Arches paper, an artistic decision that emphasizes the refined quality and durability of the medium. Within the pages, the visual elements crafted by Gris dance alongside Reverdy's thoughtful words, creating an intertwined narrative greater than the sum of its parts. This collaboration grew out of the enduring connection between art and poetry, providing a space where images and text meet on equal footing. Gris and Reverdy's work exemplified the fusion of artistic disciplines, a theme central to the exhibition's thesis, which argues for the collaborative potential inherent in the livre d'artiste tradition. By integrating lithographs and text honed through the presses of Mourlot Frères, this project underscores how the intersection of art and literature can produce a richly textured dialogue. The work doesn't merely illustrate poetry; it brings it to life on each page. This melding of disciplines expands our understanding of how collaborative ventures redefine artistic mediums. It's not just an historical accomplishment but a lesson in the unyielding exploration of artistic boundaries. Through this work, we ponder how these interpretations inform our perceptions of the divine and the infinite possibilities of human creativity.\n\nThat's 3 stops — Freud's theory posited Moses as Egyptian, not Hebrew, in his monotheism study and Gris and Reverdy's exhibit showcased interdisciplinary fusion, emphasizing livre d'artiste collaboration. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "As you consider \"Au Soleil du Plafond,\" created through the collaboration between Spanish artist Juan Gris and French poet Pierre Reverdy, think about the innovative spirit they brought to the book as an art form in 1955. This work is a quintessential example from the exhibition, showcasing the fusion of poetry and art."
+    }
+  ]
+}

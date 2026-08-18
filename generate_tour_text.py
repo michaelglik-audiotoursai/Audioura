@@ -12617,10 +12617,43 @@ REWRITE RULES (all mandatory):
     # organisation is grounded anywhere at all, which no rephrasing can dodge.
     # Same scope and same bar as 5.158b: exhibition-scoped museum tours, and an
     # org absent from BOTH the record and the corpus is the only thing that drops.
-    if (tour_category == 'museum' and _exhibition_checklist_result
+    # Behind DISABLE_ORG_GROUNDING_GATE=1, like every other gate in this chain, so
+    # its effect on tour quality can be A/B measured rather than assumed. D480: a
+    # single run is a sample, so the comparison is a mean over >=3 runs each way.
+    _org_gate_disabled = os.environ.get('DISABLE_ORG_GROUNDING_GATE', '').strip() == '1'
+    if _org_gate_disabled:
+        print(f"\n  [LOCAL-479] Organisation grounding gate DISABLED by env var")
+    elif (tour_category == 'museum' and _exhibition_checklist_result
             and getattr(_exhibition_checklist_result, 'page_text', '')):
+        # [LOCAL-482] Ground against the SERP snippets and stop corpus as well as
+        # the exhibition page. Measured A/B over 3 runs each way: the gate cost
+        # 5.4 index points (38.3 with, 43.7 without), and the reason is visible in
+        # the drop log — it caught "The Hogarth Press" (a real fabrication, the one
+        # Michael has objected to most) but also dropped "Éditions Verve", which is
+        # the actual publisher of Au Soleil du Plafond and simply is not mentioned
+        # on the MFA's exhibition page.
+        #
+        # A museum's own page is a thin evidence base for a question about
+        # publishers. The snippets we already retrieved and paid for are a much
+        # larger one, and using them narrows the false-rejection half of the trade
+        # without touching the false-acceptance half: an organisation named nowhere
+        # in ANY of our evidence is still dropped.
         _org_corpus = getattr(_exhibition_checklist_result, 'page_text', '') or ''
-        print(f"\n  [LOCAL-479] PHASE 5.158c: Organisation grounding gate...")
+        try:
+            _org_extra = []
+            for _osn in (_DIRECT_SNIPPETS_PER_STOP or {}).values():
+                for _os in (_osn or []):
+                    if isinstance(_os, dict):
+                        _org_extra.append(f"{_os.get('title','')} {_os.get('snippet','')}")
+            for _oe in (_stop_corpus_data or {}).values():
+                for _op in ((_oe or {}).get('passages') or []):
+                    _org_extra.append(str(_op))
+            if _org_extra:
+                _org_corpus = _org_corpus + '\n' + '\n'.join(_org_extra)
+        except Exception as _oc_err:
+            print(f"  [LOCAL-482] could not widen org corpus (non-fatal): {_oc_err}")
+        print(f"\n  [LOCAL-479] PHASE 5.158c: Organisation grounding gate "
+              f"(corpus {len(_org_corpus)} chars)...")
         try:
             from prose_entity_grounding_gate import apply_org_grounding_gate
             _org_stats = apply_org_grounding_gate(

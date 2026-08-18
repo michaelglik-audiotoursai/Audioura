@@ -19443,3 +19443,54 @@ Same shape as D478 and D479: **a blocklist only rejects what somebody has alread
 it reject.** Worth noting that the durable version of this check is the one D479 built
 for organisations — ask whether a specific fact is present, rather than whether a known
 bad phrase is absent. Recorded as the direction for Part 4 when it is next touched.
+
+## D482 — The A/B that mattered: the org gate cost 5 points, and widening its evidence base recovered them
+
+**2026-08-18, measured, three runs per arm (D480 rule — no single run is evidence).**
+
+| arm | runs | mean | range |
+|---|---|---|---|
+| org gate OFF | 48 / 40 / 43 | **43.7** | 40–48 |
+| org gate ON, exhibition page only | 38 / 41 / 36 | **38.3** | 36–41 |
+| org gate ON, **widened corpus** | 48 / 46 / 43 | **45.7** | 43–48 |
+
+**The gate as first built cost 5.4 index points.** The drop log said why: it caught "The
+Hogarth Press" — a genuine fabrication — and also dropped **"Éditions Verve", which is
+the actual publisher of *Au Soleil du Plafond*** and simply is not named on the MFA's
+exhibition page. A museum's own page is a thin evidence base for a question about
+publishers.
+
+Grounding now also consults the SERP snippets and stop corpus **we have already
+retrieved and paid for**. Result: zero false drops across three runs, and a mean above
+the gate-off baseline. Adding a disable flag first — which every other gate in the chain
+already had — is what made this measurable at all.
+
+### The subtle part, and it changes the architecture
+
+**With the widened corpus the org gate no longer catches Hogarth.** Verified directly:
+
+```
+org gate, exhibition page only  -> ungrounded  (drops)
+org gate, widened corpus        -> grounded    (keeps)
+role-claim gate, narrow corpus  -> drops it
+```
+
+The reason is that **The Hogarth Press is real and really did publish Freud's 1939 English
+edition.** Attributing the *1974 Dalí-illustrated* edition to it is a **misattribution,
+not a hallucination** — and an entity-presence check cannot see the difference, because
+the entity is genuinely present. The narrow corpus was catching it by accident.
+
+So the two gates are not redundant and must both stay:
+
+| gate | corpus | question | catches |
+|---|---|---|---|
+| 5.158b role-claim | exhibition page (narrow) | is agent X in role Y **for this work**? | **misattributions** |
+| 5.158c org grounding | page + snippets (wide) | does this organisation exist in our evidence **at all**? | **pure hallucinations** |
+
+**Widening the role-claim gate's corpus would break it** — that is the trap this
+measurement almost walked into, and the note is here so nobody "fixes" the asymmetry
+later. The role gate's narrowness is load-bearing.
+
+**Standing at end of session, three runs on final code: mean 45.7, range 43–48**, against
+36 on the first full-tour run this afternoon. Still short of the lab's 64, and the gap is
+still the story-prompt extraction (D474), untouched on purpose.
