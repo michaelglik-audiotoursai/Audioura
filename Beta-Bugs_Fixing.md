@@ -73,10 +73,21 @@ for each step; report what you are doing as you go so he can interrupt.
    [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) and
    [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3). Read the comments first.
 2. 🔵 **Claude — Review (Beta)** — list `1000410000000728`
-3. 🔵 **Claude — Review (Storied)** — list `1000410000000732`
-4. Any task whose description opens with `**Agent:** Claude`
+3. 🟦 **Services — Kiro (Beta)** — list `1000410000000729` — only tasks whose
+   description opens `**Agent:** Claude`
+4. Any other task whose description opens with `**Agent:** Claude`
 
 Within each, highest priority first, then oldest. Skip anything already `complete`.
+
+> ### ⛔ The Storied Claude — Review list is NOT your queue
+>
+> List `1000410000000732` belongs to **`Storied_Tours`** on the Mac Mini. Checked on
+> 2026-08-18: everything in it is tour-narration quality — `generate_tour_text.py`, the
+> story pipeline, POI text rules — which is precisely the scope §0 tells you to stay out
+> of. Working it would duplicate or collide with the Mac Mini's session.
+>
+> If something there genuinely needs Beta-side work, hand it over via a task rather than
+> doing it here.
 
 **Work it: investigate, fix, commit, merge to `main`, close tasks, write docs, run
 the local Docker stack.** Report outcomes plainly, including failures.
