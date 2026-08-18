@@ -119,13 +119,19 @@
       "kept_snippets": 20,
       "serp_queries": 10,
       "story": "In 1974-75, Salvador Dalí created a series of drypoints and lithographs on sheepskin, interpreting Sigmund Freud's \"Moses and Monotheism.\" This livre d'artiste, sold as a set of ten, is a testament to Dalí's fascination with Freud, whom he met only once in 1938. During that meeting, Freud remarked that Dalí looked like a fanatic, a comment that delighted the artist. The Museum of Fine Arts, Boston, acquired this rare set, now featured in the \"Picasso, Miró, Dalí: Unbound\" exhibition, highlighting the intersection of surrealism and psychoanalysis.",
-      "survived": "In 1974-75, Salvador Dalí created a series of drypoints and lithographs on sheepskin, interpreting Sigmund Freud's \"Moses and Monotheism.\" This livre d'artiste, sold as a set of ten, is a testament to Dalí's fascination with Freud, whom he met only once in 1938. During that meeting, Freud remarked that Dalí looked like a fanatic, a comment that delighted the artist. The Museum of Fine Arts, Boston, acquired this rare set, now featured in the \"Picasso, Miró, Dalí: Unbound\" exhibition, highlighting the intersection of surrealism and psychoanalysis.",
-      "drops": [],
-      "validated": true,
-      "valuation_index": 52,
-      "historic": 24,
-      "detail": 29,
-      "social": 69,
+      "survived": "During that meeting, Freud remarked that Dalí looked like a fanatic, a comment that delighted the artist. The Museum of Fine Arts, Boston, acquired this rare set, now featured in the \"Picasso, Miró, Dalí: Unbound\" exhibition, highlighting the intersection of surrealism and psychoanalysis.",
+      "drops": [
+        {
+          "gate": "LOCAL-402 temporal",
+          "n": 1,
+          "reason": "'Sigmund Freud' died in 1939, cannot have met in 1974"
+        }
+      ],
+      "validated": false,
+      "valuation_index": 20,
+      "historic": 0,
+      "detail": 0,
+      "social": 12,
       "running_best": 64
     },
     {
@@ -147,13 +153,19 @@
       "kept_snippets": 20,
       "serp_queries": 10,
       "story": "In the Museum of Fine Arts, Boston, Salvador Dalí's \"Moses and Monotheism\" portfolio stands as a testament to the artist's surreal interpretation of Sigmund Freud's foundational text. Created in 1974-75, this set of ten drypoints and lithographs on sheepskin captures Dalí's fascination with Freud, whom he met only once in a bizarre encounter in London in 1938. The portfolio, with its unique medium of soft glove sheepskin, reflects Dalí's dedication to exploring psychoanalytic themes, a pursuit that was deeply influenced by his brief yet impactful meeting with Freud. This exhibition, \"Picasso, Miró, Dalí: Unbound,\" showcases how Dalí, alongside other artists, pushed the boundaries of artistic expression by delving into complex psychological narratives.",
-      "survived": "In the Museum of Fine Arts, Boston, Salvador Dalí's \"Moses and Monotheism\" portfolio stands as a testament to the artist's surreal interpretation of Sigmund Freud's foundational text. Created in 1974-75, this set of ten drypoints and lithographs on sheepskin captures Dalí's fascination with Freud, whom he met only once in a bizarre encounter in London in 1938. The portfolio, with its unique medium of soft glove sheepskin, reflects Dalí's dedication to exploring psychoanalytic themes, a pursuit that was deeply influenced by his brief yet impactful meeting with Freud. This exhibition, \"Picasso, Miró, Dalí: Unbound,\" showcases how Dalí, alongside other artists, pushed the boundaries of artistic expression by delving into complex psychological narratives.",
-      "drops": [],
-      "validated": true,
-      "valuation_index": 50,
-      "historic": 24,
-      "detail": 29,
-      "social": 69,
+      "survived": "In the Museum of Fine Arts, Boston, Salvador Dalí's \"Moses and Monotheism\" portfolio stands as a testament to the artist's surreal interpretation of Sigmund Freud's foundational text. The portfolio, with its unique medium of soft glove sheepskin, reflects Dalí's dedication to exploring psychoanalytic themes, a pursuit that was deeply influenced by his brief yet impactful meeting with Freud. This exhibition, \"Picasso, Miró, Dalí: Unbound,\" showcases how Dalí, alongside other artists, pushed the boundaries of artistic expression by delving into complex psychological narratives.",
+      "drops": [
+        {
+          "gate": "LOCAL-402 temporal",
+          "n": 1,
+          "reason": "'Freud' died in 1939, cannot have met in 1974"
+        }
+      ],
+      "validated": false,
+      "valuation_index": 20,
+      "historic": 0,
+      "detail": 7,
+      "social": 57,
       "running_best": 64
     },
     {
@@ -175,13 +187,19 @@
       "kept_snippets": 20,
       "serp_queries": 10,
       "story": "In the Museum of Fine Arts, Boston, the exhibition \"Picasso, Miró, Dalí: Unbound\" showcases the intertwined legacies of these three iconic artists. Salvador Dalí's \"Moses and Monotheism,\" a set of drypoints and lithographs on sheepskin, serves as a testament to the profound influence of Sigmund Freud's psychoanalytic theories on Dalí's work. This particular piece, created in 1974-75, reflects Dalí's fascination with Freud, whom he met only once in 1938. The encounter left a lasting impression, with Freud reportedly whispering to his friends that Dalí looked like a fanatic, a remark that delighted the artist. The exhibition highlights how Dalí, along with Picasso and Miró, drew inspiration from foundational texts and each other, creating works that pushed the boundaries of artistic expression.",
-      "survived": "In the Museum of Fine Arts, Boston, the exhibition \"Picasso, Miró, Dalí: Unbound\" showcases the intertwined legacies of these three iconic artists. Salvador Dalí's \"Moses and Monotheism,\" a set of drypoints and lithographs on sheepskin, serves as a testament to the profound influence of Sigmund Freud's psychoanalytic theories on Dalí's work. This particular piece, created in 1974-75, reflects Dalí's fascination with Freud, whom he met only once in 1938. The encounter left a lasting impression, with Freud reportedly whispering to his friends that Dalí looked like a fanatic, a remark that delighted the artist. The exhibition highlights how Dalí, along with Picasso and Miró, drew inspiration from foundational texts and each other, creating works that pushed the boundaries of artistic expression.",
-      "drops": [],
-      "validated": true,
-      "valuation_index": 48,
-      "historic": 42,
+      "survived": "In the Museum of Fine Arts, Boston, the exhibition \"Picasso, Miró, Dalí: Unbound\" showcases the intertwined legacies of these three iconic artists. Salvador Dalí's \"Moses and Monotheism,\" a set of drypoints and lithographs on sheepskin, serves as a testament to the profound influence of Sigmund Freud's psychoanalytic theories on Dalí's work. The encounter left a lasting impression, with Freud reportedly whispering to his friends that Dalí looked like a fanatic, a remark that delighted the artist. The exhibition highlights how Dalí, along with Picasso and Miró, drew inspiration from foundational texts and each other, creating works that pushed the boundaries of artistic expression.",
+      "drops": [
+        {
+          "gate": "LOCAL-402 temporal",
+          "n": 1,
+          "reason": "'Freud' died in 1939, cannot have met in 1974"
+        }
+      ],
+      "validated": false,
+      "valuation_index": 29,
+      "historic": 22,
       "detail": 21,
-      "social": 57,
+      "social": 45,
       "running_best": 64
     },
     {

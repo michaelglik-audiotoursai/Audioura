@@ -104,11 +104,32 @@ _MATERIAL_RE = re.compile(
 )
 
 # Dimensions and measurements
+# [LOCAL-470] The bare units `m` and `in` used to be in this list, with `\s*`
+# permitting zero width — so "In 1938 met Freud" produced the dimension "1938 m"
+# and "published in 1955 in London" produced "1955 in". A year is not a
+# measurement. Both collide with the two commonest words in museum prose; `cm`
+# and `mm` do not, and museum text writes "48 x 32 cm" rather than "0.48 m".
+# Units are now anchored with \b so a unit cannot match inside a longer word.
+# Same defect family as D466's `d\.?` reading "published 1887" as "died 1887".
 _DIMENSION_RE = re.compile(
-    r'(\d+\s*(?:x|×|by)\s*\d+|\d+\s*(?:cm|mm|in|inches|feet|ft|m|metres|meters)'
-    r'|\d+\s*(?:copies|impressions|prints|plates|pages|volumes|sheets|pieces|works))',
+    r'(\d+\s*(?:x|×|by)\s*\d+'
+    r'|\d+\s*(?:cm|mm|inches|feet|ft|metres|meters)\b'
+    r'|\d+\s*(?:copies|impressions|prints|plates|pages|volumes|sheets|pieces|works)\b)',
     re.IGNORECASE
 )
+
+# [LOCAL-470] Small numbers are spelled out in museum prose — "a set of ten
+# drypoints", "a suite of fifteen lithographs". The digits-only form scored those
+# at ZERO, which is the commonest way a livre d'artiste is described and the exact
+# subject of this exhibition. `drypoints` was also missing from the noun list, so
+# "ten drypoints" failed twice over.
+_NUMBER_WORD = (r'\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|'
+                r'twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|'
+                r'nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|'
+                r'ninety|hundred')
+_COUNTABLE = (r'lithographs|etchings|drypoints|engravings|woodcuts|aquatints|'
+              r'prints|plates|pages|volumes|copies|illustrations|works|pieces|'
+              r'panels|canvases|drawings|photographs|sheets|impressions')
 
 # Process/technique words
 _PROCESS_RE = re.compile(
@@ -122,9 +143,8 @@ _PROCESS_RE = re.compile(
 
 # Counts and quantities — "a set of 10", "11 lithographs", "three volumes"
 _COUNT_RE = re.compile(
-    r'\b(set of \d+|\d+ (?:lithographs|etchings|prints|volumes|plates|pages|'
-    r'copies|illustrations|works|pieces|panels|canvases|drawings|'
-    r'photographs|engravings|woodcuts|aquatints))\b',
+    r'\b((?:set|suite|series|portfolio|edition|group)\s+of\s+(?:' + _NUMBER_WORD + r')'
+    r'|(?:' + _NUMBER_WORD + r')\s+(?:' + _COUNTABLE + r'))\b',
     re.IGNORECASE
 )
 

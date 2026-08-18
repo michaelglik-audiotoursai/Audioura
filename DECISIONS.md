@@ -19032,3 +19032,80 @@ in R3: `stakes` 0.0 → **6.0**/15, best story 54 → 63.
 as penalty), D469 (a ranker discarding what the scorer rewards) — is **two instruments
 disagreeing about the same thing while each looks healthy alone.** Reading one gate's
 verdict never exposes any of them. Comparing two does.
+
+## D470 — Two more lying detectors inside the object score: a year read as metres, and counts that only understood digits
+
+**2026-08-18.** D468 made `detail` a first-class term worth 30. Three rounds later it was
+stuck at **7.1 of 30 — 24% used** — while its `materials` sub-score was already
+saturating. Decomposing the sub-scores over the eight round-3 stories:
+
+```
+materials              22 hits   drypoints, engravings, lithographs, sheepskin
+processes               5 hits   edition, numbered, printed, signed
+dimensions              1 hit    '1938 m'        <- a YEAR, read as metres
+counts                  0 hits                   <- despite "a set of ten drypoints"
+physical_descriptions   1 hit    tactile
+```
+
+**A.** `_DIMENSION_RE` allowed the bare units `m` and `in` with `\s*` permitting zero
+width, so "In 1938 met Freud" yielded the dimension `1938 m` and "in 1955 in London"
+yielded `1955 in`. Both units collide with the commonest words in museum prose; `cm` and
+`mm` do not, and museum text writes "48 x 32 cm", never "0.48 m". Bare `m` and `in` are
+gone and every unit is now `\b`-anchored. **Same defect family as D466's `d\.?`.**
+
+**B.** `_COUNT_RE` required digits — `set of \d+` — but prose spells small numbers out.
+"A set of **ten** drypoints" scored zero, and `drypoints` was **not in its noun list at
+all**, so the single commonest description of a livre d'artiste failed twice over. Number
+words added, `drypoints` added. `test_local470`: **6 of 11 red before, 11/11 after**;
+the reference story's `detail` went 21 → 29.
+
+## D471 — The temporal gate bound the year to the sentence, not to the verb — and an improvement is what exposed it
+
+**2026-08-18. Round 4 rejected three of eight stories, all wrongly, all identically:**
+
+```
+[LOCAL-402] 'Freud' died in 1939, cannot have met in 1974
+```
+
+> "Created in 1974-75, this set of ten drypoints and lithographs on sheepskin captures
+> Dalí's fascination with Freud, **whom he met only once in 1938**."
+
+**The meeting is dated 1938 in the same sentence.** `check_temporal_coherence` took the
+first year anywhere in the sentence and tested it against the death dates, so the year
+the artwork was made was applied to the verb `met`.
+
+D466 fixed the neighbour — a *publication* year is not an interaction year. This is the
+same error one step out: **any year in the sentence was treated as the interaction's,
+regardless of clause.** Two dates in one sentence is not an edge case; it is the normal
+shape whenever a work made at one time refers to an event at another, which is most of an
+exhibition.
+
+**Fix:** the event year is now the year **nearest the interaction verb**, with D466's
+publication-verb exclusion still applied first so a publication date cannot win on
+proximity. `test_local471`: **3 of 6 red before, 6/6 after** — and the three impossible
+claims are still caught, including one deliberately built so proximity would convict
+rather than acquit.
+
+**The part worth remembering: an improvement caused this regression.** The round-3
+instruction to say what was at stake produced the phrasing *"whom he met only once in
+1938"* — `only once` is exactly the stakes marker D469 went hunting for, and it walked
+straight into this bug. **Making the stories better moved them into a part of the input
+space the gates had never been tested on.** That is an argument for the TRUE set
+(STORY_GATE_TIERS measure 6) being permanent, not a one-off audit.
+
+**Re-validating round 4 with the fix, no new spend:** iterations 4, 5 and 6 went
+20 → 52, 20 → 50, 29 → 48. Rejections 3/8 → **0/8**.
+
+### The four rounds
+
+| | best | rejected | sentences | agency | stakes | detail | grounded |
+|---|---|---|---|---|---|---|---|
+| R1 baseline | 47 | 0/8 | 20.0/20 | 8.8/25 | 0.0/15 | 2.0/30 | 6.6/10 |
+| R2 cap 20 + object required | 54 | 0/8 | 20.0/20 | 6.2/25 | 0.0/15 | 8.5/30 | 5.8/10 |
+| R3 + consequence (D469) | 63 | 1/8 | 19.4/20 | 8.8/25 | 6.0/15 | 8.1/30 | 4.9/10 |
+| R4 + detail detectors (D470/D471) | **64** | 0/8 | 20.0/20 | 7.5/25 | 7.9/15 | 9.6/30 | 5.1/10 |
+
+**Michael's stopping rule — three consecutive declines — has not been approached; the
+best has risen every round.** But R3 → R4 gained one point, and the remaining headroom is
+now concentrated in `detail` (9.6 of 30) and `agency` (7.5 of 25). Those are the two
+terms to work next.

@@ -322,15 +322,32 @@ def check_temporal_coherence(
     # published livre d'artiste. When the only year present is governed by a
     # publication verb we have no evidence about WHEN they collaborated, and
     # under D450 knowing nothing is not a rejection.
+    # [LOCAL-471] Bind the year to the VERB, not to the sentence. This used to take
+    # the first year anywhere in the sentence, which rejected three of eight stories
+    # in round 4 of the iteration chart — all true, all with the meeting dated in
+    # the same breath:
+    #
+    #   "Created in 1974-75, this set of ten drypoints ... captures Dalí's
+    #    fascination with Freud, whom he met only once in 1938."
+    #
+    # 1974 is when the artwork was made; 1938 is when they met, and it is right
+    # there next to the verb. Two dates in one sentence is not an edge case — it is
+    # the normal shape whenever a work made at one time refers to an event at
+    # another, which is most of an exhibition. The year nearest the interaction verb
+    # is the one that dates it.
     if event_year is None:
-        year_match = _YEAR_RE.search(sentence)
-        if year_match:
-            candidate = int(year_match.group(1))
+        verb_pos = interaction_match.start()
+        candidates = []
+        for m in _YEAR_RE.finditer(sentence):
+            y = int(m.group(1))
             pub = _PUBLICATION_YEAR_RE.search(sentence)
-            if pub and int(pub.group(1)) == candidate:
-                event_year = None      # publication date — proves nothing here
-            else:
-                event_year = candidate
+            # D466: a year governed by a publication verb dates the object, not the
+            # people. Skip it here too, so it cannot win on proximity alone.
+            if pub and int(pub.group(1)) == y:
+                continue
+            candidates.append((abs(m.start() - verb_pos), y))
+        if candidates:
+            event_year = min(candidates)[1]
 
     # 4. For each pair of persons, check temporal feasibility
     for i in range(len(persons)):

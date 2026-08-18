@@ -429,7 +429,15 @@ def main():
                       if os.path.exists(corpus_path) else '')
             best = 0
             for it in state['iterations']:
-                ev = evaluate(it.get('survived') or it.get('story', ''), corpus)
+                # Re-VALIDATE as well as re-score: the gates are instruments too,
+                # and a gate fix (D466, D471) changes which stories were ever
+                # rejected. Re-scoring without this would keep a story marked
+                # invalid on a verdict the current code no longer reaches.
+                survived, drops = validate(it.get('story', ''), corpus)
+                it['survived'] = survived
+                it['drops'] = drops
+                it['validated'] = bool(it.get('story')) and not drops and bool(survived)
+                ev = evaluate(survived, corpus)
                 it.update({'valuation_index': ev['valuation_index'],
                            'historic': ev['historic'], 'detail': ev['detail'],
                            'social': ev['social']})
