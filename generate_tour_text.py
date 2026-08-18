@@ -9273,6 +9273,20 @@ Then provide a detailed description of the exhibit. Include:
 - One piece of historical or cultural context that changes how the visitor understands it
 - If relevant: how this piece connects to the broader collection or {tour_type}
 
+NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
+  LISTENER — its medium, material, technique, edition size, count, binding, colour or
+  condition — and tie that property to the story. "A set of ten drypoints and
+  lithographs on sheepskin" is the standard; "an important work" is not. The listener
+  is standing in front of the object; a story that never mentions it is a caption about
+  something else. Take the property from the source material. If the material names
+  none, write nothing about the physical object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something. That
+  is the difference between a story and a caption. It must come from the source
+  material — if there is no such consequence there, write without one rather than
+  inventing drama.
+
 EXPLAIN-WHAT-YOU-NAME RULE (critical):
 Every concept, motif, symbol, technique, cultural reference, or person you mention
 MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.

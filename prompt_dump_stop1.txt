@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-12T16:40:03.585421
+Generated: 2026-08-18T15:16:40.320672
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -13,12 +13,15 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • Broder (Louis Broder, publisher)
   • Fridman (Boris Fridman, donor)
+  • Broder (Louis Broder, publisher)
 ━━━ END REQUIRED NAMES ━━━
 
 ━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
+  • material: Printed on Japan
+  • material: on Rives
   • material: publisher’s vellum
+  • plate count: 15 lithographs
   • plate count: 40 color lithographs
   • publisher/printer: Louis Broder
 ━━━ END CONCRETE FACTS ━━━
@@ -34,6 +37,20 @@ Then provide a detailed description of the exhibit. Include:
 - One specific technique, material choice, or compositional decision and WHY it matters
 - One piece of historical or cultural context that changes how the visitor understands it
 - If relevant: how this piece connects to the broader collection or museum
+
+NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
+  LISTENER — its medium, material, technique, edition size, count, binding, colour or
+  condition — and tie that property to the story. "A set of ten drypoints and
+  lithographs on sheepskin" is the standard; "an important work" is not. The listener
+  is standing in front of the object; a story that never mentions it is a caption about
+  something else. Take the property from the source material. If the material names
+  none, write nothing about the physical object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something. That
+  is the difference between a story and a caption. It must come from the source
+  material — if there is no such consequence there, write without one rather than
+  inventing drama.
 
 EXPLAIN-WHAT-YOU-NAME RULE (critical):
 Every concept, motif, symbol, technique, cultural reference, or person you mention
@@ -96,8 +113,8 @@ DO NOT USE these phrases: the building was erected, historically important, the 
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: wonder
-- Unique angle to emphasize: This sculpture by Joan Miró is not just a whimsical creature but a fusion of surrealism and Catalan folklore, capturing the imagination with its vibrant colors and mysterious form.
-- End with a forward-looking hook: What deeper meanings might we uncover in other art forms that challenge tradition?
+- Unique angle to emphasize: This piece, created by the Surrealist artist Max Ernst in 1925, uses frottage to transform ordinary textures into the fantastical, highlighting the unseen worlds within the mundane.
+- End with a forward-looking hook: What other artists have revealed hidden worlds through light and shadow?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
 The Museum of Fine Arts was founded in 1870 in Copley Square.
@@ -106,7 +123,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
 The initial location of the Museum of Fine Arts was on the top floor of the Boston Athenæum.
 
 PROVENANCE (museum-published credit line — you MUST name the donor):
-  Gift of Boris Fridman
+  Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
 
 MANDATORY: Name the donor "Boris Fridman" (surname "Fridman") in your text. Do NOT write "a gift to the museum" without naming who gave it.
 PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
@@ -118,7 +135,7 @@ WORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):
   Date: 1971
   Medium: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
   Publisher: Louis Broder
-  Credit line: Gift of Boris Fridman
+  Credit line: Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
 
 You MUST name the artist in your description. If a collaborator or author is given, name them too. These are grounded facts — use them.
 
@@ -162,25 +179,25 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
 ━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
   ✓ "Broder" — Louis Broder (publisher): published this work
   ✓ "Frères" — Mourlot Frères (printer): printed this work
-  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
 Write at least one sentence per person above that names them by surname.
 If you omit any of these surnames, your response will be REJECTED and regenerated.
 ━━━ END REQUIRED CONTENT ━━━
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
+  • Boris Fridman (Donor): gave this work as a gift to the museum
   • Louis Broder (Publisher): published this work
   • Mourlot Frères (Printer): printed this work
-  • Boris Fridman (Donor): gave this work as a gift to the museum
 
 STORY SERVES THE THESIS: The person/action you name should connect to WHY
 this exhibition exists — e.g., a printer matters because the show argues printers
 were essential collaborators, not because printers are inherently interesting.
 NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
+  'donor' → use 'Boris Fridman'
   'publisher' → use 'Louis Broder'
   'printer' → use 'Mourlot Frères'
-  'donor' → use 'Boris Fridman'
 
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
@@ -189,20 +206,55 @@ A story has: a person, a specific circumstance, a consequence.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Exhibition Checklist — Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
-      Published by Louis Broder. Gift of Boris Fridman
-  [2] Joan Miró. Cover front from Le Lézard aux plumes d'or ...
-      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
-  [3] Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ( The Lizard ...
-      Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
-  [4] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
+      Published by Louis Broder. Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
+  [2] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
       Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
-  [5] Joan Miró. Plate (folio 31 verso) from Le Lézard aux ...
-      Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+  [3] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
+      Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
+  [4] Joan Miró. Plate (folio 18) from Le Lézard aux plumes d'or ...
+      ... Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Joan Miró. Lithograph from an illustrated book with forty lithographs ... Edition: 150.
+  [5] Joan Miró. Frontispiece from Le Lézard aux plumes ...
+      Joan Miró. Frontispiece from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [6] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
+      Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
+  [7] Joan Miró. Cover front from Le Lézard aux plumes d'or ( The Lizard with ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [8] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
+      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
+  [9] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [10] The Lizard with Golden Feathers - Joan Miro - Cutter & Cutter Fine Art
+      Le Lezard aux Plumes d'Or (The Lizard with Golden Feathers) | c.1967 | Lithograph in Colors Printed on Japan Kochi Paper | Printed by Atelier Mourlot, Paris ...
+  [11] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [12] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
+  [13] Le Lézard aux plumes d'or (The Lizard with Golden Feathers) | MoMA
+      Le Lézard aux plumes d'or (The Lizard with. Golden Feathers). These works are part of an illustrated book. 40 works online. Joan Miró.
+  [14] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) by ...
+      Bidding for Le Lézard aux plumes d'or (The Lizard with Golden Feathers): plate 4 (M. 800, see C. bks 148), Joan Miró has ended.
+  [15] Le Lézard aux plumes dor The Lizard with Golden ...
+      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (M. 789-828, C. bks 148), 1971 ; Medium: lithographs in colors, on Rives BFK paper and lithographs in ...
+  [16] Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515
+      Joan Miró, Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515 ; Joan Miró (1893 - 1983) · Etching ...
+  [17] Joan Miró Lithograph, Le lezard aux plumes d'or ...
+      Joan Miró Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, this color lithograph is hand signed by Joan Miró (Barcelona, 1893 - Palma, 1983) ...
+  [18] Joan Miró's Broder Collection: How One Artist Revolutionized Lithography
+      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
+  [19] Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515
+      Joan Miró, Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515 ; Joan Miró (1893 - 1983) · Etching ...
+  [20] Louis Broder Archives - Park West Gallery
+      Joan Miró's “Broder Collection” is a series of color lithographs that, until 2004, had been inaccessible for over 30 years. The Broder Collection's vivid colors ...
 
 ━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
+  • material: Printed on Japan
+  • material: on Rives
   • material: publisher’s vellum
+  • plate count: 15 lithographs
   • plate count: 40 color lithographs
   • publisher/printer: Louis Broder
+  • publisher/printer: Atelier Mourlot
+  • catalogue ref: 1967, no. 515
 ━━━ END CANDIDATE SPECIFICS ━━━
 
 STORY INSTRUCTION (LOCAL-407/412/419):
@@ -389,14 +441,19 @@ Write the story FIRST, then add physical description if space allows.
 
 
 ================================================================================
-Total user message length: 25320 chars
+Total user message length: 30218 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 3
+candidate_specifics found: 8
+  • material: Printed on Japan
+  • material: on Rives
   • material: publisher’s vellum
+  • plate count: 15 lithographs
   • plate count: 40 color lithographs
   • publisher/printer: Louis Broder
+  • publisher/printer: Atelier Mourlot
+  • catalogue ref: 1967, no. 515
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Moses and Monotheism', '__stop_1__', 'Au Soleil du Plafond', '__stop_2__']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Au Soleil du Plafond', '__stop_1__', 'Moses and Monotheism', '__stop_2__']

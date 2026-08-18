@@ -19109,3 +19109,81 @@ space the gates had never been tested on.** That is an argument for the TRUE set
 best has risen every round.** But R3 → R4 gained one point, and the remaining headroom is
 now concentrated in `detail` (9.6 of 30) and `agency` (7.5 of 25). Those are the two
 terms to work next.
+
+## D472 — The full tour is NOT ready for Storied release. The lab scores 64; production scores 36, and the reason is the piece we have not built
+
+**2026-08-18. Michael: "generate the full tour including all the stories on all stops to
+evaluate maybe we reached the acceptable point for Storied release and can start moving
+to Subscribed."** Answer: **no, and the gap is specific and known.**
+
+Run from the host (the container is `code_sha 35cb1d4` and has none of D466–D471), D261
+env, `SNIPPET_CAP_PER_STOP=20`, 3 stops found, 4,928 chars, 147.0 s.
+`TOUR_MFA_RELEASE_20260818_1514.txt`.
+
+```
+ #  stop                          idx  hist  detl   soc
+ 1  Le Lézard aux plumes d'or      43    12    13    57
+ 2  Au Soleil du Plafond           21     0    20    15
+ 3  Moses and Monotheism           44     0     6    45
+    MEAN                           36     4    13    39
+```
+
+**Lab best on stop 2 was 64. Production mean is 36.** Before this run I ported the two
+rules that moved the lab score — name a physical property of the object, say what it cost
+— into the museum prose prompt (`generate_tour_text.py`). They are diluted there among
+~15 other instructions in a prompt that must also produce orientation, physical
+description and context. **The lab prompt does one job and the production prompt does
+six.**
+
+### Three findings, and only one of them is a defect in a gate
+
+**1. The Hogarth Press fabrication shipped for the FIFTH time, and the gate that exists
+to stop it reported `0 role claims`.** `extract_role_claims` matches passive voice only:
+
+```
+"This work was printed by The Hogarth Press."                  -> 1 claim
+"The Hogarth Press ... printed this work, ensuring that ..."   -> 0 claims
+```
+
+The model wrote it in the active voice and walked straight past. This is a **false
+negative in a safety gate** — the opposite failure from everything else today, and the
+more dangerous one. Michael has flagged this exact fabrication as the tour's largest
+problem more than once.
+
+**2. The temporal gate did real work: two of its three rejections were correct.** It
+deleted *"In 1955, Juan Gris ... collaborated with Pierre Reverdy"* — and that sentence
+**is false as written**; Gris died in 1927, and D466's publication-verb exclusion
+correctly does not apply because "In 1955" is not governed by a publication verb here. It
+also correctly deleted a 1974 Dalí–Freud *collaboration*. **One rejection was false:**
+`'Moses' died in -1200, cannot have collaboration with in 1974` — a Biblical figure in
+the work's TITLE was read as an interacting person with a negative-year death date.
+
+**3. Stop 2 is two sentences and scores 21 because the gate deleted the false sentence
+and NOTHING REPLACED IT.** That is the retry loop — `STORY_BASELINE.md` §5① — stated as
+plainly as it can be. **The gate behaved correctly and the tour got worse**, because a
+correct deletion with no second attempt is indistinguishable from having no material. The
+lab has the retry loop; production does not, and this run is the cost of that gap
+measured on a real tour.
+
+### What stands between here and release
+
+1. **The retry loop in production** (§5①). It is now the top item by evidence, not by
+   argument: it is the direct cause of stop 2.
+2. **Active-voice role claims** in `extract_role_claims` — a one-pattern fix to a safety
+   gate with a five-occurrence history.
+3. **Title figures are not collaborators.** "Moses" in *Moses and Monotheism* must not
+   enter the temporal gate's person list. Same class as the `World War` / `Maresfield
+   Gardens` errors of D447/D449.
+4. **A dedicated story pass.** The lab beat production by 28 points largely because its
+   prompt does one job. Extracting the story prompt from the 10,443-line
+   `generate_tour_text()` was already named as the next piece by `story_lab.py` S5.
+
+**The marketing closer** ("The Treat Page shows whether there are real savings...") is
+appended to the tour text and would be read aloud. Not a release blocker, but it is in
+the artifact.
+
+**What is genuinely good:** stop 1 scores 43 with real production facts — 40 colour
+lithographs, Louis Broder's vellum, Mourlot Frères, and Boris Fridman's donation, all
+true and all sourced. **Zero stops had `detail == 0`**, which was six of eight in the lab
+before today. The object is reaching the prose. The pipeline is closer than it was this
+morning and it is not ready.
