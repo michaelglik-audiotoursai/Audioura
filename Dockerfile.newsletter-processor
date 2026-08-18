@@ -4,7 +4,13 @@ WORKDIR /app
 
 RUN pip install flask psycopg2-binary requests beautifulsoup4
 
-COPY newsletter_processor_service.py .
+# newsletter_processor_service.py imports seven sibling modules (apple_podcasts_processor,
+# spotify_processor, subscription_detector, dh_service_simple, user_consolidation_service,
+# credential_verification_service, advertising_url_filter). Copying the service file alone
+# crash-loops on ModuleNotFoundError. An explicit list drifts every time an import is added,
+# which is how this broke — so copy them all, as Dockerfile.cloudrun already does.
+# .dockerignore keeps tests and one-off scripts out of the context.
+COPY *.py .
 
 EXPOSE 5017
 
