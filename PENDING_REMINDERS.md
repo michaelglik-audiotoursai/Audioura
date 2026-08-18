@@ -8,6 +8,22 @@ Durable across sessions. Delete a line once delivered.
       having decided to clear at a natural break rather than mid-review.
       Practical steps to give him: `/clear`, then type `restart`.
 
+- [ ] **2026-08-18 10:2x — THE MISSION FOR THE NEXT SESSION, in Michael's words:**
+      *"improve the validators so the good stories for humans are not dismissed as
+      inaccurate when there is no evidence that they are."*
+      **This is a false-positive problem, not a coverage problem.** The gates currently
+      reject material that a reader would accept, on the strength of checks that do not
+      actually establish inaccuracy. Two known instruments already lie and are the place
+      to start, both unfixed: **D423** — `[LOCAL-410] beats_in_delivered_text` reports a
+      false `0` while the beats are verifiably present in the text (LEAD nearly published
+      "the gates are eating the stories" on that zero); and **D243/D462** — exact-match
+      and identifier greps report false absence (accent-folding on `stop_corpus` joins;
+      `other.pause()` vs `otherAudio.pause()`). **Before tightening anything, measure how
+      often a gate's rejection is right.** The standing check applies with full force: run
+      the gate against a case whose answer is already known. `story_validator.py`,
+      `STORY_GATE_TIERS.md` and `story_lab.py` (D424) are the surface.
+      Michael is driving this jointly — see the next reminder, which still binds.
+
 - [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
       He asked to work on story generation **jointly** in the next session, one
       subroutine at a time, using `story_lab.py` (D424). `PARKED_kiro_task_LOCAL-457.md`

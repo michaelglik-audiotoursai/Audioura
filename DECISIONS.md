@@ -18763,3 +18763,63 @@ checking something other than whether the image builds. Do not trust it on other
 **Not done, on purpose:** the task's larger suggestion — drop the per-service Dockerfiles and
 standardise on `Dockerfile.cloudrun`. Right direction, real blast radius, should not ride
 along with a two-line unbreak. `wdvrdaxn8y` left open for it.
+
+## D464 — `beta-staging` is retired without ever being used; D461's build was overtaken by events
+
+**2026-08-18. Michael asked whether `beta-staging` is really a thing. It is not, and the
+honest answer is that its premise dissolved.** It was created (D461) on the assumption
+that fixing Yuri's bugs would need a new mobile build, verified against a staging backend
+before the live one moved. **Beta_Bugs fixed BETA-1 server-side instead**, so `main` and
+GCloud-Beta were updated directly and no staging rehearsal ever happened.
+
+Measured today, not assumed:
+
+```
+origin/main..origin/beta-staging     1 commit   — Beta-Bugs_Fixing.md only
+non-markdown files exclusive to it   NONE
+origin/beta-staging..origin/main     9 commits  — including both audio-fix commits
+144ca98, 84e6054                     both ancestors of origin/main
+```
+
+**D461's dissolution guard is satisfied in substance.** That guard — merge before
+deleting — exists so *fixes* are not lost. There are no fixes on the branch: its sole
+commit rewrites `Beta-Bugs_Fixing.md` to describe a staging workflow that was never run,
+and `main` has since edited that same file (`dca9f83`). **Merging it would put an obsolete
+process back on `main` and conflict with the newer text.** So: delete without merging, as
+a deliberate exception, recorded here rather than left implicit.
+
+**LEAD did not delete it** — deleting a pushed branch is Michael's call (the D459
+precedent). The command is one line, and it is in the answer.
+
+**What actually generalises.** D461 reasoned correctly from a wrong premise: it assumed
+the fix needed an app build, and built a whole branch and environment plan around that.
+The diagnosis stated in D461 itself — *"both of Yuri's bugs read as client-side... if that
+holds, no backend change is needed and GCloud-Beta-Staging is not on the critical path"* —
+was half right in a way that mattered: BETA-1 was not in the Flutter app **or** the
+backend logic but in the **generated HTML**, which a server fix reaches without any app
+build. **Diagnose the layer before designing the delivery mechanism for it.**
+
+**Keep:** the environment-parity lesson from D461 (deploy staging from `main`'s own commit
+and smoke-test before the fix lands) is still right and still worth doing the day a fix
+genuinely needs a backend change. It is the branch that is retired, not the reasoning.
+
+## D465 — The Windows Beta session is named `Beta_Bugs`, and the naming prefix is load-bearing
+
+**2026-08-18.** Michael: *"is Claude-Beta how it suppose to call itself — it does not
+produce its name and date as I asked."* Correct on both counts, and the two are connected.
+
+The session signs its ClickUp comments *"the Beta_Bugs session on Michael's Windows
+laptop"* but does not prefix its replies, so Michael reads it as "Claude-Beta". **One
+session, two names, because the one mechanism that fixes the name was skipped.**
+
+**Canonical name: `Beta_Bugs`** — it matches how the session already identifies itself and
+the underscore form of the other rows. Added to the `CLAUDE.md` table with its real scope:
+server code on `main`, GCloud-Beta deploys, Play uploads, never `storied`.
+
+**`Beta_Mobile` retired in the same edit.** It was the Mac Mini worktree on `beta/yuri-bugs`
+— the D459 branch, deleted from origin. That work moved to Windows. The local worktree
+still exists and holds one markdown commit; left in place, marked do-not-build-on.
+
+**The rule gained a sentence it was missing:** on restart, a session's first act is to find
+its row in the table and adopt that name; if no row fits, it adds one before replying.
+Without that, the table is a list nobody is required to read.

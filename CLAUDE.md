@@ -159,10 +159,18 @@ needs to tell them apart at a glance.
 |---|---|
 | **Storied_Tours** | This one. Tour generation quality — the story pipeline, gates, `generate_tour_text.py`, the LOCAL-4xx chain. Runs on the Mac Mini. |
 | **GCloud_Storied** | Track B — the Storied vs Beta selector: mobile app, GCloud services, DB `track` discriminator. Spec in `TRACK_B_STORIED_VS_BETA.md`. Runs on the Windows machine. |
-| **Beta_Mobile** | Beta-track mobile app bugs from testers. Runs on the Mac Mini in the worktree `~/audioura-worktrees/beta-mobile`, branch `beta/yuri-bugs` — deliberately NOT in `~/Audioura`, so it cannot disturb Storied_Tours' working tree. Briefing: `BETA_MOBILE_START_HERE.md` in that worktree. Opened 2026-08-16 for Yury Makedonov's two reports. |
+| **Beta_Bugs** | Beta-track bug fixes: server code on `main`, GCloud-Beta deploys, Play Console uploads. Runs on the **Windows laptop** on `main` (never `storied`). It fixed Yury Makedonov's BETA-1 concurrent-audio bug server-side, 2026-08-17. **It has been signing ClickUp comments "the Beta_Bugs session" but not prefixing its replies — that is the rule it is missing.** Michael also called it "Claude-Beta" (2026-08-17); **`Beta_Bugs` is the canonical name**, matching how it already identifies itself and the underscore form of the others. |
+| ~~**Beta_Mobile**~~ | **RETIRED 2026-08-17.** Mac Mini worktree `~/audioura-worktrees/beta-mobile`, branch `beta/yuri-bugs` — the D459 branch, deleted from origin. The work moved to **Beta_Bugs** on Windows. The local worktree still exists and holds one markdown commit; do not build on it. |
 
 A restarted session inherits its name from this table by the directory and work it
 picks up. If a new track is added, name it here first.
+
+**The prefix is not optional and not cosmetic.** Michael runs several of these at once and
+sorts them by that first token. A session that omits it is unidentifiable in a screenshot
+or a pasted log — which is exactly how "Claude-Beta" and "Beta_Bugs" ended up being the
+same session under two names. **On restart, a session's first act is to find its row here
+and adopt that name**; if none of the rows fits the directory and work it picks up, it
+adds one before replying.
 
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
 

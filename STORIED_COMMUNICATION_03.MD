@@ -532,3 +532,54 @@ prevent.** Done. D463. Branch `fix/dockerfile-build-breaks` @ `a0d7238`, cut fro
 - **Proven red before green**, both images, then rebuilt from the Storied context too.
 - **Kept out of `beta-staging`** — D461 bounds that branch to Yuri's fixes so his test
   result stays interpretable. No GCloud deploy.
+
+## 2026-08-18
+
+### 10:2x — Michael: is beta-staging really a thing? and what is the Windows session called?
+
+❯ *"Is beta-staging really a thing? I was thinking about it when I thought that fixing
+Yury's bugs would require a new mobile app. It turned out that you on Windows managed to
+fix it on server only..."*
+
+**No. It is retired without ever having been used, and the premise it was built on
+dissolved.** D464. Measured: `origin/main..origin/beta-staging` is **1 commit, markdown
+only**; `origin/beta-staging..origin/main` is **9**, including both audio-fix commits.
+D461's merge-before-delete guard exists to stop *fixes* being lost — there are none on it,
+and its one commit describes a staging workflow that never ran, on a file `main` has since
+rewritten. **Delete without merging**, recorded as a deliberate exception. LEAD did not
+delete it — pushed branch, Michael's call (D459 precedent).
+
+The general lesson, and it is on LEAD: D461 reasoned well from a wrong premise. BETA-1 was
+not in the Flutter app *or* the backend logic — it was in the **generated HTML**, which a
+server fix reaches with no app build at all. **Diagnose the layer before designing the
+delivery mechanism.** The environment-parity lesson from D461 survives; only the branch is
+retired.
+
+❯ *"We created a task for you here or on Windows — is Claude-Beta how it suppose to call
+itself: it does not produce its name and date as I asked."*
+
+**The task is here, in Storied**, and it is not for LEAD:
+[`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5), 🟩 Mobile — Kiro, **Agent: Mobile
+Kiro**, riding the Storied release. It is well specified and its diagnosis is right — the
+numbering was never wrong, pin 1 hides under pin 2. Worth keeping from it: `_applyCoordJitter`
+fires only on **byte-identical** coordinates and offsets by 8.9 m, which at the default
+zoom 14 is **1.3 pixels** — about 28× too small to see.
+
+**On the name: `Beta_Bugs` is canonical, and the omission is the cause of the confusion.**
+D465. It signs ClickUp comments *"the Beta_Bugs session"* but never prefixes its replies,
+so it reads as "Claude-Beta" — one session, two names, because the one mechanism that
+fixes the name was skipped. Added to the `CLAUDE.md` table with its real scope; `Beta_Mobile`
+retired in the same edit. The rule gained the sentence it was missing: **on restart, a
+session's first act is to adopt its row, or add one before replying.**
+
+❯ *"Are you ready for /clear+restart to dedicate your efforts to improve the validators so
+the good storied for humans are not dismissed as inaccurate when there are no evidence
+that they are?"*
+
+**Yes — ready now, and the mission is written to disk so the fresh session starts with it**
+(`PENDING_REMINDERS.md`, top open item, quoted verbatim). Framed as what it is: a
+**false-positive** problem, not a coverage problem. Two instruments are already known to
+lie and neither is fixed — **D423** (`beats_in_delivered_text` reports a false `0` while
+the beats are demonstrably in the text) and **D243/D462** (exact-match greps reporting
+false absence). **Measure how often a gate's rejection is right before tightening
+anything.**
