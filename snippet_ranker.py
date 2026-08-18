@@ -33,6 +33,12 @@ import re
 import os
 from typing import List, Dict, Tuple, Set
 
+# [LOCAL-469] The same stakes detector `evaluate_story` grades the finished story
+# with. Imported rather than re-declared so the ranker and the scorer can never
+# drift apart — ranking for one definition of "consequence" and scoring against
+# another is exactly the defect this fixes.
+from story_opportunity_scan import _STAKES
+
 # Configurable cap — default 5
 SNIPPET_CAP_PER_STOP = int(os.environ.get('SNIPPET_CAP_PER_STOP', '5'))
 
@@ -177,6 +183,28 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     # Verb of consequence: +3
     if _VERBS_OF_CONSEQUENCE.search(text):
         score += 3
+
+    # [LOCAL-469] Stakes marker: +4
+    #
+    # Measured on MFA Unbound stop 2, round 2 of the iteration chart: every one of
+    # eight stories scored stakes_score 0 of 15. The detector was not broken — the
+    # material never reached the writer. 7 of 80 retrieved snippets carried a
+    # stakes marker and only 2 of 20 survived the cap, including a total miss on
+    #   "Moses and Monotheism was the last major work, and it was the most reckless."
+    #
+    # The cause was that we RANK for one thing and SCORE the finished story for
+    # another. `_VERBS_OF_CONSEQUENCE` matches the action — met, printed, donated.
+    # `_STAKES` matches what the action cost: only, never, the last, unfinished,
+    # despite, destroyed. `evaluate_story` measures the story on the second and the
+    # ranker rewarded neither, so the one signal that separates a story from a
+    # caption was being discarded before anyone could use it.
+    #
+    # Weighted 4 — above person/verb/date individually, because a consequence is
+    # rarer in the pool (9%) and is the term the finished story is graded on. It is
+    # applied AFTER the biography hard-reject above, so a stakes word inside a
+    # biography snippet cannot buy its way past that.
+    if _STAKES.search(text):
+        score += 4
 
     # Date: +2
     if _YEAR_PATTERN.search(text):
@@ -628,6 +656,40 @@ def rank_and_cap_snippets(
     else:
         usable_count = len(capped)  # Can't assess without title
 
+    # [LOCAL-469] CONSEQUENCE RESCUE — a reserved slot, on the LOCAL-415 pattern.
+    #
+    # The +4 stakes bonus above is not enough on its own, and deliberately so. The
+    # single most valuable snippet in the round-2 pool —
+    #   "Moses and Monotheism was the last major work, and it was the most reckless"
+    # — carries no year, no place and no artist surname, so it scores 5 against 15
+    # for a well-formed but consequence-free sentence. Weighting stakes high enough
+    # to win that contest outright would distort every other ranking to fix one
+    # case. Guaranteeing it a seat does not.
+    #
+    # Rule: if nothing that survived the cap carries a stakes marker but the pool
+    # has one, the lowest-ranked survivor gives up its place to the best one. At
+    # most one slot, and only when the count is zero — so this can never crowd out
+    # material, only prevent a total blackout of the one signal the finished story
+    # is graded on.
+    consequence_rescued = False
+    _kept_has_stakes = any(
+        _STAKES.search(f"{snip.get('title', '')} {snip.get('snippet', '')}")
+        for _, snip in capped)
+    if not _kept_has_stakes:
+        _stakes_pool = [
+            (s, snip) for s, snip in scored
+            if _STAKES.search(f"{snip.get('title', '')} {snip.get('snippet', '')}")
+        ]
+        if _stakes_pool:
+            _best_s, _best_snip = max(_stakes_pool, key=lambda x: x[0])
+            if len(capped) >= cap:
+                capped[-1] = (_best_s, _best_snip)
+            else:
+                capped.append((_best_s, _best_snip))
+            consequence_rescued = True
+            print(f"    [LOCAL-469] CONSEQUENCE RESCUE: '{_best_snip.get('snippet', '')[:60]}' "
+                  f"let through (score {_best_s}) — no surviving snippet carried a stakes marker")
+
     # [LOCAL-414] Report how many tier3 snippets survived into the final output
     tier3_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'tier3')
     unverified_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'unverified')
@@ -645,6 +707,7 @@ def rank_and_cap_snippets(
         'output_count': len(capped),
         'usable_count': usable_count,
         'starvation_rescued': starvation_rescued,
+        'consequence_rescued': consequence_rescued,
         'scores': [
             (s[1].get('title', '')[:50], s[0], s[1].get('tier', '')) for s in capped
         ],

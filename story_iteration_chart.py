@@ -143,6 +143,11 @@ def gather(stop, focus_fact, live):
     return queries, results, kept, cost_q
 
 
+    # ROUND 2 (D468): the round-1 curve scored `detail` 0 on six of eight
+    # iterations — the stories almost never named the physical thing in the case.
+    # That is D449, and it survived because the old index could not see it. Now
+    # that it can, the writer is told to do it, and the snippet cap is raised so
+    # there is material to do it FROM (round 1 discarded 74 of 79 results).
 WRITER_PROMPT = """You are writing one story for an audio tour stop.
 
 STOP: {title}
@@ -156,6 +161,17 @@ SOURCE MATERIAL — you may use nothing that is not here:
 Write 3-5 sentences. Rules:
 - Connect the fact to THIS object, and through it to the exhibition, the museum or
   the city. That connection is what makes it a story rather than a caption.
+- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE OBJECT IN FRONT OF THE
+  LISTENER — its medium, material, size, technique, edition, binding, colour or
+  condition — and tie that property to the fact. A listener is standing in front of
+  the thing; a story that never mentions it is a caption about something else.
+  Take the property from the source material. If the material names none, say so by
+  writing nothing about the object rather than inventing a property.
+- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
+  unfinished, done only once, done for the last time, or done despite something.
+  That is the difference between a story and a caption, and it must come from the
+  source material. If the material contains no such consequence, write the story
+  without one rather than inventing drama.
 - Every factual assertion must be supported by the source material above.
 - Do not invent a publisher, printer, donor, date or quantity. If the material does
   not name one, do not name one.
@@ -399,10 +415,29 @@ def main():
     ap.add_argument('--fresh', action='store_true', help='discard previous iterations')
     ap.add_argument('--replay', action='store_true',
                     help='rebuild the chart from saved state, no spend')
+    ap.add_argument('--rescore', action='store_true',
+                    help='re-evaluate the SAVED stories with the current index and '
+                         'rebuild the chart. No search, no writing, no spend — so '
+                         'any change in the curve is the metric and nothing else.')
     a = ap.parse_args()
-    if a.replay:
+    if a.replay or a.rescore:
         load_env()
-        write_chart(json.load(open(STATE)))
+        state = json.load(open(STATE))
+        if a.rescore:
+            corpus_path = os.path.join(HERE, 'story_lab_state', 'stop2_page_text.txt')
+            corpus = (open(corpus_path, encoding='utf-8').read()
+                      if os.path.exists(corpus_path) else '')
+            best = 0
+            for it in state['iterations']:
+                ev = evaluate(it.get('survived') or it.get('story', ''), corpus)
+                it.update({'valuation_index': ev['valuation_index'],
+                           'historic': ev['historic'], 'detail': ev['detail'],
+                           'social': ev['social']})
+                if it['validated'] and ev['valuation_index'] > best:
+                    best = ev['valuation_index']
+                it['running_best'] = best
+            json.dump(state, open(STATE, 'w'), indent=2, ensure_ascii=False)
+        write_chart(state)
         print(f"  chart -> {os.path.relpath(CHART_MD, HERE)}")
         return
     run(a)

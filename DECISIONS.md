@@ -18945,3 +18945,90 @@ against a number we already know is wrong.
 **Standing check that earned its keep:** #3, run the instrument against a case whose
 answer is already known. The cap experiment was one run and $0.04, and it inverted the
 conclusion the eight-iteration curve was about to support.
+
+## D468 — The valuation index now counts the object; three rounds of iteration took the best story 47 → 63
+
+**2026-08-18. Michael: "go ahead and continue development to improve the stories unless
+I stop you or your score goes down for 3 consecutive iterations."** D467 had established
+the order — fix the index first, then re-run, then tune retrieval — because tuning
+against a number known to be wrong is not tuning.
+
+**The index (`evaluate_story.py:342`), on Michael's default weighting.** Object detail is
+first-class and equal to agency; groundedness drops to a tiebreak that can only add:
+
+```
+             OLD                          NEW (D468)
+sentences    min(30, n*10)                min(20, n*5)      4th sentence now worth 5
+agency       min(30, hits*10)             min(25, hits*10)
+stakes       min(25, hits*12)             min(15, hits*8)
+detail       — NOT IN THE FORMULA —       int(detail * 0.30)
+groundedness int(fraction * 15)           int(fraction * 10)
+```
+
+`test_local468_valuation_counts_the_object.py`: **4 of 11 red before, 11/11 after.** The
+red case that mattered read `generic=40 object=40` — a story naming *"drypoints and
+lithographs on sheepskin"* scored identically to one that never mentioned the object.
+
+**Rescoring the eight saved round-1 stories with the new index changed nothing about the
+material and everything about the ranking** — iteration 1, which had `detail` 41 and had
+been the *worst* of the eight, became competitive. The old index had been ranking away
+from the object.
+
+### The rounds
+
+| | best validated | sentences | agency | stakes | detail | grounded |
+|---|---|---|---|---|---|---|
+| R1 baseline | 47 | 20.0/20 | 8.8/25 | **0.0**/15 | **1.8**/30 | 6.6/10 |
+| R2 cap 20 + object required | 54 | 20.0/20 | 6.2/25 | **0.0**/15 | 7.2/30 | 5.8/10 |
+| R3 + consequence (D469) | **63** | 19.4/20 | 8.8/25 | **6.0**/15 | 7.1/30 | 4.9/10 |
+
+`detail` was 0 on six of eight stories in R1 and is non-zero on eight of eight from R2 —
+the object is in the story now. **The score has risen every round; the stopping rule
+Michael set has not been approached.**
+
+**A true positive worth recording.** R3 iteration 6 was REJECTED by the temporal gate:
+*"'Freud' died in 1939, cannot have met in 1974"* — the writer had invented a 1974
+Dalí–Freud meeting. D466 loosened that gate's false rejections and this proves it still
+catches the real thing. The one rejection in 24 iterations was correct.
+
+## D469 — We ranked for one definition of "story" and graded on another
+
+**The measurement that found it:** R2 scored `stakes` 0.0 of 15 on **eight of eight**
+stories. The detector is not broken — three control sentences fire it. Tracing back one
+stage:
+
+```
+retrieved (raw)     7 of 80 snippets carry a stakes marker
+survived the ranker 2 of 20
+```
+
+and the best one in the entire pool never reached the writer:
+
+> "Moses and Monotheism was the last major work, and it was the most reckless."
+
+**`score_snippet` rewarded a named person, a verb of consequence, a date, a place and
+production facts — and nothing for stakes**, which is the term `evaluate_story` then
+grades the finished story on. We were ranking for the ACTION (met, printed, donated) and
+scoring for what the action COST (only, never, the last, unfinished, despite). A story
+needs both, and the second was being discarded before the writer could see it.
+
+**Fixed two ways, and the split is the point:**
+
+1. **+4 for a stakes marker**, applied after the biography hard-reject so a stakes word
+   cannot buy a biography past it. `_STAKES` is now **imported** from
+   `story_opportunity_scan` rather than re-declared, so ranker and scorer cannot drift.
+2. **A CONSEQUENCE RESCUE reserved slot**, on the existing LOCAL-415 starvation-rescue
+   pattern. +4 alone is deliberately not enough: that snippet carries no year, no place
+   and no artist surname, so it scores 5 against 15 for a well-formed consequence-free
+   sentence. **Weighting stakes high enough to win that contest outright would distort
+   every ranking to fix one case; giving it a seat does not.** At most one slot, only
+   when the count is zero.
+
+`test_local469_ranker_keeps_the_consequence.py`: **2 of 7 red before, 7/7 after.** Result
+in R3: `stakes` 0.0 → **6.0**/15, best story 54 → 63.
+
+**What generalises, and it is the third instance today:** every defect found on
+2026-08-18 — D466 (a gate reading absence as falsehood), D467 (a scorer reading absence
+as penalty), D469 (a ranker discarding what the scorer rewards) — is **two instruments
+disagreeing about the same thing while each looks healthy alone.** Reading one gate's
+verdict never exposes any of them. Comparing two does.

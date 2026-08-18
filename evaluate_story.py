@@ -339,24 +339,54 @@ def _score_social(text: str, sentences: List[str]) -> tuple:
     return total, evidence
 
 
-def _compute_valuation_index(text: str, sentences: List[str], corpus: str = '') -> tuple:
+def _compute_valuation_index(text: str, sentences: List[str], corpus: str = '',
+                             detail: int = None) -> tuple:
     """Compute valuation_index (0–100) from existing signals.
 
-    Formula:
-        sentence_score  (0–30): min(30, sentence_count * 10)
-        agency_score    (0–30): min(30, agency_hits * 10)
-        stakes_score    (0–25): min(25, stakes_hits * 12)
-        groundedness    (0–15): int(grounded_fraction * 15) if corpus provided
+    Formula (D468):
+        sentence_score  (0–20): min(20, sentence_count * 5)
+        agency_score    (0–25): min(25, agency_hits * 10)
+        stakes_score    (0–15): min(15, stakes_hits * 8)
+        detail_score    (0–30): int(detail * 0.30)          <- the object
+        groundedness    (0–10): int(grounded_fraction * 10) <- tiebreak only
 
-    See module docstring for rationale.
+    D467 measured the previous formula on eight iterations of MFA Unbound stop 2
+    and found it was the reason the curve plateaued. Three things were wrong, and
+    all three are fixed here:
+
+    1. **The object was not in the formula.** `_score_detail` — does a sentence
+       name a physical property of the thing in the case — was computed and never
+       added, so a story that named "drypoints and lithographs printed on
+       sheepskin" scored identically to one that did not. That is measure 4 of
+       STORY_GATE_TIERS.md and Michael's most-repeated complaint (D449). It is now
+       a first-class term, weighted equal to agency, on his ruling of 2026-08-18.
+
+    2. **Groundedness punished specificity.** Raising the snippet cap 5 -> 20 moved
+       detail 0 -> 29 and historic 46 -> 66 while the INDEX FELL 61 -> 50, because
+       the new proper nouns were absent from the museum's own webpage. That is the
+       D466 mistake one layer up: absence of evidence scored as evidence against.
+       Groundedness is now a small additive tiebreak that can only ever help — a
+       thin corpus costs nothing, because a thin corpus is a fact about our
+       retrieval, not about the story.
+
+    3. **Sentences past the third were free.** 3 * 10 already capped that term, so
+       Michael's "3-5 sentences, larger for the best one" scored as though every
+       story were three. Now the fourth sentence is worth 5.
+
+    `detail` is passed in by `evaluate_story` so the two are guaranteed to be the
+    same number; it is recomputed only when this is called directly.
     """
     n_sentences = len(sentences)
     agency_hits = sum(1 for s in sentences if _AGENCY_VERB.search(s))
     stakes_hits = sum(1 for s in sentences if _STAKES.search(s))
 
-    sentence_score = min(30, n_sentences * 10)
-    agency_score = min(30, agency_hits * 10)
-    stakes_score = min(25, stakes_hits * 12)
+    if detail is None:
+        detail, _ = _score_detail(text, sentences)
+
+    sentence_score = min(20, n_sentences * 5)
+    agency_score = min(25, agency_hits * 10)
+    stakes_score = min(15, stakes_hits * 8)
+    detail_score = int(detail * 0.30)
 
     groundedness_bonus = 0
     grounded_fraction = None
@@ -377,9 +407,10 @@ def _compute_valuation_index(text: str, sentences: List[str], corpus: str = '') 
             corpus_lower = corpus.lower()
             grounded = sum(1 for c in claims if c.lower() in corpus_lower)
             grounded_fraction = grounded / len(claims)
-            groundedness_bonus = int(grounded_fraction * 15)
+            groundedness_bonus = int(grounded_fraction * 10)
 
-    total = _clamp(0, 100, sentence_score + agency_score + stakes_score + groundedness_bonus)
+    total = _clamp(0, 100, sentence_score + agency_score + stakes_score
+                   + detail_score + groundedness_bonus)
 
     evidence = {
         'sentence_count': n_sentences,
@@ -388,6 +419,8 @@ def _compute_valuation_index(text: str, sentences: List[str], corpus: str = '') 
         'agency_score': agency_score,
         'stakes_hits': stakes_hits,
         'stakes_score': stakes_score,
+        'detail_raw': detail,
+        'detail_score': detail_score,
         'groundedness_bonus': groundedness_bonus,
         'grounded_fraction': grounded_fraction,
     }
@@ -435,7 +468,8 @@ def evaluate_story(story: str, matrix: Dict = None, corpus: str = '') -> Dict:
     historic, hist_ev = _score_historic(story, sentences)
     detail, det_ev = _score_detail(story, sentences)
     social, soc_ev = _score_social(story, sentences)
-    valuation, val_ev = _compute_valuation_index(story, sentences, corpus)
+    valuation, val_ev = _compute_valuation_index(story, sentences, corpus,
+                                                 detail=detail)
 
     return {
         'historic': historic,

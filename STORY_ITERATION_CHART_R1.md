@@ -9,26 +9,26 @@ flat stretch means those iterations bought nothing — that is the stopping poin
 
 | # | focus fact | kept | validated | index | hist | detail | social | **best** |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Dalí's 1974 illustrations for Freud's Moses an | 20 | ✅ | 53 | 72 | 53 | 57 | **53** |
-| 2 | the 1938 London meeting between Salvador Dalí  | 20 | ✅ | 51 | 30 | 33 | 69 | **53** |
-| 3 | Freud's thesis that Moses was Egyptian, and th | 20 | ✅ | 47 | 70 | 21 | 57 | **53** |
-| 4 | how the Museum of Fine Arts Boston acquired th | 20 | ✅ | 50 | 24 | 21 | 69 | **53** |
-| 5 | the printing and edition history of the Moses  | 20 | ✅ | 48 | 40 | 21 | 69 | **53** |
-| 6 | why Picasso, Miró and Dalí are shown together  | 20 | ❌ | 18 | 0 | 0 | 57 | **53** |
-| 7 | Dalí's surrealist reading of psychoanalysis in | 20 | ✅ | 63 | 58 | 31 | 57 | **63** |
-| 8 | the livre d'artiste tradition and its Boston c | 20 | ✅ | 39 | 12 | 21 | 57 | **63** |
+| 1 | Dalí's 1974 illustrations for Freud's Moses an | 5 | ✅ | 38 | 44 | 41 | 57 | **38** |
+| 2 | the 1938 London meeting between Salvador Dalí  | 5 | ✅ | 37 | 67 | 0 | 57 | **38** |
+| 3 | Freud's thesis that Moses was Egyptian, and th | 5 | ✅ | 47 | 46 | 0 | 69 | **47** |
+| 4 | how the Museum of Fine Arts Boston acquired th | 5 | ✅ | 26 | 30 | 0 | 57 | **47** |
+| 5 | the printing and edition history of the Moses  | 5 | ✅ | 36 | 34 | 0 | 69 | **47** |
+| 6 | why Picasso, Miró and Dalí are shown together  | 5 | ✅ | 37 | 34 | 0 | 77 | **47** |
+| 7 | Dalí's surrealist reading of psychoanalysis in | 5 | ✅ | 37 | 47 | 0 | 69 | **47** |
+| 8 | the livre d'artiste tradition and its Boston c | 5 | ✅ | 39 | 12 | 8 | 80 | **47** |
 
 ## The curve
 
 ```
-   1 |█████████████████████████████████ best= 53 this= 53
-   2 |█████████████████████████████████ best= 53 this= 51
-   3 |█████████████████████████████████ best= 53 this= 47
-   4 |█████████████████████████████████ best= 53 this= 50
-   5 |█████████████████████████████████ best= 53 this= 48
-   6 |█████████████████████████████████ best= 53 this= 18
-   7 |████████████████████████████████████████ best= 63 this= 63
-   8 |████████████████████████████████████████ best= 63 this= 39
+   1 |████████████████████████████████ best= 38 this= 38
+   2 |████████████████████████████████ best= 38 this= 37
+   3 |████████████████████████████████████████ best= 47 this= 47
+   4 |████████████████████████████████████████ best= 47 this= 26
+   5 |████████████████████████████████████████ best= 47 this= 36
+   6 |████████████████████████████████████████ best= 47 this= 37
+   7 |████████████████████████████████████████ best= 47 this= 37
+   8 |████████████████████████████████████████ best= 47 this= 39
 ```
 
 `█` running best over validated stories · `·` this iteration alone
@@ -36,9 +36,9 @@ flat stretch means those iterations bought nothing — that is the stopping poin
 ## Where it stands
 
 - iterations run: **8**
-- best validated index: **63**
-- iterations since the best improved: **1**
-- stories rejected by a gate: **1 of 8**
+- best validated index: **47**
+- iterations since the best improved: **5**
+- stories rejected by a gate: **0 of 8**
 - SERP queries spent: **80**
 
 ## Why it plateaus — read this before tuning anything (D467)
@@ -70,7 +70,3 @@ Three consequences, all measured:
 
 So the plateau does not mean we stopped finding better stories. It means the
 instrument stopped being able to see them.
-
-### What the gates deleted
-
-- iter 6 — `LOCAL-402 temporal` — 'Freud' died in 1939, cannot have met in 1974
