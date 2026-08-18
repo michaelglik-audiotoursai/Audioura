@@ -54,6 +54,31 @@ from typing import Dict, List, Optional, Tuple
 
 # Verbs/phrases that assert MUTUAL INTERACTION (both parties alive at the time)
 _INTERACTION_PATTERNS = [
+    # [LOCAL-476] NOMINALISED relationships: "embarked on a profound artistic
+    # collaboration", "formed a partnership", "struck up a friendship".
+    #
+    # Found the hard way. On the 2026-08-18 release run the gate correctly rejected
+    # "In 1955, the collaboration between Juan Gris and Pierre Reverdy…" (Gris died
+    # in 1927). The LOCAL-474 retry then told the model not to repeat or rephrase
+    # it, and the model rephrased it to "In 1955, Juan Gris and Pierre Reverdy
+    # embarked on a profound artistic collaboration" — which matched nothing here,
+    # so the gate never even reached the dates, and the false claim shipped.
+    #
+    # A prohibition-driven retry hands the model what it needs to route around the
+    # detector. The verb list is now adversarially probed by our own pipeline, so
+    # it has to cover the noun forms and not only "collaborated with".
+    #
+    # Deliberately requires a governing verb rather than matching a bare
+    # "collaboration": an unanchored noun would fire on "The collaboration
+    # exemplifies the exhibition's argument", and false rejections are the thing
+    # this whole session has been removing.
+    r'(?:embark(?:ed|ing)?\s+on|enter(?:ed|ing)?\s+into|form(?:ed|ing)?|'
+    r'forg(?:ed|ing)|beg(?:an|inning|in)|start(?:ed|ing)?|launch(?:ed|ing)?|'
+    r'undert(?:ook|aken|aking)|struck\s+up|strike\s+up|shared?d?|'
+    r'maintain(?:ed|ing)?|sustain(?:ed|ing)?)\s+'
+    r'(?:a|an|the|their|his|her|this|its)?\s*[\w\s\-]{0,30}?'
+    r'(?:collaboration|partnership|friendship|correspondence|dialogue|'
+    r'association|venture|alliance)',
     # collaborate / collaboration / collaborating
     r'collaborat(?:ed|ing|ion|ions)\s+(?:with|between)',
     r'collaborat(?:ed|ing|ion|ions)\s+(?:of\s+)?\w+\s+(?:with|and)',

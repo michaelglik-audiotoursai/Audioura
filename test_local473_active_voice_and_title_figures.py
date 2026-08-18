@@ -73,6 +73,23 @@ class TestActiveVoiceRoleClaims:
         assert len(c['agent']) < 40, c['agent']
         print(f"  ✅ agent is clean: {c['agent']!r}")
 
+    def test_every_punctuation_form_is_caught(self):
+        """[LOCAL-478] Run 4 shipped Hogarth a THIRD way: an em-dash parenthetical.
+
+        The terminator alternation listed only `.` `,` and some prepositions, so an
+        agent closed by any other punctuation did not match at all. Three shapes of
+        the same fabrication escaped on three separate runs — passive, active, and
+        parenthetical. Patterns are enumerable; the model's phrasings are not.
+        """
+        for s in ("The set's limited edition—published by The Hogarth Press—is rare.",
+                  'Published by Éditions Verve (Paris).',
+                  'The book was published by Tériade; the plates came later.',
+                  'Printed by Mourlot Frères',
+                  'Issued by The Hogarth Press: a limited run.'):
+            claims = extract_role_claims(s)
+            assert claims, f"no claim from: {s}"
+        print("  ✅ em dash, brackets, semicolon, colon and end-of-string all close")
+
     def test_ordinary_prose_is_not_a_role_claim(self):
         """Standing check D242 #1 — this must be able to be wrong."""
         for s in ("Dalí printed his own name on the cover.",

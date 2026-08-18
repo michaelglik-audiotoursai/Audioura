@@ -2140,13 +2140,52 @@ def _regate_prose(prose: str, poi: dict) -> str:
     """[LOCAL-474] Re-apply the DETERMINISTIC deletion gates to regenerated prose.
 
     Only the free, offline gates: the retry happens after the chain has run and
-    will not run again, so anything it invents would otherwise ship ungated. These
-    three are the ones that caught real fabrications on the 2026-08-18 release run.
+    will not run again, so anything it invents would otherwise ship ungated.
     Non-fatal throughout — a gate that errors must not lose the text.
+
+    [LOCAL-477] The first version ran three gates — unsupported-claim, role-claim
+    and temporal — because those were the three that had caught fabrications. That
+    was too narrow, and run 3 proved it: the retried stop came back ending
+
+        "What deeper meanings might lie beneath the vibrant hues of the lizard's
+         feathers?"
+
+    a rhetorical question, which the prompt forbids in capitals and which R2
+    (PHASE 5.141) deletes — but R2 runs BEFORE the retry and never saw it. The
+    retry was escaping every STYLE gate in the chain while being checked by the
+    three FACT gates.
+
+    The general principle, learned twice now: **anything that regenerates text
+    after the chain must re-run the chain, not a favourite subset of it.** A retry
+    is a new draft and deserves the same scrutiny as the first one.
     """
     if not prose or not prose.strip():
         return prose
     out = prose
+
+    # Markdown leakage. The model emits "** " into prose that will be SPOKEN;
+    # run 3 shipped an orientation beginning `** "Au Soleil du Plafond,"`.
+    out = re.sub(r'\*{1,3}', '', out)
+    out = re.sub(r'^\s*#{1,6}\s*', '', out, flags=re.MULTILINE)
+    out = re.sub(r'[ \t]{2,}', ' ', out).strip()
+
+    # R2 — rhetorical questions (PHASE 5.141).
+    try:
+        from style_validator_detector import apply_r2_to_description
+        out, _r2_del, _ = apply_r2_to_description(out)
+    except Exception:
+        pass
+
+    # Belt and braces: R2 works per paragraph, and the rule that matters most for
+    # audio is that the stop must not END on a question.
+    try:
+        from unsupported_claim_gate import _split_sentences
+        _sents = _split_sentences(out)
+        while _sents and _sents[-1].rstrip().endswith('?'):
+            _sents.pop()
+        out = ' '.join(_sents).strip() or out
+    except Exception:
+        pass
     try:
         from unsupported_claim_gate import apply_unsupported_claim_gate
         out, _ = apply_unsupported_claim_gate(out, corpus_passages=[],
@@ -12953,6 +12992,28 @@ REWRITE RULES (all mandatory):
     # Bounded: one retry per stop, only for stops that fell below the floor BECAUSE
     # of the gates, and the result is kept only if it is longer than what the gates
     # left. It can therefore never make a stop worse than not running.
+    # [LOCAL-477] Strip markdown from EVERY prose field, not only retried ones.
+    # Run 3 shipped an orientation beginning `** "Au Soleil du Plafond,"` on a stop
+    # the retry never touched, so this is a property of normal generation. These
+    # fields are going to a text-to-speech voice: asterisks and hashes are either
+    # read aloud or produce an audible stumble, and no gate in the chain looks for
+    # them.
+    _md_cleaned = 0
+    for _mpoi in poi_list:
+        for _mf in ('description', 'orientation'):
+            _mv = _mpoi.get(_mf) or ''
+            if not _mv or _mv.startswith('['):
+                continue
+            _clean = re.sub(r'\*{1,3}', '', _mv)
+            _clean = re.sub(r'^\s*#{1,6}\s*', '', _clean, flags=re.MULTILINE)
+            _clean = re.sub(r'[ \t]{2,}', ' ', _clean).strip()
+            if _clean != _mv:
+                _mpoi[_mf] = _clean
+                _md_cleaned += 1
+    if _md_cleaned:
+        print(f"\n  [LOCAL-477] stripped markdown from {_md_cleaned} prose field(s) "
+              f"— these are spoken aloud")
+
     _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0}
     if _storied_mode and not _phase5_ceiling_breached:
         _RETRY_FLOOR = 120
@@ -12984,13 +13045,29 @@ REWRITE RULES (all mandatory):
 
             _spine_stop, _fact_sheet, _story_type = _regen_args_by_idx.get(
                 _ri, (None, None, None))
+            # [LOCAL-476] Forbid the RELATIONSHIP, not the sentence.
+            #
+            # The first version of this listed the removed sentences and said "do
+            # not repeat or rephrase". The model rephrased anyway — "the
+            # collaboration between Juan Gris and Pierre Reverdy" came back as
+            # "Juan Gris and Pierre Reverdy embarked on a profound artistic
+            # collaboration", the same false claim in a form the gate could not
+            # see. Naming the sentence teaches the model which WORDS to avoid;
+            # naming the underlying assertion is the only version that cannot be
+            # satisfied by a paraphrase.
             _forbidden = '\n'.join(f'- "{s.strip()}"' for s in _removed)
             _rpoi['_local474_forbidden'] = (
-                "\n\nCLAIMS ALREADY REJECTED FOR THIS STOP — a fact-check removed "
-                "each of these from a previous draft. Do NOT repeat them, do not "
-                "rephrase them, and do not assert anything that depends on them. "
-                "Write about something else you can support from the material "
-                "above:\n" + _forbidden + "\n")
+                "\n\nCLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed "
+                "each of the following from a previous draft because it is FALSE:"
+                "\n" + _forbidden + "\n\n"
+                "Do not restate these claims in ANY form. This is a ban on the "
+                "underlying assertion, not on the wording — rephrasing it, "
+                "nominalising the verb, softening it with 'reportedly' or "
+                "'is said to have', or implying it indirectly all count as "
+                "restating it. In particular, do not assert that two people "
+                "worked together, met, or corresponded at any date if a claim "
+                "above says they did. Write about something else that the source "
+                "material supports.\n")
             try:
                 _retry_stats['retried'] += 1
                 _r = _generate_description(

@@ -49,6 +49,14 @@ from style_validator_detector import (
 
 # Well-known references a general audience DOES know — skip these
 _WELL_KNOWN = {
+    # [LOCAL-475] Modern artists a general audience knows by name. The set had
+    # picasso and freud but not miró or dalí — two of the three artists named in
+    # the title of the exhibition we test on. Comparison is accent-folded (see
+    # `_is_well_known`), so the accented and unaccented spellings both match.
+    'joan miró', 'miró', 'salvador dalí', 'dalí', 'henri matisse', 'matisse',
+    'marc chagall', 'chagall', 'vincent van gogh', 'van gogh', 'claude monet',
+    'monet', 'rembrandt', 'michelangelo', 'leonardo da vinci', 'da vinci',
+    'andy warhol', 'warhol', 'frida kahlo', 'georgia o’keeffe', "georgia o'keeffe",
     # Wars/events
     'world war i', 'world war ii', 'wwi', 'wwii', 'the renaissance',
     'the french revolution', 'the industrial revolution', 'the cold war',
@@ -145,13 +153,36 @@ _WORK_TITLE_PATTERN = re.compile(
 )
 
 
+def _fold_accents(s: str) -> str:
+    """[LOCAL-475] Strip diacritics for comparison. See `_is_well_known`."""
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', s or '')
+                   if unicodedata.category(c) != 'Mn')
+
+
 def _is_well_known(name: str) -> bool:
-    """Check if a reference is well-known to a general audience."""
-    lower = name.lower().strip()
-    if lower in _WELL_KNOWN:
+    """Check if a reference is well-known to a general audience.
+
+    [LOCAL-475] This compared raw lowercase strings, so it answered **False for
+    Joan Miró and Salvador Dalí** while answering True for Picasso and Freud —
+    the accented names of two of the three headline artists in the exhibition we
+    have been testing on all week. Miró was therefore DEGRADED (his name deleted
+    from a sentence about his own book), which is what produced
+
+        "In 1971 known for his distinct surrealist imagery, created ..."
+
+    in TOUR_MFA_RELEASE_20260818_1532.txt. Both sides are now accent-folded, which
+    is standing check #4 (D243) catching something for the third time: exact match
+    on accented names silently reports absence.
+    """
+    lower = _fold_accents(name.lower().strip())
+    if not lower:
+        return False
+    folded = {_fold_accents(k) for k in _WELL_KNOWN}
+    if lower in folded:
         return True
     # Check if any well-known name is a substring
-    for known in _WELL_KNOWN:
+    for known in folded:
         if known in lower or lower in known:
             return True
     return False
@@ -237,7 +268,8 @@ def _has_nearby_gloss(sentence: str, entity_name: str, sentences: List[str],
     return False
 
 
-def detect_unglossed_references(text: str, stop_names: List[str] = None) -> List[Dict]:
+def detect_unglossed_references(text: str, stop_names: List[str] = None,
+                                exempt: List[str] = None) -> List[Dict]:
     """Stage 1: Deterministic detection of named entities lacking explanation.
 
     Returns list of dicts with:
@@ -263,6 +295,24 @@ def detect_unglossed_references(text: str, stop_names: List[str] = None) -> List
             for w in sn.split():
                 if len(w) > 3:
                     _stop_fragments.add(w.lower())
+
+    # [LOCAL-475] The stop's own artist is the SUBJECT, not an incidental
+    # reference, and must never be a candidate for glossing or degrading. Miró
+    # was degraded out of a sentence about his own book. `_is_well_known` now
+    # covers him, but the next tour will have an artist nobody has heard of and
+    # the same thing would happen — the fix has to be structural, not a list.
+    # Accent-folded for the D243 reason.
+    _exempt_folded = {_fold_accents(e.lower().strip()) for e in (exempt or []) if e}
+    for _e in list(_exempt_folded):
+        for _w in _e.split():
+            if len(_w) > 3:
+                _exempt_folded.add(_w)
+
+    def _is_exempt(name: str) -> bool:
+        f = _fold_accents((name or '').lower().strip())
+        if not f:
+            return False
+        return any(x and (x == f or x in f or f in x) for x in _exempt_folded)
 
     for i, sent in enumerate(sentences):
         if len(sent) < 15:
@@ -315,6 +365,9 @@ def detect_unglossed_references(text: str, stop_names: List[str] = None) -> List
                 continue
             if _stop_fragments and any(entity_name.lower() in sf or sf in entity_name.lower()
                                        for sf in _stop_fragments if len(sf) > 3):
+                continue
+            # [LOCAL-475] The stop's own artist is never an incidental reference.
+            if _is_exempt(entity_name):
                 continue
             if not _has_nearby_gloss(sent, entity_name, sentences, i):
                 seen_entities.add(entity_name.lower())
@@ -926,8 +979,18 @@ def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
     end_pos = pos + len(entity)
     after = sentence[end_pos:]
 
-    # Handle possessive: "Entity's ..."
-    if after.startswith("'s ") or after.startswith("'s "):
+    # Handle possessive: "Entity's ..." / "Entity’s ..."
+    #
+    # [LOCAL-475] This line used to test the SAME ASCII literal twice —
+    #     after.startswith("'s ") or after.startswith("'s ")
+    # — so the curly apostrophe the model actually emits was never covered, and
+    # the guard silently did nothing. That is how
+    #     "bound in the Louis Broder, a mid-20th century French publisher,’s vellum"
+    # reached the delivered tour. Every Unicode apostrophe variant is now handled,
+    # and a trailing space is no longer required (a possessive at a clause end,
+    # "Broder’s, which...", is still a possessive).
+    _after_stripped = after.lstrip()
+    if any(_after_stripped.startswith(ap + 's') for ap in ("'", '’', 'ʼ', '′')):
         # Drop the gloss rather than produce "Entity, gloss,'s X"
         # Possessive constructions can't cleanly take an appositive
         return sentence
@@ -1168,12 +1231,52 @@ _DEGRADE_GUARD_ORPHAN_ADJECTIVE = re.compile(
 )  # "the nearby forms" — adjective without noun object
 
 
+_DEGRADE_OPENER = re.compile(
+    r'^\s*(?:In|On|During|By|After|Before|Since|Around|Throughout|At)\b',
+    re.IGNORECASE)
+
+# Verbs that need a subject in front of them. If the clause after the first comma
+# opens with one of these and nothing before the comma could be that subject, the
+# subject has been deleted.
+_DEGRADE_ORPHAN_VERB = re.compile(
+    r'^\s*(?:created|published|printed|produced|made|designed|wrote|painted|'
+    r'illustrated|commissioned|founded|established|donated|gave|built|'
+    r'completed|began|started|collaborated|worked|met)\b', re.IGNORECASE)
+
+
+def _degrade_has_lost_its_subject(sentence: str) -> bool:
+    """[LOCAL-475] Did degrading delete the sentence's subject?
+
+    The delivered tour contained
+
+        "In 1971 known for his distinct surrealist imagery, created
+         'Le Lézard aux plumes d'or,' an illustrated book."
+
+    because the gate dropped "Joan Miró" from between "1971" and "known". Seven
+    guards passed it. The signature is specific and cheap to test for: the
+    sentence opens with a temporal or prepositional phrase, the clause after the
+    first comma starts with a bare past-tense verb, and there is no capitalised
+    word before that comma that could be the subject.
+    """
+    s = (sentence or '').strip()
+    if ',' not in s or not _DEGRADE_OPENER.match(s):
+        return False
+    head, _, tail = s.partition(',')
+    if not _DEGRADE_ORPHAN_VERB.match(tail):
+        return False
+    # Any capitalised token after the first word could be the missing subject.
+    tokens = head.split()[1:]
+    return not any(t[:1].isupper() for t in tokens if t[:1].isalpha())
+
+
 def _degrade_sentence_is_wellformed(sentence: str) -> bool:
     """Check that a degraded sentence passes all five degrade guards.
 
     Returns True if well-formed, False if any guard fires.
     """
     if len(sentence.strip()) < 15:
+        return False
+    if _degrade_has_lost_its_subject(sentence):   # [LOCAL-475]
         return False
     if _DEGRADE_GUARD_BARE_POSSESSIVE.search(sentence):
         return False
@@ -1364,6 +1467,7 @@ def apply_unglossed_reference_gate(
     api_key: str = None,
     model: str = None,
     stop_names: List[str] = None,
+    exempt: List[str] = None,
 ) -> Tuple[str, Dict]:
     """Apply the unglossed-reference gate to a stop description.
 
@@ -1406,7 +1510,8 @@ def apply_unglossed_reference_gate(
         return description, stats
 
     # Stage 1: Detect
-    refs = detect_unglossed_references(description, stop_names=stop_names)
+    refs = detect_unglossed_references(description, stop_names=stop_names,
+                                       exempt=exempt)
     stats['references_detected'] = len(refs)
 
     if not refs:
@@ -1558,9 +1663,16 @@ def apply_gate_to_stop_descriptions(
             if sc_entry and sc_entry.get('passages'):
                 passages = sc_entry['passages']
 
+        # [LOCAL-475] The stop's own artist (and any collaborator named on the
+        # stop record) is the subject of the stop, not an incidental reference.
+        # Miró was DEGRADED out of a sentence about his own book on the
+        # 2026-08-18 release run, leaving "In 1971 known for his distinct
+        # surrealist imagery, created ...".
+        _exempt = [poi.get(f) for f in ('artist', 'collaborator', 'writer')
+                   if poi.get(f)]
         new_desc, stats = apply_unglossed_reference_gate(
             desc, corpus_passages=passages, api_key=api_key, model=model,
-            stop_names=all_stop_names,
+            stop_names=all_stop_names, exempt=_exempt,
         )
 
         if stats['references_glossed'] > 0 or stats['references_degraded'] > 0:

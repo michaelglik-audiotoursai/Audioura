@@ -19289,3 +19289,80 @@ generic gates; (3) `_INTERACTION_RE` needs nominalised forms regardless.
 **2 and 3 are grammatical corruption produced by the gates themselves.** They are worse
 for a listener than the fact errors, because they are audible immediately. Neither is in
 any test.
+
+## D475–D478 — Four rounds of gate-caused corruption, and the same fabrication escaping in a third grammatical form
+
+**2026-08-18, Michael away, continuous development.** Everything below was found by
+reading the delivered tour text, not by reading a gate's verdict.
+
+### D475 — The gates were producing broken English
+
+Two defects in `TOUR_MFA_RELEASE_20260818_1532.txt`, both caused BY the gates, both worse
+for a listener than a fact error because they are audible instantly:
+
+```
+"In 1971 known for his distinct surrealist imagery, created 'Le Lézard…'"
+"bound in the Louis Broder, a mid-20th century French publisher,’s vellum"
+```
+
+Four causes, `test_local475` **6 of 13 red → 13/13**:
+
+1. **`_is_well_known` returned False for Joan Miró and Salvador Dalí** while returning
+   True for Picasso and Freud. `_WELL_KNOWN` had 80 entries, neither Miró nor Dalí, and
+   no accent folding — so Miró was DEGRADED out of a sentence about **his own book**.
+   Both sides now accent-fold; the modern artists a general audience knows are in the set.
+2. **The possessive guard tested the SAME ASCII literal twice** —
+   `after.startswith("'s ") or after.startswith("'s ")`. The curly apostrophe the model
+   actually emits was never covered, so a guard whose comment reads "Handles possessive"
+   did nothing. All Unicode apostrophe variants now handled.
+3. **`_degrade_sentence_is_wellformed` passed a subjectless sentence** through seven
+   guards. `_degrade_has_lost_its_subject` added: temporal opener, bare past-tense verb
+   after the first comma, no capitalised token that could be the subject.
+4. **The stop's own artist is now exempt** from glossing and degrading, threaded from
+   `poi['artist'/'collaborator'/'writer']`. Fix 1 covers Miró by name; this covers the
+   next tour, whose artist nobody has heard of.
+
+### D476 — Forbidding the sentence taught the model to paraphrase; forbid the claim
+
+The retry's prohibition listed removed sentences and said "do not repeat or rephrase".
+The model rephrased. `_INTERACTION_PATTERNS` gained the **nominalised** forms (`embarked
+on a … collaboration`, `formed a partnership`, `struck up a friendship`) — deliberately
+requiring a governing verb, because an unanchored `collaboration` would fire on "The
+collaboration exemplifies the exhibition's argument" and false rejections are what this
+whole session has been removing. The prohibition now bans the **assertion**, naming
+paraphrase, nominalisation and hedging as violations. `test_local476` 5/5, with five true
+sentences asserted to survive.
+
+### D477 — Anything that regenerates after the chain must re-run the chain
+
+Run 3's retried stop came back ending *"What deeper meanings might lie beneath the
+vibrant hues of the lizard's feathers?"* — a rhetorical question the prompt forbids in
+capitals and R2 (PHASE 5.141) deletes. **R2 runs before the retry and never saw it.**
+`_regate_prose` was checking the three FACT gates and letting the retry escape every
+STYLE gate. It now runs R2, strips markdown, and drops a trailing question.
+
+**Markdown stripping applies to every stop, not only retried ones** — run 3 shipped an
+orientation beginning `** "Au Soleil du Plafond,"` on a stop the retry never touched.
+These fields go to a text-to-speech voice and no gate in the chain looked for asterisks.
+
+### D478 — The Hogarth fabrication escaped a THIRD time, and the pattern is the point
+
+| run | form | caught? |
+|---|---|---|
+| original | `printed by The Hogarth Press` (passive) | ✅ from the start |
+| D472 run | `The Hogarth Press … printed this work` (active) | ❌ → fixed D473 |
+| run 4 | `edition—published by The Hogarth Press—underscore` (em dash) | ❌ → fixed here |
+
+The terminator alternation listed `.` `,` and a few prepositions, so an agent closed by
+**any other punctuation did not match at all**. Dashes, brackets, semicolons, colons,
+quotes and end-of-string added.
+
+**And `[A-Z]` cannot match an accented capital**, so `Éditions Verve` — a real publisher
+in this corpus — could never start an agent name. Fixed in all four patterns. **That is
+the D243 accent lesson for the fourth time today** (after `_is_well_known`, the
+`stop_corpus` joins, and `_fold` in the validator).
+
+**What generalises:** three shapes of one fabrication escaped one gate on three separate
+runs. Enumerating patterns is losing a race against a generative model — the same
+structural point as D476. The durable answer is to check the **claim** (agent X in role Y
+for this work) rather than the **string**, and that is now the top item on the gate work.

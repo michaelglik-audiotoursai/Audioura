@@ -48,9 +48,27 @@ _ROLE_VERBS = (
 
 # Pattern: "published by <Agent>" or "<Agent>... published this"
 # We also catch possessive forms: "The Hogarth Press's decision to publish"
+# [LOCAL-478] The terminator alternation used to list only `.` `,` and a handful of
+# prepositions, so an agent closed by any other punctuation did not match at all.
+# Run 4 of the release check shipped the Hogarth Press claim for a THIRD distinct
+# grammatical form \u2014
+#     "the set's limited edition\u2014published by The Hogarth Press\u2014underscore ..."
+# \u2014 because the em dash is not a terminator and the pattern simply failed. Dashes,
+# semicolons, colons, brackets, quotes and end-of-string are now terminators too.
+#
+# Three shapes of the same fabrication have now escaped this gate on three separate
+# runs: passive (caught from the start), active (D473), and parenthetical (here).
+# The claim is being restated in whatever form the detector does not cover, which is
+# the D476 lesson arriving through a different door \u2014 patterns are enumerable and
+# the model's phrasings are not.
 _ROLE_BY_PATTERN = re.compile(
     r'\b(?:' + '|'.join(_ROLE_VERBS) + r')\s+by\s+'
-    r"([A-Z][A-Za-z\u00C0-\u00FF\s'\u2019\-&]+?)(?:\.|,|\s+in\s+|\s+on\s+|\s+at\s+|\s+to\s+|\s+for\s+|\s+this\s+|\s+the\s+|\s+a\s+|\s+through\s+|\s+further\s+)",
+    # [LOCAL-478] `[A-Z]` cannot match an accented capital, so "\u00C9ditions Verve" \u2014
+    # a real publisher in this very corpus \u2014 could never start an agent name. The
+    # D243 accent lesson, hit for the fourth time on 2026-08-18.
+    r"([A-Z\u00C0-\u00D6\u00D8-\u00DE][A-Za-z\u00C0-\u00FF\s'\u2019\-&]+?)"
+    r"(?:\.|,|;|:|\u2014|\u2013|\(|\)|\[|\]|\"|\u201C|\u201D|\s+in\s+|\s+on\s+|\s+at\s+|\s+to\s+"
+    r"|\s+for\s+|\s+this\s+|\s+the\s+|\s+a\s+|\s+through\s+|\s+further\s+|$)",
     re.IGNORECASE,
 )
 
@@ -68,8 +86,8 @@ _ROLE_BY_PATTERN = re.compile(
 # "Dalí printed his own name" and "the exhibition published a catalogue of visitor
 # numbers" from being read as production claims.
 _ROLE_ACTIVE_PATTERN = re.compile(
-    r"\b((?:The\s+)?[A-Z][A-Za-zÀ-ÿ'’\-&]+"
-    r"(?:\s+[A-Z][A-Za-zÀ-ÿ'’\-&]+){0,3})"
+    r"\b((?:The\s+)?[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’\-&]+"
+    r"(?:\s+[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÿ'’\-&]+){0,3})"
     r"(?:\s*,[^,.]{0,80},)?\s+"
     r"(" + '|'.join(_ROLE_VERBS) + r")\s+"
     r"(?:this|the|these|that)\s+"
