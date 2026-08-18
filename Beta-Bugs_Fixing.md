@@ -53,7 +53,46 @@ briefing. Work top to bottom.
 > services, needs `OPENAI_API_KEY` in `.env`).
 
 **You are the `Beta_Bugs` session.** Begin every reply with
-`[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time.
+`[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time. Keep doing it —
+it is easy to use the prefix once and then let it lapse.
+
+Confirmed by Michael 2026-08-18, resolving a conflict: `YURI_BUGS_START_HERE.md`
+used to say `Beta_Mobile`, which was wrong on both counts — this is the name, and
+the work turned out to be services rather than mobile.
+
+---
+
+## 📋 "READ YOUR QUEUE" — Michael's trigger phrase
+
+When Michael says **"read your queue"**, work autonomously. Do not ask permission
+for each step; report what you are doing as you go so he can interrupt.
+
+**The queue, in this order:**
+
+1. Tasks awaiting a tester reply — currently
+   [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) and
+   [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3). Read the comments first.
+2. 🔵 **Claude — Review (Beta)** — list `1000410000000728`
+3. 🔵 **Claude — Review (Storied)** — list `1000410000000732`
+4. Any task whose description opens with `**Agent:** Claude`
+
+Within each, highest priority first, then oldest. Skip anything already `complete`.
+
+**Work it: investigate, fix, commit, merge to `main`, close tasks, write docs, run
+the local Docker stack.** Report outcomes plainly, including failures.
+
+### 🛑 Stop and ask Michael anyway, even in queue mode
+
+- **Any GCloud deploy.** Use `deploy_tour_modernized.sh`; runbook
+  [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
+- **Pushing `origin/storied`** — the branch model makes that his gate.
+- **Anything irreversible:** force-push, history rewrite, deleting a pushed branch,
+  `DELETE` on the production database.
+- **A mobile release** — a version bump and store upload puts a build in testers'
+  hands.
+- **Unattended cloud spend**, such as scheduled agents.
+
+Agreed with Michael 2026-08-18. Everything else: decide, do it, and say what you did.
 
 You are **not** the Storied session. A separate Claude runs on the Mac Mini on branch
 `storied` and owns tour generation and the story pipeline. You will not see its files
