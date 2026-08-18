@@ -514,3 +514,21 @@ Full outcome in [ANSWERS.MD Q-2026-08-17-1](ANSWERS.MD#q202608171) and D462.
   (`a1f5d9f`), image rebuilt, and verified **from inside the container**.
 - **Not pushed** — 66 ahead of `origin/storied`, still behind the field-test gate. The
   file is Storied-only so `main` is owed nothing. No `storied` → `main` merge.
+
+### 13:5x — Michael: "should we not fix wdvrdaxn8y's two Dockerfile breaks now?"
+
+❯ *"Wait, shoudl nto we fix wdvrdaxn8y's two Dockerfile breaks now?"*
+
+**Yes — and noting them instead of fixing them was the stall RULE ZERO exists to
+prevent.** Done. D463. Branch `fix/dockerfile-build-breaks` @ `a0d7238`, cut from
+`origin/main` and pushed; merged into local `storied` @ `9b4fd14`.
+
+- **The reported break was seven breaks.** `Dockerfile.newsletter-processor` copies only
+  the service file, which imports **seven** siblings. `apple_podcasts_processor` is just
+  the first one Python reaches. Fixed with `COPY *.py .` — a hand-maintained list that
+  drifts from the imports is the defect itself.
+- **`psycopg2-binary` 2.9.1 → 2.9.9** — no cp311 wheel was the whole story; 2.9.9 has
+  cp39 and cp311 and is already this repo's pin in three other requirements files.
+- **Proven red before green**, both images, then rebuilt from the Storied context too.
+- **Kept out of `beta-staging`** — D461 bounds that branch to Yuri's fixes so his test
+  result stays interpretable. No GCloud deploy.

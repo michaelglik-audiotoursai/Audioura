@@ -18713,3 +18713,53 @@ five-line change.
 **Not pushed.** Local `storied` is 66 ahead of `origin/storied` and still behind the
 iPhone field-test gate; the fixed file exists only on `storied`, so `main` is owed
 nothing. No `storied` → `main` merge was made or proposed (D459/D461 stand).
+
+## D463 — The two Dockerfile build breaks, fixed on a `main`-cut branch; the reported one was seven
+
+**2026-08-17.** Michael asked why `wdvrdaxn8y` was being noted rather than fixed. Fair —
+noting is the stall RULE ZERO exists to prevent. Fixed on **`fix/dockerfile-build-breaks`**
+@ `a0d7238`, cut from `origin/main` and pushed; merged into local `storied` @ `9b4fd14`.
+
+**The report understated break 1 by a factor of seven.** `Dockerfile.newsletter-processor`
+copies only the service file, which imports **seven** siblings — `apple_podcasts_processor`,
+`spotify_processor`, `subscription_detector`, `dh_service_simple`,
+`user_consolidation_service`, `credential_verification_service`, `advertising_url_filter`.
+The reported one is merely the first Python reaches, at line 18. Fixing that line alone
+moves the crash to line 19. **Read the imports; do not fix the traceback.**
+
+**Fixed with `COPY *.py .` rather than a seven-item list, deliberately.** A hand-maintained
+copy list that drifts from the imports *is* the defect; a longer list only resets the clock.
+`Dockerfile.cloudrun` already uses this pattern and `.dockerignore` curates the context.
+Transitive check first: those seven need nothing local beyond stdlib and nothing third-party
+beyond `requests`/`psycopg2`, both already installed — so no dependency change was needed.
+
+**Break 2 as reported.** `requirements.txt` pinned `psycopg2-binary==2.9.1`, no cp311 wheel,
+so `Dockerfile.tour-worker` (`python:3.11-slim`) source-built and died on `pg_config`. Bumped
+to **2.9.9** — cp39 *and* cp311 wheels, and already the pin in three other requirements files
+here, so it is a version this repo runs rather than a new one. That matters because
+`requirements.txt` is shared with `Dockerfile.generator` and `Dockerfile.orchestrator`, both
+`python:3.9-slim`.
+
+**Both proven red before green** (D242 check 1 — a build that passes proves nothing until
+the old one is watched to fail):
+
+```
+tour-worker  2.9.1 -> exit 1, "pg_config executable not found"   2.9.9 -> exit 0, cp311 wheel
+newsletter   before -> ModuleNotFoundError: apple_podcasts_processor
+             after  -> import newsletter_processor_service OK
+```
+
+Then rebuilt both **from the Storied context** — different `.dockerignore`, far more `.py`
+files in reach — exit 0 both, import clean.
+
+**Kept out of `beta-staging` on purpose.** D461 bounds that branch to Yuri's two fixes plus
+the version bump, so a "broken in staging" report stays interpretable. This goes to `main`
+on its own schedule. Not urgent: production builds from `Dockerfile.cloudrun`, which is why
+neither break ever surfaced there.
+
+**`SUBMISSION_LOCAL-64.md` marked both of these files `PASS`** (lines 151, 158). It was
+checking something other than whether the image builds. Do not trust it on other Dockerfiles.
+
+**Not done, on purpose:** the task's larger suggestion — drop the per-service Dockerfiles and
+standardise on `Dockerfile.cloudrun`. Right direction, real blast radius, should not ride
+along with a two-line unbreak. `wdvrdaxn8y` left open for it.
