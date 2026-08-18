@@ -361,6 +361,20 @@ def check_temporal_coherence(
             if not dates_a and not dates_b:
                 continue  # Can't check without dates
 
+            # [LOCAL-473] An ancient or mythological figure is a SUBJECT, not a
+            # collaborator. The D472 release run rejected a true sentence about
+            # "Dalí's illustrations for Moses and Monotheism" with
+            #   'Moses' died in -1200, cannot have collaboration with in 1974
+            # Nobody has ever claimed Dalí collaborated with Moses; the name is in
+            # the work's TITLE. This gate exists to catch an impossible interaction
+            # between real contemporaries — a three-thousand-year gap is a category
+            # error, not a factual one, and reporting it as a falsehood is exactly
+            # how a gate throws away a true sentence. Same class as the `World War`
+            # and `Maresfield Gardens` misreadings of D447/D449.
+            if any(d and d.get('death') is not None and d['death'] < 1000
+                   for d in (dates_a, dates_b)):
+                continue
+
             # Check: if we have an event year, was either party dead?
             if event_year:
                 if dates_a and dates_a.get('death') and event_year > dates_a['death']:

@@ -2123,6 +2123,54 @@ _LAST_VERIFICATION_TIER = ""
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
 # ──────────────────────────────────────────────────────────────────────────────
+def _sentences_removed_by_gates(before: str, after: str):
+    """[LOCAL-474] Sentences present before the gate chain and absent after it.
+
+    Module scope so it is testable without a key, a DB or a network — D421 bounced
+    a task for exactly the opposite arrangement, where the only way to test a
+    validator was to grep the source of the function it lived in.
+    """
+    from unsupported_claim_gate import _split_sentences
+    kept = {s.strip() for s in _split_sentences(after or '')}
+    return [s.strip() for s in _split_sentences(before or '')
+            if s.strip() and s.strip() not in kept]
+
+
+def _regate_prose(prose: str, poi: dict) -> str:
+    """[LOCAL-474] Re-apply the DETERMINISTIC deletion gates to regenerated prose.
+
+    Only the free, offline gates: the retry happens after the chain has run and
+    will not run again, so anything it invents would otherwise ship ungated. These
+    three are the ones that caught real fabrications on the 2026-08-18 release run.
+    Non-fatal throughout — a gate that errors must not lose the text.
+    """
+    if not prose or not prose.strip():
+        return prose
+    out = prose
+    try:
+        from unsupported_claim_gate import apply_unsupported_claim_gate
+        out, _ = apply_unsupported_claim_gate(out, corpus_passages=[],
+                                              api_key=None, model=None)
+    except Exception:
+        pass
+    try:
+        from stop_claim_audit import apply_role_claim_gate
+        rec = {'publisher': poi.get('publisher', '') or '',
+               'credit_line': poi.get('credit_line', '') or '',
+               'artist': poi.get('artist', '') or ''}
+        out, _ = apply_role_claim_gate(out, rec, poi.get('_corpus_text', '') or '')
+    except Exception:
+        pass
+    try:
+        from temporal_coherence_gate import check_temporal_coherence
+        from unsupported_claim_gate import _split_sentences
+        out = ' '.join(s for s in _split_sentences(out)
+                       if not check_temporal_coherence(s))
+    except Exception:
+        pass
+    return out.strip()
+
+
 # [LOCAL-413] build_snippet_block — module-scope function for testability.
 # Previously this logic was inlined in the per-stop prompt assembly loop.
 # Lifted here so tests can assert on the returned string directly.
@@ -10567,6 +10615,12 @@ Write the story FIRST, then add physical description if space allows.
 """
             description_prompt += _story_reinforcement
 
+        # [LOCAL-474] The post-gate retry sets this. It goes LAST, after every other
+        # instruction, because it is the one thing the previous draft got wrong and
+        # instructions nearest the end carry most weight. Absent on a first draft.
+        if poi.get('_local474_forbidden'):
+            description_prompt += poi['_local474_forbidden']
+
         description_data = {
             "model": story_pass_model(),  # D370 — story pass only, not the pipeline default
             "messages": [
@@ -11438,10 +11492,15 @@ Write the story FIRST, then add physical description if space allows.
         _spine_arc = _storied_spine.get("arc", []) if _storied_mode and _storied_spine else []
         _fact_sheets_list = _storied_fact_sheets if _storied_mode and _storied_fact_sheets else []
         futures = {}
+        # [LOCAL-474] Keep each stop's generation arguments so the post-gate retry
+        # can re-run _generate_description for a stop the gates hollowed out. These
+        # are otherwise local to this loop and unreachable 1,200 lines later.
+        _regen_args_by_idx = {}
         for i, poi in enumerate(poi_list):
             spine_stop = _spine_arc[i] if i < len(_spine_arc) else None
             fact_sheet = _fact_sheets_list[i] if i < len(_fact_sheets_list) else None
             story_type = poi.get('story_type')
+            _regen_args_by_idx[i] = (spine_stop, fact_sheet, story_type)
             futures[executor.submit(_generate_description, (i, poi, spine_stop, fact_sheet, story_type))] = i
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
@@ -11717,6 +11776,12 @@ Write the story FIRST, then add physical description if space allows.
             print(f"  [LOCAL-423] Story verifier import error (non-fatal): {_sv_err}")
         except Exception as _sv_err:
             print(f"  [LOCAL-423] Story verifier error (non-fatal): {_sv_err}")
+
+    # [LOCAL-474] Snapshot every stop's prose BEFORE the deletion-gate chain runs.
+    # The retry after the chain diffs against this to learn exactly which sentences
+    # were removed, without having to modify all ten gates to report in a common
+    # format. Same technique as gate_fp_probe.py.
+    _pre_gate_prose = {i: (p.get('description') or '') for i, p in enumerate(poi_list)}
 
     # [LOCAL-394] 120-word floor enforcement — log stops under minimum but NEVER drop them.
     # The floor is a retry trigger inside _generate_description, not a post-generation filter.
@@ -12864,6 +12929,103 @@ REWRITE RULES (all mandatory):
                 p[_field_key] = _text.strip()
     print(f"  [LOCAL-41] Stripped {_audio_fixes} trailing question(s), "
           f"removed {_broader_context_count} 'broader context' instance(s)")
+
+    # -------- [LOCAL-474] PHASE 5.17: Post-gate retry --------
+    #
+    # THE MEASURED PROBLEM (D472). The gate chain above is allowed to delete
+    # sentences and nothing regenerates what it removed. On the 2026-08-18 release
+    # run, stop 2 "Au Soleil du Plafond" came out as two sentences scoring 21,
+    # because the temporal gate CORRECTLY deleted "In 1955, Juan Gris collaborated
+    # with Pierre Reverdy" — Gris died in 1927 — and nothing replaced it. The gate
+    # was right and the tour got worse. A correct deletion with no second attempt
+    # is indistinguishable from having had no material at all.
+    #
+    # The 120-word floor at LOCAL-394 does not catch this: it runs BEFORE the chain
+    # and only logs. This is the same floor, re-checked after the deletions, with a
+    # regeneration behind it.
+    #
+    # WHY IT IS A RETRY AND NOT A RE-ROLL. Regenerating blind would reproduce the
+    # same false claim — the model has no idea why anything was removed. The removed
+    # sentences are fed back as an explicit prohibition, which is the production
+    # equivalent of the lab loop's rotating focus fact (STORY_BASELINE.md §5①):
+    # a second attempt that has learned something from the first.
+    #
+    # Bounded: one retry per stop, only for stops that fell below the floor BECAUSE
+    # of the gates, and the result is kept only if it is longer than what the gates
+    # left. It can therefore never make a stop worse than not running.
+    _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0}
+    if _storied_mode and not _phase5_ceiling_breached:
+        _RETRY_FLOOR = 120
+        for _ri, _rpoi in enumerate(poi_list):
+            _now = _rpoi.get('description') or ''
+            _before = _pre_gate_prose.get(_ri, '')
+            if not _now or _now.startswith('['):
+                continue
+            _now_wc = len(_now.split())
+            if _now_wc >= _RETRY_FLOOR:
+                continue
+            # Only stops the GATES hollowed out. A stop that was always short is a
+            # retrieval problem, and regenerating it just spends money on the same
+            # empty corpus.
+            if len(_before.split()) - _now_wc < 15:
+                continue
+            _retry_stats['eligible'] += 1
+
+            _removed = _sentences_removed_by_gates(_before, _now)
+            if not _removed:
+                continue
+
+            _stop_label = _rpoi.get('name', f'Stop {_ri + 1}')
+            print(f"\n  [LOCAL-474] PHASE 5.17: retry '{_stop_label[:44]}' — "
+                  f"{len(_before.split())}w → {_now_wc}w after gates, "
+                  f"{len(_removed)} sentence(s) removed")
+            for _rm in _removed:
+                print(f"    removed: \"{_rm[:100]}\"")
+
+            _spine_stop, _fact_sheet, _story_type = _regen_args_by_idx.get(
+                _ri, (None, None, None))
+            _forbidden = '\n'.join(f'- "{s.strip()}"' for s in _removed)
+            _rpoi['_local474_forbidden'] = (
+                "\n\nCLAIMS ALREADY REJECTED FOR THIS STOP — a fact-check removed "
+                "each of these from a previous draft. Do NOT repeat them, do not "
+                "rephrase them, and do not assert anything that depends on them. "
+                "Write about something else you can support from the material "
+                "above:\n" + _forbidden + "\n")
+            try:
+                _retry_stats['retried'] += 1
+                _r = _generate_description(
+                    (_ri, _rpoi, _spine_stop, _fact_sheet, _story_type))
+                _new_desc = _r[2] or ''
+                # RE-GATE THE RETRY. The gate chain has already run and will not run
+                # again, so an ungated retry could ship a fresh fabrication that the
+                # first draft would have had caught — turning a safety improvement
+                # into a hole. The deterministic gates are re-applied here, and the
+                # comparison is made on what SURVIVES them, not on the raw draft.
+                _new_desc = _regate_prose(_new_desc, _rpoi)
+                if len(_new_desc.split()) > _now_wc and not _new_desc.startswith('['):
+                    _rpoi['description'] = _new_desc
+                    if _r[1]:
+                        _rpoi['orientation'] = _r[1]
+                    total_cost += _r[5] if len(_r) > 5 else 0
+                    _retry_stats['improved'] += 1
+                    print(f"    [LOCAL-474] regenerated and re-gated: "
+                          f"{len(_new_desc.split())}w (was {_now_wc}w)")
+                else:
+                    _retry_stats['kept_original'] += 1
+                    print(f"    [LOCAL-474] retry not better after re-gating — "
+                          f"keeping the original gated text")
+            except Exception as _rt_err:
+                _retry_stats['kept_original'] += 1
+                print(f"    [LOCAL-474] retry failed (non-fatal): {_rt_err}")
+            finally:
+                _rpoi.pop('_local474_forbidden', None)
+
+        if _retry_stats['eligible']:
+            print(f"\n  [LOCAL-474] retry summary: {_retry_stats['eligible']} eligible, "
+                  f"{_retry_stats['retried']} retried, {_retry_stats['improved']} improved, "
+                  f"{_retry_stats['kept_original']} kept original")
+            print(f"  [LOCAL-474] each regenerated stop was re-gated before being "
+                  f"accepted; a retry can only replace text it beats after gating.")
 
     # -------- [LOCAL-44] PHASE 5.10: Anti-preaching post-processing --------
     # Strip trailing sentences that instruct the listener what to feel, notice,

@@ -54,6 +54,29 @@ _ROLE_BY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# [LOCAL-473] ACTIVE VOICE: "<Agent> printed this work", "Tériade published this book".
+#
+# The gate matched passive voice only, and the D472 release run shipped the Hogarth
+# Press fabrication for the FIFTH time with the gate reporting `0 role claims` —
+# because the model wrote "The Hogarth Press, known for its groundbreaking
+# publications, printed this work". A false negative in a safety gate.
+#
+# The `(?:,[^,.]{0,80},)?` is the appositive between subject and verb, matched but
+# NOT captured, so the agent stays "The Hogarth Press" rather than swallowing
+# "known for its groundbreaking publications". The object must be a determiner plus
+# a work noun — "this work", "the edition" — which is what keeps
+# "Dalí printed his own name" and "the exhibition published a catalogue of visitor
+# numbers" from being read as production claims.
+_ROLE_ACTIVE_PATTERN = re.compile(
+    r"\b((?:The\s+)?[A-Z][A-Za-zÀ-ÿ'’\-&]+"
+    r"(?:\s+[A-Z][A-Za-zÀ-ÿ'’\-&]+){0,3})"
+    r"(?:\s*,[^,.]{0,80},)?\s+"
+    r"(" + '|'.join(_ROLE_VERBS) + r")\s+"
+    r"(?:this|the|these|that)\s+"
+    r"(?:work|book|edition|volume|portfolio|suite|series|set|album|"
+    r"prints?|plates?|lithographs?|etchings?|drypoints?|illustrations?)\b"
+)
+
 # Pattern: "<Agent>, <role descriptor>" e.g. "The Hogarth Press, known for its publication"
 # or "<Agent>'s decision to publish"
 _POSSESSIVE_PUBLISH_PATTERN = re.compile(
@@ -151,6 +174,22 @@ def extract_role_claims(text: str) -> List[Dict]:
                 break
         claims.append({
             'role': role,
+            'agent': agent,
+            'agent_bare': _strip_leading_article(agent),
+            'sentence': _find_sentence_containing(text, m.start(), m.end()),
+        })
+
+    # [LOCAL-473] Active voice: "<Agent> printed this work"
+    for m in _ROLE_ACTIVE_PATTERN.finditer(text):
+        agent = m.group(1).strip().rstrip('.,')
+        if not agent or len(agent) < 3:
+            continue
+        agent_key = _normalize_for_search(agent)
+        if agent_key in seen_agents:
+            continue
+        seen_agents.add(agent_key)
+        claims.append({
+            'role': _ROLE_TO_RECORD_FIELD.get(m.group(2).lower(), 'publisher'),
             'agent': agent,
             'agent_bare': _strip_leading_article(agent),
             'sentence': _find_sentence_containing(text, m.start(), m.end()),

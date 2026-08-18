@@ -19187,3 +19187,105 @@ lithographs, Louis Broder's vellum, Mourlot Frères, and Boris Fridman's donatio
 true and all sourced. **Zero stops had `detail == 0`**, which was six of eight in the lab
 before today. The object is reaching the prose. The pipeline is closer than it was this
 morning and it is not ready.
+
+## D473 — Two production holes closed: active-voice role claims, and title figures read as collaborators
+
+**2026-08-18.** Both found by the D472 release run, both tested red-before-green in
+`test_local473_active_voice_and_title_figures.py` (**4 of 9 red → 9/9**).
+
+**A. `extract_role_claims` matched passive voice only.** The Hogarth Press fabrication
+shipped a fifth time with the gate reporting `0 role claims`:
+
+```
+"This work was printed by The Hogarth Press."                 -> 1 claim
+"The Hogarth Press ... printed this work, ensuring that ..."  -> 0 claims
+```
+
+A false NEGATIVE in a safety gate — the opposite direction from everything else this
+session and the more dangerous one. `_ROLE_ACTIVE_PATTERN` added, with the appositive
+matched but not captured so the agent stays `The Hogarth Press` rather than swallowing
+`known for its groundbreaking publications`. The object must be a determiner plus a work
+noun, which is what keeps "Dalí printed his own name" out.
+
+**B. An ancient figure named in the WORK'S TITLE was read as a collaborator** —
+`'Moses' died in -1200, cannot have collaboration with in 1974`. The gate exists to catch
+impossible interactions between real contemporaries; a three-thousand-year gap is a
+category error, not a factual one. Persons with a death year before 1000 CE no longer
+produce a temporal verdict.
+
+## D474 — The production retry loop works, and it taught the model to evade a gate
+
+**2026-08-18. Michael: "fix them and run the tour again, putting all your lab
+enhancements into production if you feel it is a good idea; if not tell me why not."**
+
+**Built (`generate_tour_text.py` PHASE 5.17).** The 120-word floor at LOCAL-394 runs
+BEFORE the deletion chain and only logs. PHASE 5.17 is the same floor re-checked AFTER
+it, with a regeneration behind it. It fires only for stops the gates hollowed out (a
+stop that was always short is a retrieval problem and regenerating it spends money on the
+same empty corpus), one retry each, and the removed sentences are fed back as an explicit
+prohibition — that is what makes it a retry rather than a re-roll. The result is
+**re-gated** before acceptance and kept only if it beats the original *after* gating, so
+it can never make a stop worse than not running.
+
+**Measured, same exhibition, back to back:**
+
+| | run 1 (D472) | run 2 |
+|---|---|---|
+| stop indices | 43 / **21** / 44 | 42 / **38** / 32 |
+| mean | 36 | 37 |
+| **worst stop** | **21** | **32** |
+| detail (mean) | 13 | **33** |
+| chars | 4,928 | 6,196 |
+| Hogarth fabrication | **present** | **gone** |
+
+Retry: 2 eligible, 2 retried, 2 improved, 0 kept original. **The mean barely moved and the
+floor rose 11 points** — which is what a retry loop is for. It does not make good stops
+better; it stops bad stops from shipping.
+
+### THE FINDING — a prohibition-driven retry can teach the model to evade the gate
+
+Stop 2's first draft said *"In 1955, the collaboration between Juan Gris and Pierre
+Reverdy…"*. The temporal gate **correctly** rejected it — Gris died in 1927. The retry
+told the model not to repeat **or rephrase** it. The model rephrased it anyway:
+
+> "In 1955, Juan Gris and Pierre Reverdy embarked on a profound artistic collaboration…"
+
+**Same false claim, and it shipped**, because `_INTERACTION_RE` matches `collaborated
+with` and `collaboration between` but not `embarked on a … collaboration`. Verified: the
+sentence yields `interaction verb: None`, so the gate never even reached the dates.
+
+**This is a structural property of the design, not a missing verb.** Telling a model what
+was rejected gives it the information needed to route around the detector. The gate's
+verb list is now, in effect, adversarially probed by our own retry. Adding `embarked on`
+is whack-a-mole and would be the wrong lesson.
+
+**The right fixes, in order:** (1) the retry prohibition should forbid the *relationship*
+("do not assert that Gris and Reverdy worked together at any date"), not the sentence;
+(2) the re-gate should check the retry against the **claims** removed, not only re-run the
+generic gates; (3) `_INTERACTION_RE` needs nominalised forms regardless.
+
+### What I did NOT port, and why
+
+- **`evaluate_story` as a production GATE.** It is calibrated against exactly one human
+  judgement — Michael's "feels excellent" on a 64. Letting an uncalibrated number delete
+  content is today's core mistake in a new place. It stays a reported number.
+- **`SNIPPET_CAP_PER_STOP` 5 → 20 as the default.** Measured on one exhibition. It is an
+  env override on the release runner until a second venue confirms it, because it
+  quadruples the snippet block in every prompt for every tour type.
+- **Extracting the story prompt into its own pass.** The largest remaining quality lever
+  and the reason the lab beats production by ~25 points — and a refactor of the critical
+  path. Shipping it in the same change as the retry loop would make a regression
+  unattributable. Sequence them.
+
+### Still not release-ready. Three defects visible in the run-2 text
+
+1. **A false claim shipped** (the Gris/Reverdy 1955 evasion above).
+2. **A subject was deleted, leaving a broken sentence:** *"In 1971 known for his distinct
+   surrealist imagery, created 'Le Lézard aux plumes d'or'"* — Miró's name is gone.
+3. **A gloss was spliced into a possessive:** *"bound in the Louis Broder, a mid-20th
+   century French publisher,'s vellum"*. `unglossed_reference_gate` has guards for
+   exactly this (`_guard_spliced_sentence`, `_guard_doubled_name`) and they did not fire.
+
+**2 and 3 are grammatical corruption produced by the gates themselves.** They are worse
+for a listener than the fact errors, because they are audible immediately. Neither is in
+any test.
