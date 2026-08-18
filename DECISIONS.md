@@ -18823,3 +18823,71 @@ still exists and holds one markdown commit; left in place, marked do-not-build-o
 **The rule gained a sentence it was missing:** on restart, a session's first act is to find
 its row in the table and adopt that name; if no row fits, it adds one before replying.
 Without that, the table is a list nobody is required to read.
+
+## D466 — The first measured false rejection: the temporal gate threw away a true collaboration because a regex read "published 1887" as "died 1887"
+
+**2026-08-18. Michael's mission for this session:** *"improve the validators so the good
+stories for humans are not dismissed as inaccurate when there is no evidence that they
+are."* Measurement first, per the standing check — run the instrument against a case whose
+answer is already known.
+
+**The known-answer case did not behave as predicted, and that is worth stating plainly.**
+`gate_fp_probe.py` (new) replays the deterministic drop-gates over `TOUR_MFA_20260812_2030.txt`
+— delivered text Michael read and adjudicated, so the correct drop count is zero.
+
+```
+LOCAL-263 unsupported-claim   0 dropped   (idempotent; not the culprit)
+LOCAL-458 role-claim          2 dropped   — both the Hogarth Press sentences
+```
+
+Both LOCAL-458 drops are **correct**: Michael independently called the Hogarth attribution
+"the largest problem" in the tour and the review records it as fabricated, fourth
+occurrence. So on this tour the gate that would have caught the worst error **did not fire
+in production** and the fabrication shipped. That is a false-NEGATIVE result, the opposite
+of what was being hunted, and delivered text can never show a false positive anyway —
+it contains only survivors. **Delivered tours are the wrong instrument for this mission.**
+
+**The right instrument is the drop log of a real run.** `local413_run_output.log` holds one:
+
+```
+[LOCAL-402] coherence reject: '"Au Soleil du Plafond," created by Juan Gris in
+collaboration with Pierre Reverd' — 'Juan Gris' died in 1887, cannot have
+collaboration with in 1955
+```
+
+**Juan Gris died in 1927.** 1887 is his birth year, and `_KNOWN_DATES` holds both correctly.
+The rejected claim is true and documented. Three independent defects put it there; each is
+now covered by a test that was **verified red before the fix**
+(`test_local466_temporal_false_rejection.py`, 6/12 failing → 12/12 passing):
+
+**A. The lifespan regexes ate ordinary words.** `(?:died|d\.?)` — optional period, `\s*`
+permitting zero width — matched the final `d` of any word before a year. Measured:
+`published 1887` → died 1887, `printed 1971` → died 1971, and worst,
+`signed 1916 and died 1927` → **1916**, because the left-to-right match consumed the wrong
+one and the real death year was never reached. `b\.?` had the same flaw (`Feb 1955` → born
+1955). The period is now required and both branches anchored on `\b`.
+
+**B. Partial snippet evidence shadowed the correct table.** `get_person_dates` returned the
+snippet result the moment it was non-empty, so `{'birth': 1887}` erased the table's
+`{'birth': 1887, 'death': 1927}` — and the death year is precisely what the check reads.
+The sources are now merged, snippet winning per-field where it has a value.
+
+**C. A publication year is not an interaction year — and this is the design lesson.** With
+A and B fixed the gate STILL rejected the sentence, now with the *correct* dates: Gris
+d.1927, book published 1955. Gris drew the lithographs before he died; Tériade published
+them in 1955. **Posthumous publication is not a temporal impossibility, and in a livre
+d'artiste corpus it is the norm, not an edge case.** A year governed by
+published/printed/issued/exhibited/donated no longer supplies the event year. Under D450,
+knowing nothing is not a rejection.
+
+**Why `test_local402_temporal_coherence.py` was 11/11 green throughout.** Every one of its
+cases asserts the gate FIRES. It contains no case in which firing would be wrong, so it
+cannot detect a false rejection — a suite that can only fail in one direction measures one
+direction. **Every gate needs a TRUE set, not only a FALSE set** (STORY_GATE_TIERS.md
+measure 6, which had never been built). LOCAL-402 remains 11/11 after the fix, so the real
+impossibility (Dalí/Freud 1974) is still caught.
+
+**What generalises.** All three defects are the D423/D243 shape — an instrument reporting a
+confident falsehood — and none was reachable by reading the gate's own verdict. The drop
+log said "died in 1887" and the fact that this was checkable against a known lifespan is
+what exposed it. **Read what a gate threw away, not what it kept.**

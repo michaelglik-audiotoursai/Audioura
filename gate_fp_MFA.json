@@ -1,0 +1,22 @@
+{
+  "file": "/Users/micha/Audioura/TOUR_MFA_20260812_2030.txt",
+  "sentences": 38,
+  "findings": [
+    {
+      "gate": "LOCAL-458 role-claim",
+      "stop": "Moses and Monotheism",
+      "field": "description",
+      "claim_type": "credit_line -> The Hogarth Press",
+      "reason": "record empty, absent from corpus",
+      "sentence": "Commissioned by The Hogarth Press, this collaboration was published to merge Freud's profound theories with Dalí’s vivid surrealism."
+    },
+    {
+      "gate": "LOCAL-458 role-claim",
+      "stop": "Moses and Monotheism",
+      "field": "description",
+      "claim_type": "credit_line -> The Hogarth Press",
+      "reason": "record empty, absent from corpus",
+      "sentence": "This exhibit showcases how artists like Dalí, in collaboration with publishers such as The Hogarth Press, transformed books into art forms through deeply integrated visual and textual partnerships."
+    }
+  ]
+}

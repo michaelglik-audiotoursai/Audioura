@@ -93,17 +93,35 @@ _INTERACTION_RE = re.compile(
 _YEAR_RE = re.compile(r'\b(1[4-9]\d{2}|20[0-2]\d)\b')
 
 # Birth/death year patterns for extracting from snippets
+# LOCAL-466: the abbreviation branches used to be `b\.?` and `d\.?` — an OPTIONAL
+# period with `\s*` permitting zero width, so the final letter of any ordinary word
+# before a year was read as a lifespan marker: "published 1887" → died 1887,
+# "printed 1971" → died 1971, "Feb 1955" → born 1955. That is how the gate came to
+# believe Juan Gris died in 1887 (his birth year) and threw away a true sentence.
+# The period is now REQUIRED on the abbreviation and both branches are anchored on
+# a word boundary, so `\bd\.` cannot match inside "published".
 _BIRTH_PATTERNS = [
-    re.compile(r'(?:born|b\.?)\s*(?:in\s*)?(\d{4})', re.IGNORECASE),
+    re.compile(r'\b(?:born|b\.)\s*(?:in\s*)?(\d{4})', re.IGNORECASE),
     re.compile(r'\((\d{4})\s*[-–—]\s*(?:\d{4}|present)\)', re.IGNORECASE),  # (1856–1939)
     re.compile(r'(\d{4})\s*[-–—]\s*(?:\d{4}|present)', re.IGNORECASE),
 ]
 
 _DEATH_PATTERNS = [
-    re.compile(r'(?:died|d\.?)\s*(?:in\s*)?(\d{4})', re.IGNORECASE),
+    re.compile(r'\b(?:died|d\.)\s*(?:in\s*)?(\d{4})', re.IGNORECASE),
     re.compile(r'\(\d{4}\s*[-–—]\s*(\d{4})\)', re.IGNORECASE),  # (1856–1939) → 1939
     re.compile(r'\d{4}\s*[-–—]\s*(\d{4})', re.IGNORECASE),
 ]
+
+# LOCAL-466: a year governed by one of these is when the OBJECT was made public,
+# not when the people worked together. Gris drew the lithographs for `Au Soleil du
+# Plafond` before his death in 1927; Tériade published them in 1955. Reading 1955
+# as the year of the collaboration made a true, documented partnership look
+# chronologically impossible. Posthumous publication is normal in this corpus —
+# livres d'artiste are the whole subject — so this is not an edge case.
+_PUBLICATION_YEAR_RE = re.compile(
+    r'\b(?:published|printed|issued|released|reissued|republished|exhibited|'
+    r'shown|displayed|acquired|donated|bequeathed|catalogued)\b'
+    r'[^.;]{0,40}?(\d{4})', re.IGNORECASE)
 
 # Well-known dates for persons frequently appearing in this corpus
 # (fallback when snippets don't carry dates explicitly)
@@ -190,24 +208,35 @@ def get_person_dates(
     person_name: str,
     snippets: Optional[List[Dict[str, str]]] = None,
 ) -> Optional[Dict[str, int]]:
-    """Get birth/death dates for a person, checking snippets first then fallback."""
-    # 1. Try snippet corpus
-    if snippets:
-        from_snippets = extract_person_dates_from_snippets(snippets, person_name)
-        if from_snippets:
-            return from_snippets
+    """Get birth/death dates for a person: snippets first, table filling the gaps.
 
-    # 2. Fallback to known dates
+    LOCAL-466: this used to RETURN the snippet result the moment it was non-empty,
+    so a snippet yielding only `{'birth': 1887}` shadowed the table's correct
+    `{'birth': 1887, 'death': 1927}` for Juan Gris. Partial evidence outranked a
+    known answer, and the missing death year is exactly what the coherence check
+    reads. The two sources are now MERGED, with the snippet winning per-field
+    where it actually has a value — live evidence still beats a stale table, but
+    it can no longer erase what it does not mention.
+    """
+    from_snippets = {}
+    if snippets:
+        from_snippets = extract_person_dates_from_snippets(snippets, person_name) or {}
+
+    known = None
     name_lower = person_name.lower().strip()
     if name_lower in _KNOWN_DATES:
-        return _KNOWN_DATES[name_lower]
+        known = _KNOWN_DATES[name_lower]
+    else:
+        surname = person_name.split()[-1].lower() if person_name.split() else ''
+        if surname and surname in _KNOWN_DATES:
+            known = _KNOWN_DATES[surname]
 
-    # Try surname only
-    surname = person_name.split()[-1].lower() if person_name.split() else ''
-    if surname and surname in _KNOWN_DATES:
-        return _KNOWN_DATES[surname]
+    if not from_snippets and not known:
+        return None
 
-    return None
+    merged = dict(known or {})
+    merged.update(from_snippets)
+    return merged
 
 
 def _extract_persons_from_sentence(sentence: str) -> List[str]:
@@ -282,11 +311,26 @@ def check_temporal_coherence(
         # But also check for single person + implicit "with X" reference
         return None
 
-    # 3. Extract or infer the event year from the sentence
+    # 3. Extract or infer the event year from the sentence.
+    #
+    # LOCAL-466: a publication year is NOT the year the people interacted. The
+    # gate used to take the first year in the sentence and test it against the
+    # death dates, which rejected
+    #   '"Au Soleil du Plafond," created by Juan Gris in collaboration with
+    #    Pierre Reverdy, was published in 1955'
+    # as impossible because Gris died in 1927 — a true claim about a posthumously
+    # published livre d'artiste. When the only year present is governed by a
+    # publication verb we have no evidence about WHEN they collaborated, and
+    # under D450 knowing nothing is not a rejection.
     if event_year is None:
         year_match = _YEAR_RE.search(sentence)
         if year_match:
-            event_year = int(year_match.group(1))
+            candidate = int(year_match.group(1))
+            pub = _PUBLICATION_YEAR_RE.search(sentence)
+            if pub and int(pub.group(1)) == candidate:
+                event_year = None      # publication date — proves nothing here
+            else:
+                event_year = candidate
 
     # 4. For each pair of persons, check temporal feasibility
     for i in range(len(persons)):

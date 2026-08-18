@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-17 13:13 EDT
+# RESTART briefing — generated 2026-08-18 11:00 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     302e01e STORIED_COMMUNICATION_03: log the Beta-Staging plan and the Beta-track correction
-unpushed 63 commits
+HEAD     70e16e9 D464/D465: retire beta-staging; name the Windows session Beta_Bugs; set the validator mission
+unpushed 71 commits
 dirty    1 files
 ```
 
@@ -64,9 +64,10 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  11:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
-  18:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
-  26:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  11:- [ ] **2026-08-18 10:2x — THE MISSION FOR THE NEXT SESSION, in Michael's words:**
+  27:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
+  34:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
+  42:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules
