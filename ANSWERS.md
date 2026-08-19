@@ -1022,3 +1022,81 @@ and the fix read back **from inside the container**, not from the source tree.
 **Not pushed.** Local `storied` is 66 ahead of `origin/storied`, still behind the iPhone
 field-test gate; the fix touches a Storied-only file so it owes `main` nothing. No
 `storied` → `main` merge made or proposed.
+
+---
+
+# 2026-08-18 — validator session (D466–D482)
+
+**A181. Are good stories being dismissed as inaccurate without evidence? — YES, and the
+first case was proven.** `local413_run_output.log`: the temporal gate rejected a true Juan
+Gris / Pierre Reverdy collaboration on the claim that Gris "died in 1887". He died 1927.
+Three defects: `(?:died|d\.?)` matched the final `d` of "published"; a partial snippet
+shadowed the correct `_KNOWN_DATES`; a publication year was read as the interaction year.
+[D466] · [`temporal_coherence_gate.py`](temporal_coherence_gate.py)
+
+**A182. Delivered tours cannot show false rejections.** They contain only survivors. The
+evidence lives in run drop logs. `gate_fp_probe.py` was built on the wrong premise and the
+finding is recorded rather than the tool discarded. [D466]
+
+**A183. Is Michael's described algorithm what the code does? — No.** 15 matrix fields not
+8; `medium` = physical medium, `venue` = three fields, `credit_line` = provenance string
+that LOCAL-406 parses `donor`/`printer` out of. Serper.dev is the only retrieval engine;
+Gemini has zero production importers. `evaluate_story`/`story_validator` are not in the
+live generator. Story-worthiness selection and the retry loop do not exist.
+[`STORY_BASELINE.md`](STORY_BASELINE.md)
+
+**A184. Why did the iteration curve plateau? — The metric, not the material.**
+`valuation_index` had no term for the object; groundedness penalised specificity. Raising
+the snippet cap moved `detail` 0→29 while the index FELL 61→50. [D467] ·
+[`evaluate_story.py:342`](evaluate_story.py#L342)
+
+**A185. Fixing the index moved the stories.** Object detail became first-class, sentences
+past the third stopped being free, groundedness became an additive tiebreak. Best story
+47 → 54 → 63 → 64 over four rounds. [D468] · `test_local468`
+
+**A186. We ranked for one definition of "story" and scored on another.** 7 of 80 snippets
+carried a stakes marker, 2 of 20 survived the cap, and the best line in the pool never
+reached the writer. `_STAKES` is now imported by both ranker and scorer so they cannot
+drift. [D469] · [`snippet_ranker.py`](snippet_ranker.py)
+
+**A187. Is Storied ready for release? — No.** Full tour: lab 64 vs production 36. Hogarth
+fabrication shipped; stop 2 was two sentences because a gate correctly deleted a false
+claim and nothing replaced it. [D472] · `TOUR_MFA_RELEASE_20260818_1514.txt`
+
+**A188. The retry loop works — and it teaches the model to evade the gate.** Worst stop
+21→32, detail 13→33. Then, told not to repeat *or rephrase* a rejected claim, the model
+nominalised the verb and shipped the same falsehood. Prohibitions now ban the assertion.
+[D474, D476] · `generate_tour_text.py` PHASE 5.17
+
+**A189. Anything regenerating after the gate chain must re-run the chain.** The retry was
+checked by three fact gates and escaped every style gate. [D477]
+
+**A190. The gates were producing broken English.** `_is_well_known` returned False for
+Miró and Dalí but True for Picasso (no accent folding), so Miró was degraded out of a
+sentence about his own book; the possessive guard tested the same ASCII literal twice.
+[D475] · [`unglossed_reference_gate.py`](unglossed_reference_gate.py)
+
+**A191. One fabrication escaped one gate in three grammatical forms on three runs.**
+Passive (caught), active (D473), em-dash parenthetical (D478). Enumerating patterns loses
+to a generative model. Also `[A-Z]` cannot match `É` — the D243 accent lesson, **fourth
+time in one day**.
+
+**A192. Misattribution ≠ hallucination, and it decides which gate catches what.** The
+Hogarth Press is real and did publish Freud's 1939 edition; attributing the 1974 Dalí
+edition to it is a misattribution. An entity-presence check cannot see it. **The
+role-claim gate's narrow corpus is load-bearing — widening it would break it.** [D482]
+
+**A193. A single tour run is a sample, not a measurement.** The same code scores 36–50.
+Report mean and range over ≥3 runs. Final state: **45.7 mean, range 43–48.** [D480, D482]
+
+**A194. What did today cost? ~$3.13** OpenAI + SERP (16 tours ≈ $2.59, lab ≈ $0.54);
+$1.94 estimated because variance-run cost lines were grepped away. **`cost_ledger`
+under-reports host-side work ~20×** — it showed $0.1110.
+
+## Code map — added 2026-08-18
+- [`STORY_BASELINE.md`](STORY_BASELINE.md) — what the pipeline actually does, with links
+- [`story_iteration_chart.py`](story_iteration_chart.py) — the retry loop in the lab
+- [`STORY_ITERATION_CHART.md`](STORY_ITERATION_CHART.md) — score over iterations
+- [`gate_fp_probe.py`](gate_fp_probe.py) — false-rejection probe (premise flawed, see A182)
+- [`run_full_tour_release_check.py`](run_full_tour_release_check.py) — full tour + per-stop scores
+- `VARIANCE_{CLEAN,CONTROL,WIDENED}.log` — the three A/B arms
