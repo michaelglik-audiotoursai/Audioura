@@ -9079,6 +9079,62 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     _s_snippets.insert(0, _credit_snippet)
                     print(f"      [credit_line] {_s_credit[:100]}")
 
+                # -------- [LOCAL-489] STEP 3.4: "if too small, learn more" --------
+                # Production could already SEE thin material (corpus_coverage,
+                # wired since LOCAL-198) and could not ACT on it — the corpus
+                # gate's only response is to restrict what the narration may
+                # claim. Restricting is not learning. The stop stays thin and the
+                # narration gets blamed for it.
+                #
+                # ONE round, at most STORY_REPLENISH_QUERIES (3) queries, never
+                # re-issuing a query already sent. This is the one step on
+                # Michael's list that can spend without bound, so the caps are
+                # structural rather than advisory.
+                if os.environ.get('DISABLE_STORY_REPLENISH', '').strip() != '1':
+                    try:
+                        from story_replenish import (needs_replenishment,
+                                                     build_followup_queries)
+                        from corpus_coverage import assess_stop_coverage
+                        _rp_passages = [s.get('snippet', '') for s in _s_snippets
+                                        if s.get('snippet')]
+                        _rp_cov = assess_stop_coverage(
+                            _s_name, _museum_venue_name or '', _rp_passages)
+                        _rp = needs_replenishment(_rp_passages, _rp_cov)
+                        if _rp['needs_more']:
+                            _reason = ('thin' if _rp['thin'] else '') + \
+                                      ('+uncovered' if _rp['uncovered'] else '')
+                            print(f"    [LOCAL-489] Stop {_s_idx+1} needs more material "
+                                  f"({_reason.strip('+')}): {_rp['passage_count']} passages, "
+                                  f"{_rp['total_chars']} chars, verdict={_rp['verdict']}")
+                            _rp_issued = {q for q in (_s_query_log or []) if isinstance(q, str)}
+                            _rp_queries = build_followup_queries(_s_stop_data, _rp_issued)
+                            if not _rp_queries:
+                                print(f"      [LOCAL-489] no targeted follow-up available "
+                                      f"— the matrix has no second agent to ask about")
+                            for _rq in _rp_queries:
+                                try:
+                                    from work_story_searcher import _serp_search
+                                    _rq_results, _ = _serp_search(_rq)
+                                except Exception as _rq_err:
+                                    print(f"      [LOCAL-489] follow-up failed: {_rq_err}")
+                                    continue
+                                _added = 0
+                                for _rr in (_rq_results or []):
+                                    _rs = _rr.get('snippet') or ''
+                                    if _rs:
+                                        _s_snippets.append(_rr)
+                                        _added += 1
+                                _local410_total_queries += 1
+                                _local410_total_results += len(_rq_results or [])
+                                print(f"      [LOCAL-489] +{_added} from: {_rq[:78]}")
+                            _s_poi['_replenished'] = {
+                                'queries': len(_rp_queries), 'reason': _reason.strip('+'),
+                                'chars_before': _rp['total_chars']}
+                    except ImportError as _rp_err:
+                        print(f"    [LOCAL-489] replenishment unavailable ({_rp_err})")
+                    except Exception as _rp_err:
+                        print(f"    [LOCAL-489] replenishment failed (non-fatal): {_rp_err}")
+
                 # -------- [LOCAL-488] STEP 4: ask a SECOND model --------
                 # Michael's step 4: "we generate query and ask it to multiple
                 # entities such as AI OpenAI.API — do we use any other AI? and/or
