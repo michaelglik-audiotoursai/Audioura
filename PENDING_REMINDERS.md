@@ -9,12 +9,15 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
-- [ ] **⛔ 2026-08-18 21:49 — OPENAI CREDITS ARE EXHAUSTED. Only Michael can fix this.**
+- [x] RESOLVED 2026-08-18 22:0x — **OpenAI credits exhausted; Michael added $30, verified live.**
       Three measurement runs died at the first API call: `credit_balance_exhausted`,
       HTTP 429, nothing spent. **No tour can be generated at all** until credits are
       added at platform.openai.com/settings/organization/billing. This blocks the story
       work, every A/B, and the D480 3-run rule. Yesterday's spend was ~$3.13 / 16 runs.
       Consequence already recorded: **45.7 is stale, do not re-quote it** (A199, D483).
+      **Top-ups are now logged in [`OPENAI_CREDIT_LOG.md`](OPENAI_CREDIT_LOG.md)** — Michael
+      asked how much he added last time and nobody had written it down. Standing ask:
+      **set auto-recharge**; the balance has run dry mid-session twice in two weeks.
 
 - [x] DONE 2026-08-18 21:4x — **Mission item 1 (audit the instruments as a class)** —
       D483, commit `36235ce`. `text_fold.py` is now the one folding primitive; 4 defects
