@@ -24,6 +24,31 @@ Durable across sessions. Delete a line once delivered.
       `STORY_GATE_TIERS.md` and `story_lab.py` (D424) are the surface.
       Michael is driving this jointly — see the next reminder, which still binds.
 
+- [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
+      Michael asked what the culprit of slow progress is. **It is that the instruments
+      lie, and each fix reveals another.** Of 17 decisions on 2026-08-18, **11 were
+      broken detectors** (D466 D467 D469 D470 D471 D473 D475 D476 D477 D478 D481), 3 were
+      new capability (D468 D474 D479), 3 were measurement discipline (D472 D480 D482).
+      Four separate accent-folding bugs in one day. A scorer that penalised the
+      specificity we wanted. A ranker discarding what the scorer rewarded.
+      **Do NOT continue fixing them one at a time — that is the slow path we just
+      measured.** Instead, audit them as a class, in this order:
+        1. **Every regex in the gate/scorer chain gets an accent-folding and a
+           word-boundary test.** D243 has now been hit five times; it is systemic.
+        2. **Every gate needs a TRUE set**, not only a FALSE set
+           (STORY_GATE_TIERS.md measure 6). LOCAL-402 was 11/11 green while
+           false-rejecting, because every case asserted the gate FIRES.
+        3. **Cross-check pairs of instruments that should agree** — ranker vs scorer
+           (D469), gate vs gate (D482), lab vs production. Every defect today was two
+           instruments disagreeing while each looked healthy alone.
+      **The one real quality lever, still untouched on purpose:** extract the story
+      prompt from the 10,443-line `generate_tour_text()` into its own pass. The lab
+      scores 64 doing one job; production scores 45.7 (3-run mean, range 43-48) doing
+      six. It is a critical-path refactor — start it with Michael awake, and not in the
+      same change as anything else, or a regression is unattributable (D474).
+      **Measurement rule now binding (D480): mean and range over >=3 runs. Never quote
+      a single run.** Runners: `run_full_tour_release_check.py`, `story_iteration_chart.py`.
+
 - [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
       He asked to work on story generation **jointly** in the next session, one
       subroutine at a time, using `story_lab.py` (D424). `PARKED_kiro_task_LOCAL-457.md`
