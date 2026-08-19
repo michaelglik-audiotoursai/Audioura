@@ -8995,6 +8995,14 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     print(f"    [LOCAL-486] worthiness check failed, mining anyway "
                           f"(non-fatal): {_sw_err}")
                 _s_poi['_worthiness'] = _s_worth
+                # Log the decision EVERY time, not only on a skip. The first live
+                # run of this check was silent because all three stops were worth
+                # mining — correct behaviour, and no evidence whatever that the
+                # code had run. The live-artifact gate wants the log line, not the
+                # absence of one.
+                print(f"    [LOCAL-486] Stop {_s_idx+1} worthiness: "
+                      f"score={_s_worth['score']}/4 mine={_s_worth['worth_mining']} "
+                      f"— {_s_worth['why'][:90]}")
                 if not _s_worth['worth_mining']:
                     print(f"    [LOCAL-486] Stop {_s_idx+1} '{_s_name[:40]}' NOT MINED — "
                           f"{_s_worth['why']}")
@@ -13119,34 +13127,134 @@ REWRITE RULES (all mandatory):
         print(f"\n  [LOCAL-477] stripped markdown from {_md_cleaned} prose field(s) "
               f"— these are spoken aloud")
 
-    _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0}
+    _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0,
+                    'trigger_floor': 0, 'trigger_no_story': 0}
     if _storied_mode and not _phase5_ceiling_breached:
         _RETRY_FLOOR = 120
+
+        # -------- [LOCAL-487] STEP 7a: retry on "NO VALID STORY" --------
+        # Michael's step 7 says: "If there are no valid stories, we go to the next
+        # fact ... and repeat from #4." The retry as built fires on a 120-word
+        # FLOOR instead, which is a different question. A stop can be 200 words of
+        # valid, grounded, entirely storyless prose — someone described, nothing
+        # risked, refused or lost — and never retry. Length is not story.
+        #
+        # The bar used here is MICHAEL'S OWN, not an invented index threshold:
+        # `story_opportunity_scan.verdict` already encodes "at least one story of
+        # >= 3 consecutive sentences about one person, carrying an action and
+        # something at stake". It was written, tested, and had zero production
+        # callers — the fourth orphan module wired tonight.
+        #
+        # An index threshold was the obvious alternative and is worse: the index
+        # is calibrated against one human judgement (D474), so a number picked off
+        # it would be a threshold on a threshold. The structural bar needs no
+        # calibration.
+        # The cap below ranks storyless stops by the step-5 index, and PHASE 5.21
+        # — which normally sets it — runs AFTER this. Compute it here too. The
+        # pass is pure and free (no API call), and 5.21 recomputes it afterwards
+        # so the final report reflects any text this retry changes.
+        try:
+            from story_index_pass import apply_story_index, build_index_corpus
+            apply_story_index(poi_list, corpus=build_index_corpus(
+                _exhibition_checklist_result, _stop_corpus_data))
+        except Exception as _pi_err:
+            print(f"  [LOCAL-487] pre-retry index unavailable, cap will fall back "
+                  f"to stop order (non-fatal): {_pi_err}")
+
+        _no_story_stops = set()
+        try:
+            from story_opportunity_scan import measure as _sos_measure, verdict as _sos_verdict
+            for _vi, _vpoi in enumerate(poi_list):
+                _vtext = _vpoi.get('description') or ''
+                if not _vtext or _vtext.startswith('['):
+                    continue
+                try:
+                    _vv = _sos_verdict(_sos_measure(_vtext))
+                except Exception:
+                    continue
+                _vpoi['_story_verdict'] = _vv
+                if _vv.get('needs_additional_story'):
+                    _no_story_stops.add(_vi)
+            if _no_story_stops:
+                print(f"\n  [LOCAL-487] step 7a: {len(_no_story_stops)} stop(s) have "
+                      f"NO VALID STORY by Michael's bar (3+ consecutive sentences, "
+                      f"one person, an action and something at stake)")
+                for _vi in sorted(_no_story_stops):
+                    _why = (poi_list[_vi].get('_story_verdict') or {}).get('why', '')
+                    print(f"    stop {_vi + 1} '{poi_list[_vi].get('name', '')[:38]}': {_why[:110]}")
+
+                # CAP THE SPEND. Measured 2026-08-19 00:3x: the bar rejects
+                # EVERY stop of a current production tour — a finding in its own
+                # right, and consistent with the lab-vs-production gap (D472).
+                # But "retry everything that fails the bar" is one extra
+                # generation per stop, roughly tripling the cost of a tour, on a
+                # trigger that has never been shown to improve anything.
+                #
+                # So the retry goes to the WORST stop only: the one Michael reads
+                # first when a tour disappoints, ranked by the step-5 index that
+                # is already computed. One extra generation per tour, bounded.
+                # Raising the cap is a cost decision and wants the A/B D484 sizes
+                # at 15 runs per arm — not a quiet constant change.
+                _retry_cap = int(os.environ.get('STORY_RETRY_CAP', '1') or '1')
+                if len(_no_story_stops) > _retry_cap:
+                    _ranked = sorted(
+                        _no_story_stops,
+                        key=lambda i: (poi_list[i].get('_story_index', 999), i))
+                    _kept = set(_ranked[:_retry_cap])
+                    print(f"    [LOCAL-487] cap={_retry_cap}: retrying only the weakest "
+                          f"— stop {sorted(_kept)[0] + 1} "
+                          f"'{poi_list[sorted(_kept)[0]].get('name','')[:34]}' "
+                          f"(index {poi_list[sorted(_kept)[0]].get('_story_index','?')})")
+                    _no_story_stops = _kept
+        except ImportError as _sos_err:
+            print(f"  [LOCAL-487] story_opportunity_scan not importable — "
+                  f"7a falls back to the word floor alone ({_sos_err})")
+
         for _ri, _rpoi in enumerate(poi_list):
             _now = _rpoi.get('description') or ''
             _before = _pre_gate_prose.get(_ri, '')
             if not _now or _now.startswith('['):
                 continue
             _now_wc = len(_now.split())
-            if _now_wc >= _RETRY_FLOOR:
+
+            # Trigger 1 (LOCAL-474, unchanged): the gates hollowed the stop out.
+            _hollowed = (_now_wc < _RETRY_FLOOR
+                         and len(_before.split()) - _now_wc >= 15)
+            # Trigger 2 (LOCAL-487): there is no valid story, at any length.
+            _storyless = _ri in _no_story_stops
+
+            if not _hollowed and not _storyless:
                 continue
-            # Only stops the GATES hollowed out. A stop that was always short is a
-            # retrieval problem, and regenerating it just spends money on the same
-            # empty corpus.
-            if len(_before.split()) - _now_wc < 15:
-                continue
+            # A stop that was never worth mining has no second fact to rotate to;
+            # retrying it spends money on the same absent corpus. Step 2 already
+            # decided this, so read its answer rather than guessing again.
+            if _storyless and not _hollowed:
+                _w = _rpoi.get('_worthiness') or {}
+                if _w.get('worth_mining') is False:
+                    continue
+            _retry_stats['trigger_floor' if _hollowed else 'trigger_no_story'] += 1
             _retry_stats['eligible'] += 1
 
             _removed = _sentences_removed_by_gates(_before, _now)
-            if not _removed:
+            # [LOCAL-487] A storyless stop has nothing REMOVED to forbid — the
+            # gates were happy with it; it is simply not a story. Aborting here
+            # on an empty `_removed`, as the LOCAL-474 version did, would have
+            # made trigger 2 fire and then do nothing at all, which is the exact
+            # silent-no-op shape this session has been fixing since 21:00.
+            if not _removed and not _storyless:
                 continue
 
             _stop_label = _rpoi.get('name', f'Stop {_ri + 1}')
-            print(f"\n  [LOCAL-474] PHASE 5.17: retry '{_stop_label[:44]}' — "
-                  f"{len(_before.split())}w → {_now_wc}w after gates, "
-                  f"{len(_removed)} sentence(s) removed")
-            for _rm in _removed:
-                print(f"    removed: \"{_rm[:100]}\"")
+            if _storyless and not _removed:
+                _why = (_rpoi.get('_story_verdict') or {}).get('why', 'no valid story')
+                print(f"\n  [LOCAL-487] PHASE 5.17: retry '{_stop_label[:44]}' — "
+                      f"{_now_wc}w and NO VALID STORY: {_why[:120]}")
+            else:
+                print(f"\n  [LOCAL-474] PHASE 5.17: retry '{_stop_label[:44]}' — "
+                      f"{len(_before.split())}w → {_now_wc}w after gates, "
+                      f"{len(_removed)} sentence(s) removed")
+                for _rm in _removed:
+                    print(f"    removed: \"{_rm[:100]}\"")
 
             _spine_stop, _fact_sheet, _story_type = _regen_args_by_idx.get(
                 _ri, (None, None, None))
@@ -13160,19 +13268,38 @@ REWRITE RULES (all mandatory):
             # see. Naming the sentence teaches the model which WORDS to avoid;
             # naming the underlying assertion is the only version that cannot be
             # satisfied by a paraphrase.
-            _forbidden = '\n'.join(f'- "{s.strip()}"' for s in _removed)
-            _rpoi['_local474_forbidden'] = (
-                "\n\nCLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed "
-                "each of the following from a previous draft because it is FALSE:"
-                "\n" + _forbidden + "\n\n"
-                "Do not restate these claims in ANY form. This is a ban on the "
-                "underlying assertion, not on the wording — rephrasing it, "
-                "nominalising the verb, softening it with 'reportedly' or "
-                "'is said to have', or implying it indirectly all count as "
-                "restating it. In particular, do not assert that two people "
-                "worked together, met, or corresponded at any date if a claim "
-                "above says they did. Write about something else that the source "
-                "material supports.\n")
+            _instruction = ''
+            if _removed:
+                _forbidden = '\n'.join(f'- "{s.strip()}"' for s in _removed)
+                _instruction += (
+                    "\n\nCLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed "
+                    "each of the following from a previous draft because it is FALSE:"
+                    "\n" + _forbidden + "\n\n"
+                    "Do not restate these claims in ANY form. This is a ban on the "
+                    "underlying assertion, not on the wording — rephrasing it, "
+                    "nominalising the verb, softening it with 'reportedly' or "
+                    "'is said to have', or implying it indirectly all count as "
+                    "restating it. In particular, do not assert that two people "
+                    "worked together, met, or corresponded at any date if a claim "
+                    "above says they did. Write about something else that the source "
+                    "material supports.\n")
+            if _storyless:
+                # [LOCAL-487] The storyless case needs the opposite instruction
+                # from the forbidding one: nothing was wrong, something is
+                # MISSING. State the bar the draft failed, in the same terms the
+                # detector used, so the second attempt is aimed at it.
+                _instruction += (
+                    "\n\nTHIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.\n"
+                    "It may be accurate and well written; it is still a description. "
+                    "A story here means: ONE named person, across THREE OR MORE "
+                    "consecutive sentences, DOING something — deciding, refusing, "
+                    "persuading, travelling, failing — with something at stake for "
+                    "them. Not 'X was an artist who worked in Paris'. Something "
+                    "happened, to someone, and it mattered.\n"
+                    "Use only the source material supplied. If the material will not "
+                    "support such a story, write the shorter factual account rather "
+                    "than inventing one — an invented story is worse than none.\n")
+            _rpoi['_local474_forbidden'] = _instruction
             try:
                 _retry_stats['retried'] += 1
                 _r = _generate_description(
@@ -13184,7 +13311,32 @@ REWRITE RULES (all mandatory):
                 # into a hole. The deterministic gates are re-applied here, and the
                 # comparison is made on what SURVIVES them, not on the raw draft.
                 _new_desc = _regate_prose(_new_desc, _rpoi)
-                if len(_new_desc.split()) > _now_wc and not _new_desc.startswith('['):
+                # [LOCAL-487] ACCEPTANCE DEPENDS ON WHY WE RETRIED.
+                #
+                # For a hollowed-out stop, longer is the right test: the gates
+                # deleted text and the retry is trying to replace it.
+                #
+                # For a STORYLESS stop it is exactly the wrong test — the entire
+                # premise of step 7a is that length is not story, so accepting a
+                # retry for being longer would re-import the bug in the acceptance
+                # criterion after removing it from the trigger. The storyless
+                # retry is kept only if it now CLEARS MICHAEL'S BAR, judged by the
+                # same detector that rejected the first draft.
+                _accept = False
+                if _new_desc and not _new_desc.startswith('['):
+                    if _storyless and not _hollowed:
+                        try:
+                            from story_opportunity_scan import (
+                                measure as _am, verdict as _av)
+                            _accept = not _av(_am(_new_desc)).get(
+                                'needs_additional_story', True)
+                            print(f"    [LOCAL-487] retry judged on the story bar, "
+                                  f"not on length: cleared={_accept}")
+                        except Exception:
+                            _accept = len(_new_desc.split()) > _now_wc
+                    else:
+                        _accept = len(_new_desc.split()) > _now_wc
+                if _accept:
                     _rpoi['description'] = _new_desc
                     if _r[1]:
                         _rpoi['orientation'] = _r[1]
@@ -13206,6 +13358,9 @@ REWRITE RULES (all mandatory):
             print(f"\n  [LOCAL-474] retry summary: {_retry_stats['eligible']} eligible, "
                   f"{_retry_stats['retried']} retried, {_retry_stats['improved']} improved, "
                   f"{_retry_stats['kept_original']} kept original")
+            print(f"  [LOCAL-487] triggers: {_retry_stats['trigger_floor']} hollowed "
+                  f"by gates, {_retry_stats['trigger_no_story']} storyless "
+                  f"(step 7a — Michael's bar, independent of length)")
             print(f"  [LOCAL-474] each regenerated stop was re-gated before being "
                   f"accepted; a retry can only replace text it beats after gating.")
 

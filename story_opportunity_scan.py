@@ -198,9 +198,30 @@ def _bridge_pronouns(hits: List[int], sentences: List[str],
         if not any(i - 1 in extended or i - 1 == j for j in extended):
             continue  # must directly follow a sentence already in the run
         folded = _fold(s)
-        if any(o in folded or (o.split()[-1] if o.split() else o) in folded
-               for o in others):
-            continue  # a competing person is named — do not assume coreference
+        competing = [o for o in others
+                     if o in folded or (o.split()[-1] if o.split() else o) in folded]
+        if competing:
+            # [LOCAL-487] A competing name in the sentence used to end the run
+            # outright. That is right when the other person is the SUBJECT, and
+            # wrong when they appear in a subordinate clause after the pronoun:
+            #
+            #   "He relented only after Broder agreed to let him choose."
+            #
+            # "He" is Miró, continuing the previous sentence; Broder is the object
+            # of the clause. Refusing to bridge here cost the run its third
+            # sentence and turned a refusal-and-resolution into "not a story".
+            #
+            # A pronoun that OPENS the sentence, before any competing name, is
+            # continuing the established subject. That is the only case allowed
+            # through — anything looser starts inventing coreference.
+            pm = _PRONOUN.search(s)
+            first_competitor = min(
+                (folded.find(o.split()[-1] if o.split() else o) for o in competing
+                 if (folded.find(o.split()[-1] if o.split() else o)) >= 0),
+                default=-1)
+            opens_with_pronoun = bool(pm) and pm.start() <= 3
+            if not (opens_with_pronoun and first_competitor > pm.start()):
+                continue
         extended.add(i)
     return sorted(extended)
 
@@ -216,11 +237,25 @@ def measure(text: str) -> Dict:
         hits = [i for i, s in enumerate(sentences)
                 if key in _fold(s) or (len(tail) >= 4 and re.search(
                     r'\b' + re.escape(tail) + r'\b', _fold(s)))]
-        h['sentences'] = len(hits)
         h['at'] = _bridge_pronouns(hits, sentences, handles, h) if hits else hits
-        # agency: does any sentence show this handle DOING something?
-        h['agency'] = sum(1 for i in hits if _AGENCY_VERB.search(sentences[i]))
-        h['stakes'] = sum(1 for i in hits if _STAKES.search(sentences[i]))
+        h['sentences'] = len(h['at'])
+        # [LOCAL-487] Count agency and stakes over the BRIDGED run, not the raw
+        # hits. This line used `hits` while the run above used the bridged list,
+        # so a sentence pulled into the run by pronoun bridging extended the run
+        # and then contributed nothing to its load — the run and the load were
+        # measured on two different sentence sets.
+        #
+        # Measured effect: "Broder spent three years persuading Miró. / Miró
+        # refused twice. / He relented only after Broder agreed to let him choose
+        # the printer." — a refusal, a stake and a resolution, three consecutive
+        # sentences, one person — scored run=2, load=0 and was reported as NOT a
+        # story. The verb that carries the whole thing, `relented`, sat in the
+        # bridged sentence that agency never looked at.
+        #
+        # Same shape as D469 (ranker vs scorer) and D483 (grounder vs remover):
+        # two halves of one instrument reading different inputs.
+        h['agency'] = sum(1 for i in h['at'] if _AGENCY_VERB.search(sentences[i]))
+        h['stakes'] = sum(1 for i in h['at'] if _STAKES.search(sentences[i]))
 
         # state is assigned below, once the RUN is known — scattering a stake
         # anywhere across six sentences is not the same as putting one inside the

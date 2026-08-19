@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 139.2943549156189,
+  "chars": 4852,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "index": 45,
+      "historic": 12,
+      "detail": 26,
+      "social": 30,
+      "text": "Published in 1971 and gifted by Boris Fridman, this book is a key example of the livre d'artiste tradition, where visual art meets the printed page. The book contains forty color lithographs, each an explosion of Miró's dreamlike visions printed on Japan paperthe vellum. The collection showcases 40 color lithographs, framing an atmosphere of wonder and imagination. The collaboration between Miró and Broder, along with the craftsmanship of Atelier Mourlot, who printed the works, exemplified the innovative potential of artist-publisher partnerships. The donation to the MFA not only enriched the museum's collection but also highlighted the extraordinary blend of poetry and visual art that defines 20th-century artistic books. By uniting color lithographs with text, \"Le Lézard aux plumes d’or\" celebrates a vivid imagination, hinting at profound spiritual themes through the symbolic lizard that dances across Miró's pages.",
+      "orientation": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston immerses you in a world where the livre d'artiste reigns supreme, showcasing groundbreaking works that transformed the book into an art form. In the Lois B. and Michael K. Torf Gallery (Gallery 184), you will encounter three extraordinary works by Spanish artists that had no precedent, revolutionizing how images, words, and typography intersect in deeply collaborative ventures. Explore Le Lézard aux plumes d’or (The Lizard with Golden Feathers), Au Soleil du Plafond, and Moses and Monotheism, each a testament to the evolution of artistic expression as a reflection of human belief and imagination. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Position yourself to best view this location."
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "index": 40,
+      "historic": 18,
+      "detail": 20,
+      "social": 30,
+      "text": "The work was published by Éditions Verve, a house renowned for producing artist books that integrate text and image in a seamless dialogue. Gris's lithographs engage in a visual conversation with Reverdy's words, demonstrating the power of collaboration to transcend traditional boundaries between text and image. Juan Gris, a pivotal figure in the Cubist movement, infused his lithographs with a sense of geometry and abstraction, reflecting his artistic philosophy. His collaboration with Reverdy resulted in a series that not only illustrates the text but also expands upon it, creating a unified narrative experience. The choice of Mourlot Frères as the printer ensured that each lithograph captured the subtle interplay of color and form, further enhancing the viewer's engagement with the work.",
+      "orientation": "Step closer to \"Au Soleil du Plafond,\" where the interplay of light and shadow dances across the lithographs, revealing their delicate textures and intricate compositions on Arches paper. From this vantage point, the nuances of color and form become evident, inviting contemplation of the collaboration between artist and writer."
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "index": 47,
+      "historic": 12,
+      "detail": 37,
+      "social": 45,
+      "text": "In 1974, Salvador Dalí illustrated a set of 10 drypoints and lithographs on sheepskin for Freud’s \"Moses and Monotheism,\" giving his surrealist touch to Freud’s exploration of monotheistic origins. Freud's text proposed that Moses was not a Hebrew but an Egyptian, reimagining monotheistic roots and stirring intellectual debates. This set exemplifies the exhibition's argument that artists like Dalí were revolutionizing the book as an art form. By intertwining Dalí's visual interpretations with Freud's text, they crafted a piece that invites the audience to reconsider the cultural and psychological foundations of faith. The medium of sheepskin not only adds an ancient, tactile quality but also echoes the enduring complexities of monotheism and authority.\n\nThat's 3 stops — Le Lézard aux plumes d’or celebrates a vivid imagination and Au Soleil du Plafond expands upon Reverdy's text through illustrations. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "As you stand here, face the delicate sheepskin pages of \"Moses and Monotheism\" to fully appreciate the convergence of image and text."
+    }
+  ]
+}
