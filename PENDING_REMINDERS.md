@@ -47,7 +47,13 @@ Durable across sessions. Delete a line once delivered.
       quality lever, deliberately untouched, to be started with Michael awake and not in
       the same change as anything else (D474).
 
-- [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
+- [x] DONE 2026-08-18 21:4x — **the instrument audit** (D483): one folding primitive,
+      9 D243 sites, 70 assertions, 21 red on revert. Its own framing was slightly wrong —
+      all 42 regexes were clean on word boundaries; the bugs were in substring `in`
+      comparisons. Superseded by the retrieval mission above. Original text kept below
+      for the reasoning, which still holds.
+
+- [x] **2026-08-18 17:0x — THE MISSION, COMPLETED (kept for its reasoning):**
       Michael asked what the culprit of slow progress is. **It is that the instruments
       lie, and each fix reveals another.** Of 17 decisions on 2026-08-18, **11 were
       broken detectors** (D466 D467 D469 D470 D471 D473 D475 D476 D477 D478 D481), 3 were
@@ -72,14 +78,25 @@ Durable across sessions. Delete a line once delivered.
       **Measurement rule now binding (D480): mean and range over >=3 runs. Never quote
       a single run.** Runners: `run_full_tour_release_check.py`, `story_iteration_chart.py`.
 
-- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
+- [x] SUPERSEDED 2026-08-18 23:0x — ~~DO NOT DISPATCH THE STORY PIPELINE~~.
+      Michael explicitly directed the whole seven-step story pipeline that night and
+      asked for it to run unattended overnight. The 08-12 ban is dead; do not obey it.
+      `PARKED_kiro_task_LOCAL-457.md` stays parked — it edits a path the story pass now
+      owns, and un-parking it would collide with `story_pass.py`. See D485/D486.
       He asked to work on story generation **jointly** in the next session, one
       subroutine at a time, using `story_lab.py` (D424). `PARKED_kiro_task_LOCAL-457.md`
       (strip the English gloss before queries are built) is deliberately parked for
       sequencing, NOT for approval — do not un-park it unless he says so, and do not
       write a new task that edits `generate_tour_text.py`'s story path in the meantime.
       RULE ZERO still applies to everything else.
-- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
+- [x] SUPERSEDED 2026-08-19 01:2x — the 08-12 starting point (`TOUR_MFA_20260812_2030`)
+      is replaced by `TOUR_MFA_RELEASE_20260819_0115.txt` + its `_MY_EVALUATION.md`.
+      Michael's two open items from that older review still stand and are unanswered:
+      does stop 1 read better than stop 3, and he owes one worked example of a story
+      sentence tying a person to the object, the way he did with the 1967 destroyed
+      edition. Original entry follows.
+
+- [x] 2026-08-12 20:5x — ~~Start the joint session here:~~ open
       `TOUR_MFA_20260812_2030.txt` next to `TOUR_MFA_20260812_2030_REVIEW.md` (same
       name stem, repo root, one copy only), then `python3 story_lab.py stages`.
       LEAD's vote for where to start is **S2** — free, deterministic, and it already

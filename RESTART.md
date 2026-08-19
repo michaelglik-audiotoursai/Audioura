@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-18 21:41 EDT
+# RESTART briefing — generated 2026-08-19 09:39 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     42d8c49 Record Michael's 7-step story system verbatim in comm_03 with verified per-step status
-unpushed 85 commits
+HEAD     f6bff2d D486: record the story-pass A/B before it is lost with the session
+unpushed 106 commits
 dirty    1 files
 ```
 
@@ -13,7 +13,7 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      564
+cost_ledger rows:      590
 ```
 ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 
@@ -64,10 +64,13 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  12:- [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
-  37:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
-  44:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
-  52:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  12:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  16:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  23:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  50:- [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
+  75:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
+  82:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
+  90:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules
