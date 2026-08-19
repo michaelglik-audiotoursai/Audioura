@@ -163,6 +163,32 @@ def parse_leads(text: str, provider: str) -> List[Dict]:
     return leads
 
 
+def provider_family(provider: str) -> str:
+    """The MODEL behind a provider name.
+
+    [LOCAL-488] `gemini` and `gemini_grounded` are two call styles onto the same
+    model. A claim proposed by both is one model answering twice, and counting it
+    as cross-model agreement is counting a model as its own corroboration —
+    exactly the error this module's docstring warns about ("one model answering
+    fluently proves nothing"). Measured on the first live fan-out: 1 lead showed
+    "agreement", and it was gemini+gemini_grounded.
+
+    Agreement is only evidence across FAMILIES.
+    """
+    p = (provider or '').lower()
+    if p.startswith('gemini'):
+        return 'gemini'
+    if p.startswith('openai') or p.startswith('gpt'):
+        return 'openai'
+    return p or 'unknown'
+
+
+def families_agreeing(lead: Dict) -> int:
+    """How many distinct model families proposed this claim."""
+    provs = lead.get('providers') or [lead.get('provider')]
+    return len({provider_family(p) for p in provs if p})
+
+
 def merge_leads(all_leads: List[Dict]) -> List[Dict]:
     """Group near-identical claims across providers. Agreement is the signal."""
     merged: List[Dict] = []

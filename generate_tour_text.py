@@ -9079,6 +9079,70 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     _s_snippets.insert(0, _credit_snippet)
                     print(f"      [credit_line] {_s_credit[:100]}")
 
+                # -------- [LOCAL-488] STEP 4: ask a SECOND model --------
+                # Michael's step 4: "we generate query and ask it to multiple
+                # entities such as AI OpenAI.API — do we use any other AI? and/or
+                # Serp and/or Gemini". Production asked exactly one model.
+                # `story_leads.py` implements the fan-out and had zero production
+                # callers; the 429 that blocked it on 2026-08-13 is long gone —
+                # the account returns HTTP 200 on both live model names.
+                #
+                # THE PRIZE IS NOT MORE LEADS, IT IS AGREEMENT. Two models
+                # independently proposing the same dated event is the strongest
+                # grounding signal available, and it is the ONLY one that can
+                # catch a misattribution: D482's Hogarth Press is real and really
+                # did publish Freud, just not that edition, so no entity-presence
+                # check can ever see it. Agreement can.
+                #
+                # Runs only for stops step 2 judged worth mining, so the second
+                # model is never spent on a stop that had nothing to say.
+                if os.environ.get('DISABLE_STORY_LEADS', '').strip() != '1':
+                    try:
+                        from story_leads import (run as _leads_run, available_providers,
+                                                 families_agreeing, provider_family)
+                        _provs = available_providers()
+                        if len({provider_family(_p) for _p in _provs}) < 2:
+                            print(f"    [LOCAL-488] providers {_provs} span fewer than "
+                                  f"two model families — cross-model agreement needs "
+                                  f"two; set GEMINI_API_KEY")
+                        else:
+                            _lr = _leads_run(
+                                subject=_s_artist or _s_name,
+                                work=_s_english_title or _s_name,
+                                venue=_museum_venue_name or location,
+                                providers=_provs,
+                                verify_top=int(os.environ.get('STORY_LEADS_VERIFY', '3')),
+                            )
+                            _confirmed = [c for c in _lr['checked']
+                                          if c.get('status') == 'CONFIRMED']
+                            # Distinct model FAMILIES, not provider strings:
+                            # gemini + gemini_grounded is one model answering
+                            # twice, which is not corroboration.
+                            _agreed = [l for l in _lr['leads'] if families_agreeing(l) > 1]
+                            print(f"    [LOCAL-488] step 4: {len(_provs)} providers, "
+                                  f"{len(_lr['leads'])} leads, {len(_agreed)} with "
+                                  f"cross-model agreement, {len(_confirmed)} SERP-confirmed")
+                            # Confirmed leads go in FIRST — they are dated, checked
+                            # and carry citations, which is exactly the material the
+                            # story prompt is starved of.
+                            for _cl in _confirmed:
+                                _s_snippets.insert(0, {
+                                    'title': f"Cross-model lead ({'+'.join(_cl.get('providers', []) or ['?'])})",
+                                    'snippet': f"{_cl.get('year', '')} {_cl.get('claim', '')}".strip(),
+                                    'url': (_cl.get('citations') or [''])[0],
+                                })
+                            if _confirmed:
+                                print(f"      → injected {len(_confirmed)} confirmed "
+                                      f"lead(s) ahead of the SERP snippets")
+                            _s_poi['_leads_agreement'] = {
+                                'providers': _provs, 'leads': len(_lr['leads']),
+                                'agreed': len(_agreed), 'confirmed': len(_confirmed)}
+                    except ImportError as _ld_err:
+                        print(f"    [LOCAL-488] story_leads not importable — "
+                              f"step 4 stays single-model ({_ld_err})")
+                    except Exception as _ld_err:
+                        print(f"    [LOCAL-488] lead fan-out failed (non-fatal): {_ld_err}")
+
                 _local410_snippets[_s_name] = _s_snippets
                 _local410_snippets[f"__stop_{_s_idx}__"] = _s_snippets
 
