@@ -85,7 +85,52 @@ _STOPWORD_HANDLES = frozenset({
     'the museum', 'the exhibition', 'the collection', 'the gallery',
 })
 
-# Verbs that indicate a HUMAN DID SOMETHING — the raw material of a story.
+# [LOCAL-495] Capitalised mid-sentence but not names: months, weekdays, and the
+# handful of words museum prose capitalises out of habit. Without this the
+# single-token pass turns "Gift", "Boston" and "March" into story candidates.
+_COMMON_CAPS = frozenset({
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december',
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'gift', 'bequest', 'museum', 'gallery', 'collection', 'exhibition',
+    'stop', 'orientation', 'north', 'south', 'east', 'west',
+})
+
+# [LOCAL-495] Nouns naming an EVENT that changes a state. Under D487 these can
+# carry a story on their own: Prince's minimal story requires the middle event to
+# be ACTIVE, not human, and "Pompeii was a living city / Vesuvius erupted /
+# Pompeii was buried" satisfies it with no person in it. Michael, 2026-08-19:
+# "I question that the story should be always about a person... The same is true
+# about reconstructions and renovation."
+#
+# Kept to nouns that ARE the change. "collection" and "exhibition" are states, not
+# events, and are already stopworded above.
+_EVENT_TERMS = {
+    'eruption': 'what did it bury, and how much of it survives',
+    'earthquake': 'what fell, and what was rebuilt',
+    'fire': 'what burned, and what was saved',
+    'flood': 'how high, and what was lost',
+    'siege': 'how long, and who held out',
+    'war': 'what was taken, and what came back',
+    'bombing': 'what was hit, and what was reconstructed',
+    'occupation': 'who took it, and what they removed',
+    'demolition': 'who ordered it, and what stood there',
+    'reconstruction': 'from what evidence, and how faithful',
+    'restoration': 'who paid, and what they had to guess',
+    'renovation': 'what was kept, and what was replaced',
+    'excavation': 'who dug, and what they found',
+    'rediscovery': 'who found it, and how long it had been lost',
+    'shipwreck': 'what went down with it',
+    'eviction': 'who was moved, and where they went',
+    'closure': 'why it shut, and what happened to what was inside',
+}
+
+# Verbs that indicate AN AGENT DID SOMETHING — the raw material of a story.
+#
+# [LOCAL-495] "an agent", not "a human". D487: a volcano, a fire, a war and a
+# restoration campaign all act, and Prince's structure asks only that the middle
+# event be active. The eruption verbs below were absent, so a Pompeii-shaped
+# story scored agency=0 and the detector refused a textbook minimal story.
 _AGENCY_VERB = re.compile(
     r'\b(chose|refused|insisted|fought|persuaded|paid|bought|sold|gave|donated|'
     r'destroyed|burned|hid|smuggled|fled|died|survived|founded|abandoned|'
@@ -97,7 +142,15 @@ _AGENCY_VERB = re.compile(
     # corpus that said "designed by Charles Bulfinch and completed in 1798".
     r'designed|built|constructed|completed|erected|rebuilt|demolished|'
     r'named|renamed|laid|opened|closed|settled|occupied|marched|voted|'
-    r'petitioned|sheltered|hid|escaped|elected|appointed|resigned)\b',
+    r'petitioned|sheltered|hid|escaped|elected|appointed|resigned|'
+    # [LOCAL-495] Non-human agents act with these. Without them the scanner
+    # cannot see the change in "Vesuvius erupted and buried the city".
+    r'erupted|buried|collapsed|flooded|submerged|razed|toppled|sank|'
+    r'shattered|swept|struck|engulfed|consumed|split|cracked|'
+    # ...and the repair, which is the other half of Michael's case:
+    # "The same is true about reconstructions and renovation."
+    r'restored|renovated|reconstructed|rebuilt|excavated|unearthed|'
+    r'rediscovered|reopened|salvaged|recovered|reassembled)\b',
     re.IGNORECASE)
 
 # Consequence / stakes markers — the difference between a fact and a story.
@@ -160,12 +213,35 @@ def find_handles(text: str) -> List[Dict]:
 
     for m in _PROPER_SPAN.finditer(text):
         add(m.group(1).strip(), 'proper noun')
+
+    # [LOCAL-495] Single-token proper nouns. `_PROPER_SPAN` requires TWO
+    # capitalised words, so "Pompeii", "Vesuvius" and "Herculaneum" were invisible
+    # to this scanner — the exact case Michael raised. A one-word name cannot be
+    # taken on capitalisation alone, because every sentence starts capitalised, so
+    # it counts only if it also appears mid-sentence at least once.
+    _mid = set()
+    for s in split_sentences(text):
+        for m in re.finditer(r'(?<![.!?]\s)(?<!^)\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{3,})\b', s):
+            if m.start() > 0:
+                _mid.add(m.group(1))
+    for token in _mid:
+        if _fold(token) in _COMMON_CAPS:
+            continue
+        # skip anything already covered by a multi-word span
+        if any(_fold(token) in _fold(h['surface']) for h in handles):
+            continue
+        add(token, 'proper noun')
+
     for m in _QUOTED.finditer(text):
         add(_TRAILING_PUNCT.sub('', m.group(1).strip()), 'title')
     low = _fold(text)
     for term, note in _LOADED_TERMS.items():
         if re.search(r'\b' + re.escape(term) + r'\b', low):
             add(term, 'loaded noun', note)
+    # [LOCAL-495] Events last, so a proper-noun reading of the same surface wins.
+    for term, note in _EVENT_TERMS.items():
+        if re.search(r'\b' + re.escape(term) + r'\b', low):
+            add(term, 'event', note)
     return handles
 
 
@@ -174,6 +250,20 @@ def find_handles(text: str) -> List[Dict]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _PRONOUN = re.compile(r'\b(he|she|they|him|her|them|his|hers|their)\b', re.IGNORECASE)
+
+# [LOCAL-495] The non-person equivalent of a pronoun. Prose names a town once and
+# then says "the town"; naming an event once and then saying "the disaster" is the
+# same move. Without this, a place or an event subject can only ever score as high
+# as its literal name is repeated, while a PERSON subject gets bridged — so the
+# detector would keep preferring people even after can_carry stopped requiring
+# one, and the LOCAL-493 prompt change would be silently undone here.
+_DEFINITE_ANAPHOR = re.compile(
+    r'\b(?:the|its|their)\s+'
+    r'(town|city|site|place|building|house|church|temple|villa|palace|'
+    r'ruins|remains|structure|settlement|quarter|district|island|'
+    r'disaster|eruption|fire|flood|blast|collapse|catastrophe|'
+    r'work|piece|book|volume|edition|painting|sculpture|manuscript)\b',
+    re.IGNORECASE)
 
 
 def _bridge_pronouns(hits: List[int], sentences: List[str],
@@ -185,15 +275,18 @@ def _bridge_pronouns(hits: List[int], sentences: List[str],
     narration, which is backwards. A sentence continues the current subject when
     it carries a personal pronoun and names no competing person.
 
-    Only proper nouns get this. "the exhibition" is not referred to as "he".
+    [LOCAL-495] Extended to non-person subjects via `_DEFINITE_ANAPHOR`, because
+    "the town" does for Pompeii exactly what "he" does for Miro. Titles and loaded
+    nouns still get nothing — they cannot carry a story in the first place.
     """
-    if owner['kind'] != 'proper noun':
+    if owner['kind'] not in ('proper noun', 'event'):
         return hits
     others = [_fold(h['surface']) for h in handles
               if h['kind'] == 'proper noun' and h is not owner]
     extended = set(hits)
     for i, s in enumerate(sentences):
-        if i in extended or not _PRONOUN.search(s):
+        # [LOCAL-495] Either referring device continues the subject.
+        if i in extended or not (_PRONOUN.search(s) or _DEFINITE_ANAPHOR.search(s)):
             continue
         if not any(i - 1 in extended or i - 1 == j for j in extended):
             continue  # must directly follow a sentence already in the run
@@ -214,7 +307,7 @@ def _bridge_pronouns(hits: List[int], sentences: List[str],
             # A pronoun that OPENS the sentence, before any competing name, is
             # continuing the established subject. That is the only case allowed
             # through — anything looser starts inventing coreference.
-            pm = _PRONOUN.search(s)
+            pm = _PRONOUN.search(s) or _DEFINITE_ANAPHOR.search(s)
             first_competitor = min(
                 (folded.find(o.split()[-1] if o.split() else o) for o in competing
                  if (folded.find(o.split()[-1] if o.split() else o)) >= 0),
@@ -286,8 +379,19 @@ def measure(text: str) -> Dict:
         h['run'] = longest
         h['run_agency'] = sum(1 for i in best_span if _AGENCY_VERB.search(sentences[i]))
         h['run_stakes'] = sum(1 for i in best_span if _STAKES.search(sentences[i]))
-        # A story is about someone. A title or a loaded noun cannot carry one.
-        h['can_carry'] = h['kind'] == 'proper noun'
+        # [LOCAL-495] A story is about ONE SUBJECT held across the sentences —
+        # not necessarily a person. D487: Prince requires the middle event to be
+        # ACTIVE, not human, so a place, an institution or an event can carry a
+        # story. A title still cannot (it names a thing, and things do not act),
+        # and neither can a loaded noun, whose whole point is that it is a
+        # prompt for a story rather than one.
+        #
+        # This had to change WITH story_pass.py's prompt (LOCAL-493), not after:
+        # the generator was told it may write about an eruption while this
+        # detector still refused anything without a person, and a refusal here
+        # triggers the LOCAL-487 retry. The two halves would have disagreed on
+        # every non-person stop — D483's defect class again.
+        h['can_carry'] = h['kind'] in ('proper noun', 'event')
 
         if longest >= 3 and h['run_agency'] >= 1 and h['run_stakes'] >= 1:
             h['state'] = 'DEVELOPED'
@@ -343,8 +447,11 @@ def verdict(m: Dict) -> Dict:
                            f"described, but nothing is risked, refused or lost. "
                            f"That is exposition, not a story.")
     else:
+        # [LOCAL-495] "one subject", not "one person" — this string is printed by
+        # generate_tour_text.py:13406 on every run and was the last place the old
+        # person-only bar was still being stated.
         need, why = True, (f"longest qualifying run is {lr['run']} sentence(s); the bar "
-                           f"is 3 consecutive sentences about one person, carrying an "
+                           f"is 3 consecutive sentences about one subject, carrying an "
                            f"action and a consequence")
     return {'needs_additional_story': need, 'why': why,
             'dangling_count': len(dangling), 'has_arc': has_arc, 'has_load': has_load}
