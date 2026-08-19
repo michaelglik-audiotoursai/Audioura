@@ -9,6 +9,24 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+      `TOUR_MFA_RELEASE_20260819_0115.txt` and its `_MY_EVALUATION.md`. LEAD wrote the
+      evaluation before you read the tour, so the comparison is worth something.
+
+- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+      Your step 3 says a chain ACROSS entities (fact → stop → exhibition). Your bar in
+      `story_opportunity_scan` says THREE consecutive sentences about ONE person with an
+      action and something at stake. A sentence each about publisher, printer and donor
+      satisfies the first and is "a list of credits" to the second. The generator now
+      aims at both; when the material supports only one, **which do you want?** See D485.
+
+- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+      own pass, the limit is visibly the material: there are no stakes in the retrieved
+      snippets for ANY stop, so the detector correctly refuses all three. Step 3.4's
+      replenishment never fired because these stops are not thin by CHARACTER COUNT —
+      they are thin IN KIND. The floor measures volume; what is missing is conflict.
+      Do not spend another round on prompt shape. [D485]
+
 - [x] RESOLVED 2026-08-18 22:0x — **OpenAI credits exhausted; Michael added $30, verified live.**
       Three measurement runs died at the first API call: `credit_balance_exhausted`,
       HTTP 429, nothing spent. **No tour can be generated at all** until credits are
