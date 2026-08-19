@@ -10789,7 +10789,97 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
         # [LOCAL-421] STORY REINFORCEMENT — recency effect: last instruction wins.
         # gpt-3.5-turbo buries names in evaluative prose unless told exactly what shape
         # the text must take. This block is the LAST thing in the prompt.
+        # -------- [LOCAL-490 / D474] THE STORY PASS --------
+        # The block below this one is the LOCAL-421 "final story shape"
+        # reinforcement: instructions telling the model what a story looks like,
+        # appended to a prompt that is simultaneously doing orientation,
+        # directions, transitions, category voice and physical description. It
+        # has to shout ("read this LAST — it overrides everything above")
+        # precisely because it is competing.
+        #
+        # D474: the lab scores 64 doing one job, production 42.8 doing six. And
+        # steps 5 and 7 of Michael's seven both need "the story for this stop" to
+        # EXIST as an object — to be scored, sized to 3-5 sentences, and rotated
+        # when invalid. It never did; there was only a whole stop description.
+        #
+        # So: run the story separately, and hand this prompt a FINISHED story
+        # instead of an instruction to produce one. Behind STORY_PASS_ENABLED so
+        # the comparison is a flag flip rather than a revert, which is a better
+        # form of Michael's "land it alone" rule than landing it alone.
+        _story_pass_result = None
         if _storied_mode and tour_category == 'museum':
+            try:
+                from story_pass import generate_story_for_stop, is_enabled as _sp_on
+                if _sp_on():
+                    # The ranked, capped snippets this stop is about to be
+                    # written from — the same material the description prompt
+                    # gets, so the story pass is never working from less.
+                    # `_stop_snippets` is assigned inside the LOCAL-402 branch, so
+                    # it can be undefined here on a stop with no direct snippets.
+                    # locals() rather than a bare reference: a NameError would be
+                    # swallowed by the except below and silently disable the pass
+                    # for that stop, which is the kind of quiet degradation this
+                    # session has spent all night removing.
+                    _sp_source = locals().get('_stop_snippets') or []
+                    _sp_material = []
+                    for _sp_s in (_sp_source or []):
+                        _sp_t = _sp_s.get('snippet') if isinstance(_sp_s, dict) else str(_sp_s)
+                        if _sp_t:
+                            _sp_material.append(_sp_t)
+                    _sp_matrix = {
+                        'canonical_title': poi.get('name', ''),
+                        'english_title': poi.get('english_title', ''),
+                        'artist': poi.get('artist', ''),
+                        'publisher': poi.get('publisher', ''),
+                        'printed_by': poi.get('printed_by', '') or poi.get('printer', ''),
+                        'medium': poi.get('medium', ''),
+                        'credit_line': poi.get('credit_line', ''),
+                        'venue_name': _museum_venue_name or '',
+                        # Step 7b's rotating fact, when a previous attempt set one.
+                        'focus_fact': poi.get('_focus_fact', ''),
+                    }
+                    # Step 7c: 3-5 sentences, and a larger allowance only for the
+                    # stop currently scoring highest — "in most valuable we can
+                    # take a larger size".
+                    from story_pass import MAX_SENTENCES, MAX_SENTENCES_TOP
+                    _sp_max = (MAX_SENTENCES_TOP
+                               if poi.get('_is_top_value_stop') else MAX_SENTENCES)
+                    _story_pass_result = generate_story_for_stop(
+                        _sp_matrix, _sp_material, max_sentences=_sp_max,
+                        forbidden=poi.get('_local474_forbidden', '') or '')
+                    poi['_story_pass'] = _story_pass_result
+                    print(f"  [LOCAL-490] Stop {stop_num} story pass: "
+                          f"ok={_story_pass_result['ok']} "
+                          f"({_story_pass_result['reason']}), "
+                          f"${_story_pass_result['cost']:.4f}")
+                    if _story_pass_result['ok']:
+                        print(f"    story: \"{_story_pass_result['story'][:150]}\"")
+            except ImportError as _sp_err:
+                print(f"  [LOCAL-490] story_pass not importable — falling back to "
+                      f"the inline shape instructions ({_sp_err})")
+            except Exception as _sp_err:
+                print(f"  [LOCAL-490] story pass failed (non-fatal): {_sp_err}")
+
+        if _storied_mode and tour_category == 'museum' and _story_pass_result \
+                and _story_pass_result.get('ok'):
+            # A finished story. The prompt's job here is to CARRY it, not to
+            # invent one — so this instruction is short, and it is a
+            # prohibition on tampering rather than a lesson in narrative shape.
+            description_prompt += f"""
+
+━━━ THE STORY FOR THIS STOP (already written and fact-checked) ━━━
+{_story_pass_result['story']}
+━━━ END STORY ━━━
+
+This story is REQUIRED and comes first in your description. Reproduce its facts
+exactly — every name, date and number. You may adjust wording to flow into the
+surrounding text; you may NOT add a fact to it, remove a named person from it,
+or replace it with a story of your own.
+
+After the story, add physical description and context if there is room. Do not
+introduce any further named person who does not appear above.
+"""
+        elif _storied_mode and tour_category == 'museum':
             _story_reinforcement = """
 
 ━━━ FINAL STORY SHAPE (read this LAST — it overrides everything above) ━━━
@@ -13403,6 +13493,49 @@ REWRITE RULES (all mandatory):
                     "worked together, met, or corresponded at any date if a claim "
                     "above says they did. Write about something else that the source "
                     "material supports.\n")
+            # -------- [LOCAL-491] STEP 7b: ROTATE TO THE NEXT FACT --------
+            # Michael's step 7: "If there are no valid stories, we go to the next
+            # fact ... and repeat from #4." Production forbade the rejected claim
+            # and asked again on the same subject — a retry, not a rotation. D476
+            # recorded the result: the model nominalised the verb and shipped the
+            # same falsehood in a form the gate could not see. Telling a model
+            # what NOT to write leaves it exactly where it was.
+            #
+            # Rotation changes the subject instead. The next fact off the matrix
+            # becomes the focus, and the story pass is pointed at it.
+            #
+            # NOT via credit_line, which is what Michael specified: LOCAL-406
+            # regex-parses donor and printer out of that field, so a fact written
+            # there is read as a person's name. `focus_fact` is its own slot.
+            try:
+                from story_focus_fact import next_focus_fact, MAX_ROTATIONS
+                _tried = set(_rpoi.get('_focus_tried') or [])
+                if len(_tried) < MAX_ROTATIONS:
+                    _fmatrix = {
+                        'canonical_title': _rpoi.get('name', ''),
+                        'english_title': _rpoi.get('english_title', ''),
+                        'artist': _rpoi.get('artist', ''),
+                        'publisher': _rpoi.get('publisher', ''),
+                        'printed_by': _rpoi.get('printed_by', '') or _rpoi.get('printer', ''),
+                        'credit_line': _rpoi.get('credit_line', ''),
+                        'medium': _rpoi.get('medium', ''),
+                        'venue_name': _museum_venue_name or '',
+                    }
+                    _next = next_focus_fact(_fmatrix, _tried)
+                    if _next:
+                        _rpoi['_focus_fact'] = _next['fact']
+                        _rpoi['_focus_tried'] = sorted(_tried | {_next['key']})
+                        print(f"    [LOCAL-491] step 7b: rotating to the "
+                              f"{_next['key']} fact — {_next['why']}")
+                        print(f"      focus: \"{_next['fact'][:100]}\"")
+                    else:
+                        print(f"    [LOCAL-491] step 7b: no unused fact left on the "
+                              f"matrix — retrying without a rotation")
+            except ImportError as _ff_err:
+                print(f"    [LOCAL-491] focus-fact rotation unavailable ({_ff_err})")
+            except Exception as _ff_err:
+                print(f"    [LOCAL-491] rotation failed (non-fatal): {_ff_err}")
+
             if _storyless:
                 # [LOCAL-487] The storyless case needs the opposite instruction
                 # from the forbidding one: nothing was wrong, something is
