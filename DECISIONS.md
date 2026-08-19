@@ -19834,3 +19834,123 @@ changes.
 - **Variance destroys material, not just numbers.** The 01:07 run opened stop 3 with *"In
   1938, Salvador Dalí met Sigmund Freud in London and sketched his portrait"* — the best
   sentence the pipeline has produced. On identical code the 01:15 run does not contain it.
+
+## D487 — What a story is, settled from the encyclopedia. Michael's two definitions were never rivals.
+
+**2026-08-19, Michael: *"Let's look at the definition of the story to decide what 'story'
+is. Let's start with an encyclopedia."*** Six rounds had gone into prompt shape against
+what turned out to be a definitional question. Full sources and reasoning in
+[`STORY_DEFINITION.md`](STORY_DEFINITION.md).
+
+**The five definitions that matter.** Forster/Britannica: story vs plot is *entirely*
+causality — "the queen died" vs "the queen died **of grief**", one word. Prince (1973): a
+minimal story is three conjoined events, first and third stative, **second active**, third
+the inverse of the first — mechanically checkable. Wikipedia: character, conflict, cause
+and effect. Labov: for narrative told **aloud** — our medium — the indispensable part is
+**evaluation**, the point; *"pointless stories are met with the withering rejoinder, 'So
+what?'"* Hühn/Schmid: a change of state is only **tellable** given relevance,
+unpredictability, effect, irreversibility and non-iterativity.
+
+**Ruling on the two definitions (the pending question from D485, now closed).** The scanner
+bar (one subject, three sentences, action, stakes) **is** the story — Prince plus Labov.
+Step 3's chain (fact → stop → exhibition → museum → city) is **not a rival definition**; it
+is *which* story to tell, and it is structurally Labov's **coda**, the return to the
+present. Sequential filters, not competitors. Relevance without narrativity is a catalogue
+entry; narrativity without relevance is a podcast about something the listener is not
+looking at.
+
+**Michael's two corrections to LEAD's first reading, both accepted and both load-bearing:**
+
+1. **Plot beats story, and that upgrades step 3 rather than demoting it.** LEAD ruled the
+   chain was "relevance, not story" because associations carry no causality. True of a
+   *correlation* chain, false of a *causal* one: *"this object is here **because** Fridman
+   gave it"* is a plot spanning exactly the entities step 3 names. **The test on step 3 is
+   not "is there a connection" but "is the connection a *because*."**
+2. **A story does not require a person.** Prince requires the middle event to be **active**,
+   not human. *"Pompeii was a living city / Vesuvius erupted / Pompeii was buried"* is a
+   textbook minimal story with no person in it. Labov reads person-centric because he
+   studied people telling stories about their own lives — his domain, not his definition.
+   **The "person" rule was never about people**; it existed to stop subject-hopping (the
+   list-of-credits failure). The real invariant is **continuity of subject**, not humanity
+   of subject. Landed as LOCAL-493 (`c70608f`).
+
+**Consequence for the detector.** Hühn's five replace the single stakes question, because
+they work for volcanoes and donors alike where "is a person at risk" works for one.
+Non-iterativity alone rejects most of what we retrieve: *"the press published many
+editions"* is a routine; *"the 1967 edition was destroyed"* is an event.
+
+**Consequence for retrieval, and it restates D485 more precisely.** Every query we issue is
+**topical** — material *about* an object. Prince says the unit is *a change of state with
+an agent*. The 2026-08-19 evaluation said "there are no stakes in the retrieved material";
+the accurate statement is **we never asked for them.**
+
+## D488 — "No evaluation" banned the one thing Labov calls indispensable
+
+`story_pass.py` rule read *"No evaluation: not 'stands as a testament to'…"*. It was right
+about its targets and wrong about its name: those are Labov's **external** evaluation, the
+weakest of his three kinds and identical to our measured filler (*transformative* ×3,
+*vibrant* ×3). **Embedded** evaluation and **evaluative action** — the point shown through
+what someone said, chose, refused or lost — are what make a story worth telling, and the
+blanket ban suppressed them.
+
+Now: *show the point, do not announce it*, every forbidden phrase retained, plus a
+mechanical test — **strip every proper noun and number; if something that still sounds like
+praise remains, it is commentary.** The pass criterion is Labov's own: the listener should
+want to say **"It did?"** — not "how interesting", and never "so what?".
+
+## D489 — Step 3's replenishment measures volume; what is missing is kind
+
+The seven-point matrix was re-verified against the tree on 2026-08-19 and **four of seven
+rows moved** (2 ✅ LOCAL-486; 4 ✅ LOCAL-488; 5 ✅ LOCAL-485 report-only; 7 two of three via
+LOCAL-491 + `MAX_SENTENCES_TOP`). Two gaps remain, and **they are one bug**:
+
+**Every measure of "thin" we have is a measure of volume.** `generate_tour_text.py:613`
+classifies rich/medium/thin on a *count* of QIDs; `:9120` gates replenishment on a
+character floor; step 7a's retry fires on a word floor. So the loop asks *"is there
+enough?"* and never *"is it the right kind?"* On the 08-19 tour all three stops passed the
+volume test with 140/143/249 words and the detector still refused all three — **the
+material was sufficient and useless.** Replenishment could not fire because by its own
+instrument nothing was wrong.
+
+**Fix, in three parts, and (c) is the one that gets new material:** (a) classify by the
+presence of an **active event with an agent** — Prince's middle event, the same test
+LOCAL-493 made the generator aim at, so retrieval and generation share one criterion;
+(b) trigger both replenishment and the 7a retry on that instead of on length; (c) give
+round 2 an **event-shaped query** — *destroyed, seized, banned, refused, fled, lost, bought
+back, hid, contested, returned, only surviving, never completed, until* — because
+re-issuing a topical query with a bigger budget returns the same catalogue prose.
+
+**(a) lands report-only first.** LEAD's claim that the two instruments "disagree
+constantly" is exactly the kind that was wrong in D423 (LOCAL-410's false zero). Log both
+verdicts side by side, change nothing, and show a disagreement rate before spending money
+on a loop built on it. Same discipline as step 5.
+
+## D490 — The donor is never deleted. Provenance is not a claim awaiting verification.
+
+Michael, reading the 08-19 release tour: *"one real problem is that Fridman as a generous
+gifter is gone completely… The organizer, charitable gifter, sponsor should not be
+dismissed."*
+
+**Every gate did its job and the outcome was still wrong** (`TOUR_MFA_RELEASE_RUN3.log`):
+`:235` the checklist correctly set `credit_line='Gift of Boris Fridman'`; `:364` LOCAL-423
+correctly excluded two *wrong* Fridmans (a Mexican linguist, a New York gallery), leaving
+zero snippets on the real one; `:425` the unglossed gate searched, asked the model, got
+nothing, and **degraded the name**; `:520` a whole sentence went with it.
+
+**Two defects, neither in the gates that fired.** The gate cannot tell a name carrying its
+own provenance from one the model asserted — *"Gift of Boris Fridman"* **is** the source,
+and his gloss is derivable from the field he came out of with no search at all. And the
+inference is backwards: **no third-party web page about a collector is the normal state for
+a private individual**, not evidence of fabrication.
+
+**Why deletion is worse than leaving him unexplained.** His three events are Prince's
+minimal story exactly — collected it, gave it to the MFA, it is public. Degrading removed
+the **middle, active** event, the only one that cannot be stated without naming him,
+leaving state/state/state. Under D487 the donor is also the one person whose action *is*
+the "because" that puts the object in the room.
+
+Landed as LOCAL-494 (`6909872`): a provenance stage **ahead of** the corpus search and the
+model call, both degrade paths made non-deleting, and a malformed gloss now drops the
+**gloss**, not the person. It does **not** exempt these names — the gate was right that he
+was unexplained; it supplies the explanation. Control test proves the gate still degrades
+undocumented names.
