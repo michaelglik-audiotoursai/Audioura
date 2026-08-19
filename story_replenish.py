@@ -47,20 +47,49 @@ THIN_CHAR_FLOOR = int(os.environ.get('STORY_THIN_FLOOR', '1500') or '1500')
 def needs_replenishment(passages: List[str], coverage: Optional[Dict] = None) -> Dict:
     """Is there too little here to write a story from?
 
-    Two independent reasons, reported separately so the log says which fired:
+    THREE independent reasons, reported separately so the log says which fired:
       * `thin`      — not enough text, by character count;
       * `uncovered` — the corpus does not mention the stop's own subject
-                      (`assess_stop_coverage` verdict of EMPTY or VENUE_ONLY).
+                      (`assess_stop_coverage` verdict of EMPTY or VENUE_ONLY);
+      * `eventless` — [D492] there is plenty of on-topic text and NOTHING
+                      HAPPENS IN IT.
 
     A stop can be verbose and uncovered, or brief and on-topic. Both need more.
+
+    **Why `eventless` was added, measured rather than assumed (D492).** Three
+    clean runs of the MFA exhibition, 2026-08-19 11:20-11:32: the volume test
+    returned `COVERED` on **9 of 9** stop-observations while the kind test found
+    **no eventful sentence in 6 of 9** — the same two stops failing every run,
+    the same one passing, with no run-to-run variance at all. Both failing stops
+    had 46-113 sentences of retrieved material. They were not thin; they were
+    thin IN KIND, and this function could not see it, so replenishment never
+    fired on the stops that most needed it.
+
+    The bar is Prince's minimal story (D487): a change of state with an agent.
+    Not a person — a volcano, a fire or a restoration campaign all act.
     """
     texts = [p for p in (passages or []) if p]
     total = sum(len(p) for p in texts)
     thin = total < THIN_CHAR_FLOOR
     verdict = (coverage or {}).get('verdict')
     uncovered = verdict in ('EMPTY', 'VENUE_ONLY')
-    return {'needs_more': bool(thin or uncovered),
-            'thin': thin, 'uncovered': uncovered,
+
+    # [D492] Import locally: this module is imported by the lab and by tooling
+    # that must keep working if the classifier is unavailable, and an eventless
+    # verdict that cannot be computed must degrade to "no opinion", never to
+    # "needs more" — a false `needs_more` spends money on every stop.
+    eventless = False
+    kind = 'unknown'
+    try:
+        from material_kind import classify_material, KIND_EVENTFUL
+        kind = classify_material(texts)['kind']
+        eventless = (kind != KIND_EVENTFUL)
+    except Exception:
+        pass
+
+    return {'needs_more': bool(thin or uncovered or eventless),
+            'thin': thin, 'uncovered': uncovered, 'eventless': eventless,
+            'kind': kind,
             'total_chars': total, 'passage_count': len(texts),
             'verdict': verdict or 'UNKNOWN'}
 

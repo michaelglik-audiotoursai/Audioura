@@ -9137,7 +9137,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
                         if _rp['needs_more']:
                             _reason = ('thin' if _rp['thin'] else '') + \
-                                      ('+uncovered' if _rp['uncovered'] else '')
+                                      ('+uncovered' if _rp['uncovered'] else '') + \
+                                      ('+eventless' if _rp.get('eventless') else '')
                             print(f"    [LOCAL-489] Stop {_s_idx+1} needs more material "
                                   f"({_reason.strip('+')}): {_rp['passage_count']} passages, "
                                   f"{_rp['total_chars']} chars, verdict={_rp['verdict']}")

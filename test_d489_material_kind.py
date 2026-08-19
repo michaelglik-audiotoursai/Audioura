@@ -229,3 +229,72 @@ class TestPilotFoundBugs(unittest.TestCase):
     def test_action_without_stakes_also_disagrees(self):
         """Material that acts but risks nothing is the 01:15 failure exactly."""
         self.assertIn('DISAGREE', summarise_stop('s', ACTIVE, volume_verdict='COVERED'))
+
+
+class TestEventlessTriggersReplenishment(unittest.TestCase):
+    """D492(b) — replenishment now fires on KIND, not only on volume.
+
+    Measured, not assumed. Three clean runs of the MFA exhibition on
+    2026-08-19 11:20-11:32: the volume test returned COVERED on **9 of 9**
+    stop-observations while the kind test found no eventful sentence in
+    **6 of 9** — the same two stops failing every run and the same one passing,
+    with no run-to-run variance. Both failing stops carried 46-113 sentences of
+    retrieved material. They were not thin. They were thin IN KIND, and
+    `needs_replenishment` could not see it, so the loop never fired on the stops
+    that most needed it.
+    """
+
+    COVERED = {'verdict': 'COVERED'}
+    BULKY_INERT = ['Joan Miro was a Catalan artist known for surrealism. ' * 40]
+    BULKY_EVENTFUL = ['Miro decided to destroy the lithographs and only '
+                      'twelve survive. ' * 40]
+
+    def setUp(self):
+        from story_replenish import needs_replenishment
+        self.n = needs_replenishment
+
+    def test_bulky_but_eventless_now_needs_more(self):
+        r = self.n(self.BULKY_INERT, self.COVERED)
+        self.assertTrue(r['needs_more'])
+        self.assertTrue(r['eventless'])
+        self.assertFalse(r['thin'], 'this stop is NOT thin by volume')
+
+    def test_bulky_and_eventful_does_not(self):
+        """The control: the gate must not fire on everything."""
+        r = self.n(self.BULKY_EVENTFUL, self.COVERED)
+        self.assertFalse(r['needs_more'])
+        self.assertFalse(r['eventless'])
+
+    def test_genuinely_thin_still_fires(self):
+        r = self.n(['short.'], self.COVERED)
+        self.assertTrue(r['needs_more'])
+        self.assertTrue(r['thin'])
+
+    def test_the_reason_is_reported_separately(self):
+        """The log must say WHICH test fired, or the next session cannot tell
+        a volume failure from a kind failure — which is the whole distinction."""
+        r = self.n(self.BULKY_INERT, self.COVERED)
+        self.assertIn('eventless', r)
+        self.assertIn('kind', r)
+        self.assertEqual(r['kind'], KIND_INERT)
+
+    def test_a_missing_classifier_degrades_to_no_opinion(self):
+        """A false `needs_more` spends money on every stop, so an unavailable
+        classifier must never manufacture one."""
+        import builtins
+        import story_replenish
+        real_import = builtins.__import__
+
+        def blocked(name, *a, **k):
+            if name == 'material_kind':
+                raise ImportError('simulated')
+            return real_import(name, *a, **k)
+
+        builtins.__import__ = blocked
+        try:
+            r = story_replenish.needs_replenishment(self.BULKY_INERT, self.COVERED)
+        finally:
+            builtins.__import__ = real_import
+        self.assertFalse(r['eventless'], 'unavailable classifier invented a verdict')
+        self.assertFalse(r['needs_more'])
+        self.assertEqual(r['kind'], 'unknown')
