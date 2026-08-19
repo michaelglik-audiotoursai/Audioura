@@ -9,6 +9,21 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+      His words, 12:2x: *"I do not have time this week so it will go to the next week."*
+      `tests/run_mobile_decryption.py` carries `boston_username`/`boston_password` and the
+      `device_key` that decrypts them, on origin since `ba6651b`. **Rotation is the only
+      step that helps once pushed** — LEAD has not decrypted them and will not rewrite
+      history (irreversible, Michael's call). See D223 / A-index.
+
+- [ ] **2026-08-19 — LEAD needs source names from Michael to do D492(d).** The retrieval
+      is reaching auction and dealer listings: the best action-bearing sentence in 112
+      retrieved sentences was a lot description, another stop's was *"Sold as a set of
+      10."* Naming 3–5 source TYPES he trusts for art stories (museum scholarly
+      catalogues, artist foundation sites, exhibition essays, academic press) is worth
+      more than any ranking heuristic LEAD invents, and is the one input that cannot be
+      derived from the code.
+
 - [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
       `TOUR_MFA_RELEASE_20260819_0115.txt` and its `_MY_EVALUATION.md`. LEAD wrote the
       evaluation before you read the tour, so the comparison is worth something.
