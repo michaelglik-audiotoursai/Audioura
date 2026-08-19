@@ -8933,6 +8933,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
             _local410_snippets = {}
             _local410_total_queries = 0
             _local410_total_results = 0
+            _worthiness_skipped = 0  # [LOCAL-486] step 2
 
             for _s_idx, _s_poi in enumerate(poi_list):
                 _s_name = _s_poi.get('name', '')
@@ -8973,6 +8974,39 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     'medium': _s_medium,
                     'english_title': _s_english_title,
                 }
+                # -------- [LOCAL-486] STEP 2: is this stop worth mining? --------
+                # Michael's step 2, never previously implemented: "we analyze the
+                # tour stops and determine that some of them would benefit from
+                # stories". Until now every museum stop was mined at full cost —
+                # 3-6 SERP queries plus ranking plus a story pass — including
+                # stops with no named agent, no credit-line fact, no specific
+                # medium and no specific title, which cannot produce a Fact →
+                # Stop → Exhibition chain no matter what the queries return.
+                #
+                # Asymmetric on purpose: a wrong "yes" wastes cents, a wrong "no"
+                # silently loses a story and nothing downstream would show it. A
+                # stop is mined on ANY one of four signals; only a stop with zero
+                # is skipped. See story_worthiness.py.
+                _s_worth = {'worth_mining': True, 'score': -1, 'why': 'not assessed'}
+                try:
+                    from story_worthiness import assess_stop_worthiness
+                    _s_worth = assess_stop_worthiness(_s_stop_data)
+                except Exception as _sw_err:
+                    print(f"    [LOCAL-486] worthiness check failed, mining anyway "
+                          f"(non-fatal): {_sw_err}")
+                _s_poi['_worthiness'] = _s_worth
+                if not _s_worth['worth_mining']:
+                    print(f"    [LOCAL-486] Stop {_s_idx+1} '{_s_name[:40]}' NOT MINED — "
+                          f"{_s_worth['why']}")
+                    _local410_snippets[_s_name] = []
+                    _local410_snippets[f"__stop_{_s_idx}__"] = []
+                    _local410_chain_log[_s_name] = {
+                        'queries_issued': 0, 'serp_results': 0, 'snippets_injected': 0,
+                        'mining_status': 'skipped_unworthy', 'query_log': [],
+                    }
+                    _worthiness_skipped += 1
+                    continue
+
                 _s_result = search_stories_for_stop(
                     _s_stop_data, tour_type='contained',
                     generation_tier=os.environ.get('GENERATION_TIER', 'plus'),
@@ -9061,6 +9095,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 print(f"\n  [LOCAL-410] SERP search complete: {_local410_total_queries} queries, "
                       f"{_local410_total_results} results, "
                       f"{_total_raw} total snippets")
+                if _worthiness_skipped:
+                    # Report what step 2 saved, in the unit that matters. At the
+                    # measured 3-6 queries per stop this is the whole point of
+                    # the check, and an unreported saving is one nobody can A/B.
+                    print(f"  [LOCAL-486] step 2 skipped {_worthiness_skipped} unworthy "
+                          f"stop(s) — roughly {_worthiness_skipped * 4} queries not issued")
                 # [LOCAL-411] Report that ranking+capping will be applied at injection time
                 from snippet_ranker import SNIPPET_CAP_PER_STOP as _411_cap
                 print(f"  [LOCAL-411] Snippet ranking+capping enabled: "
