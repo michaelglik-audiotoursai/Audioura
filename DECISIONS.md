@@ -19682,3 +19682,94 @@ a name whose institution word (`Athenæum`) is not in `_ORG_MARKER_RE`. Pre-exis
 introduced by LOCAL-483. **Adding the word is exactly the enumeration D476 warns about**;
 the real fix is one shared entity-type decision that both gates consult instead of two
 independent heuristics. Batched with the next change set per rule 4 above.
+
+## D485 — All seven of Michael's steps are wired. Six were built already; the work was plugging them in.
+
+**2026-08-18 23:00 → 2026-08-19 00:30, continuous development while Michael slept.** He
+asked for the whole of `SEVEN_POINTS_PLAN.md` plus the D474 extraction, overnight.
+
+| step | before | commit |
+|---|---|---|
+| 1 generate | done | — |
+| 2 worthiness | **never implemented** | `d44c2af` LOCAL-486 |
+| 3.4 learn more | detector wired, no action | `5a815d5` LOCAL-489 |
+| 4 multiple engines | one model | `fa3d48d` LOCAL-488 |
+| 5 value index | 0 production references | `bdf10aa` LOCAL-485 |
+| 6 validate | done | — |
+| 7a trigger | word floor | `3faa596` LOCAL-487 |
+| 7b rotation | forbade instead | `43bf0a0` LOCAL-491 |
+| 7c 3–5 sentences | 450-word packing | `43bf0a0`, inside the story pass |
+| D474 extraction | — | `43bf0a0`, `4e50c4a` LOCAL-490 |
+
+**Five orphan modules acquired their first production caller tonight**: `evaluate_story`,
+`story_opportunity_scan`, `story_leads`, `corpus_coverage`'s action half, and the new
+`story_pass`. The plan's central claim held — this was integration, not invention.
+
+### Five defects found by wiring, none of which a unit test would have produced
+
+1. **`measure()` read two different sentence sets.** The RUN came from the
+   pronoun-bridged list, AGENCY and STAKES from the unbridged one, so a sentence pulled
+   into a run contributed nothing to its load. D469 and D483's shape again: two halves of
+   one instrument, different inputs.
+2. **Pronoun bridging ended a run at any competing name**, so *"He relented only after
+   Broder agreed"* broke Miró's run — a refusal and a resolution scored as "not a story".
+3. **`if not _removed: continue`** would have aborted every storyless retry, since the
+   gates removed nothing from them. The new trigger would have fired and done nothing.
+4. **The cost import named a module that does not exist** (`cost_tracker`), and the
+   try/except reported every story-pass call as **$0.0000**. A silent zero in a cost
+   meter is worse than no meter.
+5. **`gemini` + `gemini_grounded` were being counted as cross-model agreement.** They are
+   two call styles onto one model. The first live fan-out found exactly one "agreement"
+   and that was it — a model counted as its own corroboration, the precise error
+   `story_leads`' own docstring warns about.
+
+### The finding that outranks the seven steps
+
+**With the story isolated in its own pass, the limiting factor is visibly the material.**
+
+The pass now writes the best story the snippets allow, and the detector still refuses it,
+with the right reason:
+
+> *"someone is described, but nothing is risked, refused or lost. That is exposition, not
+> a story."*
+
+There are no stakes in the retrieved material for **any** stop of this exhibition. No
+prompt can produce them without inventing, and an invention here would enter **upstream of
+every gate in the chain** — the one place the whole safety apparatus cannot see.
+
+Two consequences:
+
+- **The next work is retrieval, not prompting.** Six rounds of prompt engineering have
+  been spent on a shortage of material. Step 3.4's replenishment loop is the beginning of
+  the answer and did not fire once tonight, because the stops are not thin by *character
+  count* — they are thin in *kind*. The floor measures volume; what is missing is stakes.
+- This is only visible because the story became a separate pass with its own inputs. That
+  is the argument for D474 that the score comparison may well not make.
+
+### Two of Michael's own definitions of "story" disagree, and it needs his ruling
+
+- **Step 3**: *"Story is connecting a fact with the stop with the exhibition or museum or
+  with the city or with the country"* — a chain ACROSS entities.
+- **The bar in `story_opportunity_scan`**: three consecutive sentences about **ONE**
+  person, carrying an action and something at stake.
+
+A story satisfying the first fails the second: a sentence each about publisher, printer
+and donor is a chain, and the detector calls it a list of credits. The generator now aims
+at both — one protagonist held for three sentences, THEN the chain outward — but which
+definition governs when they cannot both be met is **Michael's call, not LEAD's**, because
+it is a question about what he wants the product to sound like.
+
+### Not claimed
+
+**Step 3.4 is wired and unit-verified but never live-exercised** — no stop was thin
+enough to trigger it, which is itself the finding above: these stops are not thin by
+character count, they are thin in kind.
+
+**Step 7b's first live rotation went to the `venue` fact — the weakest on the list — and
+that was a real bug, now fixed.** LOCAL-419 enriches publisher/credit_line/medium/artist
+from the exhibition checklist into LOCAL VARIABLES only, so by PHASE 5.17 the POI dict
+still carried the empty fields `_new_poi()` gave it. The rotation was working correctly on
+an empty matrix. Verified after the fix: `publisher` is now chosen first, `venue` last.
+
+This is the same defect family as everything else this session — a value computed in one
+place and read from another that never received it.

@@ -8963,6 +8963,22 @@ Exempt: navigation directions ("Turn left", "Continue past").
                         print(f"    [LOCAL-419] Enriched stop {_s_idx+1} from checklist: "
                               f"publisher='{_s_publisher[:30]}' credit_line='{_s_credit_line[:50]}' "
                               f"medium='{_s_medium[:40]}'")
+                # [LOCAL-491] Persist the enriched matrix back onto the POI.
+                # LOCAL-419 enriches publisher/credit_line/medium/artist from the
+                # checklist into LOCAL VARIABLES only, so by PHASE 5.17 the POI
+                # dict still has the empty fields `_new_poi()` gave it. The first
+                # live rotation went straight to the `venue` fact — the weakest
+                # one on the list — because publisher, printer and credit_line
+                # were all invisible to it. The rotation was working; it was being
+                # handed an empty matrix.
+                for _mk, _mv in (('publisher', _s_publisher),
+                                 ('credit_line', _s_credit_line),
+                                 ('medium', _s_medium),
+                                 ('artist', _s_artist),
+                                 ('english_title', _s_english_title)):
+                    if _mv and not _s_poi.get(_mk):
+                        _s_poi[_mk] = _mv
+
                 _s_stop_data = {
                     'canonical_title': _s_name,
                     'artist': _s_artist,
