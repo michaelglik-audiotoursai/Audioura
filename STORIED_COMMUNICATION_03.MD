@@ -811,3 +811,67 @@ to learn nothing.
 **Honest standing: no measurable change in tour quality tonight, in either direction.**
 The gate fixes are justified by mechanism and unit evidence, not by a score. **45.7 is
 retired**; the best current figure is **42.8 ± 2.1 over 22 runs**.
+
+---
+
+## 2026-08-19 00:3x — all seven steps wired overnight
+
+❯ *"Please do Suggested order: 5 → 2 → 7a+7c → 4 → 3 → prompt extraction → 7b ... in the
+manner of Continues development so when I wake up tomorrow everything needs to get done"*
+
+**All seven are wired, plus the D474 extraction.** Nine commits, `bdf10aa` → `52e051e`.
+
+| step | was | now |
+|---|---|---|
+| 2 worthiness | never implemented | mines only stops with material; skips the rest |
+| 3.4 learn more | detector wired, no action | one capped follow-up round on thin stops |
+| 4 multiple engines | one model | OpenAI + Gemini, agreement counted by MODEL |
+| 5 value index | 0 production references | per-stop index, reported never gating |
+| 7a trigger | 120-word floor | your bar: no valid story, at any length |
+| 7b rotation | forbade the claim | rotates to the next fact on the matrix |
+| 7c size | 450-word packing | 3–5 sentences, longer for the most valuable |
+| D474 | story = instructions in a 6-job prompt | its own pass, its own object |
+
+**Five modules got their first production caller tonight** — `evaluate_story`,
+`story_opportunity_scan`, `story_leads`, `corpus_coverage`'s action half, and the new
+`story_pass`. The plan's claim held: this was plugging in, not building.
+
+### The finding that matters more than the seven steps
+
+**With the story alone in its own pass, the limit is visibly the MATERIAL, not the prompt.**
+
+The pass now writes the best story the snippets allow. The detector still refuses it, and
+its reason is the point:
+
+> *"someone is described, but nothing is risked, refused or lost. That is exposition, not
+> a story."*
+
+**There are no stakes in the retrieved material for any stop.** No prompt can produce them
+without inventing — and an invention here lands *upstream of every gate*, the one place
+the whole safety chain cannot see. Six rounds of prompt engineering have been spent on a
+shortage of material.
+
+**So the next work is retrieval, not prompting.** Step 3.4 never fired tonight, because
+these stops are not thin by character count — they are thin *in kind*. The floor measures
+volume; what is missing is stakes.
+
+### One thing needs your ruling, because it is two of your own definitions disagreeing
+
+- **Your step 3**: *"Story is connecting a fact with the stop with the exhibition or
+  museum or with the city or with the country"* — a chain ACROSS entities.
+- **Your bar in the scanner**: three consecutive sentences about **ONE** person, with an
+  action and something at stake.
+
+A story satisfying the first fails the second — a sentence each about publisher, printer
+and donor is your chain, and the detector calls it a list of credits. I have aimed the
+generator at both (one protagonist for three sentences, then the chain outward), but
+**which one governs when they cannot both be met is your call**, not mine: it is a
+question about what the product should sound like.
+
+### Five bugs found by wiring, none of which a unit test would have produced
+
+A cost meter silently reporting **$0.0000**; `gemini` + `gemini_grounded` counted as
+cross-model agreement (one model as its own corroboration); a retry trigger that would
+have fired and done nothing; and two halves of one detector reading different sentence
+lists. All in the same family as this session's earlier work: a value computed in one
+place, read from another that never received it.
