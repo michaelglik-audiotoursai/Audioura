@@ -122,6 +122,24 @@ def _looks_like_person_name(candidate: str) -> bool:
     if candidate.lower() in _KNOWN_NON_PERSON_STRINGS:
         return False
 
+    # [LOCAL-483 r2] An ORGANISATION is not a person, and this gate must not judge
+    # one. Caught on live output, not in a unit test: teaching
+    # `_PERSON_MULTI_WORD` to see accented capitals made "Éditions Verve" visible
+    # to the PERSON extractor for the first time, which then found no "Éditions
+    # Verve" on the 4,699-char exhibition page and dropped the sentence — the
+    # exact D482 false rejection, through a third gate, opened by the fix for the
+    # first two.
+    #
+    # The org gate (5.158c) grounded the same name correctly in the same run,
+    # against the widened corpus, having run one phase too late to matter. Two
+    # instruments disagreeing, again; this time the disagreement was ours.
+    #
+    # `_ORG_MARKER_RE` is the marker list the org gate already uses, so the two
+    # gates now agree on what an organisation IS — which is the precondition for
+    # them not fighting over the same span.
+    if _ORG_MARKER_RE.search(candidate):
+        return False
+
     # A personal name should have at least one word that is NOT a common noun/adj
     has_name_word = False
     for w in words:

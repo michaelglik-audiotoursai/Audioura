@@ -250,6 +250,42 @@ def test_span_patterns_see_accented_capitals():
               n_accented == n_ascii and n_ascii > 0, True)
 
 
+def test_person_extractor_does_not_claim_organisations():
+    """The regression the unit tests did not catch and the live run did.
+
+    Teaching `_PERSON_MULTI_WORD` to see accented capitals (section 7) made
+    'Éditions Verve' visible to the PERSON extractor for the first time. Gate
+    5.158 then looked for it on the 4,699-char exhibition page, did not find it,
+    and dropped the sentence — the D482 false rejection of the real publisher,
+    arriving through a third gate that the fix for the first two had opened.
+
+    In the same run, one phase later, the org gate grounded that exact name
+    correctly against the widened corpus. Two instruments disagreeing about the
+    same span, which is the shape this whole suite exists to catch; this time we
+    were the ones who introduced it.
+
+    Both halves are asserted: organisations are not people, AND people are still
+    people — including accented ones, or the section-7 fix has been undone.
+    """
+    print("\n[8] the person extractor does not claim organisations")
+    from prose_entity_grounding_gate import extract_person_names
+    text = ("Éditions Verve published the book. Salvador Dalí and Joan Miró met "
+            "Louis Broder. Mourlot Frères printed it at the Museum of Fine Arts. "
+            "Boris Fridman lent the set. The Hogarth Press issued an edition. "
+            "Édouard Manet knew Émile Zola.")
+    found = extract_person_names(text)
+
+    # FALSE set — none of these is a person.
+    for org in ['Éditions Verve', 'Mourlot Frères', 'The Hogarth Press',
+                'Museum of Fine Arts']:
+        check(f"{org!r} is NOT extracted as a person", org in found, False)
+
+    # TRUE set — all of these are, accents included.
+    for person in ['Salvador Dalí', 'Joan Miró', 'Louis Broder',
+                   'Boris Fridman', 'Édouard Manet', 'Émile Zola']:
+        check(f"{person!r} IS extracted as a person", person in found, True)
+
+
 def main():
     print("=" * 62)
     print("  LOCAL-483 — gate chain audited as a class")
@@ -263,6 +299,7 @@ def main():
     test_paired_instruments_agree()
     test_org_gate_true_and_false_sets()
     test_span_patterns_see_accented_capitals()
+    test_person_extractor_does_not_claim_organisations()
 
     print("\n" + "=" * 62)
     print(f"  RESULTS: {len(PASSED)}/{len(PASSED) + len(FAILED)} passed, "
