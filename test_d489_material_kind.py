@@ -298,3 +298,71 @@ class TestEventlessTriggersReplenishment(unittest.TestCase):
         self.assertFalse(r['eventless'], 'unavailable classifier invented a verdict')
         self.assertFalse(r['needs_more'])
         self.assertEqual(r['kind'], 'unknown')
+
+
+class TestPlaceholderQueries(unittest.TestCase):
+    """LOCAL-498 — a placeholder must never become a search term.
+
+    Exposed the moment D492b made the eventless trigger fire. The 12:05 run
+    issued, for stop 3, all three of:
+
+        "Not specified" "Moses and Monotheism" history
+        "Salvador Dali" "Not specified" collaboration
+        "Not specified" "Moses and Monotheism" collection
+
+    Three of three follow-up queries poisoned, on the stop the new trigger
+    exists to rescue: the loop fired correctly and then spent its entire capped
+    budget searching for a placeholder.
+
+    Exactly D486/LOCAL-491's defect — `story_focus_fact` built the focus fact
+    "Not specified published Moses and Monotheism." — and `text_fold`'s
+    `is_placeholder` was written that same night to end it. `story_replenish`
+    simply never called it.
+    """
+
+    STOP3 = {'canonical_title': 'Moses and Monotheism',
+             'english_title': 'Moses and Monotheism',
+             'artist': 'Salvador Dali',
+             'publisher': 'Not specified',
+             'printed_by': 'Not specified',
+             'credit_line': 'Not specified',
+             'venue_name': 'Museum of Fine Arts, Boston'}
+
+    STOP1 = {'canonical_title': 'Le Lezard aux plumes d or',
+             'english_title': 'The Lizard with Golden Feathers',
+             'artist': 'Joan Miro',
+             'publisher': 'Louis Broder',
+             'printed_by': 'Mourlot Freres',
+             'credit_line': 'Gift of Boris Fridman',
+             'venue_name': 'Museum of Fine Arts, Boston'}
+
+    def setUp(self):
+        from story_replenish import build_followup_queries
+        self.b = build_followup_queries
+
+    def test_no_query_contains_a_placeholder(self):
+        for q in self.b(self.STOP3):
+            self.assertNotIn('Not specified', q)
+            self.assertNotIn('not specified', q.lower())
+
+    def test_falls_back_to_an_honest_query(self):
+        """Losing the poisoned queries must not leave the stop with nothing."""
+        qs = self.b(self.STOP3)
+        self.assertTrue(qs, 'no follow-up at all for a stop that needs one')
+        self.assertIn('Moses and Monotheism', qs[0])
+
+    def test_real_matrix_values_are_untouched(self):
+        """The control: the filter must not eat legitimate agents."""
+        qs = self.b(self.STOP1)
+        joined = ' '.join(qs)
+        self.assertIn('Louis Broder', joined)
+        self.assertIn('Mourlot Freres', joined)
+        self.assertIn('Joan Miro', joined)
+
+    def test_placeholder_variants_are_all_caught(self):
+        for junk in ('Not specified', 'not specified', 'N/A', 'unknown',
+                     'None', 'TBD'):
+            m = dict(self.STOP3, publisher=junk)
+            for q in self.b(m):
+                self.assertNotIn(junk.lower(), q.lower(),
+                                 f'{junk!r} reached a query')

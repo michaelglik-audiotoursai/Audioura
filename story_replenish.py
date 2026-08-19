@@ -29,7 +29,7 @@ import os
 import re
 from typing import Dict, List, Optional, Set
 
-from text_fold import fold
+from text_fold import fold, is_placeholder
 
 __all__ = ['needs_replenishment', 'build_followup_queries',
            'MAX_FOLLOWUP_QUERIES', 'THIN_CHAR_FLOOR', 'REPLENISH_DISABLED_ENV']
@@ -95,7 +95,28 @@ def needs_replenishment(passages: List[str], coverage: Optional[Dict] = None) ->
 
 
 def _clean(value: Optional[str]) -> str:
-    return re.sub(r'\s+', ' ', (value or '')).strip()
+    """Normalise whitespace, and treat a placeholder as absent.
+
+    [LOCAL-498] `_clean` only squeezed whitespace, so a matrix field reading
+    "Not specified" became a quoted SEARCH TERM. Exposed the moment D492b made
+    the eventless trigger fire — the 12:05 run issued, for stop 3, all three of:
+
+        "Not specified" "Moses and Monotheism" history
+        "Salvador Dalí" "Not specified" collaboration
+        "Not specified" "Moses and Monotheism" collection
+
+    Three of three follow-up queries poisoned, on the stop the new trigger
+    exists to rescue. The loop fired correctly and then spent its whole capped
+    budget searching for a placeholder.
+
+    Exactly D486/LOCAL-491's defect — `story_focus_fact` built the focus fact
+    "Not specified published Moses and Monotheism." — and `text_fold`'s
+    `is_placeholder` was written that same night to end it. This module simply
+    never called it. Fixing it here rather than at each use site is the point of
+    having one primitive (D483).
+    """
+    cleaned = re.sub(r'\s+', ' ', (value or '')).strip()
+    return '' if is_placeholder(cleaned) else cleaned
 
 
 def build_followup_queries(matrix: Dict,

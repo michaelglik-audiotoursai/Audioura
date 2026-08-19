@@ -9163,9 +9163,43 @@ Exempt: navigation directions ("Turn left", "Continue past").
                                 _local410_total_queries += 1
                                 _local410_total_results += len(_rq_results or [])
                                 print(f"      [LOCAL-489] +{_added} from: {_rq[:78]}")
+                            # [LOCAL-498] DID THE ROUND WORK? Re-classify after.
+                            #
+                            # Without this the loop spends its capped budget and
+                            # nobody can tell whether it bought a story or more
+                            # of the same. The 12:05 run fired correctly on both
+                            # eventless stops, added 17 and 24 passages, and the
+                            # log could not say whether either stop was still
+                            # eventless afterwards — which is the only question
+                            # that matters about a replenishment round.
+                            #
+                            # Reports; never re-fires. One round stays one round.
+                            _rp_after_passages = [s.get('snippet', '') for s in _s_snippets
+                                                  if s.get('snippet')]
+                            _rp_after_kind = 'unknown'
+                            try:
+                                from material_kind import classify_material
+                                _rp_after = classify_material(_rp_after_passages)
+                                _rp_after_kind = _rp_after['kind']
+                                _rp_worked = (_rp.get('kind') != _rp_after_kind)
+                                print(f"      [LOCAL-498] after replenishment: "
+                                      f"kind {_rp.get('kind')} -> {_rp_after_kind}, "
+                                      f"{_rp['total_chars']} -> "
+                                      f"{sum(len(p) for p in _rp_after_passages)} chars, "
+                                      f"eventful={_rp_after['eventful_sentences']} "
+                                      f"{'(CHANGED)' if _rp_worked else '(NO CHANGE — the round bought more of the same)'}")
+                                if _rp_after.get('best_sentence'):
+                                    print(f"         best now: "
+                                          f"\"{_rp_after['best_sentence'][:110]}\"")
+                            except Exception as _rpa_err:
+                                print(f"      [LOCAL-498] post-round check "
+                                      f"unavailable (non-fatal): {_rpa_err}")
+
                             _s_poi['_replenished'] = {
                                 'queries': len(_rp_queries), 'reason': _reason.strip('+'),
-                                'chars_before': _rp['total_chars']}
+                                'chars_before': _rp['total_chars'],
+                                'kind_before': _rp.get('kind'),
+                                'kind_after': _rp_after_kind}
                     except ImportError as _rp_err:
                         print(f"    [LOCAL-489] replenishment unavailable ({_rp_err})")
                     except Exception as _rp_err:
