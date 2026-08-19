@@ -104,14 +104,23 @@ A STORY here has a specific meaning, and it is the only thing being asked for:
   A FACT connects the STOP to the EXHIBITION, the museum, the city or the country,
   THROUGH A PERSON WHO DID SOMETHING.
 
-Concretely: one named person, across {MIN_SENTENCES} or more consecutive sentences,
-DOING something — deciding, refusing, persuading, commissioning, travelling,
-failing — with something at stake for them. Then, if the material supports it,
-a second named person or the wider consequence.
+Build it around ONE NAMED PERSON and STAY WITH THEM. This matters and is the
+commonest way these come out wrong: a sentence each about the publisher, the
+printer and the donor is a list of credits, not a story, and it reads as one.
 
-"X was a Catalan artist who worked in Paris" is not a story. "Broder spent three
-years persuading Miró, who refused twice before agreeing on condition that he
-choose the printer himself" is one.
+  Sentences 1–3: the SAME person. What they did, why they did it or what it cost
+    them, and what followed. You may refer to them as "he" or "she" after the
+    first naming — that reads better aloud than repeating the name.
+  Then, and only then: connect outward to a second person, to this exhibition,
+    or to this museum.
+
+"X was a Catalan artist who worked in Paris" is not a story — it is a label.
+"Broder published the book and had Mourlot pull every sheet by hand, so the
+artist and the printer worked in the same room" is one: someone did something,
+and something followed.
+
+Aim for that shape. Where the material is plainer than the example, write the
+plainer version — a real, small, sourced action beats an invented dramatic one.
 
 THE MATRIX FOR THIS STOP
 {matrix_block}
@@ -135,9 +144,13 @@ RULES
   - No evaluation: not "stands as a testament to", not "showcasing a unique
     fusion", not "the transformative power of". Say what happened.
   - Plain prose for a voice to read aloud. No markdown, no headings, no bullets.
-  - If the source material will not support a story of this shape, reply with
-    exactly {NO_STORY} and nothing else. An empty story is fine. An invented one
-    is not, and would enter upstream of every fact-check in the pipeline.
+  - Reply with exactly {NO_STORY} and nothing else ONLY if the material names no
+    person at all, or records nothing any person did. That is a narrow test: if
+    there is a named publisher, printer, donor or collaborator and any action
+    attributable to them, write the story. Do not answer {NO_STORY} because the
+    material is less dramatic than the example — write the undramatic version.
+    An invented story is the one unacceptable outcome, because it would enter
+    upstream of every fact-check in the pipeline.
 
 Write the story now."""
     return prompt
@@ -229,10 +242,14 @@ def _default_caller(prompt: str, model: str = None):
     text = body['choices'][0]['message']['content']
     usage = body.get('usage') or {}
     try:
-        from cost_tracker import llm_cost
+        # `cost_rates`, not `cost_tracker` — the latter does not exist, and the
+        # try/except was reporting every story-pass call as $0.0000 rather than
+        # failing. A silent zero in a cost meter is worse than no meter.
+        from cost_rates import llm_cost
         cost = llm_cost(model=model,
                         input_tokens=usage.get('prompt_tokens', 0),
                         output_tokens=usage.get('completion_tokens', 0))
-    except Exception:
+    except Exception as err:
+        print(f"  [LOCAL-490] cost unavailable for the story pass: {err}")
         cost = 0.0
     return text, cost

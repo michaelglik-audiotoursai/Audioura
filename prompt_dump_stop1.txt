@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-19T00:09:03.630373
+Generated: 2026-08-19T00:16:33.970735
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -19,11 +19,11 @@ STYLE: Channel the passion of a curator who fell in love with this piece — mak
 
 ━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
   • material: Printed on Japan
-  • material: on wove
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
   • publisher/printer: Louis Broder
+  • publisher/printer: Atelier Mourlot
 ━━━ END CONCRETE FACTS ━━━
 
 
@@ -113,8 +113,8 @@ DO NOT USE these phrases: the building was erected, historically important, the 
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: wonder
-- Unique angle to emphasize: This exhibit challenges the boundaries of natural history and surrealism, depicting a creature that exists only in the artist's mind yet feels palpable.
-- End with a forward-looking hook: What other realms can art transport us to?
+- Unique angle to emphasize: Marvel at how Max Ernst's surreal imagination challenges our perception of the natural world, blending fantastical elements with familiar forms.
+- End with a forward-looking hook: What ancient belief systems might have inspired such visions?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
 The Museum of Fine Arts was founded in 1870 in Copley Square.
@@ -123,7 +123,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
 The initial location of the Museum of Fine Arts was on the top floor of the Boston Athenæum.
 
 PROVENANCE (museum-published credit line — you MUST name the donor):
-  Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
+  Gift of Boris Fridman
 
 MANDATORY: Name the donor "Boris Fridman" (surname "Fridman") in your text. Do NOT write "a gift to the museum" without naming who gave it.
 PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
@@ -135,7 +135,7 @@ WORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):
   Date: 1971
   Medium: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
   Publisher: Louis Broder
-  Credit line: Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
+  Credit line: Gift of Boris Fridman
 
 You MUST name the artist in your description. If a collaborator or author is given, name them too. These are grounded facts — use them.
 
@@ -205,50 +205,49 @@ WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 A story has: a person, a specific circumstance, a consequence.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) ...
+  [1] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) by ...
       From Phillips, Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) ... edition was 195), published by Louis Broder, Paris, framed. ... Lithographs.
   [2] Exhibition Checklist — Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
-      Published by Louis Broder. Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
-  [3] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
+      Published by Louis Broder. Gift of Boris Fridman
+  [3] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...
       Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
-  [4] Joan Miró. Cover front from Le Lézard aux plumes d'or ( The Lizard with ...
+  [4] Joan Miró. Cover front from Le Lézard aux plumes d'or ...
       Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
-  [5] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
+  [5] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...
       Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
-  [6] Joan Miró. Plate (folio 31 verso) from Le Lézard aux ...
+  [6] Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or ... - MoMA
       Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
-  [7] Joan Miró. Frontispiece from Le Lézard aux plumes ...
+  [7] Joan Miró. Frontispiece from Le Lézard aux plumes d'or ( The Lizard ...
       Joan Miró. Frontispiece from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
-  [8] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...
+  [8] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA
       Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
-  [9] Joan Miró. Cover front from Le Lézard aux plumes d'or ...
+  [9] Joan Miró. Cover front from Le Lézard aux plumes d'or ( The Lizard with ...
       Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
-  [10] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
-      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
+  [10] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
   [11] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
-  [12] Joan Miró - Le lézard aux plumes d'or
-      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
-  [13] Joan Miró - Le lézard aux plumes d'or
+  [12] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
-  [14] Le Lézard aux plumes d'or (The Lizard with Golden Feathers) | MoMA
+  [13] Le Lézard aux plumes d'or (The Lizard with Golden Feathers)
       Le Lézard aux plumes d'or (The Lizard with. Golden Feathers). These works are part of an illustrated book. 40 works online. Joan Miró.
-  [15] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) by ...
+  [14] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) ...
       Bidding for Le Lézard aux plumes d'or (The Lizard with Golden Feathers): plate 4 (M. 800, see C. bks 148), Joan Miró has ended.
-  [16] The Lizard with Golden Feathers - Joan Miro - Cutter & Cutter Fine Art
+  [15] The Lizard with Golden Feathers - Joan Miro
       Le Lezard aux Plumes d'Or (The Lizard with Golden Feathers) | c.1967 | Lithograph in Colors Printed on Japan Kochi Paper | Printed by Atelier Mourlot, Paris ...
-  [17] Louis Broder
-      Joan Miró, Louis Broder, Crommelynck and Dutrou · 1957 · color etching and aquatint on wove paper mounted to cardboard · Accession ID 2010.73.1. 1 of 3. Site ...
-  [18] 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA
-      Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of ...
-  [19] Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515
+  [16] Joan Miró | Le Lézard aux plumes d'or (book) - Composition Gallery
+      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
+  [17] Joan Miró, Le lezard aux plumes d'or (The Lizard ...
+      Joan Miró, Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515. No image available. Artist: Joan Miró (1893 - 1983). Medium: Etching ...
+  [18] Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515
       Joan Miró, Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515 ; Joan Miró (1893 - 1983) · Etching ...
+  [19] Joan Miró lithograph, The Lizard with Golden Feathers, 1971
+      Item #, w-8914 ; Historical Description. Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic ...
   [20] Louis Broder Archives
       Joan Miró's “Broder Collection” is a series of color lithographs that, until 2004, had been inaccessible for over 30 years. The Broder Collection's vivid colors ...
 
 ━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
   • material: Printed on Japan
-  • material: on wove
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
@@ -441,19 +440,18 @@ Write the story FIRST, then add physical description if space allows.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "Boris Fridman, whose discerning eye for collaborative printed works enriched his collection, later gifted this exceptional piece to the Museum of Fine Arts, Boston."
-- "What new possibilities does this fusion of art and literature suggest?"
+- "Broder's dedication to such projects ensured that Miró's imaginative visions were realized with the utmost precision, using the renowned Atelier Mourlot's expertise in lithographic printing."
+- "This contribution enriched the museum's collection, providing visitors the opportunity to experience the synthesis of visual art and literature."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
 
 ================================================================================
-Total user message length: 31016 chars
+Total user message length: 30939 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 8
+candidate_specifics found: 7
   • material: Printed on Japan
-  • material: on wove
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
@@ -463,4 +461,4 @@ candidate_specifics found: 8
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Au Soleil du Plafond', '__stop_1__', 'Moses and Monotheism', '__stop_2__']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Moses and Monotheism', '__stop_1__', 'Au Soleil du Plafond', '__stop_2__']
