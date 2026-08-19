@@ -19773,3 +19773,64 @@ an empty matrix. Verified after the fix: `publisher` is now chosen first, `venue
 
 This is the same defect family as everything else this session — a value computed in one
 place and read from another that never received it.
+
+## D486 — The D474 extraction was A/B'd and did not move the score. The hypothesis is refuted.
+
+**2026-08-19 00:20–00:52. Five runs per arm, the same exhibition, the only difference
+`STORY_PASS_ENABLED`.** Recorded here because it nearly was not: it lived in one session's
+context and in `AB_STORY_PASS.log` for an hour, and D485 above describes the extraction as
+correct without saying it had been measured. A fresh session would have inherited the
+recommendation and not the evidence — which is Volume 01's death, in miniature.
+
+| arm | runs | mean | range |
+|---|---|---|---|
+| story pass **ON** | 42 / 42 / 55 / 43 / 41 | **44.6** | 41–55 |
+| story pass **OFF** | 49 / 49 / 54 / 37 / 42 | **46.2** | 37–54 |
+
+**Difference −1.6, pooled sd 5.6, SE 3.6, 95% CI −8.6 to +5.4. Indistinguishable from
+zero.**
+
+**What this refutes.** D472 and D474 held that the gap between the lab's 64 and
+production's ~43 was the story prompt being one job among six, and that extracting it would
+close it. **At 5 runs per arm the design resolves ~10 points, and a 21-point effect would
+have been unmissable. It is not there.** Do not restate "the extraction closes the
+lab/production gap" — it was tested and it does not.
+
+**What survives, and it is not small.** The extraction was still the right change, for
+reasons that never depended on the score:
+
+- **It created the object steps 5 and 7 need.** Both were being applied to a whole stop
+  description because that was the only thing that existed. `focus_fact`, the 3–5 sentence
+  rule and the value index all attach to a story; there was no story to attach them to.
+- **It is what made the real bottleneck visible.** With the story alone in its own call,
+  fed its own material, the detector's refusal became legible: *"someone is described, but
+  nothing is risked, refused or lost."* That diagnosis is unavailable while the story is a
+  paragraph inside a six-job prompt, and it is the finding the next month of work should
+  follow (D485).
+
+**So the lesson is about attribution, not about the change.** A refactor can be correct and
+score-neutral. Had it been landed *with* the six wirings, as everything else was, the flat
+result would have been read as "the seven steps did nothing" — which is why Michael's
+"land it alone" rule (D474) was right even though he overrode it, and why the flag
+(`STORY_PASS_ENABLED`) was the substitute that preserved its benefit.
+
+**Default left ON.** It costs ~$0.005/stop, scores the same, and carries the object the
+remaining steps are built on. Turning it off is a one-line env change if that judgement
+changes.
+
+### Also recorded from this session, so it is not only in commit messages
+
+- **LOCAL-492**, both found by *reading a delivered tour*, not by a test: a subjectless
+  sentence shipped (`"Later recognizing the value of this collaboration, gifted the
+  piece…"`) because the LOCAL-475 guard's two halves were word lists that did not contain
+  `Later` or `gifted`; and a gloss was inserted inside a noun phrase (`"the Linde Family,
+  <gloss>, gallery"`). Both rewritten structurally rather than extended.
+- **LOCAL-491 r3**: `story_focus_fact` built the focus fact `"Not specified published
+  Moses and Monotheism."` from a placeholder string, and the tour read *"The Hogarth
+  Press, the Louis Broder of Freud's original text."* `story_worthiness`, written two
+  hours earlier the same night, already filtered placeholders. **Two modules from this
+  session disagreeing about what a named agent is — D483's exact defect class, committed
+  inside the session that fixed D483.** Both now share `text_fold.is_placeholder`.
+- **Variance destroys material, not just numbers.** The 01:07 run opened stop 3 with *"In
+  1938, Salvador Dalí met Sigmund Freud in London and sketched his portrait"* — the best
+  sentence the pipeline has produced. On identical code the 01:15 run does not contain it.

@@ -1825,7 +1825,55 @@ On the morning of Sunday, 08/16/2026 09:59.  Settings  Status   Config   Usage  
    ████████████████████████████████████████████▉      89% used
    $112.49 / $125.00 spent · Resets Sep 1 (America/New_York)                                                                                                                                                                                            
 
+On 08/182026 at 13:12 : Started contines development to improve Stories in Storied release: Settings  Status   Config   Usage   Stats
+                                                                                                                                 Session                                                                                                                                                                                                                                             Total cost:            $6.68
+ Total duration (API):  13m 53s
+ Total duration (wall): 2h 10m 30s                                                                                           Total code changes:    1096 lines added, 19 lines removed                                                                    Usage by model:
+        claude-opus-5:  1.9k input, 60.8k output, 7.3m cache read, 147.1k cache write ($6.67)
+     claude-haiku-4-5:  999 input, 14 output, 0 cache read, 0 cache write ($0.0011)
 
+ Current session                                                                                                                  ████████████████████████████████                   64% used
+ Resets 3:09pm (America/New_York)
+                                                                                                                               Current week (all models)                                                                                                       ███▌                                               7% used                                                                       Resets Aug 24 at 11:59pm (America/New_York)                                                                                     +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+   What's contributing to your limits usage?
+   Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+                                                                                                                                   Last 24h · these are independent characteristics of your usage, not a breakdown
+
+   25% of your usage came from MCP server "claude.ai ClickUp"
+    MCP tool results stay in context for the rest of the session. /compact to flush them, or disable servers you don't need.
+
+   MCP servers             % of usage
+   claude.ai ClickUp              25%
+                                                                                                                       to day · w to week                                                                                                         
+   Usage credits
+   ████████████████████████████████████████████▉      89% used
+   $112.49 / $125.00 spent · Resets Sep 1 (America/New_York)
+
+In the morning on 08/19/2026 09:35 after the overnight work:  Settings  Status   Config   Usage   Stats
+
+ Session                                                                                                                                                                                                                                             Total cost:            $47.12
+ Total duration (API):  50m 53s
+ Total duration (wall): 11h 52m 56s
+ Total code changes:    2961 lines added, 186 lines removed
+ Usage by model:                                                                                                                       claude-opus-5:  3.5k input, 216.0k output, 72.1m cache read, 577.1k cache write ($47.12)
+     claude-haiku-4-5:  536 input, 16 output, 0 cache read, 0 cache write ($0.0006)
+                                                                                                                             Current session
+ ██████████▌                                        21% used
+ Resets 2:10pm (America/New_York)
+
+ Current week (all models)
+ ████████████                                       24% used
+ Resets Aug 25 at 12am (America/New_York)                                                                             +50% weekly limits promo through Aug 31 · clau.de/cc-50-promo                                                                                                                                                                                               What's contributing to your limits usage?
+ Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+                                                                                                                       Last 24h · these are independent characteristics of your usage, not a breakdown                                                                                                                                                                            87% of your usage was at >150k context
+  Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.
+
+ MCP servers             % of usage                                                                                               claude.ai ClickUp               2%                                                                                           
+ d to day · w to week
+                                                                                                                            Usage credits
+ ███████████████████████████████████████████████▌   95% used
+ $118.78 / $125.00 spent · Resets Sep 1 (America/New_York)
 
 
 
