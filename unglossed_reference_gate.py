@@ -995,6 +995,31 @@ def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
         # Possessive constructions can't cleanly take an appositive
         return sentence
 
+    # [LOCAL-492] The entity may be a MODIFIER rather than the head of its noun
+    # phrase, and an appositive cannot be inserted into the middle of one. The
+    # 2026-08-19 01:07 tour shipped
+    #
+    #   "The presence of ... in the Linde Family, recognized for philanthropic
+    #    support of the museum, gallery reflects the museum's commitment"
+    #
+    # because "Linde Family" modifies "gallery" and the gloss went between them.
+    # Same class as the possessive case guarded above: the entity is not the
+    # thing the sentence is predicating about.
+    #
+    # The signal is structural: an entity preceded by a DETERMINER and followed
+    # by a lowercase word is attributive — "the Linde Family gallery", "the
+    # Mourlot Frères atelier". An entity that heads its phrase has no determiner
+    # directly before it ("Louis Broder published…", "The Hogarth Press printed…",
+    # where "The" belongs to the entity itself).
+    _before = sentence[:pos].rstrip()
+    _prev_word = _before.split()[-1].lower() if _before.split() else ''
+    _next_word = after.lstrip().split()[0] if after.lstrip().split() else ''
+    if (_prev_word in ('the', 'a', 'an', 'this', 'that', 'these', 'those')
+            and _next_word[:1].islower()):
+        # Drop the gloss rather than split the noun phrase. An unglossed
+        # reference is a smaller defect than a broken sentence.
+        return sentence
+
     # Insert appositive: "Entity, gloss, rest"
     # Handle case where entity is already followed by a comma
     if after.lstrip().startswith(','):
