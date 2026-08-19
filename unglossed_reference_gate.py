@@ -560,7 +560,13 @@ def supply_glosses(references: List[Dict], corpus_passages: List[str],
     if not model:
         model = os.environ.get('GLOSS_MODEL', 'gpt-4o-mini')
 
-    needs_gloss = [r for r in references if r.get('triage') in ('gloss_needed', 'load_bearing')]
+    # [LOCAL-494] `provenance` refs already carry a gloss composed from the stop
+    # record. Re-running the corpus search and the model call on them is what
+    # produced the Fridman degrade — the lookup failed, and failure was read as
+    # "unverified" rather than "private collector, as expected".
+    needs_gloss = [r for r in references
+                   if r.get('triage') in ('gloss_needed', 'load_bearing')
+                   and not r.get('provenance')]
     if not needs_gloss:
         return references, 0, 0.0, 0.0
 
@@ -799,9 +805,13 @@ def compose_glosses(references: List[Dict], api_key: str,
     if not model:
         model = os.environ.get('GLOSS_MODEL', 'gpt-4o-mini')
 
-    # Filter to refs that have a raw_fact and need composition
+    # Filter to refs that have a raw_fact and need composition.
+    # [LOCAL-494] `provenance` glosses are already appositives by construction
+    # (ROLE_GLOSSES), so composing them again can only distort them — and a
+    # compose that returns DROP would delete a name the record documents.
     composable = [r for r in references
                   if r.get('raw_fact') and r.get('stage') != 'degrade'
+                  and not r.get('provenance')
                   and r.get('triage') in ('gloss_needed', 'load_bearing')]
 
     if not composable or not api_key:
@@ -1520,6 +1530,13 @@ def apply_glosses_to_text(text: str, glossed_refs: List[Dict]) -> Tuple[str, Lis
         original_sent = ref['sentence']
 
         if ref.get('stage') == 'degrade' or not ref.get('gloss'):
+            # [LOCAL-494] A name the museum's own record documents is never
+            # deleted. Unexplained is a lesser failure than absent: the donor's
+            # act is why the object is in the room, so degrading them removes
+            # the "because" along with the name. Leave the sentence intact.
+            if ref.get('provenance'):
+                ref['stage'] = 'provenance_kept'
+                continue
             # Degrade: remove the name
             text = _degrade_reference_in_text(text, entity, original_sent)
             continue
@@ -1546,6 +1563,12 @@ def apply_glosses_to_text(text: str, glossed_refs: List[Dict]) -> Tuple[str, Lis
                 'gloss': gloss,
                 'reason': failure_reason,
             })
+            # [LOCAL-494] ...unless the record itself names them. A malformed
+            # gloss is a reason to drop the GLOSS, not the person.
+            if ref.get('provenance'):
+                ref['stage'] = 'provenance_kept'
+                ref['guard_failure'] = failure_reason
+                continue
             text = _degrade_reference_in_text(text, entity, original_sent)
             ref['stage'] = 'guard_failed'
             ref['guard_failure'] = failure_reason
@@ -1568,6 +1591,7 @@ def apply_unglossed_reference_gate(
     model: str = None,
     stop_names: List[str] = None,
     exempt: List[str] = None,
+    stop_record: Dict = None,
 ) -> Tuple[str, Dict]:
     """Apply the unglossed-reference gate to a stop description.
 
@@ -1593,6 +1617,8 @@ def apply_unglossed_reference_gate(
         'references_suppressed': 0,
         'references_known': 0,
         'references_guard_failed': 0,
+        'references_provenance': 0,   # [LOCAL-494] glossed from the stop record
+        'references_provenance_kept': 0,  # named but unexplained — never deleted
         'triage_tokens': 0,
         'triage_cost': 0.0,
         'triage_latency': 0.0,
@@ -1636,6 +1662,49 @@ def apply_unglossed_reference_gate(
 
     if not needs_gloss:
         return description, stats
+
+    # [LOCAL-494] Stage 2b: glosses that need no search, because the stop's own
+    # record already states the role. Boris Fridman was degraded out of the
+    # 2026-08-19 release tour after a corpus search and a model call both failed
+    # to find him — while `credit_line='Gift of Boris Fridman'` sat in the stop
+    # record the whole time. The museum's record is not a claim awaiting
+    # verification; it IS the verification.
+    #
+    # Runs BEFORE stages 3 and 4, so a provenance name costs nothing and cannot
+    # be degraded by a failed lookup. `provenance` also survives onto the ref as
+    # the never-delete marker read by apply_glosses_to_text.
+    if stop_record:
+        try:
+            from provenance_gloss import provenance_gloss_for
+            for ref in needs_gloss:
+                p_gloss = provenance_gloss_for(ref['entity'], stop_record)
+                if p_gloss:
+                    ref['gloss'] = p_gloss
+                    ref['raw_fact'] = p_gloss
+                    ref['gloss_source'] = 'provenance'
+                    ref['stage'] = 'provenance'
+                    ref['provenance'] = True
+                    stats['references_provenance'] += 1
+        except Exception as _prov_err:  # never fatal — the old path still works
+            print(f"    [LOCAL-494] provenance gloss unavailable "
+                  f"(non-fatal): {_prov_err}")
+
+    # Only entities with no documented role still need the paid lookup.
+    needs_gloss = [r for r in needs_gloss if not r.get('provenance')]
+    if not needs_gloss:
+        new_description, guard_failures = apply_glosses_to_text(description, refs)
+        stats['guard_failures'] = guard_failures
+        new_description, dropped = validate_and_repair_full_text(new_description)
+        stats['sentences_dropped_by_guard'] = len(dropped)
+        stats['dropped_sentences'] = dropped
+        for ref in refs:
+            if ref.get('provenance'):
+                stats['references_glossed'] += 1
+                stats['glossed_list'].append({
+                    'entity': ref['entity'], 'gloss': ref.get('gloss', ''),
+                    'source': 'provenance', 'stage': ref.get('stage', 'provenance'),
+                })
+        return new_description, stats
 
     # Stage 3: Supply facts (corpus or model)
     refs, gloss_tokens, gloss_cost, gloss_latency = supply_glosses(
@@ -1682,6 +1751,17 @@ def apply_unglossed_reference_gate(
                 'action': 'guard_failed',
                 'gloss_attempted': ref.get('gloss', ''),
                 'reason': ref.get('guard_failure', ''),
+            })
+        elif ref.get('stage') == 'provenance_kept':
+            # [LOCAL-494] Named in the record, no usable gloss — kept anyway.
+            # Counted separately from 'glossed' so the log never claims an
+            # explanation that is not in the text.
+            stats['references_provenance_kept'] += 1
+            stats['glossed_list'].append({
+                'entity': ref['entity'],
+                'action': 'kept_unglossed',
+                'reason': ref.get('guard_failure', 'no usable gloss'),
+                'source': 'provenance',
             })
         elif ref.get('stage') == 'degrade':
             stats['references_degraded'] += 1
@@ -1773,6 +1853,11 @@ def apply_gate_to_stop_descriptions(
         new_desc, stats = apply_unglossed_reference_gate(
             desc, corpus_passages=passages, api_key=api_key, model=model,
             stop_names=all_stop_names, exempt=_exempt,
+            # [LOCAL-494] the stop's own record — credit_line, publisher,
+            # printed_by — so a documented donor is glossed from provenance
+            # instead of being degraded when the open web has never heard of
+            # them, which is the normal case for a private collector.
+            stop_record=poi,
         )
 
         if stats['references_glossed'] > 0 or stats['references_degraded'] > 0:
