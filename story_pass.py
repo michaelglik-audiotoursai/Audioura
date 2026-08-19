@@ -101,26 +101,62 @@ like — those are written elsewhere.
 
 A STORY here has a specific meaning, and it is the only thing being asked for:
 
-  A FACT connects the STOP to the EXHIBITION, the museum, the city or the country,
-  THROUGH A PERSON WHO DID SOMETHING.
+  SOMETHING CHANGED, SOMETHING CAUSED THE CHANGE, AND IT MATTERED.
 
-Build it around ONE NAMED PERSON and STAY WITH THEM. This matters and is the
-commonest way these come out wrong: a sentence each about the publisher, the
-printer and the donor is a list of credits, not a story, and it reads as one.
+Three parts, and all three must be there:
 
-  Sentences 1–3: the SAME person. What they did, why they did it or what it cost
-    them, and what followed. You may refer to them as "he" or "she" after the
-    first naming — that reads better aloud than repeating the name.
-  Then, and only then: connect outward to a second person, to this exhibition,
-    or to this museum.
+  1. How things stood.
+  2. AN ACTION that changed it — this is the part that is usually missing.
+  3. How things stood afterwards, which must differ from 1.
+
+  "Pompeii was a living city. Vesuvius erupted in 79 AD. Pompeii was buried, and
+  stayed buried for sixteen centuries." — that is the whole shape.
+
+BUILD IT AROUND ONE NAMED SUBJECT AND STAY WITH THEM.
+
+The subject may be A PERSON, but it does not have to be. A place, an institution,
+a workshop, an eruption, a war, a fire, a restoration campaign, or the object
+itself can all carry a story, provided they DO something in part 2. Do not refuse
+to write a story because no person is named — write it about whatever acted.
+
+Staying with one subject is what matters, and abandoning it is the commonest way
+these come out wrong: a sentence each about the publisher, the printer and the
+donor is a list of credits, not a story, and it reads as one. When the subject is
+a person you may say "he" or "she" after first naming them — that reads better
+aloud than repeating the name.
+
+  Sentences 1-3: the SAME subject throughout.
+  Then, and only then: connect outward — to a second person, to this exhibition,
+    to this museum, to the city. Say WHY that connection holds.
+
+USE "BECAUSE", NOT "AND THEN". This is the difference between a story and a list.
+
+  "The king died, and then the queen died" is a sequence.
+  "The king died, and then the queen died OF GRIEF" is a story.
+
+Same two events; the causal link is the whole difference. Every stop already has
+a sequence of facts. Your job is the link between them.
 
 "X was a Catalan artist who worked in Paris" is not a story — it is a label.
-"Broder published the book and had Mourlot pull every sheet by hand, so the
-artist and the printer worked in the same room" is one: someone did something,
-and something followed.
+"Broder published the book and had Mourlot pull every sheet by hand, SO the
+artist and the printer worked in the same room" is one: something was done, and
+something followed BECAUSE of it.
 
-Aim for that shape. Where the material is plainer than the example, write the
-plainer version — a real, small, sourced action beats an invented dramatic one.
+IS IT WORTH TELLING? Before you write, check the change you have found:
+
+  - Did it have consequences, for the subject or for what survives?
+  - Was it unexpected, rather than what anyone would assume?
+  - Did it stick — is it irreversible, or was it undone?
+  - Did it happen ONCE? "The press published many editions" is a routine, not an
+    event. "The 1967 edition was destroyed" is an event.
+
+The test to apply when you finish: a listener who has just heard this should want
+to say "IT DID?" or "HE DID?" — not "how interesting", and above all not
+"so what?". If the only honest response is "so what?", you have written a label.
+
+Where the material is plainer than the examples, write the plainer version — a
+real, small, sourced action beats an invented dramatic one. Numbers earn this:
+how many were destroyed, how long it lasted, how much was paid, what remains.
 
 THE MATRIX FOR THIS STOP
 {matrix_block}
@@ -141,14 +177,24 @@ SOURCE MATERIAL — everything you may use. You may not add facts from memory.
 RULES
   - Between {MIN_SENTENCES} and {max_sentences} sentences. No more.
   - Every name, date, place and number must appear in the source material above.
-  - No evaluation: not "stands as a testament to", not "showcasing a unique
-    fusion", not "the transformative power of". Say what happened.
+  - SHOW THE POINT, DO NOT ANNOUNCE IT. The story must make clear why it was
+    worth telling — but through what was done, chosen, refused, lost or paid for.
+    Never by commentary from outside: not "stands as a testament to", not
+    "showcasing a unique fusion", not "the transformative power of", not
+    "transformative", "vibrant", "profound" or "revolutionary". Test: delete
+    every proper noun and every number from your sentence. If something is left
+    that still sounds like praise, it is commentary — cut it and say what
+    happened instead.
   - Plain prose for a voice to read aloud. No markdown, no headings, no bullets.
-  - Reply with exactly {NO_STORY} and nothing else ONLY if the material names no
-    person at all, or records nothing any person did. That is a narrow test: if
-    there is a named publisher, printer, donor or collaborator and any action
-    attributable to them, write the story. Do not answer {NO_STORY} because the
-    material is less dramatic than the example — write the undramatic version.
+  - Reply with exactly {NO_STORY} and nothing else ONLY if the material records
+    NOTHING THAT HAPPENED — no action, no change, by anyone or anything. That is
+    a narrow test, and it is deliberately NOT a test for people. If there is a
+    named publisher, printer, donor or collaborator and any action attributable
+    to them, write the story. If there is no person at all but something still
+    occurred — an eruption, a fire, a war, a demolition, a rebuilding, a
+    rediscovery, a move from one collection to another — write THAT story, with
+    the event as the subject. Do not answer {NO_STORY} because the material is
+    less dramatic than the examples — write the undramatic version.
     An invented story is the one unacceptable outcome, because it would enter
     upstream of every fact-check in the pipeline.
 
