@@ -20021,3 +20021,45 @@ defect #1 of the 2026-08-19 review — *"the passive voice is eating the actors"
 mechanically detectable, and *"was posthumously realized"* classifies correctly as a
 non-action. `was published BY Broder` keeps its agent and counts. Reported separately so a
 run shows how much retrieved material is action with the actor removed.
+
+## D492 — Measured: the volume instrument says COVERED on stops that contain no story
+
+**2026-08-19 11:20–11:32, three clean runs of the same exhibition after the D489a r2
+instrument fixes.** Michael: *"do not wait for me to confirm: if you see that your claim is
+right, start tasks for gating."* It is right, and it reproduces without variance.
+
+| stop | volume | kind | eventful sentences | disagrees |
+|---|---|---|---|---|
+| Le Lézard aux plumes d'or | `COVERED` ×3 | `active` ×3 | **0, 0, 0** | **yes ×3** |
+| Moses and Monotheism | `COVERED` ×3 | `active` ×3 | **0, 0, 0** | **yes ×3** |
+| Au Soleil du Plafond | `COVERED` ×3 | `eventful` ×3 | 2, 2, 2 | no ×3 |
+
+**6 of 9 stop-observations disagree; volume returned `COVERED` on 9 of 9.** The same two
+stops fail every run and the same one passes every run — the verdict has no run-to-run
+variance at all, which is what distinguishes this from the index (sd 4.9, D484).
+
+**The finding that was not in the hypothesis, and only appears because the instrument
+prints the SENTENCE and not just a count** (D423's lesson applied): the best action-bearing
+sentence in 112 retrieved sentences for Le Lézard is
+
+> *"Le Lezard aux Plumes d'Or | c.1967 | Lithograph in Colors Printed on Japan Kochi Paper |
+> Printed by Atelier Mourlot"*
+
+— **an auction lot description**; and for Moses and Monotheism, *"Sold as a set of 10."*
+**The material for two of three stops is dealer and auction listings.** That is a SOURCE
+problem, not only a query-shape problem, and it changes what D489(c) has to do: an
+event-shaped query issued against the same auction-catalogue sources returns
+event-shaped auction prose.
+
+**Also quantified, upstream of any prompt:** `passive=11, 11, 12` on Le Lézard — a dozen
+retrieved sentences carrying an action with the actor deleted. The "passive voice is eating
+the actors" defect starts in RETRIEVAL, not in generation.
+
+**Index across the three runs: 57.3 / 58.0 / 61.0, mean 58.8, sd 1.9.** Not comparable to
+the 01:15 run's 38.7 — different code, different day, uncontrolled — and no delta is
+claimed from it.
+
+**Consequence — D489's fix list is amended.** (a) is done and stays report-only. (b) and
+(c) proceed. **(d) is new and outranks (c):** rank and filter retrieval sources so a lot
+description cannot be the best sentence a stop has. Ordering: (b) cheapest and already
+measurable, (d) next because (c) is worth little without it, (c) last.
