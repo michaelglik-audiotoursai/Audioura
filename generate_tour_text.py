@@ -9180,8 +9180,27 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             _rp_eventless_only = (_rp.get('eventless')
                                                   and not _rp['thin']
                                                   and not _rp['uncovered'])
+                            # [D494] DEFAULT FLIPPED TO ON, by Michael, 12:22:
+                            #   "I do not care a lot about cost at the moment, I
+                            #    care about good stories being produced and their
+                            #    generation put in production. The cost we will
+                            #    calculate later."
+                            #
+                            # D493 turned this OFF because two rounds bought 4,400
+                            # characters and zero eventful sentences. That was a
+                            # COST argument — spend for no yield — and cost is
+                            # explicitly not the constraint right now.
+                            #
+                            # It is also a thin sample: two stops, one exhibition,
+                            # two runs. Leaving it on keeps LOCAL-498's post-round
+                            # measurement accumulating on every tour, which is the
+                            # only way to learn whether the round ever helps on
+                            # other venues, and it cannot make a tour worse — a
+                            # round that adds nothing usable adds nothing.
+                            #
+                            # STORY_REPLENISH_ON_EVENTLESS=0 turns it off again.
                             _rp_skip = (_rp_eventless_only and os.environ.get(
-                                'STORY_REPLENISH_ON_EVENTLESS', '').strip() != '1')
+                                'STORY_REPLENISH_ON_EVENTLESS', '1').strip() == '0')
                             if _rp_skip:
                                 print(f"      [D493] eventless only — diagnosed, not "
                                       f"replenished. The round was measured at zero "

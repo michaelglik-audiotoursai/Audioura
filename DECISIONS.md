@@ -20101,3 +20101,33 @@ present and will reappear.**
 nothing rather than "NO CHANGE" — the latter reads as a round that ran and failed instead
 of one never issued, and a log that describes spending which did not happen is the class of
 instrument failure this session has spent all day removing (D423, D483, D491).
+
+## D494 — D493 reversed by Michael the same hour: cost is not the constraint
+
+**Michael, 2026-08-19 12:22:** *"I do not care a lot about cost at the moment, I care about
+good stories being produced and their generation put in production. The cost we will
+calculate later, if it is prohibitive, then we will discuss how to lower the cost keeping
+the stories of high quality, but that is later."*
+
+D493 turned the eventless replenishment round OFF because two rounds bought 4,402 characters
+and zero eventful sentences. **That was a cost argument** — spend for no yield — and cost is
+explicitly not the constraint. Default flipped back ON (`STORY_REPLENISH_ON_EVENTLESS=0`
+disables).
+
+**Two reasons it is also the better call on the evidence, not only on the instruction:**
+
+1. **The sample is thin.** Two stops, one exhibition, two runs. "Measured at zero yield" is
+   a fair description of what was seen and a weak basis for switching a capability off.
+   Leaving it on accumulates LOCAL-498's post-round measurement on every tour, which is the
+   only way to learn whether the round helps at other venues.
+2. **It cannot make a tour worse.** A round that returns nothing usable adds nothing; the
+   material simply is not eventful either way.
+
+D493's *measurement* stands and is not withdrawn — the round as currently shaped produced no
+eventful sentence on either stop, and that is still the argument for D492(d) source ranking
+ahead of (c) event-shaped queries. What is withdrawn is the decision to stop issuing it.
+
+**Standing correction to how LEAD weighs things:** cost was treated as a first-order
+constraint without being asked. The stated priority is story quality and getting generation
+into production; cost is a later conversation. Do not switch a quality capability off to
+save cents again.
