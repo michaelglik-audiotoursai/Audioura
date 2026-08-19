@@ -661,3 +661,51 @@ discarded. The **`cost_ledger` under-reports host-side work ~20×** — it recor
 
 **No.** DECISIONS.md was updated all day; these two were not touched since 10:22 and
 08/17. That is the rule this file exists to enforce, and I broke it for a full session.
+
+---
+
+## 2026-08-18 17:2x — THE 7-STEP STORY SYSTEM, in Michael's words, with status
+
+Michael could not find these steps in this file: the 2026-08-18 entry above summarised
+the exchange but never recorded the steps themselves. Recorded verbatim here, because
+they are the specification everything else is measured against.
+
+> 1. The system generates tours.
+> 2. We analyze the tour stops and determine that some of them would benefit from stories.
+> 3. In the loop: stop-by-stop we analyze the sentences and select facts to follow the
+>    methodology: Story is connecting a fact with the stop with the exhibition or museum
+>    or with the city or with the country.
+>       1. Again: Fact —> Stop —> Exhibition
+>       2. Making query
+>       3. Getting result and evaluating parts for the most interesting story
+>       4. Getting the right story size: if too small need to learn more from Internet.
+>    Based on that methodology in order to get ready for #2: Making query we build the
+>    matrix: canonical_title, english_title, artist, publisher, credit_line, Printed by,
+>    medium, venue
+> 4. We generate query and ask it to multiple entities such as AI OpenAI.API — do we use
+>    any other AI? and/or Serp and/or Gemini
+> 5. We evaluate the story assigning a value index.
+> 6. We validate story.
+> 7. From all validated valid stories we pick the most valuable, make it to 3-5 sentences,
+>    in most valuable we can take a larger size. If there are no valid stories, we go to
+>    the next fact make it credit_line in our matrix and repeat from #4.
+
+**Status verified against code 2026-08-18 evening — two done, one never started, four partial:**
+
+| # | status | detail |
+|---|---|---|
+| 1 | ✅ done | — |
+| 2 | ❌ **never implemented** | no worthiness check exists; every museum stop is mined at full cost |
+| 3 | ⚠️ 3 of 4 | matrix ✅ (15 fields), query ✅, evaluate parts ✅ (D469). **"if too small, learn more" is lab-only** (`story_lab.py` S4) |
+| 4 | ⚠️ one engine, one model | Serper.dev + OpenAI. Gemini built in `story_leads.py`, **zero production importers** |
+| 5 | ⚠️ fixed, **not wired** | `evaluate_story` improved (D468/D470) and has **0 references in `generate_tour_text.py`** |
+| 6 | ✅ done, much stronger | D466, D471, D473, D475–D479, D481 |
+| 7 | ⚠️ half built | retry exists (PHASE 5.17) but fires on a post-gate **word floor**, not "no valid story"; **forbids rejected claims instead of rotating to the next fact** (no `focus_fact` in production); packs to a **450-word budget**, not 3–5 sentences |
+
+**5 and 7 are the two that close the loop**, and both work in the lab — which is why the
+lab scores 64 and production 45.7. Step 5 is deliberately unwired: the index is calibrated
+against one human judgement, so it may REPORT but must not yet GATE (D474).
+
+**`credit_line` still cannot carry Michael's rotating fact** — LOCAL-406 regex-parses
+`donor` and `printer` out of that field, so a fact written there is read as a person's
+name. It needs its own slot; the lab calls it `focus_fact` (`STORY_BASELINE.md` §2).
