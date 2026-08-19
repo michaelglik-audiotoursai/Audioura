@@ -13268,6 +13268,44 @@ REWRITE RULES (all mandatory):
     else:
         print(f"\n  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false")
 
+    # -------- [LOCAL-485] PHASE 5.21: Story valuation index (Michael's step 5) --------
+    #
+    # Michael's step 5 is "we evaluate the story assigning a value index".
+    # `evaluate_story` has existed and been improved twice (D468 counts the object,
+    # D470 fixed a year read as metres) and had **zero references in this file**.
+    # It is step 5 of seven, built and unplugged — which is the shape of most of
+    # the gap between the lab's 64 and production's 43 (SEVEN_POINTS_PLAN.md).
+    #
+    # IT REPORTS. IT DOES NOT GATE. D474 is explicit: the index is calibrated
+    # against a single human judgement — Michael's, on one exhibition — and a gate
+    # built on one calibration point will confidently delete good material. Wiring
+    # it as a gate is a separate decision that needs its own evidence.
+    #
+    # WHY THIS IS FIRST of the seven, despite changing not one word of any tour:
+    # it is the only way to know whether anything else helped. Before it, the sole
+    # quality signal was a full tour run scored offline — $0.16, ~2.5 minutes, and
+    # a single-run sd of 4.9 index points (D484), so a 3-run mean resolves nothing
+    # smaller than ~10 points. A per-stop index printed during generation is free,
+    # immediate, and per-stop, which is the granularity every remaining step needs.
+    #
+    # Runs last, immediately before assembly, so it scores exactly what ships —
+    # after every gate, the retry, the anti-preaching strip and the obligation
+    # audit have had their say.
+    _story_index_stats = {}
+    print(f"\n  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...")
+    try:
+        from story_index_pass import (apply_story_index, build_index_corpus,
+                                      format_index_report)
+        _story_index_stats = apply_story_index(
+            poi_list,
+            corpus=build_index_corpus(_exhibition_checklist_result, _stop_corpus_data),
+        )
+        print(format_index_report(_story_index_stats))
+    except ImportError as _xierr:
+        print(f"  [LOCAL-485] WARNING: story_index_pass not importable — skipped ({_xierr})")
+    except Exception as _xierr:
+        print(f"  [LOCAL-485] ERROR: story index failed (non-fatal): {_xierr}")
+
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')
     print(f"\nPHASE 6: Assembling the complete tour...")
