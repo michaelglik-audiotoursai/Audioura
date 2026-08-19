@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-19 09:39 EDT
+# RESTART briefing — generated 2026-08-19 09:55 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     304d94a Retire three reminders that would misdirect a fresh session
-unpushed 107 commits
+HEAD     f61639d restart briefing regenerated
+unpushed 108 commits
 dirty    1 files
 ```
 

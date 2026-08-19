@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 220.12175488471985,
+  "chars": 5690,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+      "index": 50,
+      "historic": 25,
+      "detail": 7,
+      "social": 72,
+      "text": "In 1971, Joan Miró completed \"Le Lézard aux plumes d'or,\" an illustrated book featuring forty color lithographs. As a result, the work became one of Miró's most celebrated portfolios, capturing the imagination of collectors and cementing its place in art history. Today, this piece can be appreciated at the Museum of Fine Arts, Boston, thanks to the generous gift of Boris Fridman, the collector who gave this work to the museum. This work exemplifies the transformative power of the livre d'artiste, a form where the book itself becomes a cohesive work of art. Each page reveals a mythical world, where a simple lizard transforms into a creature of legend, adorned with golden feathers that spark the viewer’s imagination. The lithographs are not mere illustrations; they are integral to the narrative, blurring the lines between text and image. Louis Broder's decision to publish this work highlights the importance of collaboration in the art world.",
+      "orientation": "You are about to explore the \"Picasso, Miro, Dali: Unbound\" exhibition at the Museum of Fine Arts in Boston. This exhibition showcases the transformative power of the livre d'artiste, revolutionizing the book as an art form through deeply collaborative ventures. In Gallery 184, you will encounter three extraordinary works by Spanish artists: \"Le Lézard aux plumes d'or (The Lizard with Golden Feathers),\" \"Moses and Monotheism,\" and \"Au Soleil du Plafond.\" Through these pieces, the exhibition delves into how images, words, and typography intersect, offering a unique perspective on the universal theme of transformation across different cultures and times. At Le Lézard aux plumes d’or, witness the transformation of a lizard into a legendary creature with golden feathers. Later, at Moses and Monotheism, experience the significance of sheepskin as a tactile medium echoing ancient texts and manuscripts. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Position yourself to best view this location."
+    },
+    {
+      "stop": "Moses and Monotheism by Salvador Dalí",
+      "index": 57,
+      "historic": 45,
+      "detail": 30,
+      "social": 69,
+      "text": "In 1938, Salvador Dalí met Sigmund Freud in London, an encounter that left a lasting impression on the artist. During this meeting, Dalí created sketches of Freud, which later influenced his work on the illustrations for Freud's final book, \"Moses and Monotheism.\" This experience and the resulting artwork marked a significant moment in Dalí's career, as it linked him directly to the psychoanalytic theories that intrigued him. By 1974, Dalí had completed a series of ten engravings for the book, merging his surrealist style with Freud's controversial ideas. This fusion of art and psychoanalysis continues to spark interest and discussion, highlighting the enduring impact of Dalí's work. The choice of sheepskin as a medium is significant, for it adds a tactile dimension to the artwork, echoing ancient texts and manuscripts. The integration of Dalí's illustrations with Freud's text offers a visual and intellectual dialogue, reinforcing the transformative power of belief systems and cultural evolution. As you ponder the weight of these interpretations, consider how this piece connects with other works in the museum, like \"Le Lézard aux plumes d’or,\" exploring the themes of light and transformation.",
+      "orientation": "Stand before the display of \"Moses and Monotheism\" and observe the interplay of text and image. From this vantage, the intricate details of Salvador Dalí's surrealist illustrations, etched on sheepskin, become prominent. The sheepskin's unique texture, combined with Dalí's distinct style, invites a deeper understanding of the work's historical and cultural significance."
+    },
+    {
+      "stop": "Au Soleil du Plafond by Juan Gris",
+      "index": 62,
+      "historic": 24,
+      "detail": 30,
+      "social": 60,
+      "text": "In 1927, Juan Gris completed his final work, \"Au Soleil du Plafond,\" just before his untimely death at the age of 40 due to kidney failure. Though Gris had finished only half of the intended project, the concept lingered in art circles. In 1955, the Louis Broder Tériade took the initiative to bring Gris's vision to life by releasing a deluxe portfolio with 11 lithographs on Arches wove paper, ensuring the artist’s last work reached the public. Pierre Reverdy lent his poetic prowess to this enterprise, his lyrical prose complementing Gris's vibrant imagery, allowing for an evocative harmony of text and image. The work captivates the essence of integration and cooperation that defined the era of livres d'artistes, providing a window into the dynamic interchange between text and image that redefined artistic books.\n\nThat's 3 stops — Le Lézard aux plumes d’or showcases a lizard's mythical transformation with golden feathers and Au Soleil du Plafond features Pierre Reverdy's poetic prose alongside Gris's vibrant imagery. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "This work represents how artists revolutionize books into art forms through collaboration, fitting seamlessly within the exhibition's thesis."
+    }
+  ]
+}

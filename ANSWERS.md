@@ -1154,6 +1154,69 @@ fan-out reported exactly one "cross-model agreement" and that was it — a model
 its own corroboration, the error `story_leads`' own docstring warns about. Agreement is
 now counted by model FAMILY. [D485, LOCAL-488]
 
+# 2026-08-19 morning — the story definition, settled from the encyclopedia (D487–D492)
+
+## A205 — What IS a story? Five encyclopedic definitions, and the ruling
+**Q (Michael, 09:58):** *"Let's look at the definition of the story to decide what 'story' is. Let's start with an encyclopedia."*
+
+**Forster/Britannica:** story vs plot is *entirely* causality — "the queen died" vs "died **of grief**", one word.
+**Prince (1973):** a minimal story is three conjoined events, first and third stative, **second active**, third the inverse of the first. Mechanically checkable.
+**Wikipedia:** character, conflict, cause and effect.
+**Labov:** for narrative told *aloud* — our medium — the indispensable part is **evaluation**, the point. *"Pointless stories are met with the withering rejoinder, 'So what?'"*
+**Hühn/Schmid:** a change of state is *tellable* only given relevance, unpredictability, effect, irreversibility, non-iterativity.
+
+**Ruling (D487):** Michael's two definitions were never rivals. The scanner bar IS the story; step 3's chain is *which* story to tell, and structurally it is Labov's **coda**. Sequential filters. Sources: [`STORY_DEFINITION.md`](STORY_DEFINITION.md).
+
+## A206 — Labov's evaluation can enter GENERATION, and our prompt was banning it
+**Q (Michael, 10:09):** *"Is this possible to add into the story generation not only as evaluation?"*
+
+`story_pass.py:144` read *"No evaluation: not 'stands as a testament to'…"* — banning by name the one component Labov calls indispensable. It targeted **external** evaluation (the adjectives) and hit the point as collateral. Now *show the point, do not announce it*, every forbidden phrase kept, plus a mechanical test: **strip every proper noun and number; if praise remains it is commentary.** D488.
+
+## A207 — Plot beats story, and that UPGRADES step 3
+**Q (Michael, 10:14):** *"plot is more valuable than the story to me... it connects things and identifies the causality not just correlation."*
+
+Correct, and it corrected LEAD. LEAD had ruled step 3's chain "relevance, not story" — true of a *correlation* chain, false of a *causal* one. *"This object is here **because** Fridman gave it"* is a plot spanning exactly the entities step 3 names. **The test on step 3 is not "is there a connection" but "is the connection a *because*."** D487.
+
+## A208 — A story needs an AGENT, not a person
+**Q (Michael, 10:14):** *"I question that the story should be always about a person; for example Pompeii was destroyed because of volcanic eruption is a story... The same is true about reconstructions and renovation."*
+
+Correct. Prince requires the middle event to be **active**, not human. Labov reads person-centric because he studied people telling stories about their own lives — his domain, not his definition. **The "person" rule was never about people**; it existed to stop subject-hopping. The real invariant is **continuity of subject**. LOCAL-493 (generator), LOCAL-495 (detector — which still required a person, a mismatch LEAD created one commit earlier). D487.
+
+## A209 — The seven-step matrix, re-verified: six of seven are built
+**Q (Michael, 10:14):** *"I want to see the matrix... How is it changed now?"*
+
+Four of seven rows moved. **LEAD had two claims wrong** (D491): step 7a IS implemented — LOCAL-487, and it fired live — so **six of seven steps are built**, not five; and LOCAL-494 was reported as live-confirmed by a run that never exercised it. Only D489's kind-vs-volume gap remains.
+
+## A210 — Why Fridman vanished, twice, and by two different mechanisms
+**Q (Michael, 10:14):** *"The organizer, charitable gifter, sponsor should not be dismissed, agree?"*
+
+Agreed. Two independent causes:
+- **LOCAL-494** — the gate could not tell a name carrying its own provenance from one the model asserted. *"Gift of Boris Fridman"* **is** the source. And "no web page about this collector" is the *normal* state for a private individual, not evidence of fabrication.
+- **LOCAL-496** — he died again by a different route: "Fine Arts", a fragment of the **venue's own name**, was degraded → *"The Museum Boston"* → org-grounding gate could not ground it → whole sentence dropped, donor included → retry forbade the relationship. Third instance of one class, with LOCAL-475 and LOCAL-494.
+
+**Verified live:** degraded 1 → 0; the tour now reads *"Boris Fridman, a dedicated collector of such works, donated this particular edition to the MFA."*
+
+## A211 — Measured: the volume instrument says COVERED on stops with no story in them
+**Q (Michael, 11:17):** *"do not wait for me to confirm: if you see that your claim is right, start tasks for gating."*
+
+Three clean runs: volume `COVERED` on **9 of 9** stop-observations; kind found no event in **6 of 9** — same two stops failing every run, **zero variance**. Gating landed (D492b): replenishment now fires on `eventless`, degrading to no-opinion if the classifier is unavailable.
+
+**Not in the hypothesis:** the best action-bearing sentence in 112 retrieved sentences was **an auction lot description**; another stop's was *"Sold as a set of 10."* Two of three stops are fed dealer listings, so **source ranking now outranks query shape**. D492.
+
+## A212 — Was the conversation file being updated? No.
+**Q (Michael, 11:59):** *"Are you updating STORIED_COMMUNICATION_03.MD? Are you starting the reply with your name and date?"*
+
+**No, and inconsistently.** `STORIED_COMMUNICATION_03.MD` had not been touched since 00:21 by the previous session while eight real questions were answered into `DECISIONS.md` and commit messages instead — the failure that file exists to prevent. Roughly half of replies carried the `[Storied_Tours]@date|time` prefix; mid-work replies had none, and printed times were estimated rather than read, drifting ~45 minutes by midday. Backfilled at 11:59.
+
+## Code map — added 2026-08-19 (later)
+- [`STORY_DEFINITION.md`](STORY_DEFINITION.md) — the five encyclopedic definitions, with sources
+- [`material_kind.py`](material_kind.py) — D489a: is the material the right KIND, not how much
+- [`provenance_gloss.py`](provenance_gloss.py) — LOCAL-494: a documented role needs no search
+- [`run_prompt_ab.py`](run_prompt_ab.py) — the A/B harness, alternating arms, prints the CI
+- [`test_local495_subject_not_person.py`](test_local495_subject_not_person.py) — the detector accepts non-person subjects
+- [`test_local496_venue_is_not_a_reference.py`](test_local496_venue_is_not_a_reference.py) — the venue is the setting
+- `D489_CLEAN_{1,2,3}.log` — the three runs behind D492
+
 ## Code map — added 2026-08-19
 - [`SEVEN_POINTS_PLAN.md`](SEVEN_POINTS_PLAN.md) — what each of the 7 steps needed
 - [`story_pass.py`](story_pass.py) — D474: the story as its own pass over its own object

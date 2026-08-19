@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 250.69188618659973,
+  "chars": 6009,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+      "index": 66,
+      "historic": 12,
+      "detail": 49,
+      "social": 45,
+      "text": "In 1971, Louis Broder published \"Le Lézard aux plumes d’or\" (The Lizard with Golden Feathers), an illustrated book featuring forty color lithographs by Joan Miró. Before this publication, such a vibrant fusion of art and literature was not part of Broder's repertoire. By choosing to publish this work, Broder contributed to elevating the status of illustrated books as significant artistic expressions. This decision also helped cement Joan Miró's reputation as a master of printmaking, bringing his vivid and imaginative creations to a broader audience. Miró's lithographs in this book are printed on exquisite publisher's vellum, a choice that enhances the brilliance of his colors and the finesse of his lines. This tactile quality invites a closer examination, revealing the layers of Miró's whimsical yet profound imagery. The work exemplifies the exhibition's thesis that artists revolutionized the book as an art form through deeply collaborative ventures. Boris Fridman's gift of this particular piece to the museum enriches the collection, showcasing the evolution of books as integrated artworks. As you explore these lithographs, consider how art transcends the canvas, transforming the space into a vivid narrative landscape.",
+      "orientation": "The Picasso, Miro, Dali: Unbound exhibition at MFA in Boston presents the livre d'artiste, a groundbreaking art form where images, words, and typography merge in unprecedented ways. These works, rarely seen, redefine the book as an art object, embodying deep collaborations and utterly original concepts. As you explore this collection in Gallery 184, you will encounter Le Lézard aux plumes d’or (The Lizard with Golden Feathers), Au Soleil du Plafond, and Moses and Monotheism. Step into a realm where altered realities and belief systems intertwine, inviting you to ponder the profound impact of these extraordinary Spanish artists' creations. At Le Lézard aux plumes d’or, you'll discover how Broder elevated illustrated books. Then, at Moses and Monotheism, experience Dalí's surrealistic interpretation of Freud's ideas. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Stand directly in front of the display in the Linde Family Wing at the Museum of Fine Arts, Boston. From this vantage point, you can fully appreciate the vivid interplay of colors and the intricate details of Joan Miró's lithographs, which might be overlooked from a distance. The proximity allows you to discern the texture and depth of the Louis Broder's vellum, an essential element in experiencing the fusion of visual and literary art."
+    },
+    {
+      "stop": "Au Soleil du Plafond by Juan Gris",
+      "index": 69,
+      "historic": 25,
+      "detail": 28,
+      "social": 57,
+      "text": "In the mid-1910s, L. Rosenberg began a project for a book titled \"Au Soleil du Plafond,\" with Juan Gris as its designer and Pierre Reverdy as its author. Gris completed only half of the intended work before passing away in 1927. Reverdy's poetic text accompanies the visual works, showcasing the collaboration between text and image. The book's production was commissioned from Mourlot Frères, a renowned lithography workshop in Paris, by Tériade, known for their lithography expertise, ensuring the exceptional quality of the prints. Printed on Arches wove paper, these lithographs capture the essence of Gris's cubist style, transforming the traditional book into a vibrant, visual experience. The piece exemplifies how artists like Gris redefined books as integrated works of art, aligning with the exhibition's thesis.",
+      "orientation": "Stand just a few feet from \"Au Soleil du Plafond\" for an ideal view of the intricate interplay between text and image. From here, you can appreciate the elaborate lithographs and understand how they transform the concept of a book into a visual and poetic journey."
+    },
+    {
+      "stop": "Moses and Monotheism by Salvador Dalí",
+      "index": 60,
+      "historic": 12,
+      "detail": 49,
+      "social": 60,
+      "text": "Salvador Dalí, in 1974, embarked on an artistic endeavor by illustrating Sigmund Freud's \"Moses and Monotheism,\" a text that delved into complex theories about the origins of monotheism. The project resulted in a set of ten drypoints and lithographs on sheepskin, vividly brought to life by Dalí's imaginative interpretations. Freud, known for his pioneering work in psychoanalysis, authored this provocative text, proposing that Moses was not a Hebrew but an Egyptian, which was a radical theory for its time. The Hogarth Press, known for its literary prowess, published this edition, exemplifying the bold integration of literature and fine art. This creative venture underscores the exhibition's theme by illustrating how Dalí infused Freud's controversial ideas with surrealist visuals, turning the book into a multi-sensory experience.\n\nThat's 3 stops — Le Lézard aux plumes d’or elevated illustrated books' artistic status and Au Soleil du Plafond lithographs transform books into vibrant visual experiences. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "** As you stand here, position yourself so you can examine both the illustrations and the text of \"Moses and Monotheism.\" Notice the way the images captivate your attention against the sheepskin pages, just as the words command your contemplation. In doing so, you uncover an intimate dialogue between word and image."
+    }
+  ]
+}
