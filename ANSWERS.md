@@ -1125,6 +1125,44 @@ generated at all until credits are added**, which is Michael's billing action. C
 for the record: **45.7 (A193) is stale and must not be re-quoted** — these were
 gate-behaviour changes and their end-to-end effect is unmeasured. [D483]
 
+**A200. All seven of Michael's steps are wired (2026-08-19).** Five modules got their
+first production caller: [`evaluate_story`](evaluate_story.py),
+[`story_opportunity_scan`](story_opportunity_scan.py), [`story_leads`](story_leads.py),
+`corpus_coverage`'s action half, and the new [`story_pass.py`](story_pass.py). The gap was
+integration, not invention — which is why the lab scored 64 and production 43. [D485]
+
+**A201. THE limiting factor is the MATERIAL, not the prompt.** With the story isolated in
+its own pass, it writes the best story the snippets allow and the detector still refuses
+it: *"someone is described, but nothing is risked, refused or lost."* **No stakes exist in
+the retrieved material for any stop.** No prompt can add them without inventing, and an
+invention in the story pass lands **upstream of every gate**. Six rounds of prompt work
+were spent on a shortage of material. **Next work is retrieval.** [D485]
+
+**A202. Two of Michael's own definitions of "story" disagree, and it is his ruling.**
+Step 3 says a chain ACROSS entities (fact → stop → exhibition); the scanner's bar says
+THREE consecutive sentences about ONE person with action and stakes. A sentence each about
+publisher, printer and donor satisfies the first and is "a list of credits" to the second.
+The generator now aims at both; which governs when they conflict is a product question.
+[D485]
+
+**A203. Step 3.4 never fired: these stops are thin in KIND, not in volume.** The
+replenishment floor measures characters; every stop cleared it. What is missing is stakes.
+A volume floor cannot detect that. [D485]
+
+**A204. `gemini` + `gemini_grounded` is ONE model answering twice.** The first live
+fan-out reported exactly one "cross-model agreement" and that was it — a model counted as
+its own corroboration, the error `story_leads`' own docstring warns about. Agreement is
+now counted by model FAMILY. [D485, LOCAL-488]
+
+## Code map — added 2026-08-19
+- [`SEVEN_POINTS_PLAN.md`](SEVEN_POINTS_PLAN.md) — what each of the 7 steps needed
+- [`story_pass.py`](story_pass.py) — D474: the story as its own pass over its own object
+- [`story_index_pass.py`](story_index_pass.py) — step 5, report-only valuation index
+- [`story_worthiness.py`](story_worthiness.py) — step 2, which stops earn mining
+- [`story_replenish.py`](story_replenish.py) — step 3.4, capped "learn more" round
+- [`story_focus_fact.py`](story_focus_fact.py) — step 7b, the rotation, named-agent first
+- [`OPENAI_CREDIT_LOG.md`](OPENAI_CREDIT_LOG.md) — top-ups, outages, burn rate
+
 ## Code map — added 2026-08-18
 - [`STORY_BASELINE.md`](STORY_BASELINE.md) — what the pipeline actually does, with links
 - [`story_iteration_chart.py`](story_iteration_chart.py) — the retry loop in the lab
