@@ -1259,14 +1259,89 @@ def _degrade_has_lost_its_subject(sentence: str) -> bool:
     word before that comma that could be the subject.
     """
     s = (sentence or '').strip()
-    if ',' not in s or not _DEGRADE_OPENER.match(s):
+    if ',' not in s:
         return False
     head, _, tail = s.partition(',')
-    if not _DEGRADE_ORPHAN_VERB.match(tail):
+
+    # [LOCAL-492] Both halves of this test used to be WORD LISTS, and the
+    # 2026-08-19 01:01 tour shipped
+    #
+    #   "Later recognizing the value of this collaboration, gifted the piece to
+    #    the Museum of Fine Arts, Boston."
+    #
+    # after the gate dropped "Boris Fridman". Neither list matched: `Later` was
+    # not among the ten openers, `gifted` not among the twenty-one verbs. Adding
+    # two words would fix this sentence and not the next one — D476's lesson,
+    # that patterns are enumerable and the model's phrasings are not.
+    #
+    # Both are now structural:
+    #   opener — the head is adverbial/participial if it contains no candidate
+    #            subject at all, which is the thing actually being tested;
+    #   verb   — a past-tense verb is one ending in -ed, plus the short closed
+    #            set of irregulars that cannot be recognised by shape.
+    if not _tail_starts_with_past_verb(tail):
         return False
-    # Any capitalised token after the first word could be the missing subject.
-    tokens = head.split()[1:]
-    return not any(t[:1].isupper() for t in tokens if t[:1].isalpha())
+
+    # A head that OPENS with a determiner is a noun phrase, and therefore has a
+    # subject even when that subject is lowercase: "The edition, printed on
+    # vellum, runs to eighty copies" is well-formed. Without this the guard
+    # deletes ordinary sentences, which is worse than the defect it prevents —
+    # every gate in this chain is one over-eager rule away from being the thing
+    # that damages the tour (D475).
+    tokens = head.split()
+    if tokens and _DEGRADE_DETERMINER.match(tokens[0]):
+        return False
+    # Otherwise a subject would be a capitalised token (a name) after the first
+    # word, or a personal/relative pronoun anywhere in the head.
+    #
+    # KNOWN MISS, left deliberately: a capitalised PLACE reads as a subject, so
+    #     "In 1938 while visiting London, sketched the portrait."
+    # is not caught. Separating people from places needs NER, and the alternative
+    # — a list of place names — is the enumeration this rewrite exists to escape.
+    # The miss fails SAFE: the guard declines to flag, so nothing is deleted and
+    # the sentence survives to the later validators. A false positive here would
+    # delete a well-formed sentence, which is the more expensive error.
+    if any(t[:1].isupper() for t in tokens[1:] if t[:1].isalpha()):
+        return False
+    if _DEGRADE_SUBJECT_PRONOUN.search(head):
+        return False
+    return True
+
+
+_DEGRADE_DETERMINER = re.compile(
+    r'^(?:the|a|an|this|that|these|those|its|his|her|their|our|your|my|'
+    r'each|every|both|several|many|few|some|any|no)$', re.IGNORECASE)
+
+
+# Irregular past tenses that do not end in -ed. Deliberately short: the -ed test
+# below carries the general case, and this exists only for shapes it cannot see.
+_IRREGULAR_PAST = frozenset({
+    'gave', 'made', 'wrote', 'began', 'built', 'met', 'sold', 'bought', 'sent',
+    'left', 'took', 'brought', 'became', 'won', 'lost', 'held', 'kept', 'led',
+    'ran', 'saw', 'sat', 'set', 'put', 'paid', 'told', 'taught', 'sought',
+    'chose', 'drew', 'came', 'went', 'grew', 'knew', 'threw', 'spent', 'lent',
+})
+
+_DEGRADE_SUBJECT_PRONOUN = re.compile(
+    r'\b(?:he|she|they|it|who|which|i|we|you)\b', re.IGNORECASE)
+
+
+def _tail_starts_with_past_verb(tail: str) -> bool:
+    """Does the clause after the comma open with a bare past-tense verb?
+
+    Shape-based (-ed) plus a closed irregular set, rather than a list of the
+    verbs we happen to have seen. `-ed` also matches adjectives ("tired"), which
+    is acceptable here: this test only fires once the head has been shown to
+    contain no subject at all, and a subjectless clause opening with an adjective
+    is equally broken.
+    """
+    words = (tail or '').strip().split()
+    if not words:
+        return False
+    first = re.sub(r'[^A-Za-z]', '', words[0]).lower()
+    if len(first) < 3:
+        return False
+    return first.endswith('ed') or first in _IRREGULAR_PAST
 
 
 def _degrade_sentence_is_wellformed(sentence: str) -> bool:

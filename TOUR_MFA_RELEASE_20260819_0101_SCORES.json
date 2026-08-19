@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 210.8616440296173,
+  "chars": 5303,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+      "index": 34,
+      "historic": 40,
+      "detail": 20,
+      "social": 45,
+      "text": "In 1956, Louis Broder, a notable figure in printmaking, began a partnership with Joan Miró and the renowned French lithographic studio, Atelier Mourlot. Broder published this work, highlighting his dedication to reviving the livre d'artiste tradition, where image and text meld seamlessly. This partnership allowed Miró to work closely with skilled printers, ensuring his artistic vision was realized in vivid detail. The vividness of the lithographs on Japan paper underscores Miró's mastery in translating his surreal imagination into tangible form. Later recognizing the value of this collaboration, gifted the piece to the Museum of Fine Arts, Boston, enriching its collection significantly. In line with the exhibition's thesis, this work captures the essence of how collaborative ventures revolutionized the book as an art form.",
+      "orientation": "The Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, explores the transformative power of imagination and belief in art through the lens of the livre d'artiste. Featuring extraordinary works by Spanish artists, this collection had no precedent, revolutionizing the book as an art form. These deeply collaborative ventures, rarely on view, delve into how images, words, and typography intersect in Gallery 184. Within this captivating space, you will encounter Le Lézard aux plumes d’or (The Lizard with Golden Feathers), Au Soleil du Plafond, and Moses and Monotheism, each a window into the boundless creativity and boundless imagination of these iconic artists. As you continue your tour, you will learn about the collaboration behind \"Le Lézard aux plumes d’or\" at this work and discover how Pierre Reverdy ensured the completion of \"Au Soleil du Plafond\" after Juan Gris's passing at this work. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). From this vantage, the vividness of the 40 color lithographs becomes apparent, each page a bridge into the surreal."
+    },
+    {
+      "stop": "Au Soleil du Plafond by Juan Gris",
+      "index": 62,
+      "historic": 40,
+      "detail": 13,
+      "social": 72,
+      "text": "In 1916, Léonce Rosenberg commissioned the Spanish artist Juan Gris to create illustrations for Pierre Reverdy's text \"Au Soleil du Plafond.\" Gris, a prominent figure in the Cubist movement, took on the project with his distinct artistic vision, despite the challenges of the time, including the turmoil of World War I. Unfortunately, Gris passed away in 1927, having completed only half of the intended work.Pierre Reverdy later saw the project brought to life in a Parisian edition, ensuring Gris’s illustrations were paired with his words, thus preserving their shared vision. Tériade Éditeur, known for its commitment to publishing artistically significant books, realized the publication with Mourlot Frères printing the lithographs. This collaboration between Reverdy and Gris exemplifies the exhibition's argument that the livre d'artiste is a dynamic form of artistic expression, where image and text become inseparable.",
+      "orientation": "The best vantage point for \"Au Soleil du Plafond\" is directly in front of the display case."
+    },
+    {
+      "stop": "Moses and Monotheism by Salvador Dalí",
+      "index": 69,
+      "historic": 21,
+      "detail": 49,
+      "social": 72,
+      "text": "In 1938, Salvador Dalí met Sigmund Freud in London and sketched his portrait. Years later, Dalí created illustrations for this very book, producing a set of drypoints and lithographs on sheepskin. This set of ten illustrations by Dalí, executed on sheepskin, is a tactile reminder of the collaborative spirit that defined the era's artistic ventures. The choice of sheepskin as a medium is more than an aesthetic preference; it echoes the ancient traditions of religious texts, bringing Freud's provocative ideas into a timeless context. The Hogarth Press, known for its literary contributions, published Freud's text, further cementing the collaborative nature of this work. This piece advances the exhibition's argument by demonstrating how Dalí and Freud, like many others, merged images, words, and typography into a unified artistic statement.\n\nThat's 3 stops — Le Lézard aux plumes d’or, donated to the Museum of Fine Arts, Boston and Au Soleil du Plafond, completed posthumously in a Parisian edition by Pierre Reverdy. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "As you stand here, you'll want to angle yourself slightly to the left, allowing the warm gallery lights to illuminate the sheepskin's texture. This perspective highlights the interplay between Dalí's surreal illustrations and the text by Freud, showing how each element complements the other in this intimate format."
+    }
+  ]
+}

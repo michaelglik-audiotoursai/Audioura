@@ -87,6 +87,17 @@ _NON_NAME_OPENERS = frozenset({
     'our', 'your', 'their', 'my', 'some', 'any', 'each', 'every', 'all',
     'no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
     'nine', 'ten', 'at', 'in', 'on', 'by', 'to', 'for', 'with', 'from',
+    # [LOCAL-492] Sentence-initial subordinators. The 2026-08-19 01:01 run logged
+    #     person 'Despite Gris' pre-grounded (story beat source) — keeping
+    # because "Despite Gris's early demise" starts a sentence, so `Despite` is
+    # capitalised and `[A-Z][a-z]+\s+[A-Z][a-z]+` matched the pair. The gate then
+    # reasoned about the grounding of a person named "Despite Gris". Harmless
+    # here only because it resolved to KEEP; the same match on a drop path would
+    # have deleted a sentence to remove a preposition.
+    'despite', 'although', 'though', 'while', 'whilst', 'after', 'before',
+    'during', 'through', 'without', 'within', 'against', 'between', 'among',
+    'because', 'since', 'unless', 'until', 'when', 'where', 'whether',
+    'following', 'featuring', 'including', 'regarding', 'concerning',
 })
 
 # Words that are NOT personal name parts — common nouns, adjectives, places
