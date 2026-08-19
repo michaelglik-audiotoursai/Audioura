@@ -2340,6 +2340,16 @@ _DIRECT_SNIPPETS_PER_STOP: dict = {}
 _PHASE_COST_HARD_LIMIT = float(os.environ.get("COST_HARD_LIMIT_USD", "1.30"))
 
 
+class _SkipPostRoundCheck(Exception):
+    """[D493] No replenishment round was issued, so there is nothing to re-measure.
+
+    Control flow, not an error. It exists so the post-round check reports nothing
+    rather than reporting "NO CHANGE", which would read as a round that ran and
+    failed instead of a round that was never issued. The log must not describe
+    spending that did not happen.
+    """
+
+
 class _CostCeilingBreached(Exception):
     """Raised when accumulated generation cost exceeds COST_HARD_LIMIT at a phase boundary.
 
@@ -9142,9 +9152,50 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             print(f"    [LOCAL-489] Stop {_s_idx+1} needs more material "
                                   f"({_reason.strip('+')}): {_rp['passage_count']} passages, "
                                   f"{_rp['total_chars']} chars, verdict={_rp['verdict']}")
+                            # [D493] MEASURED AT ZERO YIELD — detect, do not spend.
+                            #
+                            # The 12:10 run, with LOCAL-498's post-round check
+                            # finally able to answer the question:
+                            #
+                            #   stop 1: active -> active,  8342 -> 11565 chars, eventful=0
+                            #   stop 2: active -> active,  3420 ->  4599 chars, eventful=0
+                            #
+                            # Two rounds, +3223 and +1179 characters of genuinely
+                            # new material, ZERO eventful sentences. The trigger
+                            # picks the right stops (D492: same two every run,
+                            # zero variance); the ACTION does nothing, because
+                            # more queries of the same shape against the same
+                            # auction-catalogue sources return the same prose.
+                            #
+                            # So the two are separated. `eventless` keeps
+                            # diagnosing — that is D489a's whole value and it
+                            # costs nothing — and stops buying. thin/uncovered
+                            # stops still get their round; that path was never
+                            # the one measured at zero.
+                            #
+                            # Re-enable with STORY_REPLENISH_ON_EVENTLESS=1 once
+                            # D492(d) source ranking and (c) event-shaped queries
+                            # land, which is what would make the round worth
+                            # issuing.
+                            _rp_eventless_only = (_rp.get('eventless')
+                                                  and not _rp['thin']
+                                                  and not _rp['uncovered'])
+                            _rp_skip = (_rp_eventless_only and os.environ.get(
+                                'STORY_REPLENISH_ON_EVENTLESS', '').strip() != '1')
+                            if _rp_skip:
+                                print(f"      [D493] eventless only — diagnosed, not "
+                                      f"replenished. The round was measured at zero "
+                                      f"yield (D493); set STORY_REPLENISH_ON_EVENTLESS=1 "
+                                      f"to issue it anyway.")
+                                _s_poi['_replenished'] = {
+                                    'queries': 0, 'reason': 'eventless_diagnosed_only',
+                                    'chars_before': _rp['total_chars'],
+                                    'kind_before': _rp.get('kind'),
+                                    'kind_after': _rp.get('kind')}
                             _rp_issued = {q for q in (_s_query_log or []) if isinstance(q, str)}
-                            _rp_queries = build_followup_queries(_s_stop_data, _rp_issued)
-                            if not _rp_queries:
+                            _rp_queries = ([] if _rp_skip else
+                                           build_followup_queries(_s_stop_data, _rp_issued))
+                            if not _rp_queries and not _rp_skip:
                                 print(f"      [LOCAL-489] no targeted follow-up available "
                                       f"— the matrix has no second agent to ask about")
                             for _rq in _rp_queries:
@@ -9178,6 +9229,13 @@ Exempt: navigation directions ("Turn left", "Continue past").
                                                   if s.get('snippet')]
                             _rp_after_kind = 'unknown'
                             try:
+                                if _rp_skip:
+                                    # Nothing was issued, so there is nothing to
+                                    # re-measure. Saying "NO CHANGE" here would
+                                    # read as a failed round rather than an
+                                    # unissued one — the log must not describe
+                                    # spending that did not happen.
+                                    raise _SkipPostRoundCheck()
                                 from material_kind import classify_material
                                 _rp_after = classify_material(_rp_after_passages)
                                 _rp_after_kind = _rp_after['kind']
@@ -9191,15 +9249,21 @@ Exempt: navigation directions ("Turn left", "Continue past").
                                 if _rp_after.get('best_sentence'):
                                     print(f"         best now: "
                                           f"\"{_rp_after['best_sentence'][:110]}\"")
+                            except _SkipPostRoundCheck:
+                                pass
                             except Exception as _rpa_err:
                                 print(f"      [LOCAL-498] post-round check "
                                       f"unavailable (non-fatal): {_rpa_err}")
 
-                            _s_poi['_replenished'] = {
-                                'queries': len(_rp_queries), 'reason': _reason.strip('+'),
-                                'chars_before': _rp['total_chars'],
-                                'kind_before': _rp.get('kind'),
-                                'kind_after': _rp_after_kind}
+                            if _rp_skip:
+                                _s_poi.setdefault('_replenished', {})
+                            else:
+                                _s_poi['_replenished'] = {
+                                    'queries': len(_rp_queries),
+                                    'reason': _reason.strip('+'),
+                                    'chars_before': _rp['total_chars'],
+                                    'kind_before': _rp.get('kind'),
+                                    'kind_after': _rp_after_kind}
                     except ImportError as _rp_err:
                         print(f"    [LOCAL-489] replenishment unavailable ({_rp_err})")
                     except Exception as _rp_err:

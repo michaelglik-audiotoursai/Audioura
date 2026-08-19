@@ -20063,3 +20063,41 @@ claimed from it.
 (c) proceed. **(d) is new and outranks (c):** rank and filter retrieval sources so a lot
 description cannot be the best sentence a stop has. Ordering: (b) cheapest and already
 measurable, (d) next because (c) is worth little without it, (c) last.
+
+## D493 — The replenishment round buys material and no stories. Detect, do not spend.
+
+**2026-08-19 12:10, the first run able to answer its own question.** LOCAL-498 added a
+post-round re-classification; D492b had made the `eventless` trigger fire. Together they
+produced the measurement:
+
+```
+stop 1: kind active -> active,  8342 -> 11565 chars,  eventful=0   (NO CHANGE)
+stop 2: kind active -> active,  3420 ->  4599 chars,  eventful=0   (NO CHANGE)
+```
+
+**Two rounds, +3,223 and +1,179 characters of genuinely new retrieved material, and zero
+eventful sentences.** The trigger is correct — D492 showed it picks the same two stops
+every run with no variance — and **the action it takes does nothing**, because more queries
+of the same shape against the same auction-catalogue sources return the same catalogue
+prose. That is D492's source finding, demonstrated instead of argued.
+
+**Ruling: separate the diagnosis from the spend.** `eventless` keeps detecting and
+reporting, which is D489a's whole value and costs nothing. It stops issuing queries.
+`thin`/`uncovered` stops still get their round — that path was never the one measured at
+zero. Re-enable with `STORY_REPLENISH_ON_EVENTLESS=1`, which is what D492(d) source ranking
+and (c) event-shaped queries would earn.
+
+**Reversible, one env var, and it stops paying ~4 SERP queries per tour for a round now
+measured at zero yield.** Recorded rather than asked because it is reversible (RULE ZERO).
+
+**A caveat on something that looks like a fix and is not.** Stop 1's donor query improved
+from `"Boris Fridman. © Successió Miró / Artists Rights Society (ARS)"` to `"Boris
+Fridman"` between the 12:05 and 12:10 runs. That is **run-to-run variation in the
+checklist's `credit_line`** (`Gift of Boris Fridman` vs the version carrying the ARS
+copyright tail), not LOCAL-498's placeholder filter. **The copyright-tail bug is still
+present and will reappear.**
+
+**What the log must never do.** When no round is issued, the post-round check prints
+nothing rather than "NO CHANGE" — the latter reads as a round that ran and failed instead
+of one never issued, and a log that describes spending which did not happen is the class of
+instrument failure this session has spent all day removing (D423, D483, D491).
