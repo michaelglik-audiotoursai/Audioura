@@ -1782,23 +1782,71 @@ def apply_unglossed_reference_gate(
     return new_description, stats
 
 
+def _venue_fragments(venue_name: str) -> List[str]:
+    """[LOCAL-496] The venue's own name, and the pieces of it a detector can see.
+
+    "Fine Arts" was DEGRADED out of "The Museum of Fine Arts, Boston" on the
+    2026-08-19 11:51 run, and that one deletion cost the tour a whole sentence
+    and its donor — see the cascade documented on `apply_gate_to_stop_descriptions`.
+    `_PROPER_SPAN`-style detection sees the internal capitalised span, so the
+    exemption has to cover the fragments, not only the full string.
+    """
+    if not venue_name or not isinstance(venue_name, str):
+        return []
+    out = {venue_name.strip()}
+    # Drop a trailing city ("..., Boston, MA") and re-offer the head.
+    head = re.split(r'\s*,\s*', venue_name.strip())[0]
+    if head:
+        out.add(head)
+    # Internal capitalised spans: "Museum of Fine Arts" -> "Fine Arts", "Museum".
+    for m in re.finditer(r'\b([A-ZÀ-ÖØ-Þ][\wÀ-ÿ]+(?:\s+[A-ZÀ-ÖØ-Þ][\wÀ-ÿ]+)*)', venue_name):
+        span = m.group(1).strip()
+        if len(span) >= 4:
+            out.add(span)
+    return [o for o in out if o]
+
+
 def apply_gate_to_stop_descriptions(
     poi_list: List[Dict],
     stop_corpus_data: Dict = None,
     api_key: str = None,
     model: str = None,
+    venue_name: str = None,
 ) -> Dict:
     """Apply the unglossed-reference gate to all stops in a tour.
+
+    [LOCAL-496] `venue_name` exists because of a two-gate cascade measured on the
+    2026-08-19 11:51 run, which is how Michael's Fridman objection survived the
+    LOCAL-494 fix:
+
+      :454  this gate degraded "Fine Arts" — a FRAGMENT OF THE VENUE'S OWN NAME —
+            turning "The Museum of Fine Arts, Boston" into "The Museum Boston"
+      :476  LOCAL-479's organisation grounding gate then looked for an
+            organisation called "The Museum Boston", found it nowhere in the
+            corpus (it exists nowhere on earth), declared it ungrounded and
+            DROPPED THE WHOLE SENTENCE — which was
+            "...proudly hosts this piece, thanks to the generosity of Boris
+            Fridman, who donated..."
+      :537  the LOCAL-476 retry then FORBADE that relationship, so the
+            regeneration could not put him back either.
+
+    One wrong deletion, three gates deep, and the donor is gone from the stop
+    permanently. The second and third gates behaved correctly on the input they
+    were given; the defect is entirely at :454. Same class as LOCAL-475 (the
+    stop's own artist) and LOCAL-494 (the documented donor): **the gate deleting
+    something that is the subject or the setting, not an incidental reference.**
 
     Args:
         poi_list: list of POI dicts with 'description' and 'name' keys
         stop_corpus_data: dict mapping stop_name → {passages: [...]}
         api_key: OpenAI API key
         model: LLM model
+        venue_name: the tour's venue, exempted along with its fragments
 
     Returns:
         Summary dict with per-stop and total stats.
     """
+    _venue_exempt = _venue_fragments(venue_name)
     total_stats = {
         'total_detected': 0,
         'total_glossed': 0,
@@ -1850,6 +1898,8 @@ def apply_gate_to_stop_descriptions(
         # surrealist imagery, created ...".
         _exempt = [poi.get(f) for f in ('artist', 'collaborator', 'writer')
                    if poi.get(f)]
+        # [LOCAL-496] ...and the venue itself. The listener is standing in it.
+        _exempt += _venue_exempt
         new_desc, stats = apply_unglossed_reference_gate(
             desc, corpus_passages=passages, api_key=api_key, model=model,
             stop_names=all_stop_names, exempt=_exempt,

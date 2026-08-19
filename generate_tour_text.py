@@ -12757,6 +12757,19 @@ REWRITE RULES (all mandatory):
                 stop_corpus_data=_stop_corpus_data if '_stop_corpus_data' in dir() else None,
                 api_key=_urg_api_key,
                 model=_urg_model,
+                # [LOCAL-496] The venue is the setting, not an unexplained
+                # reference. Degrading "Fine Arts" out of "Museum of Fine Arts,
+                # Boston" produced "The Museum Boston", which LOCAL-479 then
+                # could not ground, so it dropped the sentence — and the donor
+                # in it. One wrong deletion, three gates deep.
+                #
+                # `_museum_venue_name` (resolved at :5157), NOT `location`.
+                # `location` here is the request string — "Picasso, Miro, Dali:
+                # Unbound exhibition at MFA, Boston, MA" — whose capitalised
+                # spans are Picasso, Miro and Dali. Exempting those would make
+                # the gate blind to the three artists it most needs to check.
+                venue_name=(_museum_venue_name
+                            if '_museum_venue_name' in dir() else None),
             )
 
             print(f"  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):")
