@@ -19954,3 +19954,70 @@ model call, both degrade paths made non-deleting, and a malformed gloss now drop
 **gloss**, not the person. It does **not** exempt these names — the gate was right that he
 was unexplained; it supplies the explanation. Control test proves the gate still degrades
 undocumented names.
+
+## D491 — Corrections to D489's matrix, and three defects found while fixing it
+
+**2026-08-19 midday. Two claims in the 11:00 matrix were wrong, both LEAD's.**
+
+**Row 7 was wrong: step 7a IS implemented.** LEAD reported "the retry fires on a word
+floor, not on 'no valid story'". It is **LOCAL-487** (`generate_tour_text.py:13361`,
+"Trigger 2: there is no valid story, at any length"), and it fired on the 11:51 live run:
+*"step 7a: 1 stop(s) have NO VALID STORY by Michael's bar"*. **Six of the seven steps are
+built**, not five. D489's kind-vs-volume gap is the whole of what remains.
+
+**LOCAL-494 was reported as confirmed by a run that did not exercise it.** Fridman appears
+in the 11:51 delivered tour, and the provenance path **never fired** — no LOCAL-494 line in
+the log; the gate flagged only `Fine Arts` and `Mourlot Frères`. He survived for an
+unrelated reason. Unit tests stand; the live claim did not, and was withdrawn before it
+reached Michael's screen as a confirmation. D423's shape.
+
+### The three defects, all found by fixing the previous one
+
+**LOCAL-495 — the generator and the detector disagreed, and LEAD caused it one commit
+earlier.** LOCAL-493 told `story_pass` it may write about any acting subject; the detector
+still required a person, and a refusal there fires the LOCAL-487 retry. Four enforcement
+points, of which the first was **invisibility, not rejection**: `_PROPER_SPAN` requires two
+capitalised tokens, so *Pompeii* and *Vesuvius* were never handles. Also: no non-human
+agency verbs, no repair verbs, and `_bridge_pronouns` extended a run for people and gave
+places nothing — so the detector would have kept preferring people after `can_carry`
+stopped requiring one, silently undoing LOCAL-493.
+
+**And a pre-existing defect the red-check exposed, larger than the Pompeii case:** a story
+about *"Broder"* and *"Miró"* — surnames only — produced **zero handles**, run=0,
+handle=None. Not refused: unmeasurable. Naming someone in full once and then by surname is
+what the story prompt explicitly asks for. Found only because a test class LEAD had named
+`TestPersonPathUnchanged` went **red** against HEAD when it should have been green — the
+red-check catching a wrong assumption in the test rather than in the code. **Two-token
+names verified bit-for-bit unchanged.**
+
+**LOCAL-496 — the venue is the setting, not a reference.** How Fridman died the second
+time, on the 11:51 run, in three gates of which only the first is wrong:
+`:454` the unglossed gate degraded **"Fine Arts"**, a fragment of the venue's own name,
+producing *"The Museum Boston"*; `:476` LOCAL-479 searched for an organisation of that
+name, found none — it exists nowhere on earth — and dropped the sentence, *"...thanks to
+the generosity of Boris Fridman, who donated..."*; `:537` the LOCAL-476 retry then forbade
+the relationship, so regeneration could not restore him. **Third instance of one class:**
+LOCAL-475 (the stop's own artist), LOCAL-494 (the documented donor), LOCAL-496 (the venue).
+The gate deleting the SUBJECT or the SETTING rather than an incidental reference.
+
+*The near-miss, recorded because it would have shipped green and fixed nothing:*
+`venue_name=location` exempts *Picasso, Miró, Dali* — the request string's capitalised
+spans — and nothing named "Fine Arts". `_museum_venue_name` (`:5157`) is the correct source.
+
+**LOCAL-497 — the verb list never contained the verbs.** `story_opportunity_scan`'s own
+comment states its list "was tuned on museum material — refused, **printed**, donated".
+**`printed` was never in the regex.** Neither was `published`, nor any verb for how an
+object came to exist. On an exhibition whose subject is publishers and printers, *"Louis
+Broder published the book"* and *"Mourlot Frères printed the lithographs"* both scored
+**agency=0**. Nor was bare `destroy` — only `destroyed` — so *"Miró decided to destroy the
+lithographs"*, quoted in that same file as the best consequence in the entire MFA tour,
+carried stakes and no agency. **A comment asserting behaviour the code lacks is D483's
+class, and it was found by a NEW module's tests, not by the scanner's own suite** — the
+argument for building the instrument before the loop that consumes it.
+
+**D489a — agentless passives do not count as material.** *"The book was published in 1971"*
+carries an agency verb and no actor; Prince's middle event requires an agent. This is
+defect #1 of the 2026-08-19 review — *"the passive voice is eating the actors"* — now
+mechanically detectable, and *"was posthumously realized"* classifies correctly as a
+non-action. `was published BY Broder` keeps its agent and counts. Reported separately so a
+run shows how much retrieved material is action with the actor removed.
