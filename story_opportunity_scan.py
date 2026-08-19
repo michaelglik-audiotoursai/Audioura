@@ -150,7 +150,27 @@ _AGENCY_VERB = re.compile(
     # ...and the repair, which is the other half of Michael's case:
     # "The same is true about reconstructions and renovation."
     r'restored|renovated|reconstructed|rebuilt|excavated|unearthed|'
-    r'rediscovered|reopened|salvaged|recovered|reassembled)\b',
+    r'rediscovered|reopened|salvaged|recovered|reassembled|'
+    # [LOCAL-497] THE MAKING VERBS, absent since this regex was written.
+    #
+    # The comment above says the list "was tuned on museum material — refused,
+    # PRINTED, donated". `printed` was never in it. Neither was `published`,
+    # which is the commonest action in an exhibition of illustrated books, nor
+    # any other verb describing how an object came to exist. So on the MFA
+    # exhibition — whose subject IS publishers and printers — "Louis Broder
+    # published the book" and "Mourlot Freres printed the lithographs" both
+    # scored agency=0, and the detector reported no action in the one sentence
+    # that contains the only action there is.
+    #
+    # Found by D489's material-kind tests, not by the scanner's own suite:
+    # a comment asserting behaviour the code does not have (D483's class).
+    r'published|printed|issued|engraved|etched|lithographed|bound|'
+    r'illustrated|translated|edited|cast|carved|wove|forged|assembled|'
+    # Bare infinitives after a modal or "decided to". `destroyed` was present
+    # and `destroy` was not, so "For technical reasons, Miro decided to DESTROY
+    # the lithographs" — quoted in the _STAKES comment below as the best
+    # consequence in the whole MFA tour — carried stakes and no agency.
+    r'destroy|abandon|refuse|withdraw|reject|dismantle)\b',
     re.IGNORECASE)
 
 # Consequence / stakes markers — the difference between a fact and a story.

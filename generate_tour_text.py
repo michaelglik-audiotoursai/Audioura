@@ -9116,6 +9116,25 @@ Exempt: navigation directions ("Turn left", "Continue past").
                         _rp_cov = assess_stop_coverage(
                             _s_name, _museum_venue_name or '', _rp_passages)
                         _rp = needs_replenishment(_rp_passages, _rp_cov)
+
+                        # [D489 step a] REPORT ONLY — never gates, never spends.
+                        # Every instrument above counts material; none asks what
+                        # KIND it is. On the 01:15 tour all three stops cleared
+                        # the volume test and the story detector still refused
+                        # all three. LEAD's claim is that the two verdicts
+                        # disagree constantly; that is the shape that was wrong
+                        # in D423, so this logs both and decides nothing. The
+                        # disagreement rate over real runs is what earns the
+                        # re-query loop, or kills the idea.
+                        try:
+                            from material_kind import summarise_stop
+                            print("    " + summarise_stop(
+                                _s_name, _rp_passages,
+                                volume_verdict=str(_rp.get('verdict', ''))))
+                        except Exception as _mk_err:
+                            print(f"    [D489] material-kind report unavailable "
+                                  f"(non-fatal): {_mk_err}")
+
                         if _rp['needs_more']:
                             _reason = ('thin' if _rp['thin'] else '') + \
                                       ('+uncovered' if _rp['uncovered'] else '')
