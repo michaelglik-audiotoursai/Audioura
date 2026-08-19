@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-18 11:00 EDT
+# RESTART briefing — generated 2026-08-18 21:41 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     70e16e9 D464/D465: retire beta-staging; name the Windows session Beta_Bugs; set the validator mission
-unpushed 71 commits
+HEAD     42d8c49 Record Michael's 7-step story system verbatim in comm_03 with verified per-step status
+unpushed 85 commits
 dirty    1 files
 ```
 
@@ -13,7 +13,7 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      548
+cost_ledger rows:      564
 ```
 ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 
@@ -64,10 +64,10 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  11:- [ ] **2026-08-18 10:2x — THE MISSION FOR THE NEXT SESSION, in Michael's words:**
-  27:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
-  34:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
-  42:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  12:- [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
+  37:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
+  44:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
+  52:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules

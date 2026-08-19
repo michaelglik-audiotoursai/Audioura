@@ -33,6 +33,10 @@ LOCAL-385 additions:
 import re
 from typing import Dict, List, Optional, Set, Tuple
 
+# [LOCAL-483] One accent-folding primitive for the whole gate chain. See
+# `text_fold.py` for why this is a module and not three private helpers.
+from text_fold import contains_entity, entity_pattern, fold
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # [LOCAL-385] GATED PROSE FIELDS — defined ONCE, consumed by BOTH gates.
@@ -67,9 +71,14 @@ _KNOWN_NON_PERSON_STRINGS = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Multi-word capitalised name (the pattern that LOCAL-376 used)
+# [LOCAL-483] `[A-Z]` cannot match `É`. This is the EXTRACTOR for gate 5.158, so
+# the consequence was not a missed drop but a missed inspection: an artist named
+# "Édouard Manet" was never recognised as a person at all, and therefore never
+# checked for grounding. A gate that cannot see an entity reports it as clean.
+# Measured: 2 names found in the ASCII sentence, 0 in the accented one.
 _PERSON_MULTI_WORD = re.compile(
-    r'\b([A-Z][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|la|le|les|des|d\'|l\')?'
-    r'\s*[A-Z][a-zà-ÿ]+)+)\b'
+    r'\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|la|le|les|des|d\'|l\')?'
+    r'\s*[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+)+)\b'
 )
 
 # Words that cannot START a personal name — articles, demonstratives, prepositions
@@ -193,34 +202,36 @@ def check_person_grounded(person_name: str, page_text: str,
     if not person_name or not page_text:
         return False
 
-    # Normalise for search: case-insensitive
-    page_lower = page_text.lower()
-    name_lower = person_name.lower()
+    # [LOCAL-483] Accent-fold every comparison. Measured before this change:
+    # check_person_grounded('Salvador Dali', "...Salvador Dalí...") -> False,
+    # and the same for Miró and Cézanne. The model writes the unaccented form
+    # far more often than the corpus does, so the exhibition's own headline
+    # artist was being judged UNGROUNDED and his sentences dropped. D243, sixth
+    # occurrence; the org gate (5.158c) already folded and its two siblings did
+    # not. All three now share `text_fold`.
+    surname = _surname_from_full_name(person_name)
 
     # Check full name in page text
-    if name_lower in page_lower:
+    if contains_entity(page_text, person_name):
         return True
 
-    # Check surname in page text (word-boundary match)
-    surname = _surname_from_full_name(person_name)
-    if surname and len(surname) >= 3:
-        # Word boundary check on the original-case page text to avoid
-        # false positives on common short words
-        pattern = r'\b' + re.escape(surname) + r'\b'
-        if re.search(pattern, page_text, re.IGNORECASE):
-            return True
+    # Check surname in page text (whole-word, so 'Ars' cannot match 'Arsenal')
+    if surname and len(surname) >= 3 and contains_entity(page_text, surname):
+        return True
 
     # Check against declared artist names from checklist
     if stop_artist_names:
+        name_folded = fold(person_name)
+        surname_folded = fold(surname)
         for artist in stop_artist_names:
             if not artist:
                 continue
             # Full name match
-            if name_lower == artist.lower():
+            if name_folded and name_folded == fold(artist):
                 return True
             # Surname match
-            artist_surname = _surname_from_full_name(artist)
-            if surname and artist_surname and surname.lower() == artist_surname.lower():
+            artist_surname = fold(_surname_from_full_name(artist))
+            if surname_folded and artist_surname and surname_folded == artist_surname:
                 return True
 
     return False
@@ -244,18 +255,23 @@ def _mentions_person(sentence: str, full_name: str, surname: str) -> bool:
       - Full name: 'Xavier Lalanne'
       - Bare surname: 'Lalanne'
       - Possessive: "Lalanne's"
-    All as whole-word matches (case-sensitive for surname).
+    All as whole-word, accent-folded matches.
+
+    [LOCAL-483] This has to fold for the same reason `check_person_grounded`
+    does, and for a sharper one: the two functions are a pair. The grounding
+    check decides a person is ungrounded from the corpus spelling, and this one
+    then finds their mentions in the prose spelling. When only one of them
+    folded, the gate could condemn 'Salvador Dalí' and then fail to find
+    'Salvador Dali' in the very sentence that named him — a drop decision with
+    no drop. Two instruments disagreeing while each looked healthy alone.
     """
-    # Full name (case-insensitive — may appear mid-sentence)
-    if full_name.lower() in sentence.lower():
+    # Full name
+    if contains_entity(sentence, full_name):
         return True
 
-    # Bare surname with word boundary (case-sensitive — surnames are capitalised)
-    if surname and len(surname) >= 3:
-        # Match surname optionally followed by 's (possessive)
-        pattern = r'\b' + re.escape(surname) + r"(?:'s)?\b"
-        if re.search(pattern, sentence):
-            return True
+    # Bare surname, optional possessive
+    if surname and len(surname) >= 3 and contains_entity(sentence, surname):
+        return True
 
     return False
 
@@ -1420,9 +1436,14 @@ _WELL_KNOWN_ORGS = {
 
 
 def _fold_org(s: str) -> str:
-    import unicodedata
-    return ''.join(c for c in unicodedata.normalize('NFD', (s or '').lower())
-                   if unicodedata.category(c) != 'Mn').strip()
+    """[LOCAL-483] Now an alias for the shared primitive.
+
+    The private copy was correct about accents and silently wrong about
+    whitespace: it never collapsed runs, so an org scraped as 'Editions  Verve'
+    folded to a key no claim could ever equal. `text_fold.fold` does both. Kept
+    as a name because the org gate's tests and log lines refer to it.
+    """
+    return fold(s)
 
 
 def extract_organisation_names(text: str) -> List[str]:
@@ -1452,8 +1473,21 @@ def check_org_grounded(org: str, page_text: str, record_values: List[str],
     bare = re.sub(r'^the\s+', '', f)
     if f in _WELL_KNOWN_ORGS or bare in _WELL_KNOWN_ORGS:
         return True
+    # [LOCAL-483] This used to be `if k in f or f in k` — either containment
+    # direction exempted the org. Measured against a corpus naming none of them:
+    #     'Tate Modern Press'  -> grounded      'The Met Foundation' -> grounded
+    #     'Louvre Editions'    -> grounded      'Tate Publishing'    -> grounded
+    # Appending a marker word to a famous museum's name does not make it that
+    # museum; it names a DIFFERENT entity, and inventing a publishing arm for a
+    # real museum is precisely the fabrication shape this gate exists to catch.
+    # The reverse direction (`f in k`) was worse still: any fragment of a known
+    # name grounded itself.
+    #
+    # What the loop was legitimately buying is place-qualified venue names —
+    # "Museum of Fine Arts, Boston" is the Museum of Fine Arts. So the exemption
+    # now fires only on a known name followed by a comma qualifier.
     for k in _WELL_KNOWN_ORGS:
-        if k in f or f in k:
+        if f.startswith(k + ',') or bare.startswith(k + ','):
             return True
     for e in (exempt or []):
         ef = _fold_org(e)

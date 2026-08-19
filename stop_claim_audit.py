@@ -27,6 +27,9 @@ Design:
 import re
 from typing import Dict, List, Optional, Set, Tuple
 
+# [LOCAL-483] The gate chain's one accent-folding primitive. See `text_fold.py`.
+from text_fold import contains_entity, fold
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROLE CLAIM EXTRACTION
@@ -140,25 +143,37 @@ def _strip_leading_article(name: str) -> str:
 
 
 def _normalize_for_search(text: str) -> str:
-    """Lowercase, collapse whitespace for substring search."""
-    return re.sub(r'\s+', ' ', text.lower()).strip()
+    """Lowercase, accent-fold, collapse whitespace for search.
+
+    [LOCAL-483] The accent fold is new. Without it,
+    `_agent_in_text('Editions Verve', "...Éditions Verve...")` returned False
+    and the role-claim gate dropped the sentence naming the real publisher of
+    *Au Soleil du Plafond* — the exact false rejection D482 measured at 5 index
+    points on the sibling org gate, arriving here through the other door.
+    """
+    return fold(text)
 
 
 def _agent_in_text(agent: str, text: str) -> bool:
     """Check if agent name (or its article-stripped form) appears in text.
 
-    Checks both the full form and the article-stripped form.
-    Case-insensitive substring match.
+    Checks both the full form and the article-stripped form, accent-folded and
+    on word boundaries.
+
+    [LOCAL-483] The match used to be a bare substring, which grounded a
+    fabricated agent on any word that happened to contain it: measured,
+    `_agent_in_text('Ars', 'Arsenal Gallery')` returned True. A gate that
+    accepts too easily fails silently, which is why this went five months
+    unnoticed while the false-rejection half got fixed four times in one day.
     """
     if not agent or not text:
         return False
-    text_lower = _normalize_for_search(text)
     # Check full name
-    if _normalize_for_search(agent) in text_lower:
+    if contains_entity(text, agent):
         return True
     # Check without leading article
     bare = _strip_leading_article(agent)
-    if bare != agent and _normalize_for_search(bare) in text_lower:
+    if bare != agent and contains_entity(text, bare):
         return True
     return False
 
@@ -313,11 +328,12 @@ def remove_sentences_with_agent(text: str, agent: str) -> Tuple[str, List[str]]:
     dropped = []
 
     for sent in sentences:
-        sent_lower = _normalize_for_search(sent)
-        agent_lower = _normalize_for_search(agent)
-        bare_lower = _normalize_for_search(agent_bare)
-
-        if agent_lower in sent_lower or (agent_bare != agent and bare_lower in sent_lower):
+        # [LOCAL-483] Same folded, whole-word predicate the grounding check uses.
+        # These two are a pair: `_agent_in_text` decides the agent is ungrounded
+        # and this one finds its mentions to remove. When they disagreed on
+        # spelling, the gate logged a drop and removed nothing.
+        if _agent_in_text(agent, sent) or (
+                agent_bare != agent and _agent_in_text(agent_bare, sent)):
             dropped.append(sent)
         else:
             kept.append(sent)

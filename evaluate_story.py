@@ -162,9 +162,14 @@ _PHYSICAL_DESC = re.compile(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Proper noun spans (people)
+# [LOCAL-483] Accented capitals added — `[A-Z]` scored "Édouard Manet met Émile
+# Zola" as ZERO named people, which zeroes the Social axis for exactly the French
+# material this exhibition is made of. This regex is the fallback path (the
+# primary is `story_validator.named_people`), so the defect only surfaced when
+# that import failed — a silent degradation, not a crash. D243.
 _PERSON_NAME = re.compile(
-    r'\b([A-Z][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|des|et)\s+)?'
-    r'\s+[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)?)\b'
+    r'\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|des|et)\s+)?'
+    r'\s+[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+)?)\b'
 )
 
 # Social / relational verbs — how people behave toward each other

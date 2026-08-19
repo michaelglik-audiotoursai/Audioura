@@ -47,10 +47,15 @@ sys.path.insert(0, HERE)
 # HANDLES — the things a text points at
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# [LOCAL-483] The capital classes were bare `[A-Z]`, which cannot match `É`, so
+# "Édouard Manet met Émile Zola" yielded ZERO proper nouns while its unaccented
+# twin yielded two. Same defect as LOCAL-478's `_ROLE_BY_PATTERN` and D466's
+# temporal gate — D243, now counted nine times. `story_validator._NAME_SPAN`
+# already used the accented class; its siblings did not.
 _PROPER_SPAN = re.compile(
     r'\b((?:The\s+|Le\s+|La\s+|Les\s+)?'
-    r'[A-Z][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|des|et)\s+|\s+)'
-    r'[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)*)\b'
+    r'[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|des|et)\s+|\s+)'
+    r'[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+)*)\b'
 )
 _QUOTED = re.compile(r'["“]([^"”]{3,80})["”]')
 # Titles arrive with the sentence punctuation swept inside the closing quote
