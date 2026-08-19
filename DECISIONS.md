@@ -19597,3 +19597,88 @@ The code changes stand on their own evidence: 60/60 unit assertions, 21 red on r
 110 existing assertions green. What is unavailable is the end-to-end number, and the
 honest statement is that **45.7 is stale and there is no replacement for it yet** — not
 that quality is unchanged.
+
+## D484 — The 3-run rule is itself an instrument, and it is under-powered. D482's headline number does not survive it.
+
+**2026-08-18 22:2x.** D480 made "mean and range over >= 3 runs" binding, which was a real
+improvement over quoting single runs. Tonight produced the data to check whether 3 is
+enough. **It is not.**
+
+### The measurement
+
+**22 full-tour runs on this exhibition today**, same location, same 4-stop request:
+
+```
+mean 42.8   sd 4.9   range 35.7 - 53.7
+```
+
+Three arms of three runs each, on code differing only by small gate fixes:
+
+| arm | runs | mean | range |
+|---|---|---|---|
+| D482 baseline, 16:38–16:43 | 48.5 / 46.0 / 43.0 | **45.8** | 43.0–48.5 |
+| LOCAL-483 r1, 22:07–22:12 | 46.3 / 43.3 / 53.7 | **47.8** | 43.3–53.7 |
+| LOCAL-483 r2, 22:16–22:20 | 44.3 / 37.0 / 41.0 | **40.8** | 37.0–44.3 |
+
+**The three arms span 7.0 points.** With a single-run sd of 4.9, the standard error of a
+3-run mean is **2.8**, so the 95% band on any one of these numbers is about **±5.6**.
+
+Every one of those arms is the same distribution. None of the differences is real.
+
+### What this retracts
+
+**D482's headline — "the org gate cost 5.4 index points" (43.7 gate-off vs 38.3
+gate-on) — is not supported by its own evidence.** The standard error of a difference
+between two 3-run means is ~4.0 points, so 5.4 carries a 95% interval of roughly ±7.8. It
+is indistinguishable from zero.
+
+The *qualitative* half of D482 stands and is worth more than the number: the drop log
+showed the gate removing **"Éditions Verve", the real publisher**, and widening the
+evidence base stopped it doing that. That is a directly observed false rejection, not an
+inference from a mean. **The architecture conclusion — that the role-claim gate's narrow
+corpus is load-bearing and must not be widened — also stands**, because it rests on a
+mechanism, not on a score.
+
+What does not stand is "5 points", and it should not be repeated.
+
+### Runs needed, at sd = 4.9, 80% power, alpha 0.05
+
+| effect to detect | runs per arm | cost, both arms |
+|---|---|---|
+| 10 points | 4 | ~$1.20 |
+| 7 points | 8 | ~$2.46 |
+| **5 points** | **15** | **~$4.82** |
+| 3 points | 42 | ~$13.39 |
+| 2 points | 94 | ~$30.12 |
+
+**3 runs can only resolve an effect of about 10 points.** Anything smaller needs a real
+sample, and at $0.16/run that is affordable — $5 buys a properly powered 5-point test.
+The rule was too weak, not too expensive.
+
+### The rule that replaces D480's
+
+1. **3 runs remain the floor for "did I break it?"** — they reliably catch a 10-point
+   regression, which is what a broken gate looks like.
+2. **No claim of an effect smaller than 10 points from 3 runs.** Report the mean, the
+   range, **and n**, and say "indistinguishable" when it is.
+3. **A real A/B — one where the answer changes a design decision — is 15 runs per arm.**
+   Budget $5 and run it once, rather than 3 runs six times.
+4. **Batch code changes between measurements.** Every fix invalidates the previous number.
+   Tonight measured three times because two fixes landed between runs; that is $1.50 spent
+   to learn nothing, and the discipline is to batch and measure once.
+
+### The honest standing on tonight's work
+
+**No measurable change in tour quality, in either direction.** The LOCAL-483 gate fixes
+are justified by mechanism and by unit evidence — 70/70 assertions, 21 red on revert, and
+one observed live false rejection removed — **not** by a score movement, and none should
+be claimed. `45.7` is retired; the current number is **42.8 ± 2.1 over 22 runs**, which
+is the first figure today with enough behind it to quote.
+
+### Still open, deliberately not fixed tonight
+
+`Ungrounded: ['Boston Athenæum']` — the person gate is still claiming an organisation, via
+a name whose institution word (`Athenæum`) is not in `_ORG_MARKER_RE`. Pre-existing, not
+introduced by LOCAL-483. **Adding the word is exactly the enumeration D476 warns about**;
+the real fix is one shared entity-type decision that both gates consult instead of two
+independent heuristics. Batched with the next change set per rule 4 above.

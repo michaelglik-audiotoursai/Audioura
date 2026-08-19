@@ -761,3 +761,53 @@ change too, with three gates false-rejecting.
 
 **Not claimed:** the tour score. These are gate-behaviour changes, so **45.7 is stale and
 I am not quoting it.** The three runs that would replace it are what the credits block.
+
+## 2026-08-18 22:2x — the credits, and what the runs actually showed
+
+❯ *"I put $30 to OpenAI"* · *"We also are running CERP and Genivi… should I add money?"*
+
+**No — neither needs money.** Probed both: **Serper** (the SERP search provider) returns
+200 with credits; **Gemini** returns 200 on all three model names the code uses. The 429
+"prepayment credits" note from 08-13 is stale, and my first Gemini probe failed on a
+*retired model name*, not billing. Gemini also has **zero production importers** —
+`generate_tour_text.py` does not import `story_leads.py`, only the lab does. It is step 4
+of your 7-step list, built but unwired; money will not wire it. **OpenAI is where the
+spend is**: ~$0.16/run against ~$0.02 of Serper. Top-ups now logged in
+`OPENAI_CREDIT_LOG.md` — you asked how much you added last time and nobody had written it
+down.
+
+**The runs found a regression I had introduced.** Teaching the person extractor to see
+accented capitals made **`Éditions Verve` visible to it as a PERSON**; gate 5.158 then
+looked for that "person" on the narrow exhibition page, failed, and dropped the sentence.
+That is your Éditions Verve false rejection **through a third gate — one my own fix
+opened** — while the org gate grounded the same name correctly one phase later. Fixed:
+the person extractor now rejects anything carrying an organisation marker, sharing the org
+gate's vocabulary. Only a live run could have caught it.
+
+**And then the measurement contradicted itself, which is the real finding.**
+
+| arm | mean | range |
+|---|---|---|
+| D482 baseline | 45.8 | 43.0–48.5 |
+| after r1 fixes | 47.8 | 43.3–53.7 |
+| after r2 fix | 40.8 | 37.0–44.3 |
+
+Three arms, essentially the same code, **7 points apart**. Across all 22 runs today the
+single-run sd is **4.9**, so a 3-run mean carries **±5.6** at 95%. **All three arms are
+one distribution.**
+
+**So D482's "the org gate cost 5 points" does not survive.** That difference was also
+3-vs-3 and also inside the noise. What stands from D482 is the part that never depended on
+the number: the drop log **showing** Éditions Verve being removed, and the argument that
+the role-claim gate's narrow corpus is load-bearing. Mechanisms survive; the 5 points do
+not.
+
+**3 runs can only resolve a ~10-point effect.** To resolve 5 points takes **15 runs per
+arm — about $5**. The rule was too weak, not too expensive. New rule in D484: 3 runs to
+check for breakage, 15 per arm for a real A/B, and **batch changes between measurements**
+— tonight measured three times because two fixes landed in between, which is $1.50 spent
+to learn nothing.
+
+**Honest standing: no measurable change in tour quality tonight, in either direction.**
+The gate fixes are justified by mechanism and unit evidence, not by a score. **45.7 is
+retired**; the best current figure is **42.8 ± 2.1 over 22 runs**.
