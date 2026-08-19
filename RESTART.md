@@ -3,8 +3,8 @@
 ## Git
 ```
 branch   storied
-HEAD     f6bff2d D486: record the story-pass A/B before it is lost with the session
-unpushed 106 commits
+HEAD     304d94a Retire three reminders that would misdirect a fresh session
+unpushed 107 commits
 dirty    1 files
 ```
 
@@ -67,10 +67,7 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
   12:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
   16:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
   23:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  50:- [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
-  75:- [ ] 2026-08-12 20:5x — **DO NOT DISPATCH THE STORY PIPELINE. Michael is driving it.**
-  82:- [ ] 2026-08-12 20:5x — **Start the joint session here:** open
-  90:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  107:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules
