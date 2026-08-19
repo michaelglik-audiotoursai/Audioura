@@ -21,11 +21,9 @@ COPY requirements-browser.txt .
 RUN pip install --no-cache-dir -r requirements-browser.txt
 
 # Copy application files
-COPY newsletter_processor_service.py .
-COPY spotify_processor.py .
-COPY apple_podcasts_processor.py .
-COPY browser_automation.py .
-COPY cleanup_newsletter_simple.py .
+# Copy all modules rather than an explicit list — the list had drifted and was
+# missing 10 imported siblings. See note in Dockerfile.orchestrator.
+COPY *.py .
 
 # Expose port
 EXPOSE 5017

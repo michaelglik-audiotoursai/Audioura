@@ -2,6 +2,10 @@ FROM python:3.9-slim
 WORKDIR /app
 COPY requirements_orchestrator.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY tour_orchestrator_service.py /app/
+# Copy every service module. Copying only the entry-point file silently omits
+# the siblings it imports (entitlements.py), and the service then fails closed
+# at runtime. Dockerfile.cloudrun, which production builds from, copies *.py
+# for exactly this reason.
+COPY *.py /app/
 EXPOSE 5002
 CMD ["python", "tour_orchestrator_service.py"]

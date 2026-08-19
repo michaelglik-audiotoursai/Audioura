@@ -4,7 +4,10 @@ WORKDIR /app
 
 RUN pip install flask psycopg2-binary requests beautifulsoup4
 
-COPY newsletter_processor_service.py .
+# Copy all modules — this entry point imports 13 sibling modules
+# (apple_podcasts_processor, entitlements, content_expander, ...), none of
+# which were copied. See note in Dockerfile.orchestrator.
+COPY *.py .
 
 EXPOSE 5017
 
