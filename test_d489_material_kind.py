@@ -172,3 +172,60 @@ class TestSharesOneVocabulary(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+class TestPilotFoundBugs(unittest.TestCase):
+    """Two defects the first live pilot exposed, both in this instrument.
+
+    Both would have made it report ZERO disagreements on every run — i.e.
+    "LEAD's claim is wrong" — for reasons having nothing to do with the claim.
+    A report-only pilot earning its keep before anything was gated on it.
+    """
+
+    def test_attributive_participles_are_not_actions(self):
+        """The pilot's first stop reported its best sentence as:
+
+            "Illustrated book with forty lithographs (including wrapper front
+             and cover)."
+
+        The purest catalogue line in the tour, scored as an action, by the
+        instrument built to tell catalogue prose from stories.
+        """
+        for s in ('Illustrated book with forty lithographs.',
+                  'Printed matter from the Broder archive.',
+                  'A bound volume in publisher vellum.',
+                  'Engraved plates, forty in number.'):
+            self.assertFalse(has_agentive_action(s), s)
+
+    def test_making_verbs_still_count_with_an_agent(self):
+        """The narrowing must not undo LOCAL-497."""
+        for s in ('Louis Broder published the book in 1971.',
+                  'The lithographs were printed by Mourlot Freres.',
+                  'He published it himself after the war.'):
+            self.assertTrue(has_agentive_action(s), s)
+
+    def test_non_making_verbs_are_unaffected(self):
+        """Only the making verbs need agent evidence."""
+        self.assertTrue(has_agentive_action('Vesuvius erupted and buried the town.'))
+        self.assertTrue(has_agentive_action('Miro refused twice.'))
+
+    def test_disagree_fires_on_the_coverage_vocabulary(self):
+        """`needs_replenishment` returns COVERED/EMPTY/VENUE_ONLY, not
+        rich/medium/thin. The first version compared against the wrong
+        vocabulary, so the flag could never fire."""
+        line = summarise_stop('s', INERT, volume_verdict='COVERED')
+        self.assertIn('DISAGREE', line)
+
+    def test_disagree_accepts_both_vocabularies(self):
+        for verdict in ('COVERED', 'covered', 'rich', 'medium'):
+            self.assertIn('DISAGREE', summarise_stop('s', INERT, volume_verdict=verdict),
+                          f'{verdict!r} not recognised as a satisfied volume verdict')
+
+    def test_unknown_verdict_does_not_flag(self):
+        """Fail silent, not false-positive, on a vocabulary we do not know."""
+        for verdict in ('UNKNOWN', 'EMPTY', 'VENUE_ONLY', '', None):
+            self.assertNotIn('DISAGREE', summarise_stop('s', INERT, volume_verdict=verdict))
+
+    def test_action_without_stakes_also_disagrees(self):
+        """Material that acts but risks nothing is the 01:15 failure exactly."""
+        self.assertIn('DISAGREE', summarise_stop('s', ACTIVE, volume_verdict='COVERED'))

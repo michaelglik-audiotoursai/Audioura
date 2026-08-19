@@ -57,15 +57,56 @@ _AGENTLESS_PASSIVE = re.compile(
     r'(?P<verb>\w+ed)\b(?!\s+by\b)', re.IGNORECASE)
 
 
+# [D489a r2] THE ATTRIBUTIVE-PARTICIPLE TRAP, found by the first pilot run.
+#
+# LOCAL-497 added the making verbs (published, printed, illustrated, bound...)
+# because the scanner could not see "Louis Broder published the book". Museum
+# catalogue prose uses the same words as ADJECTIVES, and the pilot's very first
+# stop reported its best sentence as:
+#
+#     "Illustrated book with forty lithographs (including wrapper front and cover)."
+#
+# That is the purest catalogue line in the tour and it scored as an action. So
+# the instrument built to tell catalogue prose from stories was counting
+# catalogue prose as a story — silently, and in the direction that hides the
+# disagreement it exists to find.
+#
+# These verbs therefore require EXPLICIT AGENT EVIDENCE, which is also exactly
+# what Prince's middle event demands: a capitalised name immediately before
+# ("Broder published"), or "by" immediately after ("printed by Mourlot").
+_MAKING_VERBS = frozenset({
+    'published', 'printed', 'issued', 'engraved', 'etched', 'lithographed',
+    'bound', 'illustrated', 'translated', 'edited', 'cast', 'carved', 'wove',
+    'forged', 'assembled', 'designed', 'built', 'commissioned',
+})
+
+_AGENT_BEFORE = re.compile(
+    r'\b([A-ZÀ-ÖØ-Þ][\wÀ-ÿ.\'’-]+(?:\s+[A-ZÀ-ÖØ-Þ][\wÀ-ÿ.\'’-]+)*|he|she|they|who)\s+$')
+
+
+def _making_verb_has_agent(sentence: str, match) -> bool:
+    """Is this making-verb occurrence attached to an actor?"""
+    before = sentence[:match.start()]
+    after = sentence[match.end():]
+    if re.match(r'\s+by\b', after):
+        return True
+    return bool(_AGENT_BEFORE.search(before))
+
+
 def has_agentive_action(sentence: str) -> bool:
     """True when something happens AND someone or something does it."""
     if not sentence or not _AGENCY_VERB.search(sentence):
         return False
-    # Every agency verb in the sentence sitting in an agentless passive means
-    # nothing in it has an actor.
-    verbs = {m.group(0).lower() for m in _AGENCY_VERB.finditer(sentence)}
-    passive = {m.group('verb').lower() for m in _AGENTLESS_PASSIVE.finditer(sentence)}
-    return bool(verbs - passive)
+    passive = {m.group('verb').lower()
+               for m in _AGENTLESS_PASSIVE.finditer(sentence)}
+    for m in _AGENCY_VERB.finditer(sentence):
+        verb = m.group(0).lower()
+        if verb in passive:
+            continue          # action with the actor removed
+        if verb in _MAKING_VERBS and not _making_verb_has_agent(sentence, m):
+            continue          # "Illustrated book" — an adjective, not an act
+        return True
+    return False
 
 KIND_EVENTFUL = 'eventful'   # something happens AND something is at stake
 KIND_RICH = 'active'         # something happens, nothing is at stake
@@ -125,8 +166,20 @@ def summarise_stop(stop_name: str, snippets: List[str],
     than needing to be reconstructed afterwards.
     """
     m = classify_material(snippets)
-    disagrees = (volume_verdict in ('rich', 'medium')
-                 and m['kind'] == KIND_INERT)
+    # [D489a r2] The pilot printed volume=COVERED and this flag never fired.
+    # `needs_replenishment` returns the COVERAGE vocabulary — EMPTY, VENUE_ONLY,
+    # COVERED, UNKNOWN (`story_replenish.py:60`) — not the rich/medium/thin
+    # of the QID classifier at generate_tour_text.py:613. Comparing against the
+    # wrong vocabulary meant the instrument would have reported ZERO
+    # disagreements on every run, i.e. "LEAD's claim is wrong", for a reason
+    # that has nothing to do with the claim. Both vocabularies are accepted, and
+    # anything unrecognised is treated as "not a satisfied volume verdict" so
+    # the flag fails silent rather than false-positive.
+    _volume_satisfied = str(volume_verdict).strip().lower() in (
+        'covered', 'rich', 'medium')
+    # A story needs a change of state with something at stake. Material that is
+    # merely 'active' has actions and no consequence — the 01:15 failure exactly.
+    disagrees = _volume_satisfied and m['kind'] in (KIND_INERT, KIND_RICH)
     line = (f"[D489] material kind: stop='{stop_name[:38]}' "
             f"kind={m['kind']} volume={volume_verdict or 'n/a'} "
             f"sentences={m['sentences']} active={m['active_sentences']} "
