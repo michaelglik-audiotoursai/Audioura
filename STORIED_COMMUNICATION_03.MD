@@ -875,3 +875,102 @@ cross-model agreement (one model as its own corroboration); a retry trigger that
 have fired and done nothing; and two halves of one detector reading different sentence
 lists. All in the same family as this session's earlier work: a value computed in one
 place, read from another that never received it.
+
+---
+
+# 2026-08-19 morning — Michael back. The story definition, settled from the encyclopedia.
+
+*Appended 11:59, late. This session answered six real questions and wrote every answer to
+`DECISIONS.md` and to commit messages instead of here — the exact failure this file exists
+to prevent, and the one that killed Volume 01. Michael caught it by asking.*
+
+---
+
+## Q1 (09:58) — "Meanwhile, while we are having this discussion, please push the changes you approve."
+
+Pushed `0ac89b3..f61639d`, 108 commits. Scanned the whole unpushed range for secrets first:
+clean — only placeholders and `api_key=None` code paths. The Boston Globe credential is
+pre-existing and already on origin from `ba6651b`; this push added nothing new. It remains
+unrotated, which is still Michael's call.
+
+## Q2 (09:58) — "Let's look at the definition of the story to decide what 'story' is. Let's start with an encyclopedia."
+
+Five definitions, sources in [`STORY_DEFINITION.md`](STORY_DEFINITION.md), ruling in D487.
+
+- **Forster/Britannica** — story vs plot is *entirely* causality. "The king died, and then
+  the queen died" / "…died **of grief**". One word.
+- **Prince (1973)** — a minimal story is three conjoined events, first and third stative,
+  **second active**, third the inverse of the first. Mechanically checkable.
+- **Wikipedia** — character, conflict, cause and effect.
+- **Labov** — for narrative told *aloud*, our medium, the indispensable part is
+  **evaluation**, the point: *"Pointless stories are met with the withering rejoinder,
+  'So what?'"*
+- **Hühn/Schmid** — a change of state is *tellable* only given relevance, unpredictability,
+  effect, irreversibility and non-iterativity.
+
+**LEAD's ruling: Michael's two definitions were never rivals.** The scanner bar IS the
+story (Prince + Labov). Step 3's chain is *which* story to tell, and structurally it is
+Labov's **coda** — the return to the present. Sequential filters, not competitors.
+
+## Q3 (10:09) — "Is this possible to add [Labov's evaluation] into the story generation, not only as evaluation?"
+
+Yes, and overdue: `story_pass.py:144` read *"No evaluation: not 'stands as a testament
+to'…"* — banning by name the component Labov calls indispensable. It was aiming at
+**external** evaluation (the adjectives) and hitting the point as collateral. Now: *show
+the point, do not announce it*, every forbidden phrase retained, plus a mechanical test —
+strip every proper noun and number, and if praise remains it is commentary. D488.
+
+## Q4 (10:14) — "Plot is more valuable than the story to me... And I question that the story should be always about a person; for example Pompeii was destroyed because of volcanic eruption is a story."
+
+**Michael right on both; both corrected LEAD.**
+
+1. **Plot beats story — and that UPGRADES step 3 rather than demoting it.** LEAD had ruled
+   the chain "relevance, not story" because associations carry no causality. True of a
+   *correlation* chain, false of a *causal* one. **The test on step 3 is not "is there a
+   connection" but "is the connection a *because*."**
+2. **A story needs an agent, not a person.** Prince requires the middle event to be
+   **active**, not human. Labov reads person-centric because he studied people telling
+   stories about their own lives — his domain, not his definition. The "person" rule was
+   never about people; it existed to stop subject-hopping. The real invariant is
+   **continuity of subject**. Landed LOCAL-493, and LOCAL-495 had to follow because the
+   detector still required a person while the generator no longer did.
+
+## Q5 (10:14) — "I want to see the matrix... How is it changed now?"
+
+Re-verified by call site. **Four of seven rows moved**, and LEAD had two of them wrong —
+see D491. Corrected: **six of seven steps are built** (step 7a is LOCAL-487 and it fired
+live). Only D489's kind-vs-volume gap remains.
+
+## Q6 (10:14) — "Fridman as a generous gifter is gone completely... The organizer, charitable gifter, sponsor should not be dismissed, agree?"
+
+Agreed, and it took two fixes because there were two independent causes.
+
+- **LOCAL-494** — the gate could not tell a name carrying its own provenance from one the
+  model asserted. *"Gift of Boris Fridman"* **is** the source. Also: no web page about a
+  collector is the *normal* state for a private individual, not evidence of fabrication.
+- **LOCAL-496** — he died again on the next run by a different route: the gate degraded
+  **"Fine Arts"**, a fragment of the venue's own name, producing *"The Museum Boston"*,
+  which the org-grounding gate could not ground, so it dropped the whole sentence and the
+  donor in it; the retry then forbade the relationship. **Verified live**: degraded 1 → 0,
+  and the delivered tour now reads *"Boris Fridman, a dedicated collector of such works,
+  donated this particular edition to the MFA."*
+
+## Q7 (11:17) — "Do not wait for me to confirm: if you see that your claim is right, start tasks for gating."
+
+**The claim was right.** Three clean runs: volume said `COVERED` on **9 of 9**
+stop-observations; kind found no event in **6 of 9** — same two stops failing every run,
+zero variance. Gating landed as D492b: replenishment now fires on `eventless`.
+
+**The finding that was not in the hypothesis:** the best action-bearing sentence in 112
+retrieved sentences was *an auction lot description*; another stop's was *"Sold as a set of
+10."* Two of three stops are fed dealer listings. **Source ranking now outranks
+query shape** — an event-shaped query against auction catalogues returns event-shaped
+auction prose. D492.
+
+## Q8 (11:59) — "Are you doing something at the moment? Are you updating STORIED_COMMUNICATION_03.MD? Are you starting the reply with your name and date?"
+
+**No, no, and inconsistently.** Nothing was running — LEAD said it would run a tour and
+then stopped instead. This file had not been touched since 00:21 by the previous session,
+with every answer going to `DECISIONS.md` instead. And roughly half the replies carried the
+`[Storied_Tours]@date|time` prefix; the mid-work ones had none, and the times printed were
+estimated rather than read, drifting ~45 minutes by midday.
