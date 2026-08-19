@@ -30,7 +30,7 @@ specific medium beats a venue, and anything already tried is skipped.
 import re
 from typing import Dict, List, Optional, Set
 
-from text_fold import fold
+from text_fold import fold, is_placeholder
 
 __all__ = ['candidate_facts', 'next_focus_fact', 'MAX_ROTATIONS']
 
@@ -40,8 +40,23 @@ __all__ = ['candidate_facts', 'next_focus_fact', 'MAX_ROTATIONS']
 MAX_ROTATIONS = 1
 
 
+# Placeholder values that museum records use to mean "we do not know". They are
+# strings, so every naive `if field:` treats them as data.
+#
+# [LOCAL-491 r3] This list is why the first live rotation produced the focus fact
+#     "Not specified published Moses and Monotheism."
+# which the story pass then had to make sense of, and did not: the delivered stop
+# read "The Hogarth Press, the Louis Broder of Freud's original text" — incoherent,
+# and it dragged in the one fabrication Michael has objected to most.
+#
+# `story_worthiness._has_named_agent` already filtered exactly these. This module
+# was written two hours later and did not. Two modules from the same night
+# disagreeing about what counts as a named agent — the defect class this whole
+# session has been about, committed by the session itself.
 def _clean(v: Optional[str]) -> str:
-    return re.sub(r'\s+', ' ', (v or '')).strip()
+    """Normalise whitespace, and treat a placeholder as the absence it means."""
+    out = re.sub(r'\s+', ' ', (v or '')).strip()
+    return '' if is_placeholder(out) else out
 
 
 def candidate_facts(matrix: Dict, material: Optional[List[str]] = None) -> List[Dict]:

@@ -1,0 +1,761 @@
+location : Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+stops    : 4
+cap      : 20
+out      : TOUR_MFA_RELEASE_20260819_0056.txt
+
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:7564. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:7565. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:7993. Caller should supply input_tokens and output_tokens separately.
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260819_005607.txt'
+
+======================================================================
+CALL #001 | 00:56:07.746 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  tour_type: museum
+  total_stops_parameter: 4
+  output_file: /Users/micha/Audioura/TOUR_MFA_RELEASE_20260819_0056.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260819_005607.txt'
+
+======================================================================
+CALL #002 | 00:56:07.747 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": "Unbound exhibition",
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Boston, MA
+   Requirements: Unbound exhibition
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+[TIMING] phase=intent elapsed=1.4s cumulative=1.4s
+
+Detected tour category: MUSEUM
+Using museum template for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260819_005607.txt'
+
+======================================================================
+CALL #003 | 00:56:09.187 | GENERATING_PROMPT
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  user_request: museum Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA...
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q1565911 (Museum of Fine Arts, Houston)
+    URL: http://www.mfah.org/
+    Coords: 29.725605, -95.390539
+    Language: en
+  [venue_resolver] SPARQL: 105 works found for Q1565911
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-362] Scoped request detected (requirements='Unbound exhibition') — early deterministic bypass suppressed
+
+  [LOCAL-362] SCOPED REQUEST DETECTED:
+    Requirements: Unbound exhibition
+    POI type: museum exhibits
+    Artists extracted: ['Picasso', 'Miro', 'Dali']
+    → Deterministic bypass will be SUPPRESSED (venue-wide fill is wrong for scoped requests)
+[TIMING] phase=poi_selection elapsed=9.3s cumulative=10.7s
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+
+  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══
+  [LOCAL-364] Exhibition search term: 'Picasso, Miro, Dali: Unbound'
+  [LOCAL-364] Venue URL: http://www.mfa.org/
+  [LOCAL-364] Searching for exhibition 'Picasso, Miro, Dali: Unbound' on http://www.mfa.org
+  [LOCAL-427] HTTP 200 from http://www.mfa.org/exhibitions (attempt 1)
+  [LOCAL-364] Found exhibition listing: http://www.mfa.org/exhibitions (5130 chars)
+  [LOCAL-364] Matched exhibition: 'Picasso, Miró, Dalí: Unbound' (score: 1.00)
+  [LOCAL-364] Exhibition URL: http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-427] HTTP 200 from http://www.mfa.org/exhibition/picasso-miro-dali-unbound (attempt 1)
+  [LOCAL-364] No closing date found — assuming exhibition is current
+  [LOCAL-368] Line-pattern extraction found no works — trying LLM prose extraction
+  [LOCAL-368] ✓ PROSE LLM PATH: 3 works extracted from prose
+    Source: http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró (1971)
+    - Au Soleil du Plafond by Juan Gris (1955)
+    - Moses and Monotheism by Salvador Dalí (1974)
+  [LOCAL-364] Result: ExhibitionChecklistResult(path=prose_llm, works=3, title='Picasso, Miró, Dalí: Unbound', url='http://www.mfa.org/exhibition/picasso-miro-dali-unbound')
+  [LOCAL-364/368] ✓ PROSE_LLM PATH: 3 works from exhibition page
+    Source: http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    Shape: prose_llm_extraction
+    Stops from exhibition prose_llm:
+      - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) (by Joan Miró)
+      - Au Soleil du Plafond (by Juan Gris)
+      - Moses and Monotheism (by Salvador Dalí)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+   - Au Soleil du Plafond
+   - Moses and Monotheism
+  [D1/LOCAL-372] SKIP D1v2 — stops sourced from exhibition prose_llm (D1v2 checks the PERMANENT collection; a temporary show is not in it)
+  [D1/LOCAL-372] 3 exhibition stop(s) grounded against the venue page
+
+  [LOCAL-370] R4 replenishment SUPPRESSED (exhibition-scoped request)
+    Scope: Unbound exhibition
+    Honest stop count: 3 (no venue-wide backfill — D275)
+  [R4] Target reached: 3/3 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition prose_llm (already grounded against venue page by LOCAL-372)
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260819_005607.txt'
+
+======================================================================
+CALL #004 | 00:56:25.473 | PHASE_3B_REQUEST
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0005 (568 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+  [LOCAL-355] Querying OSM for venue facts (city: Miro, hint: museum)
+  [LOCAL-355] Le Lézard aux plumes d’or (The Lizard with Golden Feathers): no practical facts in OSM
+  [LOCAL-355] Au Soleil du Plafond: no practical facts in OSM
+  [LOCAL-355] Moses and Monotheism: no practical facts in OSM
+   Coords cluster detected: 3 stops share '42.3396, -71.0941', refetching...
+   Cluster refetch OK 'Au Soleil du Plafond': 42.3384, -71.0869
+   Cluster refetch OK 'Moses and Monotheism': 42.3395, -71.0899
+   Cluster refetch OK 'Le Lézard aux plumes d’or (The Lizard with Golden Feathers)': 42.3398, -71.0897
+Extracted first POI coordinates: (42.3398, -71.0897)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+  [D4] Museum single-coordinate: all stops set to (42.3398, -71.0897) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3398, -71.0897
+   Directions: Head southeast on Museum Rd, then turn right onto Huntington Ave. You'll see the...
+2. Au Soleil du Plafond
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3398, -71.0897
+   Directions: Continue straight on Huntington Ave. The exhibit entrance will be on your right ...
+3. Moses and Monotheism
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3398, -71.0897
+   Directions: Walk straight through the lobby to reach the exhibit hall. Enjoy the exploration...
+================================
+
+[TIMING] phase=exhibition_checklist elapsed=20.9s cumulative=31.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 1/1 corpus pages for 'Museum of Fine Arts, Boston'
+    page[0] score=240 url=http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [§3-adapter] No elements extracted from 1 pages
+  [LOCAL-369] Exhibition prose yielded no story elements
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Museum of Fine Arts, Boston model=gpt-4o tokens=1224 (in=674 out=550) cost=$0.0072 latency=6.2s
+[COST_METER] FRESH | spine_generate | $0.007185 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0072
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 0/3 stops have per-stop passages (0 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Au Soleil du Plafond' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Moses and Monotheism' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 3 EMPTY, 0 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=9.5s cumulative=41.0s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=exhibition source='Bold, experimental, extravagant, and unbound, both literally and in the creative'
+  [LOCAL-392] beat='Juan Gris' source_work='Au Soleil du Plafond' -> stop 2
+  [LOCAL-392] beat='Pierre Reverdy' source_work='Au Soleil du Plafond' -> stop 2
+  [LOCAL-392] beat='Dalí' source_work='Moses and Monotheism' -> stop 3
+  [LOCAL-392] beat='Freud' source_work='Moses and Monotheism' -> stop 3
+  [LOCAL-392] beat='Boris Fridman' source_work='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' -> stop 1
+  [LOCAL-392] beat='Louis Broder' source_work='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' -> stop 1
+  [LOCAL-392] beat='Linde Family' source_work='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' -> stop 1
+  [LOCAL-392] beat='Torf' -> exhibition_wide (no single work match)
+
+  [LOCAL-383] Extracted 10 story beats, 8 named people: Boris Fridman, Dalí, Freud, Juan Gris, Linde Family, Louis Broder
+[TIMING] phase=narration elapsed=0.0s cumulative=41.1s
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+    [LOCAL-419] Enriched stop 1 from checklist: publisher='Louis Broder' credit_line='Gift of Boris Fridman. © Successió Miró / Artists ' medium='Illustrated book with 40 color lithograp'
+    [LOCAL-486] Stop 1 worthiness: score=4/4 mine=True — has named_agent, credit_line_fact, specific_medium, specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 27 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for dosde.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for dosde.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for composition.gallery: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wdartgallery-modern.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for emuseum.toledomuseum.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artfocusnow.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for coleccionbbva.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for books.google.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for cutterandcutter.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for galerie-lelong.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for researchgate.net: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 10 unverified, 0 budget-expired
+      [credit_line] Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026
+    [LOCAL-488] step 4: 3 providers, 8 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 1 'Le Lézard aux plumes d’or (The Lizard with Golden ': queries=9 serp_results=53 snippets=54
+      → Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.
+      → Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year 
+    [LOCAL-419] Enriched stop 2 from checklist: publisher='Not specified' credit_line='Not specified' medium='Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=3/4 mine=True — has named_agent, credit_line_fact, specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 19 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 0 unverified, 0 budget-expired
+      [credit_line] Not specified
+    [LOCAL-488] step 4: 3 providers, 8 leads, 0 with cross-model agreement, 1 SERP-confirmed
+      → injected 1 confirmed lead(s) ahead of the SERP snippets
+    Stop 2 'Au Soleil du Plafond': queries=5 serp_results=34 snippets=36
+      → 1927 Juan Gris completed the painting "Au Soleil du Plafond".
+      → Not specified
+    [LOCAL-419] Enriched stop 3 from checklist: publisher='Not specified' credit_line='Not specified' medium='Illustrations'
+    [LOCAL-486] Stop 3 worthiness: score=4/4 mine=True — has named_agent, credit_line_fact, specific_medium, specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 21 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 0 unverified, 0 budget-expired
+      [credit_line] Not specified
+    [LOCAL-488] step 4: 3 providers, 8 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'Moses and Monotheism': queries=5 serp_results=30 snippets=31
+      → Not specified
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:11006. Caller should supply input_tokens and output_tokens separately.
+      → Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with 
+
+  [LOCAL-410] SERP search complete: 19 queries, 117 results, 121 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=20/stop, 121 raw → max 60 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Le Lézard aux plumes d’or (The Lizard with Golden : serp_results=53 elements_extracted=- beats_injected=- (measured post-generation)
+    Au Soleil du Plafond: serp_results=34 elements_extracted=- beats_injected=- (measured post-generation)
+    Moses and Monotheism: serp_results=30 elements_extracted=- beats_injected=- (measured post-generation)
+[TIMING] phase=external_lookups elapsed=73.4s cumulative=114.5s
+
+Generating description for Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró, ...
+
+Generating description for Stop 2: Au Soleil du Plafond by Juan Gris, ...
+
+Generating description for Stop 3: Moses and Monotheism by Salvador Dalí, ...
+  [LOCAL-381] stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' matched_work=True medium='Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum' work_identity_chars=493
+  [LOCAL-383] Stop 1 beats: Boris Fridman, Louis Broder, Linde Family
+  [LOCAL-381] stop='Moses and Monotheism' matched_work=True medium='Illustrations' work_identity_chars=325
+  [LOCAL-383] Stop 3 beats: Dalí, Freud
+  [LOCAL-380] Recovered collaborator from page prose: 'Pierre Reverdy'
+  [LOCAL-381] stop='Au Soleil du Plafond' matched_work=True medium='Not specified' work_identity_chars=792
+  [LOCAL-383] Stop 2 beats: Juan Gris, Pierre Reverdy, Torf
+  [LOCAL-411] Stop 3 snippet ranking: input=31 bio_rejected=0 tier3_demoted=25 cap=20 output=20 usable=12 (t1t2=4, t3=14)
+    Top scores: [('moses and monotheism by salvador dalí', 10, 'tier2'), ('Salvador Dalí', 10, 'tier1'), ('Moses and Monotheism', 9, 'tier1')]
+  [LOCAL-407] Stop 3: 3 candidate specifics extracted: ['edition/number: set of 10', 'material: on sheepskin', 'publisher/printer: By The Hogarth Press']
+  [LOCAL-402] Stop 3: injected 20 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11985 after=28041 (+16056 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28041)
+  [LOCAL-411] Stop 2 snippet ranking: input=36 bio_rejected=0 tier3_demoted=23 cap=20 output=20 usable=18 (t1t2=9, t3=8)
+    Top scores: [('Designed by Juan Gris - Au Soleil du Plafond', 24, 'tier1'), ('Designed by Juan Gris - Au Soleil du Plafond', 15, 'tier1'), ('Juan Gris', 15, 'tier1')]
+  [LOCAL-407] Stop 2: 8 candidate specifics extracted: ['material: on Arches', 'plate count: 11 lithograph', 'plate count: 11 lithographs', 'plate count: 1955 Lithograph']
+  [LOCAL-402] Stop 2: injected 20 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13122 after=29841 (+16719 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29841)
+    [LOCAL-469] CONSEQUENCE RESCUE: 'Joan Miró's “Broder Collection” is a series of color lithogr' let through (score 9) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 1 snippet ranking: input=54 bio_rejected=0 tier3_demoted=29 cap=20 output=20 usable=17 (t1t2=11, t3=4)
+    Top scores: [("Le Lézard aux plumes d'or (The Lizard with Golden ", 18, 'tier2'), ('Louis Broder - National Gallery of Art', 17, 'tier1'), ("Joan Miró. Le Lézard aux plumes d'or ( The Lizard ", 15, 'tier1')]
+  [LOCAL-407] Stop 1: 8 candidate specifics extracted: ['material: on wove', 'material: Printed on Japan', 'material: Paper: Rives', 'material: publisher’s vellum']
+  [LOCAL-402] Stop 1: injected 20 snippets as reference material
+  [LOCAL-417] Stop 1: SUPPRESSED 1 required names (no snippet evidence): ['Linde Family']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12429 after=29208 (+16779 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29208)
+  [LOCAL-490] Stop 3 story pass: ok=True (4 sentences), $0.0046
+    story: "Salvador Dalí, known for his surrealist works, created illustrations for Sigmund Freud's book "Moses and Monotheism" in 1974-75. Dalí's work, which in"
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0048
+    story: "Juan Gris, a Spanish painter who lived and worked in France, embarked on a collaboration with French author Pierre Reverdy to create "Au Soleil du Pla"
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0053
+    story: "In 1956, Louis Broder, a publisher based in Paris, embarked on a creative partnership with the renowned artist Joan Miró. This collaboration led to th"
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0352 (7420 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/3)
+Stop 1 API call cost: $0.0377 (7944 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0370 (7798 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/3)
+Stop 2 API call cost: $0.0384 (8082 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0393 (8281 tokens, model=gpt-4o)
+Stop 3 description word count: 178 words
+  [LOCAL-407] Stop 3 snippet-specifics audit:
+    offered: 3
+    used:    2 — ['material: on sheepskin', 'publisher/printer: By The Hogarth Press']
+    ignored: 1 — ['edition/number: set of 10']
+Stop 1 API call cost: $0.0399 (8394 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/3)
+Stop 2 API call cost: $0.0407 (8559 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/3)
+Stop 1 API call cost: $0.0419 (8814 tokens, model=gpt-4o)
+Stop 1 description word count: 180 words
+  [LOCAL-407] Stop 1 snippet-specifics audit:
+    offered: 8
+    used:    5 — ['material: Printed on Japan', 'material: publisher’s vellum', 'plate count: 15 lithographs']
+    ignored: 3 — ['material: on wove', 'material: Paper: Rives', 'publisher/printer: Atelier Mourlot']
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0428 (9001 tokens, model=gpt-4o)
+Stop 2 description word count: 267 words
+  [LOCAL-407] Stop 2 snippet-specifics audit:
+    offered: 8
+    used:    7 — ['material: on Arches', 'plate count: 11 lithograph', 'plate count: 11 lithographs']
+    ignored: 1 — ['publisher/printer: Catalogue']
+  [LOCAL-388] PRE-GATE stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' beats_assigned=3 beats_in_output=2 dropped=['Linde Family']
+  [LOCAL-388] PRE-GATE stop='Au Soleil du Plafond' beats_assigned=3 beats_in_output=3 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Moses and Monotheism' beats_assigned=2 beats_in_output=2 dropped=[]
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Au Soleil du Plafond': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Moses and Monotheism': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001925 (input=7988, output=1212)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:12275. Caller should supply input_tokens and output_tokens separately.
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    [LOCAL-427] Venue page text injected as verification source (venue source, 4699 chars from http://www.mfa.org/exhibition/picasso-miro-dali-unbound)
+    [LOCAL-423] Entity disambiguation: excluded 2 snippets for 'Fridman' (wrong entity)
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    ✓ PASS stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)': claims=3, sourced=3, unsourced=0, contradicted=0
+      evidence (3 sourced claims):
+        claim='1956' ← https://www.parkwestgallery.com/blog/joan-miro-broder-collec
+        claim='Louis Broder, a publisher based in Paris' ← http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+        claim='in 1971' ← http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+      disambiguation: excluded 2 snippets
+        • 'Boris Fridman-Mintz PhD Instituto Nacional de Antr': Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+        • 'FRIDMAN GALLERY': Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    ✓ PASS stop='Au Soleil du Plafond': claims=3, sourced=3, unsourced=0, contradicted=0
+      evidence (3 sourced claims):
+        claim='Juan Gris, the Spanish painter renowned for his contributions to' ← https://redtreetimes.com/2019/01/14/juan-gris-and-the-fabric
+        claim='in 1927' ← 
+        claim='in 1955' ← http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    ✓ PASS stop='Moses and Monotheism': claims=3, sourced=3, unsourced=0, contradicted=0
+      evidence (3 sourced claims):
+        claim='in 1974' ← http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+        claim='in 1939' ← https://www.daliparis.com/en/gallery-item/dream-moses-monoth
+        claim='The Hogarth Press, the publisher of Freud' ← https://archive.org/details/mosesandmonothei032233mbp
+  [LOCAL-423] STORY VERIFICATION: ALL STOPS PASSED — every extracted claim is sourced
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Style retry summary: 1 paragraphs retried, 1 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0005 (581 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 2
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/22)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 1
+    Glossed (composed): 0
+    Suppressed (already explained): 0
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 319 tokens, $0.0001, 0.6s
+    Gloss: 182 tokens, $0.0000, 0.5s
+    Compose: 0 tokens, $0.0000, 0.0s
+    Total added cost: $0.0001
+    Stops affected: 1
+    Glosses applied:
+      • Boris Fridman → DEGRADED (name dropped)
+
+  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...
+  [LOCAL-390] person 'Salvador Dalí' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Juan Gris' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Louis Broder' pre-grounded (story beat source) — keeping
+  [LOCAL-385] ungrounded person 'Henri Matisse' — will remove all mentions
+  [LOCAL-390] person 'Pierre Reverdy' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Sigmund Freud' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Despite Gris' pre-grounded (story beat source) — keeping
+  [LOCAL-385] field=description stop='Au Soleil du Plafond' ungrounded person 'Henri Matisse' — dropping sentence: "In this context, the connection to Henri Matisse's dynamic ceiling designs, also..."
+  [LOCAL-385] field=description stop='Au Soleil du Plafond' ungrounded person 'Henri Matisse' — dropping sentence: "Matisse's vision of light and color, akin to the sun's profound cultural symboli..."
+  [LOCAL-385] Prose entity grounding gate summary:
+    Persons detected: 9
+    Persons grounded: 8
+    Persons ungrounded: 1
+    Sentences dropped: 2
+    Stops affected: 2
+    Ungrounded: ['Henri Matisse']
+
+  [LOCAL-458] PHASE 5.158b: Role-claim gate...
+  [LOCAL-458] entity gate: corpus=4699 chars, 0 role claims, 0 entities, 0 dropped
+
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate (corpus 53109 chars)...
+  [LOCAL-479] orgs detected=4 grounded=3 ungrounded=1 sentences_dropped=2
+    [LOCAL-479] field=orientation stop='Le Lézard aux plumes d’or (The' org='Linde Family Gallery' — ungrounded
+      dropped: "Stand in the Linde Family Gallery and let your eyes trace the vivid colors of Joan Miró's illustrati"
+      dropped: "The natural lighting in the gallery enhances the vivid hues and intricate details of Miró's lithogra"
+
+  [LOCAL-385] PHASE 5.159: Form-claim gate (scans all prose fields)...
+  [LOCAL-385] Form-claim gate summary:
+    Claims detected: 0
+    Claims kept (compatible): 0
+    Claims removed: 0
+    Metaphor-exempt (kept): 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-389] PHASE 5.160: Numeric-claim gate (scans all prose fields)...
+  [LOCAL-389] Numeric-claim gate summary:
+    Claims detected: 0
+    Grounded (identity block): 0
+    Grounded (page text): 0
+    Ungrounded (dropped): 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 24
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Museum of Fine Arts, Boston'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [3] DELETED: 'This collaboration' in: This collaboration between Dalí's artistic interpretation and Freud's pioneering
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [LOCAL-477] stripped markdown from 1 prose field(s) — these are spoken aloud
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Le Lézard aux plumes d’or (The Lizard ': the longest run (4 sentences, book) has agency=0 stakes=0 — someone is described, but nothing is risked, refus
+    stop 3 'Moses and Monotheism': the longest run (6 sentences, Sigmund Freud) has agency=0 stakes=0 — someone is described, but nothing is risk
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Moses and Monotheism' (index 33)
+
+  [LOCAL-474] PHASE 5.17: retry 'Le Lézard aux plumes d’or (The Lizard with G' — 141w → 100w after gates, 5 sentence(s) removed
+    removed: "In 1956, Louis Broder, a publisher based in Paris, embarked on a creative partnership with the renow"
+    removed: "This collaboration led to the creation of "Le Lézard aux plumes d’or" (The Lizard with Golden Feathe"
+    removed: "Printed on publisher’s vellum, the book's tactile elegance complements Miró's surrealist vision, whe"
+    removed: "The collaboration between Broder and Miró exemplifies the exhibition's thesis that artists revolutio"
+    removed: "What do these golden feathers symbolize, and how might they connect to other artworks in the museum?"
+    [LOCAL-491] step 7b: rotating to the publisher fact — a publisher is a person who decided to make this happen
+      focus: "Louis Broder published Le Lézard aux plumes d’or (The Lizard with Golden Feathers)."
+
+Generating description for Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró, ...
+  [LOCAL-381] stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' matched_work=True medium='Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum' work_identity_chars=493
+  [LOCAL-383] Stop 1 beats: Boris Fridman, Louis Broder, Linde Family
+    [LOCAL-469] CONSEQUENCE RESCUE: 'Joan Miró's “Broder Collection” is a series of color lithogr' let through (score 9) — no surviving snippet carried a stakes marker
+  [LOCAL-411] Stop 1 snippet ranking: input=54 bio_rejected=0 tier3_demoted=29 cap=20 output=20 usable=17 (t1t2=11, t3=4)
+    Top scores: [("Le Lézard aux plumes d'or (The Lizard with Golden ", 18, 'tier2'), ('Louis Broder - National Gallery of Art', 17, 'tier1'), ("Joan Miró. Le Lézard aux plumes d'or ( The Lizard ", 15, 'tier1')]
+  [LOCAL-407] Stop 1: 8 candidate specifics extracted: ['material: on wove', 'material: Printed on Japan', 'material: Paper: Rives', 'material: publisher’s vellum']
+  [LOCAL-402] Stop 1: injected 20 snippets as reference material
+  [LOCAL-417] Stop 1: SUPPRESSED 1 required names (no snippet evidence): ['Linde Family']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12429 after=29208 (+16779 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29208)
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0060
+    story: "Louis Broder published "Le Lézard aux plumes d’or" (The Lizard with Golden Feathers), an illustrated book by Joan Miró, in 1971. Broder, a Paris-based"
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0389 (8200 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/3)
+Stop 1 API call cost: $0.0411 (8654 tokens, model=gpt-4o)
+  [LOCAL-391] Stop 1: scrubbed 1 unfilled role(s)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/3)
+Stop 1 API call cost: $0.0430 (9054 tokens, model=gpt-4o)
+Stop 1 description word count: 161 words
+  [LOCAL-407] Stop 1 snippet-specifics audit:
+    offered: 8
+    used:    4 — ['material: Paper: Rives', 'plate count: 15 lithographs', 'plate count: 40 color lithographs']
+    ignored: 4 — ['material: on wove', 'material: Printed on Japan', 'material: publisher’s vellum']
+    [LOCAL-474] regenerated and re-gated: 161w (was 100w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Moses and Monotheism' — 178w → 155w after gates, 1 sentence(s) removed
+    removed: "This collaboration between Dalí's artistic interpretation and Freud's pioneering theories results in"
+    [LOCAL-491] step 7b: rotating to the publisher fact — a publisher is a person who decided to make this happen
+      focus: "Not specified published Moses and Monotheism."
+
+Generating description for Stop 3: Moses and Monotheism by Salvador Dalí, ...
+  [LOCAL-381] stop='Moses and Monotheism' matched_work=True medium='Illustrations' work_identity_chars=325
+  [LOCAL-383] Stop 3 beats: Dalí, Freud
+  [LOCAL-411] Stop 3 snippet ranking: input=31 bio_rejected=0 tier3_demoted=25 cap=20 output=20 usable=12 (t1t2=4, t3=14)
+    Top scores: [('moses and monotheism by salvador dalí', 10, 'tier2'), ('Salvador Dalí', 10, 'tier1'), ('Moses and Monotheism', 9, 'tier1')]
+  [LOCAL-407] Stop 3: 3 candidate specifics extracted: ['edition/number: set of 10', 'material: on sheepskin', 'publisher/printer: By The Hogarth Press']
+  [LOCAL-402] Stop 3: injected 20 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=11985 after=28041 (+16056 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28041)
+  [LOCAL-490] Stop 3 story pass: ok=True (4 sentences), $0.0056
+    story: "Salvador Dalí, the renowned Spanish surrealist, created a series of illustrations for "Moses and Monotheism," a book originally written by Sigmund Fre"
+Stop 3 API call cost: $0.0367 (7728 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0387 (8137 tokens, model=gpt-4o)
+Stop 3 description word count: 168 words
+  [LOCAL-407] Stop 3 snippet-specifics audit:
+    offered: 3
+    used:    2 — ['material: on sheepskin', 'publisher/printer: By The Hogarth Press']
+    ignored: 1 — ['edition/number: set of 10']
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 1 improved, 1 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length)
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Le Lézard aux plumes d’or (The Lizard wi   34    12    20    60
+     2  Au Soleil du Plafond                       70    35    34    77
+     3  Moses and Monotheism                       33    35    29    46
+    [LOCAL-485] index mean 45.7 over 3 stop(s), range 33-70
+    [LOCAL-485] weakest: 'Moses and Monotheism' at 33
+[TIMING] phase=story_first elapsed=79.0s cumulative=193.5s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-382] Thesis block injected into prolog (1183 chars)
+  [R2] Prolog saved for Stop 1 (95 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 95 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 95 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 143
+    Words after:  143
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 1.4s, $0.0081, 1233 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Le Lézard aux plumes d’or (The Lizard with Golden Feathers)] (dated_event_with_consequence): This publication is now part of the Museum of Fine Arts, Boston, thanks to a gen...
+      [Au Soleil du Plafond] (cause): Reverdy's role as poet added a profound lyrical layer to Gris’s visual artistry,...
+      [Moses and Monotheism] (cause): Freud, a pioneer in psychoanalysis, authored this work in 1939, aiming to delve ...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0031 (536 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Au Soleil du Plafond, you'll explore how Reverdy's poetry intertwined with Gris’s artistry. Moving forward, delve into Freud's psychoanalytical insights on religious belief at Moses and Monotheism."
+      FAIL: vague language detected in Part 4
+    Part 4 LLM cost: $0.0033 (546 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (38 words):
+      "Reverdy's poetic influence on Gris's artistry at Au Soleil du Plafond and Freud's psychoanalytical exploration in Moses and Monotheism await you after the generous gift of The Lizard with Golden Feathers to the Museum of Fine Arts, Boston."
+      Stops referenced: 3
+    Part 4 total cost: $0.0064
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Museum of Fine Arts, Boston — next is Au So...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in Museum of Fine Arts, Boston: Moses and Mo...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.2s, $0.0025, 435 tokens
+  [LOCAL-280] Recap built: 25 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Au Soleil du Plafond] (cause): "Reverdy's role as poet added a profound lyrical layer to Gris’s visual artistry,..."
+      → composed: "Au Soleil du Plafond, where Reverdy's poetry enriched Gris's artistry"
+    [Moses and Monotheism] (cause): "Freud, a pioneer in psychoanalysis, authored this work in 1939, aiming to delve ..."
+      → composed: "Moses and Monotheism, a 1939 Freud work exploring religious psychology"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Au Soleil du Plafond, where Reverdy's poetry enriched Gris's artistry and Moses and Monotheism, a 1939 Freud work exploring religious psychology."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [LOCAL-275] Part 2: Treat Page only (no tour verified), anchored to (42.3398, -71.0897)
+  [LOCAL-275] Part 2 (news): news_orchestrator_service.py confirmed
+  [LOCAL-275] Closing offer: 2 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+  [LOCAL-391] Final assembly scrub: replaced 1 unfilled role(s)
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' beats_assigned=3 beats_in_output=3 dropped=[]
+    stop='Au Soleil du Plafond' beats_assigned=3 beats_in_output=3 dropped=[]
+    stop='Moses and Monotheism' beats_assigned=2 beats_in_output=2 dropped=[]
+
+=== Word Count Statistics ===
+Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers) - 180 words
+Stop 2: Au Soleil du Plafond - 267 words
+Stop 3: Moses and Monotheism - 178 words
+===========================
+
+
+Total API cost: $0.1899 (30324 tokens)
+CACHE STORE: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA / museum / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/Audioura/TOUR_MFA_RELEASE_20260819_0056.txt
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA - Museum Tour
+Tour-Category: museum
+
+Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró
+
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Coordinates: 42.3398, -71.0897
+
+Orientation: You are about to explore the Picasso, Miro, Dali: Unbound exhibition at MFA in Boston. This exhibition centers on the livre d'artiste, a revolutionary art form that blends images, words, and typogra...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Le Lézard aux plumes d’or (The Lizard with Golden : serp_results=53 snippets_injected=54 beats_in_delivered_text=0
+    Au Soleil du Plafond: serp_results=34 snippets_injected=36 beats_in_delivered_text=0
+    Moses and Monotheism: serp_results=30 snippets_injected=31 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=6.0s cumulative=199.5s
+[TIMING] phase=verification elapsed=0.0s cumulative=199.5s
+[TIMING] TOTAL wall=199.5s phases: story_first=79.0s, external_lookups=73.4s, exhibition_checklist=20.9s, fact_sheets=9.5s, poi_selection=9.3s, packing=6.0s, intent=1.4s, narration=0.0s, verification=0.0s
+
+======================================================================
+GENERATED 6574 chars in 199.5s -> TOUR_MFA_RELEASE_20260819_0056.txt
+======================================================================
+
+ #  stop                                          idx  hist  detl   soc
+--------------------------------------------------------------------------
+ 1  Le Lézard aux plumes d’or (The Lizard with G   34    12    20    60
+ 2  Au Soleil du Plafond by Juan Gris              70    35    34    77
+ 3  Moses and Monotheism by Salvador Dalí          33    32    29    61
+--------------------------------------------------------------------------
+    MEAN                                           46    26    28    66
+
+  stops with detail == 0 (no object named): 0 of 3
+
+  scores -> TOUR_MFA_RELEASE_20260819_0056_SCORES.json

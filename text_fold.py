@@ -33,7 +33,46 @@ import re
 import unicodedata
 from typing import Optional
 
-__all__ = ['fold', 'contains_entity', 'entity_pattern']
+__all__ = ['fold', 'contains_entity', 'entity_pattern', 'is_placeholder',
+           'PLACEHOLDER_VALUES']
+
+# [LOCAL-491 r3] Values a museum record uses to mean "we do not know". They are
+# strings, so every naive `if field:` treats them as data.
+#
+# This lives here, next to `fold`, for the same reason `fold` does. Two modules
+# written the same night — `story_worthiness` and `story_focus_fact` — each grew
+# its own version of this list and they disagreed: worthiness accepted
+# "Not specified" as a named agent, focus-fact rejected it. The visible cost was
+# a focus fact reading
+#     "Not specified published Moses and Monotheism."
+# handed to the story pass, which produced the incoherent
+#     "The Hogarth Press, the Louis Broder of Freud's original text".
+#
+# That is D483's exact defect class, committed inside the session that fixed
+# D483. Which is the argument for the primitive, not against it: the list is only
+# safe when there is one of it.
+PLACEHOLDER_VALUES = frozenset({
+    '', '-', '--', 'n a', 'na', 'nil', 'none', 'null',
+    'not specified', 'not stated', 'not known', 'not available', 'not applicable',
+    'unspecified', 'unknown', 'undetermined', 'unattributed', 'unidentified',
+    'various', 'anonymous', 'tbd', 'tba', 'no data', 'no information',
+})
+
+
+def is_placeholder(value: Optional[str]) -> bool:
+    """Does this field say "we do not know" rather than carry a value?
+
+    Punctuation is normalised to spaces before comparison, so `n/a`, `n.a.`,
+    `N-A` and `n a` are one answer rather than four entries. Enumerating the
+    spellings is what produced this bug in the first place — the set had `n a`
+    and `na` and not `n/a`, and `n/a` sailed through as a publisher's name.
+    Normalise, then compare; do not extend the list.
+    """
+    folded = fold(value)
+    if folded in PLACEHOLDER_VALUES:
+        return True
+    normalised = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]+', ' ', folded)).strip()
+    return normalised in PLACEHOLDER_VALUES
 
 
 def fold(s: Optional[str]) -> str:

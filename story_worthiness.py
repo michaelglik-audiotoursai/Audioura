@@ -32,7 +32,7 @@ import os
 import re
 from typing import Dict, List, Optional
 
-from text_fold import fold
+from text_fold import fold, is_placeholder
 
 __all__ = ['assess_stop_worthiness', 'WORTHINESS_DISABLED_ENV', 'agreement_report']
 
@@ -54,7 +54,11 @@ def _has_named_agent(matrix: Dict) -> bool:
     """Is there a person or organisation to build a Fact → Stop chain from?"""
     for field in ('artist', 'publisher', 'printer', 'printed_by'):
         value = (matrix.get(field) or '').strip()
-        if value and len(value) >= 3 and fold(value) not in ('unknown', 'n a', 'na', 'various'):
+        # [LOCAL-491 r3] Was a private four-item tuple that did not include
+        # 'not specified' — the commonest of them all in MFA records. Shared
+        # primitive now, so this module and story_focus_fact cannot disagree
+        # about what a named agent is (they did, and it shipped).
+        if value and len(value) >= 3 and not is_placeholder(value):
             return True
     return False
 
@@ -74,7 +78,7 @@ def _medium_is_specific(matrix: Dict) -> bool:
     medium = (matrix.get('medium') or '').strip()
     if len(medium) < 6:
         return False
-    return fold(medium) not in ('mixed media', 'not specified', 'unknown', 'various')
+    return not is_placeholder(medium) and fold(medium) != 'mixed media'
 
 
 def _title_is_specific(matrix: Dict) -> bool:
