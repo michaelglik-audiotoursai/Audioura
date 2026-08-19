@@ -19494,3 +19494,106 @@ later. The role gate's narrowness is load-bearing.
 **Standing at end of session, three runs on final code: mean 45.7, range 43–48**, against
 36 on the first full-tour run this afternoon. Still short of the lab's 64, and the gap is
 still the story-prompt extraction (D474), untouched on purpose.
+
+## D483 — The instruments were audited as a class, and the class had a second half nobody had tested
+
+**2026-08-18 evening. The mission set at 17:0x, item 1.** Of 17 decisions that day, 11
+were broken detectors, and the ruling was: stop fixing them one at a time.
+
+### What the one-at-a-time path would have found
+
+Four defects, each real, each measured by direct probe on the code as it stood:
+
+```
+check_person_grounded('Salvador Dali', "...Salvador Dalí...")  -> False
+_agent_in_text('Editions Verve',       "...Éditions Verve...") -> False
+_agent_in_text('Ars',                  'Arsenal Gallery')      -> True
+_PERSON_MULTI_WORD.findall("Édouard Manet met Émile Zola")     -> []
+```
+
+The first three are D243 again — sixth, seventh, eighth occurrence. The consequence of
+the first is that the exhibition's headline artist is judged UNGROUNDED whenever the
+model writes the unaccented spelling, and his sentences are dropped. The consequence of
+the second is D482's false rejection of Éditions Verve arriving through the sibling gate,
+five index points' worth, after that exact bug had been fixed in the org gate hours
+earlier.
+
+### The shape, stated once because it keeps recurring
+
+**Three sibling instruments ask the same question of the same corpus and only the newest
+is right.** The org gate folded accents; `check_person_grounded` and `_agent_in_text` did
+not. `story_validator._NAME_SPAN` used the accented capital class `[A-ZÀ-ÖØ-Þ]`; its
+three siblings used bare `[A-Z]`. Each was correct when written, in isolation, by whoever
+had just been bitten. Nothing propagated the lesson sideways.
+
+`text_fold.py` is the answer to that: one `fold()` and one `contains_entity()`, and every
+entity-vs-corpus comparison in the chain now calls them. `_fold_org` survives as an alias
+because the org gate's logs name it — and it was silently wrong about whitespace, never
+collapsing runs, so `'Editions  Verve'` folded to a key no claim could equal.
+
+### Two findings the mission did not predict
+
+**The word-boundary half came back clean.** All 42 compiled regexes in
+`evaluate_story`, `story_validator`, `story_opportunity_scan`,
+`prose_entity_grounding_gate` and `stop_claim_audit` were swept mechanically; **none**
+matches inside a longer word. The boundary bugs were all in the `in` substring
+comparisons, which no regex audit would have reached. The mission's framing —
+"every regex" — pointed slightly off-target, and the mechanical sweep is what showed it.
+
+**The gates' false-ACCEPTANCE half was untested, and broken.** `check_org_grounded`
+exempted any organisation whose folded name merely *contained* a well-known museum's, in
+either direction. Measured against a corpus naming none of them:
+
+```
+'Tate Modern Press'  -> grounded      'The Met Foundation' -> grounded
+'Louvre Editions'    -> grounded      'Tate Publishing'    -> grounded
+```
+
+Inventing a publishing arm for a real museum is precisely the fabrication this gate
+exists to catch, and it was the one shape guaranteed to pass. Now exempted only on a
+comma-qualified prefix, which keeps `'Museum of Fine Arts, Boston'` and drops the rest.
+
+This is measure 6 of `STORY_GATE_TIERS.md` — **every gate needs a TRUE set, not only a
+FALSE set** — and it is why it matters. The false-rejection half fails loudly, in
+Michael's reading of a tour, and got fixed four times in one day. The false-acceptance
+half fails silently and sat untouched.
+
+### `_PERSON_MULTI_WORD` cost an inspection, not a drop
+
+It is gate 5.158's **extractor**. Blind to `É`, it never recognised "Édouard Manet" as a
+person, so the gate never checked him and reported the stop clean. A gate that cannot see
+an entity does not report a miss; it reports success.
+
+### Verification
+
+- **60/60** on `test_local483_gate_fold_and_boundary.py`, which is table-driven over the
+  grounding predicates so a new gate inherits every probe.
+- **21 RED on revert** to the pre-change code (D242 standing check 1 — a test that cannot
+  fail is not evidence).
+- **110 assertions across 10 existing suites still green.** They were *also* green before
+  this change, with three gates false-rejecting. That is the whole argument for the
+  table-driven suite.
+
+### What is NOT claimed
+
+**The tour score was not re-measured before this was written.** These are gate-behaviour
+changes, so D482's mean of 45.7 is stale and must not be quoted. Three runs are owed
+(D480), and are running.
+
+### The three runs did not happen: the OpenAI account is out of credits
+
+Attempted 21:49. All three failed at PHASE_3A, the first API call, in under a second:
+
+```
+X PHASE 3A failed: status 429
+"You have no credits remaining." code: credit_balance_exhausted
+```
+
+No tour was generated and nothing was spent. **This blocks every measurement, not just
+this one** — no tour can be generated at all until credits are added, which is Michael's
+billing action and nobody else's. Yesterday's spend was ~$3.13 across 16 runs.
+
+The code changes stand on their own evidence: 60/60 unit assertions, 21 red on revert,
+110 existing assertions green. What is unavailable is the end-to-end number, and the
+honest statement is that **45.7 is stale and there is no replacement for it yet** — not
+that quality is unchanged.

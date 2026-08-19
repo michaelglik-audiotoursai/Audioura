@@ -709,3 +709,55 @@ against one human judgement, so it may REPORT but must not yet GATE (D474).
 **`credit_line` still cannot carry Michael's rotating fact** — LOCAL-406 regex-parses
 `donor` and `printer` out of that field, so a fact written there is read as a person's
 name. It needs its own slot; the lab calls it `focus_fact` (`STORY_BASELINE.md` §2).
+
+---
+
+## 2026-08-18 21:4x — the instrument audit, run as a class
+
+❯ *restart*
+
+Picked up the mission left at 17:0x: audit the instruments as a class rather than one at
+a time. Result below, plus one thing you have to do.
+
+**⛔ The OpenAI account is out of credits.** Three measurement runs failed instantly at
+the first API call — `credit_balance_exhausted`. Nothing was spent, and **no tour can be
+generated at all until you add credits.** That blocks the story work and every score.
+
+**Four defects, found by probe, all in the grounding gates:**
+
+| probe, on the code as it stood | result |
+|---|---|
+| `check_person_grounded('Salvador Dali', "…Salvador Dalí…")` | **False** |
+| `_agent_in_text('Editions Verve', "…Éditions Verve…")` | **False** |
+| `_agent_in_text('Ars', 'Arsenal Gallery')` | **True** |
+| `_PERSON_MULTI_WORD` on "Édouard Manet met Émile Zola" | **no names found** |
+
+The first means Dalí's own sentences get dropped whenever the model spells him without
+the accent. The second is the Éditions Verve rejection you cost five index points to —
+the same bug, in the sibling gate, hours after the first was fixed.
+
+**The pattern, and it is the answer to "why is progress slow":** three instruments ask
+the same question of the same corpus and only the newest one is right. Each was fixed
+correctly by whoever had just been bitten; nothing carried the lesson sideways. There is
+now **one** folding primitive (`text_fold.py`) that all of them call, and the new test
+suite is table-driven over the gates, so one that forgets goes red the day it is written.
+
+**Two things the mission's framing did not predict:**
+
+1. **The word-boundary hunt came back empty.** All 42 regexes swept mechanically — none
+   matches inside a longer word. The boundary bugs were in the substring `in` comparisons,
+   which a regex audit would never have reached.
+2. **The gates' false-ACCEPTANCE half was untested and broken.** `Tate Modern Press`,
+   `The Met Foundation` and `Louvre Editions` all grounded for free against a corpus
+   naming none of them, because the exemption matched any name *containing* a famous
+   museum's. Inventing a publishing arm for a real museum was the one fabrication shape
+   guaranteed to pass. This is your measure 6 — a gate needs a TRUE set, not just a FALSE
+   set. The false-rejection half fails loudly and got fixed four times in one day; this
+   half fails silently and nobody had looked.
+
+**Verified:** 60/60 new assertions, **21 red on revert** to the old code, and 110
+assertions across 10 existing suites still green — all of which were green *before* this
+change too, with three gates false-rejecting.
+
+**Not claimed:** the tour score. These are gate-behaviour changes, so **45.7 is stale and
+I am not quoting it.** The three runs that would replace it are what the credits block.

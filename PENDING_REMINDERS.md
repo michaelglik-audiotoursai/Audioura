@@ -9,6 +9,23 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [ ] **⛔ 2026-08-18 21:49 — OPENAI CREDITS ARE EXHAUSTED. Only Michael can fix this.**
+      Three measurement runs died at the first API call: `credit_balance_exhausted`,
+      HTTP 429, nothing spent. **No tour can be generated at all** until credits are
+      added at platform.openai.com/settings/organization/billing. This blocks the story
+      work, every A/B, and the D480 3-run rule. Yesterday's spend was ~$3.13 / 16 runs.
+      Consequence already recorded: **45.7 is stale, do not re-quote it** (A199, D483).
+
+- [x] DONE 2026-08-18 21:4x — **Mission item 1 (audit the instruments as a class)** —
+      D483, commit `36235ce`. `text_fold.py` is now the one folding primitive; 4 defects
+      fixed across 3 gates; 60/60 new assertions, 21 red on revert. Items 2 and 3 were
+      folded into the same suite (TRUE sets for every gate; the paired-instrument
+      cross-check is section [5]). **Item 1's regex framing was slightly off** — all 42
+      regexes were clean on boundaries; the bugs were in substring `in` comparisons.
+      **Still open from that mission: the story-prompt extraction** — the one real
+      quality lever, deliberately untouched, to be started with Michael awake and not in
+      the same change as anything else (D474).
+
 - [ ] **2026-08-18 17:0x — THE MISSION FOR THE NEXT SESSION, decided from measurement:**
       Michael asked what the culprit of slow progress is. **It is that the instruments
       lie, and each fix reveals another.** Of 17 decisions on 2026-08-18, **11 were

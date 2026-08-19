@@ -1093,6 +1093,38 @@ Report mean and range over ≥3 runs. Final state: **45.7 mean, range 43–48.**
 $1.94 estimated because variance-run cost lines were grepped away. **`cost_ledger`
 under-reports host-side work ~20×** — it showed $0.1110.
 
+**A195. Why the instruments keep lying: three siblings ask the same question and only the
+newest is right.** The org gate folded accents; `check_person_grounded` and
+`_agent_in_text` did not. `story_validator._NAME_SPAN` used the accented capital class;
+its three siblings used bare `[A-Z]`. Each was fixed correctly by whoever had just been
+bitten, and nothing carried it sideways. Fix: **one primitive**
+([`text_fold.py`](text_fold.py)) that every entity-vs-corpus comparison calls, plus a
+**table-driven** suite so a new gate inherits every probe. [D483]
+
+**A196. The word-boundary hunt came back EMPTY — the bugs were in the `in` comparisons.**
+All 42 compiled regexes in the chain were swept mechanically; none matches inside a longer
+word. `_agent_in_text('Ars', 'Arsenal Gallery')` returned True because it was a plain
+substring test, not a regex. An audit scoped to "every regex" would have missed all of it.
+[D483]
+
+**A197. A gate needs a TRUE set, not only a FALSE set — and here is what that buys.**
+`check_org_grounded` exempted any name *containing* a famous museum's, so `Tate Modern
+Press`, `The Met Foundation` and `Louvre Editions` grounded for free against a corpus
+naming none of them. Inventing a publishing arm for a real museum was the one fabrication
+shape guaranteed to pass. The false-rejection half fails loudly and got fixed four times in
+one day; this half fails silently and nobody had looked. [D483, STORY_GATE_TIERS.md m.6]
+
+**A198. A gate that cannot SEE an entity reports success, not a miss.**
+`_PERSON_MULTI_WORD` is gate 5.158's extractor and was blind to `É`, so "Édouard Manet"
+was never recognised as a person and never checked for grounding. The cost was an
+inspection, not a drop. [D483]
+
+**A199. OpenAI credits are exhausted (2026-08-18 21:49).** Three measurement runs failed
+at the first API call — `credit_balance_exhausted`, nothing spent. **No tour can be
+generated at all until credits are added**, which is Michael's billing action. Consequence
+for the record: **45.7 (A193) is stale and must not be re-quoted** — these were
+gate-behaviour changes and their end-to-end effect is unmeasured. [D483]
+
 ## Code map — added 2026-08-18
 - [`STORY_BASELINE.md`](STORY_BASELINE.md) — what the pipeline actually does, with links
 - [`story_iteration_chart.py`](story_iteration_chart.py) — the retry loop in the lab
@@ -1100,3 +1132,6 @@ under-reports host-side work ~20×** — it showed $0.1110.
 - [`gate_fp_probe.py`](gate_fp_probe.py) — false-rejection probe (premise flawed, see A182)
 - [`run_full_tour_release_check.py`](run_full_tour_release_check.py) — full tour + per-stop scores
 - `VARIANCE_{CLEAN,CONTROL,WIDENED}.log` — the three A/B arms
+- [`text_fold.py`](text_fold.py) — THE accent-fold + whole-word primitive for the gate chain
+- [`test_local483_gate_fold_and_boundary.py`](test_local483_gate_fold_and_boundary.py) — the gate chain audited as a class
+- `LOCAL483_REMEASURE.log` — the three blocked runs (`credit_balance_exhausted`)
