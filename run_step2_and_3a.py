@@ -50,6 +50,7 @@ from exhibition_checklist import find_exhibition_checklist    # noqa: E402
 from generate_tour_text import match_work_for_stop            # noqa: E402
 from story_pass import MATRIX_KEYS, MATRIX_SLOTS              # noqa: E402
 from story_worthiness import assess_stop_worthiness           # noqa: E402
+from text_fold import is_placeholder                          # noqa: E402
 
 
 def rule(c='─', n=78):
@@ -79,7 +80,14 @@ for i, name in enumerate(STOP_NAMES, 1):
     # Exactly production's LOCAL-419 enrichment, then D498's slot assembly.
     sources = {
         'canonical_title': name,
-        'english_title': work.get('english_title', '') or '',
+        # Production does NOT leave this empty: `_s_english_title =
+        # _s_poi.get('english_title', _s_name)` falls back to the canonical
+        # title, and the checklist only overrides it if it has something better.
+        # An earlier version of this script omitted the fallback and reported the
+        # slot as EMPTY on all three stops, which is not what a real run shows.
+        # Reproduced faithfully here — the slot is FILLED, with a copy of the
+        # title, which is a different and more interesting problem.
+        'english_title': (work.get('english_title', '') or name),
         'artist': work.get('artist', '') or '',
         'publisher': work.get('publisher', '') or '',
         'printed_by': work.get('printed_by', '') or work.get('printer', '') or '',
@@ -129,8 +137,20 @@ for i, name, work, matrix, v in rows:
             shown = shown[:57] + '...'
         print(f"   {mark} {labels.get(k, k):<18} {shown}")
     filled = sum(1 for k in MATRIX_KEYS if matrix[k])
-    print(f"     -> {filled}/{len(MATRIX_KEYS)} filled; empty: "
-          f"{[k for k in MATRIX_KEYS if not matrix[k]] or 'none'}")
+    # A slot holding "Not specified", or a copy of another slot, is filled by the
+    # counter and empty to the query synthesiser. Counted separately so the
+    # headline number cannot flatter itself.
+    placeholder = [k for k in MATRIX_KEYS
+                   if matrix[k] and is_placeholder(matrix[k])]
+    echoed = [k for k in MATRIX_KEYS
+              if k != 'canonical_title' and matrix[k]
+              and matrix[k] == matrix['canonical_title']]
+    real = filled - len(placeholder) - len(echoed)
+    print(f"     -> {filled}/{len(MATRIX_KEYS)} filled, but only {real} carry "
+          f"information")
+    print(f"        empty:        {[k for k in MATRIX_KEYS if not matrix[k]] or 'none'}")
+    print(f"        placeholder:  {placeholder or 'none'}")
+    print(f"        echoes title: {echoed or 'none'}")
 
 print()
 rule('═')

@@ -50,7 +50,7 @@ story prompt can see. An empty slot is a question the system cannot ask.
   STOP 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
 ──────────────────────────────────────────────────────────────────────────────
      canonical_title    Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
-   ! english_title      (EMPTY)
+     english_title      Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
      artist             Joan Miró
      publisher          Louis Broder
    ! printed_by         (EMPTY)
@@ -58,12 +58,15 @@ story prompt can see. An empty slot is a question the system cannot ask.
      credit_line        Gift of Boris Fridman. © Successió Miró / Artists Rights ...
      venue_name         Museum of Fine Arts, Boston
    ! Focus fact (7b)    (EMPTY)
-     -> 6/9 filled; empty: ['english_title', 'printed_by', 'focus_fact']
+     -> 7/9 filled, but only 6 carry information
+        empty:        ['printed_by', 'focus_fact']
+        placeholder:  none
+        echoes title: ['english_title']
 ──────────────────────────────────────────────────────────────────────────────
   STOP 2: Au Soleil du Plafond
 ──────────────────────────────────────────────────────────────────────────────
      canonical_title    Au Soleil du Plafond
-   ! english_title      (EMPTY)
+     english_title      Au Soleil du Plafond
      artist             Juan Gris
      publisher          Not specified
    ! printed_by         (EMPTY)
@@ -71,12 +74,15 @@ story prompt can see. An empty slot is a question the system cannot ask.
      credit_line        Not specified
      venue_name         Museum of Fine Arts, Boston
    ! Focus fact (7b)    (EMPTY)
-     -> 6/9 filled; empty: ['english_title', 'printed_by', 'focus_fact']
+     -> 7/9 filled, but only 3 carry information
+        empty:        ['printed_by', 'focus_fact']
+        placeholder:  ['publisher', 'medium', 'credit_line']
+        echoes title: ['english_title']
 ──────────────────────────────────────────────────────────────────────────────
   STOP 3: Moses and Monotheism
 ──────────────────────────────────────────────────────────────────────────────
      canonical_title    Moses and Monotheism
-   ! english_title      (EMPTY)
+     english_title      Moses and Monotheism
      artist             Salvador Dalí
      publisher          Not specified
    ! printed_by         (EMPTY)
@@ -84,7 +90,10 @@ story prompt can see. An empty slot is a question the system cannot ask.
      credit_line        Not specified
      venue_name         Museum of Fine Arts, Boston
    ! Focus fact (7b)    (EMPTY)
-     -> 6/9 filled; empty: ['english_title', 'printed_by', 'focus_fact']
+     -> 7/9 filled, but only 4 carry information
+        empty:        ['printed_by', 'focus_fact']
+        placeholder:  ['publisher', 'credit_line']
+        echoes title: ['english_title']
 
 ══════════════════════════════════════════════════════════════════════════════
 STOPPING HERE. No query issued, no story written, no ranking performed.
