@@ -8939,6 +8939,22 @@ Exempt: navigation directions ("Turn left", "Continue past").
             and os.environ.get('GENERATION_TIER', 'plus') != 'free'):
         try:
             from work_story_searcher import search_stories_for_stop, synthesize_queries
+            from work_story_searcher import set_venue_domain
+            # [D495] Register the toured venue's own site so its pages — and its
+            # collection subdomain — classify tier1 without a Wikidata lookup.
+            # This replaces adding one museum to the hand-maintained seed list:
+            # the seed held 13 domains and not the venue we had been generating
+            # against for a week, and the next venue would have had the same hole.
+            # `_det_entity` is rebound in several branches above, so read it the
+            # defensive way rather than assuming it is bound.
+            _venue_ent = locals().get('_det_entity')
+            _venue_site = getattr(_venue_ent, 'official_url', '') if _venue_ent else ''
+            if _venue_site:
+                print(f"  [D495] venue domain seeded tier1: {set_venue_domain(_venue_site)}")
+            else:
+                set_venue_domain('')
+                print(f"  [D495] no venue URL resolved — venue-domain seeding inactive "
+                      f"for this run (falls back to Wikidata + disk cache)")
             print(f"\n  [LOCAL-410] SERP search wiring — searching for stories on {len(poi_list)} stops...")
             _local410_snippets = {}
             _local410_total_queries = 0
@@ -10269,17 +10285,20 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # Biography-only snippets are rejected outright (LOCAL-406 Part B).
                 from snippet_ranker import rank_and_cap_snippets, SNIPPET_CAP_PER_STOP
                 _ranked_snippets, _ranking_report = rank_and_cap_snippets(
-                    _stop_snippets, artist=artist, work_title=poi_name
+                    _stop_snippets, artist=artist, work_title=poi_name,
+                    category=tour_category,  # [D495] scopes the catalogue exemption
                 )
                 print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
                       f"input={_ranking_report['input_count']} "
                       f"bio_rejected={_ranking_report['rejected_biography_only']} "
                       f"tier3_demoted={_ranking_report['tier3_demoted']} "
+                      f"market_demoted={_ranking_report['market_demoted']} "
                       f"cap={_ranking_report['cap_applied']} "
                       f"output={_ranking_report['output_count']} "
                       f"usable={_ranking_report['usable_count']} "
                       f"(t1t2={_ranking_report['tier1_tier2_in_output']}, "
-                      f"t3={_ranking_report['tier3_in_output']}"
+                      f"t3={_ranking_report['tier3_in_output']}, "
+                      f"market={_ranking_report['market_in_output']}"
                       f"{', RESCUED' if _ranking_report['starvation_rescued'] else ''})")
                 if _ranking_report['scores']:
                     print(f"    Top scores: {_ranking_report['scores'][:3]}")

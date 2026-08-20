@@ -16,7 +16,15 @@ Durable across sessions. Delete a line once delivered.
       step that helps once pushed** — LEAD has not decrypted them and will not rewrite
       history (irreversible, Michael's call). See D223 / A-index.
 
-- [ ] **2026-08-19 — LEAD needs source names from Michael to do D492(d).** The retrieval
+- [x] ANSWERED 2026-08-20 — **source names delivered, recorded as D496.** Michael's order
+      for art stories: (1) museum scholarly record — wall texts and `/objects/` collection
+      pages, which carry production facts structurally; (2) artist foundation / catalogue
+      raisonné; (3) livre d'artiste printer and publisher archives (Mourlot, Broder,
+      Tériade, Verve, Maeght) — tier2, and only when `event=True`; (4) the art market,
+      always −5, no lookup. **(4) is built (D495). (1)–(3) as retrieval PREFERENCE are
+      not** — that is (c)/(e) and is where the next real gain is.
+
+- [x] SUPERSEDED by the line above — **LEAD needed source names from Michael for D492(d).** The retrieval
       is reaching auction and dealer listings: the best action-bearing sentence in 112
       retrieved sentences was a lot description, another stop's was *"Sold as a set of
       10."* Naming 3–5 source TYPES he trusts for art stories (museum scholarly

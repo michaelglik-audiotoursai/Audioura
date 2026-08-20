@@ -20131,3 +20131,161 @@ ahead of (c) event-shaped queries. What is withdrawn is the decision to stop iss
 constraint without being asked. The stated priority is story quality and getting generation
 into production; cost is a later conversation. Do not switch a quality capability off to
 save cents again.
+
+## D495 — (d): the source ranking. What was measured, and what it does NOT fix
+
+**2026-08-20, Michael's scope, built and red-checked.** D492 ordered the remaining
+work (b) → (d) → (c). (b) was already done — both triggers fire on kind, not length
+(D492b for replenishment, LOCAL-487 for the 7a retry). This is (d).
+
+### The correction that came first, and it matters more than the fix
+
+LEAD reported the tier arithmetic as *"the thing (d) has to fix"*. Measured, it is not:
+
+```
+                          lot(invaluable)   competitor
+strong event sentence           8               18      event wins
+  same, wikidata cold           8               12      event wins
+weak mfa.org checklist entry    8               10      mfa wins
+  same, wikidata cold           8                4      LOT WINS
+```
+
+**Against a real event sentence the lot loses comfortably either way.** The four fixes
+below would NOT have changed the 08-19 tour. What decided that run is D492's finding —
+there was no event sentence in the pool at all, so the lot won by walkover. (d) is
+**hardening; it is not the fix for storyless stops.** That remains (c) plus source
+selection. Recorded because the fix was nearly published as a cure.
+
+Where it does bite is the third row: weak-but-real museum material, which is what these
+stops actually have. There the ranking inverts outright on a cold-Wikidata run, 4 to 8.
+
+### The five changes
+
+**1. An art-market source class, decided before any network call.** `artnet.com` and
+`artsy.net` were in `tier2_news_domains` — 48 entries alongside the NYT and JSTOR —
+scoring **+1**. Artnet is a price database built on auction results; Artsy is a gallery
+marketplace. They join `invaluable`, `liveauctioneers`, `christies`, `sothebys`,
+`1stdibs`, `mutualart`, `abebooks`, `drouot`, `artprice` in `art_market_domains`, at
+`MARKET_PENALTY = -5`. Demoted, not rejected: an auction record is sometimes the only
+place a provenance fact appears, and starvation-rescue can still surface one.
+
+**2. The venue's own domain is tier1 for its own tour.** `mfa.org` was not in
+`institutional_domain_seed` — 13 hand-maintained domains, and not the venue we had
+generated every tour against for a week. **Michael refused the one-line patch**: *"Don't
+add mfa.org to seed manually. Implement: seed = { venue_domain } ∪ persistent_disk_cache."*
+Right, and the reason is the next venue. `set_venue_domain()` takes
+`VenueEntity.official_url`, already resolved per tour, and covers subdomains so
+`collections.mfa.org` is tier1 too.
+
+**3. Wikidata fails open.** The bug: `_check_wikidata_p856` returned `'tier3'` from the
+dead-host short-circuit while its own exception handlers returned `'unverified'` — the
+same event with two verdicts. And because `batch_check_wikidata_p856` submits that
+function per domain, **the first failure marked the host cold and every remaining domain
+in the run short-circuited to tier3 (−5)**. One hiccup demoted a whole run, the museum
+included. Now every path where we did not get an answer returns `unverified`; only a
+lookup that SUCCEEDED and found no institutional class returns tier3.
+
+`UNVERIFIED_PENALTY` is **0**, Michael's ruling: a lookup we could not perform carries no
+information about the source. It was −2, a penalty for our own infrastructure. This is
+only safe because of the split above — keep success-but-unknown at −5, or SEO filler
+rises to meet the museums.
+
+**4. A persistent domain-tier cache.** `_MODULE_DOMAIN_CACHE` is a plain module dict and
+every tour is a fresh process, so it started empty every run — while the comment on it
+claimed *"per-host across runs"*. Same class as D483: a comment asserting behaviour the
+code lacks. `.domain_tier_cache.json` persists **decisive verdicts only** — never
+`unverified`, because caching one bad network minute would make it permanent. This is
+what makes the hand-maintained seed list stop mattering on the second tour of any venue.
+
+**5. The production-fact bonus requires event company.** Two branches, one defect.
+
+The exemption at LOCAL-419 was meant to carve out a rare good case and swallowed the
+rule instead: the six `_PRODUCTION_FACT_PATTERNS` — publisher-by, printer-by, edition
+size, technique-on-paper, set/suite of N, paper names — **are the fields of an auction
+lot entry**. Measured: the same lot line scored 7 with the price present and 7 with it
+stripped, because either branch pays +3.
+
+- catalogue + production facts → **0 on museum tours** (was +3), scoped there because
+  that is where the story pass runs and where lot descriptions are the dominant genre.
+- non-catalogue + production facts → **+3 only when `_is_event_snippet` is also true**.
+  This is the branch that actually paid the D492 lot line, which carried no lot number
+  and no price and so was never classified as catalogue at all.
+
+**The discriminator is not WHICH facts are present.** The proposed alternative,
+"production facts excluding lot fields", describes the empty set. It is whether anyone is
+doing anything:
+
+```
+auction lot line           event=False  prod=True   -> no bonus
+pure spec sheet            event=False  prod=True   -> no bonus
+scholarly production note  event=True   prod=True   -> keeps it
+```
+
+### Verification
+
+`test_d495_source_ranking.py`, 22 assertions, five sections. **Six red-checks run, and
+two of them caught bad tests rather than confirming good code** — the standing check
+earning its place again (D242):
+
+- the disk-cache test asserted through `_disk_cache_load`, which filters on load as well
+  as on put, so deleting the put-side guard left it green. Re-anchored to the file.
+- the event-company tests asserted on `_is_event_snippet` directly — **testing the helper,
+  not the rule**. Deleting the clause from production changed nothing they looked at.
+  Re-written to measure the branch's actual point contribution.
+
+Regression: five suites fail, all five **identical to baseline `ccafaf5`** by test name,
+compared in a clean worktree. Two real breaks were caused and fixed —
+`test_local411`'s wiring guard does a literal substring match on the import line and a
+multi-line import broke it (reverted to one line), and `test_local445`'s dead-host test
+asserted `'tier3'`, which is the value D495 changes; updated to `TIER_UNVERIFIED` with
+the no-network assertion it exists for left intact.
+
+**Not run live.** No tour generated; Michael has not asked for one.
+
+## D496 — Michael's source order for art stories, which answers the D492(d) ask
+
+**2026-08-20.** The pending ask — 3–5 source TYPES he trusts — answered. Recorded because
+it is the one input that cannot be derived from the code, and (c) and (e) both need it.
+
+1. **Museum scholarly record** — event and production facts together. Exhibition wall
+   texts (freely accessible via the MFA's mobile app; summary wall text on the exhibition
+   page), and `/objects/` collection pages, which carry production facts **structurally
+   rather than as snippets**. Any `collections.*` / `*.museum` / `*.musee.fr` / `*.museo.es`
+   with a P856 and an art-museum class.
+2. **Artist foundation / catalogue raisonné** — `fundacio*`, `foundation*`, the artist's
+   own foundation. Resolved once via P856, then cached.
+3. **Livre d'artiste printer and publisher archives** — Mourlot, Broder, Tériade, Verve,
+   Maeght. Tier2, and **only counts when `event=True`**, per D495's new rule.
+4. **The art market, always −5, no lookup** — implemented as D495(1).
+
+**Not yet built: 1–3 as retrieval preference.** D495 only stops the market winning. Making
+the generator PREFER these sources is (c)/(e) and is where the next real gain is.
+
+## D497 — (e) and (f) opened; what belongs in each
+
+**(e) — venue/geo/language-aware source tiering.** Seed the toured venue's domain
+automatically (landed early in D495) and extend: per-category tier lists — there is one
+global `tier2_news_domains` for every tour type, so Eater and Infatuation cannot be tier1
+for a restaurant tour, nor Trailforks and Komoot for a biking one. Language-aware query
+synthesis: **`venue_lang` is hardcoded `'en'`** at the stop-data construction in
+`generate_tour_text.py` even though `VenueEntity.language` is resolved and available —
+found while building D495. Geo-bias SERP by country. Accent-folding on corpus joins (D243).
+
+**Not urgent, and the reason matters:** the entire storied story pipeline runs under
+`tour_category == 'museum'` today, so per-category tier lists buy nothing until another
+category gets a story pass. `venue_lang` is the live half of (e).
+
+**Rejected from (e): language-aware Wikidata.** The suggestion was to try French Wikipedia
+P856 before English. The call is a SPARQL `ASK` on `wdt:P856` and `wdt:P31/wdt:P279*` —
+no labels, no sitelinks, **no language dimension at all**. Wikidata items are not
+per-language. There is nothing there to make language-aware. Language matters in
+retrieval, not in classification.
+
+**(f) — split the snippet pool.** D495 tunes a single ranked list that two consumers want
+opposite things from: the story pass needs events, the description prompt needs production
+specifics (LOCAL-407/408 mine them out of snippet text). One capped list serving both is
+**why the LOCAL-419 exemption was added in the first place**, and why removing it carried
+any risk. Ranking facts and events separately, each with its own cap, would end this class
+of bug rather than tune it. Michael: *"make it a separate task, don't fold into (d) —
+it touches prompt and ranking cap, bigger than hardening."* Touches the prompt, so it
+wants D474's discipline: alone, with him awake.

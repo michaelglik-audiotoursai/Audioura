@@ -215,8 +215,16 @@ class TestDeadHostBreaker(unittest.TestCase):
         # Now call P856 — it should NOT call urlopen
         result = wss._check_wikidata_p856('example-museum.org')
 
-        # Result must be tier3 (failure value)
-        self.assertEqual(result, 'tier3')
+        # [D495] Result must be `unverified`, not `tier3`. This assertion used to
+        # read 'tier3' and that value was the bug: because
+        # `batch_check_wikidata_p856` submits `_check_wikidata_p856` per domain,
+        # the first failure marked the host cold and every remaining domain in
+        # the run took THIS path — so one Wikidata hiccup demoted a whole run by
+        # 5 points, the toured museum's own site included. "We could not reach
+        # Wikidata" and "Wikidata answered, not an institution" are now different
+        # verdicts. The no-network assertion below is what this test is FOR and
+        # is unchanged.
+        self.assertEqual(result, wss.TIER_UNVERIFIED)
         # NO network call issued
         mock_urlopen.assert_not_called()
         print(f"\n  [DEAD-HOST] Second call to cold host: NO network request ✓")

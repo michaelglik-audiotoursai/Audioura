@@ -50,10 +50,28 @@ SNIPPET_CAP_PER_STOP = int(os.environ.get('SNIPPET_CAP_PER_STOP', '5'))
 # both have the same content, but still possible when tier3 is the ONLY source.
 TIER3_PENALTY = int(os.environ.get('SNIPPET_TIER3_PENALTY', '-5'))
 
-# [LOCAL-459] R1/R2: Unverified penalty — lighter than tier3. A Wikidata timeout
-# is a fact about our network, not about the domain. freud.org.uk and belvedere.at
-# should not be penalized as heavily as a confirmed non-institutional domain.
-UNVERIFIED_PENALTY = int(os.environ.get('SNIPPET_UNVERIFIED_PENALTY', '-2'))
+# [LOCAL-459] R1/R2: Unverified penalty — a Wikidata timeout is a fact about our
+# network, not about the domain. freud.org.uk and belvedere.at should not be
+# penalized as heavily as a confirmed non-institutional domain.
+#
+# [D495] NOW ZERO, not -2. Michael's ruling: a lookup we could not perform
+# carries no information about the source, so it must move the score by nothing.
+# -2 was a penalty for our own infrastructure. This only became safe once
+# `work_story_searcher` stopped collapsing "lookup failed" and "lookup succeeded,
+# not an institution" into the same verdict — the second still scores -5.
+UNVERIFIED_PENALTY = int(os.environ.get('SNIPPET_UNVERIFIED_PENALTY', '0'))
+
+# [D495] The commercial art trade: auction houses, price databases, dealer
+# marketplaces. Same weight as tier3 and for a different reason — a lot
+# description is not low-quality prose, it is a different GENRE. Measured
+# cause (D492): the best action-bearing sentence in 112 retrieved for one stop
+# was an auction lot line, and another stop's was "Sold as a set of 10."
+MARKET_PENALTY = int(os.environ.get('SNIPPET_MARKET_PENALTY', '-5'))
+
+# The demoted classes, for tie-breaks and starvation rescue. On an equal score a
+# tier1/tier2 source must win; and when a stop has nothing else, any of these may
+# still be rescued rather than leaving the stop with no material at all.
+_LOWER_TIERS = ('tier3', 'unverified', 'market')
 
 # Verbs of consequence — actions that indicate a story, not a description
 _VERBS_OF_CONSEQUENCE = re.compile(
@@ -154,8 +172,11 @@ def _has_production_fact_content(text: str) -> bool:
     return matches >= 2
 
 
-def score_snippet(snippet: Dict, artist: str = '') -> int:
+def score_snippet(snippet: Dict, artist: str = '', category: str = '') -> int:
     """Score a single snippet for story quality.
+
+    `category` is the tour category ('museum', 'walking', …). [D495] Only the
+    catalogue/production-fact exemption reads it; '' preserves prior behaviour.
 
     Returns:
       Positive score for good snippets, -999 for biography-only rejects.
@@ -227,6 +248,10 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     # so that freud.org.uk (national museum) is not punished like SEO filler.
     elif tier == 'unverified':
         score += UNVERIFIED_PENALTY
+    # [D495] The art market is a source CLASS decided from the rules file before
+    # any network call, not a failure state.
+    elif tier == 'market':
+        score += MARKET_PENALTY
 
     # Contains artist surname: +1
     if artist:
@@ -248,9 +273,29 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     if _is_catalogue and not _has_production_facts:
         score -= 4
     elif _is_catalogue and _has_production_facts:
-        # [LOCAL-419] Production-fact catalogue entries get a BONUS — these
-        # are the snippets that contain publisher, printer, edition size, medium.
-        score += 3
+        # [LOCAL-419] Production-fact catalogue entries got a BONUS — these are
+        # the snippets that contain publisher, printer, edition size, medium.
+        #
+        # [D495] ON MUSEUM TOURS THAT BONUS IS NOW ZERO. The exemption was meant
+        # to carve out a rare good case and instead swallowed the rule: the six
+        # `_PRODUCTION_FACT_PATTERNS` — publisher-by, printer-by, edition size,
+        # technique-on-paper, set/suite of N, paper names — ARE the fields of an
+        # auction lot entry. There is nothing left to penalise once they are
+        # exempt. Measured: the same lot line scored 7 with the price present and
+        # 7 with it stripped, because either branch pays +3.
+        #
+        # Zero rather than -4: the material stays reachable (a lot record is
+        # sometimes the only place a provenance fact appears) and simply cannot
+        # win. The actual demotion comes from the `market` domain class.
+        #
+        # Scoped to museum because that is where the story pass runs
+        # (`generate_tour_text.py`, `tour_category == 'museum'`), and where lot
+        # descriptions are the dominant genre in the pool. `category=''` keeps
+        # the old behaviour for every other caller.
+        if category == 'museum':
+            pass  # +0
+        else:
+            score += 3
 
     # ─── LOCAL-412: Event/narrative bonus ───────────────────────────────────
     # A snippet that describes a specific historical event (person did X in Y)
@@ -266,7 +311,24 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     # [LOCAL-419] Production-fact bonus (non-catalogue snippets too)
     # Snippets that name the publisher, printer, edition, or medium of the work
     # get a bonus even if they aren't catalogue entries.
-    if _has_production_facts and not _is_catalogue:
+    #
+    # [D495] NOW REQUIRES EVENT COMPANY. This is the branch that actually paid
+    # the D492 lot line: it carried no lot number and no price, so
+    # `_is_catalogue_snippet` never saw it, and it collected +3 here as though it
+    # were a scholarly production note.
+    #
+    # The discriminator is not WHICH facts are present — the alternative proposal
+    # of "production facts excluding lot fields" describes the empty set, since
+    # all six patterns are standard lot fields. It is whether anyone is DOING
+    # anything. Verified on real material:
+    #
+    #   auction lot line           event=False  prod=True   -> no bonus
+    #   pure spec sheet            event=False  prod=True   -> no bonus
+    #   scholarly production note  event=True   prod=True   -> keeps it
+    #
+    # Applied at every category, unlike the catalogue branch above: a spec sheet
+    # with no actor is not a story on a walking tour either.
+    if _has_production_facts and not _is_catalogue and _is_event_snippet(text):
         score += 3
 
     return score
@@ -526,6 +588,7 @@ def rank_and_cap_snippets(
     cap: int = None,
     work_title: str = '',
     stop_record: Dict = None,
+    category: str = '',
 ) -> Tuple[List[Dict], Dict]:
     """Rank snippets by story quality and cap at top N.
 
@@ -558,6 +621,7 @@ def rank_and_cap_snippets(
     rejected_bio = 0
     tier3_demoted = 0
     unverified_count = 0
+    market_demoted = 0  # [D495]
 
     # [LOCAL-419] Normalize work title for relevance check
     _work_title_lower = work_title.lower().strip() if work_title else ''
@@ -574,7 +638,7 @@ def rank_and_cap_snippets(
         _stop_terms = _build_stop_relevance_terms(_fallback_record)
 
     for snip in snippets:
-        s = score_snippet(snip, artist)
+        s = score_snippet(snip, artist, category=category)
         if s == -999:
             rejected_bio += 1
         else:
@@ -616,10 +680,13 @@ def rank_and_cap_snippets(
                 tier3_demoted += 1
             elif snip.get('tier') == 'unverified':
                 unverified_count += 1
+            elif snip.get('tier') == 'market':
+                market_demoted += 1  # [D495]
             scored.append((s, snip))
 
-    # Sort descending by score, with tier1/tier2 winning ties over tier3/unverified
-    scored.sort(key=lambda x: (x[0], 0 if x[1].get('tier') in ('tier3', 'unverified') else 1), reverse=True)
+    # Sort descending by score, with tier1/tier2 winning ties over the demoted
+    # classes. [D495] `market` joins that set: on a tie, the museum wins.
+    scored.sort(key=lambda x: (x[0], 0 if x[1].get('tier') in _LOWER_TIERS else 1), reverse=True)
 
     # Cap
     capped = scored[:cap]
@@ -638,7 +705,7 @@ def rank_and_cap_snippets(
         if usable_count == 0 and capped:
             _all_lower_tier_relevant = [
                 (s, snip) for s, snip in scored
-                if snip.get('tier') in ('tier3', 'unverified')
+                if snip.get('tier') in _LOWER_TIERS
                 and _snippet_is_title_relevant(snip, work_title)
             ]
             if _all_lower_tier_relevant:
@@ -693,6 +760,7 @@ def rank_and_cap_snippets(
     # [LOCAL-414] Report how many tier3 snippets survived into the final output
     tier3_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'tier3')
     unverified_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'unverified')
+    market_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'market')  # [D495]
     tier1_tier2_in_output = sum(1 for _, snip in capped if snip.get('tier') in ('tier1', 'tier2'))
 
     report = {
@@ -700,8 +768,10 @@ def rank_and_cap_snippets(
         'rejected_biography_only': rejected_bio,
         'tier3_demoted': tier3_demoted,
         'unverified_count': unverified_count,
+        'market_demoted': market_demoted,          # [D495]
         'tier3_in_output': tier3_in_output,
         'unverified_in_output': unverified_in_output,
+        'market_in_output': market_in_output,      # [D495]
         'tier1_tier2_in_output': tier1_tier2_in_output,
         'cap_applied': cap,
         'output_count': len(capped),

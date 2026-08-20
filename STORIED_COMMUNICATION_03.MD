@@ -974,3 +974,69 @@ then stopped instead. This file had not been touched since 00:21 by the previous
 with every answer going to `DECISIONS.md` instead. And roughly half the replies carried the
 `[Storied_Tours]@date|time` prefix; the mid-work ones had none, and the times printed were
 estimated rather than read, drifting ~45 minutes by midday.
+
+# 2026-08-20
+
+## Q1 (10:32) — "restart"
+
+Clean and idle: `storied` @ `ccafaf5`, 0 unpushed, nothing in flight, 31 real tour rows,
+no ROW LOSS. Only live alerts are the Boston Globe credential, deferred to the week of
+08-24.
+
+Matrix re-verified by call site: **seven of seven steps built**, not six — step 2
+(`story_worthiness`, LOCAL-486) and step 7b (`story_focus_fact`, LOCAL-491) have both
+landed since the record last said otherwise. **One half-row and one new defect: 7c's
+`_is_top_value_stop` occurs exactly once in the repository — the line reading it.**
+Nothing sets it, `MAX_SENTENCES_TOP = 7` is unreachable, and it cannot be fixed by adding
+the assignment: the step-5 index it depends on is computed two phases after the story pass
+chooses the sentence budget. Its own task, not folded into anything.
+
+## Q2 (11:39) — "explain the two mechanisms, and show me the 7 step matrix"
+
+**Checking properly changed both, and one of my claims was false.** I said the lot
+description escapes the catalogue penalty because it carries no price. It does not: the
+same sentence with `Lot 34 | Estimate: $3,000-5,000` put back scores **identically**. The
+real defect is that LOCAL-419's exemption is unreachable-by-construction — its six
+production-fact patterns ARE the fields of an auction lot.
+
+Second mechanism was worse than described: `artnet.com` and `artsy.net` were classified
+**tier2**, and `mfa.org` was in no seed list at all, so on a cold-Wikidata run the museum's
+own site scored −5 while the price database scored +1.
+
+## Q3 (12:20) — "confirm (d) is only the inversion, and geo/language/tour_type is (e)?"
+
+Confirmed, **with the correction that matters**: measured, the inversion would not have
+changed the 08-19 tour. Against a real event sentence the lot loses 8 to 18 either way.
+It only bites against weak-but-real museum material — which is what these stops have.
+**(d) is hardening; it is not the fix for storyless stops.**
+
+## Q4 (12:2x) — Meta AI's six suggestions, "not my directives, debate them"
+
+Three right, two wrong on the mechanism, one quoting an error of mine I had already
+retracted.
+
+- **Right:** fail-open on Wikidata; a local cache (the strongest idea in the set — it
+  dissolves the seed problem, and the module cache carried a comment falsely claiming it
+  already persisted across runs); the art-market class; per-category and geo tiering as (e).
+- **Wrong — language-aware Wikidata:** the SPARQL `ASK` has no language dimension. No
+  labels, no sitelinks. Wikidata items are not per-language. Nothing there to fix.
+- **Wrong — "production facts excluding lot fields":** that describes the empty set. All
+  six patterns are standard lot fields. The discriminator is not which facts but whether
+  anyone is doing anything — verified on real material, and it needs no `art_book` tour
+  type, which does not exist.
+- **Stale — "only 1 point apart":** my sentence, already retracted. The real compressed
+  margin is 10 vs 8 for weak museum material, and removing an unearned bonus fixes it.
+  Rescaling would not: it multiplies the noise with the signal.
+
+## Q5 (12:2x) — "go for (d) as scoped; open (e) and (f); don't add mfa.org manually"
+
+Built and recorded as D495. Five changes, 22 assertions, **six red-checks — two of which
+caught bad tests rather than confirming good code**: one asserted through a loader that
+filters as well as the writer, and the event-company tests asserted on the helper instead
+of the rule, staying green when the rule was deleted from production. Both re-anchored.
+
+Regression compared in a clean worktree at `ccafaf5`: five suites fail, all five identical
+to baseline by test name. Two real breaks caused and fixed. **Not run live.**
+
+Michael's source order recorded as D496 — it answers the pending D492(d) ask. (e) and (f)
+opened as D497.

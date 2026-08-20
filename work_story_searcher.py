@@ -21,12 +21,99 @@ EXTERNAL_LOOKUP_BATCH_BUDGET_SECONDS = 20.0  # Wall-budget for a batch of P856 l
 EXTERNAL_LOOKUP_POOL_SIZE = 10  # Thread pool size for concurrent lookups
 EXTERNAL_LOOKUP_PER_TIMEOUT = 8  # Per-lookup timeout (seconds), unchanged from original
 
-# Module-level domain tier cache — persists across calls within the same process/run
+# Module-level domain tier cache — process-lifetime only. Every tour generation is
+# a fresh process, so this starts empty every run. [D495] The comment that used to
+# sit on line 837 claimed it was "per-host across runs"; it never was, and that
+# false claim is why the seed hole went unnoticed for so long. The ACROSS-run cache
+# is `_DISK_CACHE_PATH` below.
 _MODULE_DOMAIN_CACHE: Dict[str, str] = {}
+
+# Tier constants. `market` is [D495]: the commercial art trade — auction houses,
+# price databases and dealer marketplaces. It is a source CLASS, not a failure
+# state, so it is decided from the rules file before any network call.
+TIER_MARKET = 'market'
+TIER_UNVERIFIED = 'unverified'
+
+# [D495] The venue whose tour is being generated. Its own domain — and any
+# subdomain of it, e.g. collections.mfa.org — is tier1 for that tour, because a
+# museum's own collection pages are the primary record for the objects in it.
+# Set per tour by the generator; never hardcoded to one venue (that was the
+# `institutional_domain_seed` mistake: 13 hand-maintained domains that did not
+# include the venue we had been generating against for a week).
+_VENUE_DOMAIN: str = ''
 
 # Load rules
 with open(RULES_PATH, 'r') as f:
     _RULES = json.load(f)
+
+
+def set_venue_domain(url_or_domain: str) -> str:
+    """Register the toured venue's own site for this run. Returns the domain set."""
+    global _VENUE_DOMAIN
+    d = (url_or_domain or '').strip()
+    if not d:
+        _VENUE_DOMAIN = ''
+        return ''
+    _VENUE_DOMAIN = normalize_domain(d) if '/' in d else d.lower()
+    return _VENUE_DOMAIN
+
+
+def _is_venue_domain(domain: str) -> bool:
+    """The venue's own domain, or a subdomain of it."""
+    if not _VENUE_DOMAIN or not domain:
+        return False
+    return domain == _VENUE_DOMAIN or domain.endswith('.' + _VENUE_DOMAIN)
+
+
+# ─── [D495] Persistent domain-tier cache ──────────────────────────────────────
+# A resolved domain does not change between runs, and the P856 lookup that
+# resolves it is the least reliable step in the chain: one timeout marks
+# query.wikidata.org cold and every remaining domain in that run short-circuits.
+# Resolving mfa.org ONCE and keeping the answer removes the dependency entirely
+# on every subsequent tour.
+#
+# ONLY DECISIVE ANSWERS ARE PERSISTED. `unverified` means "we could not reach
+# Wikidata", which is a fact about our network at one moment — caching it would
+# make one bad minute permanent.
+_DISK_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '.domain_tier_cache.json')
+_DISK_CACHE_DECISIVE = ('tier1', 'tier2', 'tier3', TIER_MARKET, 'reject')
+_DISK_CACHE: Dict[str, str] = {}
+
+
+def _disk_cache_load() -> Dict[str, str]:
+    global _DISK_CACHE
+    if _DISK_CACHE:
+        return _DISK_CACHE
+    try:
+        with open(_DISK_CACHE_PATH, 'r') as fh:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            _DISK_CACHE = {k: v for k, v in data.items()
+                           if isinstance(v, str) and v in _DISK_CACHE_DECISIVE}
+    except FileNotFoundError:
+        _DISK_CACHE = {}
+    except Exception as e:
+        print(f"  [D495] domain cache unreadable, starting empty (non-fatal): {e}")
+        _DISK_CACHE = {}
+    return _DISK_CACHE
+
+
+def _disk_cache_put(domain: str, tier: str) -> None:
+    """Persist a decisive verdict. Never persists `unverified`."""
+    if not domain or tier not in _DISK_CACHE_DECISIVE:
+        return
+    cache = _disk_cache_load()
+    if cache.get(domain) == tier:
+        return
+    cache[domain] = tier
+    try:
+        tmp = _DISK_CACHE_PATH + '.tmp'
+        with open(tmp, 'w') as fh:
+            json.dump(cache, fh, indent=0, sort_keys=True)
+        os.replace(tmp, _DISK_CACHE_PATH)
+    except Exception as e:
+        print(f"  [D495] domain cache not written (non-fatal): {e}")
 
 
 # --- DB connection (matches venue_resolver.py pattern) ---
@@ -84,6 +171,24 @@ def _classify_domain_quick(domain: str) -> Optional[str]:
     """
     domain = normalize_domain(domain) if '/' in domain else domain.lower()
 
+    # Step 0 [D495]: the toured venue's own site, and its subdomains.
+    # Ahead of everything else because no rule below can know which venue this
+    # tour is about, and the museum's own collection pages are the primary
+    # record for the objects on display in it.
+    if _is_venue_domain(domain):
+        return 'tier1'
+
+    # Step 0b [D495]: the commercial art trade — decided from the rules file,
+    # BEFORE any network call. These are the sources that made a lot description
+    # the best action-bearing sentence in 112 retrieved (D492); they are demoted
+    # rather than rejected, because an auction record can still be the only place
+    # a provenance fact appears, and starvation-rescue can still surface one.
+    if domain in _RULES.get('art_market_domains', []):
+        return TIER_MARKET
+    for _m in _RULES.get('art_market_domains', []):
+        if domain.endswith('.' + _m):
+            return TIER_MARKET
+
     # Step 1: Reject check FIRST (R1b)
     if domain in _RULES.get('reject_photo_hosts', []):
         return 'reject'
@@ -128,85 +233,76 @@ def classify_domain(domain: str, domain_cache: dict = None) -> str:
     """Classify a domain into tier1/tier2/tier3/reject.
 
     Evaluation order (R1): reject signals FIRST, then tier grant.
-    SPARQL timeout/failure → tier3 (leads-only), logged.
+    SPARQL timeout/failure → `unverified` (D495), never `tier3`. "We could not
+    reach Wikidata" and "Wikidata answered and this is not an institution" are
+    different findings and no longer share a verdict.
     """
     domain = normalize_domain(domain) if '/' in domain else domain.lower()
 
-    # Step 1: Reject check FIRST (R1b)
-    if domain in _RULES.get('reject_photo_hosts', []):
-        return 'reject'
-    if domain in _RULES.get('reject_satire_domains', []):
-        return 'reject'
-    # Known commerce/SEO patterns (extensible)
-    _commerce_patterns = ['shop.', 'store.', 'buy.', 'prints.', 'poster']
-    if any(p in domain for p in _commerce_patterns):
-        return 'reject'
-
-    # Step 1b: Platform/UGC hosts → reject (F2: before P856)
-    if domain in _RULES.get('reject_platforms', []):
-        return 'reject'
-    # Also check if domain is a subdomain of a platform
-    for platform in _RULES.get('reject_platforms', []):
-        if domain.endswith('.' + platform):
-            return 'reject'
-
-    # Step 2: Wikipedia/mirrors → tier1
-    if domain in ('en.wikipedia.org', 'wikipedia.org', 'britannica.com'):
-        return 'tier1'
-    if domain in _RULES.get('wikipedia_mirrors', []):
-        return 'tier1'  # syndication of wikipedia — T1 but counts as same source
-
-    # Step 3: Tier 2 news/journalism check
-    if domain in _RULES.get('tier2_news_domains', []):
-        return 'tier2'
-
-    # Step 4: TLD-based institutional signals
-    if domain.endswith('.edu') or domain.endswith('.gov') or domain.endswith('.museum'):
-        return 'tier1'
-    if domain.endswith('.gouv.fr') or domain.endswith('.ac.uk'):
-        return 'tier1'
-
-    # Step 4b: Institutional domain seed (cache-equivalent, data not class rule)
-    if domain in _RULES.get('institutional_domain_seed', []):
-        return 'tier1'
+    # Steps 0-4b are shared with the batch path. They were duplicated here for
+    # LOCAL-441 and the two copies then drifted — [D495] added the venue and
+    # art-market steps and only one copy would have got them. One body now.
+    quick = _classify_domain_quick(domain)
+    if quick is not None:
+        return quick
 
     # Step 5: Wikidata P856 check with class constraint (R1a)
     # Check domain_cache first
     if domain_cache and domain in domain_cache:
         return domain_cache[domain]
 
-    # [LOCAL-441] Check module-level cache (persists across calls within a run)
+    # [LOCAL-441] Check module-level cache (this process only)
     if domain in _MODULE_DOMAIN_CACHE:
         result = _MODULE_DOMAIN_CACHE[domain]
         if domain_cache is not None:
             domain_cache[domain] = result
         return result
 
+    # [D495] Check the ACROSS-run disk cache before spending a lookup. This is
+    # what makes the venue seed unnecessary on the second tour of any venue.
+    _disk = _disk_cache_load().get(domain)
+    if _disk:
+        _MODULE_DOMAIN_CACHE[domain] = _disk
+        if domain_cache is not None:
+            domain_cache[domain] = _disk
+        return _disk
+
     # Try SPARQL (P856 + P31 class constraint)
     tier = _check_wikidata_p856(domain)
     if domain_cache is not None:
         domain_cache[domain] = tier
     _MODULE_DOMAIN_CACHE[domain] = tier  # [LOCAL-441] Persist for future calls
+    _disk_cache_put(domain, tier)        # [D495] decisive answers only
     return tier
 
 
 def _check_wikidata_p856(domain: str) -> str:
     """Check Wikidata for institutional classification via P856 + P31 class constraint.
-    On timeout/failure → 'tier3' (leads-only, logged). Never 'tier1', never skipped.
 
-    [LOCAL-445-C] Dead-host rule: if query.wikidata.org (or any Wikimedia host) is
-    already cold, short-circuit immediately to 'tier3'. On first timeout/429, mark
-    cold for the remainder of the run.
+    [D495] FAIL-OPEN. Every path where we did not get an answer returns
+    `unverified`; only a successful lookup that found no institutional class
+    returns 'tier3'. Before this, the dead-host short-circuit and the
+    no-classes guard both returned 'tier3' while the exception handlers below
+    returned 'unverified' — the same event with two verdicts, and because
+    `batch_check_wikidata_p856` submits this function per domain, the FIRST
+    failure marked the host cold and every remaining domain in the run
+    short-circuited to tier3 (-5). One Wikidata hiccup demoted a whole run,
+    including the toured museum's own site.
+
+    [LOCAL-445-C] Dead-host rule: if query.wikidata.org (or any Wikimedia host)
+    is already cold, short-circuit immediately. On first timeout/429, mark cold
+    for the remainder of the run.
     """
     from dead_host_breaker import is_host_cold, mark_host_cold
 
     # [LOCAL-445-C] Dead-host check BEFORE any network call
     if is_host_cold('https://query.wikidata.org'):
-        return 'tier3'
+        return TIER_UNVERIFIED  # [D495] host is cold — a fact about our network
 
     institutional_classes = _RULES.get('tier1_institutional_classes', [])
     if not institutional_classes:
-        return 'tier3'
+        # [D495] Misconfiguration on our side, not a verdict about the domain.
+        return TIER_UNVERIFIED
 
     # Build SPARQL ASK with P31/P279* class constraint (R1a)
     classes_values = ' '.join(f'wd:{qid}' for qid in institutional_classes)
@@ -260,7 +356,9 @@ def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
     """[LOCAL-441] Concurrently check multiple domains against Wikidata P856.
 
     Runs lookups in parallel with a global wall-budget. When the budget expires,
-    unanswered lookups are treated as tier3 (same as timeout today).
+    unanswered lookups are `unverified` — [D495] not tier3. The docstring said
+    tier3 while the code below already said `unverified`; the mismatch is the
+    same class as the "persists across runs" comment on the module cache.
 
     Args:
         domains: list of unique domains to check (already filtered for cache hits)
@@ -865,18 +963,28 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
         domain = r['domain']
         if domain in domain_cache:
             continue  # Already resolved
-        # Check if resolvable without P856 (reject, tier1, tier2 rules)
+        # Check if resolvable without P856 (venue, art-market, reject, tier1, tier2)
         quick_tier = _classify_domain_quick(domain)
         if quick_tier is not None:
             domain_cache[domain] = quick_tier
-        else:
-            domains_needing_p856.add(domain)
+            continue
+        # [D495] Then the across-run disk cache — a domain resolved on any
+        # previous tour costs nothing here, which is what makes the
+        # hand-maintained institutional seed list stop mattering.
+        disk_tier = _disk_cache_load().get(domain)
+        if disk_tier:
+            domain_cache[domain] = disk_tier
+            _MODULE_DOMAIN_CACHE[domain] = disk_tier
+            continue
+        domains_needing_p856.add(domain)
 
     # [LOCAL-441] Phase 3: Batch concurrent P856 lookups with wall-budget
     if domains_needing_p856:
         p856_results = batch_check_wikidata_p856(list(domains_needing_p856))
         domain_cache.update(p856_results)
         _MODULE_DOMAIN_CACHE.update(p856_results)  # Persist for future calls in this run
+        for _d, _t in p856_results.items():
+            _disk_cache_put(_d, _t)  # [D495] decisive answers only; never `unverified`
 
     # [LOCAL-441] Phase 4: Classify all results using the now-populated cache
     for r in raw_serp_results:

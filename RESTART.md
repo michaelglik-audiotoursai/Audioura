@@ -1,11 +1,11 @@
-# RESTART briefing — generated 2026-08-19 09:55 EDT
+# RESTART briefing — generated 2026-08-20 10:32 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     f61639d restart briefing regenerated
-unpushed 108 commits
-dirty    1 files
+HEAD     ccafaf5 reminders: credential deferred to week of 08-24; LEAD needs source names for D492(d)
+unpushed 0 commits
+dirty    8 files
 ```
 
 ## Production safety
@@ -13,7 +13,7 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      590
+cost_ledger rows:      597
 ```
 ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 
@@ -64,10 +64,12 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  12:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
-  16:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
-  23:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  107:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  12:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+  19:- [ ] **2026-08-19 — LEAD needs source names from Michael to do D492(d).** The retrieval
+  27:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  31:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  38:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  122:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules
