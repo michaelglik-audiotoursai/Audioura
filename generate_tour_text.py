@@ -10998,7 +10998,13 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         _sp_t = _sp_s.get('snippet') if isinstance(_sp_s, dict) else str(_sp_s)
                         if _sp_t:
                             _sp_material.append(_sp_t)
-                    _sp_matrix = {
+                    # [D498] Step 3a: filled slot-by-slot from `story_pass`'s own
+                    # vocabulary, so the producer cannot drift from the consumer.
+                    # `_sp_sources` maps each slot to where production holds it;
+                    # any slot the prompt reads and this dict does not fill is a
+                    # KeyError here rather than a silently empty line there.
+                    from story_pass import MATRIX_KEYS
+                    _sp_sources = {
                         'canonical_title': poi.get('name', ''),
                         'english_title': poi.get('english_title', ''),
                         'artist': poi.get('artist', ''),
@@ -11010,6 +11016,11 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         # Step 7b's rotating fact, when a previous attempt set one.
                         'focus_fact': poi.get('_focus_fact', ''),
                     }
+                    _sp_matrix = {k: _sp_sources[k] for k in MATRIX_KEYS}
+                    _sp_filled = sum(1 for k in MATRIX_KEYS if _sp_matrix[k])
+                    print(f"  [D498] Stop {stop_num} matrix: {_sp_filled}/{len(MATRIX_KEYS)} "
+                          f"slots filled — empty: "
+                          f"{[k for k in MATRIX_KEYS if not _sp_matrix[k]] or 'none'}")
                     # Step 7c: 3-5 sentences, and a larger allowance only for the
                     # stop currently scoring highest — "in most valuable we can
                     # take a larger size".
@@ -13523,7 +13534,8 @@ REWRITE RULES (all mandatory):
               f"— these are spoken aloud")
 
     _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0,
-                    'trigger_floor': 0, 'trigger_no_story': 0}
+                    'trigger_floor': 0, 'trigger_no_story': 0,
+                    'trigger_top_value': 0}  # [D498]
     if _storied_mode and not _phase5_ceiling_breached:
         _RETRY_FLOOR = 120
 
@@ -13555,6 +13567,54 @@ REWRITE RULES (all mandatory):
         except Exception as _pi_err:
             print(f"  [LOCAL-487] pre-retry index unavailable, cap will fall back "
                   f"to stop order (non-fatal): {_pi_err}")
+
+        # -------- [D498] STEP 7c: "in most valuable we can take a larger size" --------
+        # `MAX_SENTENCES_TOP = 7` has existed since LOCAL-491 and was UNREACHABLE:
+        # `_is_top_value_stop` occurred exactly once in the repository — the line
+        # reading it at the story pass. Nothing ever set it, so every stop was
+        # capped at MAX_SENTENCES = 5 and the record credited step 7c as landed.
+        #
+        # It could not be fixed by adding the missing assignment, and that is the
+        # real content of this fix. "Most valuable" is a statement about the
+        # step-5 index; the index scores WRITTEN prose; the story pass chooses the
+        # sentence budget BEFORE any prose exists. There is no moment during the
+        # first pass at which the answer is knowable.
+        #
+        # So the larger allowance is spent where the answer DOES exist: here,
+        # after the index has been computed, in the retry phase that already
+        # regenerates stops. The top stop is marked and joins the retry set; the
+        # story pass reads the flag on regeneration and writes to 7 sentences.
+        #
+        # ACCEPTANCE IS AN INDEX IMPROVEMENT, not length. A longer retry that
+        # scores worse is a worse stop, and "it got longer" is the acceptance bug
+        # LOCAL-487 removed from the storyless trigger — re-importing it here
+        # would undo that lesson one screen further down.
+        _top_value_idx = None
+        if os.environ.get('DISABLE_STORY_TOP_SIZE', '').strip() != '1':
+            _scored_stops = [(i, p.get('_story_index')) for i, p in enumerate(poi_list)
+                             if isinstance(p.get('_story_index'), (int, float))
+                             and (p.get('description') or '')
+                             and not (p.get('description') or '').startswith('[')]
+            if _scored_stops:
+                _top_value_idx = max(_scored_stops, key=lambda t: (t[1], -t[0]))[0]
+                poi_list[_top_value_idx]['_is_top_value_stop'] = True
+                from story_pass import MAX_SENTENCES, MAX_SENTENCES_TOP, sentences_in
+                # THE STORY, not the description. Measured on the 14:28 live run:
+                # stop 2's story pass wrote 5 sentences — exactly at the cap, so
+                # the larger allowance was the whole point — while its assembled
+                # description was 9, because the description also carries
+                # orientation, directions and transitions. Counting the
+                # description made `_top_value` false for every stop and left 7c
+                # dead in a new way. The unit tests could not see this; they
+                # asserted the flag was written, not what it was measured against.
+                _sp_res = poi_list[_top_value_idx].get('_story_pass') or {}
+                _cur_sent = sentences_in(_sp_res.get('story') or '')
+                print(f"\n  [D498] step 7c: most valuable stop is "
+                      f"{_top_value_idx + 1} '{poi_list[_top_value_idx].get('name','')[:38]}' "
+                      f"(index {poi_list[_top_value_idx].get('_story_index')}) — allowance "
+                      f"{MAX_SENTENCES} -> {MAX_SENTENCES_TOP} sentences on regeneration, "
+                      f"story currently {_cur_sent} sentence(s)"
+                      f"{' — no story pass result, cannot judge' if not _sp_res else ''}")
 
         _no_story_stops = set()
         try:
@@ -13617,8 +13677,21 @@ REWRITE RULES (all mandatory):
                          and len(_before.split()) - _now_wc >= 15)
             # Trigger 2 (LOCAL-487): there is no valid story, at any length.
             _storyless = _ri in _no_story_stops
+            # Trigger 3 [D498]: this is the most valuable stop and it may now be
+            # written longer. Only worth a generation if it is not already using
+            # the larger allowance.
+            _top_value = (_ri == _top_value_idx)
+            if _top_value:
+                # The STORY's length, not the description's — see the note at the
+                # flag assignment. No story-pass result means we cannot tell
+                # whether the allowance would buy anything, so do not spend.
+                from story_pass import (MAX_SENTENCES as _D498_MAX,
+                                        sentences_in as _D498_sent)
+                _sp_r = _rpoi.get('_story_pass') or {}
+                _top_value = bool(_sp_r) and 0 < _D498_sent(
+                    _sp_r.get('story') or '') <= _D498_MAX
 
-            if not _hollowed and not _storyless:
+            if not _hollowed and not _storyless and not _top_value:
                 continue
             # A stop that was never worth mining has no second fact to rotate to;
             # retrying it spends money on the same absent corpus. Step 2 already
@@ -13627,7 +13700,18 @@ REWRITE RULES (all mandatory):
                 _w = _rpoi.get('_worthiness') or {}
                 if _w.get('worth_mining') is False:
                     continue
-            _retry_stats['trigger_floor' if _hollowed else 'trigger_no_story'] += 1
+            # [D498] Counted separately, and BEFORE the floor/no-story branch, so
+            # the summary cannot report a trigger that fired as zero. The existing
+            # two-way `trigger_floor if _hollowed else trigger_no_story` does
+            # exactly that: on the 08-20 run step 7a detected 2 storyless stops
+            # and the summary printed "0 storyless", because both were also
+            # hollowed and the ternary can only credit one.
+            if _hollowed:
+                _retry_stats['trigger_floor'] += 1
+            if _storyless:
+                _retry_stats['trigger_no_story'] += 1
+            if _top_value and not _hollowed and not _storyless:
+                _retry_stats['trigger_top_value'] += 1
             _retry_stats['eligible'] += 1
 
             _removed = _sentences_removed_by_gates(_before, _now)
@@ -13762,7 +13846,34 @@ REWRITE RULES (all mandatory):
                 # same detector that rejected the first draft.
                 _accept = False
                 if _new_desc and not _new_desc.startswith('['):
-                    if _storyless and not _hollowed:
+                    if _top_value and not _hollowed and not _storyless:
+                        # [D498] The most valuable stop was already the best one.
+                        # Spending a generation on it is only justified by a
+                        # MEASURED improvement, so it is judged on the step-5
+                        # index — not on length, which is what it was allowed to
+                        # add. `apply_story_index` is pure and costs no API call.
+                        try:
+                            from story_index_pass import (
+                                apply_story_index as _d498_idx,
+                                build_index_corpus as _d498_corpus)
+                            _before_ix = _rpoi.get('_story_index')
+                            _probe = [{'name': _rpoi.get('name', ''),
+                                       'description': _new_desc}]
+                            _d498_idx(_probe, corpus=_d498_corpus(
+                                _exhibition_checklist_result, _stop_corpus_data))
+                            _after_ix = _probe[0].get('_story_index')
+                            _accept = (isinstance(_after_ix, (int, float))
+                                       and isinstance(_before_ix, (int, float))
+                                       and _after_ix > _before_ix)
+                            print(f"    [D498] step 7c judged on the index, not on "
+                                  f"length: {_before_ix} -> {_after_ix}, "
+                                  f"accepted={_accept}")
+                        except Exception as _d498_err:
+                            print(f"    [D498] index unavailable — the longer draft "
+                                  f"is REJECTED rather than accepted unmeasured "
+                                  f"({_d498_err})")
+                            _accept = False
+                    elif _storyless and not _hollowed:
                         try:
                             from story_opportunity_scan import (
                                 measure as _am, verdict as _av)
@@ -13798,7 +13909,10 @@ REWRITE RULES (all mandatory):
                   f"{_retry_stats['kept_original']} kept original")
             print(f"  [LOCAL-487] triggers: {_retry_stats['trigger_floor']} hollowed "
                   f"by gates, {_retry_stats['trigger_no_story']} storyless "
-                  f"(step 7a — Michael's bar, independent of length)")
+                  f"(step 7a — Michael's bar, independent of length), "
+                  f"{_retry_stats['trigger_top_value']} top-value "
+                  f"(step 7c — larger allowance). Triggers overlap and are counted "
+                  f"separately; they do not sum to 'eligible'.")
             print(f"  [LOCAL-474] each regenerated stop was re-gated before being "
                   f"accepted; a retry can only replace text it beats after gating.")
 

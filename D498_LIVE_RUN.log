@@ -1,0 +1,217 @@
+location : Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+stops    : 4
+cap      : 20
+out      : TOUR_MFA_RELEASE_20260820_1423.txt
+
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:6134. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:6135. Caller should supply input_tokens and output_tokens separately.
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260820_142330.txt'
+
+======================================================================
+CALL #001 | 14:23:30.030 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  tour_type: museum
+  total_stops_parameter: 4
+  output_file: /Users/micha/Audioura/TOUR_MFA_RELEASE_20260820_1423.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260820_142330.txt'
+
+======================================================================
+CALL #002 | 14:23:30.030 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": "Unbound exhibition",
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Boston, MA
+   Requirements: Unbound exhibition
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+[TIMING] phase=intent elapsed=3.0s cumulative=3.0s
+
+Detected tour category: MUSEUM
+Using museum template for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260820_142330.txt'
+
+======================================================================
+CALL #003 | 14:23:32.998 | GENERATING_PROMPT
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  user_request: museum Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA...
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q1565911 (Museum of Fine Arts, Houston)
+    URL: http://www.mfah.org/
+    Coords: 29.725605, -95.390539
+    Language: en
+  [venue_resolver] SPARQL: 105 works found for Q1565911
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-362] Scoped request detected (requirements='Unbound exhibition') — early deterministic bypass suppressed
+
+  [LOCAL-362] SCOPED REQUEST DETECTED:
+    Requirements: Unbound exhibition
+    POI type: museum exhibits
+    Artists extracted: ['Picasso', 'Miro', 'Dali']
+    → Deterministic bypass will be SUPPRESSED (venue-wide fill is wrong for scoped requests)
+[TIMING] phase=poi_selection elapsed=10.1s cumulative=13.1s
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+
+  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══
+  [LOCAL-364] Exhibition search term: 'Picasso, Miro, Dali: Unbound'
+  [LOCAL-364] Venue URL: http://www.mfa.org/
+  [LOCAL-364] Searching for exhibition 'Picasso, Miro, Dali: Unbound' on http://www.mfa.org
+  [LOCAL-427] HTTP 200 from http://www.mfa.org/exhibitions (attempt 1)
+  [LOCAL-364] Found exhibition listing: http://www.mfa.org/exhibitions (5130 chars)
+  [LOCAL-364] Matched exhibition: 'Picasso, Miró, Dalí: Unbound' (score: 1.00)
+  [LOCAL-364] Exhibition URL: http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-427] HTTP 503 from http://www.mfa.org/exhibition/picasso-miro-dali-unbound — retrying in 2.3s (attempt 1, 28s budget remaining)
+  [LOCAL-427] HTTP 503 from http://www.mfa.org/exhibition/picasso-miro-dali-unbound — retrying in 3.1s (attempt 2, 26s budget remaining)
+  [LOCAL-427] HTTP 503 from http://www.mfa.org/exhibition/picasso-miro-dali-unbound — retrying in 7.5s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 503 from http://www.mfa.org/exhibition/picasso-miro-dali-unbound — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-364] Result: ExhibitionChecklistResult(path=fallback, works=0, title='Picasso, Miró, Dalí: Unbound', url='http://www.mfa.org/exhibition/picasso-miro-dali-unbound')
+
+  [LOCAL-364] Checklist unavailable — falling back to creator filter
+    Reason: Exhibition page at http://www.mfa.org/exhibition/picasso-miro-dali-unbound returned no content
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-09-08 01:41:17.131968)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [venue_resolver] SPARQL: 100 works found for Q49133
+  [LOCAL-362] Total documented works at venue: 97 (10 catalogue, 100 SPARQL)
+  [LOCAL-362] After artist-scope filter: 0 works match artists ['Picasso', 'Miro', 'Dali']
+    Picasso: 0 works
+    Miro: 0 works
+    Dali: 0 works
+  [LOCAL-362] No works match scope artists in SPARQL/catalogue — falling through to Phase 3A (GPT will use requirements)
+  [R4] Museum tour: asking for 8 candidates (2x for D1v2 filtering)
+  [LOCAL-425] Phase 3A constraint overridden for exhibition: 'Picasso, Miro, Dali: Unbound'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260820_142330.txt'
+
+======================================================================
+CALL #004 | 14:24:02.492 | PHASE_3A_REQUEST
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops: 4
+  poi_type_hint: museum exhibits
+
+PHASE 3A API call cost: $0.0003 (421 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260820_142330.txt'
+
+======================================================================
+CALL #005 | 14:24:03.999 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
+List exactly 8 specific, real, well-known museum exhibits relevant to: museum Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A NA
+  prompt_last_300_chars: e works you are confident are IN THIS EXHIBITION.
+- Do NOT list the museum's iconic permanent-collection works unless they are explicitly part of this exhibition.
+- Do NOT fabricate artwork names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Les Demoiselles d'Avignon", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
+{"name": "The Tilled Field", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
+{"name": "The Farm", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
+{"name": "The Persistence of Memory", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"}]
+
+OK PHASE 3A parsed 4 candidate POI(s):
+   - Les Demoiselles d'Avignon @ Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115
+   - The Tilled Field @ Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115
+   - The Farm @ Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115
+   - The Persistence of Memory @ Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [D1v2] Venue resolved: Q49133 → URL=http://www.mfa.org/, lang=en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-09-08 01:41:17.131968)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [D1v2] Cache HIT: 168 canonical titles (tier=rich), 10 catalogue works, combined_text=690170 chars
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Ankhhaf' → 'Ankhhaf (1905)'
+  [LOCAL-24] Classification: 168 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 168 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 161 dynamic aliases from 199 works
+  [D1v2] Injected 161 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] DROPPED 'Les Demoiselles d'Avignon' — no canonical title match
+  [D1v2] DROPPED 'The Tilled Field' — no canonical title match
+  [D1v2] DROPPED 'The Farm' — no canonical title match
+  [D1v2] DROPPED 'The Persistence of Memory' — no canonical title match
+  [D1v2] ⚠️  ALL 4 candidate(s) were DROPPED — every work was filtered out, producing unresolvable from non-empty input
+    DROPPED: 'Les Demoiselles d'Avignon' — no canonical match
+    DROPPED: 'The Tilled Field' — no canonical match
+    DROPPED: 'The Farm' — no canonical match
+    DROPPED: 'The Persistence of Memory' — no canonical match
+  [D1v2] 0 works verified — tier: unresolvable
+  [D1] Tier: unresolvable — clean fail (entity=True, sparql=199)
+
+FAILED: no text returned

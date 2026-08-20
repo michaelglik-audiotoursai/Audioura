@@ -41,7 +41,35 @@ import re
 from typing import Dict, List, Optional
 
 __all__ = ['generate_story_for_stop', 'build_story_prompt', 'STORY_PASS_ENABLED_ENV',
-           'NO_STORY', 'sentences_in']
+           'NO_STORY', 'sentences_in', 'MATRIX_SLOTS', 'MATRIX_KEYS']
+
+# [D498] Step 3a — ONE slot vocabulary, shared by the producer and the consumer.
+#
+# `build_story_prompt` reads these keys; `generate_tour_text` used to build the
+# same dict inline from a hand-copied list. They happened to match, and nothing
+# enforced it — a renamed key would have silently emptied a slot rather than
+# raising, because `f()` below falls back to ''.
+#
+# NOT routed through `interrogation_matrix.build_matrix`, deliberately. That
+# module derives the matrix by PARSING STOP PROSE, which is the lab's input.
+# Production already holds these facts structurally, off the exhibition
+# checklist (LOCAL-419 enrichment). Re-deriving them from prose would throw away
+# the better source to satisfy a diagram. `interrogation_matrix` keeps its own
+# vocabulary (it calls the venue slot `venue`, this one calls it `venue_name`)
+# because it answers a different question from a different input.
+MATRIX_SLOTS = (
+    ('Work', 'canonical_title'),
+    ('English title', 'english_title'),
+    ('Artist', 'artist'),
+    ('Publisher', 'publisher'),
+    ('Printed by', 'printed_by'),
+    ('Medium', 'medium'),
+    ('Credit line', 'credit_line'),
+    ('Venue', 'venue_name'),
+)
+# The rotating focus fact (step 7b) is a slot but not a labelled fact line — it
+# is rendered separately below — so it is listed apart from MATRIX_SLOTS.
+MATRIX_KEYS = tuple(k for _, k in MATRIX_SLOTS) + ('focus_fact',)
 
 STORY_PASS_ENABLED_ENV = 'STORY_PASS_ENABLED'
 NO_STORY = 'NO_STORY'
@@ -78,10 +106,7 @@ def build_story_prompt(matrix: Dict, material: List[str],
         return (matrix.get(key) or default).strip()
 
     facts = []
-    for label, key in (('Work', 'canonical_title'), ('English title', 'english_title'),
-                       ('Artist', 'artist'), ('Publisher', 'publisher'),
-                       ('Printed by', 'printed_by'), ('Medium', 'medium'),
-                       ('Credit line', 'credit_line'), ('Venue', 'venue_name')):
+    for label, key in MATRIX_SLOTS:  # [D498] one vocabulary, defined once
         value = f(key)
         if value:
             facts.append(f"  {label}: {value}")

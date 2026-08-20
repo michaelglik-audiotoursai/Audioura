@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 265.8794059753418,
+  "chars": 6289,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+      "index": 73,
+      "historic": 12,
+      "detail": 36,
+      "social": 72,
+      "text": "In 1971, the renowned publisher Louis Broder commissioned Joan Miró to create \"Le Lézard aux plumes d’or,\" an illustrated book that seamlessly integrates poetry with visual art. Miró not only illustrated this work but also penned the poems himself, achieving an elegant synthesis of text and image. The decision to collaborate with Broder marked a significant milestone in the history of the livre d'artiste, a fine art book where the book itself is seen as a work of art. Broder's choice to use the esteemed Mourlot studio, famous for its lithography expertise, amplified the book's artistic impact. The book consists of 40 vibrant color lithographs printed on publisher’s vellum, enhancing the tactile experience and adding depth to Miró's abstract visions. Boris Fridman recognized the cultural significance of this collaboration and generously donated this exquisite work to the Museum of Fine Arts, Boston. His contribution provides the museum's 1.2 million annual visitors with the opportunity to experience Miró's imaginative world. This work exemplifies the exhibition's thesis by showcasing how Broder's commissioning of Miró advanced the book as a collaborative art form. As you explore further, consider how such partnerships have continued to evolve, blurring the lines between the boundaries of art and reality.",
+      "orientation": "You are about to explore the Picasso, Miro, Dali: Unbound exhibition at the MFA in Boston, a collection that features extraordinary works by Spanish artists showcased in the Lois B. and Michael K. Torf Gallery. This exhibition delves into the transformative power of the livre d'artiste, a deeply collaborative art form that revolutionized the book as an art form, exploring the intersection of images, words, and typography. Within this innovative space, you will encounter three striking works: Le Lézard aux plumes d’or (The Lizard with Golden Feathers), Au Soleil du Plafond, and Moses and Monotheism. Through these pieces, the exhibition invites you to witness surreal and transformative elements that challenge and redefine our understanding of the world. At Le Lézard aux plumes d’or, you'll experience Miró's vibrant lithographs on publisher’s vellum, enhancing the tactile experience. Moving on to Au Soleil du Plafond, you'll find a volume with lithographs exemplifying the fusion of words and images in the livre d'artiste tradition. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Stand close to \"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" in the Linde Family Gallery to appreciate the exquisite texture of the Louis Broder's vellum. From this vantage point, the delicate interplay of color and form in the lithographs becomes strikingly vivid, inviting you into the imaginative realm that Joan Miró so masterfully conjured."
+    },
+    {
+      "stop": "Au Soleil du Plafond by Juan Gris",
+      "index": 64,
+      "historic": 12,
+      "detail": 27,
+      "social": 45,
+      "text": "In 1955, the convergence of artistic minds saw the birth of \"Au Soleil du Plafond,\" a revolutionary work that melded the visual artistry of Juan Gris with the poetic expression of Pierre Reverdy. Published by Éditions Verve, this volume contains eleven lithographs that exemplify the profound fusion of words and images characteristic of the livre d'artiste tradition. Mourlot Frères printed these delicate lithographs, ensuring meticulous reproduction of Gris's complex designs. This collaboration also highlights the enduring influence of Gris's vision, realized posthumously, as Reverdy carried forth their shared creative enterprise. Within this exhibition, it becomes evident how their contributions helped revolutionize the concept of the book as a collaborative artwork, embodying the ideals the exhibition seeks to illuminate.",
+      "orientation": "Turn your gaze upward and let your eyes traverse the vivid dialogue unfolding on the pages of \"Au Soleil du Plafond.\" From this vantage, the intricate interplay of text and image reveals its full depth, immersing you in a narrative woven by the collaborative genius of Juan Gris and Pierre Reverdy."
+    },
+    {
+      "stop": "Moses and Monotheism by Salvador Dalí",
+      "index": 50,
+      "historic": 24,
+      "detail": 22,
+      "social": 69,
+      "text": "In 1938, Salvador Dalí met Sigmund Freud in London and sketched his portrait. This meeting profoundly influenced Dalí, leading him to create illustrations in 1974 for Freud's book \"Moses and Monotheism.\" These illustrations layer a surreal perspective onto Freud's exploration of monotheism, transforming the psychoanalytic text into a visual and narrative experience. Freud, known for his groundbreaking theories in psychoanalysis, authored this text to delve into the origins of monotheistic belief, suggesting that Moses was an Egyptian. By choosing to illustrate Freud’s work, Dalí not only honored Freud’s intellectual legacy but also advanced the exhibition's thesis. This work exemplifies how artists revolutionized the book as an art form through deeply collaborative ventures, merging image and text into a unified artistic statement.\n\nThat's 3 stops — Moses and Monotheism, Dalí showcased Freud's work in the exhibition and Le Lézard aux plumes d’or, 40 lithographs on vellum deepen Miró's art. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "As you stand before Dalí's illustrations for Sigmund Freud's \"Moses and Monotheism,\" take a step closer to appreciate the intricate detail in his line work. From this vantage point, the surreal elements that intertwine with Freud’s text become more apparent, offering a richer understanding of both the artist's and the author's intent."
+    }
+  ]
+}
