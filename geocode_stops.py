@@ -269,11 +269,46 @@ def correct_stop(stop_text, tour_location, tour_anchor=None):
     return new_text, record
 
 
+def _median_anchor(text_content):
+    """A rough centre for the tour, taken from the model's own coordinates.
+
+    The model is unreliable about any single stop but consistently lands in the
+    right city, so the median of its coordinates is a solid anchor — and unlike
+    the tour title, it always exists.
+
+    This matters because the anchor is what rejects a wrong same-named match.
+    Without it, regenerating "Toronto Ravines And Other Green Spaces" placed a
+    stop called "Sherwood Park" in Sherwood Park, ALBERTA — 2,700 km away —
+    because the tour title is not a geocodable place, so the anchor was None and
+    the plausibility check never ran. The median of the other stops would have
+    caught it instantly.
+    """
+    pts = []
+    for stop_text in text_content:
+        _, _, coords = _parse_stop(stop_text)
+        if coords:
+            pts.append(coords)
+    if len(pts) < 2:
+        return None
+    lats = sorted(p[0] for p in pts)
+    lngs = sorted(p[1] for p in pts)
+    mid = len(pts) // 2
+    return (lats[mid], lngs[mid])
+
+
 def correct_stops(text_content, tour_location, tour_anchor=None):
     """Validate every stop. Returns (new_text_content, records).
 
     Never raises: a geocoding problem must not fail tour generation.
     """
+    # Prefer a geocoded anchor, but never proceed without one if the stops can
+    # supply it themselves. An absent anchor silently disables the only guard
+    # against a confidently wrong same-name match.
+    if tour_anchor is None:
+        tour_anchor = _median_anchor(text_content)
+        if tour_anchor:
+            logging.info("[GEOCODE] anchor from stop median: %.4f, %.4f", *tour_anchor)
+
     new_content, records = [], []
     for stop_text in text_content:
         try:
