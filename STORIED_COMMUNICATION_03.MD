@@ -1040,3 +1040,88 @@ to baseline by test name. Two real breaks caused and fixed. **Not run live.**
 
 Michael's source order recorded as D496 — it answers the pending D492(d) ask. (e) and (f)
 opened as D497.
+
+## Q6 (14:08) — "go through the 7 steps step-by-step for the MFA exhibition; show me the matrix — more than 7 steps now, and all green?"
+
+**More rows: yes, 13 once the sub-steps are separated. All green: not yet** — and the
+second reason mattered more than the first.
+
+Two rows were amber. **7c**: `MAX_SENTENCES_TOP = 7` had been unreachable since
+LOCAL-491 — `_is_top_value_stop` occurred exactly once in the repository, the line
+reading it. **3a**: production duplicated the 8 matrix slots inline instead of sharing
+one definition with the prompt that consumes them.
+
+**The larger point: "green" means the step is WIRED AND FIRES. It does not mean the step
+produced a story.** Every row except 7c was already green on the 08-19 run Michael read
+and found storyless. A green matrix is not a good tour.
+
+A live 4-stop run (14:09) gave the first stop × step table with what each step actually
+RETURNED. It also gave D495 its live evidence, and the before/after is decisive — same
+venue, same exhibition, same 10 Wikidata timeouts:
+
+```
+                    08-19 (before)     08-20 (after)
+tier3_demoted        17 / 17 / 21       0 / 0 / 0
+tier3 in prompt       9 /  4 /  3       0 / 0 / 0
+market_demoted        —                 7 / 6 / 3
+market in prompt      —                 0 / 0 / 0
+tier1+tier2 in prompt 8 /  3 /  9       7 / 9 / 6
+```
+
+Those 17–21 "tier3 demotions" were Wikidata-timeout artifacts, not verdicts. And 16
+art-market snippets were demoted with none surviving into any prompt.
+
+**And the stories did not improve.** `eventful` still 0 on two of three stops;
+replenishment bought 2,634 and 1,179 characters and returned eventful 0→0 for a third
+time; step 4 found **0 cross-model agreement on all three stops**. Index 60.7 sits inside
+D492's 57.3/58.0/61.0 band — one run, no delta claimed.
+
+## Q7 (14:1x) — "fix 3a and 7c so the matrix is all green, then go step by step"
+
+Both landed, D498 / `2e373f9`. **The matrix is now green on all 13 rows.**
+
+| # | step | state | production call site |
+|---|---|---|---|
+| 1 | Generate tours | ✅ | — |
+| 2 | Which stops deserve a story | ✅ | `story_worthiness` → `gtt:9003` |
+| 3a | The matrix (8 slots + focus_fact) | ✅ | `story_pass.MATRIX_SLOTS`, one definition |
+| 3b | Query construction | ✅ | `synthesize_queries` |
+| 3c | Evaluate the retrieved parts | ✅ | `rank_and_cap_snippets` + D495 |
+| 3d | "If too small, learn more" | ✅ | `story_replenish`, `eventless` ON |
+| 4 | Ask multiple engines | ✅ | `story_leads`, openai + gemini verified live |
+| 5 | Value index | ✅ report-only | `story_index_pass`, PHASE 5.21 |
+| 6 | Validate the story | ✅ | unglossed / org-grounding / claim-audit gates |
+| 7a | Retry on "no valid story" | ✅ | LOCAL-487 |
+| 7b | Rotate to the next fact | ✅ | `story_focus_fact` |
+| 7c | 3–5 sentences, more for the best | ✅ | D498, verified live |
+| + | The story in its own pass (D474) | ✅ | `story_pass` |
+
+**7c was dead in two ways and the second only appeared live.** The fix is not the missing
+assignment — "most valuable" is a statement about the step-5 index, the index scores
+written prose, and the story pass picks the budget before prose exists. So the allowance
+is spent after the index, in the retry phase, and accepted only on an index improvement.
+Then the first version measured the assembled DESCRIPTION rather than the story: stop 2's
+story was 5 sentences, its description 9, so the trigger was false for every stop and 7c
+was dead in a new way while the log announced the allowance had been granted. **13 unit
+tests could not see that; one live run did.**
+
+Verified 14:33: fired on stop 2 (index 63, story 4 sentences), regenerated at the
+7-sentence allowance, scored **63 → 59, and was rejected**. The guard working on its
+first outing — and a hint that "more sentences for the best stop" may not be the win the
+rule assumes.
+
+**A third defect fixed on the way:** the retry summary printed `0 storyless` while step 7a
+had just detected 2, because `trigger_floor if _hollowed else trigger_no_story` can credit
+only one of two overlapping triggers.
+
+**Flagged, not buried:** one of three D498 runs failed upstream at D1v2 candidate
+verification, two phases before any changed code. Baseline also succeeded, so it is
+exhibition-page nondeterminism — the checklist landed on a "gallery highlights" page and
+proposed *Les Demoiselles d'Avignon* and *The Persistence of Memory*, neither in this
+show. **A one-in-three failure mode of checklist retrieval, worth its own look.**
+
+**First finding for the step-by-step,** surfaced by 3a's new logging on every stop of
+every run: `printed_by` is empty. The prompt reserves a "Printed by" slot, the LOCAL-419
+enrichment copies publisher/credit_line/medium/artist/english_title off the checklist, and
+**reads no printer field at all** — on an exhibition whose subject is printers and
+publishers.
