@@ -1,0 +1,80 @@
+[
+  {
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+    "matrix": {
+      "canonical_title": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "english_title": "",
+      "artist": "Joan Miró",
+      "publisher": "Louis Broder",
+      "printed_by": "",
+      "medium": "Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum",
+      "credit_line": "Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "focus_fact": ""
+    },
+    "worthiness": {
+      "worth_mining": true,
+      "score": 4,
+      "why": "has named_agent, credit_line_fact, specific_medium, specific_title",
+      "signals": {
+        "named_agent": true,
+        "credit_line_fact": true,
+        "specific_medium": true,
+        "specific_title": true
+      },
+      "disabled": false
+    }
+  },
+  {
+    "stop": "Au Soleil du Plafond",
+    "matrix": {
+      "canonical_title": "Au Soleil du Plafond",
+      "english_title": "",
+      "artist": "Juan Gris",
+      "publisher": "Not specified",
+      "printed_by": "",
+      "medium": "Not specified",
+      "credit_line": "Not specified",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "focus_fact": ""
+    },
+    "worthiness": {
+      "worth_mining": true,
+      "score": 3,
+      "why": "has named_agent, credit_line_fact, specific_title",
+      "signals": {
+        "named_agent": true,
+        "credit_line_fact": true,
+        "specific_medium": false,
+        "specific_title": true
+      },
+      "disabled": false
+    }
+  },
+  {
+    "stop": "Moses and Monotheism",
+    "matrix": {
+      "canonical_title": "Moses and Monotheism",
+      "english_title": "",
+      "artist": "Salvador Dalí",
+      "publisher": "Not specified",
+      "printed_by": "",
+      "medium": "Illustrations",
+      "credit_line": "Not specified",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "focus_fact": ""
+    },
+    "worthiness": {
+      "worth_mining": true,
+      "score": 4,
+      "why": "has named_agent, credit_line_fact, specific_medium, specific_title",
+      "signals": {
+        "named_agent": true,
+        "credit_line_fact": true,
+        "specific_medium": true,
+        "specific_title": true
+      },
+      "disabled": false
+    }
+  }
+]

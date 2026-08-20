@@ -1,0 +1,93 @@
+request : Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+venue   : Museum of Fine Arts Boston
+site    : http://www.mfa.org/
+language: en
+
+  [LOCAL-364] Searching for exhibition 'Picasso, Miro, Dali: Unbound' on http://www.mfa.org
+  [LOCAL-427] HTTP 200 from http://www.mfa.org/exhibitions (attempt 1)
+  [LOCAL-364] Found exhibition listing: http://www.mfa.org/exhibitions (5130 chars)
+  [LOCAL-364] Matched exhibition: 'Picasso, Miró, Dalí: Unbound' (score: 1.00)
+  [LOCAL-364] Exhibition URL: http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-427] HTTP 200 from http://www.mfa.org/exhibition/picasso-miro-dali-unbound (attempt 1)
+  [LOCAL-364] No closing date found — assuming exhibition is current
+  [LOCAL-368] Line-pattern extraction found no works — trying LLM prose extraction
+  [LOCAL-368] ✓ PROSE LLM PATH: 3 works extracted from prose
+    Source: http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró (1971)
+    - Au Soleil du Plafond by Juan Gris (1955)
+    - Moses and Monotheism by Salvador Dalí (1974)
+checklist: path=prose_llm works=3 url=http://www.mfa.org/exhibition/picasso-miro-dali-unbound
+
+
+══════════════════════════════════════════════════════════════════════════════
+STEP 2 — WHICH STOPS REQUIRE A STORY   (story_worthiness, LOCAL-486)
+══════════════════════════════════════════════════════════════════════════════
+Four independent signals. A stop is mined on ANY ONE of them; only a stop
+scoring zero is skipped. That asymmetry is deliberate — a wrong 'no' costs
+a story, a wrong 'yes' costs a few queries.
+
+  #  stop                                          score  mine?  signals
+──────────────────────────────────────────────────────────────────────────────
+  1  Le Lézard aux plumes d’or (The Lizard with G  4/4    YES    named_agent, credit_line_fact, specific_medium, specific_title
+  2  Au Soleil du Plafond                          3/4    YES    named_agent, credit_line_fact, specific_title
+  3  Moses and Monotheism                          4/4    YES    named_agent, credit_line_fact, specific_medium, specific_title
+──────────────────────────────────────────────────────────────────────────────
+
+══════════════════════════════════════════════════════════════════════════════
+STEP 3a — THE MATRIX THE FIRST QUERY WILL BE BUILT FROM   (D498)
+══════════════════════════════════════════════════════════════════════════════
+Nine slots. These, and only these, are what the query synthesiser and the
+story prompt can see. An empty slot is a question the system cannot ask.
+
+──────────────────────────────────────────────────────────────────────────────
+  STOP 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+──────────────────────────────────────────────────────────────────────────────
+     canonical_title    Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+   ! english_title      (EMPTY)
+     artist             Joan Miró
+     publisher          Louis Broder
+   ! printed_by         (EMPTY)
+     medium             Illustrated book with 40 color lithographs (including wra...
+     credit_line        Gift of Boris Fridman. © Successió Miró / Artists Rights ...
+     venue_name         Museum of Fine Arts, Boston
+   ! Focus fact (7b)    (EMPTY)
+     -> 6/9 filled; empty: ['english_title', 'printed_by', 'focus_fact']
+──────────────────────────────────────────────────────────────────────────────
+  STOP 2: Au Soleil du Plafond
+──────────────────────────────────────────────────────────────────────────────
+     canonical_title    Au Soleil du Plafond
+   ! english_title      (EMPTY)
+     artist             Juan Gris
+     publisher          Not specified
+   ! printed_by         (EMPTY)
+     medium             Not specified
+     credit_line        Not specified
+     venue_name         Museum of Fine Arts, Boston
+   ! Focus fact (7b)    (EMPTY)
+     -> 6/9 filled; empty: ['english_title', 'printed_by', 'focus_fact']
+──────────────────────────────────────────────────────────────────────────────
+  STOP 3: Moses and Monotheism
+──────────────────────────────────────────────────────────────────────────────
+     canonical_title    Moses and Monotheism
+   ! english_title      (EMPTY)
+     artist             Salvador Dalí
+     publisher          Not specified
+   ! printed_by         (EMPTY)
+     medium             Illustrations
+     credit_line        Not specified
+     venue_name         Museum of Fine Arts, Boston
+   ! Focus fact (7b)    (EMPTY)
+     -> 6/9 filled; empty: ['english_title', 'printed_by', 'focus_fact']
+
+══════════════════════════════════════════════════════════════════════════════
+STOPPING HERE. No query issued, no story written, no ranking performed.
+══════════════════════════════════════════════════════════════════════════════
+
+machine-readable copy -> STEP2_3A_MATRIX.json

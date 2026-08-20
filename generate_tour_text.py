@@ -13536,7 +13536,21 @@ REWRITE RULES (all mandatory):
     _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0,
                     'trigger_floor': 0, 'trigger_no_story': 0,
                     'trigger_top_value': 0}  # [D498]
-    if _storied_mode and not _phase5_ceiling_breached:
+    # [D499] `DISABLE_STORY_RETRY=1` switches off the WHOLE of PHASE 5.17 — the
+    # LOCAL-474 hollowed-by-gates retry, step 7a, step 7b's rotation and step 7c's
+    # allowance. Added because there was no way to generate a tour with step 7
+    # inactive: `STORY_PASS_ENABLED=0` disables the story pass but NOT this block,
+    # which is gated only on storied mode. The first attempt at a step-0 baseline
+    # was contaminated as a result — 7a fired on 3 stops and 7b rotated on 3, in a
+    # run whose whole purpose was to show the tour BEFORE step 7 touches it.
+    #
+    # Off by default; this changes no production behaviour. It also gives step 7
+    # as a whole a single A/B lever, which it did not have.
+    _retry_disabled = os.environ.get('DISABLE_STORY_RETRY', '').strip() == '1'
+    if _retry_disabled:
+        print("\n  [D499] PHASE 5.17 retry DISABLED by env var — steps 7a, 7b and "
+              "7c inactive, and the LOCAL-474 hollowed-stop retry with them")
+    if _storied_mode and not _phase5_ceiling_breached and not _retry_disabled:
         _RETRY_FLOOR = 120
 
         # -------- [LOCAL-487] STEP 7a: retry on "NO VALID STORY" --------
