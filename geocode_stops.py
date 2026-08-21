@@ -94,8 +94,14 @@ MAX_TOUR_RADIUS_KM = float(os.getenv("GEOCODE_MAX_RADIUS_KM", "50"))
 
 _HTTP_TIMEOUT_S = float(os.getenv("GEOCODE_TIMEOUT", "10"))
 
-_COORD_RE = re.compile(r'^(Coordinates:\s*)([-\d.]+)\s*,\s*([-\d.]+)\s*$', re.IGNORECASE | re.MULTILINE)
-_ADDRESS_RE = re.compile(r'^Address:\s*(.+)$', re.IGNORECASE | re.MULTILINE)
+# [^\S\n]* is "horizontal whitespace only". Plain \s* also matches newlines, so
+# an EMPTY "Address:" line would swallow the following line and treat it as the
+# address — producing lookups for strings like "Coordinates: 12.35". Stops with
+# no address are common wherever the model has thin data, which is precisely
+# where this module has to behave.
+_COORD_RE = re.compile(r'^(Coordinates:[^\S\n]*)([-\d.]+)[^\S\n]*,[^\S\n]*([-\d.]+)[^\S\n]*$',
+                       re.IGNORECASE | re.MULTILINE)
+_ADDRESS_RE = re.compile(r'^Address:[^\S\n]*(\S.*)$', re.IGNORECASE | re.MULTILINE)
 
 _last_request_at = 0.0
 
