@@ -1,0 +1,200 @@
+[
+  {
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+    "matrix": {
+      "canonical_title": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "english_title": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "artist": "Joan Miró",
+      "publisher": "Louis Broder",
+      "printed_by": "Mourlot",
+      "medium": "Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum",
+      "credit_line": "Gift of Boris Fridman",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "focus_fact": "",
+      "provenance": "Boris Fridman, Newton, MA; 2021, gift of Boris Fridman to the MFA. (Accession Date: December 15, 2021)",
+      "publication_year": "1971",
+      "accession_number": "2021.1055",
+      "catalogue_raisonne": "Cramer, Miró livres illustrés,148; Mourlot 789 - 828"
+    },
+    "object_record": {
+      "found": true,
+      "url": "https://collections.mfa.org/objects/698625",
+      "filled": [
+        "credit_line (copyright tail removed)",
+        "printed_by",
+        "provenance",
+        "publication_year",
+        "accession_number",
+        "catalogue_raisonne"
+      ],
+      "record_fields": 9
+    },
+    "agents": {
+      "hero": {
+        "field": "artist",
+        "value": "Joan Miró"
+      },
+      "sponsor": {
+        "field": "publisher",
+        "value": "Louis Broder"
+      },
+      "builder": {
+        "field": "printed_by",
+        "value": "Mourlot"
+      }
+    },
+    "focus_facts": [
+      {
+        "key": "publisher",
+        "fact": "Louis Broder published Le Lézard aux plumes d’or (The Lizard with Golden Feathers).",
+        "why": "a publisher is a person who decided to make this happen"
+      },
+      {
+        "key": "printed_by",
+        "fact": "Mourlot printed Le Lézard aux plumes d’or (The Lizard with Golden Feathers).",
+        "why": "a printing house is a workshop where people worked together"
+      },
+      {
+        "key": "donor",
+        "fact": "Boris Fridman gave Le Lézard aux plumes d’or (The Lizard with Golden Feathers) to Museum of Fine Arts, Boston.",
+        "why": "a donor chose this work and chose this museum"
+      },
+      {
+        "key": "artist",
+        "fact": "Joan Miró made Le Lézard aux plumes d’or (The Lizard with Golden Feathers).",
+        "why": "the maker, when no other agent is available"
+      },
+      {
+        "key": "medium",
+        "fact": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) is Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum.",
+        "why": "how it was physically made — a process involves people"
+      },
+      {
+        "key": "venue",
+        "fact": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) is held at Museum of Fine Arts, Boston.",
+        "why": "institutional context; weakest, but it scopes the search"
+      },
+      {
+        "key": "hook:significance:louis broder",
+        "fact": "What did Louis Broder actually do, that makes this significant?",
+        "why": "the stop's own text asserts significance (\"exemplifies\") without showing it",
+        "source_sentence": "Published by Louis Broder, a figure renowned for his commitment to the art of the book, this work exemplifies the collaborative spirit that the exhibition highlights."
+      },
+      {
+        "key": "hook:significance:miro",
+        "fact": "What did Miró actually do, that makes this significant?",
+        "why": "the stop's own text asserts significance (\"was pivotal\") without showing it",
+        "source_sentence": "Broder's decision to engage Miró was pivotal, as it allowed the artist to explore a new dimension of creativity, blending visual and textual narratives seamlessly."
+      }
+    ]
+  },
+  {
+    "stop": "Au Soleil du Plafond",
+    "matrix": {
+      "canonical_title": "Au Soleil du Plafond",
+      "english_title": "Au Soleil du Plafond",
+      "artist": "Juan Gris",
+      "publisher": "",
+      "printed_by": "",
+      "medium": "",
+      "credit_line": "",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "focus_fact": ""
+    },
+    "object_record": {
+      "found": false,
+      "url": "",
+      "filled": [],
+      "record_fields": 0
+    },
+    "agents": {
+      "hero": {
+        "field": "artist",
+        "value": "Juan Gris"
+      },
+      "sponsor": {},
+      "builder": {}
+    },
+    "focus_facts": [
+      {
+        "key": "artist",
+        "fact": "Juan Gris made Au Soleil du Plafond.",
+        "why": "the maker, when no other agent is available"
+      },
+      {
+        "key": "venue",
+        "fact": "Au Soleil du Plafond is held at Museum of Fine Arts, Boston.",
+        "why": "institutional context; weakest, but it scopes the search"
+      },
+      {
+        "key": "hook:change:juan gris and pierre reverdy",
+        "fact": "What did Juan Gris and Pierre Reverdy change, and what was it like before?",
+        "why": "the stop's own text asserts change (\"revolutionized\") without showing it",
+        "source_sentence": "In this singular work, Juan Gris and Pierre Reverdy, the French poet linked to Surrealism, embarked on a project that revolutionized the concept of the book as art, exemplifying the collaborative spirit that defines the MFA's exhibition."
+      },
+      {
+        "key": "hook:change:boundaries of artistic media",
+        "fact": "What were the boundaries of artistic media before this, and what changed them?",
+        "why": "the stop's own text asserts change (\"challenge\") without showing it",
+        "source_sentence": "\"Au Soleil du Plafond\" vividly represents the exhibition's thesis, which highlights how visual artists and poets collaborated to challenge the boundaries of artistic media."
+      },
+      {
+        "key": "hook:relation:juan gris and pierre reverdy",
+        "fact": "What did Juan Gris and Pierre Reverdy actually do together, and what came of it?",
+        "why": "the stop's own text asserts relation (\"collaborative\") without showing it",
+        "source_sentence": "Orientation: This vantage point lets you appreciate its composition, a collaborative vision by Juan Gris and Pierre Reverdy, as it melds poetic narrative with artistic expression."
+      }
+    ]
+  },
+  {
+    "stop": "Moses and Monotheism",
+    "matrix": {
+      "canonical_title": "Moses and Monotheism",
+      "english_title": "Moses and Monotheism",
+      "artist": "Salvador Dalí",
+      "publisher": "",
+      "printed_by": "",
+      "medium": "Illustrations",
+      "credit_line": "",
+      "venue_name": "Museum of Fine Arts, Boston",
+      "focus_fact": ""
+    },
+    "object_record": {
+      "found": false,
+      "url": "",
+      "filled": [],
+      "record_fields": 0
+    },
+    "agents": {
+      "hero": {
+        "field": "artist",
+        "value": "Salvador Dalí"
+      },
+      "sponsor": {},
+      "builder": {}
+    },
+    "focus_facts": [
+      {
+        "key": "artist",
+        "fact": "Salvador Dalí made Moses and Monotheism.",
+        "why": "the maker, when no other agent is available"
+      },
+      {
+        "key": "medium",
+        "fact": "Moses and Monotheism is Illustrations.",
+        "why": "how it was physically made — a process involves people"
+      },
+      {
+        "key": "venue",
+        "fact": "Moses and Monotheism is held at Museum of Fine Arts, Boston.",
+        "why": "institutional context; weakest, but it scopes the search"
+      },
+      {
+        "key": "hook:relation:dali",
+        "fact": "What did Dalí actually do together, and what came of it?",
+        "why": "the stop's own text asserts relation (\"collaboration\") without showing it",
+        "source_sentence": "Through this collaboration, Dalí and Freud engage in a dialogue, bridging literary and visual art forms, and enhancing the book’s impact beyond its textual content."
+      }
+    ]
+  }
+]

@@ -32,7 +32,8 @@ from typing import Dict, List, Optional, Set
 
 from text_fold import fold, is_placeholder
 
-__all__ = ['candidate_facts', 'next_focus_fact', 'MAX_ROTATIONS']
+__all__ = ['candidate_facts', 'candidate_facts_with_hooks', 'next_focus_fact',
+           'MAX_ROTATIONS']
 
 # One rotation per stop by default. Each costs a full generation; two stops
 # rotating twice is a doubled tour bill. Raising it is a cost decision and wants
@@ -110,6 +111,39 @@ def candidate_facts(matrix: Dict, material: Optional[List[str]] = None) -> List[
         add('venue', f'{title} is held at {venue}.'.strip(),
             'institutional context; weakest, but it scopes the search')
 
+    return out
+
+
+def candidate_facts_with_hooks(matrix: Dict, stop_text: str = '',
+                               venue_name: str = '',
+                               material: Optional[List[str]] = None) -> List[Dict]:
+    """[D502] The matrix facts, then the stop's own unanswered questions.
+
+    Michael's step 7 rotation, extended: when the matrix facts are exhausted —
+    and on stops 2 and 3 of the MFA exhibition the matrix holds ONE agent, so
+    they are exhausted almost immediately — the next place to look is the text
+    itself, for the assertions it makes and never substantiates.
+
+    Matrix facts first, deliberately. They are grounded in the museum's own
+    record; a hook is grounded only in the fact that we said something. A hook
+    is a QUESTION TO RESEARCH, never an answer, so it ranks below any real fact.
+    """
+    out = candidate_facts(matrix, material)
+    if not stop_text:
+        return out
+    try:
+        from story_hooks import find_hooks, hooks_to_focus_facts
+        # The agents the matrix already names are accepted as entities outright;
+        # everything else must clear a two-token bar. Without this, "Miró" alone
+        # mid-sentence is discarded as a possible common noun.
+        known = [matrix.get(k, '') for k in
+                 ('artist', 'publisher', 'printed_by', 'printer', 'credit_line')]
+        hooks = find_hooks(stop_text, matrix.get('canonical_title', ''),
+                           venue_name or matrix.get('venue_name', ''),
+                           known_agents=[k for k in known if k])
+        out.extend(hooks_to_focus_facts(hooks))
+    except Exception:
+        pass  # never fail a tour for want of a hook
     return out
 
 
