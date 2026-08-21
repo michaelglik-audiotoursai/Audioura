@@ -9,10 +9,13 @@ briefing. Work top to bottom.
 > ClickUp's email alerts; this session gets nothing. The only way you learn that
 > Yury answered is by looking.
 >
+> **Three** tasks are waiting on him, all assigned to him, all `in progress`.
+>
 > | task | what we asked him | if he answered |
 > |---|---|---|
-> | [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) BETA-1, concurrent audio | generate a **new** tour, confirm one audio at a time | **works** → set it **Complete**, comment with commit `144ca98` and revision `tour-modernized-00008-fsn`. **fails** → unzip his tour, check `index.html`: the `addEventListener('play'` handler must call `otherAudio.pause()`. If it doesn't, his tour predates the deploy — a false negative, not a regression. |
-> | [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3) BETA-2, map numbering | zoom in far, confirm pin #1 appears next to #2 | **confirmed** → close as `WORKS AS DESIGNED — confusing`; the real fix is [`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5) in the Storied release. Update `SUBMISSION_BETA_BUGS.md`, which still carries the older `UNPROVEN` verdict. **genuine mismatch** → new defect; first check whether the stop's `audio_N.txt` has a `Coordinates:` line, since stops without one are dropped from the map while survivors keep their numbers. |
+> | [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) BETA-1, concurrent audio | generate a **new** tour, confirm one audio at a time | **works** → set **Complete**, cite `audioura:v33` / `tour-modernized-00009-99b`. **fails** → unzip his tour and check `index.html`: the `addEventListener('play'` handler must call `otherAudio.pause()`. If it doesn't, his tour predates the deploy — a false negative, not a regression. |
+> | [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3) BETA-2, map numbering | zoom in far, confirm pin #1 appears beside #2 | **confirmed** → close as `WORKS AS DESIGNED — confusing`; real fix is [`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5) in Storied. **genuine mismatch** → new defect; check whether the stop's `audio_N.txt` has a `Coordinates:` line, since stops without one are dropped from the map while survivors keep their numbers. |
+> | [`wdvrdaxqjn`](https://app.clickup.com/t/wdvrdaxqjn) BETA-4, wrong coordinates | generate a **new** tour, check each pin is where that place actually is | **works** → set **Complete**, cite `audioura:v33`, and record it in `SUBMISSION_BETA_BUGS.md`. **a pin is wrong** → run the stop's name and address through `geocode_stops.resolve_stop()` and read the confidence: a *low*-confidence miss is known behaviour, a *high*-confidence miss is a real regression. **pins in the wrong ocean** → that is [`wdvrdaxqte`](https://app.clickup.com/t/wdvrdaxqte), reversed lat/lng, not this. |
 >
 > **Handle it yourself.** Michael's instruction, 2026-08-17: close it or continue
 > the work here on the Windows laptop; only come to him if you actually need a
@@ -21,36 +24,91 @@ briefing. Work top to bottom.
 > **One exception: ask Michael before any GCloud deploy.** Use
 > `deploy_tour_modernized.sh`; runbook is [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
 
-> ## ✅ STATE AS OF 2026-08-17 — most of this file is now history
+> ## ✅ STATE AS OF 2026-08-20 — §§0–9 below are history, not a plan
 >
-> §§3–7 below describe work that is **done**. Read them for context, not as a plan.
+> Everything in §§3–7 is **done**. Read them for background only.
 >
-> - **BETA-1 — CONFIRMED and FIXED.** The bug was in the generated tour HTML, **not
->   the Flutter app**: the `play` listener recorded the current stop but never paused
->   the others. Fixed in `tour_generation_modernized.py`, `single_file_app_builder.py`,
->   `tour_editing_phase2.py`, `translation_service.py`. Verified before/after on the
->   local stack and by Michael on device in EN, ZH and RU.
-> - **Merged and pushed.** `main` is at `f24a5fe`; `storied` was forward-merged and
->   pushed (`afae00d..0ac89b3`) with Michael's authorisation. The Mac Mini session
->   (`Storied_Tours`) has been told — [`wdvrdaxnbw`](https://app.clickup.com/t/wdvrdaxnbw).
-> - **Deployed to GCloud.** `tour-modernized` runs `audioura:v32`, revision
->   `tour-modernized-00008-fsn`. Roll back with `./deploy_tour_modernized.sh --rollback`.
-> - **No mobile build needed for BETA-1** — no Dart changed, so the §7 version bump
->   does *not* apply. Yury uses the app he already has.
-> - **BETA-2 — not a numbering bug.** Stops 1 and 2 sit so close that pin 1 is hidden
->   under pin 2. Real fix is scheduled for Storied ([`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5)),
->   deliberately **not** patched on Beta.
-> - **BETA-3 — tour mislabelled "Museum Tour"** ([`wdvrdaxmub`](https://app.clickup.com/t/wdvrdaxmub)):
->   cosmetic, already fixed on `storied`, deferred.
-> - **Still open, deliberately unfixed:** `generate_tour_text.py:10` imports
->   `enhanced_tour_templates_fixed`, which is untracked — `tour-generator` will not
->   start from a clean checkout. Several service Dockerfiles copy a single `.py` and
->   omit modules they import ([`wdvrdaxn8y`](https://app.clickup.com/t/wdvrdaxn8y)).
->   Local Beta stack recipe: [`wdvrdaxn8x`](https://app.clickup.com/t/wdvrdaxn8x).
+> ### After a reboot, do these three things
+>
+> 1. `cd /d "C:\Users\micha\eclipse-workspace\AudioTours\development"`
+> 2. `docker-compose -f docker-compose-beta-local.yml up -d` — the local Beta stack,
+>    21 services. Needs `OPENAI_API_KEY` in `.env`. Health-check the chain with
+>    `curl localhost:5002/health` (orchestrator) and `localhost:5021/health`
+>    (tour-modernized). **Never** `docker-compose up -d` without `-f`, and **never**
+>    accept the `--remove-orphans` suggestion — it destroys unrelated long-running
+>    containers on this machine.
+> 3. Read the FIRST ACTION box above and check the two tester tasks.
+>
+> Nothing is lost by a reboot: all work is pushed to `origin/main` and
+> `origin/storied`, and the running containers are recreatable from the compose file.
+>
+> ### Yury's six reports — the whole picture
+>
+> | # | report | state |
+> |---|---|---|
+> | 1 | two audios play at once | **fixed, deployed, live.** Awaiting his check — `wdvrdaxmq2` |
+> | 2 | audio/map numbering | **not a numbering bug** — pin 1 hidden under pin 2. Fix scheduled Storied `wdvrdaxnc5`. Awaiting his check — `wdvrdaxmq3` |
+> | 3 | stop #6 over Central Islands | **fixed, deployed, live.** Awaiting his check — `wdvrdaxqjn` |
+> | 4 | all pins offset | same fix as #3 |
+> | 5 | parking / driving directions | feature filed for Storied — `wdvrdaxqjp` |
+> | 6 | tour mislabelled "Museum Tour" | cosmetic, already fixed on `storied` — `wdvrdaxmub` |
+>
+> ### What is deployed
+>
+> `tour-modernized` runs **`audioura:v33`**, revision **`tour-modernized-00009-99b`**
+> (deployed 2026-08-20). Contains the concurrent-audio fix *and* coordinate
+> validation. Roll back with `./deploy_tour_modernized.sh --rollback`; `v32` is intact.
+> **Deploying is a hard stop — ask Michael first.** Runbook `wdvrdaxn9f`.
+>
+> ### Git
+>
+> `main` and `storied` are both pushed and in sync with origin. `storied` was
+> forward-merged on 2026-08-20 (`ccafaf5..dba7f5a`); the Mac Mini session was told via
+> `wdvrdaxqth`. Two remote branches appeared that nobody here has inspected:
+> `beta-staging` and `fix/dockerfile-build-breaks`.
+>
+> ### Coordinate work — what it does and does not do
+>
+> `geocode_stops.py` gathers up to three independent estimates per stop (the model's
+> own coordinate, `name + city`, and the full address) and only changes a coordinate
+> when two agree within 200 m. Measured over 40 stops in 8 cities against Wikidata:
+> median error **87 m → 46 m**, worst 1,616 m → 558 m, zero regressions.
+> High-confidence stops average 26 m; low-confidence ones 303 m, and **every error
+> over 500 m is in the low-confidence group**.
+>
+> It is a mitigation, not a cure. It cannot resolve names the model invents
+> ("Leslie Spit parking" is a description, not a place) and OSM has no car parks
+> mapped near Tommy Thompson Park at all. The cure is `wdvrdaxqtf` in Storied.
+>
+> ### Open, deliberately unfixed
+>
+> - **`wdvrdaxqte` — latitude/longitude reversed in some tours.** The most severe
+>   coordinate defect found: Madagascar tours put every stop 9,899 km out, in the
+>   Indian Ocean. Swapping the pair lands 3.9 km from the city. 2 of 16 tours scanned.
+>   Pre-existing, affects both tracks. `geocode_stops.py` cannot fix it — its anchor is
+>   the median of the stops, so with everything reversed it rejects the *correct*
+>   answers.
+> - **`generate_tour_text.py:10` imports `enhanced_tour_templates_fixed`**, which is
+>   untracked. `tour-generator` will not start from a clean checkout. Flagged, not fixed.
+> - **Kiro CLI is not installed** on this machine and `kiro_dispatcher.py` cannot run
+>   on Windows (`import fcntl`). Session planned — `wdvrdaxqtg`, detail in `wdvrdaxqnz`.
 > - **Unruled by Michael:** whether the current-location dot should be labelled `#0`.
 >
-> Local Beta stack: `docker-compose -f docker-compose-beta-local.yml up -d` (21
-> services, needs `OPENAI_API_KEY` in `.env`).
+> ### Hard-won gotchas — all cost real time
+>
+> - **Verify by effect, never by exit code.** `docker-compose build` was observed
+>   exiting 0 while actually failing.
+> - **Grep for imports before deleting any untracked file.** Deleting
+>   `enhanced_tour_templates_fixed.py` crash-looped `tour-generator`.
+> - **Do not trust a same-named match.** A geocoder never says "I don't know" — it
+>   returns its best guess. Wrong answers found this week: a town in Alberta, a rock
+>   formation in Colorado, a cycle bridge 12.7 km from the Sydney Opera House.
+> - **Git worktrees hit Windows MAX_PATH.** Use a short root (`C:\stwt`) and
+>   `git -c core.longpaths=true`.
+> - **Postcodes break geocoding.** `"Bennelong Point, Sydney"` resolves; add
+>   `NSW 2000, Australia` and it fails by 12.75 km.
+> - **Look up ground truth, never recall it.** Two of my confident "correct
+>   coordinates" were wrong from memory and produced misleading measurements.
 
 **You are the `Beta_Bugs` session.** Begin every reply with
 `[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time. Keep doing it —
