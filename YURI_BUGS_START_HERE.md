@@ -1,7 +1,16 @@
 # Yuri's bugs — start here
 
-You are the **Beta_Mobile** session. Begin every reply with
-`[Beta_Mobile]@<MM/DD/YYYY|HH:MM>`.
+> **⚠️ This file is superseded. Read `Beta-Bugs_Fixing.md` instead** — that is the
+> live briefing Michael opens sessions with, and it carries the current state.
+> Kept for history.
+
+You are the **`Beta_Bugs`** session. Begin every reply with
+`[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`.
+
+This file previously said `Beta_Mobile`, which conflicted with `Beta-Bugs_Fixing.md`.
+Michael settled it on 2026-08-18: the name is **`Beta_Bugs`**. `Beta_Mobile` was
+wrong on both counts — the bug turned out to be in the Python services, not the
+Flutter app.
 
 ---
 

@@ -3,15 +3,107 @@
 Michael starts Claude and says **"read Beta-Bugs_Fixing.md"**. This file is the whole
 briefing. Work top to bottom.
 
-> ## ⛔ ORDER MATTERS — read this before anything
+> ## 🔔 FIRST ACTION — check whether Yury has replied
 >
-> **The merge / version-bump / tag sequence in §7 is the LAST step, not the first.**
-> As of 2026-08-17 `fix/yuri-audio-and-map` contains **two markdown files and zero
-> code changes**. Merging it into `main` now would tag a Beta release for
-> documentation. §§3–6 come first: verify, derive, implement, test. Only then §7.
+> **Before anything else, read the comments on these two tasks.** Michael gets
+> ClickUp's email alerts; this session gets nothing. The only way you learn that
+> Yury answered is by looking.
+>
+> | task | what we asked him | if he answered |
+> |---|---|---|
+> | [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) BETA-1, concurrent audio | generate a **new** tour, confirm one audio at a time | **works** → set it **Complete**, comment with commit `144ca98` and revision `tour-modernized-00008-fsn`. **fails** → unzip his tour, check `index.html`: the `addEventListener('play'` handler must call `otherAudio.pause()`. If it doesn't, his tour predates the deploy — a false negative, not a regression. |
+> | [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3) BETA-2, map numbering | zoom in far, confirm pin #1 appears next to #2 | **confirmed** → close as `WORKS AS DESIGNED — confusing`; the real fix is [`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5) in the Storied release. Update `SUBMISSION_BETA_BUGS.md`, which still carries the older `UNPROVEN` verdict. **genuine mismatch** → new defect; first check whether the stop's `audio_N.txt` has a `Coordinates:` line, since stops without one are dropped from the map while survivors keep their numbers. |
+>
+> **Handle it yourself.** Michael's instruction, 2026-08-17: close it or continue
+> the work here on the Windows laptop; only come to him if you actually need a
+> decision. **Do not route these tasks back to him.**
+>
+> **One exception: ask Michael before any GCloud deploy.** Use
+> `deploy_tour_modernized.sh`; runbook is [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
+
+> ## ✅ STATE AS OF 2026-08-17 — most of this file is now history
+>
+> §§3–7 below describe work that is **done**. Read them for context, not as a plan.
+>
+> - **BETA-1 — CONFIRMED and FIXED.** The bug was in the generated tour HTML, **not
+>   the Flutter app**: the `play` listener recorded the current stop but never paused
+>   the others. Fixed in `tour_generation_modernized.py`, `single_file_app_builder.py`,
+>   `tour_editing_phase2.py`, `translation_service.py`. Verified before/after on the
+>   local stack and by Michael on device in EN, ZH and RU.
+> - **Merged and pushed.** `main` is at `f24a5fe`; `storied` was forward-merged and
+>   pushed (`afae00d..0ac89b3`) with Michael's authorisation. The Mac Mini session
+>   (`Storied_Tours`) has been told — [`wdvrdaxnbw`](https://app.clickup.com/t/wdvrdaxnbw).
+> - **Deployed to GCloud.** `tour-modernized` runs `audioura:v32`, revision
+>   `tour-modernized-00008-fsn`. Roll back with `./deploy_tour_modernized.sh --rollback`.
+> - **No mobile build needed for BETA-1** — no Dart changed, so the §7 version bump
+>   does *not* apply. Yury uses the app he already has.
+> - **BETA-2 — not a numbering bug.** Stops 1 and 2 sit so close that pin 1 is hidden
+>   under pin 2. Real fix is scheduled for Storied ([`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5)),
+>   deliberately **not** patched on Beta.
+> - **BETA-3 — tour mislabelled "Museum Tour"** ([`wdvrdaxmub`](https://app.clickup.com/t/wdvrdaxmub)):
+>   cosmetic, already fixed on `storied`, deferred.
+> - **Still open, deliberately unfixed:** `generate_tour_text.py:10` imports
+>   `enhanced_tour_templates_fixed`, which is untracked — `tour-generator` will not
+>   start from a clean checkout. Several service Dockerfiles copy a single `.py` and
+>   omit modules they import ([`wdvrdaxn8y`](https://app.clickup.com/t/wdvrdaxn8y)).
+>   Local Beta stack recipe: [`wdvrdaxn8x`](https://app.clickup.com/t/wdvrdaxn8x).
+> - **Unruled by Michael:** whether the current-location dot should be labelled `#0`.
+>
+> Local Beta stack: `docker-compose -f docker-compose-beta-local.yml up -d` (21
+> services, needs `OPENAI_API_KEY` in `.env`).
 
 **You are the `Beta_Bugs` session.** Begin every reply with
-`[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time.
+`[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time. Keep doing it —
+it is easy to use the prefix once and then let it lapse.
+
+Confirmed by Michael 2026-08-18, resolving a conflict: `YURI_BUGS_START_HERE.md`
+used to say `Beta_Mobile`, which was wrong on both counts — this is the name, and
+the work turned out to be services rather than mobile.
+
+---
+
+## 📋 "READ YOUR QUEUE" — Michael's trigger phrase
+
+When Michael says **"read your queue"**, work autonomously. Do not ask permission
+for each step; report what you are doing as you go so he can interrupt.
+
+**The queue, in this order:**
+
+1. Tasks awaiting a tester reply — currently
+   [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) and
+   [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3). Read the comments first.
+2. 🔵 **Claude — Review (Beta)** — list `1000410000000728`
+3. 🟦 **Services — Kiro (Beta)** — list `1000410000000729` — only tasks whose
+   description opens `**Agent:** Claude`
+4. Any other task whose description opens with `**Agent:** Claude`
+
+Within each, highest priority first, then oldest. Skip anything already `complete`.
+
+> ### ⛔ The Storied Claude — Review list is NOT your queue
+>
+> List `1000410000000732` belongs to **`Storied_Tours`** on the Mac Mini. Checked on
+> 2026-08-18: everything in it is tour-narration quality — `generate_tour_text.py`, the
+> story pipeline, POI text rules — which is precisely the scope §0 tells you to stay out
+> of. Working it would duplicate or collide with the Mac Mini's session.
+>
+> If something there genuinely needs Beta-side work, hand it over via a task rather than
+> doing it here.
+
+**Work it: investigate, fix, commit, merge to `main`, close tasks, write docs, run
+the local Docker stack.** Report outcomes plainly, including failures.
+
+### 🛑 Stop and ask Michael anyway, even in queue mode
+
+- **Any GCloud deploy.** Use `deploy_tour_modernized.sh`; runbook
+  [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
+- **Pushing `origin/storied`** — the branch model makes that his gate.
+- **Anything irreversible:** force-push, history rewrite, deleting a pushed branch,
+  `DELETE` on the production database.
+- **A mobile release** — a version bump and store upload puts a build in testers'
+  hands.
+- **Unattended cloud spend**, such as scheduled agents.
+
+Agreed with Michael 2026-08-18. Everything else: decide, do it, and say what you did.
 
 You are **not** the Storied session. A separate Claude runs on the Mac Mini on branch
 `storied` and owns tour generation and the story pipeline. You will not see its files

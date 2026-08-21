@@ -50,7 +50,16 @@ pattern is already present in `translation_service.py` (its other generator),
 
 ### The fix
 
-Commit `144ca98`. Five lines in each of two generators, copying the established pattern:
+Commits `144ca98` and `84e6054`. Five lines in each of **four** generators, copying the
+established pattern.
+
+The scope grew after the first commit: a systematic audit of every
+`addEventListener('play'` across the Python generators found the same omission in
+`single_file_app_builder.py` (the builder used by `tour-processor`, the local
+docker-compose path) and in `tour_editing_phase2.py` (the live editing service, which
+regenerates a tour's HTML after an edit and would otherwise have reintroduced the bug).
+Two remaining offenders, `tour_editing_phase2_container.py` and `_final.py`, are
+unreferenced duplicates and were left alone.
 
 ```js
 audio.addEventListener('play', function() {
@@ -107,14 +116,108 @@ change.
 fix failed. A Flutter-side JS injection would have fixed already-downloaded tours too;
 Michael chose generator-only on 2026-08-17.
 
+### Shipped — verified on device and live in production
+
+| | |
+|---|---|
+| verified by Michael, on device | English, **Chinese and Russian** — one audio at a time |
+| verified on the local Beta stack | before `CONCURRENT_COUNT=2` → after `1`, both from freshly generated tours |
+| merged to `main` | `34397e2`, pushed |
+| forward-merged to `storied` | `afae00d..0ac89b3`, pushed with Michael's authorisation; `[LOCAL-323]` verified intact |
+| deployed to GCloud | `tour-modernized` → `audioura:v32`, revision `tour-modernized-00008-fsn` |
+| rollback | `./deploy_tour_modernized.sh --rollback` (previous image `v8` untouched) |
+| mobile build | **not required** — no Dart changed, so no version bump, no store upload |
+
+Still open: Yury's own confirmation on `wdvrdaxmq2`.
+
+**A correction worth recording.** During this work I warned that `translation-service`
+still carried the bug in production and that translated tours would be affected. **That
+was wrong**, and Michael's Chinese and Russian tests disproved it. The buggy block at
+`translation_service.py:1553` sits in `_generate_translated_html`, which is **defined but
+never called** — dead code. The live path is `_create_english_format_html` (`:785`),
+whose listener already paused the other elements before any of this work. My warning came
+from reading a function without checking whether anything invokes it — the same mistake
+that produced the `enhanced_tour_templates_fixed` incident recorded below. No
+`translation-service` deploy was needed.
+
 ---
 
 ## BETA-2 — audio/map numbering off by one — `wdvrdaxmq3`
 
-### Verdict: `UNPROVEN — could not reproduce on available data`
+### Verdict: `WORKS AS DESIGNED — but genuinely misleading`
 
-Not `NOT REPRODUCIBLE`: I could not obtain the tour Yury used, so his claim is neither
-confirmed nor refuted. Handed to Michael for device verification.
+**Resolved 2026-08-17.** Michael reproduced it on his own phone using Yury's tour. An
+earlier revision of this document recorded `UNPROVEN`; that is superseded.
+
+**The numbering was never wrong.** Stops 1 and 2 in Yury's tour sit so close together
+that **pin 1 is completely hidden underneath pin 2**. Zoomed out, the first visible pin
+reads `2`, so the sequence looks shifted by one. Yury's inference was entirely
+reasonable from what was on screen — he reported a real problem, just not the one it
+appeared to be.
+
+### Why the pins overlap — two stacked defects
+
+`tour_map_screen.dart` already carries logic meant to prevent exactly this
+(`_applyCoordJitter`, `:90-109`). It fails twice.
+
+**1. It only fires on *exactly identical* coordinates.**
+
+```dart
+final key = '${pois[i].coords.latitude},${pois[i].coords.longitude}';
+```
+
+A string key, so only byte-identical pairs are separated. Two stops 11 m apart are not
+"identical" and receive no offset at all.
+
+| tour in the archive | stops | distance | jitter fires? |
+|---|---|---|---|
+| Chagall, Nice | 4 & 5 | 0.0 m | yes — exact match |
+| **Davis Square, Somerville** | **2 & 3** | **11.1 m** | **no — slips through** |
+
+**2. Even when it fires, the offset is invisible.**
+
+The step is `0.00008°` = **8.9 m**. Markers are 36 px. At the map's `initialZoom: 14`
+one marker covers **249 m** of ground, so 8.9 m is **1.3 pixels** — roughly **28× too
+small**.
+
+| zoom | ground covered by a 36 px marker | 8.9 m jitter, in px | separate? |
+|---|---|---|---|
+| 14 (default) | 249 m | 1.3 | no |
+| 17 | 31 m | 10.3 | no |
+| 18 | 16 m | 20.6 | no |
+| 19 | 8 m | 41.2 | yes |
+
+Pins only come apart at **zoom 19**, matching both Yury's and Michael's experience that
+you must zoom in extremely far.
+
+### ❌ The obvious fix is wrong
+
+Do **not** simply enlarge the jitter. Separating pins at zoom 14 would mean displacing
+them ~250 m, and the map would then be **lying about where the stops are**. Any fix must
+keep pin positions truthful.
+
+### The agreed fix — Storied release, not Beta
+
+Tracked as **`wdvrdaxnc5`**. Stops that would visually overlap merge into a **single pin
+carrying both numbers** (e.g. `1-2`), which **splits back into individual pins as the
+user zooms in**. Clustering is by *screen distance*, not ground distance, since whether
+two pins collide depends entirely on zoom.
+
+Michael's reasoning for the design: it removes the ambiguity Yury reported, and it also
+tells the listener something true and useful — that these two stops are right next to
+each other — while still resolving to exact positions when zoomed in.
+
+**No Beta change.** It is a display issue rather than a broken tour, and the fix touches
+the map screen enough to belong in a proper release. It is also mobile Dart, so shipping
+it needs an app build and a `versionCode` bump.
+
+### Still unfixed, and separate from the above
+
+`_parsePoi()` returns `null` when a stop's `.txt` has no `Coordinates:` line
+(`tour_map_screen.dart:113`). Those stops are dropped from the map while the survivors
+**keep their original numbers**, producing real *gaps* — pins `1, 4, 5` for a 5-stop
+tour. This is a genuine latent defect. It is **not** what Yury hit (his stops all have
+coordinates), and it remains unaddressed.
 
 ### What was ruled out
 
@@ -140,37 +243,6 @@ For a healthy tour the three systems agree, verified on the Boston walking tour:
 
 `_loadPois()` walks `audio_1.txt`, `audio_2.txt`, … and sets each POI's `index` to the
 **file number** (`tour_map_screen.dart:63-88`).
-
-### The one real mechanism that can desynchronise them
-
-`_parsePoi()` returns `null` when a stop's `.txt` has no `Coordinates:` line
-(`tour_map_screen.dart:113`). Those stops are silently dropped from the map, but the
-survivors **keep their original file numbers**. The map therefore shows *gaps*, never a
-renumbering — e.g. pins `1, 4, 5` for a 5-stop tour.
-
-Compounding it: when the map is opened from a stop whose POI was dropped,
-`_focusPoi()` cannot find that index and falls back to the POI **nearest the user**,
-highlighting it orange (`tour_map_screen.dart:187-208`). Opening the map from "Audio 1"
-on a tour where stop 1 has no coordinates would highlight a *different* pin — which is a
-plausible route to "Audio 1 corresponds to point #2".
-
-### Why it could not be confirmed here
-
-- Yury's Toronto tour is not on this machine, and the local Postgres is not running.
-- Across 80 archived tours, every tour with partial coordinates had them on **stop 1
-  only** (all indoor museum tours) — the opposite shape from what Yury describes.
-- The highlight logic depends on real GPS, which an emulator cannot meaningfully supply.
-
-### What to check on a real device
-
-1. Open Yury's tour, tap the 🚶 map button on **Audio 1**.
-2. On the map, read the pin numbers left to right. **Is any number missing?**
-3. If pin `1` is absent, the cause is confirmed: `audio_1.txt` has no `Coordinates:`
-   line, so stop 1 was dropped and the orange highlight fell through to another pin.
-4. Cross-check by unzipping that tour and grepping each `audio_N.txt` for `Coordinates:`.
-
-**Prediction to falsify:** at least one stop in that tour has no `Coordinates:` line, and
-the missing pin numbers correspond exactly to those stops.
 
 ### Open question for Michael — not assumed, not implemented
 
