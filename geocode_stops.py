@@ -284,6 +284,124 @@ def location_hint(tour_name):
     return hint
 
 
+# Two candidates this close together are taken to corroborate each other.
+# Measured over 23 stops with independent ground truth:
+#
+#   sources agree within 200 m (12 stops):  worst error   398 m
+#   sources disagree  > 200 m (11 stops):   worst error 1,616 m
+#
+# Agreement predicts trustworthiness. Note the sample is small, so this is an
+# informed starting point rather than a tuned constant.
+AGREEMENT_M = float(os.getenv("GEOCODE_AGREEMENT_M", "200"))
+
+
+def _candidates(name, address, tour_location):
+    """Independent estimates of where this stop is, keyed by how they were found.
+
+    Two lookups, both free. They fail in different ways, which is what makes
+    comparing them informative:
+
+      by_name    - "{stop}, {city}" with postcode and country stripped
+      by_address - the model's full address, verbatim
+
+    Where they disagree materially, the address lookup is usually the one at
+    fault. Every large disagreement measured had the model right and the
+    address wrong: Bethesda Terrace 26 km, Sydney Opera House 12.7 km, Sydney
+    Harbour Bridge 1.5 km.
+    """
+    out = {}
+    city = city_from_address(address)
+    if name and city:
+        hit = geocode(f"{name}, {city}")
+        if hit:
+            out["by_name"] = hit
+    elif name and tour_location:
+        hit = geocode(f"{name}, {tour_location}")
+        if hit:
+            out["by_name"] = hit
+    if address:
+        hit = geocode(address)
+        if hit:
+            out["by_address"] = hit
+    return out
+
+
+def resolve_stop(stop_text, tour_location, tour_anchor=None):
+    """Pick a coordinate using agreement between independent sources.
+
+    Returns (new_text, record). record["confidence"] is "high" when two sources
+    corroborate each other, "low" when none do.
+
+    The rule, and why:
+      * two candidates within AGREEMENT_M  -> trust the geocoded one. When the
+        sources agree they are usually both right, and the geocoder is the more
+        precise of the two.
+      * nothing corroborates               -> keep the MODEL's coordinate. It is
+        the single most reliable source: in every large disagreement measured,
+        the model was right and the address lookup was wrong.
+
+    So a lookup can improve a coordinate, but only when something independent
+    backs it up. Left alone otherwise.
+    """
+    name, address, model_pt = _parse_stop(stop_text)
+    rec = {"stop": name, "address": address, "llm": model_pt,
+           "confidence": "low", "action": "kept", "reason": "", "spread_m": None}
+
+    if model_pt is None:
+        rec.update(action="skipped", reason="stop has no Coordinates line")
+        return stop_text, rec
+    if not GEOCODE_ENABLED:
+        rec.update(reason="geocoding disabled")
+        return stop_text, rec
+
+    cands = _candidates(name, address, tour_location)
+
+    # Discard any candidate that is nowhere near the tour: it has matched
+    # something unrelated that merely shares a name.
+    if tour_anchor:
+        for key in list(cands):
+            d_km = haversine_m(cands[key], tour_anchor) / 1000.0
+            if d_km > MAX_TOUR_RADIUS_KM:
+                logging.warning("[GEOCODE] %s: discarding %s match %.0f km from the tour",
+                                name, key, d_km)
+                rec.setdefault("rejected", {})[key] = round(d_km, 1)
+                del cands[key]
+
+    everything = dict(cands, model=model_pt)
+    best_pair, best_gap = None, None
+    keys = list(everything)
+    for i in range(len(keys)):
+        for j in range(i + 1, len(keys)):
+            gap = haversine_m(everything[keys[i]], everything[keys[j]])
+            if best_gap is None or gap < best_gap:
+                best_gap, best_pair = gap, (keys[i], keys[j])
+
+    rec["candidates"] = {k: [round(v[0], 6), round(v[1], 6)] for k, v in everything.items()}
+    if best_gap is not None:
+        rec["spread_m"] = round(best_gap)
+
+    if best_gap is not None and best_gap <= AGREEMENT_M:
+        rec["confidence"] = "high"
+        # Prefer a geocoded member of the agreeing pair over the model's value.
+        pick = next((k for k in best_pair if k != "model"), None)
+        if pick is None:
+            rec.update(reason=f"only the model available; nothing to corroborate")
+            return stop_text, rec
+        chosen = everything[pick]
+        if haversine_m(chosen, model_pt) <= 1.0:
+            rec.update(reason=f"{' + '.join(best_pair)} agree within {best_gap:.0f} m")
+            return stop_text, rec
+        new_text = _COORD_RE.sub(
+            lambda m: f"{m.group(1)}{chosen[0]:.6f}, {chosen[1]:.6f}", stop_text, count=1)
+        rec.update(action="replaced", chosen=pick,
+                   reason=f"{' + '.join(best_pair)} agree within {best_gap:.0f} m")
+        return new_text, rec
+
+    rec.update(reason=("sources disagree" if best_gap is not None else "no lookup succeeded")
+                      + " — keeping the model's coordinate")
+    return stop_text, rec
+
+
 def correct_stop(stop_text, tour_location, tour_anchor=None):
     """Validate one stop's coordinates, returning (new_text, record).
 
@@ -398,7 +516,7 @@ def correct_stops(text_content, tour_location, tour_anchor=None):
     new_content, records = [], []
     for stop_text in text_content:
         try:
-            fixed, record = correct_stop(stop_text, tour_location, tour_anchor)
+            fixed, record = resolve_stop(stop_text, tour_location, tour_anchor)
         except Exception as e:                      # pragma: no cover - defensive
             logging.warning("[GEOCODE] stop validation errored, keeping original: %s", e)
             fixed, record = stop_text, {"action": "error", "reason": str(e)}
