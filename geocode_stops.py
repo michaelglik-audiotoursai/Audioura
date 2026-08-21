@@ -64,10 +64,29 @@ USER_AGENT = os.getenv("GEOCODE_USER_AGENT", "Audioura/1.0 (audio tour generator
 # Nominatim allows at most 1 request/second.
 _MIN_INTERVAL_S = float(os.getenv("GEOCODE_MIN_INTERVAL", "1.1"))
 
-# Disagreement beyond this and we trust the geocoder over the model. 150 m is
-# wider than ordinary geocoder imprecision (a car park centroid vs its entrance)
-# but far below the 1-2 km errors measured above.
-REPLACE_THRESHOLD_M = float(os.getenv("GEOCODE_REPLACE_THRESHOLD_M", "150"))
+# Disagreement beyond this and we trust the geocoder over the model.
+#
+# Set from measurement, not intuition. A sweep of 40 stops across 8 cities
+# (Toronto, Boston, New York, Chicago, Paris, Edinburgh, Kyoto, Sydney), scored
+# against Wikidata as an independent source, gave:
+#
+#   threshold   improved  worse   net accuracy gained
+#      150 m         6      6            671 m
+#      500 m         1      2            554 m
+#     1000 m         1      0          1,601 m
+#
+# At 150 m the module corrected six stops and DEGRADED six others, for almost no
+# net gain. The regressions were all the same shape: the model was already
+# accurate, and the geocoder moved the pin to a different part of a large
+# feature — Royal Mile (a long street) 83 m -> 240 m, Sydney Harbour Bridge
+# 36 m -> 333 m, Luxembourg Gardens 83 m -> 240 m.
+#
+# At 1 km there are no regressions and the large win survives (Sunnybrook Park,
+# 1,616 m -> 15 m). This module exists to catch stops that are in the WRONG
+# PLACE, not to arbitrate between two defensible points on the same park. When
+# the two sources are within a kilometre they broadly agree, and the model's
+# answer is as good as the geocoder's.
+REPLACE_THRESHOLD_M = float(os.getenv("GEOCODE_REPLACE_THRESHOLD_M", "1000"))
 
 # A stop further than this from the tour's own location is not a near-miss, it
 # is a different place. Leslie Spit -> Central Islands would be caught here.
