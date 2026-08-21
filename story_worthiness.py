@@ -68,6 +68,18 @@ def _credit_line_carries_a_fact(matrix: Dict) -> bool:
     credit = (matrix.get('credit_line') or '').strip()
     if len(credit) < 12:
         return False
+    # [D500] This was the ONLY one of the four signal functions that did not
+    # filter placeholders, and "Not specified" is 13 characters — one past the
+    # len<12 guard above, so it scored as a fact. Measured on the 08-20 baseline:
+    # stops 2 and 3 were each credited with a credit-line fact they do not have,
+    # making stop 2 read 3/4 when it is 2/4.
+    #
+    # `_has_named_agent` and `_medium_is_specific`, in this same file, both call
+    # `is_placeholder`. LOCAL-491 r3 fixed exactly this class in the first of
+    # them and did not reach its neighbour. Behaviour is unchanged today — a stop
+    # mines on any one signal — but the SCORE is what step 7a's retry cap ranks on.
+    if is_placeholder(credit):
+        return False
     if _BOILERPLATE_CREDIT.match(credit):
         return False
     return True
@@ -84,6 +96,12 @@ def _medium_is_specific(matrix: Dict) -> bool:
 def _title_is_specific(matrix: Dict) -> bool:
     title = (matrix.get('canonical_title') or matrix.get('name') or '').strip()
     if len(title) < 4:
+        return False
+    # [D500] The SECOND instance of the same hole, found by a test written to pin
+    # the class rather than the case — `_credit_line_carries_a_fact` was the one
+    # observed in the 08-20 baseline, and this one was sitting beside it. Two of
+    # the four signal functions filtered placeholders and two did not.
+    if is_placeholder(title):
         return False
     return not _GENERIC_TITLE.match(title)
 

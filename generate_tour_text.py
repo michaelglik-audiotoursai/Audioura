@@ -8997,6 +8997,37 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 # one on the list — because publisher, printer and credit_line
                 # were all invisible to it. The rotation was working; it was being
                 # handed an empty matrix.
+                # [D500] "Not specified" IS NOT A VALUE. The prose_llm extractor
+                # writes it into publisher, credit_line and medium whenever the
+                # exhibition page does not mention them — and it usually does not,
+                # because that page is marketing copy, not the object record. On
+                # the 08-20 baseline, stop 2 carried it in THREE slots.
+                #
+                # An unknown field must be EMPTY, not a string that looks like
+                # data. Filled-with-a-placeholder is worse than empty in three
+                # measured ways: `synthesize_queries` searched for the literal
+                # phrase (LOCAL-498, fixed downstream — this is the source it
+                # was fixed downstream OF); `_credit_line_carries_a_fact` scored
+                # it as a fact because it is 13 characters and the guard is
+                # len<12; and the slot count reports 7/9 filled on a stop with
+                # 3 informative slots.
+                #
+                # Filtered HERE, where the checklist values enter, so every
+                # consumer below — query synthesis, the worthiness scorer, the
+                # story matrix, the focus-fact rotation — sees the same absence.
+                from text_fold import is_placeholder as _d500_ph
+                _s_publisher = '' if _d500_ph(_s_publisher) else _s_publisher
+                _s_credit_line = '' if _d500_ph(_s_credit_line) else _s_credit_line
+                _s_medium = '' if _d500_ph(_s_medium) else _s_medium
+                _s_artist = '' if _d500_ph(_s_artist) else _s_artist
+                _d500_dropped = [n for n, v in (('publisher', _s_publisher),
+                                                ('credit_line', _s_credit_line),
+                                                ('medium', _s_medium),
+                                                ('artist', _s_artist)) if not v]
+                if _d500_dropped:
+                    print(f"    [D500] Stop {_s_idx+1}: placeholder cleared from "
+                          f"{_d500_dropped} — unknown, not 'Not specified'")
+
                 for _mk, _mv in (('publisher', _s_publisher),
                                  ('credit_line', _s_credit_line),
                                  ('medium', _s_medium),
@@ -11021,6 +11052,16 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                     print(f"  [D498] Stop {stop_num} matrix: {_sp_filled}/{len(MATRIX_KEYS)} "
                           f"slots filled — empty: "
                           f"{[k for k in MATRIX_KEYS if not _sp_matrix[k]] or 'none'}")
+                    # [D500] The slot count is not the useful number. A story
+                    # needs an AGENT, so report how many of the three the stop
+                    # actually has — hero, sponsor, builder. Measured on the
+                    # 08-20 baseline: stops 2 and 3 have exactly ONE (the artist),
+                    # which is the quantity behind "there is nobody to write about".
+                    try:
+                        from story_roles import summarise as _d500_roles
+                        print(f"  {_d500_roles(_sp_matrix, tour_category)}")
+                    except Exception as _d500_err:
+                        print(f"  [D500] role report unavailable (non-fatal): {_d500_err}")
                     # Step 7c: 3-5 sentences, and a larger allowance only for the
                     # stop currently scoring highest — "in most valuable we can
                     # take a larger size".
