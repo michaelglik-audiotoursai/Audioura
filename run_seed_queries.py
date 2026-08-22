@@ -120,64 +120,72 @@ def artist_for(title):
     return ''
 
 
-set_venue_domain('http://www.mfa.org/')
-queries_run = 0
-rows = []
-t0 = time.time()
+# The experiment lives in main(); `run_seed_queries_v2` imports build_query,
+# load_stops, artist_for and KNOWN from here. Without the guard, importing this
+# module would silently re-issue 37 paid queries.
+def main():
+    set_venue_domain('http://www.mfa.org/')
+    queries_run = 0
+    rows = []
+    t0 = time.time()
 
-for stop_title, body in load_stops():
-    artist = artist_for(stop_title)
-    seeds = seeds_for_stop(body, KNOWN)
-    print(f"\n=== {stop_title[:60]} — {len(seeds)} seeds", file=sys.stderr)
-    for seed in seeds:
-        if search_cost(queries_run + 1) > HARD_COST_CEILING:
-            print("  COST CEILING REACHED — stopping", file=sys.stderr)
-            break
-        query, why = build_query(seed, stop_title, artist)
-        results, _lat = _serp_search(query)
-        queries_run += 1
+    for stop_title, body in load_stops():
+        artist = artist_for(stop_title)
+        seeds = seeds_for_stop(body, KNOWN)
+        print(f"\n=== {stop_title[:60]} — {len(seeds)} seeds", file=sys.stderr)
+        for seed in seeds:
+            if search_cost(queries_run + 1) > HARD_COST_CEILING:
+                print("  COST CEILING REACHED — stopping", file=sys.stderr)
+                break
+            query, why = build_query(seed, stop_title, artist)
+            results, _lat = _serp_search(query)
+            queries_run += 1
 
-        for r in results:
-            r['domain'] = normalize_domain(r.get('url', ''))
-            r['tier'] = _classify_domain_quick(r['domain']) or 'unverified'
+            for r in results:
+                r['domain'] = normalize_domain(r.get('url', ''))
+                r['tier'] = _classify_domain_quick(r['domain']) or 'unverified'
 
-        ranked, report = rank_and_cap_snippets(
-            results, artist=artist, work_title=stop_title,
-            category='museum')
-        snippets = [r.get('snippet', '') for r in ranked if r.get('snippet')]
-        # LIST of passages, not a joined string. `classify_material` iterates
-        # its argument, so a string is scanned CHARACTER BY CHARACTER and every
-        # verdict comes back `inert` with sentences == chars. The first run of
-        # this script reported 37/37 inert on exactly that bug — D423's shape,
-        # caught by checking the instrument against a text whose answer is known
-        # before believing a uniform zero.
-        kind = classify_material(snippets) if snippets else {}
+            ranked, report = rank_and_cap_snippets(
+                results, artist=artist, work_title=stop_title,
+                category='museum')
+            snippets = [r.get('snippet', '') for r in ranked if r.get('snippet')]
+            # LIST of passages, not a joined string. `classify_material` iterates
+            # its argument, so a string is scanned CHARACTER BY CHARACTER and every
+            # verdict comes back `inert` with sentences == chars. The first run of
+            # this script reported 37/37 inert on exactly that bug — D423's shape,
+            # caught by checking the instrument against a text whose answer is known
+            # before believing a uniform zero.
+            kind = classify_material(snippets) if snippets else {}
 
-        rows.append({
-            'stop': stop_title, 'id': seed['id'], 'class': seed['class'],
-            'kind_of_seed': seed['kind'], 'seed': seed['seed'],
-            'ask': seed['ask'], 'query': query, 'why': why,
-            'n_results': len(results), 'n_ranked': len(ranked),
-            'market_demoted': report.get('market_demoted', 0),
-            't1t2': report.get('tier1_tier2_in_output', 0),
-            'material_kind': kind.get('kind', 'none'),
-            'eventful_sentences': kind.get('eventful_sentences', 0),
-            'active': kind.get('active_sentences', 0),
-            'staked': kind.get('staked_sentences', 0),
-            'best_sentence': kind.get('best_sentence', ''),
-            'top': [{'title': r.get('title', '')[:110],
-                     'snippet': r.get('snippet', '')[:300],
-                     'domain': r.get('domain', ''), 'tier': r.get('tier', '')}
-                    for r in ranked[:3]],
-        })
-        print(f"  {seed['id']:<5} {seed['class']:<10} q={query[:58]:<58} "
-              f"n={len(results):<2} kind={kind.get('kind', '-')}", file=sys.stderr)
+            rows.append({
+                'stop': stop_title, 'id': seed['id'], 'class': seed['class'],
+                'kind_of_seed': seed['kind'], 'seed': seed['seed'],
+                'ask': seed['ask'], 'query': query, 'why': why,
+                'n_results': len(results), 'n_ranked': len(ranked),
+                'market_demoted': report.get('market_demoted', 0),
+                't1t2': report.get('tier1_tier2_in_output', 0),
+                'material_kind': kind.get('kind', 'none'),
+                'eventful_sentences': kind.get('eventful_sentences', 0),
+                'active': kind.get('active_sentences', 0),
+                'staked': kind.get('staked_sentences', 0),
+                'best_sentence': kind.get('best_sentence', ''),
+                'top': [{'title': r.get('title', '')[:110],
+                         'snippet': r.get('snippet', '')[:300],
+                         'domain': r.get('domain', ''), 'tier': r.get('tier', '')}
+                        for r in ranked[:3]],
+            })
+            print(f"  {seed['id']:<5} {seed['class']:<10} q={query[:58]:<58} "
+                  f"n={len(results):<2} kind={kind.get('kind', '-')}", file=sys.stderr)
 
-elapsed = time.time() - t0
-cost = search_cost(queries_run)
-out = {'queries': queries_run, 'cost_usd': round(cost, 4),
-       'elapsed_s': round(elapsed, 1), 'rows': rows}
-with open(os.path.join(HERE, 'SEED_QUERY_RESULTS.json'), 'w') as fh:
-    json.dump(out, fh, indent=2, ensure_ascii=False)
-print(f"\n{queries_run} queries, ${cost:.4f}, {elapsed:.0f}s "
-      f"-> SEED_QUERY_RESULTS.json", file=sys.stderr)
+    elapsed = time.time() - t0
+    cost = search_cost(queries_run)
+    out = {'queries': queries_run, 'cost_usd': round(cost, 4),
+           'elapsed_s': round(elapsed, 1), 'rows': rows}
+    with open(os.path.join(HERE, 'SEED_QUERY_RESULTS.json'), 'w') as fh:
+        json.dump(out, fh, indent=2, ensure_ascii=False)
+    print(f"\n{queries_run} queries, ${cost:.4f}, {elapsed:.0f}s "
+          f"-> SEED_QUERY_RESULTS.json", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
