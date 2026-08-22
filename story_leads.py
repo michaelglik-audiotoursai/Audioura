@@ -111,13 +111,32 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
         f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
         headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
         json={'contents': [{'parts': [{'text': prompt}]}],
-              'generationConfig': {'temperature': 0.2, 'maxOutputTokens': 600},
+              # [D506] 600 was a starvation budget, and step 4 has been running
+              # on it since LOCAL-488. Current Gemini models spend
+              # `maxOutputTokens` on INTERNAL REASONING first: measured
+              # 2026-08-22, a 600 budget produced `thoughtsTokenCount: 582`,
+              # `finishReason: MAX_TOKENS` and a **56-character answer**. Every
+              # step-4 call has been truncated mid-sentence, which is the real
+              # reason the log has said "0 leads with cross-model agreement" on
+              # every run — there was nothing to agree with.
+              #
+              # 4000 with thinking off: same question, `finishReason: STOP`,
+              # 720 characters, and the answer contained the entire Gris /
+              # Reverdy / Tériade story including the 11 lithographs and 1955.
+              'generationConfig': {
+                  'temperature': 0.2,
+                  'maxOutputTokens': int(os.environ.get('GEMINI_MAX_TOKENS', '4000')),
+                  'thinkingConfig': {'thinkingBudget': 0},
+              },
               **({'tools': [{'google_search': {}}]} if grounded else {})},
-        timeout=60)
+        timeout=90)
     r.raise_for_status()
     d = r.json()
     try:
-        return d['candidates'][0]['content']['parts'][0]['text']
+        # ALL parts, not parts[0]. A grounded response is commonly split across
+        # several, so taking the first silently truncates it.
+        parts = d['candidates'][0]['content'].get('parts', [])
+        return ''.join(p.get('text', '') for p in parts)
     except (KeyError, IndexError):
         return ''
 

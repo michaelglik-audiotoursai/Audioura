@@ -5433,6 +5433,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # a particular gallery wing. The deterministic bypass (which fills from
     # the venue's most-documented works) is exactly wrong for this case.
     _exhibition_scope = None  # None = unscoped, else dict with scope info
+    _exh_name_resolved = ''   # [D506] set when the checklist is fetched
     _exhibition_scope_artists = []  # Artist names extracted from requirements
 
     if intent and intent.get('venue_name') and tour_category == 'museum':
@@ -5604,6 +5605,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if not _exh_name_for_search.strip():
                     _exh_name_for_search = _exhibition_scope.get('requirements', '') or location
 
+                # [D506] Carry it forward. This name is resolved here, used to
+                # fetch the checklist, and was then dropped — which is why
+                # LOCAL-423's two visitor-framed queries have never run.
+                _exh_name_resolved = _exh_name_for_search
                 print(f"\n  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══")
                 print(f"  [LOCAL-364] Exhibition search term: '{_exh_name_for_search}'")
                 print(f"  [LOCAL-364] Venue URL: {_det_entity.official_url}")
@@ -9020,6 +9025,22 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 _s_credit_line = '' if _d500_ph(_s_credit_line) else _s_credit_line
                 _s_medium = '' if _d500_ph(_s_medium) else _s_medium
                 _s_artist = '' if _d500_ph(_s_artist) else _s_artist
+                # [D506] The three agents the record never carried. `printer`
+                # is D500's `builder` role — obtainable from the object record
+                # (D501) and never previously handed to query synthesis at all.
+                _s_printer = (_s_poi.get('printed_by', '')
+                              or _s_poi.get('printer', '') or '')
+                if _d500_ph(_s_printer):
+                    _s_printer = ''
+                _s_collaborator = (_s_poi.get('collaborator', '') or '')
+                if _d500_ph(_s_collaborator):
+                    _s_collaborator = ''
+                # The donor is inside the credit line; `synthesize_queries`
+                # extracts it itself, but only if the credit line is present.
+                _s_donor = (_s_poi.get('donor', '') or '')
+                if _d500_ph(_s_donor):
+                    _s_donor = ''
+
                 _d500_dropped = [n for n, v in (('publisher', _s_publisher),
                                                 ('credit_line', _s_credit_line),
                                                 ('medium', _s_medium),
@@ -9036,6 +9057,27 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     if _mv and not _s_poi.get(_mk):
                         _s_poi[_mk] = _mv
 
+                # [D506] THE STOP RECORD MUST CARRY THE WHOLE MATRIX.
+                #
+                # `synthesize_queries` reads eleven fields. This dict supplied
+                # eight, and the three it omitted are the ones that make the
+                # queries visitor-shaped instead of catalogue-shaped:
+                #
+                #   exhibition_name — gates the TWO queries that are Michael's own
+                #       Step 2 framing, "what story can be told to visitors of
+                #       {exhibition} about {work}, {credit_line}" (D366/LOCAL-423).
+                #       D426 diagnosed this unreachable on 2026-08-13 and it was
+                #       never wired. Those queries have never run in production.
+                #   printer / printed_by — D501 can now supply Mourlot from the
+                #       object record; without this key the printer queries
+                #       ("Mourlot workshop history", "Tériade Mourlot
+                #       collaboration") cannot be built.
+                #   collaborator — gates the "why collaborated" pair.
+                #
+                # Measured on Au Soleil du Plafond: the eight-field record yields
+                # 4 queries, none naming a person other than the artist; the full
+                # matrix yields 15, including the donor's motive and the
+                # collaboration's reason.
                 _s_stop_data = {
                     'canonical_title': _s_name,
                     'artist': _s_artist,
@@ -9046,6 +9088,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     'credit_line': _s_credit_line,
                     'medium': _s_medium,
                     'english_title': _s_english_title,
+                    'exhibition_name': _exh_name_resolved,
+                    'printer': _s_printer,
+                    'printed_by': _s_printer,
+                    'collaborator': _s_collaborator,
+                    'local_title': _s_poi.get('local_title', ''),
+                    'donor': _s_donor,
                 }
                 # -------- [LOCAL-486] STEP 2: is this stop worth mining? --------
                 # Michael's step 2, never previously implemented: "we analyze the
