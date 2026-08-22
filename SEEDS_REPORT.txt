@@ -1,0 +1,158 @@
+==============================================================================
+  STOP: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+  16 seeds — 8 anchored (checkable), 8 evaluative (our own)
+==============================================================================
+
+  sentence 2: "This exhibition in Gallery 184 features extraordinary works by Spanish artists, focusing on the ..."
+     subject=This exhibition in Gallery 184   action=This
+    2.1 [evaluative] [relative   ] revolutionized the book as an art form with its deep collaboration
+          -> What did This exhibition in Gallery 184 actually DO that would justify "revolutionized the book as an art form with its deep collaboration"? If nothing, cut the phrase.
+    2.2 [evaluative] [participial] focusing on the livre d'artiste
+          -> What did This exhibition in Gallery 184 actually DO that would justify "focusing on the livre d'artiste"? If nothing, cut the phrase.
+
+  sentence 4: "These pieces delve into the exploration of belief, both in the supernatural and the divine, show..."
+     subject=These   action=pieces
+    4.1 [evaluative] [participial] showcasing how artists express these concepts through their unrivaled creativity
+          -> What did These actually DO that would justify "showcasing how artists express these concepts through their unrivaled creativity"? If nothing, cut the phrase.
+
+  sentence 5: "At Le Lézard aux plumes d’or, you will learn about Broder's pivotal decision to engage Miró, all..."
+     subject=At Le Lézard aux   action=plumes
+    5.1 [anchored  ] [possessive ] Broder's pivotal decision
+          -> Is this true, and what is the event behind it: "Broder's pivotal decision"?
+    5.2 [evaluative] [participial] allowing the artist to blend visual and textual narratives seamlessly
+          -> What did At Le Lézard aux actually DO that would justify "allowing the artist to blend visual and textual narratives seamlessly"? If nothing, cut the phrase.
+
+  sentence 6: "Then, at Moses and Monotheism, you'll see imagery complementing Freud’s exploration of the origi..."
+     subject=?   action=Moses
+    6.1 [anchored  ] [possessive ] Freud's exploration of
+          -> Is this true, and what is the event behind it: "Freud's exploration of"?
+
+  sentence 8: "From this position, the intricate details and the interplay of color become most apparent, drawi..."
+     subject=From   action=this
+    8.1 [anchored  ] [participial] drawing you into the surreal world that Joan Miró has crafted
+          -> Is this true, and what is the event behind it: "drawing you into the surreal world that Joan Miró has crafted"?
+
+  sentence 10: "Published by Louis Broder, a figure renowned for his commitment to the art of the book, this wor..."
+     subject=Published by   action=Published
+    10.1 [anchored  ] [appositive ] Louis Broder, a figure renowned for his commitment to the art of the book
+          -> Is this true, and what is the event behind it: "Louis Broder, a figure renowned for his commitment to the art of the book"?
+    10.2 [evaluative] [relative   ] the exhibition highlights
+          -> What did Published by actually DO that would justify "the exhibition highlights"? If nothing, cut the phrase.
+
+  sentence 11: "Broder's decision to engage Miró was pivotal, as it allowed the artist to explore a new dimensio..."
+     subject=Broder's decision to engage Miró   action=was
+    11.1 [anchored  ] [capacity   ] Broder's decision to engage Miró was pivotal
+          -> Is this true, and what is the event behind it: "Broder's decision to engage Miró was pivotal"?
+    11.2 [evaluative] [participial] blending visual and textual narratives seamlessly
+          -> What did Broder's decision to engage Miró actually DO that would justify "blending visual and textual narratives seamlessly"? If nothing, cut the phrase.
+
+  sentence 12: "The collection, gifted by Boris Fridman, a supporter of the art community, enriches the Museum o..."
+     subject=?   action=gifted
+    12.1 [anchored  ] [appositive ] Boris Fridman, a supporter of the art community
+          -> Is this true, and what is the event behind it: "Boris Fridman, a supporter of the art community"?
+    12.2 [anchored  ] [possessive ] Boston's holdings
+          -> Is this true, and what is the event behind it: "Boston's holdings"?
+
+  sentence 13: "Fridman's contribution ensures that visitors can appreciate the intricate dance between lithogra..."
+     subject=Fridman's contribution   action=ensures
+    13.1 [anchored  ] [possessive ] Fridman's contribution ensures
+          -> Is this true, and what is the event behind it: "Fridman's contribution ensures"?
+    13.2 [evaluative] [relative   ] visitors can appreciate the intricate dance between lithography
+          -> What did Fridman's contribution actually DO that would justify "visitors can appreciate the intricate dance between lithography"? If nothing, cut the phrase.
+    13.3 [evaluative] [participial] offering a unique tactile experience and inviting viewers to ponder the narrative beyond the page
+          -> What did Fridman's contribution actually DO that would justify "offering a unique tactile experience and inviting viewers to ponder the narrative beyond the page"? If nothing, cut the phrase.
+
+==============================================================================
+  STOP: Au Soleil du Plafond
+  12 seeds — 1 anchored (checkable), 11 evaluative (our own)
+==============================================================================
+
+  sentence 2: "In this singular work, Juan Gris and Pierre Reverdy, the French poet linked to Surrealism, embar..."
+     subject=Juan Gris and Pierre Reverdy   action=this
+    2.1 [anchored  ] [appositive ] Pierre Reverdy, the French poet linked to Surrealism
+          -> Is this true, and what is the event behind it: "Pierre Reverdy, the French poet linked to Surrealism"?
+    2.2 [evaluative] [relative   ] revolutionized the concept of the book as art
+          -> What did Juan Gris and Pierre Reverdy actually DO that would justify "revolutionized the concept of the book as art"? If nothing, cut the phrase.
+    2.3 [evaluative] [participial] exemplifying the collaborative spirit that defines the MFA's exhibition
+          -> What did Juan Gris and Pierre Reverdy actually DO that would justify "exemplifying the collaborative spirit that defines the MFA's exhibition"? If nothing, cut the phrase.
+
+  sentence 3: "The project required Gris's innovative vision to blend with Reverdy's poetic prowess, resulting ..."
+     subject=The project   action=required
+    3.1 [evaluative] [possessive ] Gris's innovative vision
+          -> What did Gris actually DO that would justify "innovative vision"? If nothing, cut the phrase.
+    3.2 [evaluative] [possessive ] Reverdy's poetic prowess
+          -> What did Reverdy actually DO that would justify "poetic prowess"? If nothing, cut the phrase.
+    3.3 [evaluative] [participial] resulting in a unique interlacing of images and words
+          -> What did The project actually DO that would justify "resulting in a unique interlacing of images and words"? If nothing, cut the phrase.
+
+  sentence 4: "Their work highlights not only Gris's ability to transform visual art but also Reverdy's capacit..."
+     subject=Their work   action=highlights
+    4.1 [evaluative] [capacity   ] Gris's ability to transform visual art
+          -> What did Gris actually DO that would justify "ability to transform visual art"? If nothing, cut the phrase.
+    4.2 [evaluative] [capacity   ] Reverdy's capacity to infuse words with structural beauty
+          -> What did Reverdy actually DO that would justify "capacity to infuse words with structural beauty"? If nothing, cut the phrase.
+
+  sentence 6: "Their contributions enable the museum to showcase works that rarely emerge from the archives, of..."
+     subject=Their   action=contributions
+    6.1 [evaluative] [relative   ] rarely emerge from the archives
+          -> What did Their actually DO that would justify "rarely emerge from the archives"? If nothing, cut the phrase.
+    6.2 [evaluative] [participial] offering a glimpse into the transformative collaborations of early-20th-century artists
+          -> What did Their actually DO that would justify "offering a glimpse into the transformative collaborations of early-20th-century artists"? If nothing, cut the phrase.
+
+  sentence 7: ""Au Soleil du Plafond" vividly represents the exhibition's thesis, which highlights how visual a..."
+     subject=?   action=represents
+    7.1 [evaluative] [relative   ] highlights how visual artists
+          -> What did this actually DO that would justify "highlights how visual artists"? If nothing, cut the phrase.
+
+  sentence 8: "The confluence of art and text here resonates with broader artistic movements, inviting reflecti..."
+     subject=The confluence of art and text here   action=resonates
+    8.1 [evaluative] [participial] inviting reflection on art as a shared divine expression
+          -> What did The confluence of art and text here actually DO that would justify "inviting reflection on art as a shared divine expression"? If nothing, cut the phrase.
+
+==============================================================================
+  STOP: Moses and Monotheism
+  9 seeds — 4 anchored (checkable), 5 evaluative (our own)
+==============================================================================
+
+  sentence 1: "Orientation: As you stand near Moses and Monotheism, place yourself in such a way to catch the i..."
+     subject=?   action=As
+    1.1 [anchored  ] [possessive ] Dalí's vivid illustrations
+          -> Is this true, and what is the event behind it: "Dalí's vivid illustrations"?
+
+  sentence 2: "From this angle, the surreal qualities that breathe life into Freud’s narrative become evident."
+     subject=From   action=this
+    2.1 [anchored  ] [relative   ] breathe life into Freud’s narrative become evident
+          -> Is this true, and what is the event behind it: "breathe life into Freud’s narrative become evident"?
+
+  sentence 3: "Salvador Dalí crafted these illustrations in 1974 for Sigmund Freud’s text, infusing it with his..."
+     subject=Salvador Dalí   action=crafted
+    3.1 [evaluative] [participial] infusing it with his characteristic surrealism
+          -> What did Salvador Dalí actually DO that would justify "infusing it with his characteristic surrealism"? If nothing, cut the phrase.
+
+  sentence 4: "His imagery complements Freud’s exploration of the origins of monotheism, visualizing the psycho..."
+     subject=His imagery   action=His
+    4.1 [anchored  ] [possessive ] Freud's exploration of
+          -> Is this true, and what is the event behind it: "Freud's exploration of"?
+    4.2 [evaluative] [participial] visualizing the psychological and spiritual transition from polytheistic beliefs
+          -> What did His imagery actually DO that would justify "visualizing the psychological and spiritual transition from polytheistic beliefs"? If nothing, cut the phrase.
+
+  sentence 5: "Freud, known for his pioneering work in psychoanalysis, authored the book, which delves into the..."
+     subject=?   action=his
+    5.1 [evaluative] [relative   ] delves into the complexities of religious origins
+          -> What did this actually DO that would justify "delves into the complexities of religious origins"? If nothing, cut the phrase.
+    5.2 [anchored  ] [participial] setting the stage for Dalí's evocative interpretations
+          -> Is this true, and what is the event behind it: "setting the stage for Dalí's evocative interpretations"?
+
+  sentence 6: "The work exemplifies the exhibition's argument that the book itself is an artwork, where text an..."
+     subject=The work   action=exemplifies
+    6.1 [evaluative] [relative   ] the book itself is an artwork
+          -> What did The work actually DO that would justify "the book itself is an artwork"? If nothing, cut the phrase.
+
+  sentence 7: "Through this collaboration, Dalí and Freud engage in a dialogue, bridging literary and visual ar..."
+     subject=Dalí and Freud   action=this
+    7.1 [evaluative] [participial] bridging literary and visual art forms
+          -> What did Dalí and Freud actually DO that would justify "bridging literary and visual art forms"? If nothing, cut the phrase.
+
+==============================================================================
+  TOTAL 37 seeds across 3 stops — 13 anchored, 24 evaluative
+==============================================================================
