@@ -295,4 +295,36 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         print(f"    [D511] examined {out['examined']} credit_line(s), "
               f"{'STORY ACCEPTED' if out['story'] else 'no story passed'}, "
               f"~${out['cost_usd']:.3f}, {out['elapsed_s']:.0f}s")
+
+    # [D514] Persist every candidate, not just the winner.
+    #
+    # Michael asked to see the rejected Moses stories and their verdicts, and
+    # they were not on disk: the log carries one summary line per candidate and
+    # the story text lived only in this dict. A rejection we cannot read is a
+    # rejection we cannot check — and the whole reason Moses publishes nothing
+    # is a claim about these texts.
+    #
+    # Append-only JSONL, one line per candidate, so concurrent stops in the same
+    # run cannot clobber each other. Wrapped: persistence must never fail a tour.
+    try:
+        import json as _json
+        _path = os.environ.get('STORY_LOOP_CANDIDATE_LOG', 'story_loop_candidates.jsonl')
+        with open(_path, 'a', encoding='utf-8') as _fh:
+            for _c in out['candidates']:
+                _fh.write(_json.dumps({
+                    'ts': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'work': matrix.get('canonical_title', ''),
+                    'credit_line': _c['credit_line'],
+                    'seed_kind': _c['seed_kind'],
+                    'kind': _c['kind'],
+                    'index': _c['index'],
+                    'counts': _c['counts'],
+                    'passes': _c['gate'].get('passes'),
+                    'failed': _c['gate'].get('failed'),
+                    'ungrounded': _c['ungrounded'],
+                    'story': _c['story'],
+                }, ensure_ascii=False) + '\n')
+    except Exception as _e:
+        if verbose:
+            print(f"    [D511] candidate log not written (non-fatal): {_e}")
     return out

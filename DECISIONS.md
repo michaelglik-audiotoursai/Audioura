@@ -20379,3 +20379,50 @@ evaluative prose A213 diagnosed. The 1938 London meeting is absent in 3 runs of 
 4. D496 tiers 1–3 as retrieval preference — the only thing that will fix Moses.
 
 **Not to be done: lowering the gate.** Moses publishing nothing is the system telling the truth.
+
+## D514 — Every candidate is persisted now, because a rejection we cannot read is a rejection we cannot check
+
+**2026-08-23.** Michael asked to see all the Moses stories Gemini wrote and the validator's
+rejection of each. **They were not on disk.** `story_production_loop` printed one summary line
+per candidate and kept the text in a dict that died with the process — while the claim resting
+on those texts is *"Moses publishes nothing and the gate is right to."* Unfalsifiable as built.
+
+Now appends every candidate to `story_loop_candidates.jsonl` (`STORY_LOOP_CANDIDATE_LOG`),
+append-only so concurrent stops cannot clobber each other, and wrapped so persistence can never
+fail a tour. `run_moses_candidates.py` replays one stop under production conditions —
+including D512's verb install, which lives in `generate_tour_text` and not in the loop, so
+without it `material_kind` would score against the narrower hardcoded verb list.
+
+**Thirteen Moses stories now readable** in `MOSES_ALL_CANDIDATES.md` — 4 from today's
+production loop, 9 from the D510 lab run. **All thirteen fail `eventful`, and all thirteen are
+production descriptions**: sheepskin and silk in eleven, acrylic folios and velvet case in seven.
+Nobody's plan collapses, nobody is defied, nothing is at risk. A214 is confirmed from the texts
+rather than from a summary line. The gate is right.
+
+**Four findings that only the texts could give:**
+
+1. **The one eventful passage in the pool is the story inside Freud's book, not the story of the
+   object** — B5.2, Moses murdered in a rebellion, collective guilt. Retold content, not making.
+2. **The door to the missing story was retrieved twice and never opened.** B5.1 *"refuge in
+   England shortly before his death"*, B6.1 *"fled to London … months before his death"*. Dalí
+   came to that house in 1938. **The meeting is in none of the thirteen.** And today's replay
+   logged `[D501] no object record for 'Moses and Monotheism'` — there is no museum record to
+   read, so D511's matrix-agent fix yields one agent (Dalí) and has no purchase on this stop.
+3. **`ungrounded_names` flagged `Parisian`** — from *"the Parisian publisher Art & Valeur"*. A
+   demonym, not a person. The check runs BEFORE the gate (`if ungrounded: continue`), so it
+   discards whatever the verdict is. Second firing in two days after `Léonce Rosenberg` (D513d).
+   **This is now a bug, not a question** — nothing was lost here only because A3 also failed
+   `eventful`. Fix before `STORY_GATE_STRICT` is ever used.
+4. **A seed that can ask nothing still costs a slot.** A4, seeded on *"bringing a fresh
+   perspective to biblical narratives"*, returned *"No confirmed or corrected facts are
+   available"* — an honest null that consumed a quarter of a budget capped at 4 (D513a).
+   Screening seeds for an agent or a concrete noun raises the effective cap without raising it.
+
+**Cost of the correct behaviour:** $0.059 for today's four rejections, ~$0.176 across the three
+A/B runs, to publish nothing. Cheap. The expensive outcome would be publishing the sheepskin
+four times.
+
+**Not changed: the gate.** The closest thing to craft drama — Dalí drawing onto gold plates with
+a diamond stylus, printing onto lambskin — is ruled `active` because nothing is at risk, and that
+is right by the current definition. Making irreversibility and material risk count as stakes is a
+definition change for Michael to make deliberately, not a threshold to nudge.
