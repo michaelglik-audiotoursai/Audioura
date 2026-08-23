@@ -20505,3 +20505,64 @@ flags.
 **LEAD's recommendation: keep the rule**, add the two amendments in (a), and run three tours
 under it against the three loop-off runs already recorded (~$0.60, ~15 min) before treating 71.7
 as real.
+
+## D516 — D515 measured over three runs: +9.8, 9 of 9 stops published, a third of the cost
+
+**2026-08-23.** Michael asked for the three-run measurement and for the tour and the judgement as
+two separate documents: `TOUR_MFA_FINAL_20260823.md` (the tour verbatim) and
+`TOUR_MFA_FINAL_20260823_JUDGEMENT.md`. The rule was run exactly as approved — **the two
+amendments LEAD proposed were deliberately NOT applied**, because changing the rule
+mid-measurement measures something else.
+
+| arm | runs | mean | sd | range |
+|---|---|---|---|---|
+| loop OFF | 3 | 58.0 | 7.19 | 49.7 – 62.3 |
+| loop ON, old gate | 3 | 63.2 | 1.33 | 61.7 – 64.0 |
+| **loop ON, D515** | 3 | **67.8** | 4.11 | 64.3 – 72.3 |
+
+D515 vs loop-off **+9.8** (Welch t=2.04, df 3.2); vs the old gate **+4.5** (t=1.82). With the
+17:46 run pooled, n=4, mean 68.8, +10.8 (t=2.35). **Still not p<0.05 and not reported as if it
+were** — but unlike D513's +5.2 it survives dropping any single run, and the worst D515 run beats
+the loop-off mean by 6.
+
+**The non-statistical part is the stronger result:**
+
+| | old gate, 3 runs | D515, 3 runs |
+|---|---|---|
+| stops publishing a story | 4 of 9 | **9 of 9** |
+| loop cost per tour | $0.10–0.17 | **$0.045–0.060** |
+| loop time per tour | 290–465 s | **98–149 s** |
+| credit_lines bought per stop | 3.0 | **1.1** |
+
+Six of the nine accepted stories would have been rejected by the old gate; three would have passed
+either way. **Moses published in all three runs**, scoring 75 in run 3 — its highest ever, against
+54.3 loop-off and 42.7 under the old gate. **The rule is not a rubber stamp:** run 1's first Moses
+candidate scored 37 and was rejected on the index floor; the second passed at 59.
+
+**`C0 X0` did not recur** — counts ran C2–C5 across all nine stops. The unverified-publish case
+that prompted LEAD's amendment (a) is rare, not routine.
+
+### The defects are no longer in the loop
+
+Every blocker in this tour lives in the descriptive prose or in the join between prose and story:
+
+1. **"the Louis Broder Tériade" — stop 2, and REPRODUCIBLE.** Broder is stop 1's publisher. The
+   loop's own sentence four lines later gets Tériade right, so the stop contradicts itself. The
+   identical corruption appeared in the 17:46 run, in the loop's sentence that time and in the
+   prose this time — **two different generators, same cross-stop contamination**, which points at
+   shared per-tour context. D515's veto is structurally blind to it: the error was introduced when
+   the prose was written, never adjudicated.
+2. **The tour contradicts itself on Freud's thesis inside one stop** — prose says "an Egyptian
+   priest", the story says "of Egyptian nobility". The story is right; the closing line repeats the
+   prose. The append put the corrected fact beside the uncorrected one and kept both.
+3. **The seam and duplication are worse under D515, not better** — now that every stop carries a
+   story, every stop repeats itself.
+
+**LEAD's judgement, recorded because it reverses this morning's:** D513 said Moses publishing
+nothing was the system telling the truth. Half right — the gate was honest and it was measuring
+the wrong thing, rejecting an edition-destroyed-by-paper-defect story as `inert` while passing a
+credits list. Michael's rule found that; the old thresholds hid it.
+
+**Order of work:** (1) fix the append so the story REPLACES overlapping prose — one change kills
+defects 2 and 3, needs no network; (2) find the Broder/Tériade contamination; (3) the two D515
+amendments, now known to be rare; (4) re-measure, at which point 67.8 becomes comparable.

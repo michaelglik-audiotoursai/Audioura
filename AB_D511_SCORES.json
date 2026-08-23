@@ -1,32 +1,182 @@
 [
   {
-    "file": "TOUR_LOOP_20260823_1746.txt",
-    "arm": "ON",
+    "file": "TOUR_MFA_RELEASE_20260823_1224.txt",
+    "arm": "OFF",
     "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
-    "index": 84,
-    "historic": 31,
-    "detail": 70,
-    "social": 84,
-    "words": 287
-  },
-  {
-    "file": "TOUR_LOOP_20260823_1746.txt",
-    "arm": "ON",
-    "stop": "Au Soleil du Plafond by Juan Gris",
-    "index": 72,
+    "index": 64,
     "historic": 44,
-    "detail": 29,
+    "detail": 42,
     "social": 72,
-    "words": 216
+    "words": 179
   },
   {
-    "file": "TOUR_LOOP_20260823_1746.txt",
-    "arm": "ON",
+    "file": "TOUR_MFA_RELEASE_20260823_1224.txt",
+    "arm": "OFF",
+    "stop": "Au Soleil du Plafond by Juan Gris",
+    "index": 70,
+    "historic": 45,
+    "detail": 34,
+    "social": 53,
+    "words": 172
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1224.txt",
+    "arm": "OFF",
+    "stop": "Moses and Monotheism by Salvador Dalí",
+    "index": 53,
+    "historic": 38,
+    "detail": 27,
+    "social": 45,
+    "words": 237
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1238.txt",
+    "arm": "OFF",
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+    "index": 62,
+    "historic": 12,
+    "detail": 47,
+    "social": 45,
+    "words": 158
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1238.txt",
+    "arm": "OFF",
+    "stop": "Au Soleil du Plafond by Juan Gris",
+    "index": 36,
+    "historic": 34,
+    "detail": 0,
+    "social": 45,
+    "words": 91
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1238.txt",
+    "arm": "OFF",
+    "stop": "Moses and Monotheism by Salvador Dalí",
+    "index": 51,
+    "historic": 12,
+    "detail": 6,
+    "social": 45,
+    "words": 157
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1249.txt",
+    "arm": "OFF",
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+    "index": 58,
+    "historic": 24,
+    "detail": 19,
+    "social": 60,
+    "words": 148
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1249.txt",
+    "arm": "OFF",
+    "stop": "Au Soleil du Plafond by Juan Gris",
+    "index": 69,
+    "historic": 37,
+    "detail": 29,
+    "social": 45,
+    "words": 138
+  },
+  {
+    "file": "TOUR_MFA_RELEASE_20260823_1249.txt",
+    "arm": "OFF",
     "stop": "Moses and Monotheism by Salvador Dalí",
     "index": 59,
-    "historic": 33,
-    "detail": 26,
+    "historic": 35,
+    "detail": 6,
+    "social": 72,
+    "words": 202
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1810.txt",
+    "arm": "ON",
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+    "index": 80,
+    "historic": 54,
+    "detail": 46,
+    "social": 60,
+    "words": 213
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1810.txt",
+    "arm": "ON",
+    "stop": "Au Soleil du Plafond by Juan Gris",
+    "index": 64,
+    "historic": 56,
+    "detail": 15,
+    "social": 77,
+    "words": 208
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1810.txt",
+    "arm": "ON",
+    "stop": "Moses and Monotheism by Salvador Dalí",
+    "index": 56,
+    "historic": 30,
+    "detail": 39,
+    "social": 77,
+    "words": 296
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1816.txt",
+    "arm": "ON",
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+    "index": 68,
+    "historic": 37,
+    "detail": 44,
+    "social": 100,
+    "words": 176
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1816.txt",
+    "arm": "ON",
+    "stop": "Au Soleil du Plafond by Juan Gris",
+    "index": 75,
+    "historic": 65,
+    "detail": 42,
+    "social": 65,
+    "words": 234
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1816.txt",
+    "arm": "ON",
+    "stop": "Moses and Monotheism by Salvador Dalí",
+    "index": 50,
+    "historic": 48,
+    "detail": 18,
+    "social": 30,
+    "words": 282
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1821.txt",
+    "arm": "ON",
+    "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+    "index": 72,
+    "historic": 35,
+    "detail": 34,
+    "social": 77,
+    "words": 212
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1821.txt",
+    "arm": "ON",
+    "stop": "Au Soleil du Plafond by Juan Gris",
+    "index": 70,
+    "historic": 66,
+    "detail": 19,
+    "social": 77,
+    "words": 245
+  },
+  {
+    "file": "TOUR_LOOP_20260823_1821.txt",
+    "arm": "ON",
+    "stop": "Moses and Monotheism by Salvador Dalí",
+    "index": 75,
+    "historic": 35,
+    "detail": 57,
     "social": 45,
-    "words": 248
+    "words": 320
   }
 ]
