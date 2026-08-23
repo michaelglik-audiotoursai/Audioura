@@ -9,6 +9,16 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [x] DONE 2026-08-23 13:0x — **the A/B ran, the tour and LEAD's evaluation are in
+      [`TOUR_MFA_20260823_LOOP_ON_EVALUATION.md`](TOUR_MFA_20260823_LOOP_ON_EVALUATION.md),
+      opened in VS Code.** Six generations, arms alternating, 36 min, ~$1.1.
+      **OFF 58.0 (sd 7.22) · ON 63.2 (sd 1.35) · +5.2, NOT significant** (Welch t=1.24).
+      Drop the one bad OFF run and it is +1.0 — the loop prevented a bad run rather than
+      improving good ones. Full record **D513 / A216**. Three blockers before release, and
+      the loop is not one of them: an orientation that named the wrong artist for two of
+      three works (1 run in 6), the story-append saying everything twice, and Moses
+      publishing nothing 3 of 3. Original instruction kept below for the record.
+
 - [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
       **regenerate the whole tour** `Picasso, Miro, Dali: Unbound exhibition at MFA,
       Boston, MA` **with all stories now in place**, write it to a document and open it

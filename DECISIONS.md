@@ -20289,3 +20289,93 @@ any risk. Ranking facts and events separately, each with its own cap, would end 
 of bug rather than tune it. Michael: *"make it a separate task, don't fold into (d) —
 it touches prompt and ranking cap, bigger than hardening."* Touches the prompt, so it
 wants D474's discipline: alone, with him awake.
+
+## D513 — The loop measured in production: it raises the floor, and the append is the blocker
+
+**2026-08-23.** Michael's instruction of 08-22 executed: regenerate the whole MFA tour with
+the story work in place, and give LEAD's own evaluation. Run as the A/B he required —
+**six generations, arms alternating OFF/ON/OFF/ON/OFF/ON**, 36 min wall, ~$1.1.
+Alternating rather than batching because retrieval drifts over an hour and batching hands
+that drift to one arm. Both arms pinned to 3 stops; `score_ab_d511.py` scores both from the
+`.txt` on disk, because the release-check script scores itself and the loop script does not.
+
+| | runs | tour-mean index | sd | range |
+|---|---|---|---|---|
+| loop OFF | 3 | 58.0 | 7.22 | 49.7 – 62.3 |
+| loop ON | 3 | 63.2 | 1.35 | 61.7 – 64.0 |
+
+**+5.2, Welch t=1.24, df≈2.1 — NOT significant, and it is not recorded as a win.**
+Drop the single bad OFF run and the gap is +1.0. The loop did not lift the good runs; it
+prevented a bad one. **Reliability, not ceiling** — worth having, and not what "+5 points"
+would have implied. Gate passes: Au Soleil 3/3, Le Lézard 1/3, Moses 0/3.
+
+**The control that keeps this honest.** The loop wrote nothing on Moses in any run — it
+publishes nothing when nothing passes — and Moses still moved **11.7 points** between arms.
+Generation noise is the same size as the per-stop gains (+11.7, +15.7). On n=3 neither the
+gains nor the losses are attributable. One more triple per arm settles it for ~$1 and 35 min.
+
+**Cost of the loop, as designed:** wall 191–208 s → 438–612 s, +$0.10–0.17 per 3-stop tour.
+
+### Why I would not ship this tour
+
+1. **One run in six named the wrong artist for two of three works, in the orientation** —
+   "Salvador Dali's *Au Soleil du Plafond*", "Pablo Picasso's *Moses and Monotheism*" —
+   contradicting its own stop headings twelve lines below. Intermittent, which is harder to
+   catch, not easier. Nothing checks the orientation's attributions against the stop list.
+2. **Every stop that gets a story now says everything twice.** `generate_tour_text.py:14209`
+   is `description.rstrip() + ' ' + story`: concatenation, no paragraph break, no transition,
+   no dedupe. On Au Soleil the prose and the story both narrate Rosenberg's commission, Gris's
+   death in 1927, the unfinished plates and Mourlot — the whole life of the book, twice,
+   ninety seconds apart. The prose also asserts Mourlot printed to Gris's requirements, which
+   the story then dates to 1955, twenty-eight years after he died. **The story is right and the
+   prose it was appended to is quietly false.**
+3. **Moses publishes nothing, 3 of 3.** The gate is correct (A214). Retrieval is the failure.
+
+### Four machinery findings
+
+**(a) The cap makes the lab result unreachable.** `story_production_loop.py:164` —
+`seeds = seeds[:MAX_CREDIT_LINES]`, default **4**, matrix agents placed first. Le Lézard has
+four matrix agents, so the log reads *"4 from the matrix, 0 from the text"* and **no prose seed
+is ever tried on that stop** — while the lab pass that justified building this was
+**credit_line 13.1, examined 14 of 16** (`ADJUDICATED_EVALUATION.md`). Across nine
+stop-attempts: every stop that hit the cap failed, every acceptance came by the third
+candidate. That is consistent with "the cap is fine" AND with "the cap is the ceiling";
+distinguishable for ~$0.20 by setting `STORY_LOOP_MAX_CREDIT_LINES=14` on one stop.
+
+**(b) `work_stories` cannot connect on any host run, and says so quietly.**
+`work_story_searcher.py:124` rewrites `@localhost:` → `@postgres-2:`, a container hostname that
+does not resolve on the Mac — **in direct conflict with D261**, which mandates `@localhost:5433`
+for host runs. Every host tour logs `Read error: could not translate host name "postgres-2"`,
+returns `None`, and re-mines from scratch. It **helped this A/B** (a working cache would have
+contaminated runs 2 and 3 with run 1's material) and has silently cost every other host run.
+
+**(c) Retrieval is still the art market, D495 notwithstanding.** Pages actually fetched for
+Au Soleil: abebooks, araderbooks, iberlibro, 1stdibs, invaluable, baumanrarebooks, christies,
+art-books. The −5 penalty demotes them but nothing exists to promote above them, so they are
+what gets read. The one scholarly source in the set, `metmuseum.org/.../356117`, returned
+**HTTP 429 four times and was dropped**. D496 tiers 1–3 as retrieval PREFERENCE remain unbuilt;
+this is what that costs, measured.
+
+**(d) The entity check fired on a real person.** `UNGROUNDED:Léonce Rosenberg` — genuine, and
+present in the delivered text of another run. First firing since the fix reported 0 of 37
+(`ADJUDICATED_EVALUATION.md` §5). Whether it was correct depends on that run's evidence pool,
+unverified. **Look at it by hand before `STORY_GATE_STRICT` is ever turned on** — a check that
+flags a grounded name blocks good stories.
+
+### A213's fix did not reach Moses, and structurally cannot
+
+D511 seeded from the matrix agents so the loop could ask about people our prose never named.
+On Moses the matrix yields **one** agent — Dalí. Freud is the *author of the text*, not a
+`collaborator`, `publisher` or `printed_by` in the museum's object record, so the one person
+whose story is worth telling is still not a seed, and the remaining three slots go back to the
+evaluative prose A213 diagnosed. The 1938 London meeting is absent in 3 runs of 3.
+
+### Order of work this implies
+
+1. Fix the append: replace the overlapping prose, or generate the prose knowing a story is
+   coming. **The only one of the three blockers that is purely ours and needs no network.**
+2. Add the orientation-attribution check against the stop list.
+3. Raise the credit_line cap on one stop and find out whether the cap is the ceiling (~$0.20).
+4. D496 tiers 1–3 as retrieval preference — the only thing that will fix Moses.
+
+**Not to be done: lowering the gate.** Moses publishing nothing is the system telling the truth.

@@ -1242,3 +1242,27 @@ never told to look for.
 **The fix is not a threshold:** the seed list must include the MATRIX agents alongside
 the prose modifiers, and a challenge query must be free to drop the work title and
 interrogate the people.
+
+## Q15 (08-22, executed 08-23) — "regenerate the whole tour with all stories now in place"
+
+Done as the A/B he asked for, not a single pair: **six generations, arms alternating**
+OFF/ON/OFF/ON/OFF/ON, 36 min, ~$1.1. Tour + LEAD's evaluation in
+`TOUR_MFA_20260823_LOOP_ON_EVALUATION.md` (opened in VS Code). Full write-up **D513 / A216**.
+
+**loop OFF 58.0 (sd 7.22, range 49.7–62.3) · loop ON 63.2 (sd 1.35, range 61.7–64.0) ·
+delta +5.2, pooled sd 5.45.** Welch t=1.24, df≈2.1 — **not significant, and I will not
+claim it is.** Drop the one bad OFF run and +5.2 becomes +1.0. The loop did not raise the
+good runs; it prevented a bad one. Its product looks like **reliability, not ceiling**.
+
+Moses is the control that keeps the rest honest: the loop wrote nothing there in any run,
+and it still moved 11.7 points. **Generation noise is the same size as the gains.**
+
+**Would I ship it? No — and not because of the loop, which is the best thing in the tour.**
+(1) One run in six had the orientation name the wrong artist for two of three works,
+contradicting its own stop headings. (2) Every stop that gets a story now says everything
+twice — the append is `description + ' ' + story`, concatenation with no dedupe. (3) Moses
+publishes nothing, 3 of 3, and the gate is right to.
+
+**A213's fix did not reach Moses, and structurally cannot:** its matrix yields ONE agent
+(Dalí). Freud is the author, not a `collaborator` in the object record, so the one person
+worth asking about is still not a seed. The London meeting is still missing.

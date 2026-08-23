@@ -1272,6 +1272,54 @@ UNATTESTED. Fixed by reading leaf content divs and widening the passage window
 from 5 sentences/1000 chars to 14/3000; the old window stopped one sentence short
 of the decisive line. Unattested claims fell 53% → 34%; corrections tripled.
 
+## A216 — The loop in production, measured: it raises the floor, and it says everything twice
+
+**2026-08-23.** Michael's "regenerate the whole tour with all stories now in place", run as
+the A/B he required (a single old-vs-new pair is noise at sd 4.9, D484). Six generations,
+arms alternating, 36 min, ~$1.1. Evaluation: `TOUR_MFA_20260823_LOOP_ON_EVALUATION.md`.
+
+| | runs | tour-mean index | sd | range |
+|---|---|---|---|---|
+| loop OFF | 3 | 58.0 | 7.22 | 49.7 - 62.3 |
+| loop ON | 3 | 63.2 | 1.35 | 61.7 - 64.0 |
+
+**+5.2, and not significant** (Welch t=1.24, df~2.1). Removing the single bad OFF run takes
+it to +1.0. **The loop prevented a bad run rather than improving good ones** - reliability,
+not ceiling. Stories passed the gate on 4 of 9 stop-attempts: Au Soleil 3/3, Le Lezard 1/3,
+Moses 0/3.
+
+**The control that keeps this honest:** the loop wrote nothing on Moses in any run, and
+Moses still moved 11.7 points between arms. Generation noise is the size of the gains.
+
+**Four machinery findings, all new:**
+
+1. **The cap makes the lab result unreachable.** `story_production_loop.py:164`
+   `seeds[:MAX_CREDIT_LINES]`, default 4, matrix agents first. Le Lezard has four matrix
+   agents, so *zero* prose seeds are ever tried - and the lab pass that justified building
+   this was **credit_line 13.1, examined 14 of 16**. Every stop that hit the cap failed;
+   every acceptance came by the third candidate.
+2. **`work_stories` cache cannot connect on any host run.** `work_story_searcher.py:124`
+   rewrites `@localhost:` to `@postgres-2:`, which does not resolve on the Mac - in direct
+   conflict with D261, which mandates `@localhost:5433` for host runs. Silent permanent miss.
+   It helped this A/B (no cross-run contamination) and has been costing every other host run.
+3. **Retrieval is still the art market.** Pages actually fetched for Au Soleil: abebooks,
+   araderbooks, iberlibro, 1stdibs, invaluable, baumanrarebooks, christies, art-books. D495
+   demotes them; nothing exists to promote above them. The one scholarly page in the set,
+   metmuseum.org, returned **HTTP 429 four times and was dropped**. D496 tiers 1-3 as
+   retrieval PREFERENCE remain unbuilt and this is the cost.
+4. **The entity check fired on a real person** - `UNGROUNDED:Leonce Rosenberg`, first firing
+   since the fix reported 0 of 37. Needs a by-hand look before `STORY_GATE_STRICT` is used.
+
+**A213's fix did not reach Moses and structurally cannot.** Its matrix yields one agent
+(Dali); Freud is the author, not a `collaborator` in the object record, so no seed asks about
+him. The 1938 London meeting is still absent, 3 runs of 3.
+
+## Code map - added 2026-08-23
+- [`run_ab_d511.sh`](run_ab_d511.sh) - the alternating-arm A/B driver
+- [`score_ab_d511.py`](score_ab_d511.py) - ONE scoring instrument for both arms
+- [`TOUR_MFA_20260823_LOOP_ON_EVALUATION.md`](TOUR_MFA_20260823_LOOP_ON_EVALUATION.md) - the tour and LEAD's evaluation
+- `AB_D511_20260823_1224.log`, `AB_D511_SCORES.json` - six generations, 18 scored stops
+
 ## Code map — added 2026-08-22
 - [`story_seeds.py`](story_seeds.py) — D503, every modifier is a credit_line seed
 - [`story_relevance.py`](story_relevance.py) — D505, is this sentence about this stop
