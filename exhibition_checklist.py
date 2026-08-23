@@ -920,8 +920,46 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
             _seen_items.add(clean)
             list_items.append(clean)
 
-    # Combine: headings first, then figure captions, img alts, paragraphs, list items
-    full_text = '\n'.join(headings + figcaptions + img_alts + paragraphs + list_items)
+    # [D510] CONTENT DIVS. The extraction above reads <p>, <h1-4>, <figcaption>,
+    # <li> and img alt — and nothing else. A great deal of the prose we most
+    # need is in a bare <div>, and was invisible.
+    #
+    # The case that forced this: Christie's Lot Essay, which reads
+    #
+    #   "Mid-way through printing the project was abandoned by the artist and
+    #    his publisher because some of the colours used were reacting with the
+    #    specially commissioned paper. By the time this defect had come to light
+    #    the original plates had been erased..."
+    #
+    # sits in `<div class="content-zone chr-body">`. D366 declared that story
+    # refuted, D507 called it a fabrication, and D509's adjudicator marked three
+    # true claims UNATTESTED — all three reading the 200-character SERP snippet
+    # of a page whose own text confirms it. The page was fetched every time; the
+    # essay was never in what we extracted.
+    #
+    # Only LEAF divs: a wrapper div contains every child, so taking all of them
+    # duplicates the page many times over. A leaf here means "contains no
+    # further div", which is where prose actually lives.
+    content_divs = []
+    _seen_divs = set()
+    for d_match in re.finditer(r'<div(?:\s[^>]*)?>((?:(?!<div).)*?)</div>', html,
+                               re.DOTALL):
+        clean = re.sub(r'<[^>]+>', ' ', d_match.group(1))
+        clean = re.sub(r'&nbsp;', ' ', clean)
+        clean = re.sub(r'&[a-z]+;', ' ', clean)
+        clean = re.sub(r'\s+', ' ', clean).strip()
+        # Long enough to be prose, short enough not to be a serialised blob, and
+        # containing a sentence end — nav menus and label stacks have none.
+        if (60 < len(clean) < 4000 and '.' in clean
+                and clean not in _seen_divs):
+            _seen_divs.add(clean)
+            content_divs.append(clean)
+
+    # Combine: headings first, then figure captions, img alts, paragraphs,
+    # list items, and [D510] content divs last so existing consumers that read
+    # from the top are unaffected.
+    full_text = '\n'.join(headings + figcaptions + img_alts + paragraphs
+                          + list_items + content_divs)
 
     # [LOCAL-427] Cache the successful result
     _cache_put(url, full_text, links)

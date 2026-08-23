@@ -794,13 +794,24 @@ def rank_and_cap_snippets(
 FETCH_TOP_N = int(os.environ.get('SNIPPET_FETCH_TOP_N', '3'))
 
 
+# [D510] The window was 5 sentences and 1000 chars. On the Christie's lot that
+# reached the Lot Essay's FIRST sentence and stopped one sentence short of
+# "Mid-way through printing the project was abandoned..." — the sentence three
+# separate decisions have now turned on. Adjudication wants the passage, not a
+# teaser, and the cost of a longer one is prompt tokens, not money.
+PASSAGE_SENTENCES = int(os.environ.get('SNIPPET_PASSAGE_SENTENCES', '14'))
+PASSAGE_MAX_CHARS = int(os.environ.get('SNIPPET_PASSAGE_MAX_CHARS', '3000'))
+
+
 def _extract_passage_around_match(page_text: str, snippet_text: str,
-                                   context_sentences: int = 5) -> str:
+                                   context_sentences: int = None) -> str:
     """Extract a passage from a fetched page around where the snippet text appears.
 
     Returns up to `context_sentences` sentences around the match point.
     If the snippet text isn't found verbatim, falls back to keyword matching.
     """
+    if context_sentences is None:
+        context_sentences = PASSAGE_SENTENCES
     if not page_text or not snippet_text:
         return ''
 
@@ -840,9 +851,8 @@ def _extract_passage_around_match(page_text: str, snippet_text: str,
     end = min(len(sentences), best_idx + context_sentences)
     passage = ' '.join(sentences[start:end])
 
-    # Cap at ~1000 chars to avoid bloating the context
-    if len(passage) > 1000:
-        passage = passage[:1000] + '...'
+    if len(passage) > PASSAGE_MAX_CHARS:
+        passage = passage[:PASSAGE_MAX_CHARS] + '...'
 
     return passage
 

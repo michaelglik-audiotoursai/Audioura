@@ -1,69 +1,67 @@
-# Evaluation — the challenge loop, and which story to use
+# Evaluation — page-fetch fixed, gate enforced
 
-**123 Serper + 37 Gemini · ~$0.345 · 184s.** All 37 stories with their evidence: `ADJUDICATED_STORIES.md`.
+**123 Serper + 37 Gemini · ~$0.345.** All 37 with evidence: `ADJUDICATED_STORIES.md`.
 
-## 1. What the loop did to the claims
+## 1. The page-fetch fix, and what it was
 
-| verdict | count | meaning |
+`fetch_pages_for_top_snippets` (LOCAL-459 R5) existed with **zero callers** — but wiring it in was not enough. `_fetch_page` extracts text from `<p>`, `<h1-4>`, `<figcaption>`, `<li>` and `img alt` **and nothing else**. The Christie's Lot Essay lives in
+
+```html
+<div class="content-zone chr-body">
+  The present work is from the first edition ... Mid-way through printing
+  the project was abandoned by the artist and his publisher because some of
+  the colours used were reacting with the specially commissioned paper...
+```
+
+A bare `<div>`. **The page was fetched every time and the essay was never in what we extracted.** That single omission is behind D366 calling the story refuted, D507 calling it a fabrication, and D509 marking three true claims UNATTESTED. Content divs are now read (leaf divs only, so wrappers do not duplicate the page), and the passage window went from 5 sentences / 1,000 chars to 14 / 3,000 — the old window stopped one sentence short of the decisive line.
+
+## 2. What it changed
+
+| | D509 snippets only | D510 pages fetched |
 |---|---|---|
-| CONFIRMED | **94** | a retrieved source supports it |
-| CORRECTED | **9** | Gemini's round-1 claim was wrong and it said so |
-| DISPUTED | **32** | two sources genuinely disagree — kept as material |
-| UNATTESTED | **143** | nothing retrieved supports it |
+| CONFIRMED | 94 | **114** |
+| CORRECTED | 9 | **30** |
+| DISPUTED | 32 | 22 |
+| UNATTESTED | 143 | **87** |
 
-**143 of 278 claims (51%) had no retrieved support.** That is the number that matters. Round 1 asserted them all with equal confidence, and without the challenge step every one would have reached a listener indistinguishable from the confirmed ones.
+**Unattested fell from 53% to 34%.** Corrections more than tripled — the adjudicator now has enough text to say *what the source actually says* instead of only *no source supports this*.
 
-**11 of 37 stories tell a disagreement out loud**, as you asked:
+## 3. The gate, enforced
 
-> *While one source records a publication date of 1948, other records place its official release in Paris in 1955.*  
-> *Sources disagree on the timeline: some records date initial plates to 1967 while others place the edition entirely in 1971.*
-
-## 2. Serper is not useless — its job changed
-
-In D507 Serper was asked to *answer the question* and returned 2 eventful of 37. Here it *supplies the evidence a claim is judged against*, and on that job it produced **17 to 24 relevant sentences per credit_line** — enough to confirm 94 claims and correct 9.
-
-The division of labour that fell out of this: **Gemini narrates, retrieval adjudicates.** Neither does the other's job well. Asking Serper for a story gets catalogue prose; trusting Gemini unchallenged gets confident invention.
-
-## 3. Which story to use
-
-Ranked by: material kind first, then confirmed claims, then whether it tells a disagreement, then fewest unattested.
+`eventful` mandatory · index ≥ 60 · confirmed ≥ 3 · unattested = 0 **soft** (logged, not blocking — your ruling, until page-fetch is proven; `STORY_GATE_STRICT=1` hardens it).
 
 ### Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
 
-**Recommended: credit_line 10.2** — kind `active`, 4 confirmed, 4 unattested
+**PASS at credit_line 13.1** — examined 14 of 16 · index 63 · 3 confirmed · 3 unattested · **3 sentences allowed**
+  
+_soft: 3 unattested claim(s) — logged only, not blocking_
 
-> In 1967, Joan Miró and printer Celestin completed a first edition of lithographs to accompany a poem written by Miró for publisher Louis Broder. Shortly after printing, Miró and Broder discovered an error in the paper that distorted the lithographs. While the 1967 first edition was largely lost or abandoned, individual surviving plates from that run still surface in collections today. Miró went back to work to produce a different, completed edition, which Broder published on Rives paper in 1971.
+> Joan Miró collaborated with publisher Louis Broder to create *Le Lézard aux plumes d’or*, producing an initial set of lithographs in 1967 [artsy.net, christies.com]. The project was not completed then, and Miró created entirely new prints for a second version that delayed publication until 1971 [coleccionbbva.com, galeriearenthon.com]. Printed by Mourlot Frères in Paris, this final 1971 edition pairs Miró's graphic work with his own poetry [coleccionbbva.com, mfa.org]. The work is on display at the Museum of Fine Arts, Boston as a gift from Boris Fridman [mfa.org].
 
 ### Au Soleil du Plafond
 
-**Recommended: credit_line 3.1** — kind `eventful`, 5 confirmed, 5 unattested
+**PASS at credit_line 2.1** — examined 1 of 12 · index 62 · 4 confirmed · 0 unattested · **3 sentences allowed**
 
-> In 1916 or 1917, art dealer Léonce Rosenberg commissioned a collaborative book titled *Au Soleil du Plafond*, pairing twenty poems by Pierre Reverdy with illustrations by Juan Gris. The project stalled during World War I and remained unfinished when Gris died in 1927, leaving behind eleven gouaches (though one record describes him as having completed half of the twenty planned illustrations). The son kept the eleven gouaches as his father had left them until publisher Tériade (Éditions Verve) finally brought the work to realization in 1955. For that release, printer Mourlot Frères produced the eleven lithographs after Gris's original compositions to accompany Reverdy's text.
+> In 1916 or 1917, poet Pierre Reverdy and painter Juan Gris conceived a joint book project accepted by art dealer Léonce Rosenberg, planned to pair twenty poems with twenty illustrations. The endeavor stalled and was abandoned after Gris completed only eleven images before dying at age forty in 1927. Nearly thirty years later, publisher Tériade revived the project alongside Reverdy as a tribute to the deceased artist. The resulting volume, *Au Soleil du Plafond*, was finally published by Tériade in Paris in 1955.
 
 ### Moses and Monotheism
 
-**Recommended: credit_line 2.1** — kind `eventful`, 2 confirmed, 4 unattested
+**NO STORY PASSES** — 9 candidates examined. Best was 7.1 (index 71, `active`), failed on `eventful`.
 
-> In 1939, only months before his death, Sigmund Freud published *Moses and Monotheism*, his final and most controversial book. Decades later, Salvador Dalí produced an illustrated edition containing Freud's text accompanied by ten engravings and additional drawings. While some records date Dalí's portfolio to 1974, other sources date its publication to 1975.
+Per your ruling this publishes nothing, and the 0-of-9 is a **retrieval failure to fix upstream**, not a threshold to lower.
 
-## 4. My reservations, plainly
+## 4. Le Lézard now has a story — and the stopping rule is worth its keep
 
-**Le Lézard's best story is still weak.** Its top candidate is `active`, not `eventful`, and it contains *"printer Celestin"* — a name that appears in no source I can find and which the adjudicator let through as CONFIRMED. The loop reduced invention; it did not eliminate it.
+D509: **0 of 16 eventful**. D510: credit_line 13.1 passes. The material was always there; we were reading 200 characters of a page that contained it.
 
-**Au Soleil is genuinely good and was always going to be.** Rosenberg commissioning it, the war stalling it, Gris dead at forty with eleven of twenty done, the son keeping the gouaches, Tériade reviving it. Every load-bearing fact confirmed against a source, and the 1948/1955 disagreement told rather than hidden.
+Au Soleil passes on its **first** credit_line — 1 candidate examined instead of 12. Le Lézard needed 14. Averaged over the three stops the stopping rule examines 8 of 12.3 candidates, and on a stop with good material it examines one.
 
-**A quarter of the claims are unattested and the story still gets written.** The prompt tells Gemini to drop them, and mostly it does — but nothing mechanically enforces it. A gate that checks the delivered story against the CONFIRMED list is the obvious next guard, and it does not exist.
+## 5. The entity check — your separate bug
 
-## 5. How production should decide
+`ungrounded_names` compares every person in the delivered story against the evidence actually retrieved. It catches *printer Celestin* and passes a clean story. **It took two corrections to get there**, and both were mine: possessives (`Miró's`) were reported ungrounded because the apostrophe broke the match, and sentence-initial words (`Working`, `Consequently`, `Decades`) were read as names. A check that flags a grounded name is worse than none — it blocks good stories. **0 of 37 flagged after the fix.**
 
-The order the evidence supports:
+## 6. What I would still not ship
 
-1. **Generate the credit_line list** from the stop's own prose (D503) — cheap, no API calls.
-2. **One Gemini round per credit_line, sources captured** (D508). Cap it: the top 3-4 credit_lines by seed rank, not all 12-16. Cost is ~$0.006 each.
-3. **Challenge the checkable claims** with Serper queries built from the claim's terms (D509). ~4 queries per credit_line, $0.004.
-4. **Adjudicate and write** in one Gemini call against the retrieved evidence.
-5. **Select** on: `eventful` beats `active`; more CONFIRMED beats fewer; a told disagreement is a bonus, not a penalty; any story whose sentences are not traceable to a CONFIRMED or CORRECTED claim is rejected.
+**Moses publishes nothing.** That is the gate behaving correctly and the tour being wrong. Its best candidate scores 71 and is `active`: Freud published, Dalí illustrated, sources disagree on 1974 vs 1975. Nobody does anything to anybody. The fix is retrieval — the Freud/Dalí 1938 London meeting is real and we keep retrieving it as `active`, not `eventful`.
 
-**Cost per stop at this shape: about $0.05.** A four-stop tour is $0.20 — against the ~$0.16 a tour already costs to generate. That is affordable and the measurements above are what it buys.
-
-**What I would NOT do yet:** wire this into production. The `Celestin` case shows a fabricated name surviving the loop and being marked CONFIRMED. Until a mechanical check binds each delivered sentence to an adjudicated claim, this is a strong research pipeline and not a safe generator.
+**Unattested is still 34%.** Soft, as you ruled. Before hardening it I would want one run where a story blocked by it is inspected by hand — otherwise we will be back to deleting true material, which is the failure we just spent two days finding.

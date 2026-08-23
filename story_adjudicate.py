@@ -50,7 +50,7 @@ from typing import Dict, List, Optional
 from text_fold import fold
 
 __all__ = ['claims_of', 'challenge_queries_for', 'ADJUDICATION_PROMPT',
-           'STATUSES']
+           'STATUSES', 'count_statuses', 'ungrounded_names']
 
 STATUSES = ('CONFIRMED', 'CORRECTED', 'DISPUTED', 'UNATTESTED')
 
@@ -199,3 +199,95 @@ the work.
 - No praise, no describing how it looks, no telling the visitor what to feel.
 
 Output PART 1 then PART 2 with those headings."""
+
+
+# ─── [D510] Entity linking — the "printer Celestin" class ─────────────────────
+# Michael, 2026-08-22: *"Don't drop false positive 10.2 'printer Celestin' —
+# that's a separate bug from adjudicator confirming invented entity. Needs
+# entity linking check, not just page-fetch."*
+#
+# He is right that it is separate. Page-fetch fixes FALSE NEGATIVES — true
+# claims rejected because the evidence was truncated. This is the FALSE
+# POSITIVE: the adjudicator marked "printer Celestin" CONFIRMED when that name
+# appears in no retrieved source at all.
+#
+# The check is mechanical and needs no model: every person named in the
+# delivered story must appear in the evidence that was actually retrieved, or
+# in the stop's own matrix. A name in neither was introduced by the writer.
+
+_NAME = re.compile(r"[A-ZÀ-Þ][A-Za-zÀ-ÿ'’\-]{2,}(?:\s+[A-ZÀ-Þ][A-Za-zÀ-ÿ'’\-]+)*")
+
+# Capitalised tokens that are not people: sentence starts, months, places and
+# the vocabulary of the domain itself.
+_NOT_A_PERSON = {
+    'the', 'this', 'that', 'these', 'those', 'while', 'when', 'after', 'before',
+    'because', 'although', 'however', 'sources', 'source', 'records', 'record',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december', 'paris', 'london', 'boston',
+    'new york', 'madrid', 'barcelona', 'france', 'spain', 'world war',
+    'museum', 'gallery', 'exhibition', 'lithograph', 'lithographs', 'edition',
+    'plate', 'plates', 'stone', 'stones', 'paper', 'book', 'suite', 'portfolio',
+    'in', 'at', 'on', 'by', 'his', 'her', 'their', 'its', 'it', 'he', 'she',
+}
+
+
+def ungrounded_names(story: str, evidence_text: str, matrix: Optional[Dict] = None,
+                     extra: Optional[List[str]] = None) -> List[str]:
+    """People named in the story who appear in NO retrieved evidence.
+
+    Returns the offending names. Empty is the pass condition.
+
+    Deliberately mechanical: no model is asked whether a name is real, because a
+    model is what introduced it. The test is presence in text we actually
+    fetched, or in the museum's own matrix.
+    """
+    haystack = fold(evidence_text or '')
+    for v in (matrix or {}).values():
+        if isinstance(v, str) and v:
+            haystack += ' ' + fold(v)
+    for e in (extra or []):
+        haystack += ' ' + fold(e)
+
+    bad = []
+    for m in _NAME.finditer(story or ''):
+        name = m.group(0).strip()
+        # [D510 r2] Strip the possessive BEFORE matching. "Miró's" and "Gris's"
+        # were reported ungrounded while Miró and Gris are in every source —
+        # the apostrophe-s simply broke the comparison. Flagging a grounded
+        # name is worse than useless: it would block a good story.
+        name = re.sub(r"['’]s$", '', name).strip()
+        f = fold(name)
+        if f in _NOT_A_PERSON or len(f) < 4:
+            continue
+        # A SINGLE capitalised word needs evidence that the story treats it as
+        # a name. Two rules, and they are position rules rather than a word list:
+        #
+        #   - at a SENTENCE START anything is capitalised. The first run flagged
+        #     "Working", "Consequently", "Instead", "Around", "Decades",
+        #     "Accounts", "Released" — none is a person.
+        #   - preceded by a ROLE WORD it is a name regardless of position.
+        #     "printer Celestin" is the case this whole check exists for, and a
+        #     bare two-token rule loses it, since "printer" is lowercase.
+        if len(f.split()) < 2:
+            before = (story or '')[:m.start()].rstrip()
+            role_before = bool(re.search(
+                r'\b(printer|publisher|artist|dealer|poet|collector|donor|'
+                r'engraver|bookbinder|patron|author|editor|craftsman|'
+                r'lithographer|photographer|sculptor|architect|chef)\s*$',
+                before, re.I))
+            at_sentence_start = (not before) or before.endswith(('.', '!', '?', ':'))
+            if at_sentence_start and not role_before:
+                continue
+            if not role_before and not re.search(r'[a-z,]\s*$', before):
+                continue
+        if any(t in _NOT_A_PERSON for t in f.split()):
+            continue
+        # Present whole, or by any of its tokens longer than three characters —
+        # evidence says "Mourlot" where the story says "Mourlot Frères".
+        if f in haystack:
+            continue
+        if any(t in haystack for t in f.split() if len(t) > 3):
+            continue
+        if name not in bad:
+            bad.append(name)
+    return bad
