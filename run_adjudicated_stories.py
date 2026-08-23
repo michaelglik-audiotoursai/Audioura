@@ -38,7 +38,7 @@ from story_adjudicate import (claims_of, challenge_queries_for,
                               ADJUDICATION_PROMPT, count_statuses,
                               ungrounded_names)                       # noqa: E402
 from story_index_pass import apply_story_index                        # noqa: E402
-from story_gate import evaluate as gate_evaluate                      # noqa: E402
+from story_publish_gate import evaluate as gate_evaluate                      # noqa: E402
 from story_leads import gemini_with_sources                           # noqa: E402
 from work_story_searcher import (_serp_search, normalize_domain,
                                  _classify_domain_quick, set_venue_domain)  # noqa: E402

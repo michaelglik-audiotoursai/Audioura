@@ -23,7 +23,7 @@ Durable across sessions. Delete a line once delivered.
 
       **What is NOT wired** and must be, or the tour will regenerate without any of
       this week's work: `story_seeds`, `story_relevance`, `story_query`,
-      `story_adjudicate`, `story_gate`, `object_record`, `story_hooks`, `story_roles`.
+      `story_adjudicate`, `story_publish_gate`, `object_record`, `story_hooks`, `story_roles`.
       Eight modules, no production callers. That is the same orphan pattern the
       7-step plan opened by complaining about — **wiring them is the job**, and it is
       what "with all stories now in place" means.
