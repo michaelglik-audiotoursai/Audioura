@@ -28,12 +28,22 @@ Durable across sessions. Delete a line once delivered.
       7-step plan opened by complaining about — **wiring them is the job**, and it is
       what "with all stories now in place" means.
 
-      **Known open defect (A213), do not re-derive it:** Moses and Monotheism produces
-      no story because all nine of its credit_lines are evaluative modifiers from its
-      own baseline prose, which never mentions the Freud/Dalí 1938 London meeting. The
-      material exists — `MATRIX_QUERY_RESULTS.json` holds it three times under the
-      query `Sigmund Freud Salvador Dalí`. Fix: seed from the MATRIX AGENTS as well as
-      the prose modifiers, and let a challenge query drop the work title.
+      **A213 is FIXED (D511):** the loop now seeds from the MATRIX AGENTS as well as
+      the prose modifiers, so `agent:collaborator` = Sigmund Freud is a credit_line the
+      pipeline can ask about even though the stop text never mentions him.
+
+      **D512, both approved by Michael 2026-08-23 and landed:**
+      (a) `material_kind` accepts the action and the stake in ADJACENT sentences that
+          share a subject — requiring both in ONE sentence was measuring sentence
+          construction, not story presence, and is why the Freud story scored `active`;
+      (b) `domain_verbs.py` discovers the domain's verbs of making with ONE Serper
+          query per tour (medium-led, page-fetched), widening `_AGENCY_VERB` — additive
+          only, so a bad discovery can make the scanner generous but never blind.
+
+      **THE RUN MICHAEL WANTS IS THE A/B, not a single pair.** He said a single
+      old-vs-new comparison "gives me nothing as old can be random and so is new" —
+      correct at sd 4.9 (D484). Three runs `run_full_tour_release_check.py` (loop OFF)
+      and three `run_loop_tour.py` (loop ON), ~$1 and ~25 minutes total.
 
 - [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
       His words, 12:2x: *"I do not have time this week so it will go to the next week."*

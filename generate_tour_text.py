@@ -14118,6 +14118,33 @@ REWRITE RULES (all mandatory):
     else:
         print(f"\n  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false")
 
+    # -------- [D512] Discover this domain's verbs of making, once --------
+    #
+    # Michael, 2026-08-23: *"'Add the making verbs' has to be different for each
+    # museum type, so maybe in addition to the hardcoded set of verbs at the
+    # beginning of the tour generation we can ask (only once) the verbs from
+    # Serper appropriate for the museum type."*
+    #
+    # `_AGENCY_VERB` has been hand-extended three times and the hole reappeared
+    # on 2026-08-23: `scratched`, `sketched`, `pulled` are absent, so on an
+    # exhibition ABOUT people making objects the making sentences scored as
+    # having no action. One SERP query (~$0.001), page-fetched for enough text
+    # to measure frequency, and the pattern is WIDENED — never narrowed, so a
+    # bad discovery can only make the scanner generous, not blind.
+    if _storied_mode:
+        try:
+            from domain_verbs import install as _d512_install
+            _d512_medium = ''
+            for _d512_p in poi_list:
+                if (_d512_p.get('medium') or '').strip():
+                    _d512_medium = _d512_p['medium']
+                    break
+            _d512_install(venue_name=_museum_venue_name or location,
+                          exhibition=_exh_name_resolved or '',
+                          category=tour_category, medium=_d512_medium)
+        except Exception as _d512_err:
+            print(f"  [D512] verb discovery skipped (non-fatal): {_d512_err}")
+
     # -------- [D511] PHASE 5.20: the credit_line loop --------
     #
     # Michael, 2026-08-23: *"We have developed the loop of credit_line values,

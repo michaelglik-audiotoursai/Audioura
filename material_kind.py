@@ -33,6 +33,7 @@ import re
 from typing import Dict, List
 
 from story_opportunity_scan import (_AGENCY_VERB, _STAKES, split_sentences)
+from text_fold import fold   # [D512] accent-folded name comparison (D243)
 
 __all__ = ['classify_material', 'summarise_stop', 'has_agentive_action',
            'KIND_RICH', 'KIND_INERT', 'KIND_EVENTFUL']
@@ -108,6 +109,32 @@ def has_agentive_action(sentence: str) -> bool:
         return True
     return False
 
+def _share_a_subject(a: str, b: str) -> bool:
+    """[D512] Do two adjacent sentences belong to the same telling?
+
+    A shared capitalised name is the strong signal. A pronoun opening the second
+    sentence is the other: "Freud published it. He was dead within the year."
+    Without this test, adjacency would let a stake about one person license an
+    action by another — two unrelated facts wearing the shape of a story.
+    """
+    names_a = {fold(m.group(0)) for m in _PROPER_NOUN.finditer(a)}
+    names_b = {fold(m.group(0)) for m in _PROPER_NOUN.finditer(b)}
+    if names_a & names_b:
+        return True
+    # A surname inside a longer name: "Sigmund Freud" then "Freud".
+    for x in names_a:
+        for y in names_b:
+            if len(x) > 3 and len(y) > 3 and (x in y or y in x):
+                return True
+    if _OPENING_PRONOUN.match(b.strip()):
+        return True
+    return False
+
+
+_PROPER_NOUN = re.compile(r"[A-ZÀ-Þ][A-Za-zÀ-ÿ'’\-]{2,}")
+_OPENING_PRONOUN = re.compile(r'^(He|She|They|It|His|Her|Their|Its|The\s+\w+)\b')
+
+
 KIND_EVENTFUL = 'eventful'   # something happens AND something is at stake
 KIND_RICH = 'active'         # something happens, nothing is at stake
 KIND_INERT = 'inert'         # nothing happens: description only
@@ -128,12 +155,42 @@ def classify_material(snippets: List[str]) -> Dict:
     staked = [s for s in sentences if _STAKES.search(s)]
     both = [s for s in sentences
             if has_agentive_action(s) and _STAKES.search(s)]
+
+    # [D512] ADJACENCY. Requiring the action and the stake in the SAME SENTENCE
+    # measures sentence construction, not story presence. Measured on the Moses
+    # stop, 2026-08-23:
+    #
+    #   [action ] In 1939, shortly before his death, Freud published Moses and
+    #             Monotheism, arguing the biblical leader was Egyptian...
+    #   [stake  ] Decades later, in 1974, Dalí engaged in a posthumous dialogue
+    #             with Freud's ideas...
+    #
+    # "shortly before his death" and "posthumous" are exactly the stakes wanted.
+    # Split across two sentences the passage scored `active`; the identical facts
+    # compressed into one sentence scored `eventful`.
+    #
+    # Prince's middle event does not require the stake in the same clause. What
+    # it requires is that they belong to the same telling — so the window is
+    # ADJACENT sentences that share a subject, not any two sentences anywhere.
+    # Without the shared-subject test, a stake about one person would license an
+    # action by another, which is how "a story" becomes two unrelated facts.
+    adjacent_pairs = []
+    for i in range(len(sentences) - 1):
+        a_sent, b_sent = sentences[i], sentences[i + 1]
+        a_act, b_act = has_agentive_action(a_sent), has_agentive_action(b_sent)
+        a_stk = bool(_STAKES.search(a_sent))
+        b_stk = bool(_STAKES.search(b_sent))
+        if not ((a_act and b_stk) or (b_act and a_stk)):
+            continue
+        if not _share_a_subject(a_sent, b_sent):
+            continue
+        adjacent_pairs.append((a_sent, b_sent))
     # Reported separately so a run can show how much of the material is action
     # with the actor removed — the defect the 01:15 review ranked first.
     passive_only = [s for s in sentences
                     if _AGENCY_VERB.search(s) and not has_agentive_action(s)]
 
-    if both:
+    if both or adjacent_pairs:
         kind = KIND_EVENTFUL
     elif active:
         kind = KIND_RICH
@@ -147,13 +204,18 @@ def classify_material(snippets: List[str]) -> Dict:
         'active_sentences': len(active),
         'staked_sentences': len(staked),
         'eventful_sentences': len(both),
+        # [D512] Reported separately so a run can see WHICH rule fired. A kind
+        # that came only from adjacency is a weaker signal than one carried by a
+        # single sentence, and the log must not hide which it was.
+        'eventful_adjacent_pairs': len(adjacent_pairs),
         'agentless_passive_sentences': len(passive_only),
         # The one sentence most likely to become the story, for the log line —
         # so a human reading the run can see WHAT the instrument found, not just
         # that it found something. D423: an instrument that reports only a
         # number is an instrument nobody can check.
         'best_sentence': (both[0][:140] if both
-                          else (active[0][:140] if active else '')),
+                          else (' '.join(adjacent_pairs[0])[:200] if adjacent_pairs
+                                else (active[0][:140] if active else ''))),
     }
 
 
