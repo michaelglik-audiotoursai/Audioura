@@ -14118,6 +14118,89 @@ REWRITE RULES (all mandatory):
     else:
         print(f"\n  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false")
 
+    # -------- [D511] PHASE 5.20: the credit_line loop --------
+    #
+    # Michael, 2026-08-23: *"We have developed the loop of credit_line values,
+    # query generation with calling Gemini and asserting sources with Serper, and
+    # evaluated and developed stories. I want all of this into production before
+    # I generate a new tour."*
+    #
+    # Eight modules were built this week and none had a production caller —
+    # the orphan pattern the 7-step plan opened by complaining about. They are
+    # composed in `story_production_loop.run_for_stop`, so this is ONE call
+    # rather than four separate incisions into a 16,000-line function.
+    #
+    # HERE, after the gates and before the index, because the loop needs
+    # POST-GATE prose: its credit_lines are mined from the stop's own text, and
+    # mining pre-gate text would build a question on a sentence about to be
+    # deleted. PHASE 5.21 then re-scores whatever this replaces.
+    #
+    # OFF BY DEFAULT (`STORY_LOOP_ENABLED=1`). It adds ~$0.05 and ~60s per stop,
+    # which must be a decision rather than a surprise — and the flag is what
+    # makes the A/B possible at all, since a single old-vs-new pair is noise at
+    # sd 4.9 (D484, D480's three-run rule).
+    if _storied_mode and tour_category == 'museum':
+        try:
+            from story_production_loop import run_for_stop as _d511_run, is_enabled as _d511_on
+            if _d511_on():
+                print(f"\n  [D511] PHASE 5.20: credit_line loop — "
+                      f"object record, seeds, challenge, adjudicate, gate")
+                _d511_venue_url = getattr(locals().get('_det_entity'), 'official_url', '') or ''
+                _d511_stats = {'stops': 0, 'accepted': 0, 'cost': 0.0}
+                for _d511_i, _d511_poi in enumerate(poi_list):
+                    _d511_desc = _d511_poi.get('description') or ''
+                    if not _d511_desc or _d511_desc.startswith('['):
+                        continue
+                    _d511_stats['stops'] += 1
+                    print(f"\n  [D511] stop {_d511_i+1}: "
+                          f"{_d511_poi.get('name','')[:44]}")
+                    _d511_matrix = {
+                        'canonical_title': _d511_poi.get('name', ''),
+                        'english_title': _d511_poi.get('english_title', ''),
+                        'artist': _d511_poi.get('artist', ''),
+                        'publisher': _d511_poi.get('publisher', ''),
+                        'printed_by': _d511_poi.get('printed_by', '') or _d511_poi.get('printer', ''),
+                        'printer': _d511_poi.get('printer', '') or _d511_poi.get('printed_by', ''),
+                        'collaborator': _d511_poi.get('collaborator', ''),
+                        'credit_line': _d511_poi.get('credit_line', ''),
+                        'medium': _d511_poi.get('medium', ''),
+                        'venue_name': _museum_venue_name or '',
+                    }
+                    _d511_res = _d511_run(
+                        _d511_matrix, _d511_desc,
+                        exhibition=_exh_name_resolved or location,
+                        venue_url=_d511_venue_url,
+                        extra_entities=[_d511_poi.get('artist', '')])
+                    _d511_stats['cost'] += _d511_res.get('cost_usd', 0.0)
+                    total_cost += _d511_res.get('cost_usd', 0.0)
+                    _d511_poi['_d511'] = _d511_res
+                    if _d511_res.get('story'):
+                        # The adjudicated story REPLACES the story portion. The
+                        # descriptive prose the gates already cleared is kept —
+                        # this loop produces a story, not a whole stop.
+                        _d511_poi['_pre_d511_description'] = _d511_desc
+                        _d511_poi['description'] = (
+                            _d511_desc.rstrip() + ' ' + _d511_res['story'].strip())
+                        _d511_stats['accepted'] += 1
+                        print(f"    [D511] story ACCEPTED from credit_line "
+                              f"'{_d511_res['credit_line'][:44]}' "
+                              f"(index {_d511_res.get('index')}, "
+                              f"{_d511_res['gate']['max_sentences']} sentences)")
+                    else:
+                        # Michael's ruling: publishing nothing is correct, and a
+                        # stop with no story is a retrieval failure to fix
+                        # upstream, not a threshold to lower.
+                        print(f"    [D511] no story passed the gate — stop keeps "
+                              f"its descriptive text and publishes no story")
+                print(f"\n  [D511] PHASE 5.20 summary: "
+                      f"{_d511_stats['accepted']}/{_d511_stats['stops']} stops "
+                      f"got a gated story, ~${_d511_stats['cost']:.3f}")
+        except ImportError as _d511_imp:
+            print(f"  [D511] loop not importable, skipped (non-fatal): {_d511_imp}")
+        except Exception as _d511_err:
+            print(f"  [D511] loop FAILED, tour continues unchanged "
+                  f"(non-fatal): {type(_d511_err).__name__}: {_d511_err}")
+
     # -------- [LOCAL-485] PHASE 5.21: Story valuation index (Michael's step 5) --------
     #
     # Michael's step 5 is "we evaluate the story assigning a value index".
