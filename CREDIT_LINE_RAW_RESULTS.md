@@ -1,13 +1,12 @@
-# Raw results — 37 credit_lines × 2 engines = 74 retrievals
+# Raw results — 37 credit_lines × 2 engines, with sources
 
-**37 Serper + 37 Gemini grounded · ~$0.259 · 142s**
+**37 Serper + 37 Gemini grounded · ~$0.481**
 
-Each credit_line becomes ONE question, in two encodings (D507):
+Each credit_line becomes ONE question in two encodings (D507): Serper gets compiled keywords, Gemini gets the question verbatim.
 
-- **Serper** — compiled keywords: quoted work + named agents + `why` + year. No framing words; the question sent verbatim to Serper returns nothing.
-- **Gemini** — the question verbatim: *"What story can be told to visitors of {exhibition} about {work}, {credit_line}?"* with the matrix attached.
+**[D508] Gemini answers now carry their SOURCES**, taken from the grounding metadata rather than from bracket citations — only 2 of 37 answers wrote a bracket, while the metadata was present on 30 of 37 and was being discarded. Redirect URLs are resolved, so every source can be opened and checked. Where Gemini attributed a specific sentence, its sources are listed under it.
 
-Sentence marks: **R** relevant · w weak · **X** irrelevant (D505 gate). `kind` from `material_kind`, before → after gating.
+Sentence marks: **R** relevant · w weak · **X** irrelevant (D505 gate).
 
 
 ---
@@ -24,101 +23,85 @@ Sentence marks: **R** relevant · w weak · **X** irrelevant (D505 gate). `kind`
 8 results · kind **active → active** · R10 w0 X6
 
 **1. Joan Miró's Broder Collection: How One Artist ...**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan Miró's ... Broder's collaboration with Miró resulted in the publication of the ...
 
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** Broder's collaboration with Miró resulted in the publication of the ...  
-    <sub>names broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
+  - **R** Broder's collaboration with Miró resulted in the publication of the ...
 
 **2. Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ...**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9240>  
 > Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
 
-  - **R** Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Lithograph from an illustrated book with forty ...  
-    <sub>about someone else (Lithograph), not this stop</sub>
+  - **R** Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Lithograph from an illustrated book with forty ...
 
 **3. Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9)**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/products/le-lezard-aux-plumes-dor-1971-02-copy?srsltid=AfmBOornEIGvshbjPJzY2WnAtTdrvO3HXnny2ViYVDAo21b-Yn_0NEuR>  
 > Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9). Joan Miró. Regular price $7,480.00 USD. Lithograph in colors on B.F.K. Rives paper, watermarked.
 
-  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** Regular price $7,480.00 USD.  
-    <sub>about someone else (Regular), not this stop</sub>
-  - **X** Lithograph in colors on B.F.K.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - **X** Rives paper, watermarked.  
-    <sub>about someone else (Rives), not this stop</sub>
+  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).
+  - **X** Regular price $7,480.00 USD.
+  - **X** Lithograph in colors on B.F.K.
+  - **X** Rives paper, watermarked.
 
 **4. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **5. Virtual Member Lecture: Picasso, Miró, Dalí**  
-`mfa.org` · tier `tier1`  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/event/virtual-member-lecture-picasso-miro-dali>  
 > ... Broder, printed by Mourlot Frères, Paris, 1971. Illustrated book with ... Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers. Credit.
 
-  - **R** Broder, printed by Mourlot Frères, Paris, 1971.  
-    <sub>names mourlot, broder</sub>
-  - **X** Illustrated book with ...  
-    <sub>about someone else (Illustrated), not this stop</sub>
-  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Broder, printed by Mourlot Frères, Paris, 1971.
+  - **X** Illustrated book with ...
+  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers.
 
 **6. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOor3xM3QzMeUWcCq659y5ikgDPTA5BzCjvCl6YTZIZCg21CjqPud>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 **7. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
-  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …  
-    <sub>names louis broder, joan miro, le lezard</sub>
+  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
 **8. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
-`composition.gallery` · tier `unverified`  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, revolutionized the book as an art form with its deep collaboration?`
 
-kind **eventful → active** · R4 w0 X1
+kind **eventful → eventful** · R5 w0 X3
 
-> Joan Miró initially completed the lithographs for this collaborative project between 1963 and 1967 for a planned 1967 release. 
+> Joan Miró wrote the surrealist poem himself and handwrote the text across twenty-six pages alongside his illustrations [PerQueryResult(index="1.1.5", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_da0ymYoTxY1LdFAELqIXxjyKoF72DIrsJ5ubiX_1BBDBDrBhHl8OtYms8PdjNwKe3hF9PKBlJWFKtdlqqZsgO-bxcWFYW9TihArjwMd5m92SWnhxg__f-aKEDF3aX7ShClwMlXj2YY5B-jVnJbsOLF1nmfE1dY9pQdWbGAteChw9WsPq587b90_1P8_6SkgfYvI")].
 > 
-> After the initial printing was finished, Miró and publisher Louis Broder discovered a defect in the chosen paper that degraded and altered the lithographic ink colors. 
+> The project was originally planned for publication in 1967, but it had to be abandoned mid-production because the printing inks reacted adversely with the specially commissioned parchment paper [PerQueryResult(index="1.1.5", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_da0ymYoTxY1LdFAELqIXxjyKoF72DIrsJ5ubiX_1BBDBDrBhHl8OtYms8PdjNwKe3hF9PKBlJWFKtdlqqZsgO-bxcWFYW9TihArjwMd5m92SWnhxg__f-aKEDF3aX7ShClwMlXj2YY5B-jVnJbsOLF1nmfE1dY9pQdWbGAteChw9WsPq587b90_1P8_6SkgfYvI"), PerQueryResult(index="1.2.2", source_title="Joan Miró , Plate XII, from Le Lezard aux Plumes d'Or (M. 525) | Christie's", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHBsBws6FHnT66CUsEUeykLsXwXsLWd6tIjJT76ZqDF3pZiwHjsfCw3mJONHB3slKG41nj4j5acHHHJZPA0YVZOw-tEMBNesyVCWM1SAV8O1AA7bUfWCo7MB8JLOYOMmaTeZQ==")].
 > 
-> Because the original zinc printing plates had already been discarded, the entire existing run had to be abandoned. 
+> Because the lithographic stones had already been erased before the chemical defect was discovered, Miró and the Mourlot workshop had to recreate the entire set of plates from scratch [PerQueryResult(index="1.2.2", source_title="Joan Miró , Plate XII, from Le Lezard aux Plumes d'Or (M. 525) | Christie's", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHBsBws6FHnT66CUsEUeykLsXwXsLWd6tIjJT76ZqDF3pZiwHjsfCw3mJONHB3slKG41nj4j5acHHHJZPA0YVZOw-tEMBNesyVCWM1SAV8O1AA7bUfWCo7MB8JLOYOMmaTeZQ==")].
 > 
-> Miró was forced to redraw a completely new set of lithographs from scratch, delaying the book's final publication until 1971. 
-> 
-> Unlike many *livres d’artiste* where an artist illustrates another author's work, Miró authored both the poetry and the accompanying handwritten script alongside his visual imagery.
+> This technical failure delayed the project's release until 1971, when it was finally issued on custom wove paper bearing a watermark of Miró's name [PerQueryResult(index="1.1.5", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_da0ymYoTxY1LdFAELqIXxjyKoF72DIrsJ5ubiX_1BBDBDrBhHl8OtYms8PdjNwKe3hF9PKBlJWFKtdlqqZsgO-bxcWFYW9TihArjwMd5m92SWnhxg__f-aKEDF3aX7ShClwMlXj2YY5B-jVnJbsOLF1nmfE1dY9pQdWbGAteChw9WsPq587b90_1P8_6SkgfYvI"), PerQueryResult(index="1.1.9", source_title="Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148)", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFfEym80MUlRskfaSE7kF3q23Ez8tGe5aoIrpCIpDb8QQMSnlaayAc0GJoDw-JaRk-IMkQw8wcm86GqudiBuuDqcFz6CLRCkOwXzlVGLZWpEJH-byA94MK-s1zBsFf9sVRAMw=="), PerQueryResult(index="1.2.2", source_title="Joan Miró , Plate XII, from Le Lezard aux Plumes d'Or (M. 525) | Christie's", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHBsBws6FHnT66CUsEUeykLsXwXsLWd6tIjJT76ZqDF3pZiwHjsfCw3mJONHB3slKG41nj4j5acHHHJZPA0YVZOw-tEMBNesyVCWM1SAV8O1AA7bUfWCo7MB8JLOYOMmaTeZQ==")].
 
-  - **R** Joan Miró initially completed the lithographs for this collaborative project between 1963 and 1967 for a planned 1967 release.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** After the initial printing was finished, Miró and publisher Louis Broder discovered a defect in the chosen paper that degraded and altered the lithographic ink colors.  
-    <sub>names louis broder, broder, louis</sub>
-  - **X** Because the original zinc printing plates had already been discarded, the entire existing run had to be abandoned.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** Miró was forced to redraw a completely new set of lithographs from scratch, delaying the book's final publication until 1971.  
-    <sub>names miro</sub>
-  - **R** Unlike many *livres d’artiste* where an artist illustrates another author's work, Miró authored both the poetry and the accompanying handwritten script alongside his visual imagery.  
-    <sub>names miro</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **R** Joan Miró wrote the surrealist poem himself and handwrote the text across twenty-six pages alongside his illustrations [PerQueryResult(index="1.1.5", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_da0ymYoTxY1LdFAELqIXxjyKoF72DIrsJ5ubiX_1BBDBDrBhHl8OtYms8PdjNwKe3hF9PKBlJWFKtdlqqZsgO-bxcWFYW9TihArjwMd5m92SWnhxg__f-aKEDF3aX7ShClwMlXj2YY5B-jVnJbsOLF1nmfE1dY9pQdWbGAteChw9WsPq587b90_1P8_6SkgfYvI")].
+  - **R** The project was originally planned for publication in 1967, but it had to be abandoned mid-production because the printing inks reacted adversely with the specially commissioned parchment paper [PerQueryResult(index="1.1.5", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_da0ymYoTxY1LdFAELqIXxjyKoF72DIrsJ5ubiX_1BBDBDrBhHl8OtYms8PdjNwKe3hF9PKBlJWFKtdlqqZsgO-bxcWFYW9TihArjwMd5m92SWnhxg__f-aKEDF3aX7ShClwMlXj2YY5B-jVnJbsOLF1nmfE1dY9pQdWbGAteChw9WsPq587b90_1P8_6SkgfYvI"), PerQueryResult(index="1.2.2", source_title="Joan Miró , Plate XII, from Le Lezard aux Plumes d'Or (M.
+  - **X** 525) | Christie's", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHBsBws6FHnT66CUsEUeykLsXwXsLWd6tIjJT76ZqDF3pZiwHjsfCw3mJONHB3slKG41nj4j5acHHHJZPA0YVZOw-tEMBNesyVCWM1SAV8O1AA7bUfWCo7MB8JLOYOMmaTeZQ==")].
+  - **R** Because the lithographic stones had already been erased before the chemical defect was discovered, Miró and the Mourlot workshop had to recreate the entire set of plates from scratch [PerQueryResult(index="1.2.2", source_title="Joan Miró , Plate XII, from Le Lezard aux Plumes d'Or (M.
+  - **X** 525) | Christie's", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHBsBws6FHnT66CUsEUeykLsXwXsLWd6tIjJT76ZqDF3pZiwHjsfCw3mJONHB3slKG41nj4j5acHHHJZPA0YVZOw-tEMBNesyVCWM1SAV8O1AA7bUfWCo7MB8JLOYOMmaTeZQ==")].
+  - **R** This technical failure delayed the project's release until 1971, when it was finally issued on custom wove paper bearing a watermark of Miró's name [PerQueryResult(index="1.1.5", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_da0ymYoTxY1LdFAELqIXxjyKoF72DIrsJ5ubiX_1BBDBDrBhHl8OtYms8PdjNwKe3hF9PKBlJWFKtdlqqZsgO-bxcWFYW9TihArjwMd5m92SWnhxg__f-aKEDF3aX7ShClwMlXj2YY5B-jVnJbsOLF1nmfE1dY9pQdWbGAteChw9WsPq587b90_1P8_6SkgfYvI"), PerQueryResult(index="1.1.9", source_title="Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - **R** books 148)", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFfEym80MUlRskfaSE7kF3q23Ez8tGe5aoIrpCIpDb8QQMSnlaayAc0GJoDw-JaRk-IMkQw8wcm86GqudiBuuDqcFz6CLRCkOwXzlVGLZWpEJH-byA94MK-s1zBsFf9sVRAMw=="), PerQueryResult(index="1.2.2", source_title="Joan Miró , Plate XII, from Le Lezard aux Plumes d'Or (M.
+  - **X** 525) | Christie's", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHBsBws6FHnT66CUsEUeykLsXwXsLWd6tIjJT76ZqDF3pZiwHjsfCw3mJONHB3slKG41nj4j5acHHHJZPA0YVZOw-tEMBNesyVCWM1SAV8O1AA7bUfWCo7MB8JLOYOMmaTeZQ==")].
 
 
 ## credit_line 2.2 — *evaluative* / participial
@@ -130,97 +113,95 @@ kind **eventful → active** · R4 w0 X1
 8 results · kind **active → inert** · R10 w1 X5
 
 **1. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
-`composition.gallery` · tier `unverified`  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
 **2. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
 **3. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **4. Le Lezards aux Plumes by Joan Miro, 1971**  
-`mourloteditions.com` · tier `unverified`  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOoqf4TeTNgcVNV6Q5bzAIjQwB12mmQ0f-Bp7bHZpUGbJqXV9GqRj>  
 > Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...  
-    <sub>names joan miro, le lezard, mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
 **5. Joan Miró's Broder Collection: How One Artist ...**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...  
-    <sub>names joan miro, broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
+  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
 **6. Joan Miró, 'Le Lézard aux Plumes d'Or (Mourlot 828)', 1971**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-le-lezard-aux-plumes-dor-mourlot-828-3>  
 > Le Lézard aux Plumes d'Or (Mourlot 828), 1971. Lithograph printed in colours. 14 × 39 2/5 in | 35.5 × 100 cm. Forum Auctions: Prints & Editions (September 2021).
 
-  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.  
-    <sub>names le lezard, mourlot, lezard</sub>
-  - **X** Lithograph printed in colours.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - w 14 × 39 2/5 in | 35.5 × 100 cm.  
-    <sub>no entity of its own; snippet names le lezard</sub>
-  - **X** Forum Auctions: Prints & Editions (September 2021).  
-    <sub>about someone else (Forum Auctions), not this stop</sub>
+  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.
+  - **X** Lithograph printed in colours.
+  - w 14 × 39 2/5 in | 35.5 × 100 cm.
+  - **X** Forum Auctions: Prints & Editions (September 2021).
 
 **7. Joan Miró - Le lézard aux plumes d'or**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOop8JNk9XXeNx8GnxwatOJF8y8xYOtC0XDear4wA1COjO_rUouR1>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
 **8. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOoq-4Sr8E5C_nd-RcIPH0x2i8VqtDn0NFJ_3DdU5W8RySj67u2_O>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, focusing on the livre d'artiste?`
 
-kind **inert → inert** · R3 w1 X0
+kind **eventful → inert** · R4 w0 X1
 
-> Joan Miró authored both the surrealist poetic text and the lithographic illustrations for the project. 
+> Joan Miró created *Le Lézard aux plumes d’or* not just as an illustrator, but as the author of both the surrealist poem and the visual compositions.
 > 
-> The book was originally prepared between 1963 and 1967, but Miró and publisher Louis Broder discovered that a chemical flaw in the paper had altered the lithographs' ink colors. 
+> The project was originally planned for release in 1967 with an initial set of lithographs printed at Atelier Mourlot.
 > 
-> Because the original printing plates were destroyed or discarded after the botched run, Miró had to entirely redraw a new set of lithographs. 
+> After printing, Miró and publisher Louis Broder discovered a defect in the manufacturing of the paper that altered the intended colors.
 > 
-> The corrected definitive edition was finally published four years late in 1971.
+> Because the original zinc printing plates had already been effaced, the entire initial print run was scrapped and destroyed.
+> 
+> Miró was forced to redraw a completely new set of lithographs from scratch, delaying the final publication of the book until 1971.
 
-  - **R** Joan Miró authored both the surrealist poetic text and the lithographic illustrations for the project.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** The book was originally prepared between 1963 and 1967, but Miró and publisher Louis Broder discovered that a chemical flaw in the paper had altered the lithographs' ink colors.  
-    <sub>names louis broder, broder, louis</sub>
-  - **R** Because the original printing plates were destroyed or discarded after the botched run, Miró had to entirely redraw a new set of lithographs.  
-    <sub>names miro</sub>
-  - w The corrected definitive edition was finally published four years late in 1971.  
-    <sub>no entity of its own; snippet names louis broder</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Le Lezard aux plumes d or Miro Louis Broder story history destroyed`; `"Le Lézard aux plumes d'or" "1967" "defect" OR "paper" OR "destroyed" OR "rejected" OR "flaw"`
+
+1. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+2. `artsy.net` — <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+3. `galeriearenthon.com` — <https://galeriearenthon.com/en/oeuvre/joan-miro-le-lezard-1ere-version-planche-xv/>
+
+  - **R** Joan Miró created *Le Lézard aux plumes d’or* not just as an illustrator, but as the author of both the surrealist poem and the visual compositions.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** The project was originally planned for release in 1967 with an initial set of lithographs printed at Atelier Mourlot.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** After printing, Miró and publisher Louis Broder discovered a defect in the manufacturing of the paper that altered the intended colors.
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **X** Because the original zinc printing plates had already been effaced, the entire initial print run was scrapped and destroyed.
+      ↳ source: `galeriearenthon.com` <https://galeriearenthon.com/en/oeuvre/joan-miro-le-lezard-1ere-version-planche-xv/>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** Miró was forced to redraw a completely new set of lithographs from scratch, delaying the final publication of the book until 1971.
+      ↳ source: `galeriearenthon.com` <https://galeriearenthon.com/en/oeuvre/joan-miro-le-lezard-1ere-version-planche-xv/>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
 
 
 ## credit_line 4.1 — *evaluative* / participial
@@ -231,96 +212,98 @@ kind **inert → inert** · R3 w1 X0
 
 8 results · kind **active → inert** · R10 w1 X4
 
-**1. Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions**  
-`mourloteditions.com` · tier `unverified`  
+**1. Le Lezards aux Plumes by Joan Miro, 1971**  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOoqUcxCdZ-sM0gQ1Sz3agMcOec3UPu79DEqakq1JlkYSSaJnHerz>  
 > Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...  
-    <sub>names joan miro, le lezard, mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
-**2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
-`coleccionbbva.com` · tier `unverified`  
+**2. 557135 The Lizard with Golden Feathers Joan Miró**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-**3. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
-`moma.org` · tier `tier1`  
+**3. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
-**4. Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery**  
-`composition.gallery` · tier `unverified`  
+**4. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-**5. Le Lézard aux Plumes d'Or (Mourlot 828) (1971) by Joan Miró | Artsy**  
-`artsy.net` · tier `market`  
+**5. Joan Miró, 'Le Lézard aux Plumes d'Or (Mourlot 828)', 1971**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-le-lezard-aux-plumes-dor-mourlot-828-3>  
 > Le Lézard aux Plumes d'Or (Mourlot 828), 1971. Lithograph printed in colours ... express the inner workings of the human psyche. Miró used color and ...
 
-  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.  
-    <sub>names le lezard, mourlot, lezard</sub>
-  - **X** Lithograph printed in colours ...  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - w express the inner workings of the human psyche.  
-    <sub>no entity of its own; snippet names le lezard</sub>
-  - **R** Miró used color and ...  
-    <sub>names miro</sub>
+  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.
+  - **X** Lithograph printed in colours ...
+  - w express the inner workings of the human psyche.
+  - **R** Miró used color and ...
 
-**6. Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...**  
-`masterworksfineart.com` · tier `unverified`  
+**6. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOooe2hOuPfF593GmSmiGMBaJKZBGGQMyYMJmI7cJhnonm3IRsKNA>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
-**7. Joan Miró - Le lézard aux plumes d'or - Choice Contemporary**  
-`choicecontemporary.com` · tier `unverified`  
+**7. Joan Miró - Le lézard aux plumes d'or**  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOoq9iO_XQ3ZuDW9E0uuOOBdtHl5jNRjKyRWggEzUiITIgO_gQ4ub>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-**8. Miró Joan | 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris ...**  
-`mutualart.com` · tier `market`  
+**8. Miró Joan | 15 WORKS: Le Lézard aux Plumes d'Or, Louis ...**  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artwork/15-WORKS--Le-Lezard-aux-Plumes-d-Or--Lou/53A4166656B07AE1/Similar>  
 > 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
 
-  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.  
-    <sub>names louis broder, le lezard, broder</sub>
+  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, showcasing how artists express these concepts through their unrivaled creativity?`
 
-kind **eventful → inert** · R2 w1 X1
+kind **eventful → active** · R4 w0 X1
 
-> Joan Miró composed both the surrealist poem and the accompanying imagery for the project. 
+> Joan Miró originally created an entire eighteen-plate version of this project in 1967 based on his own surrealist poem.
 > 
-> The book was originally prepared for publication in 1967, but mid-way through production, the inks chemically reacted with a defective batch of specially commissioned paper. 
+> Midway through the print run, publisher Louis Broder and Miró halted production because a chemical defect in the specially manufactured paper caused the printing inks to alter and degrade.
 > 
-> Because the printer had already erased the original lithographic stones before the defect was discovered, the entire initial edition had to be abandoned. 
+> Because the original lithographic stones had already been erased before the chemical defect was discovered, the initial edition had to be abandoned.
 > 
-> Miró then had to completely redraw a new set of lithographic plates, delaying the final publication with publisher Louis Broder until 1971.
+> Miró was forced to redraw an entirely new suite of compositions from scratch, delaying the book’s release until 1971. 
+> 
+> The completed 1971 publication was printed on new paper stocks, pairing Miró's handwritten text across multiple pages with his lithographs.
 
-  - **R** Joan Miró composed both the surrealist poem and the accompanying imagery for the project.  
-    <sub>names joan miro, miro, joan</sub>
-  - w The book was originally prepared for publication in 1967, but mid-way through production, the inks chemically reacted with a defective batch of specially commissioned paper.  
-    <sub>no entity of its own; snippet names louis broder</sub>
-  - **X** Because the printer had already erased the original lithographic stones before the defect was discovered, the entire initial edition had to be abandoned.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** Miró then had to completely redraw a new set of lithographic plates, delaying the final publication with publisher Louis Broder until 1971.  
-    <sub>names louis broder, broder, louis</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Le Lizard aux plumes d or Miro Louis Broder Mourlot 1971 background history`; `Le Lezard aux plumes d or Miro rejected edition paper defect`
+
+1. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+2. `christies.com` — <https://www.christies.com/en/lot/lot-4958760>
+3. `pamono.com` — <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+
+  - **R** Joan Miró originally created an entire eighteen-plate version of this project in 1967 based on his own surrealist poem.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** Midway through the print run, publisher Louis Broder and Miró halted production because a chemical defect in the specially manufactured paper caused the printing inks to alter and degrade.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **X** Because the original lithographic stones had already been erased before the chemical defect was discovered, the initial edition had to be abandoned.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** Miró was forced to redraw an entirely new suite of compositions from scratch, delaying the book’s release until 1971.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** The completed 1971 publication was printed on new paper stocks, pairing Miró's handwritten text across multiple pages with his lithographs.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
 
 
 ## credit_line 5.1 — *anchored* / possessive
@@ -332,103 +315,96 @@ kind **eventful → inert** · R2 w1 X1
 8 results · kind **inert → inert** · R9 w2 X6
 
 **1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
 **2. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder ...**  
-`christies.com` · tier `market`  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
 **4. Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9)**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/products/le-lezard-aux-plumes-dor-1971-02-copy?srsltid=AfmBOoo3gB4ZU7uuL6hxqchRN1Qp8sItlh8Jcrm_h-OFjIcB44ZY2Rwn>  
 > Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9). Joan Miró. Regular price $7,480.00 USD. Lithograph in colors on B.F.K. Rives paper, watermarked.
 
-  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** Regular price $7,480.00 USD.  
-    <sub>about someone else (Regular), not this stop</sub>
-  - **X** Lithograph in colors on B.F.K.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - **X** Rives paper, watermarked.  
-    <sub>about someone else (Rives), not this stop</sub>
+  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).
+  - **X** Regular price $7,480.00 USD.
+  - **X** Lithograph in colors on B.F.K.
+  - **X** Rives paper, watermarked.
 
 **5. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971. The complete set of 15 lithographs in colors, on Rives paper. 15 1/5 × 20 1/5 × ...
 
-  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - **X** The complete set of 15 lithographs in colors, on Rives paper.  
-    <sub>about someone else (Rives), not this stop</sub>
-  - w 15 1/5 × 20 1/5 × ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.
+  - **X** The complete set of 15 lithographs in colors, on Rives paper.
+  - w 15 1/5 × 20 1/5 × ...
 
 **6. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
-`composition.gallery` · tier `unverified`  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
 **7. Miró Joan | 15 WORKS: Le Lézard aux Plumes d'Or, Louis ...**  
-`mutualart.com` · tier `market`  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artwork/15-WORKS--Le-Lezard-aux-Plumes-d-Or--Lou/53A4166656B07AE1/Similar>  
 > 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
 
-  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.  
-    <sub>names louis broder, le lezard, broder</sub>
+  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
 
 **8. Le Lezards aux Plumes by Joan Miro, 1971**  
-`mourloteditions.com` · tier `unverified`  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOorFNeJkEQ55sibdYFgZTnLnhREjyBCgvUhVqjmc7t6vLdUGvkz1>  
 > ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ... For over 170 years, the name Mourlot has been associated with important graphic ...
 
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
-  - **R** For over 170 years, the name Mourlot has been associated with important graphic ...  
-    <sub>names mourlot</sub>
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
+  - **R** For over 170 years, the name Mourlot has been associated with important graphic ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Broder's pivotal decision?`
 
-kind **eventful → eventful** · R5 w0 X0
+kind **inert → inert** · R4 w0 X0
 
-> Joan Miró originally created a full set of eighteen color lithographs between 1963 and 1967 to illustrate his own surrealist poem for the publisher Louis Broder.
+> Joan Miró originally created and printed a first version of the lithographic suite in 1967 based on his own surrealist poem. 
 > 
-> After the initial printing was finished, Broder and Miró discovered a manufacturing defect in the paper that chemically reacted with and degraded the ink colors.
+> After printing, publisher Louis Broder discovered a chemical defect in the specially commissioned paper that caused the inks and colors to alter and deteriorate. 
 > 
-> Broder made the costly decision to reject and destroy the entire defective print run rather than release a substandard edition.
+> Because the original lithographic stones had already been effaced, Broder made the radical decision to scrap the flawed print run rather than release a compromised edition. 
 > 
-> Because the original lithographic stones had already been erased in the Mourlot workshop, none of the initial compositions could simply be reprinted.
-> 
-> Consequently, Miró was forced to start completely from scratch, designing entirely new lithographic compositions that were ultimately published four years later in 1971.
+> This costly decision forced Miró to completely redraw and execute a brand-new set of lithographs, delaying publication by four years until 1971.
 
-  - **R** Joan Miró originally created a full set of eighteen color lithographs between 1963 and 1967 to illustrate his own surrealist poem for the publisher Louis Broder.  
-    <sub>names louis broder, joan miro, broder</sub>
-  - **R** After the initial printing was finished, Broder and Miró discovered a manufacturing defect in the paper that chemically reacted with and degraded the ink colors.  
-    <sub>names broder, miro</sub>
-  - **R** Broder made the costly decision to reject and destroy the entire defective print run rather than release a substandard edition.  
-    <sub>names broder</sub>
-  - **R** Because the original lithographic stones had already been erased in the Mourlot workshop, none of the initial compositions could simply be reprinted.  
-    <sub>names mourlot</sub>
-  - **R** Consequently, Miró was forced to start completely from scratch, designing entirely new lithographic compositions that were ultimately published four years later in 1971.  
-    <sub>names miro</sub>
+**SOURCES (4)** — pages Gemini actually read · searched: `Le Lezard aux plumes d or Broder paper defect lithographs`; `Le Lizard aux plumes d or Broder decision destroyed`
+
+1. `artistprint.de` — <https://artistprint.de/en/Miro-Joan/Joan-Miro-Le-Lezard-aux-plumes-dor-1967::4721.html>
+2. `christies.com` — <https://www.christies.com/en/lot/lot-4958760>
+3. `pamono.com` — <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+4. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+
+  - **R** Joan Miró originally created and printed a first version of the lithographic suite in 1967 based on his own surrealist poem.
+      ↳ source: `artistprint.de` <https://artistprint.de/en/Miro-Joan/Joan-Miro-Le-Lezard-aux-plumes-dor-1967::4721.html>
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** After printing, publisher Louis Broder discovered a chemical defect in the specially commissioned paper that caused the inks and colors to alter and deteriorate.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** Because the original lithographic stones had already been effaced, Broder made the radical decision to scrap the flawed print run rather than release a compromised edition.
+      ↳ source: `artistprint.de` <https://artistprint.de/en/Miro-Joan/Joan-Miro-Le-Lezard-aux-plumes-dor-1967::4721.html>
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** This costly decision forced Miró to completely redraw and execute a brand-new set of lithographs, delaying publication by four years until 1971.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
 
 
 ## credit_line 5.2 — *evaluative* / participial
@@ -440,97 +416,97 @@ kind **eventful → eventful** · R5 w0 X0
 8 results · kind **inert → inert** · R10 w1 X3
 
 **1. Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ...**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9240>  
 > Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
 
-  - **R** Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Lithograph from an illustrated book with forty ...  
-    <sub>about someone else (Lithograph), not this stop</sub>
+  - **R** Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Lithograph from an illustrated book with forty ...
 
 **2. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder ...**  
-`christies.com` · tier `market`  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
 **4. Joan Miró's Broder Collection: How One Artist ...**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'Or II” (1971, M.821). From Joan Miró's “Broder Collection.” In addition to lithography, Miró's talents spanned many ...
 
-  - **R** “Le Lezard aux Plumes d'Or II” (1971, M.821).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** From Joan Miró's “Broder Collection.” In addition to lithography, Miró's talents spanned many ...  
-    <sub>names joan miro, broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'Or II” (1971, M.821).
+  - **R** From Joan Miró's “Broder Collection.” In addition to lithography, Miró's talents spanned many ...
 
 **5. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOooZb-05pCQvdLOej1qAODPBIS8mW9dIkPM0ASm2IZxOww-6i0KG>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 **6. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
-  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …  
-    <sub>names louis broder, joan miro, le lezard</sub>
+  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
 **7. Joan Miró - Le lézard aux plumes d'or**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOop8d7qIPCi1O7TJut8MWDmn6YLmbOtZZPlMClsfF6HIm0E_3gRs>  
 > Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
 
-  - **R** Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
 
 **8. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or ...**  
-`ragoarts.com` · tier `unverified`  
+`ragoarts.com` · tier `unverified` · <https://www.ragoarts.com/auctions/2022/06/prints-multiples/177>  
 > Lot 177: Joan Miró 1893–1983. Untitled (from Le lezard aux plumes d'or series). 1971, lithograph in colors on Kochi Japan.
 
-  - **R** Lot 177: Joan Miró 1893–1983.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Untitled (from Le lezard aux plumes d'or series).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** 1971, lithograph in colors on Kochi Japan.  
-    <sub>about someone else (Kochi Japan), not this stop</sub>
+  - **R** Lot 177: Joan Miró 1893–1983.
+  - **R** Untitled (from Le lezard aux plumes d'or series).
+  - **X** 1971, lithograph in colors on Kochi Japan.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, allowing the artist to blend visual and textual narratives seamlessly?`
 
-kind **eventful → eventful** · R4 w0 X1
+kind **eventful → eventful** · R4 w1 X0
 
-> Joan Miró originally wrote the surreal poem himself and completed a first full run of eighteen lithographic plates with publisher Louis Broder in 1967. 
+> Joan Miró authored both the surrealist poetic text and the accompanying lithographs, enabling him to unify word and image under a single artistic vision. 
 > 
-> During that first printing attempt, a chemical defect in the specially commissioned paper caused the ink colors to alter and react unfavorably. 
+> Miró originally conceived the underlying poem between 1936 and 1939 during the Spanish Civil War as a piece of artistic resistance. 
 > 
-> Because the original lithographic stones and plates had already been erased before the defect came to light, Miró and Broder were forced to abandon the entire initial edition. 
+> Rather than setting the text in conventional typography, Miró handwrote the verses directly onto the printing surfaces, treating his calligraphy as a graphic element. 
 > 
-> Miró had to redraw and recreate a completely new set of compositions from scratch on different papers to successfully publish the project in 1971. 
+> The project was initially printed in 1967, but a manufacturing defect in the paper caused unintended color alterations. 
 > 
-> To merge the textual and visual narratives, Miró lithographically reproduced his own handwritten script alongside the imagery across dozens of pages rather than using standard typeset text.
+> Because the original lithographic stones had already been erased, Miró and publisher Louis Broder destroyed the defective 1967 edition and forced Miró to recreate the entire suite from scratch.
 
-  - **R** Joan Miró originally wrote the surreal poem himself and completed a first full run of eighteen lithographic plates with publisher Louis Broder in 1967.  
-    <sub>names louis broder, joan miro, broder</sub>
-  - **X** During that first printing attempt, a chemical defect in the specially commissioned paper caused the ink colors to alter and react unfavorably.  
-    <sub>about someone else (During), not this stop</sub>
-  - **R** Because the original lithographic stones and plates had already been erased before the defect came to light, Miró and Broder were forced to abandon the entire initial edition.  
-    <sub>names broder, miro</sub>
-  - **R** Miró had to redraw and recreate a completely new set of compositions from scratch on different papers to successfully publish the project in 1971.  
-    <sub>names miro</sub>
-  - **R** To merge the textual and visual narratives, Miró lithographically reproduced his own handwritten script alongside the imagery across dozens of pages rather than using standard typeset text.  
-    <sub>names miro</sub>
+**SOURCES (6)** — pages Gemini actually read · searched: `"Le Lézard aux plumes d'or" author text Miró wrote poem`; `"Lézard aux plumes d'or" "Broder" text wrote both`
+
+1. `miromallorca.com` — <https://miromallorca.com/en/exhibition/miro-beyond-the-canvas/>
+2. `tretyakovgallerymagazine.com` — <https://www.tretyakovgallerymagazine.com/articles/2-2012-35/livre-dartiste>
+3. `1stdibs.com` — <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/joan-miro-le-lezard-aux-plumes-dor/id-a_15677912/>
+4. `museoreinasofia.es` — <https://www.museoreinasofia.es/en/activity/documents-29-miro-poet/>
+5. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+6. `artsy.net` — <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+
+  - **R** Joan Miró authored both the surrealist poetic text and the accompanying lithographs, enabling him to unify word and image under a single artistic vision.
+      ↳ source: `miromallorca.com` <https://miromallorca.com/en/exhibition/miro-beyond-the-canvas/>
+      ↳ source: `tretyakovgallerymagazine.com` <https://www.tretyakovgallerymagazine.com/articles/2-2012-35/livre-dartiste>
+      ↳ source: `1stdibs.com` <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/joan-miro-le-lezard-aux-plumes-dor/id-a_15677912/>
+  - **R** Miró originally conceived the underlying poem between 1936 and 1939 during the Spanish Civil War as a piece of artistic resistance.
+      ↳ source: `museoreinasofia.es` <https://www.museoreinasofia.es/en/activity/documents-29-miro-poet/>
+      ↳ source: `miromallorca.com` <https://miromallorca.com/en/exhibition/miro-beyond-the-canvas/>
+  - **R** Rather than setting the text in conventional typography, Miró handwrote the verses directly onto the printing surfaces, treating his calligraphy as a graphic element.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `miromallorca.com` <https://miromallorca.com/en/exhibition/miro-beyond-the-canvas/>
+      ↳ source: `tretyakovgallerymagazine.com` <https://www.tretyakovgallerymagazine.com/articles/2-2012-35/livre-dartiste>
+  - w The project was initially printed in 1967, but a manufacturing defect in the paper caused unintended color alterations.
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** Because the original lithographic stones had already been erased, Miró and publisher Louis Broder destroyed the defective 1967 edition and forced Miró to recreate the entire suite from scratch.
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
 
 
 ## credit_line 6.1 — *anchored* / possessive
@@ -542,34 +518,50 @@ kind **eventful → eventful** · R4 w0 X1
 3 results · kind **active → active** · R3 w0 X0
 
 **1. Fall Signature Night: Picasso, Miró, Dalí**  
-`mfa.org` · tier `tier1`  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/event/fall-signature-night-picasso-miro-dali>  
 > Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.
 
-  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.  
-    <sub>names golden feathers, louis broder, the lizard</sub>
+  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.
 
 **2. Global Cultural Bulletin: August 2026**  
-`cabanamagazine.substack.com` · tier `unverified`  
+`cabanamagazine.substack.com` · tier `unverified` · <https://cabanamagazine.substack.com/p/global-cultural-bulletin-august-2026>  
 > Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, ...
 
-  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, ...  
-    <sub>names golden feathers, louis broder, the lizard</sub>
+  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, ...
 
 **3. Picasso, Miró, Dalí: Unbound**  
-`mfa.org` · tier `tier1`  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>  
 > ... Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971 ...
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971 ...  
-    <sub>names golden feathers, louis broder, the lizard</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971 ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Freud's exploration of?`
 
-kind **inert → none** · R0 w0 X1 · NO RELIABLE INFORMATION
+kind **active → active** · R3 w0 X0
 
-> NO RELIABLE INFORMATION
+> Joan Miró based *Le Lézard aux plumes d’or* on his own late-1940s poem "Poetic Games," which was written as a meditation on artistic inspiration and creativity.
+> 
+> In the exhibition *Picasso, Miró, Dalí: Unbound*, the exploration of Sigmund Freud’s work belongs instead to Salvador Dalí, who illustrated Freud's 1939 text *Moses and Monotheism*.
+> 
+> No direct connection exists between Miró’s *Le Lézard aux plumes d’or* and an exploration of Freud.
 
-  - **X** NO RELIABLE INFORMATION  
-    <sub>about someone else (RELIABLE INFORMATION), not this stop</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `"Le Lézard aux plumes d'or" "MFA" Boston "Freud"`; `"Le Lézard aux plumes d'or" Freud`; `"Picasso, Miró, Dalí: Unbound" "Le Lézard aux plumes d'or"`
+
+1. `facebook.com` — <https://www.facebook.com/mfaboston/photos/i-dont-accept-the-information-that-i-get-when-i-look-at-myself-and-thats-where-t/10156941980687321/>
+2. `facebook.com` — <https://www.facebook.com/mfaboston/photos/mir%C3%B3s-luminous-lithography-in-the-late-1940s-joan-mir%C3%B3-published-a-poem-titled-p/1511884790970889/>
+3. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+4. `artsfuse.org` — <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+5. `airmail.news` — <https://airmail.news/arts-intel/events/picasso-miro-dali-unbound>
+
+  - **R** Joan Miró based *Le Lézard aux plumes d’or* on his own late-1940s poem "Poetic Games," which was written as a meditation on artistic inspiration and creativity.
+      ↳ source: `facebook.com` <https://www.facebook.com/mfaboston/photos/i-dont-accept-the-information-that-i-get-when-i-look-at-myself-and-thats-where-t/10156941980687321/>
+      ↳ source: `facebook.com` <https://www.facebook.com/mfaboston/photos/mir%C3%B3s-luminous-lithography-in-the-late-1940s-joan-mir%C3%B3-published-a-poem-titled-p/1511884790970889/>
+  - **R** In the exhibition *Picasso, Miró, Dalí: Unbound*, the exploration of Sigmund Freud’s work belongs instead to Salvador Dalí, who illustrated Freud's 1939 text *Moses and Monotheism*.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `artsfuse.org` <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+  - **R** No direct connection exists between Miró’s *Le Lézard aux plumes d’or* and an exploration of Freud.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `airmail.news` <https://airmail.news/arts-intel/events/picasso-miro-dali-unbound>
 
 
 ## credit_line 8.1 — *anchored* / participial
@@ -580,96 +572,98 @@ kind **inert → none** · R0 w0 X1 · NO RELIABLE INFORMATION
 
 8 results · kind **active → inert** · R9 w2 X4
 
-**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
-`moma.org` · tier `tier1`  
+**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
-**2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
-`coleccionbbva.com` · tier `unverified`  
+**2. 557135 The Lizard with Golden Feathers Joan Miró**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-**3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789 ...**  
-`christies.com` · tier `market`  
+**3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder ...**  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
-**4. Le Lézard aux plumes d'or - Philip Williams Posters**  
-`postermuseum.com` · tier `reject`  
+**4. Le Lézard aux plumes d'or – Poster Museum**  
+`postermuseum.com` · tier `reject` · <https://postermuseum.com/products/image-21>  
 > Title: Le Lézard aux plumes d'or (The Lizard with Golden Feathers). Joan Miró (1893-1983) found notoriety through his Surrealist work mixed with occasional ...
 
-  - **R** Title: Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **R** Joan Miró (1893-1983) found notoriety through his Surrealist work mixed with occasional ...  
-    <sub>names joan miro, miro, joan</sub>
+  - **R** Title: Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **R** Joan Miró (1893-1983) found notoriety through his Surrealist work mixed with occasional ...
 
-**5. Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery**  
-`composition.gallery` · tier `unverified`  
+**5. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Admire Joan Miró's 1971 'Le Lézard aux plumes d'or,' featuring 15 vibrant lithographs. Secure this surreal masterpiece at Composition.Gallery!
 
-  - **R** Admire Joan Miró's 1971 'Le Lézard aux plumes d'or,' featuring 15 vibrant lithographs.  
-    <sub>names joan miro, le lezard, plumes</sub>
-  - **X** Secure this surreal masterpiece at Composition.Gallery!  
-    <sub>about someone else (Secure), not this stop</sub>
+  - **R** Admire Joan Miró's 1971 'Le Lézard aux plumes d'or,' featuring 15 vibrant lithographs.
+  - **X** Secure this surreal masterpiece at Composition.Gallery!
 
-**6. Le Lézard aux Plumes d'Or (Mourlot 828) (1971) by Joan Miró | Artsy**  
-`artsy.net` · tier `market`  
+**6. Joan Miró, 'Le Lézard aux Plumes d'Or (Mourlot 828)', 1971**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-le-lezard-aux-plumes-dor-mourlot-828-3>  
 > Le Lézard aux Plumes d'Or (Mourlot 828), 1971. Lithograph printed in colours ... drawing that attempted to express the inner workings of the human psyche.
 
-  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.  
-    <sub>names le lezard, mourlot, lezard</sub>
-  - **X** Lithograph printed in colours ...  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - w drawing that attempted to express the inner workings of the human psyche.  
-    <sub>no entity of its own; snippet names le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.
+  - **X** Lithograph printed in colours ...
+  - w drawing that attempted to express the inner workings of the human psyche.
 
-**7. Joan Miró - Le lézard aux plumes d'or - Choice Contemporary**  
-`choicecontemporary.com` · tier `unverified`  
+**7. Joan Miró - Le lézard aux plumes d'or**  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOooxShiOUNvQMb84lbZggF2aH_3p_FvtFL5v248Ii1wOuv7vQx_A>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-**8. Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...**  
-`masterworksfineart.com` · tier `unverified`  
+**8. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOorlSsyMl4UlD_tmUYVA54SyJwi9wYxe0u6_2lK5bIpDb-gP48BU>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, drawing you into the surreal world that Joan Miró has crafted?`
 
-kind **eventful → active** · R4 w0 X1
+kind **eventful → active** · R3 w1 X1
 
-> * Joan Miró authored both the surrealist poem and the visual compositions for *Le Lézard aux plumes d’or*.
-> * He originally completed a full suite of lithographs for the project with publisher Louis Broder in 1967.
-> * After production began, Miró and Broder discovered that a manufacturing defect in the specially commissioned paper caused the colored inks to deteriorate and alter.
-> * Because the original lithographic stones had already been effaced, the damaged print run was rejected and largely destroyed.
-> * Miró was forced to redraw entirely new plates and rewrite the text to publish the edition on new paper in 1971.
+> Joan Miró wrote the surrealist poem for this project between 1936 and 1939 before publishing it with his own visual accompaniment. 
+> 
+> The artist originally completed an entire initial run of lithographs for the book in 1967. 
+> 
+> After printing, Miró and publisher Louis Broder discovered a chemical defect in the manufactured paper that distorted and degraded the ink colors. 
+> 
+> Because the original lithographic surfaces had already been erased, the flawed first edition had to be scrapped and mostly destroyed. 
+> 
+> Miró was forced to redraw an entirely new set of compositions from scratch, which delayed the book's final release until 1971.
 
-  - **R** * Joan Miró authored both the surrealist poem and the visual compositions for *Le Lézard aux plumes d’or*.  
-    <sub>names le lezard aux plumes d’or, joan miro, le lezard</sub>
-  - **R** * He originally completed a full suite of lithographs for the project with publisher Louis Broder in 1967.  
-    <sub>names louis broder, broder, louis</sub>
-  - **R** * After production began, Miró and Broder discovered that a manufacturing defect in the specially commissioned paper caused the colored inks to deteriorate and alter.  
-    <sub>names broder, miro</sub>
-  - **X** * Because the original lithographic stones had already been effaced, the damaged print run was rejected and largely destroyed.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** * Miró was forced to redraw entirely new plates and rewrite the text to publish the edition on new paper in 1971.  
-    <sub>names miro</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `"Le Lézard aux plumes d'or" "1967" Mourlot paper flaw`; `"Le Lézard aux plumes d'or" 1967 1971 defect paper broder`; `Le Lézard aux plumes dor Miro Broder paper destroyed`
+
+1. `atlantis-press.com` — <https://www.atlantis-press.com/article/125923424.pdf>
+2. `arts-galleria.com` — <http://www.arts-galleria.com/Miro/MiroBio.html>
+3. `sothebys.com` — <https://www.sothebys.com/en/auctions/ecatalogue/2015/prints-n09332/lot.60.html>
+4. `artsy.net` — <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+5. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+
+  - **R** Joan Miró wrote the surrealist poem for this project between 1936 and 1939 before publishing it with his own visual accompaniment.
+      ↳ source: `atlantis-press.com` <https://www.atlantis-press.com/article/125923424.pdf>
+  - w The artist originally completed an entire initial run of lithographs for the book in 1967.
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `sothebys.com` <https://www.sothebys.com/en/auctions/ecatalogue/2015/prints-n09332/lot.60.html>
+  - **R** After printing, Miró and publisher Louis Broder discovered a chemical defect in the manufactured paper that distorted and degraded the ink colors.
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `sothebys.com` <https://www.sothebys.com/en/auctions/ecatalogue/2015/prints-n09332/lot.60.html>
+  - **X** Because the original lithographic surfaces had already been erased, the flawed first edition had to be scrapped and mostly destroyed.
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** Miró was forced to redraw an entirely new set of compositions from scratch, which delayed the book's final release until 1971.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
 
 
 ## credit_line 10.1 — *anchored* / appositive
@@ -680,92 +674,87 @@ kind **eventful → active** · R4 w0 X1
 
 8 results · kind **inert → inert** · R10 w0 X3
 
-**1. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+**1. Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ...**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9240>  
+> Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+
+  - **R** Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Lithograph from an illustrated book with forty ...
+
+**2. 557135 The Lizard with Golden Feathers Joan Miró**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-
-**2. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
-`moma.org` · tier `tier1`  
-> Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
-
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **3. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
-`composition.gallery` · tier `unverified`  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
 **4. Joan Miró's Broder Collection: How One Artist ...**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...  
-    <sub>names joan miro, broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
+  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
 **5. Le Lezards aux Plumes by Joan Miro, 1971**  
-`mourloteditions.com` · tier `unverified`  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOopQnwVX9PpFM4cte07VWIjVoeTgnGTfaGkVdcPhIu3fW7k63AXR>  
 > Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...  
-    <sub>names joan miro, le lezard, mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
 **6. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOooAW4c-R1koWEzNrceGvDOww-FLjz92_03kM91xqtg-PEQX7IOU>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 **7. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
-  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …  
-    <sub>names louis broder, joan miro, le lezard</sub>
+  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
 **8. Joan Miró - Le lézard aux plumes d'or**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOorZNeQe9uqIT-u3o5pp_ViBCfL0I7Z4crpcVDiMkD-hQbZavuJE>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Louis Broder, a figure renowned for his commitment to the art of the book?`
 
-kind **eventful → eventful** · R5 w0 X0
+kind **active → active** · R4 w0 X0
 
-> * Joan Miró paired his lithographs with his own poetry, revising verses originally written in the 1930s to create a unified work.
-> * An initial version of the book with eighteen lithographs was printed in 1967 under publisher Louis Broder.
-> * Broder and Miró discovered a paper manufacturing defect that caused chemical reactions and altered the ink colors.
-> * Because of this flaw, Broder and Miró made the decision to abandon the 1967 run and destroy the printed sheets.
-> * Because the original printing stones had already been erased, Miró had to recreate an entirely new suite of lithographs from scratch, delaying publication until 1971.
+> * Joan Miró originally created an entire set of 18 color lithographs for the project in 1967 to accompany his own handwritten poetry.
+> * After the initial printing, Miró and publisher Louis Broder discovered manufacturing defects in the paper that altered and deteriorated the ink colors.
+> * Committed to exacting standards of bookmaking, Broder and Miró rejected the flawed run and ordered the destruction of the printed volumes.
+> * Because the original lithographic stones had already been erased, Miró had to start the illustrations over completely from scratch, delaying the final release until 1971.
 
-  - **R** * Joan Miró paired his lithographs with his own poetry, revising verses originally written in the 1930s to create a unified work.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** * An initial version of the book with eighteen lithographs was printed in 1967 under publisher Louis Broder.  
-    <sub>names louis broder, broder, louis</sub>
-  - **R** * Broder and Miró discovered a paper manufacturing defect that caused chemical reactions and altered the ink colors.  
-    <sub>names broder, miro</sub>
-  - **R** * Because of this flaw, Broder and Miró made the decision to abandon the 1967 run and destroy the printed sheets.  
-    <sub>names broder, miro</sub>
-  - **R** * Because the original printing stones had already been erased, Miró had to recreate an entirely new suite of lithographs from scratch, delaying publication until 1971.  
-    <sub>names miro</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `"Le Lézard aux plumes d'or" paper defect OR flaw OR destroyed OR reject`; `Le Lezard aux plumes d or Louis Broder Miro destroyed paper Rives`
+
+1. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+2. `arts-galleria.com` — <http://www.arts-galleria.com/Miro/MiroBio.html>
+3. `artsy.net` — <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+
+  - **R** * Joan Miró originally created an entire set of 18 color lithographs for the project in 1967 to accompany his own handwritten poetry.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+  - **R** * After the initial printing, Miró and publisher Louis Broder discovered manufacturing defects in the paper that altered and deteriorated the ink colors.
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** * Committed to exacting standards of bookmaking, Broder and Miró rejected the flawed run and ordered the destruction of the printed volumes.
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
+  - **R** * Because the original lithographic stones had already been erased, Miró had to start the illustrations over completely from scratch, delaying the final release until 1971.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/joan-miro-untitled-from-le-lezard-aux-plumes-dor-15>
 
 
 ## credit_line 10.2 — *evaluative* / relative
@@ -774,96 +763,95 @@ kind **eventful → eventful** · R5 w0 X0
 
 ### SERPER — `"Le Lézard aux plumes d’or" Mourlot Broder Fridman why 1971 exhibition highlights`
 
-8 results · kind **active → active** · R9 w1 X2
+8 results · kind **active → active** · R10 w1 X2
 
-**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
-`moma.org` · tier `tier1`  
+**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
-**2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
-`coleccionbbva.com` · tier `unverified`  
+**2. 557135 The Lizard with Golden Feathers Joan Miró**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-**3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789 ...**  
-`christies.com` · tier `market`  
+**3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder ...**  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
-**4. Fall Signature Night: Picasso, Miró, Dalí | Museum of Fine Arts Boston**  
-`mfa.org` · tier `tier1`  
+**4. Fall Signature Night: Picasso, Miró, Dalí**  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/event/fall-signature-night-picasso-miro-dali>  
 > Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.
 
-  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.  
-    <sub>names golden feathers, louis broder, the lizard</sub>
+  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.
 
-**5. Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions**  
-`mourloteditions.com` · tier `unverified`  
+**5. Le Lezards aux Plumes by Joan Miro, 1971**  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOooNxXST6-tdyD4eNkrVzcwwSvr7kqKCBmGK_ozH2V-JfycXQVq_>  
 > Original lithographic poster printed by Mourlot for an exhibition by ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Original lithographic poster printed by Mourlot for an exhibition by ...  
-    <sub>names mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Original lithographic poster printed by Mourlot for an exhibition by ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
-**6. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971 - Artsy**  
-`artsy.net` · tier `market`  
+**6. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
-  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …  
-    <sub>names louis broder, joan miro, le lezard</sub>
+  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
-**7. Joan Miró - Le lézard aux plumes d'or - Choice Contemporary**  
-`choicecontemporary.com` · tier `unverified`  
+**7. Joan Miró - Le lézard aux plumes d'or**  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOoq-mE9mlPAx8-wg3Up90Gb005gHsOYq6CBvfZUU9gi69kbvjHil>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-**8. Global Cultural Bulletin: August 2026 - Cabana | Substack**  
-`cabanamagazine.substack.com` · tier `unverified`  
-> Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, ...
+**8. Le Lézard aux plumes d'or – Poster Museum**  
+`postermuseum.com` · tier `reject` · <https://postermuseum.com/products/image-21>  
+> Title: Le Lézard aux plumes d'or (The Lizard with Golden Feathers). Joan Miró (1893-1983) found notoriety through his Surrealist work mixed with occasional ...
 
-  - **R** Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, ...  
-    <sub>names golden feathers, louis broder, the lizard</sub>
+  - **R** Title: Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **R** Joan Miró (1893-1983) found notoriety through his Surrealist work mixed with occasional ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, the exhibition highlights?`
 
-kind **eventful → eventful** · R3 w1 X1
+kind **eventful → eventful** · R5 w0 X1
 
-> Joan Miró originally conceived and worked on *Le Lézard aux plumes d’or* to be published in 1967. 
+> Joan Miró originally conceived and began printing the project in 1967. 
 > 
-> Midway through the initial print run, Miró and publisher Louis Broder abandoned the entire first edition because the inks chemically reacted with and stained the specially commissioned paper. 
+> Miró and publisher Louis Broder abandoned the entire initial print run mid-production because the inks chemically reacted with the specially commissioned paper. 
 > 
-> Because the original lithographic stones and plates had already been effaced when the paper defect was discovered, the entire project had to be restarted from scratch. 
+> Because the original lithographic stones and plates had already been erased before the chemical defect was discovered, the entire first version was lost. 
 > 
-> Miró personally authored and calligraphed the accompanying Surrealist poem directly across the pages. 
+> Miró had to redraw a completely new set of plates from scratch to publish the 1971 edition. 
 > 
-> The completed project took years of re-creation before finally being issued in 1971.
+> Unlike many artists' books illustrating external literature, the accompanying text is a surrealist poem written and handwritten across the pages by Miró himself. 
+> 
+> Miró focused heavily on this printmaking project during a period of serious depression when he had temporarily abandoned painting.
 
-  - **R** Joan Miró originally conceived and worked on *Le Lézard aux plumes d’or* to be published in 1967.  
-    <sub>names le lezard aux plumes d’or, joan miro, le lezard</sub>
-  - **R** Midway through the initial print run, Miró and publisher Louis Broder abandoned the entire first edition because the inks chemically reacted with and stained the specially commissioned paper.  
-    <sub>names louis broder, broder, louis</sub>
-  - **X** Because the original lithographic stones and plates had already been effaced when the paper defect was discovered, the entire project had to be restarted from scratch.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** Miró personally authored and calligraphed the accompanying Surrealist poem directly across the pages.  
-    <sub>names miro</sub>
-  - w The completed project took years of re-creation before finally being issued in 1971.  
-    <sub>no entity of its own; snippet names le lezard aux plumes d’or</sub>
+**SOURCES (2)** — pages Gemini actually read · searched: `Le Lézard aux plumes d or Miro Louis Broder Mourlot destroyed defect paper`
+
+1. `christies.com` — <https://www.christies.com/en/lot/lot-4958760>
+2. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+
+  - **R** Joan Miró originally conceived and began printing the project in 1967.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+  - **R** Miró and publisher Louis Broder abandoned the entire initial print run mid-production because the inks chemically reacted with the specially commissioned paper.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+  - **X** Because the original lithographic stones and plates had already been erased before the chemical defect was discovered, the entire first version was lost.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+  - **R** Miró had to redraw a completely new set of plates from scratch to publish the 1971 edition.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+  - **R** Unlike many artists' books illustrating external literature, the accompanying text is a surrealist poem written and handwritten across the pages by Miró himself.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+  - **R** Miró focused heavily on this printmaking project during a period of serious depression when he had temporarily abandoned painting.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
 
 
 ## credit_line 11.1 — *anchored* / capacity
@@ -875,105 +863,105 @@ kind **eventful → eventful** · R3 w1 X1
 8 results · kind **inert → inert** · R9 w2 X5
 
 **1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
 **2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789 ...**  
-`christies.com` · tier `market`  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
 **4. Joan Miró's Broder Collection: How One Artist Revolutionized Lithography**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...  
-    <sub>names joan miro, broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
+  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
 **5. Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9)**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/products/le-lezard-aux-plumes-dor-1971-02-copy?srsltid=AfmBOoqYJL-wtTvTDGwo0ADSww-WjlGRk_6MeKnneKoaDa4--lze18Wu>  
 > Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9). Joan Miró. Regular price $7,480.00 USD. Lithograph in colors on B.F.K. Rives paper, watermarked.
 
-  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** Regular price $7,480.00 USD.  
-    <sub>about someone else (Regular), not this stop</sub>
-  - **X** Lithograph in colors on B.F.K.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - **X** Rives paper, watermarked.  
-    <sub>about someone else (Rives), not this stop</sub>
+  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).
+  - **X** Regular price $7,480.00 USD.
+  - **X** Lithograph in colors on B.F.K.
+  - **X** Rives paper, watermarked.
 
 **6. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971 - Artsy**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971. The complete set of 15 lithographs in colors, on Rives paper. 15 1/5 × 20 1/5 × ...
 
-  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - **X** The complete set of 15 lithographs in colors, on Rives paper.  
-    <sub>about someone else (Rives), not this stop</sub>
-  - w 15 1/5 × 20 1/5 × ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.
+  - **X** The complete set of 15 lithographs in colors, on Rives paper.
+  - w 15 1/5 × 20 1/5 × ...
 
 **7. Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery**  
-`composition.gallery` · tier `unverified`  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
 **8. Le lézard aux plumes d'or - Fundació Miró Mallorca**  
-`miromallorca.com` · tier `unverified`  
+`miromallorca.com` · tier `unverified` · <https://miromallorca.com/en/collection/le-lezard-aux-plumes-dor/>  
 > Author: Joan Miró; Title: Le lézard aux plumes d'or; Year: 1971; Technique: Litography; Dimensions: 39 x 106 cm; Classification: Graphic work ...
 
-  - **R** Author: Joan Miró; Title: Le lézard aux plumes d'or; Year: 1971; Technique: Litography; Dimensions: 39 x 106 cm; Classification: Graphic work ...  
-    <sub>names joan miro, le lezard, plumes</sub>
+  - **R** Author: Joan Miró; Title: Le lézard aux plumes d'or; Year: 1971; Technique: Litography; Dimensions: 39 x 106 cm; Classification: Graphic work ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Broder's decision to engage Miró was pivotal?`
 
-kind **eventful → eventful** · R4 w1 X1
+kind **eventful → eventful** · R6 w0 X0
 
-> Publisher Louis Broder originally commissioned Joan Miró to illustrate his own Surrealist poem under this title in 1967. 
+> Publisher Louis Broder commissioned Joan Miró to create the work based on a Surrealist poem Miró had written between 1936 and 1939.
 > 
-> After the entire initial print run was completed, Broder and Miró discovered manufacturing defects in the paper that had degraded the colors. 
+> Broder and Miró originally produced a complete first edition between 1963 and 1967.
 > 
-> Because of these flaws, they made the costly choice to scrap the project and destroy the printed sheets. 
+> During printing, Broder discovered a chemical defect in the specially manufactured paper that was causing the ink colors to alter and deteriorate.
 > 
-> The original stones had already been planed down or destroyed, making an identical reprint impossible. 
+> Because the original lithographic stones had already been effaced, Broder and Miró abandoned the initial print run, destroyed most of the defective sheets, and restarted the entire project from scratch.
 > 
-> Broder chose to recommit to the ambitious project, requiring Miró to draft entirely new compositions for the eventual 1971 publication. 
+> Miró executed a completely new suite of lithographs and handwriting plates, culminating in the definitive publication in 1971.
 > 
-> This project ultimately marked the final collaboration between Broder and Miró before the publisher's death.
+> The completed 1971 portfolio marked the final publishing collaboration between Broder and Miró before Broder's death.
 
-  - **R** Publisher Louis Broder originally commissioned Joan Miró to illustrate his own Surrealist poem under this title in 1967.  
-    <sub>names louis broder, joan miro, broder</sub>
-  - **R** After the entire initial print run was completed, Broder and Miró discovered manufacturing defects in the paper that had degraded the colors.  
-    <sub>names broder, miro</sub>
-  - **X** Because of these flaws, they made the costly choice to scrap the project and destroy the printed sheets.  
-    <sub>about someone else (Because), not this stop</sub>
-  - w The original stones had already been planed down or destroyed, making an identical reprint impossible.  
-    <sub>no entity of its own; snippet names louis broder</sub>
-  - **R** Broder chose to recommit to the ambitious project, requiring Miró to draft entirely new compositions for the eventual 1971 publication.  
-    <sub>names broder, miro</sub>
-  - **R** This project ultimately marked the final collaboration between Broder and Miró before the publisher's death.  
-    <sub>names broder, miro</sub>
+**SOURCES (6)** — pages Gemini actually read · searched: `"Le Lézard aux plumes d'or" Louis Broder Miro background history`; `"Le Lézard aux plumes d'or" paper defective abandoned Broder`
+
+1. `parkwestgallery.com` — <https://www.parkwestgallery.com/blog/behind-the-artist-joan-miro/>
+2. `atlantis-press.com` — <https://www.atlantis-press.com/article/125923424.pdf>
+3. `gazette-drouot.com` — <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+4. `pamono.com` — <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+5. `christies.com` — <https://www.christies.com/en/lot/lot-4958760>
+6. `facebook.com` — <https://www.facebook.com/Christies/videos/you-must-have-the-greatest-respect-for-the-material-that-is-the-starting-point-i/264771695587269/>
+
+  - **R** Publisher Louis Broder commissioned Joan Miró to create the work based on a Surrealist poem Miró had written between 1936 and 1939.
+      ↳ source: `parkwestgallery.com` <https://www.parkwestgallery.com/blog/behind-the-artist-joan-miro/>
+      ↳ source: `atlantis-press.com` <https://www.atlantis-press.com/article/125923424.pdf>
+  - **R** Broder and Miró originally produced a complete first edition between 1963 and 1967.
+      ↳ source: `gazette-drouot.com` <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+  - **R** During printing, Broder discovered a chemical defect in the specially manufactured paper that was causing the ink colors to alter and deteriorate.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+      ↳ source: `atlantis-press.com` <https://www.atlantis-press.com/article/125923424.pdf>
+  - **R** Because the original lithographic stones had already been effaced, Broder and Miró abandoned the initial print run, destroyed most of the defective sheets, and restarted the entire project from scratch.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `atlantis-press.com` <https://www.atlantis-press.com/article/125923424.pdf>
+  - **R** Miró executed a completely new suite of lithographs and handwriting plates, culminating in the definitive publication in 1971.
+      ↳ source: `christies.com` <https://www.christies.com/en/lot/lot-4958760>
+      ↳ source: `pamono.com` <https://www.pamono.com/le-lezard-aux-plumes-d-or-original-lithograph-by-joan-miro-1971-1971-2>
+      ↳ source: `atlantis-press.com` <https://www.atlantis-press.com/article/125923424.pdf>
+  - **R** The completed 1971 portfolio marked the final publishing collaboration between Broder and Miró before Broder's death.
+      ↳ source: `facebook.com` <https://www.facebook.com/Christies/videos/you-must-have-the-greatest-respect-for-the-material-that-is-the-starting-point-i/264771695587269/>
 
 
 ## credit_line 11.2 — *evaluative* / participial
@@ -982,102 +970,92 @@ kind **eventful → eventful** · R4 w1 X1
 
 ### SERPER — `"Le Lézard aux plumes d’or" Mourlot Broder Fridman why 1971 blending visual`
 
-8 results · kind **inert → inert** · R10 w0 X4
+8 results · kind **active → inert** · R10 w1 X6
 
-**1. Joan Miró. Plate (folio 12) from Le Lézard aux plumes d'or ...**  
-`moma.org` · tier `tier1`  
+**1. Joan Miró. Plate (folio 12) from Le Lézard aux plumes d'or ( The Lizard ...**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9236>  
 > Joan Miró. Plate (folio 12) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
 
-  - **R** Plate (folio 12) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Lithograph from an illustrated book with forty ...  
-    <sub>about someone else (Lithograph), not this stop</sub>
+  - **R** Plate (folio 12) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Lithograph from an illustrated book with forty ...
 
-**2. Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)**  
-`composition.gallery` · tier `unverified`  
+**2. Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery**  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-**3. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+**3. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-**4. Le Lezards aux Plumes by Joan Miro, 1971**  
-`mourloteditions.com` · tier `unverified`  
+**4. Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions**  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOooWJuIPIoxcif-O5beBj_OorsIp5tLOqxLKiwiLPqWyweJ28rPX>  
 > Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...  
-    <sub>names joan miro, le lezard, mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
-**5. Miró Joan | 15 WORKS: Le Lézard aux Plumes d'Or, Louis ...**  
-`mutualart.com` · tier `market`  
-> 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
-
-  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.  
-    <sub>names louis broder, le lezard, broder</sub>
-
-**6. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or ...**  
-`ragoarts.com` · tier `unverified`  
+**5. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or series)**  
+`ragoarts.com` · tier `unverified` · <https://www.ragoarts.com/auctions/2022/06/prints-multiples/177>  
 > Lot 177: Joan Miró 1893–1983. Untitled (from Le lezard aux plumes d'or series). 1971, lithograph in colors on Kochi Japan.
 
-  - **R** Lot 177: Joan Miró 1893–1983.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Untitled (from Le lezard aux plumes d'or series).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** 1971, lithograph in colors on Kochi Japan.  
-    <sub>about someone else (Kochi Japan), not this stop</sub>
+  - **R** Lot 177: Joan Miró 1893–1983.
+  - **R** Untitled (from Le lezard aux plumes d'or series).
+  - **X** 1971, lithograph in colors on Kochi Japan.
 
-**7. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+**6. Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...**  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOoo3mo7Sds6KN427SDTdJ-XkXyziZnT4yzyxvD3Zu9etgOXL5wgR>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
-**8. Joan Miró - Le lézard aux plumes d'or**  
-`choicecontemporary.com` · tier `unverified`  
+**7. Le Lézard aux Plumes d'Or (Mourlot 828) (1971) by Joan Miró | Artsy**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-le-lezard-aux-plumes-dor-mourlot-828-3>  
+> Le Lézard aux Plumes d'Or (Mourlot 828), 1971. Lithograph printed in colours. 14 × 39 2/5 in | 35.5 × 100 cm. Forum Auctions: Prints & Editions (September 2021).
+
+  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.
+  - **X** Lithograph printed in colours.
+  - w 14 × 39 2/5 in | 35.5 × 100 cm.
+  - **X** Forum Auctions: Prints & Editions (September 2021).
+
+**8. Joan Miró - Le lézard aux plumes d'or - Choice Contemporary**  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOoqb28cp6qqLJBfPYlQHV4kCiYQiEjVAISAJHC_33MVqG99aIFwT>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, blending visual and textual narratives seamlessly?`
 
-kind **inert → inert** · R4 w0 X3
+kind **inert → inert** · R3 w0 X1
 
-> Joan Miró created *Le Lézard aux plumes d’or* based on a surrealist poem he wrote himself, integrating his own handwritten text with the imagery [PerQueryResult(index="1.2.2", source="Behind the Artist: Joan Miró - Park West Gallery"), PerQueryResult(index="1.2.5", source="Livre d'Artiste | The Tretyakov Gallery Magazine")]. 
+> Joan Miró authored both the poetry and the lithographic imagery for *Le Lézard aux plumes d’or*, drawing upon themes from his late-1940s poem "Poetic Games".
 > 
-> Publisher Louis Broder initiated the project in the 1960s to explore the seamless dialogue between poetry and fine art [PerQueryResult(index="1.2.2", source="Behind the Artist: Joan Miró - Park West Gallery"), PerQueryResult(index="2.2.1", source="Miró, Joan Le Lézard aux plumes d'or. 1967. Set... - Lot 104 - Gazette Drouot")]. 
+> Although originally conceived and prepared for publication in 1967, the portfolio was delayed until 1971 due to issues with the initial edition's printing and paper run.
 > 
-> After the initial suite was fully printed in 1967, an unexpected flaw in the paper stock chemically altered and compromised the ink colors [PerQueryResult(index="2.2.1", source="Miró, Joan Le Lézard aux plumes d'or. 1967. Set... - Lot 104 - Gazette Drouot")]. 
+> Miró handwritten the accompanying poetic text across twenty-six pages directly for the lithographic reproduction rather than using standard typography.
 > 
-> Because the original printing plates had already been destroyed, Miró was forced to redraw the entire series from scratch, delaying the final publication until 1971 [PerQueryResult(index="1.2.1", source="Joan Miró - Le Lezard aux Plumes d'Or - National Galleries of Scotland"), PerQueryResult(index="2.2.1", source="Miró, Joan Le Lézard aux plumes d'or. 1967. Set... - Lot 104 - Gazette Drouot")].
+> The project was executed in Paris during a period in 1971 when Miró had temporarily ceased painting due to profound depression over the political situation in Spain.
 
-  - **R** Joan Miró created *Le Lézard aux plumes d’or* based on a surrealist poem he wrote himself, integrating his own handwritten text with the imagery [PerQueryResult(index="1.2.2", source="Behind the Artist: Joan Miró - Park West Gallery"), PerQueryResult(index="1.2.5", source="Livre d'Artiste | The Tretyakov Gallery Magazine")].  
-    <sub>names le lezard aux plumes d’or, joan miro, le lezard</sub>
-  - **R** Publisher Louis Broder initiated the project in the 1960s to explore the seamless dialogue between poetry and fine art [PerQueryResult(index="1.2.2", source="Behind the Artist: Joan Miró - Park West Gallery"), PerQueryResult(index="2.2.1", source="Miró, Joan Le Lézard aux plumes d'or.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - **X** - Lot 104 - Gazette Drouot")].  
-    <sub>about someone else (Gazette Drouot), not this stop</sub>
-  - **R** After the initial suite was fully printed in 1967, an unexpected flaw in the paper stock chemically altered and compromised the ink colors [PerQueryResult(index="2.2.1", source="Miró, Joan Le Lézard aux plumes d'or.  
-    <sub>names le lezard, plumes, lezard</sub>
-  - **X** - Lot 104 - Gazette Drouot")].  
-    <sub>about someone else (Gazette Drouot), not this stop</sub>
-  - **R** Because the original printing plates had already been destroyed, Miró was forced to redraw the entire series from scratch, delaying the final publication until 1971 [PerQueryResult(index="1.2.1", source="Joan Miró - Le Lezard aux Plumes d'Or - National Galleries of Scotland"), PerQueryResult(index="2.2.1", source="Miró, Joan Le Lézard aux plumes d'or.  
-    <sub>names joan miro, le lezard, plumes</sub>
-  - **X** - Lot 104 - Gazette Drouot")].  
-    <sub>about someone else (Gazette Drouot), not this stop</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Le Lizard aux plumes d or Miro Louis Broder story paper defective`; `Le Lizard aux plumes d or Miro poem text handwriting`
+
+1. `facebook.com` — <https://www.facebook.com/mfaboston/photos/mir%C3%B3s-luminous-lithography-in-the-late-1940s-joan-mir%C3%B3-published-a-poem-titled-p/1511884790970889/>
+2. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+3. `mchampetier.com` — <https://www.mchampetier.com/Lithograph-Joan-Miro-127873-work.html>
+
+  - **R** Joan Miró authored both the poetry and the lithographic imagery for *Le Lézard aux plumes d’or*, drawing upon themes from his late-1940s poem "Poetic Games".
+      ↳ source: `facebook.com` <https://www.facebook.com/mfaboston/photos/mir%C3%B3s-luminous-lithography-in-the-late-1940s-joan-mir%C3%B3-published-a-poem-titled-p/1511884790970889/>
+  - **X** Although originally conceived and prepared for publication in 1967, the portfolio was delayed until 1971 due to issues with the initial edition's printing and paper run.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `mchampetier.com` <https://www.mchampetier.com/Lithograph-Joan-Miro-127873-work.html>
+  - **R** Miró handwritten the accompanying poetic text across twenty-six pages directly for the lithographic reproduction rather than using standard typography.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+  - **R** The project was executed in Paris during a period in 1971 when Miró had temporarily ceased painting due to profound depression over the political situation in Spain.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
 
 
 ## credit_line 12.1 — *anchored* / appositive
@@ -1086,106 +1064,105 @@ kind **inert → inert** · R4 w0 X3
 
 ### SERPER — `"Le Lézard aux plumes d’or" Mourlot Broder Fridman why 1971 supporter community`
 
-8 results · kind **active → inert** · R10 w1 X8
+8 results · kind **inert → inert** · R10 w0 X6
 
-**1. Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ...**  
-`moma.org` · tier `tier1`  
-> Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
+> Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Lithograph from an illustrated book with forty ...  
-    <sub>about someone else (Lithograph), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
-**2. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+**2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-**3. Joan Miró's Broder Collection: How One Artist ...**  
-`parkwestgallery.com` · tier `unverified`  
+**3. Joan Miró's Broder Collection: How One Artist Revolutionized Lithography**  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...  
-    <sub>names joan miro, broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
+  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
-**4. Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9)**  
-`choicecontemporary.com` · tier `unverified`  
-> Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9). Joan Miró. Regular price $7,480.00 USD. Lithograph in colors on B.F.K. Rives paper, watermarked.
-
-  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** Regular price $7,480.00 USD.  
-    <sub>about someone else (Regular), not this stop</sub>
-  - **X** Lithograph in colors on B.F.K.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - **X** Rives paper, watermarked.  
-    <sub>about someone else (Rives), not this stop</sub>
-
-**5. Le lézard aux plumes d'or**  
-`miromallorca.com` · tier `unverified`  
+**4. Le lézard aux plumes d'or - Fundació Miró Mallorca**  
+`miromallorca.com` · tier `unverified` · <https://miromallorca.com/en/collection/le-lezard-aux-plumes-dor/>  
 > Author: Joan Miró; Title: Le lézard aux plumes d'or; Year: 1971; Technique: Litography; Dimensions: 39 x 106 cm; Classification: Graphic work ...
 
-  - **R** Author: Joan Miró; Title: Le lézard aux plumes d'or; Year: 1971; Technique: Litography; Dimensions: 39 x 106 cm; Classification: Graphic work ...  
-    <sub>names joan miro, le lezard, plumes</sub>
+  - **R** Author: Joan Miró; Title: Le lézard aux plumes d'or; Year: 1971; Technique: Litography; Dimensions: 39 x 106 cm; Classification: Graphic work ...
 
-**6. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or ...**  
-`ragoarts.com` · tier `unverified`  
-> Lot 177: Joan Miró 1893–1983. Untitled (from Le lezard aux plumes d'or series). 1971, lithograph in colors on Kochi Japan.
+**5. Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9)**  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/products/le-lezard-aux-plumes-dor-1971-02-copy?srsltid=AfmBOopsfC4V6tTAWDhzd62P87FKiAl0Bq8Da9L8pxEgLFOD0O-YYvMi>  
+> Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9). Joan Miró. Regular price $7,480.00 USD. Lithograph in colors on B.F.K. Rives paper, watermarked.
 
-  - **R** Lot 177: Joan Miró 1893–1983.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Untitled (from Le lezard aux plumes d'or series).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** 1971, lithograph in colors on Kochi Japan.  
-    <sub>about someone else (Kochi Japan), not this stop</sub>
+  - **R** Le lézard aux plumes d'or, 1971, Plate (Folios 8 verso and 9).
+  - **X** Regular price $7,480.00 USD.
+  - **X** Lithograph in colors on B.F.K.
+  - **X** Rives paper, watermarked.
 
-**7. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+**6. Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...**  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOopwpK4jreNtmF7LkuJxMXSfTJPPlRz7zBDMq2FHNdlq7tGO8N_E>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
-**8. Joan Miró, 'Le Lézard aux Plumes d'Or (Mourlot 828)', 1971**  
-`artsy.net` · tier `market`  
-> Le Lézard aux Plumes d'Or (Mourlot 828), 1971. Lithograph printed in colours. 14 × 39 2/5 in | 35.5 × 100 cm. Forum Auctions: Prints & Editions (September 2021).
+**7. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971 - Artsy**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
+> From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
 
-  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.  
-    <sub>names le lezard, mourlot, lezard</sub>
-  - **X** Lithograph printed in colours.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - w 14 × 39 2/5 in | 35.5 × 100 cm.  
-    <sub>no entity of its own; snippet names le lezard</sub>
-  - **X** Forum Auctions: Prints & Editions (September 2021).  
-    <sub>about someone else (Forum Auctions), not this stop</sub>
+  - **R** From Christie's, Joan Miró, Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971, The complete set of 15 lithographs in colors, on Rives paper, …
+
+**8. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or series)**  
+`ragoarts.com` · tier `unverified` · <https://www.ragoarts.com/auctions/2022/06/prints-multiples/177>  
+> Lot 177: Joan Miró 1893–1983. Untitled (from Le lezard aux plumes d'or series). 1971, lithograph in colors on Kochi Japan.
+
+  - **R** Lot 177: Joan Miró 1893–1983.
+  - **R** Untitled (from Le lezard aux plumes d'or series).
+  - **X** 1971, lithograph in colors on Kochi Japan.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Boris Fridman, a supporter of the art community?`
 
-kind **eventful → eventful** · R4 w0 X0
+kind **eventful → inert** · R5 w0 X1
 
-> Miró created the illustrated book to accompany his own surrealist poetic text originally written in the late 1930s. 
+> Joan Miró wrote the surreal poetic text underlying the project between 1936 and 1939 before deciding to illustrate it. 
 > 
-> Miró and publisher Louis Broder initially completed a first edition of lithographs in the 1960s, but they rejected and ordered the printed run destroyed after discovering a manufacturing defect in the paper that altered the colors. 
+> Miró originally created an earlier suite of lithographs in 1967 to accompany the poem with publisher Louis Broder. 
 > 
-> Because the original printing plates had already been erased, Miró was forced to redraw an entirely new set of compositions to complete the publication in 1971. 
+> After printing, Miró and Broder discovered a manufacturing defect in the paper that altered and deteriorated the ink colors. 
 > 
-> The featured 1971 copy entered the collection of the Museum of Fine Arts, Boston as a gift from Boris Fridman, a prominent collector and promoter of *livres d'artistes*.
+> Because the original printing surfaces had already been canceled or destroyed, the entire defective run was rejected and discarded. 
+> 
+> Miró had to completely recreate new compositions from scratch, which were finally printed and published in 1971. 
+> 
+> This edition was given to the Museum of Fine Arts, Boston by art collector Boris Fridman.
 
-  - **R** Miró created the illustrated book to accompany his own surrealist poetic text originally written in the late 1930s.  
-    <sub>names miro</sub>
-  - **R** Miró and publisher Louis Broder initially completed a first edition of lithographs in the 1960s, but they rejected and ordered the printed run destroyed after discovering a manufacturing defect in the paper that altered the colors.  
-    <sub>names louis broder, broder, louis</sub>
-  - **R** Because the original printing plates had already been erased, Miró was forced to redraw an entirely new set of compositions to complete the publication in 1971.  
-    <sub>names miro</sub>
-  - **R** The featured 1971 copy entered the collection of the Museum of Fine Arts, Boston as a gift from Boris Fridman, a prominent collector and promoter of *livres d'artistes*.  
-    <sub>names boris fridman, fridman, boris</sub>
+**SOURCES (6)** — pages Gemini actually read · searched: `"Le Lézard aux plumes d’or" "Boris Fridman"`; `"Le Lézard aux plumes d'or" "1967" "1971" paper defect OR flawed OR watermarked OR destroyed`
+
+1. `atlantis-press.com` — <https://www.atlantis-press.com/article/125923424.pdf>
+2. `galeriearenthon.com` — <https://galeriearenthon.com/en/oeuvre/joan-miro-le-lezard-1ere-version-planche-xi/>
+3. `1stdibs.com` — <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/joan-miro-le-lezard-aux-plumes-dor-lithograph-joan-miro-1971/id-a_6005342/>
+4. `denisbloch.com` — <https://denisbloch.com/product/le-lezard-aux-plumes-dor-446/>
+5. `arts-galleria.com` — <http://www.arts-galleria.com/Miro/MiroBio.html>
+6. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+
+  - **R** Joan Miró wrote the surreal poetic text underlying the project between 1936 and 1939 before deciding to illustrate it.
+      ↳ source: `atlantis-press.com` <https://www.atlantis-press.com/article/125923424.pdf>
+  - **R** Miró originally created an earlier suite of lithographs in 1967 to accompany the poem with publisher Louis Broder.
+      ↳ source: `galeriearenthon.com` <https://galeriearenthon.com/en/oeuvre/joan-miro-le-lezard-1ere-version-planche-xi/>
+      ↳ source: `1stdibs.com` <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/joan-miro-le-lezard-aux-plumes-dor-lithograph-joan-miro-1971/id-a_6005342/>
+  - **R** After printing, Miró and Broder discovered a manufacturing defect in the paper that altered and deteriorated the ink colors.
+      ↳ source: `denisbloch.com` <https://denisbloch.com/product/le-lezard-aux-plumes-dor-446/>
+      ↳ source: `1stdibs.com` <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/joan-miro-le-lezard-aux-plumes-dor-lithograph-joan-miro-1971/id-a_6005342/>
+  - **X** Because the original printing surfaces had already been canceled or destroyed, the entire defective run was rejected and discarded.
+      ↳ source: `galeriearenthon.com` <https://galeriearenthon.com/en/oeuvre/joan-miro-le-lezard-1ere-version-planche-xi/>
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+  - **R** Miró had to completely recreate new compositions from scratch, which were finally printed and published in 1971.
+      ↳ source: `denisbloch.com` <https://denisbloch.com/product/le-lezard-aux-plumes-dor-446/>
+      ↳ source: `arts-galleria.com` <http://www.arts-galleria.com/Miro/MiroBio.html>
+  - **R** This edition was given to the Museum of Fine Arts, Boston by art collector Boris Fridman.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
 
 
 ## credit_line 12.2 — *anchored* / possessive
@@ -1197,49 +1174,91 @@ kind **eventful → eventful** · R4 w0 X0
 2 results · kind **active → active** · R3 w0 X0
 
 **1. Picasso, Miró, Dalí: Unbound**  
-`mfa.org` · tier `tier1`  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>  
 > ... Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971 ...
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971 ...  
-    <sub>names golden feathers, louis broder, the lizard</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971 ...
 
 **2. 1850s Edo Era Abstract Japanese Katagami Stencil Art**  
-`taurocertificadosmedicos.es` · tier `unverified`  
+`taurocertificadosmedicos.es` · tier `unverified` · <https://www.taurocertificadosmedicos.es/?shop/sold?id=top25166793721100>  
 > Le Lézard aux Plumes d'Or - Original Lithograph by Joan Mirò - 1971 1971. US ... 1962 Orlando Pelayo Original Lithograph 2 Mourlot Freres. US$ 66-110. Min ...
 
-  - **R** Le Lézard aux Plumes d'Or - Original Lithograph by Joan Mirò - 1971 1971.  
-    <sub>names joan miro, le lezard, plumes</sub>
-  - **R** 1962 Orlando Pelayo Original Lithograph 2 Mourlot Freres.  
-    <sub>names mourlot</sub>
+  - **R** Le Lézard aux Plumes d'Or - Original Lithograph by Joan Mirò - 1971 1971.
+  - **R** 1962 Orlando Pelayo Original Lithograph 2 Mourlot Freres.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Boston's holdings?`
 
-kind **eventful → eventful** · R5 w0 X1
+kind **eventful → eventful** · R33 w9 X13
 
-> Joan Miró created the book to illustrate his own poetic text, originally published in 1945 as *Jeux poétiques*. 
+> Joan Miró originally conceived the project in the mid-1960s to illustrate his own poem exploring artistic inspiration [PerQueryResult(index="1.4.4", snippet="The Lizard with Feathers of Gold ( Le Lézard aux Plumes d'Or) portrays Miro as a poet visualizing his verse via lithographic images.", source_title="Sold at Auction: Joan Miró, Joan Miro - From Lezard au Plumes D'Or (The Lizard with the Golden Feathers - Invaluable.com"), PerQueryResult(index="2.4.1", snippet="Miró's luminous lithography In the late 1940s, Joan Miró published a poem titled “Poetic Games”—a meditation on creativity and artistic ... Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper front and cover); publisher's vellum. © Successió Miró / Artists Rights Society (ARS) / ADAGP, Paris 2026. | Facebook. Log in. Facebook.", source_title="Museum - Miró's luminous lithography In the late 1940s, Joan Miró published a poem titled “Poetic Games”—a meditation on creativity and artistic inspiration. In the mid-1960s, he returned to that poem for this fantasy of floating signs, weirdly shaped creatures, and calligraphic lines. Each print required multiple", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGuYWXGCC1AfO_F65Ynlo2WJ6Rr6C34B1yNpKSE7YBXQAFg6IsfenMa2j7Atx1DJOua3Sd16g7lggwfYJhhEMA8cv9scSzmYaSB0oGCniW0xmy9b_lUe9nyB61taEf1OinwIA-5ky23vPVcCtg3CtiO-PaGOR87FPCSCWC5BkBv30SEP_TUlIRVTzmr-_OhtB5XMlV1rhjQKTnifuTOSlD1Fz-iY7PwnNp7ilyXOjV4dD_15AD6EoScVB6H8mC_zdGW2b_Dfck7TaO50aCg")].
 > 
-> Miró and publisher Louis Broder originally printed a complete 18-plate edition in 1967. 
+> An initial 1967 print run was aborted when a defect in the paper factory stock caused the colors to deteriorate [PerQueryResult(index="2.2.2", snippet="Later, the Catalan artist and the publisher Louis Broder realized the alteration of colors, caused by a defect in the paper factory, forcing them to abandon the run to make new compositions on Rives paper and mother-of-pearl Japan paper, appearing in 1971 with the same title.", source_title="Joan Miró - Le Lézard aux Plumes d'Or - LIthograph by Joan Mirò - 1971 For Sale at 1stDibs"), PerQueryResult(index="2.3.7", snippet="“In 1967, Miró created 18 color lithographs to accompany his poem “le lézard aux plumes d'or”. After the printing, the artist and the publisher, Louis Broder, realized there were defects in paper that had caused deteriorations of the colors of the prints. Thus, they decided to refuse the lithographs and destroy them. Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title. Additional suites of the lithographs had been also printed on rives, parchment and Japan with size 41 X 56 cm. After the death of Louis Broder, it was impossible to determine if all the defective suites had been destroyed. We could not establish with precision the edition of these suite. It is probably the same edition that the one of 1971. In this case, there would be for each subject, 30 copies on parchment and 50 copies on Japon Nacré”. (Note in the catalogue Miró lithographe III, Maeght Publisher). Born in Barcelona, Spain, Miró studied art at School of Fine Arts at La Llotja and Gali's Escola d'Art. His earliest works show the influence of the Fauve and Cubist movements which were fashionable in Spain during the early part of the century. In 1920, Miró traveled to Paris and painted with Surrealists Andr, Masson and Max Ernst. While frequently identified with the Surrealist movement, Miró never fully accepted the movement's creed and refused to sign the Surrealist Manifesto. Miró's vibrant canvases transport the viewer to alien worlds inhabited by all manner of whimsical creatures. His work has been characterized as psychic automatism, an expression of the subconscious in free form. By 1930 Miró had developed a lyrical style that remained fairly consistent. It is distinguished by the use of brilliant pure color and the playful juxtaposition of delicate lines with abstract, often amoebic shapes. Throughout his life, Miró felt a deep connection to his Catalan heritage and ...", source_title="Joan Miro at Arts-Galleria.com")].
 > 
-> After printing, the collaborators discovered that chemical flaws in the manufactured paper were reacting with and degrading the colors. 
+> Miró and publisher Louis Broder rejected the flawed run and ordered the lithographs destroyed, but because the original printing surfaces were already ruined, the initial compositions could not simply be reprinted [PerQueryResult(index="2.3.6", snippet="In 1967 Miró executed a series of lithographs to illustrate his poem \"Le lézard aux plumes d'or\". For technical reasons, Miró decided to destroy the lithographs. Meanwhile the stones had deteriorated and couldn't be reprinted. In 1971 he executed a set of completely different lithographs and the project came to fruition as a wonderful livre de peintre.", source_title="Le lézard aux plumes d'or I - Joan Miró - Lithography on Paper - Singulart"), PerQueryResult(index="2.3.7", snippet="“In 1967, Miró created 18 color lithographs to accompany his poem “le lézard aux plumes d'or”. After the printing, the artist and the publisher, Louis Broder, realized there were defects in paper that had caused deteriorations of the colors of the prints. Thus, they decided to refuse the lithographs and destroy them. Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title. Additional suites of the lithographs had been also printed on rives, parchment and Japan with size 41 X 56 cm. After the death of Louis Broder, it was impossible to determine if all the defective suites had been destroyed. We could not establish with precision the edition of these suite. It is probably the same edition that the one of 1971. In this case, there would be for each subject, 30 copies on parchment and 50 copies on Japon Nacré”. (Note in the catalogue Miró lithographe III, Maeght Publisher). Born in Barcelona, Spain, Miró studied art at School of Fine Arts at La Llotja and Gali's Escola d'Art. His earliest works show the influence of the Fauve and Cubist movements which were fashionable in Spain during the early part of the century. In 1920, Miró traveled to Paris and painted with Surrealists Andr, Masson and Max Ernst. While frequently identified with the Surrealist movement, Miró never fully accepted the movement's creed and refused to sign the Surrealist Manifesto. Miró's vibrant canvases transport the viewer to alien worlds inhabited by all manner of whimsical creatures. His work has been characterized as psychic automatism, an expression of the subconscious in free form. By 1930 Miró had developed a lyrical style that remained fairly consistent. It is distinguished by the use of brilliant pure color and the playful juxtaposition of delicate lines with abstract, often amoebic shapes. Throughout his life, Miró felt a deep connection to his Catalan heritage and ...", source_title="Joan Miro at Arts-Galleria.com")].
 > 
-> Because the original printing plates had already been erased, Broder and Miró chose to destroy the entire initial press run. 
+> Miró redrew an entirely new set of compositions from scratch, leading to the successful 1971 publication printed by Mourlot Frères [PerQueryResult(index="1.1.1", snippet="Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971. Illustrated book with 40 color lithographs (including wrapper front and cover); publisher's vellum. Gift of Boris Fridman. © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.", source_title="Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston"), PerQueryResult(index="2.3.6", snippet="In 1971 he executed a set of completely different lithographs and the project came to fruition as a wonderful livre de peintre.", source_title="Le lézard aux plumes d'or I - Joan Miró - Lithography on Paper - Singulart"), PerQueryResult(index="2.3.7", snippet="Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title.", source_title="Joan Miro at Arts-Galleria.com")].
 > 
-> Miró had to create a brand-new set of compositions from scratch, delaying publication until 1971. 
-> 
-> The featured copy was donated to the Museum of Fine Arts, Boston, by the prominent collector Boris Fridman.
+> Each published plate in the resulting volume required multiple individual lithographic stones to layer its inks [PerQueryResult(index="1.1.8", snippet="Each print required multiple printing stones to achieve the layered compositions of intense color. See this work on view now in \"Picasso, Miró, Dalí: Unbound,\" which looks at how these Spanish artists revolutionized the book as an art form: http://ms.spr. ly/6185aJOQd : Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper front and cover); publisher's vellum.", source_title="Museum - Heat wave itinerary: avoid melting If you're looking to escape the Boston heat, come cool off with a wander through our galleries! : Unidentified artist (American, 20th century), \"Boy floating in zebra tube in swimming pool,\" photograph, dye diffusion print | Facebook")].
 
-  - **R** Joan Miró created the book to illustrate his own poetic text, originally published in 1945 as *Jeux poétiques*.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Miró and publisher Louis Broder originally printed a complete 18-plate edition in 1967.  
-    <sub>names louis broder, broder, louis</sub>
-  - **X** After printing, the collaborators discovered that chemical flaws in the manufactured paper were reacting with and degrading the colors.  
-    <sub>about someone else (After), not this stop</sub>
-  - **R** Because the original printing plates had already been erased, Broder and Miró chose to destroy the entire initial press run.  
-    <sub>names broder, miro</sub>
-  - **R** Miró had to create a brand-new set of compositions from scratch, delaying publication until 1971.  
-    <sub>names miro</sub>
-  - **R** The featured copy was donated to the Museum of Fine Arts, Boston, by the prominent collector Boris Fridman.  
-    <sub>names boris fridman, fridman, boris</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **R** Joan Miró originally conceived the project in the mid-1960s to illustrate his own poem exploring artistic inspiration [PerQueryResult(index="1.4.4", snippet="The Lizard with Feathers of Gold ( Le Lézard aux Plumes d'Or) portrays Miro as a poet visualizing his verse via lithographic images.", source_title="Sold at Auction: Joan Miró, Joan Miro - From Lezard au Plumes D'Or (The Lizard with the Golden Feathers - Invaluable.com"), PerQueryResult(index="2.4.1", snippet="Miró's luminous lithography In the late 1940s, Joan Miró published a poem titled “Poetic Games”—a meditation on creativity and artistic ...
+  - **R** Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper front and cover); publisher's vellum.
+  - **R** © Successió Miró / Artists Rights Society (ARS) / ADAGP, Paris 2026.
+  - **R** Facebook.", source_title="Museum - Miró's luminous lithography In the late 1940s, Joan Miró published a poem titled “Poetic Games”—a meditation on creativity and artistic inspiration.
+  - w In the mid-1960s, he returned to that poem for this fantasy of floating signs, weirdly shaped creatures, and calligraphic lines.
+  - **X** Each print required multiple", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGuYWXGCC1AfO_F65Ynlo2WJ6Rr6C34B1yNpKSE7YBXQAFg6IsfenMa2j7Atx1DJOua3Sd16g7lggwfYJhhEMA8cv9scSzmYaSB0oGCniW0xmy9b_lUe9nyB61taEf1OinwIA-5ky23vPVcCtg3CtiO-PaGOR87FPCSCWC5BkBv30SEP_TUlIRVTzmr-_OhtB5XMlV1rhjQKTnifuTOSlD1Fz-iY7PwnNp7ilyXOjV4dD_15AD6EoScVB6H8mC_zdGW2b_Dfck7TaO50aCg")].
+  - **R** An initial 1967 print run was aborted when a defect in the paper factory stock caused the colors to deteriorate [PerQueryResult(index="2.2.2", snippet="Later, the Catalan artist and the publisher Louis Broder realized the alteration of colors, caused by a defect in the paper factory, forcing them to abandon the run to make new compositions on Rives paper and mother-of-pearl Japan paper, appearing in 1971 with the same title.", source_title="Joan Miró - Le Lézard aux Plumes d'Or - LIthograph by Joan Mirò - 1971 For Sale at 1stDibs"), PerQueryResult(index="2.3.7", snippet="“In 1967, Miró created 18 color lithographs to accompany his poem “le lézard aux plumes d'or”.
+  - **R** After the printing, the artist and the publisher, Louis Broder, realized there were defects in paper that had caused deteriorations of the colors of the prints.
+  - **X** Thus, they decided to refuse the lithographs and destroy them.
+  - **R** Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title.
+  - **X** Additional suites of the lithographs had been also printed on rives, parchment and Japan with size 41 X 56 cm.
+  - **R** After the death of Louis Broder, it was impossible to determine if all the defective suites had been destroyed.
+  - w We could not establish with precision the edition of these suite.
+  - w It is probably the same edition that the one of 1971.
+  - **X** In this case, there would be for each subject, 30 copies on parchment and 50 copies on Japon Nacré”.
+  - **R** (Note in the catalogue Miró lithographe III, Maeght Publisher).
+  - **R** Born in Barcelona, Spain, Miró studied art at School of Fine Arts at La Llotja and Gali's Escola d'Art.
+  - **X** His earliest works show the influence of the Fauve and Cubist movements which were fashionable in Spain during the early part of the century.
+  - **R** In 1920, Miró traveled to Paris and painted with Surrealists Andr, Masson and Max Ernst.
+  - **R** While frequently identified with the Surrealist movement, Miró never fully accepted the movement's creed and refused to sign the Surrealist Manifesto.
+  - **R** Miró's vibrant canvases transport the viewer to alien worlds inhabited by all manner of whimsical creatures.
+  - w His work has been characterized as psychic automatism, an expression of the subconscious in free form.
+  - **R** By 1930 Miró had developed a lyrical style that remained fairly consistent.
+  - w It is distinguished by the use of brilliant pure color and the playful juxtaposition of delicate lines with abstract, often amoebic shapes.
+  - **R** Throughout his life, Miró felt a deep connection to his Catalan heritage and ...", source_title="Joan Miro at Arts-Galleria.com")].
+  - **R** Miró and publisher Louis Broder rejected the flawed run and ordered the lithographs destroyed, but because the original printing surfaces were already ruined, the initial compositions could not simply be reprinted [PerQueryResult(index="2.3.6", snippet="In 1967 Miró executed a series of lithographs to illustrate his poem \"Le lézard aux plumes d'or\".
+  - **R** For technical reasons, Miró decided to destroy the lithographs.
+  - **X** Meanwhile the stones had deteriorated and couldn't be reprinted.
+  - **R** In 1971 he executed a set of completely different lithographs and the project came to fruition as a wonderful livre de peintre.", source_title="Le lézard aux plumes d'or I - Joan Miró - Lithography on Paper - Singulart"), PerQueryResult(index="2.3.7", snippet="“In 1967, Miró created 18 color lithographs to accompany his poem “le lézard aux plumes d'or”.
+  - **R** After the printing, the artist and the publisher, Louis Broder, realized there were defects in paper that had caused deteriorations of the colors of the prints.
+  - **X** Thus, they decided to refuse the lithographs and destroy them.
+  - **R** Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title.
+  - **X** Additional suites of the lithographs had been also printed on rives, parchment and Japan with size 41 X 56 cm.
+  - **R** After the death of Louis Broder, it was impossible to determine if all the defective suites had been destroyed.
+  - w We could not establish with precision the edition of these suite.
+  - w It is probably the same edition that the one of 1971.
+  - **X** In this case, there would be for each subject, 30 copies on parchment and 50 copies on Japon Nacré”.
+  - **R** (Note in the catalogue Miró lithographe III, Maeght Publisher).
+  - **R** Born in Barcelona, Spain, Miró studied art at School of Fine Arts at La Llotja and Gali's Escola d'Art.
+  - **X** His earliest works show the influence of the Fauve and Cubist movements which were fashionable in Spain during the early part of the century.
+  - **R** In 1920, Miró traveled to Paris and painted with Surrealists Andr, Masson and Max Ernst.
+  - **R** While frequently identified with the Surrealist movement, Miró never fully accepted the movement's creed and refused to sign the Surrealist Manifesto.
+  - **R** Miró's vibrant canvases transport the viewer to alien worlds inhabited by all manner of whimsical creatures.
+  - w His work has been characterized as psychic automatism, an expression of the subconscious in free form.
+  - **R** By 1930 Miró had developed a lyrical style that remained fairly consistent.
+  - w It is distinguished by the use of brilliant pure color and the playful juxtaposition of delicate lines with abstract, often amoebic shapes.
+  - **R** Throughout his life, Miró felt a deep connection to his Catalan heritage and ...", source_title="Joan Miro at Arts-Galleria.com")].
+  - **R** Miró redrew an entirely new set of compositions from scratch, leading to the successful 1971 publication printed by Mourlot Frères [PerQueryResult(index="1.1.1", snippet="Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.
+  - **X** Illustrated book with 40 color lithographs (including wrapper front and cover); publisher's vellum.
+  - **R** Gift of Boris Fridman.
+  - **R** © Successió Miró / Artists Rights Society (ARS), New York / ADAGP, Paris 2026.", source_title="Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston"), PerQueryResult(index="2.3.6", snippet="In 1971 he executed a set of completely different lithographs and the project came to fruition as a wonderful livre de peintre.", source_title="Le lézard aux plumes d'or I - Joan Miró - Lithography on Paper - Singulart"), PerQueryResult(index="2.3.7", snippet="Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title.", source_title="Joan Miro at Arts-Galleria.com")].
+  - **X** Each published plate in the resulting volume required multiple individual lithographic stones to layer its inks [PerQueryResult(index="1.1.8", snippet="Each print required multiple printing stones to achieve the layered compositions of intense color.
+  - **R** See this work on view now in \"Picasso, Miró, Dalí: Unbound,\" which looks at how these Spanish artists revolutionized the book as an art form: http://ms.spr.
+  - **R** ly/6185aJOQd : Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper front and cover); publisher's vellum.", source_title="Museum - Heat wave itinerary: avoid melting If you're looking to escape the Boston heat, come cool off with a wander through our galleries!
+  - **X** : Unidentified artist (American, 20th century), \"Boy floating in zebra tube in swimming pool,\" photograph, dye diffusion print | Facebook")].
 
 
 ## credit_line 13.1 — *anchored* / possessive
@@ -1251,101 +1270,86 @@ kind **eventful → eventful** · R5 w0 X1
 8 results · kind **inert → inert** · R10 w2 X4
 
 **1. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **2. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
 **3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder ...**  
-`christies.com` · tier `market`  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
 **4. Joan Miró's Broder Collection: How One Artist ...**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...  
-    <sub>names joan miro, broder, miro</sub>
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
+  - **R** From Joan Miró's “Broder Collection.” While Miró certainly drew inspiration from Surrealism, he ...
 
 **5. Le Lezards aux Plumes by Joan Miro, 1971**  
-`mourloteditions.com` · tier `unverified`  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOorRXQ6l8T_f_2a1NXm3q2K8A61dNOW5x0bMkbfQp7GxnrahylOO>  
 > Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...  
-    <sub>names joan miro, le lezard, mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
 **6. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
-`artsy.net` · tier `market`  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971. The complete set of 15 lithographs in colors, on Rives paper. 15 1/5 × 20 1/5 × ...
 
-  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - **X** The complete set of 15 lithographs in colors, on Rives paper.  
-    <sub>about someone else (Rives), not this stop</sub>
-  - w 15 1/5 × 20 1/5 × ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.
+  - **X** The complete set of 15 lithographs in colors, on Rives paper.
+  - w 15 1/5 × 20 1/5 × ...
 
 **7. Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...**  
-`masterworksfineart.com` · tier `unverified`  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOoqAXVzdOA-KSpM8-QK7gZFtMJvluIQMCPAYCrZuIUKldLH1aI2q>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 **8. Joan Miró - Le lézard aux plumes d'or**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOoqUQKGQnSpMe2aJvFeAMq-spXIwH_LzaMVYfTH9JogHUCkfIbIy>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, Fridman's contribution ensures?`
 
-kind **eventful → eventful** · R5 w0 X0
+kind **inert → inert** · R3 w0 X0
 
-> Joan Miró wrote the surrealist poem underlying the book between 1936 and 1939, initially publishing the text in the magazine *Cahiers d'Art* in 1945. 
+> Joan Miró originally created and handwritten the poetic text alongside lithographs conceived to be issued in 1967. 
 > 
-> Miró originally created a full set of eighteen color lithographs for the project in 1967 with publisher Louis Broder. 
+> Due to defects in the special paper stock originally intended for the project, publisher Louis Broder and Miró delayed the publication by four years while producing a newly printed edition at Mourlot Frères. 
 > 
-> Due to a paper defect that altered the colors and damaged the printing surfaces, Miró and Broder abandoned the original run and destroyed most of the completed 1967 prints. 
-> 
-> Because the original plates and stones could not be reused, Miró had to completely redraw new compositions to bring the book to completion in 1971. 
-> 
-> The completed 1971 livre d'artiste entered the collection of the Museum of Fine Arts, Boston as a gift from collector Boris Fridman.
+> Boris Fridman's gift of this 1971 portfolio directly enables the Museum of Fine Arts, Boston to display a complete, unbound example of Miró’s simultaneous work as both author and graphic artist.
 
-  - **R** Joan Miró wrote the surrealist poem underlying the book between 1936 and 1939, initially publishing the text in the magazine *Cahiers d'Art* in 1945.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Miró originally created a full set of eighteen color lithographs for the project in 1967 with publisher Louis Broder.  
-    <sub>names louis broder, broder, louis</sub>
-  - **R** Due to a paper defect that altered the colors and damaged the printing surfaces, Miró and Broder abandoned the original run and destroyed most of the completed 1967 prints.  
-    <sub>names broder, miro</sub>
-  - **R** Because the original plates and stones could not be reused, Miró had to completely redraw new compositions to bring the book to completion in 1971.  
-    <sub>names miro</sub>
-  - **R** The completed 1971 livre d'artiste entered the collection of the Museum of Fine Arts, Boston as a gift from collector Boris Fridman.  
-    <sub>names boris fridman, fridman, boris</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Picasso Miro Dali Unbound Le Lezard aux plumes d or Boris Fridman`; `Le Lezard aux plumes d or Miro 1963 1971 paper defect story`; `Le Lezard aux plumes d or Miro Broder Mourlot Fridman MFA Boston`
+
+1. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+2. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+3. `tretyakovgallerymagazine.com` — <https://www.tretyakovgallerymagazine.com/articles/2-2012-35/livre-dartiste>
+
+  - **R** Joan Miró originally created and handwritten the poetic text alongside lithographs conceived to be issued in 1967.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+  - **R** Due to defects in the special paper stock originally intended for the project, publisher Louis Broder and Miró delayed the publication by four years while producing a newly printed edition at Mourlot Frères.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+  - **R** Boris Fridman's gift of this 1971 portfolio directly enables the Museum of Fine Arts, Boston to display a complete, unbound example of Miró’s simultaneous work as both author and graphic artist.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `tretyakovgallerymagazine.com` <https://www.tretyakovgallerymagazine.com/articles/2-2012-35/livre-dartiste>
 
 
 ## credit_line 13.2 — *evaluative* / relative
@@ -1356,106 +1360,91 @@ kind **eventful → eventful** · R5 w0 X0
 
 8 results · kind **inert → inert** · R10 w2 X4
 
-**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...**  
-`moma.org` · tier `tier1`  
+**1. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
-**2. 557135 The Lizard with Golden Feathers Joan Miró**  
-`coleccionbbva.com` · tier `unverified`  
+**2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-**3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder ...**  
-`christies.com` · tier `market`  
+**3. Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789 ...**  
+`christies.com` · tier `market` · <https://www.christies.com/en/lot/lot-4894878>  
 > JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M. 789-828; C. books 148) the complete set of fifteen lithographs in colors, ...
 
-  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - w books 148) the complete set of fifteen lithographs in colors, ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** JOAN MIRO Joan Miro, Le lézard aux plumes d'or, Paris, Louis Broder, 1971 (M.
+  - w books 148) the complete set of fifteen lithographs in colors, ...
 
-**4. Le Lezards aux Plumes by Joan Miro, 1971**  
-`mourloteditions.com` · tier `unverified`  
+**4. Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions**  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOopM7Zf7Wz1GS5stWv1ht0tNJyJsXYvd2MMKAs5r60c7sTjUMY2H>  
 > Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53 ...
 
-  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...  
-    <sub>names joan miro, le lezard, mourlot</sub>
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53 ...  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
+  - **R** Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions - Fine_Art - Poster ...
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53 ...
 
-**5. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris ...**  
-`artsy.net` · tier `market`  
+**5. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971 - Artsy**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
 > Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971. The complete set of 15 lithographs in colors, on Rives paper. 15 1/5 × 20 1/5 × ...
 
-  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.  
-    <sub>names louis broder, joan miro, le lezard</sub>
-  - **X** The complete set of 15 lithographs in colors, on Rives paper.  
-    <sub>about someone else (Rives), not this stop</sub>
-  - w 15 1/5 × 20 1/5 × ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.
+  - **X** The complete set of 15 lithographs in colors, on Rives paper.
+  - w 15 1/5 × 20 1/5 × ...
 
-**6. Joan Miró - Le lézard aux plumes d'or**  
-`choicecontemporary.com` · tier `unverified`  
+**6. Joan Miró - Le lézard aux plumes d'or - Choice Contemporary**  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOopFF2SyR02hAzz6NO0veQpThPBPBdhyh4xkMhGmGtlmbAxy5-SR>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-**7. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or ...**  
-`ragoarts.com` · tier `unverified`  
+**7. 177: JOAN MIRÓ, Untitled (from Le lezard aux plumes d'or series)**  
+`ragoarts.com` · tier `unverified` · <https://www.ragoarts.com/auctions/2022/06/prints-multiples/177>  
 > Lot 177: Joan Miró 1893–1983. Untitled (from Le lezard aux plumes d'or series). 1971, lithograph in colors on Kochi Japan.
 
-  - **R** Lot 177: Joan Miró 1893–1983.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Untitled (from Le lezard aux plumes d'or series).  
-    <sub>names le lezard, lezard, plumes</sub>
-  - **X** 1971, lithograph in colors on Kochi Japan.  
-    <sub>about someone else (Kochi Japan), not this stop</sub>
+  - **R** Lot 177: Joan Miró 1893–1983.
+  - **R** Untitled (from Le lezard aux plumes d'or series).
+  - **X** 1971, lithograph in colors on Kochi Japan.
 
-**8. Miró Joan | 15 WORKS: Le Lézard aux Plumes d'Or, Louis ...**  
-`mutualart.com` · tier `market`  
+**8. Miró Joan | 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris ...**  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artwork/15-WORKS--Le-Lezard-aux-Plumes-d-Or--Lou/53A4166656B07AE1/Similar>  
 > 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
 
-  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.  
-    <sub>names louis broder, le lezard, broder</sub>
+  - **R** 15 WORKS: Le Lézard aux Plumes d'Or, Louis Broder, Paris, 1971 · 6 Plates, from Le Lézard aux Plumes d'Or 6 , 1971 · 70 WORKS: Tristan Tzara, Parler Seul, A.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, visitors can appreciate the intricate dance between lithography?`
 
-kind **eventful → inert** · R4 w1 X1
+kind **active → active** · R5 w0 X0
 
-> Joan Miró wrote the surrealist poem underlying this illustrated book between 1936 and 1939.
-> 
-> Publisher Louis Broder originally initiated the printing project with Miró in the 1960s to publish the portfolio in 1967.
-> 
-> After completing an initial run of 18 lithographs at Atelier Mourlot in 1967, Miró and Broder discovered a paper manufacturing defect that altered and distorted the inks' colors.
-> 
-> Because of this defect, the artist and publisher rejected the original print run and ordered the copies destroyed.
-> 
-> Since the original lithographic plates and stones had already been effaced, Miró had to recreate an entirely new series of lithographs from scratch.
-> 
-> This forced re-creation delayed the final publication of the book until 1971.
+> * Joan Miró created *Le Lézard aux plumes d’or* to illustrate a surrealist poem that he had written himself.
+> * Publisher Louis Broder and Miró originally prepared the entire portfolio for publication around 1967.
+> * After printing the initial run, Miró and Broder discovered a chemical defect in the chosen paper that degraded and altered the lithographic colors.
+> * Because the original zinc lithography plates had already been destroyed, Miró was forced to redesign the entire series of lithographs from scratch.
+> * The revised edition was finally printed by Mourlot and published four years late in 1971.
 
-  - **R** Joan Miró wrote the surrealist poem underlying this illustrated book between 1936 and 1939.  
-    <sub>names joan miro, miro, joan</sub>
-  - **R** Publisher Louis Broder originally initiated the printing project with Miró in the 1960s to publish the portfolio in 1967.  
-    <sub>names louis broder, broder, louis</sub>
-  - **R** After completing an initial run of 18 lithographs at Atelier Mourlot in 1967, Miró and Broder discovered a paper manufacturing defect that altered and distorted the inks' colors.  
-    <sub>names mourlot, broder, miro</sub>
-  - **X** Because of this defect, the artist and publisher rejected the original print run and ordered the copies destroyed.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** Since the original lithographic plates and stones had already been effaced, Miró had to recreate an entirely new series of lithographs from scratch.  
-    <sub>names miro</sub>
-  - w This forced re-creation delayed the final publication of the book until 1971.  
-    <sub>no entity of its own; snippet names louis broder</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Le Lezard aux plumes d or Miro Louis Broder Mourlot destroyed paper defect`; `Le Lezard aux plumes d or Miro story what went wrong`
+
+1. `coleccionbbva.com` — <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+2. `nationalgalleries.org` — <https://www.nationalgalleries.org/art-and-artists/113686>
+3. `gazette-drouot.com` — <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+
+  - **R** * Joan Miró created *Le Lézard aux plumes d’or* to illustrate a surrealist poem that he had written himself.
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+      ↳ source: `nationalgalleries.org` <https://www.nationalgalleries.org/art-and-artists/113686>
+  - **R** * Publisher Louis Broder and Miró originally prepared the entire portfolio for publication around 1967.
+      ↳ source: `gazette-drouot.com` <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
+  - **R** * After printing the initial run, Miró and Broder discovered a chemical defect in the chosen paper that degraded and altered the lithographic colors.
+      ↳ source: `gazette-drouot.com` <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+  - **R** * Because the original zinc lithography plates had already been destroyed, Miró was forced to redesign the entire series of lithographs from scratch.
+      ↳ source: `gazette-drouot.com` <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+  - **R** * The revised edition was finally printed by Mourlot and published four years late in 1971.
+      ↳ source: `gazette-drouot.com` <https://www.gazette-drouot.com/en/lots/23590358-miro-joan-le-lezard-au>
+      ↳ source: `coleccionbbva.com` <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>
 
 
 ## credit_line 13.3 — *evaluative* / participial
@@ -1464,100 +1453,87 @@ kind **eventful → inert** · R4 w1 X1
 
 ### SERPER — `"Le Lézard aux plumes d’or" Mourlot Broder Fridman why 1971 offering unique`
 
-8 results · kind **active → inert** · R9 w2 X5
+8 results · kind **inert → inert** · R9 w2 X4
 
 **1. Le Lezards aux Plumes by Joan Miro, 1971 - Mourlot Editions**  
-`mourloteditions.com` · tier `unverified`  
+`mourloteditions.com` · tier `unverified` · <https://www.mourloteditions.com/products/les-lezards-aux-plumes-by-joan-miro?srsltid=AfmBOooeaU4adG9c-ZKocsX_9AuAWPmz5XgyGgM-I-OGNvO2idXEFETl>  
 > ... Le lézard aux plumes d'or", Louis Broder publisher. Corredor-Matheos N° 53. Mourlot 831. This version was pulled before lettering, (before the text was ...
 
-  - **R** Le lézard aux plumes d'or", Louis Broder publisher.  
-    <sub>names louis broder, le lezard, broder</sub>
-  - **X** Corredor-Matheos N° 53.  
-    <sub>about someone else (Corredor-Matheos), not this stop</sub>
-  - w This version was pulled before lettering, (before the text was ...  
-    <sub>no entity of its own; snippet names louis broder</sub>
+  - **R** Le lézard aux plumes d'or", Louis Broder publisher.
+  - **X** Corredor-Matheos N° 53.
+  - w This version was pulled before lettering, (before the text was ...
 
 **2. 557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA**  
-`coleccionbbva.com` · tier `unverified`  
+`coleccionbbva.com` · tier `unverified` · <https://www.coleccionbbva.com/en/obra_papel/557135-the-lizard-with-golden-feathers-joan-miro/>  
 > Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
-  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...  
-    <sub>names golden feathers, the lizard, le lezard</sub>
+  - **R** Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers) is considered one of the main pieces made by Miró that year for its extraordinary combination of two ...
 
 **3. Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA**  
-`moma.org` · tier `tier1`  
+`moma.org` · tier `tier1` · <https://www.moma.org/collection/works/9228>  
 > Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
 
-  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).  
-    <sub>names golden feathers, the lizard, le lezard</sub>
-  - **X** Illustrated book with forty lithographs (including wrapper front and cover).  
-    <sub>about someone else (Illustrated), not this stop</sub>
+  - **R** Le Lézard aux plumes d'or (The Lizard with Golden Feathers).
+  - **X** Illustrated book with forty lithographs (including wrapper front and cover).
 
 **4. Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery**  
-`composition.gallery` · tier `unverified`  
+`composition.gallery` · tier `unverified` · <https://www.composition.gallery/art/joan-mir-le-lzard-aux-plumes-dor-book/>  
 > Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
-  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...  
-    <sub>names golden feathers, the lizard, joan miro</sub>
+  - **R** Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
 
 **5. Joan Miró's Broder Collection: How One Artist Revolutionized Lithography**  
-`parkwestgallery.com` · tier `unverified`  
+`parkwestgallery.com` · tier `unverified` · <https://www.parkwestgallery.com/blog/joan-miro-broder-collection/>  
 > The Broder Collection's vivid colors and obscure shapes align with Miró's unique ... “Le Lezard aux Plumes d'or II” (1971, M.828). From Joan ...
 
-  - **R** The Broder Collection's vivid colors and obscure shapes align with Miró's unique ...  
-    <sub>names broder, miro</sub>
-  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** The Broder Collection's vivid colors and obscure shapes align with Miró's unique ...
+  - **R** “Le Lezard aux Plumes d'or II” (1971, M.828).
 
-**6. Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...**  
-`masterworksfineart.com` · tier `unverified`  
+**6. Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971 - Artsy**  
+`artsy.net` · tier `market` · <https://www.artsy.net/artwork/joan-miro-joan-miro-le-lezard-aux-plumes-dor-louis-broder-paris-1971>  
+> Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971. The complete set of 15 lithographs in colors, on Rives paper. 15 1/5 × 20 1/5 × ...
+
+  - **R** Joan Miro, Le Lézard aux plumes d'or, Louis Broder, Paris, 1971.
+  - **X** The complete set of 15 lithographs in colors, on Rives paper.
+  - w 15 1/5 × 20 1/5 × ...
+
+**7. Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...**  
+`masterworksfineart.com` · tier `unverified` · <https://www.masterworksfineart.com/artists/joan-miro/lithograph/plate-iii-from-le-lezard-aux-plumes-dor-the-lizard-with-golden-feathers-1971-2/id/w-8914?srsltid=AfmBOopCm52eCWklSa88wJoLcxelueLti8jh_hzUC4JIE_XJMAMlV7yu>  
 > Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism. Bursting with vibrant color ...
 
-  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.  
-    <sub>names golden feathers, the lizard, joan miro</sub>
-  - **X** Bursting with vibrant color ...  
-    <sub>about someone else (Bursting), not this stop</sub>
-
-**7. Le Lézard aux Plumes d'Or (Mourlot 828) (1971) by Joan Miró | Artsy**  
-`artsy.net` · tier `market`  
-> Le Lézard aux Plumes d'Or (Mourlot 828), 1971. Lithograph printed in colours. 14 × 39 2/5 in | 35.5 × 100 cm. Forum Auctions: Prints & Editions (September 2021).
-
-  - **R** Le Lézard aux Plumes d'Or (Mourlot 828), 1971.  
-    <sub>names le lezard, mourlot, lezard</sub>
-  - **X** Lithograph printed in colours.  
-    <sub>about someone else (Lithograph), not this stop</sub>
-  - w 14 × 39 2/5 in | 35.5 × 100 cm.  
-    <sub>no entity of its own; snippet names le lezard</sub>
-  - **X** Forum Auctions: Prints & Editions (September 2021).  
-    <sub>about someone else (Forum Auctions), not this stop</sub>
+  - **R** Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.
+  - **X** Bursting with vibrant color ...
 
 **8. Joan Miró - Le lézard aux plumes d'or - Choice Contemporary**  
-`choicecontemporary.com` · tier `unverified`  
+`choicecontemporary.com` · tier `unverified` · <https://choicecontemporary.com/collections/joan-miro-le-lezard-aux-plumes-dor?srsltid=AfmBOoqV6jf_ZOqWADrCXDc8TRMCJsAxiCnPFG_Z6ClfDXWw-JHKsJGL>  
 > Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
-  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...  
-    <sub>names le lezard, lezard, plumes</sub>
+  - **R** Today, Le lézard aux plumes d'or is prized for its innovation, rarity, and the way it encapsulates Miró's late-career creativity—joyful, poetic, and defiantly ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Le Lézard aux plumes d’or, offering a unique tactile experience and inviting viewers to ponder the narrative beyond the page?`
 
-kind **inert → inert** · R3 w0 X1
+kind **eventful → eventful** · R5 w1 X0
 
-> Joan Miró not only created the lithographs for *Le Lézard aux plumes d’or* but also authored the accompanying surrealist fantasy poem handwritten across the pages.
+> Joan Miró created *Le Lézard aux plumes d’or* to illustrate a surrealist poem he wrote between 1936 and 1939 [PerQueryResult(index="2.4.4", snippet="Miró wrote the... poetic surreal text underlying this book in 1936-1939.")].
 > 
-> Originally intended for publication in 1967, the entire first print run was destroyed after a defect was discovered in the paper stock.
+> Miró and publisher Louis Broder initially printed a suite of eighteen lithographs for the book in 1967 [PerQueryResult(index="2.2.2", snippet="“In 1967, Miró created 18 color lithographs to accompany his poem “le lézard aux plumes d'or”.")].
 > 
-> Because the original lithographic stones had already been effaced, Miró had to redraw every single composition from scratch to produce the final 1971 edition.
+> After printing, the pair discovered a chemical defect in the manufactured paper that distorted and deteriorated the colors [PerQueryResult(index="2.2.2", snippet="After the printing, the artist and the publisher, Louis Broder, realized there were defects in paper that had caused deteriorations of the colors of the prints.", source_title="Joan Miro at Arts-Galleria.com"), PerQueryResult(index="2.3.2", snippet="Later, the Catalan artist and the publisher Louis Broder realized the alteration of colors, caused by a defect in the paper factory...", source_title="Le Lézard aux Plumes d\'Or - Original LIthograph by Joan Mirò - 1971 1971 - Pamono")].
 > 
-> Miró turned intensely to printmaking and this project during a period of severe depression and pessimism surrounding Spain's political climate.
+> Broder and Miró rejected the flawed run and ordered the printed sheets destroyed [PerQueryResult(index="2.2.2", snippet="Thus, they decided to refuse the lithographs and destroy them.", source_title="Joan Miro at Arts-Galleria.com")].
+> 
+> Because the original lithographic stones had already been planed down and erased, Miró had to redraw an entirely new set of compositions from scratch, delaying the final publication until 1971 [PerQueryResult(index="1.1.3", snippet="Originally conceived to be issued in 1967, the portfolio was not published until 1971.", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA"), PerQueryResult(index="2.2.2", snippet="Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title.", source_title="Joan Miro at Arts-Galleria.com")].
 
-  - **R** Joan Miró not only created the lithographs for *Le Lézard aux plumes d’or* but also authored the accompanying surrealist fantasy poem handwritten across the pages.  
-    <sub>names le lezard aux plumes d’or, joan miro, le lezard</sub>
-  - **X** Originally intended for publication in 1967, the entire first print run was destroyed after a defect was discovered in the paper stock.  
-    <sub>about someone else (Originally), not this stop</sub>
-  - **R** Because the original lithographic stones had already been effaced, Miró had to redraw every single composition from scratch to produce the final 1971 edition.  
-    <sub>names miro</sub>
-  - **R** Miró turned intensely to printmaking and this project during a period of severe depression and pessimism surrounding Spain's political climate.  
-    <sub>names miro</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **R** Joan Miró created *Le Lézard aux plumes d’or* to illustrate a surrealist poem he wrote between 1936 and 1939 [PerQueryResult(index="2.4.4", snippet="Miró wrote the...
+  - w poetic surreal text underlying this book in 1936-1939.")].
+  - **R** Miró and publisher Louis Broder initially printed a suite of eighteen lithographs for the book in 1967 [PerQueryResult(index="2.2.2", snippet="“In 1967, Miró created 18 color lithographs to accompany his poem “le lézard aux plumes d'or”.")].
+  - **R** After printing, the pair discovered a chemical defect in the manufactured paper that distorted and deteriorated the colors [PerQueryResult(index="2.2.2", snippet="After the printing, the artist and the publisher, Louis Broder, realized there were defects in paper that had caused deteriorations of the colors of the prints.", source_title="Joan Miro at Arts-Galleria.com"), PerQueryResult(index="2.3.2", snippet="Later, the Catalan artist and the publisher Louis Broder realized the alteration of colors, caused by a defect in the paper factory...", source_title="Le Lézard aux Plumes d\'Or - Original LIthograph by Joan Mirò - 1971 1971 - Pamono")].
+  - **R** Broder and Miró rejected the flawed run and ordered the printed sheets destroyed [PerQueryResult(index="2.2.2", snippet="Thus, they decided to refuse the lithographs and destroy them.", source_title="Joan Miro at Arts-Galleria.com")].
+  - **R** Because the original lithographic stones had already been planed down and erased, Miró had to redraw an entirely new set of compositions from scratch, delaying the final publication until 1971 [PerQueryResult(index="1.1.3", snippet="Originally conceived to be issued in 1967, the portfolio was not published until 1971.", source_title="557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA"), PerQueryResult(index="2.2.2", snippet="Because the lithographics stones had been destroyed, there could not reproduce the same compositions, So Miró created new lithographs which appeared in 1971 with the same title.", source_title="Joan Miro at Arts-Galleria.com")].
 
 
 ---
@@ -1574,95 +1550,89 @@ kind **inert → inert** · R3 w0 X1
 8 results · kind **eventful → eventful** · R12 w0 X1
 
 **1. Designed by Juan Gris - Au Soleil du Plafond**  
-`metmuseum.org` · tier `tier1`  
+`metmuseum.org` · tier `tier1` · <https://www.metmuseum.org/art/collection/search/356117>  
 > The project was taken up by Ténade some thirty years later, with the collaboration of the author (Reverdy). ... Au Soleil du Plafond; Designer: Designed by Juan ...
 
-  - **R** The project was taken up by Ténade some thirty years later, with the collaboration of the author (Reverdy).  
-    <sub>names reverdy</sub>
-  - **R** Au Soleil du Plafond; Designer: Designed by Juan ...  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
+  - **R** The project was taken up by Ténade some thirty years later, with the collaboration of the author (Reverdy).
+  - **R** Au Soleil du Plafond; Designer: Designed by Juan ...
 
 **2. AFTER JUAN GRIS (1887-1927), Au Soleil du Plafond**  
-`onlineonly.christies.com` · tier `market`  
+`onlineonly.christies.com` · tier `market` · <https://onlineonly.christies.com/s/modern-edition/au-soleil-du-plafond-29/40612>  
 > AFTER JUAN GRIS (1887-1927) Au Soleil du Plafond the complete deluxe portfolio comprising 11 lithographs in colors on Arches wove paper, with the additional ...
 
-  - **R** AFTER JUAN GRIS (1887-1927) Au Soleil du Plafond the complete deluxe portfolio comprising 11 lithographs in colors on Arches wove paper, with the additional ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** AFTER JUAN GRIS (1887-1927) Au Soleil du Plafond the complete deluxe portfolio comprising 11 lithographs in colors on Arches wove paper, with the additional ...
 
 **3. A Cubist Glimpse | Prufrock's Dilemma - WordPress.com**  
-`prufrocksdilemma.wordpress.com` · tier `unverified`  
+`prufrocksdilemma.wordpress.com` · tier `unverified` · <https://prufrocksdilemma.wordpress.com/2014/11/23/a-cubist-glimpse/>  
 > Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
-  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
 **4. Juan Gris, Compotier (kahnweiler 1969), Au Soleil Du ...**  
-`etsy.com` · tier `unverified`  
+`etsy.com` · tier `unverified` · <https://www.etsy.com/listing/1843501536/juan-gris-compotier-kahnweiler-1969-au>  
 > Juan Gris, Compotier (Kahnweiler 1969), Au Soleil du Plafond, Limited Edition Lithograph. RHFineArtCo. 4 out of 5 stars. Returns & exchanges accepted.
 
-  - **R** Juan Gris, Compotier (Kahnweiler 1969), Au Soleil du Plafond, Limited Edition Lithograph.  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
-  - **X** Returns & exchanges accepted.  
-    <sub>about someone else (Returns), not this stop</sub>
+  - **R** Juan Gris, Compotier (Kahnweiler 1969), Au Soleil du Plafond, Limited Edition Lithograph.
+  - **X** Returns & exchanges accepted.
 
 **5. Mary Ann Caws on Pierre Reverdy**  
-`poetrysociety.org` · tier `unverified`  
+`poetrysociety.org` · tier `unverified` · <https://poetrysociety.org/poems-essays/tributes/mary-ann-caws-on-pierre-reverdy>  
 > ... Gris is largely responsible for that label. In particular, Reverdy's close collaboration with Juan Gris lay at the origin of the poems of Au Soleil du plafond ...
 
-  - **R** Gris is largely responsible for that label.  
-    <sub>names gris</sub>
-  - **R** In particular, Reverdy's close collaboration with Juan Gris lay at the origin of the poems of Au Soleil du plafond ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** Gris is largely responsible for that label.
+  - **R** In particular, Reverdy's close collaboration with Juan Gris lay at the origin of the poems of Au Soleil du plafond ...
 
 **6. Gris, Juan | Benezit Dictionary of Artists**  
-`oxfordartonline.com` · tier `unverified`  
+`oxfordartonline.com` · tier `unverified` · <https://www.oxfordartonline.com/benezit/benezit/display/10.1093/benz/9780199773787.001.0001/acref-9780199773787-e-00079272>  
 > He provided illustrations for various published works including: in 1915, Pierre Reverdy's Au soleil du plafond (Tériade, Paris), Poèmes en Prose published by P ...
 
-  - **R** He provided illustrations for various published works including: in 1915, Pierre Reverdy's Au soleil du plafond (Tériade, Paris), Poèmes en Prose published by P ...  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
+  - **R** He provided illustrations for various published works including: in 1915, Pierre Reverdy's Au soleil du plafond (Tériade, Paris), Poèmes en Prose published by P ...
 
 **7. Livre d'Artiste | The Tretyakov Gallery Magazine**  
-`tretyakovgallerymagazine.com` · tier `unverified`  
+`tretyakovgallerymagazine.com` · tier `unverified` · <https://www.tretyakovgallerymagazine.com/node/2960>  
 > A double-page spread from the book Pierre Reverdy. Au Soleil du plafond Paris, 1955. A colour lithograph by Juan Gris. 42 x 64 cm.
 
-  - **R** A double-page spread from the book Pierre Reverdy.  
-    <sub>names pierre reverdy, reverdy, pierre</sub>
-  - **R** Au Soleil du plafond Paris, 1955.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** A colour lithograph by Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
+  - **R** A double-page spread from the book Pierre Reverdy.
+  - **R** Au Soleil du plafond Paris, 1955.
+  - **R** A colour lithograph by Juan Gris.
 
 **8. Compotier – henripeyrefi**  
-`henripeyrefi.ws.gc.cuny.edu` · tier `tier1`  
+`henripeyrefi.ws.gc.cuny.edu` · tier `tier1` · <https://henripeyrefi.ws.gc.cuny.edu/2016/11/28/compotier-by-anna-soo-hoo/>  
 > It was only many years later in 1955 that Reverdy published a scaled-back version of their original plans: Au soleil du plafond. In this book ...
 
-  - **R** It was only many years later in 1955 that Reverdy published a scaled-back version of their original plans: Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** It was only many years later in 1955 that Reverdy published a scaled-back version of their original plans: Au soleil du plafond.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, Pierre Reverdy, the French poet linked to Surrealism?`
 
-kind **eventful → eventful** · R5 w0 X0
+kind **eventful → eventful** · R4 w0 X0
 
-> The project was originally initiated around 1916–1917 by the art dealer and publisher Léonce Rosenberg as a direct collaboration pairing twenty poems by Pierre Reverdy with plates by Juan Gris. 
+> *Au Soleil du Plafond* was originally conceived around 1916–1917 as a collaborative project between Pierre Reverdy and Juan Gris, commissioned by art dealer Léonce Rosenberg. 
 > 
-> Production came to a sudden halt when Gris died of kidney failure in 1927 at age forty, leaving behind only eleven completed gouache illustrations. 
+> The book was planned to pair twenty poems by Reverdy with matching illustrations by Gris, but it was abruptly halted when Gris died prematurely in 1927 after finishing only eleven gouaches.
 > 
-> Publisher Tériade resurrected the stalled project nearly three decades later with Reverdy to publish the work posthumously. 
+> Publisher Tériade revived the abandoned project nearly thirty years later in close collaboration with Reverdy.
 > 
-> Reverdy reshaped the revived edition into a memorial tribute to his late friend, publishing the poems in a facsimile of his own handwriting alongside Gris's prints. 
-> 
-> The completed livre d’artiste was finally issued in 1955 after master lithographer Fernand Mourlot translated Gris's original gouaches into color lithographs.
+> Reverdy wrote out the full manuscript in facsimile handwriting so the book could finally be published in 1955 as a posthumous tribute to his deceased friend.
 
-  - **R** The project was originally initiated around 1916–1917 by the art dealer and publisher Léonce Rosenberg as a direct collaboration pairing twenty poems by Pierre Reverdy with plates by Juan Gris.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** Production came to a sudden halt when Gris died of kidney failure in 1927 at age forty, leaving behind only eleven completed gouache illustrations.  
-    <sub>names gris</sub>
-  - **R** Publisher Tériade resurrected the stalled project nearly three decades later with Reverdy to publish the work posthumously.  
-    <sub>names reverdy, teriade</sub>
-  - **R** Reverdy reshaped the revived edition into a memorial tribute to his late friend, publishing the poems in a facsimile of his own handwriting alongside Gris's prints.  
-    <sub>names reverdy, gris</sub>
-  - **R** The completed livre d’artiste was finally issued in 1955 after master lithographer Fernand Mourlot translated Gris's original gouaches into color lithographs.  
-    <sub>names gris</sub>
+**SOURCES (4)** — pages Gemini actually read · searched: `Au Soleil du Plafond Juan Gris Pierre Reverdy Teriade publisher`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `amorosart.com` — <https://en.amorosart.com/artwork-gris-pierre_reverdy_au_soleil_du_plafond_11_lithographies_couleurs_ex_de_t%C3%AAte_avec_suite_1955-125479.html>
+3. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+4. `artsy.net` — <https://www.artsy.net/artwork/juan-gris-pierre-reverdy-au-soleil-du-plafond-paris-teriade-editeur>
+
+  - **R** *Au Soleil du Plafond* was originally conceived around 1916–1917 as a collaborative project between Pierre Reverdy and Juan Gris, commissioned by art dealer Léonce Rosenberg.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `amorosart.com` <https://en.amorosart.com/artwork-gris-pierre_reverdy_au_soleil_du_plafond_11_lithographies_couleurs_ex_de_t%C3%AAte_avec_suite_1955-125479.html>
+  - **R** The book was planned to pair twenty poems by Reverdy with matching illustrations by Gris, but it was abruptly halted when Gris died prematurely in 1927 after finishing only eleven gouaches.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/juan-gris-pierre-reverdy-au-soleil-du-plafond-paris-teriade-editeur>
+  - **R** Publisher Tériade revived the abandoned project nearly thirty years later in close collaboration with Reverdy.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Reverdy wrote out the full manuscript in facsimile handwriting so the book could finally be published in 1955 as a posthumous tribute to his deceased friend.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `amorosart.com` <https://en.amorosart.com/artwork-gris-pierre_reverdy_au_soleil_du_plafond_11_lithographies_couleurs_ex_de_t%C3%AAte_avec_suite_1955-125479.html>
 
 
 ## credit_line 2.2 — *evaluative* / relative
@@ -1673,94 +1643,90 @@ kind **eventful → eventful** · R5 w0 X0
 
 8 results · kind **inert → inert** · R11 w2 X1
 
-**1. Living Still Life | John Golding**  
-`nybooks.com` · tier `unverified`  
+**1. Living Still Life | John Golding | The New York Review of Books**  
+`nybooks.com` · tier `unverified` · <https://www.nybooks.com/articles/1993/01/28/living-still-life/>  
 > ... Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later). These small ...
 
-  - **R** Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later).  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later).
 
-**2. Coffee Grinder, Cup and Glass on a Table - Juan Gris**  
-`artsdot.com` · tier `unverified`  
+**2. Purchase Collectible Image - Juan Gris**  
+`artsdot.com` · tier `unverified` · <https://artsdot.com/en/orders/image/juan-gris-coffee-grinder-cup-and-glass-on-a-table-D3VJD5-en/>  
 > ... Reverdy that truly ignited his artistic revolution. Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
-  - **R** Reverdy that truly ignited his artistic revolution.  
-    <sub>names reverdy</sub>
-  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Reverdy that truly ignited his artistic revolution.
+  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
-**3. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...**  
-`academia.edu` · tier `tier1`  
+**3. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & Harlequins ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105223968/The_cubism_of_Juan_Gris_Vol_II_Portraits_Pierrots_and_Harlequins_Drawings_Designs_for_the_theatre_Books_Lithographs_Pochoirs_Press_illustrations>  
 > ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc Gris ...
 
-  - **R** Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Pierrots, Drawings, Books, etc Gris ...  
-    <sub>names gris</sub>
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.
+  - **R** Pierrots, Drawings, Books, etc Gris ...
 
-**4. LES RECUEILS ILLUSTRÉS DE PIERRE REVERDY**  
-`jstor.org` · tier `tier2`  
-> by S Linarès · 2007 · Cited by 2 — Au soleil du plafond, 11 lithographies en couleurs d'apres des oeuvres de Juan Gris, texte de Pierre Reverdy manuscrit lithographie, [Paris], Teriade, 1955.
+**4. LES RECUEILS ILLUSTRÉS DE PIERRE REVERDY - jstor**  
+`jstor.org` · tier `tier2` · <https://www.jstor.org/stable/23013428>  
+> Au soleil du plafond, 11 lithographies en couleurs d'apres des oeuvres de Juan Gris, texte de Pierre Reverdy manuscrit lithographie, [Paris], Teriade, 1955.
 
-  - **R** by S Linarès · 2007 · Cited by 2 — Au soleil du plafond, 11 lithographies en couleurs d'apres des oeuvres de Juan Gris, texte de Pierre Reverdy manuscrit lithographie, [Paris], Teriade, 1955.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
+  - **R** Au soleil du plafond, 11 lithographies en couleurs d'apres des oeuvres de Juan Gris, texte de Pierre Reverdy manuscrit lithographie, [Paris], Teriade, 1955.
 
-**5. Advance Exhibition Schedule**  
-`mfa.org` · tier `tier1`  
+**5. Advance Exhibition Schedule | Museum of Fine Arts Boston**  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/news/advance-exhibition-schedule>  
 > At the turn of the 20th century, they revolutionized the book as an art form. ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on ...
 
-  - w At the turn of the 20th century, they revolutionized the book as an art form.  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
+  - w At the turn of the 20th century, they revolutionized the book as an art form.
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
 
-**6. Objects Observed: The Poetry of Things in Twentieth ...**  
-`dokumen.pub` · tier `unverified`  
+**6. Objects Observed: The Poetry of Things in Twentieth-Century France ...**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear. Let us look, ...
 
-  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.
 
-**7. Coming Attractions: July 19 Through August 3 - What Will ...**  
-`artsfuse.org` · tier `unverified`  
+**7. Coming Attractions: July 19 Through August 3 - What Will Light Your Fire**  
+`artsfuse.org` · tier `unverified` · <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>  
 > ... Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy. Here, both text and ...
 
-  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
-  - **X** Here, both text and ...  
-    <sub>about someone else (Here), not this stop</sub>
+  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.
+  - **X** Here, both text and ...
 
-**8. 'Bibliotheque Litteraire Jacques Doucet, Paris, France' ...**  
-`bridgemanimages.com` · tier `unverified`  
+**8. 'Bibliotheque Litteraire Jacques Doucet, Paris, France' images and ...**  
+`bridgemanimages.com` · tier `unverified` · <https://www.bridgemanimages.com/en-US/explore/location/Bibliotheque%20Litteraire%20Jacques%20Doucet,%20Paris,%20France/gallery>  
 > ... Au soleil du plafond', by Pierre Reverdy (1889-1960) 1955 (colour litho) · Gris, Juan (1887-1927). CHT203701. Quick Preview. Add to the current lightbox. Remove ...
 
-  - **R** Au soleil du plafond', by Pierre Reverdy (1889-1960) 1955 (colour litho) · Gris, Juan (1887-1927).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - w Add to the current lightbox.  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** Au soleil du plafond', by Pierre Reverdy (1889-1960) 1955 (colour litho) · Gris, Juan (1887-1927).
+  - w Add to the current lightbox.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, revolutionized the concept of the book as art?`
 
-kind **eventful → eventful** · R4 w0 X0
+kind **eventful → eventful** · R5 w0 X0
 
-> The project was originally commissioned around 1916–1917 by the art dealer Léonce Rosenberg as a collaborative work between poet Pierre Reverdy and painter Juan Gris.
-> 
-> The original plan stalled when Gris died prematurely of kidney failure in 1927 at age 40, having completed only 11 of the planned 20 gouache illustrations.
-> 
-> Publisher Tériade revived the abandoned project nearly three decades later with Reverdy's participation to honor his late friend.
-> 
-> The volume was finally brought to completion and published in 1955 with Reverdy's handwritten poems and Gris's gouaches rendered as lithographs by the Mourlot Frères workshop.
+> *Au Soleil du Plafond* was originally conceived around 1916–1917 under the art dealer and publisher Léonce Rosenberg. 
+> Juan Gris created gouache illustrations for Pierre Reverdy’s poems, intending to illustrate all twenty of them. 
+> Production was halted when Gris fell ill and died prematurely in 1927, leaving only eleven illustrations completed. 
+> Publisher Tériade revived and reconceived the project nearly thirty years later in collaboration with Reverdy. 
+> Reverdy incorporated his handwritten text and published the book in 1955 as a posthumous tribute to his deceased friend.
 
-  - **R** The project was originally commissioned around 1916–1917 by the art dealer Léonce Rosenberg as a collaborative work between poet Pierre Reverdy and painter Juan Gris.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** The original plan stalled when Gris died prematurely of kidney failure in 1927 at age 40, having completed only 11 of the planned 20 gouache illustrations.  
-    <sub>names gris</sub>
-  - **R** Publisher Tériade revived the abandoned project nearly three decades later with Reverdy's participation to honor his late friend.  
-    <sub>names reverdy, teriade</sub>
-  - **R** The volume was finally brought to completion and published in 1955 with Reverdy's handwritten poems and Gris's gouaches rendered as lithographs by the Mourlot Frères workshop.  
-    <sub>names reverdy, gris</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Au Soleil du Plafond Juan Gris Pierre Reverdy MFA Boston Picasso Miro Dali Unbound`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+3. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+
+  - **R** *Au Soleil du Plafond* was originally conceived around 1916–1917 under the art dealer and publisher Léonce Rosenberg.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+  - **R** Juan Gris created gouache illustrations for Pierre Reverdy’s poems, intending to illustrate all twenty of them.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+  - **R** Production was halted when Gris fell ill and died prematurely in 1927, leaving only eleven illustrations completed.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Publisher Tériade revived and reconceived the project nearly thirty years later in collaboration with Reverdy.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Reverdy incorporated his handwritten text and published the book in 1955 as a posthumous tribute to his deceased friend.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
 
 
 ## credit_line 2.3 — *evaluative* / participial
@@ -1769,116 +1735,104 @@ kind **eventful → eventful** · R4 w0 X0
 
 ### SERPER — `"Au Soleil du Plafond" Reverdy Gris why exemplifying collaborative spirit defines`
 
-8 results · kind **inert → inert** · R13 w1 X2
+8 results · kind **inert → inert** · R13 w2 X2
 
-**1. (PDF) Textual Spaces: The Poetry of Pierre Reverdy - ResearchGate**  
-`researchgate.net` · tier `unverified`  
+**1. (PDF) Textual Spaces: The Poetry of Pierre Reverdy**  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/374031362_Textual_Spaces_The_Poetry_of_Pierre_Reverdy>  
 > anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the. destructive wind: Le vent noir qui tordait les ...
 
-  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - w destructive wind: Le vent noir qui tordait les ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.
+  - w destructive wind: Le vent noir qui tordait les ...
 
-**2. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & Harlequins ...**  
-`academia.edu` · tier `tier1`  
+**2. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105223968/The_cubism_of_Juan_Gris_Vol_II_Portraits_Pierrots_and_Harlequins_Drawings_Designs_for_the_theatre_Books_Lithographs_Pochoirs_Press_illustrations>  
 > ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc Gris ...
 
-  - **R** Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Pierrots, Drawings, Books, etc Gris ...  
-    <sub>names gris</sub>
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.
+  - **R** Pierrots, Drawings, Books, etc Gris ...
 
-**3. Coming Attractions: July 19 Through August 3 - What Will Light Your Fire**  
-`artsfuse.org` · tier `unverified`  
+**3. Coming Attractions: July 19 Through August 3 - What Will ...**  
+`artsfuse.org` · tier `unverified` · <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>  
 > ... Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy. Here, both text and ...
 
-  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
-  - **X** Here, both text and ...  
-    <sub>about someone else (Here), not this stop</sub>
+  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.
+  - **X** Here, both text and ...
 
-**4. [PDF] Objects Observed - The Poetry of Things in Twentieth - dokumen.pub**  
-`dokumen.pub` · tier `unverified`  
+**4. Objects Observed - The Poetry of Things in Twentieth**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/download/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > Au Soleil du plafond was originally to have been a collaborative effort, featuring still lifes by the major Cubist artist Juan Gris accompanying prose poems ...
 
-  - **R** Au Soleil du plafond was originally to have been a collaborative effort, featuring still lifes by the major Cubist artist Juan Gris accompanying prose poems ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** Au Soleil du plafond was originally to have been a collaborative effort, featuring still lifes by the major Cubist artist Juan Gris accompanying prose poems ...
 
-**5. Juan Gris, The Soup Tureen, from Au Soleil du Plafond, 1955 (after)**  
-`1stdibs.com` · tier `market`  
+**5. Juan Gris, The Soup Tureen, from Au Soleil du Plafond ...**  
+`1stdibs.com` · tier `market` · <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/juan-gris-juan-gris-soup-tureen-from-au-soleil-du-plafond-1955-after/id-a_16383312/>  
 > This exquisite lithograph after Juan Gris (1887–1927), titled La Soupiere (The Soup Tureen), from the folio Au Soleil du Plafond (In the Sunlight of the ...
 
-  - **R** This exquisite lithograph after Juan Gris (1887–1927), titled La Soupiere (The Soup Tureen), from the folio Au Soleil du Plafond (In the Sunlight of the ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** This exquisite lithograph after Juan Gris (1887–1927), titled La Soupiere (The Soup Tureen), from the folio Au Soleil du Plafond (In the Sunlight of the ...
 
-**6. Pablo Picasso Exhibitions: Current, Upcoming & Past Shows - Mutual Art**  
-`mutualart.com` · tier `market`  
+**6. Pablo Picasso Exhibitions: Current, Upcoming & Past Shows**  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artist/Pablo-Picasso/68EFD50CBA356F91/artist-info/exhibitions>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-**7. Deux Pôles de L'image Littéraire Au XXe Siècle - La Poésie Plastique ...**  
-`scribd.com` · tier `unverified`  
-> ... Au soleil du plafond. Jennifer Pap voque la gense de ce projet, dans un article trs document, Entre quatre murs: Reverdy, Cubism, and the space of the still ...
+**7. Deux Pôles de L'image Littéraire Au XXe Siècle**  
+`scribd.com` · tier `unverified` · <https://www.scribd.com/document/324300632/Deux-poles-de-l-image-litte-raire-au-XXe-siecle-la-poe-sie-plastique-de-Pierre-Reverdy-et-le-mythe-dans-les-romans-de-Michel-Tournier-These-pdf>  
+> 30 Illustration par Juan Gris pour La Guitare endormie de Reverdy. (Chapon ... Au soleil du plafond, La Libert des mers (op. cit.), indiquant que les ...
 
-  - **R** Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** Jennifer Pap voque la gense de ce projet, dans un article trs document, Entre quatre murs: Reverdy, Cubism, and the space of the still ...  
-    <sub>names reverdy</sub>
+  - **R** 30 Illustration par Juan Gris pour La Guitare endormie de Reverdy.
+  - **R** Au soleil du plafond, La Libert des mers (op.
+  - w cit.), indiquant que les ...
 
-**8. The cubism of Juan Gris. Vol I. Still lifes, landscapes - Academia.edu**  
-`academia.edu` · tier `tier1`  
+**8. (PDF) The cubism of Juan Gris. Vol I. Still lifes, landscapes**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105222311/The_cubism_of_Juan_Gris_Vol_I_Still_lifes_landscapes>  
 > ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco The cubism of Juan Gris. Vol I. Still lifes, landscapes Gris and ...
 
-  - **R** Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco The cubism of Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Still lifes, landscapes Gris and ...  
-    <sub>names gris</sub>
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco The cubism of Juan Gris.
+  - **R** Still lifes, landscapes Gris and ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, exemplifying the collaborative spirit that defines the MFA's exhibition?`
 
-kind **active → active** · R9 w0 X1
+kind **eventful → eventful** · R4 w1 X0
 
-> Art dealer Léonce Rosenberg originally conceived the project around 1915 to display Pierre Reverdy's handwritten poems alongside gouaches by Juan Gris [PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol. 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu"), PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].
+> The art dealer Léonce Rosenberg originally planned the project around 1916 to pair twenty poems by Pierre Reverdy with twenty illustrations by Juan Gris. 
 > 
-> Rosenberg intended the work to appear on large wall panels, but the original project fell apart and was abandoned [PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].
+> Production stalled when Gris died prematurely in 1927, having completed only eleven of the intended plates. 
 > 
-> Gris died in 1927 before the collaboration could ever be realized in print [PerQueryResult(index="1.1.6", source_title="Coming Attractions: July 19 Through August 3 - What Will Light Your Fire - The Arts Fuse"), PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol. 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu")].
+> Nearly thirty years later, publisher Tériade revived the abandoned project to finally realize the collaboration as a tribute to Gris. 
 > 
-> Reverdy eventually reclaimed his texts and brought them to publisher Tériade to resurrect the project as a *livre d'artiste* [PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].
+> Reverdy reshaped the work by hand-writing all of the text, which Mourlot Frères printed via lithography alongside prints made after Gris's original gouaches. 
 > 
-> Because of Gris's early death, only eleven of Reverdy's twenty poems were accompanied by color lithographs after the painter's original gouaches [PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol. 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu"), PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].
-> 
-> The book was finally published in 1955, four decades after its inception [PerQueryResult(index="1.1.1", source_title="Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston"), PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol. 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu")].
+> The completed livre d'artiste was finally published in 1955.
 
-  - **R** Art dealer Léonce Rosenberg originally conceived the project around 1915 to display Pierre Reverdy's handwritten poems alongside gouaches by Juan Gris [PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu"), PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Rosenberg intended the work to appear on large wall panels, but the original project fell apart and was abandoned [PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Gris died in 1927 before the collaboration could ever be realized in print [PerQueryResult(index="1.1.6", source_title="Coming Attractions: July 19 Through August 3 - What Will Light Your Fire - The Arts Fuse"), PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol.  
-    <sub>names gris</sub>
-  - **R** 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu")].  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Reverdy eventually reclaimed his texts and brought them to publisher Tériade to resurrect the project as a *livre d'artiste* [PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].  
-    <sub>names juan gris, reverdy, teriade</sub>
-  - **R** Because of Gris's early death, only eleven of Reverdy's twenty poems were accompanied by color lithographs after the painter's original gouaches [PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol.  
-    <sub>names reverdy, gris</sub>
-  - **R** 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu"), PerQueryResult(index="1.2.5", source_title="Juan Gris Art Value Price Guide - Invaluable.com")].  
-    <sub>names juan gris, gris, juan</sub>
-  - **X** The book was finally published in 1955, four decades after its inception [PerQueryResult(index="1.1.1", source_title="Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston"), PerQueryResult(index="1.2.4", source_title="The Orozco Collection Vol.  
-    <sub>about someone else (PerQueryResult), not this stop</sub>
-  - **R** 3 Juan Gris, Antoni Clavé, Manuel Ortiz de Zárate, Francisco Bores, Ortega, Redondela - Academia.edu")].  
-    <sub>names juan gris, gris, juan</sub>
+**SOURCES (4)** — pages Gemini actually read · searched: `Au Soleil du Plafond Juan Gris Pierre Reverdy MFA Boston story collaboration`; `Au Soleil du Plafond Juan Gris Reverdy Kahnweiler Tériade`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+3. `christies.com.cn` — <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+4. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+
+  - **R** The art dealer Léonce Rosenberg originally planned the project around 1916 to pair twenty poems by Pierre Reverdy with twenty illustrations by Juan Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+  - **R** Production stalled when Gris died prematurely in 1927, having completed only eleven of the intended plates.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+  - **R** Nearly thirty years later, publisher Tériade revived the abandoned project to finally realize the collaboration as a tribute to Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Reverdy reshaped the work by hand-writing all of the text, which Mourlot Frères printed via lithography alongside prints made after Gris's original gouaches.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+  - w The completed livre d'artiste was finally published in 1955.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
 
 
 ## credit_line 3.1 — *evaluative* / possessive
@@ -1890,95 +1844,95 @@ kind **active → active** · R9 w0 X1
 8 results · kind **inert → inert** · R12 w1 X2
 
 **1. A Cubist Glimpse | Prufrock's Dilemma - WordPress.com**  
-`prufrocksdilemma.wordpress.com` · tier `unverified`  
+`prufrocksdilemma.wordpress.com` · tier `unverified` · <https://prufrocksdilemma.wordpress.com/2014/11/23/a-cubist-glimpse/>  
 > Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
-  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
 **2. Livre d'Artiste | The Tretyakov Gallery Magazine**  
-`tretyakovgallerymagazine.com` · tier `unverified`  
+`tretyakovgallerymagazine.com` · tier `unverified` · <https://www.tretyakovgallerymagazine.com/articles/2-2012-35/livre-dartiste>  
 > A double-page spread from the book Pierre Reverdy. Au Soleil du plafond Paris, 1955. A colour lithograph by Juan Gris. 42 x 64 cm.
 
-  - **R** A double-page spread from the book Pierre Reverdy.  
-    <sub>names pierre reverdy, reverdy, pierre</sub>
-  - **R** Au Soleil du plafond Paris, 1955.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** A colour lithograph by Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
+  - **R** A double-page spread from the book Pierre Reverdy.
+  - **R** Au Soleil du plafond Paris, 1955.
+  - **R** A colour lithograph by Juan Gris.
 
-**3. Juan Gris Sold at Auction Prices**  
-`invaluable.com` · tier `market`  
+**3. Juan Gris Art Value Price Guide - Invaluable.com**  
+`invaluable.com` · tier `market` · <https://www.invaluable.com/artist/gris-juan-plmqx8pmi3/sold-at-auction-prices/?page=5&srsltid=AfmBOorJhTEhtEBV9EPDDEnm_Kka38BjAZr3oV7dHvyU8l3Xh1LrVlMf>  
 > Juan Gris (1887 - 1927) PIERRE REVERDY (1889 - 1960) AU SOLEIL DU PLAFOND 22 litografie di Gris. Ed. Est: €6,000 - €7,000. View sold prices. Juan Gris (1887 ...
 
-  - **R** Juan Gris (1887 - 1927) PIERRE REVERDY (1889 - 1960) AU SOLEIL DU PLAFOND 22 litografie di Gris.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
-  - w Est: €6,000 - €7,000.  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** Juan Gris (1887 - 1927) PIERRE REVERDY (1889 - 1960) AU SOLEIL DU PLAFOND 22 litografie di Gris.
+  - w Est: €6,000 - €7,000.
 
-**4. Pierre reverdy Stock Photos and Images**  
-`alamy.com` · tier `unverified`  
+**4. Pierre reverdy hi-res stock photography and images - Alamy**  
+`alamy.com` · tier `unverified` · <https://www.alamy.com/stock-photo/pierre-reverdy.html>  
 > Juan Gris – The Violin (Le Violon / Au soleil du plafond), 1916. RM 3F4EGGY ... Gris collaborated with his friend, the poet Pierre Reverdy, on a ...
 
-  - **R** Juan Gris – The Violin (Le Violon / Au soleil du plafond), 1916.  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
-  - **R** Gris collaborated with his friend, the poet Pierre Reverdy, on a ...  
-    <sub>names pierre reverdy, reverdy, pierre</sub>
+  - **R** Juan Gris – The Violin (Le Violon / Au soleil du plafond), 1916.
+  - **R** Gris collaborated with his friend, the poet Pierre Reverdy, on a ...
 
-**5. Picasso, Miró and Dalí reinvent the book as a work of art at ...**  
-`bonart.cat` · tier `unverified`  
+**5. Picasso, Miró and Dalí reinvent the book as a work of art at the MFA in ...**  
+`bonart.cat` · tier `unverified` · <https://www.bonart.cat/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>  
 > The exhibition also includes lesser-known collaborations, such as Au Soleil du Plafond , conceived by Juan Gris with the French poet Pierre ...
 
-  - **R** The exhibition also includes lesser-known collaborations, such as Au Soleil du Plafond , conceived by Juan Gris with the French poet Pierre ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** The exhibition also includes lesser-known collaborations, such as Au Soleil du Plafond , conceived by Juan Gris with the French poet Pierre ...
 
-**6. Juan Gris, Le Livre (kahnweiler 1969), Au Soleil Du ...**  
-`etsy.com` · tier `unverified`  
+**6. Juan Gris, Le Livre (kahnweiler 1969), Au Soleil Du Plafond ... - Etsy**  
+`etsy.com` · tier `unverified` · <https://www.etsy.com/ca/listing/1857698813/juan-gris-le-livre-kahnweiler-1969-au>  
 > Juan Gris, Le Livre (Kahnweiler 1969), Au Soleil du Plafond, Limited Edition Lithograph. RHFineArtCo. 4 out of 5 stars. Returns & exchanges accepted.
 
-  - **R** Juan Gris, Le Livre (Kahnweiler 1969), Au Soleil du Plafond, Limited Edition Lithograph.  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
-  - **X** Returns & exchanges accepted.  
-    <sub>about someone else (Returns), not this stop</sub>
+  - **R** Juan Gris, Le Livre (Kahnweiler 1969), Au Soleil du Plafond, Limited Edition Lithograph.
+  - **X** Returns & exchanges accepted.
 
-**7. Picasso, Miró, Dalí: Unbound**  
-`mfa.org` · tier `tier1`  
+**7. Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston**  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste ...
 
-**8. Living Still Life | John Golding**  
-`nybooks.com` · tier `unverified`  
+**8. Living Still Life | John Golding | The New York Review of Books**  
+`nybooks.com` · tier `unverified` · <https://www.nybooks.com/articles/1993/01/28/living-still-life/>  
 > Reverdy was two years younger than Gris and came to see Cubism through Gris's eyes ... Reverdy's Au Soleil du plafond (not published until much ...
 
-  - **R** Reverdy was two years younger than Gris and came to see Cubism through Gris's eyes ...  
-    <sub>names reverdy, gris</sub>
-  - **R** Reverdy's Au Soleil du plafond (not published until much ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Reverdy was two years younger than Gris and came to see Cubism through Gris's eyes ...
+  - **R** Reverdy's Au Soleil du plafond (not published until much ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, Gris's innovative vision?`
 
 kind **eventful → eventful** · R5 w0 X0
 
-> * The project was originally conceived in 1916–1917 as a collaboration between Juan Gris and poet Pierre Reverdy, planned for publication by art dealer Léonce Rosenberg.
-> * The original plan called for twenty gouache illustrations by Gris to match Reverdy's twenty poems.
-> * Production halted when Gris died prematurely in 1927, having completed only eleven of the intended illustrations.
-> * Publisher Tériade revived the abandoned project nearly three decades later with Reverdy to release it as a memorial tribute to Gris.
-> * Reverdy had to completely redesign the format of the book to accommodate the missing illustrations before its eventual publication in 1955.
+> The collaboration between painter Juan Gris and poet Pierre Reverdy on *Au Soleil du Plafond* was originally initiated around 1916 by art dealer Léonce Rosenberg.
+> 
+> The original plan called for Gris to create twenty illustrations corresponding to Reverdy's twenty poems.
+> 
+> Work on the book was cut short when Gris died in 1927 at age forty, leaving only eleven illustrations completed.
+> 
+> Nearly thirty years later, the publisher Tériade revived the stalled project in collaboration with Reverdy.
+> 
+> The volume was published in 1955 as a tribute to Gris, with lithographs produced from his gouaches alongside facsimiles of Reverdy's handwritten texts.
 
-  - **R** * The project was originally conceived in 1916–1917 as a collaboration between Juan Gris and poet Pierre Reverdy, planned for publication by art dealer Léonce Rosenberg.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** * The original plan called for twenty gouache illustrations by Gris to match Reverdy's twenty poems.  
-    <sub>names reverdy, gris</sub>
-  - **R** * Production halted when Gris died prematurely in 1927, having completed only eleven of the intended illustrations.  
-    <sub>names gris</sub>
-  - **R** * Publisher Tériade revived the abandoned project nearly three decades later with Reverdy to release it as a memorial tribute to Gris.  
-    <sub>names reverdy, teriade, gris</sub>
-  - **R** * Reverdy had to completely redesign the format of the book to accommodate the missing illustrations before its eventual publication in 1955.  
-    <sub>names reverdy</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `"Au Soleil du Plafond" "Gris" "Reverdy" publication Kahnweiler Tériade`; `"Au Soleil du Plafond" "Juan Gris" "Pierre Reverdy"`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `christies.com.cn` — <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+3. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+
+  - **R** The collaboration between painter Juan Gris and poet Pierre Reverdy on *Au Soleil du Plafond* was originally initiated around 1916 by art dealer Léonce Rosenberg.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+  - **R** The original plan called for Gris to create twenty illustrations corresponding to Reverdy's twenty poems.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
+  - **R** Work on the book was cut short when Gris died in 1927 at age forty, leaving only eleven illustrations completed.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Nearly thirty years later, the publisher Tériade revived the stalled project in collaboration with Reverdy.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+  - **R** The volume was published in 1955 as a tribute to Gris, with lithographs produced from his gouaches alongside facsimiles of Reverdy's handwritten texts.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `christies.com.cn` <https://www.christies.com.cn/en/lot/lot-267507?ldp_breadcrumb=back>
 
 
 ## credit_line 3.2 — *evaluative* / possessive
@@ -1989,64 +1943,65 @@ kind **eventful → eventful** · R5 w0 X0
 
 4 results · kind **inert → inert** · R5 w0 X2
 
-**1. Objects Observed - The Poetry of Things in Twentieth**  
-`dokumen.pub` · tier `unverified`  
+**1. [PDF] Objects Observed - The Poetry of Things in Twentieth - dokumen.pub**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/download/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear. Let us ...
 
-  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.
 
-**2. (PDF) The cubism of Juan Gris. Vol I. Still lifes, landscapes**  
-`academia.edu` · tier `tier1`  
+**2. The cubism of Juan Gris. Vol I. Still lifes, landscapes - Academia.edu**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105222311/The_cubism_of_Juan_Gris_Vol_I_Still_lifes_landscapes>  
 > ... Reverdy's volume of poems, "Au Soleil du Plafond". Reverdy had been Gris' neighbour at 13, Place Ravignan in Montmartre before the War, he was then a young poet ...
 
-  - **R** Reverdy's volume of poems, "Au Soleil du Plafond".  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** Reverdy had been Gris' neighbour at 13, Place Ravignan in Montmartre before the War, he was then a young poet ...  
-    <sub>names reverdy, gris</sub>
+  - **R** Reverdy's volume of poems, "Au Soleil du Plafond".
+  - **R** Reverdy had been Gris' neighbour at 13, Place Ravignan in Montmartre before the War, he was then a young poet ...
 
-**3. Efficacité/Efficacy**  
-`brill.com` · tier `unverified`  
+**3. Efficacité/Efficacy - Brill**  
+`brill.com` · tier `unverified` · <https://brill.com/display/book/9789401200738/9789401200738_webready_content_text.pdf?srsltid=AfmBOopcq1A4KHbPQX_zGhHCknWMsTxMEjx7sf9vgWfbAtwm4-5N3zjQ>  
 > morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La. Liberté des mers, 1960), en reproduction de manuscrit. Quant à Cocteau, il.
 
-  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La.  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
-  - **X** Liberté des mers, 1960), en reproduction de manuscrit.  
-    <sub>about someone else (Liberté), not this stop</sub>
+  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La.
+  - **X** Liberté des mers, 1960), en reproduction de manuscrit.
 
-**4. Transnational Railway Cultures: Trains in Music, Literature ...**  
-`dokumen.pub` · tier `unverified`  
+**4. Transnational Railway Cultures: Trains in Music, Literature, Film ...**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/transnational-railway-cultures-trains-in-music-literature-film-and-visual-art-9781789209198.html>  
 > “Cubism and the Avant-Garde Prose-Poem: Figural Space in Pierre Reverdy's 'Au soleil du plafond.' ” French Studies 43, no 2: 302–19. Schivelbusch, Wolfgang ...
 
-  - **R** “Cubism and the Avant-Garde Prose-Poem: Figural Space in Pierre Reverdy's 'Au soleil du plafond.' ” French Studies 43, no 2: 302–19.  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Schivelbusch, Wolfgang ...  
-    <sub>about someone else (Schivelbusch), not this stop</sub>
+  - **R** “Cubism and the Avant-Garde Prose-Poem: Figural Space in Pierre Reverdy's 'Au soleil du plafond.' ” French Studies 43, no 2: 302–19.
+  - **X** Schivelbusch, Wolfgang ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, Reverdy's poetic prowess?`
 
-kind **eventful → eventful** · R4 w0 X1
+kind **eventful → eventful** · R12 w0 X2
 
-> Art dealer Léonce Rosenberg originally conceived the project around 1916 or 1917 as a set of large rigid panels featuring Pierre Reverdy's handwritten poems paired with gouaches by Juan Gris. 
+> The project was originally conceived around 1916–1920 by Pierre Reverdy and Juan Gris under the backing of art dealer Léonce Rosenberg [PerQueryResult(index="1.1.1", snippet="This book was originally planned by L. Rosenberg ca. 1916-1917...", source_title="Designed by Juan Gris - Au Soleil du Plafond - The Metropolitan Museum of Art", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG5OHVThbDDlDAUDxYPOSfD4igSishHJxZkjwhZAxW8Vj3g9W3dzGeyyI5nJG0Q-I_no0nd_BrHNYDsUeqJ_HW6Yp6FEjjPzKdImlYbim4Xe-13k447DR_guQneeZhFNcYiQUn-UV7iCFXbb6w="), PerQueryResult(index="1.1.3", snippet="Conçu dès 1920 par le poète et le peintre et soutenu par Léonce Rosenberg...", source_title="Illustrated book de Juan Gris , Pierre Reverdy : AU SOLEIL DU PLAFOND. 11 LITHOGRAPHIES COULEURS. Ex. de tête avec suite (1955) on Amorosart", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFpZu8wya7Z799CrLBHvt62imsbxj-qJqMPQm7cH3ZXkugYJAm8FdkGcJDzIoMw1iUPpwZwWB_5eOnOUrwpIRmx8n8SUzrkeEHVBgKyzyTBGFP9KRF4_txNmruewYCOoPljOgeDvHC-Lz9l-wlqolC0zoFwKN7BRllLtIq6oJBrU66oFWSQSs6Or_Meh1_T0diIIHUsuZp8xAWl2L4jEHlkGeWdv_r8ctyPEhgRGHSwPaU3IYLht4OvR-08jDXo355phjhCZC8=")].
 > 
-> The publication stalled and Gris died prematurely in 1927 at age forty, leaving only eleven of the twenty planned illustrations completed. 
+> The original plan intended to pair each of Reverdy's twenty poems with a corresponding plate by Gris, but production halted when Gris died prematurely of kidney failure in 1927 leaving only eleven completed gouaches [PerQueryResult(index="1.1.2", snippet="Au soleil du plafond was José Victoriano González-Pérez (pseud. Juan Gris, 1887–1927) final body of work, as he died of kidney failure at only 40 years old in the midst of production. The collection of poems and lithographs was published nearly thirty years after Juan Gris\'s death, with Pierre Reverdy\'s (1889–1960) text produced as \"a tribute to the memory of a friend who passed away prematurely.\" The initial plan had been to illustrate each of Reverdy\'s twenty poems with a plate by Gris.", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFPZoI-psRRZJfn189CLHFQlVZSEMjY4OGLiz9gxJx2fztipVm2fg-j4t9GTJLRAM_kD137CPQn8djRhtJYR8SDF1nRBxO8p_bL9MCr1qj6uYdPCiFAzX3q_dD1ObV6g9vMy7zwds01ceD0m-Kmm-0bBWLmFmhJVSpl8jT24I7xZYIoZT35b-yBUvLuJHCUlBC83H0=")].
 > 
-> Following Rosenberg's death, Reverdy reclaimed his manuscripts and brought the unfinished project to art publisher Tériade. 
+> After Rosenberg's inaction and subsequent death, Reverdy retrieved the artwork and poems and brought them to publisher Tériade to revive the stalled book [PerQueryResult(index="1.1.8", snippet="Originally planned by Léonce Rosenberg as large panels, the work was never executed. After the death of Rosenberg and Gris (he died in 1927), Reverdy retrieved the works and brought them and his poems to Tériade for publication.", source_title="Gris, Juan. Reverdy, Paul - Sims Reed Rare Books", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFne1fa5csZ0W81LiXt77qXfhPVbl5-LcI2xj03ptZl_ZpUqoOJcsZ4ovbyeT2j8pHJ1wlx8AbB2IsJWHVQVVC__0Uqbch2c-pNfk9mL020cFJSfmEdIs_zj6YtfQ==")].
 > 
-> Because ten illustrations were missing, the creators had to fundamentally change the book's intended format. 
+> The volume was ultimately published in 1955, nearly three decades after Gris's death, with the text printed in facsimile from Reverdy's own handwriting [PerQueryResult(index="1.1.2", snippet="The collection of poems and lithographs was published nearly thirty years after Juan Gris\'s death...", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFPZoI-psRRZJfn189CLHFQlVZSEMjY4OGLiz9gxJx2fztipVm2fg-j4t9GTJLRAM_kD137CPQn8djRhtJYR8SDF1nRBxO8p_bL9MCr1qj6uYdPCiFAzX3q_dD1ObV6g9vMy7zwds01ceD0m-Kmm-0bBWLmFmhJVSpl8jT24I7xZYIoZT35b-yBUvLuJHCUlBC83H0="), PerQueryResult(index="1.1.8", snippet="The work consists of 20 poems by Reverdy, reproduced in facsimile after his manuscript and illustrated with 11 lithographs by Juan Gris executed by Mourlot Frères...", source_title="Gris, Juan. Reverdy, Paul - Sims Reed Rare Books", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFne1fa5csZ0W81LiXt77qXfhPVbl5-LcI2xj03ptZl_ZpUqoOJcsZ4ovbyeT2j8pHJ1wlx8AbB2IsJWHVQVVC__0Uqbch2c-pNfk9mL020cFJSfmEdIs_zj6YtfQ==")].
 > 
-> Tériade and printer Fernand Mourlot finally published the work in 1955, more than thirty years after its initial conception, as a tribute to Gris.
+> Reverdy framed the delayed publication as an explicit tribute to reunite with his deceased friend across time [PerQueryResult(index="1.1.2", snippet="The collection of poems and lithographs was published nearly thirty years after Juan Gris\'s death, with Pierre Reverdy\'s (1889–1960) text produced as \"a tribute to the memory of a friend who passed away prematurely.\" ... Reverdy writes at the conclusion of the preface: \"...above all with that great painter and great friend, with whom I find myself reunited here, thanks to all that defies the grave.\"", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFPZoI-psRRZJfn189CLHFQlVZSEMjY4OGLiz9gxJx2fztipVm2fg-j4t9GTJLRAM_kD137CPQn8djRhtJYR8SDF1nRBxO8p_bL9MCr1qj6uYdPCiFAzX3q_dD1ObV6g9vMy7zwds01ceD0m-Kmm-0bBWLmFmhJVSpl8jT24I7xZYIoZT35b-yBUvLuJHCUlBC83H0=")].
 
-  - **R** Art dealer Léonce Rosenberg originally conceived the project around 1916 or 1917 as a set of large rigid panels featuring Pierre Reverdy's handwritten poems paired with gouaches by Juan Gris.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** The publication stalled and Gris died prematurely in 1927 at age forty, leaving only eleven of the twenty planned illustrations completed.  
-    <sub>names gris</sub>
-  - **R** Following Rosenberg's death, Reverdy reclaimed his manuscripts and brought the unfinished project to art publisher Tériade.  
-    <sub>names reverdy, teriade</sub>
-  - **X** Because ten illustrations were missing, the creators had to fundamentally change the book's intended format.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** Tériade and printer Fernand Mourlot finally published the work in 1955, more than thirty years after its initial conception, as a tribute to Gris.  
-    <sub>names teriade, gris</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **R** The project was originally conceived around 1916–1920 by Pierre Reverdy and Juan Gris under the backing of art dealer Léonce Rosenberg [PerQueryResult(index="1.1.1", snippet="This book was originally planned by L.
+  - **R** 1916-1917...", source_title="Designed by Juan Gris - Au Soleil du Plafond - The Metropolitan Museum of Art", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG5OHVThbDDlDAUDxYPOSfD4igSishHJxZkjwhZAxW8Vj3g9W3dzGeyyI5nJG0Q-I_no0nd_BrHNYDsUeqJ_HW6Yp6FEjjPzKdImlYbim4Xe-13k447DR_guQneeZhFNcYiQUn-UV7iCFXbb6w="), PerQueryResult(index="1.1.3", snippet="Conçu dès 1920 par le poète et le peintre et soutenu par Léonce Rosenberg...", source_title="Illustrated book de Juan Gris , Pierre Reverdy : AU SOLEIL DU PLAFOND.
+  - **X** 11 LITHOGRAPHIES COULEURS.
+  - **X** de tête avec suite (1955) on Amorosart", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFpZu8wya7Z799CrLBHvt62imsbxj-qJqMPQm7cH3ZXkugYJAm8FdkGcJDzIoMw1iUPpwZwWB_5eOnOUrwpIRmx8n8SUzrkeEHVBgKyzyTBGFP9KRF4_txNmruewYCOoPljOgeDvHC-Lz9l-wlqolC0zoFwKN7BRllLtIq6oJBrU66oFWSQSs6Or_Meh1_T0diIIHUsuZp8xAWl2L4jEHlkGeWdv_r8ctyPEhgRGHSwPaU3IYLht4OvR-08jDXo355phjhCZC8=")].
+  - **R** The original plan intended to pair each of Reverdy's twenty poems with a corresponding plate by Gris, but production halted when Gris died prematurely of kidney failure in 1927 leaving only eleven completed gouaches [PerQueryResult(index="1.1.2", snippet="Au soleil du plafond was José Victoriano González-Pérez (pseud.
+  - **R** Juan Gris, 1887–1927) final body of work, as he died of kidney failure at only 40 years old in the midst of production.
+  - **R** The collection of poems and lithographs was published nearly thirty years after Juan Gris\'s death, with Pierre Reverdy\'s (1889–1960) text produced as \"a tribute to the memory of a friend who passed away prematurely.\" The initial plan had been to illustrate each of Reverdy\'s twenty poems with a plate by Gris.", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFPZoI-psRRZJfn189CLHFQlVZSEMjY4OGLiz9gxJx2fztipVm2fg-j4t9GTJLRAM_kD137CPQn8djRhtJYR8SDF1nRBxO8p_bL9MCr1qj6uYdPCiFAzX3q_dD1ObV6g9vMy7zwds01ceD0m-Kmm-0bBWLmFmhJVSpl8jT24I7xZYIoZT35b-yBUvLuJHCUlBC83H0=")].
+  - **R** After Rosenberg's inaction and subsequent death, Reverdy retrieved the artwork and poems and brought them to publisher Tériade to revive the stalled book [PerQueryResult(index="1.1.8", snippet="Originally planned by Léonce Rosenberg as large panels, the work was never executed.
+  - **R** After the death of Rosenberg and Gris (he died in 1927), Reverdy retrieved the works and brought them and his poems to Tériade for publication.", source_title="Gris, Juan.
+  - **R** Reverdy, Paul - Sims Reed Rare Books", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFne1fa5csZ0W81LiXt77qXfhPVbl5-LcI2xj03ptZl_ZpUqoOJcsZ4ovbyeT2j8pHJ1wlx8AbB2IsJWHVQVVC__0Uqbch2c-pNfk9mL020cFJSfmEdIs_zj6YtfQ==")].
+  - **R** The volume was ultimately published in 1955, nearly three decades after Gris's death, with the text printed in facsimile from Reverdy's own handwriting [PerQueryResult(index="1.1.2", snippet="The collection of poems and lithographs was published nearly thirty years after Juan Gris\'s death...", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFPZoI-psRRZJfn189CLHFQlVZSEMjY4OGLiz9gxJx2fztipVm2fg-j4t9GTJLRAM_kD137CPQn8djRhtJYR8SDF1nRBxO8p_bL9MCr1qj6uYdPCiFAzX3q_dD1ObV6g9vMy7zwds01ceD0m-Kmm-0bBWLmFmhJVSpl8jT24I7xZYIoZT35b-yBUvLuJHCUlBC83H0="), PerQueryResult(index="1.1.8", snippet="The work consists of 20 poems by Reverdy, reproduced in facsimile after his manuscript and illustrated with 11 lithographs by Juan Gris executed by Mourlot Frères...", source_title="Gris, Juan.
+  - **R** Reverdy, Paul - Sims Reed Rare Books", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFne1fa5csZ0W81LiXt77qXfhPVbl5-LcI2xj03ptZl_ZpUqoOJcsZ4ovbyeT2j8pHJ1wlx8AbB2IsJWHVQVVC__0Uqbch2c-pNfk9mL020cFJSfmEdIs_zj6YtfQ==")].
+  - **R** Reverdy framed the delayed publication as an explicit tribute to reunite with his deceased friend across time [PerQueryResult(index="1.1.2", snippet="The collection of poems and lithographs was published nearly thirty years after Juan Gris\'s death, with Pierre Reverdy\'s (1889–1960) text produced as \"a tribute to the memory of a friend who passed away prematurely.\" ...
+  - **R** Reverdy writes at the conclusion of the preface: \"...above all with that great painter and great friend, with whom I find myself reunited here, thanks to all that defies the grave.\"", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFPZoI-psRRZJfn189CLHFQlVZSEMjY4OGLiz9gxJx2fztipVm2fg-j4t9GTJLRAM_kD137CPQn8djRhtJYR8SDF1nRBxO8p_bL9MCr1qj6uYdPCiFAzX3q_dD1ObV6g9vMy7zwds01ceD0m-Kmm-0bBWLmFmhJVSpl8jT24I7xZYIoZT35b-yBUvLuJHCUlBC83H0=")].
 
 
 ## credit_line 3.3 — *evaluative* / participial
@@ -2055,106 +2010,90 @@ kind **eventful → eventful** · R4 w0 X1
 
 ### SERPER — `"Au Soleil du Plafond" Reverdy Gris why resulting unique interlacing images`
 
-8 results · kind **eventful → eventful** · R14 w1 X2
+7 results · kind **active → active** · R13 w4 X1
 
-**1. Designed by Juan Gris - Au Soleil du Plafond**  
-`metmuseum.org` · tier `tier1`  
-> Au Soleil du Plafond; Designer: Designed by Juan Gris (Spanish, Madrid 1887–1927 Boulogne-sur-Seine); Author: Written by Pierre Reverdy (French, 1889–1960)
-
-  - **R** Au Soleil du Plafond; Designer: Designed by Juan Gris (Spanish, Madrid 1887–1927 Boulogne-sur-Seine); Author: Written by Pierre Reverdy (French, 1889–1960)  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
-
-**2. Pierre Reverdy, Au Soleil du Plafond, Tériade Editeur, ...**  
-`christies.com` · tier `market`  
-> AFTER JUAN GRIS (1887-1927) Pierre Reverdy, Au Soleil du Plafond, Tériade Editeur, Paris, 1955 the complete set of 11 lithographs in colors, 1916-17, ...
-
-  - **R** AFTER JUAN GRIS (1887-1927) Pierre Reverdy, Au Soleil du Plafond, Tériade Editeur, Paris, 1955 the complete set of 11 lithographs in colors, 1916-17, ...  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
-
-**3. A double-page spread from the book Pierre Reverdy. Au ...**  
-`tretyakovgallerymagazine.ru` · tier `unverified`  
-> A double-page spread from the book Pierre Reverdy. Au Soleil du plafond. Miscellaneous. Paris, 1955. A colour lithograph by Juan Gris. 42 x 64 cm. Magazine ...
-
-  - **R** A double-page spread from the book Pierre Reverdy.  
-    <sub>names pierre reverdy, reverdy, pierre</sub>
-  - **R** Au Soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** A colour lithograph by Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-
-**4. Gris and Reverdy's Au soleil du plafond**  
-`araderbooks.com` · tier `unverified`  
-> Au soleil du plafond was José Victoriano González-Pérez (pseud. Juan Gris, 1887–1927) final body of work, as he died of kidney failure at only 40 years old in ...
-
-  - **R** Au soleil du plafond was José Victoriano González-Pérez (pseud.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** Juan Gris, 1887–1927) final body of work, as he died of kidney failure at only 40 years old in ...  
-    <sub>names juan gris, gris, juan</sub>
-
-**5. Juan Gris, 'Pierre Reverdy. Au soleil du plafond Paris ...**  
-`artsy.net` · tier `market`  
-> Juan Gris. ,. Pierre Reverdy. Au soleil du plafond Paris, Tériade Éditeur, 1955 ; Lechbinska Gallery. Zürich ; High auction record. £34.8m, Christie's, 2014.
-
-  - **R** Au soleil du plafond Paris, Tériade Éditeur, 1955 ; Lechbinska Gallery.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **X** Zürich ; High auction record.  
-    <sub>about someone else (Zürich), not this stop</sub>
-  - **X** £34.8m, Christie's, 2014.  
-    <sub>about someone else (Christie's), not this stop</sub>
-
-**6. Au Soleil du Plafond - First Edition - Signed - Pierre Reverdy**  
-`baumanrarebooks.com` · tier `unverified`  
-> Au Soleil du Plafond rare book for sale. This First Edition, Signed by Pierre REVERDY, Juan GRIS is available at Bauman Rare Books.
-
-  - **R** Au Soleil du Plafond rare book for sale.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** This First Edition, Signed by Pierre REVERDY, Juan GRIS is available at Bauman Rare Books.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-
-**7. Au soleil du plafond - Juan GRIS (Jose Victoriano ...**  
-`musee-lam.fr` · tier `unverified`  
-> ... GRIS (Jose Victoriano GONZALES PEREZ, dit) ou Pierre REVERDY. Au soleil du plafond. 1955. Juan GRIS (Jose Victoriano GONZALES PEREZ, dit) ou Pierre REVERDY. Au ...
-
-  - **R** GRIS (Jose Victoriano GONZALES PEREZ, dit) ou Pierre REVERDY.  
-    <sub>names pierre reverdy, reverdy, pierre</sub>
-  - **R** Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** Juan GRIS (Jose Victoriano GONZALES PEREZ, dit) ou Pierre REVERDY.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-
-**8. (PDF) Textual Spaces: The Poetry of Pierre Reverdy**  
-`researchgate.net` · tier `unverified`  
+**1. (PDF) Textual Spaces: The Poetry of Pierre Reverdy - ResearchGate**  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/374031362_Textual_Spaces_The_Poetry_of_Pierre_Reverdy>  
 > anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the. destructive wind: Le vent noir qui tordait les ...
 
-  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - w destructive wind: Le vent noir qui tordait les ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.
+  - w destructive wind: Le vent noir qui tordait les ...
+
+**2. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & Harlequins ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105223968/The_cubism_of_Juan_Gris_Vol_II_Portraits_Pierrots_and_Harlequins_Drawings_Designs_for_the_theatre_Books_Lithographs_Pochoirs_Press_illustrations>  
+> ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc Gris ...
+
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.
+  - **R** Pierrots, Drawings, Books, etc Gris ...
+
+**3. Efficacité/Efficacy - Brill**  
+`brill.com` · tier `unverified` · <https://brill.com/display/book/9789401200738/9789401200738_webready_content_text.pdf?srsltid=AfmBOoqntPEvmUAKBx36f_ZchBlfbLYSw0coqbIQrvx1Cjvyi5hf3qIL>  
+> morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La ... the interlacing word and image reflect each other and question the priority.
+
+  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La ...
+  - w the interlacing word and image reflect each other and question the priority.
+
+**4. The cubism of Juan Gris. Vol I. Still lifes, landscapes - Academia.edu**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105222311/The_cubism_of_Juan_Gris_Vol_I_Still_lifes_landscapes>  
+> ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 ... Gris, Au soleil du plafond, Paris, 1955, repr. plate 8 among a serie of ...
+
+  - **R** Reverdy, Au soleil du plafond.
+  - w The idea for this collaboration between 29 ...
+  - **R** Gris, Au soleil du plafond, Paris, 1955, repr.
+  - w plate 8 among a serie of ...
+
+**5. [PDF] LE CORBUSIER Y EL POEMA DEL ÁNGULO RECTO - UPCommons**  
+`upcommons.upc.edu` · tier `tier1` · <https://upcommons.upc.edu/server/api/core/bitstreams/8b08f257-f981-4eed-b8e5-60ee3e8fd781/content>  
+> ... Au Soleil du Plafond (illustrated by Gris). However, among the twenty-six livres de peintres Tériade published, such examples are rare.” Ver: ANTHO-. NIOZ ...
+
+  - **R** Au Soleil du Plafond (illustrated by Gris).
+  - **R** However, among the twenty-six livres de peintres Tériade published, such examples are rare.” Ver: ANTHO-.
+
+**6. Juan Gris, María Blanchard y los cubismos.pdf - Academia.edu**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/36249052/Juan_Gris_Mar%C3%ADa_Blanchard_y_los_cubismos_pdf>  
+> ... Au Soleil du Plafond de Reverdy. Pero 22. Sobre las relaciones de Juan Gris ... Despite the resulting abstraction of this metamorphose and are interlaced ...
+
+  - **R** Au Soleil du Plafond de Reverdy.
+  - **R** Sobre las relaciones de Juan Gris ...
+  - **X** Despite the resulting abstraction of this metamorphose and are interlaced ...
+
+**7. The Yale Anthology of Twentieth-Century French Poetry**  
+`epdf.pub` · tier `unverified` · <https://epdf.pub/the-yale-anthology-of-twentieth-century-french-poetry-5ea6b1fa35744.html>  
+> Reverdy insisted, in his famous essay on the theory of ''the Image ... Au soleil du plafond, 1955; La Liberté des mers, 1959; Sable mouvant, 1966 ...
+
+  - **R** Reverdy insisted, in his famous essay on the theory of ''the Image ...
+  - **R** Au soleil du plafond, 1955; La Liberté des mers, 1959; Sable mouvant, 1966 ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, resulting in a unique interlacing of images and words?`
 
-kind **eventful → eventful** · R4 w0 X1
+kind **eventful → eventful** · R4 w0 X0
 
-> Art dealer Léonce Rosenberg originally planned the project around 1916–1917 as a collaboration where Juan Gris would produce twenty illustrations corresponding to twenty poems by Pierre Reverdy. 
+> Art dealer Léonce Rosenberg originally planned the collaborative project between Juan Gris and Pierre Reverdy around 1916–1917. 
 > 
-> Work on the book halted when Gris died prematurely in 1927 after completing only eleven gouaches. 
+> The publication stalled because Juan Gris died of uremia in 1927 after finishing only 11 of the 20 planned illustrations. 
 > 
-> Nearly thirty years later, publisher Tériade revived the abandoned project in collaboration with Reverdy. 
+> Publisher Tériade revived the project nearly three decades later with Reverdy to release the volume as a posthumous homage to Gris. 
 > 
-> Because almost half of the illustrations were missing, the creators had to fundamentally redesign the layout and presentation of the volume. 
-> 
-> Publisher Tériade finally released the completed work in 1955 through Éditions de la Revue Verve with lithographs printed by Mourlot Frères as a posthumous tribute to Gris.
+> Published in 1955, the completed work interlaced Gris's gouache compositions with Reverdy's own handwritten poems printed via lithography.
 
-  - **R** Art dealer Léonce Rosenberg originally planned the project around 1916–1917 as a collaboration where Juan Gris would produce twenty illustrations corresponding to twenty poems by Pierre Reverdy.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** Work on the book halted when Gris died prematurely in 1927 after completing only eleven gouaches.  
-    <sub>names gris</sub>
-  - **R** Nearly thirty years later, publisher Tériade revived the abandoned project in collaboration with Reverdy.  
-    <sub>names reverdy, teriade</sub>
-  - **X** Because almost half of the illustrations were missing, the creators had to fundamentally redesign the layout and presentation of the volume.  
-    <sub>about someone else (Because), not this stop</sub>
-  - **R** Publisher Tériade finally released the completed work in 1955 through Éditions de la Revue Verve with lithographs printed by Mourlot Frères as a posthumous tribute to Gris.  
-    <sub>names teriade, verve, gris</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Au Soleil du Plafond Juan Gris Pierre Reverdy MFA Boston Picasso Miro Dali Unbound`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+3. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+
+  - **R** Art dealer Léonce Rosenberg originally planned the collaborative project between Juan Gris and Pierre Reverdy around 1916–1917.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+  - **R** The publication stalled because Juan Gris died of uremia in 1927 after finishing only 11 of the 20 planned illustrations.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Publisher Tériade revived the project nearly three decades later with Reverdy to release the volume as a posthumous homage to Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Published in 1955, the completed work interlaced Gris's gouache compositions with Reverdy's own handwritten poems printed via lithography.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
 
 
 ## credit_line 4.1 — *evaluative* / capacity
@@ -2166,93 +2105,93 @@ kind **eventful → eventful** · R4 w0 X1
 8 results · kind **inert → inert** · R12 w1 X1
 
 **1. A Cubist Glimpse | Prufrock's Dilemma - WordPress.com**  
-`prufrocksdilemma.wordpress.com` · tier `unverified`  
+`prufrocksdilemma.wordpress.com` · tier `unverified` · <https://prufrocksdilemma.wordpress.com/2014/11/23/a-cubist-glimpse/>  
 > Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
-  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
 **2. Living Still Life | John Golding**  
-`nybooks.com` · tier `unverified`  
+`nybooks.com` · tier `unverified` · <https://www.nybooks.com/articles/1993/01/28/living-still-life/>  
 > ... Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later). These small ...
 
-  - **R** Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later).  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later).
 
 **3. Cubist Painting of Picasso, Braque, Gris and Léger**  
-`thepersonalreview.blogspot.com` · tier `unverified`  
+`thepersonalreview.blogspot.com` · tier `unverified` · <http://thepersonalreview.blogspot.com/2015/02/cubist-painting-of-picasso-braque-gris.html>  
 > ... Au Soleil du plafond using color lithographs of Gris' original works ... Viewers who actually read the Reverdy poem that accompanies Gris's ...
 
-  - **R** Au Soleil du plafond using color lithographs of Gris' original works ...  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** Viewers who actually read the Reverdy poem that accompanies Gris's ...  
-    <sub>names reverdy, gris</sub>
+  - **R** Au Soleil du plafond using color lithographs of Gris' original works ...
+  - **R** Viewers who actually read the Reverdy poem that accompanies Gris's ...
 
 **4. Coffee Grinder, Cup and Glass on a Table - Juan Gris**  
-`artsdot.com` · tier `unverified`  
+`artsdot.com` · tier `unverified` · <https://artsdot.com/en/orders/image/juan-gris-coffee-grinder-cup-and-glass-on-a-table-D3VJD5-en/>  
 > ... Reverdy that truly ignited his artistic revolution. Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
-  - **R** Reverdy that truly ignited his artistic revolution.  
-    <sub>names reverdy</sub>
-  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Reverdy that truly ignited his artistic revolution.
+  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
 **5. (PDF) Textual Spaces: The Poetry of Pierre Reverdy**  
-`researchgate.net` · tier `unverified`  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/374031362_Textual_Spaces_The_Poetry_of_Pierre_Reverdy>  
 > anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the. destructive wind: Le vent noir qui tordait les ...
 
-  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - w destructive wind: Le vent noir qui tordait les ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.
+  - w destructive wind: Le vent noir qui tordait les ...
 
 **6. Juan Gris, Guitar, from Au Soleil du Plafond, 1955 (after)**  
-`1stdibs.com` · tier `market`  
+`1stdibs.com` · tier `market` · <https://www.1stdibs.com/art/prints-works-on-paper/abstract-prints-works-on-paper/juan-gris-juan-gris-guitar-from-au-soleil-du-plafond-1955-after/id-a_16383272/>  
 > This exquisite lithograph after Juan Gris (1887–1927), titled Guitare (Guitar), from the folio Au Soleil du Plafond (In the Sunlight of the Ceiling), ...
 
-  - **R** This exquisite lithograph after Juan Gris (1887–1927), titled Guitare (Guitar), from the folio Au Soleil du Plafond (In the Sunlight of the Ceiling), ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** This exquisite lithograph after Juan Gris (1887–1927), titled Guitare (Guitar), from the folio Au Soleil du Plafond (In the Sunlight of the Ceiling), ...
 
 **7. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...**  
-`academia.edu` · tier `tier1`  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105223968/The_cubism_of_Juan_Gris_Vol_II_Portraits_Pierrots_and_Harlequins_Drawings_Designs_for_the_theatre_Books_Lithographs_Pochoirs_Press_illustrations>  
 > ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc Gris ...
 
-  - **R** Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Pierrots, Drawings, Books, etc Gris ...  
-    <sub>names gris</sub>
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.
+  - **R** Pierrots, Drawings, Books, etc Gris ...
 
 **8. Advance Exhibition Schedule**  
-`mfa.org` · tier `tier1`  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/news/advance-exhibition-schedule>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, Gris's ability to transform visual art?`
 
 kind **eventful → eventful** · R4 w0 X0
 
-> The project was originally planned around 1916–1917 by the art dealer and publisher Léonce Rosenberg as a collaborative volume pairing twenty poems by Pierre Reverdy with plates by Juan Gris.
+> Art dealer Léonce Rosenberg originally commissioned the project around 1916 as a collaborative portfolio pairing twenty poems by Pierre Reverdy with twenty artworks by Juan Gris.
 > 
-> Production halted when Gris died prematurely of kidney failure in 1927, having completed only eleven of the intended illustrations.
+> The initial plan collapsed because Gris died of kidney failure in 1927 at age forty, leaving only eleven completed illustrations. 
 > 
-> Publisher Tériade revived the abandoned project nearly three decades later with Reverdy's participation.
+> Following the deaths of the painter and the dealer, Reverdy reclaimed his manuscripts and brought the unfinished work to publisher Tériade. 
 > 
-> The book was finally published in 1955 by Tériade, printed by Mourlot Frères, with Reverdy dedicating the work as a posthumous tribute to Gris.
+> Tériade reconceived the format and published the book in 1955—nearly three decades after Gris's death—using Mourlot Frères to print the lithographs after Gris's original gouaches.
 
-  - **R** The project was originally planned around 1916–1917 by the art dealer and publisher Léonce Rosenberg as a collaborative volume pairing twenty poems by Pierre Reverdy with plates by Juan Gris.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** Production halted when Gris died prematurely of kidney failure in 1927, having completed only eleven of the intended illustrations.  
-    <sub>names gris</sub>
-  - **R** Publisher Tériade revived the abandoned project nearly three decades later with Reverdy's participation.  
-    <sub>names reverdy, teriade</sub>
-  - **R** The book was finally published in 1955 by Tériade, printed by Mourlot Frères, with Reverdy dedicating the work as a posthumous tribute to Gris.  
-    <sub>names reverdy, teriade, gris</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `"Au Soleil du Plafond" "Gris" "Reverdy"`; `"Au Soleil du Plafond" Juan Gris Reverdy history published Kahnweiler Tériade`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+3. `invaluable.com` — <https://www.invaluable.com/artist/gris-juan-plmqx8pmi3/sold-at-auction-prices/>
+4. `etsy.com` — <https://www.etsy.com/nz/listing/1857706555/juan-gris-bouteille-kahnweiler-1969-au>
+5. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+
+  - **R** Art dealer Léonce Rosenberg originally commissioned the project around 1916 as a collaborative portfolio pairing twenty poems by Pierre Reverdy with twenty artworks by Juan Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `invaluable.com` <https://www.invaluable.com/artist/gris-juan-plmqx8pmi3/sold-at-auction-prices/>
+  - **R** The initial plan collapsed because Gris died of kidney failure in 1927 at age forty, leaving only eleven completed illustrations.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `etsy.com` <https://www.etsy.com/nz/listing/1857706555/juan-gris-bouteille-kahnweiler-1969-au>
+  - **R** Following the deaths of the painter and the dealer, Reverdy reclaimed his manuscripts and brought the unfinished work to publisher Tériade.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `invaluable.com` <https://www.invaluable.com/artist/gris-juan-plmqx8pmi3/sold-at-auction-prices/>
+  - **R** Tériade reconceived the format and published the book in 1955—nearly three decades after Gris's death—using Mourlot Frères to print the lithographs after Gris's original gouaches.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+      ↳ source: `invaluable.com` <https://www.invaluable.com/artist/gris-juan-plmqx8pmi3/sold-at-auction-prices/>
 
 
 ## credit_line 4.2 — *evaluative* / capacity
@@ -2264,96 +2203,95 @@ kind **eventful → eventful** · R4 w0 X0
 7 results · kind **inert → inert** · R12 w0 X2
 
 **1. Coffee Grinder, Cup and Glass on a Table — Juan Gris**  
-`wahooart.com` · tier `unverified`  
+`wahooart.com` · tier `unverified` · <https://wahooart.com/en/art/juan-gris-coffee-grinder-cup-and-glass-on-a-table-D3VJD5-en/>  
 > Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond ... This piece is a testament to Gris's ability to ... structural ...
 
-  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** This piece is a testament to Gris's ability to ...  
-    <sub>names gris</sub>
+  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond ...
+  - **R** This piece is a testament to Gris's ability to ...
 
 **2. Objects Observed: The Poetry of Things in Twentieth ...**  
-`dokumen.pub` · tier `unverified`  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear. Let us look, ...
 
-  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.
 
 **3. (PDF) The cubism of Juan Gris. Vol I. Still lifes, landscapes**  
-`academia.edu` · tier `tier1`  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105222311/The_cubism_of_Juan_Gris_Vol_I_Still_lifes_landscapes>  
 > Reverdy, Au Soleil du Plafond, Paris, 1955 J. Thrall Soby, Juan Gris, Museum of Modern Art, New York, 1958 (illustrated p. 56) G. Tinterow, Juan Gris ...
 
-  - **R** Reverdy, Au Soleil du Plafond, Paris, 1955 J.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** Thrall Soby, Juan Gris, Museum of Modern Art, New York, 1958 (illustrated p.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Tinterow, Juan Gris ...  
-    <sub>names juan gris, gris, juan</sub>
+  - **R** Reverdy, Au Soleil du Plafond, Paris, 1955 J.
+  - **R** Thrall Soby, Juan Gris, Museum of Modern Art, New York, 1958 (illustrated p.
+  - **R** Tinterow, Juan Gris ...
 
 **4. Efficacité/Efficacy**  
-`brill.com` · tier `unverified`  
+`brill.com` · tier `unverified` · <https://brill.com/display/book/9789401200738/9789401200738_webready_content_text.pdf?srsltid=AfmBOoo8eZQHH5bTwpb5qcgkAH8wNyvwhJCyV9utM2AHgI4reVw4TS1s>  
 > morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La. Liberté des mers, 1960), en reproduction de manuscrit. Quant à Cocteau, il.
 
-  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La.  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
-  - **X** Liberté des mers, 1960), en reproduction de manuscrit.  
-    <sub>about someone else (Liberté), not this stop</sub>
+  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La.
+  - **X** Liberté des mers, 1960), en reproduction de manuscrit.
 
 **5. Transnational Railway Cultures: Trains in Music, Literature ...**  
-`dokumen.pub` · tier `unverified`  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/transnational-railway-cultures-trains-in-music-literature-film-and-visual-art-9781789209198.html>  
 > Both Nord-Sud and SIC advertised Reverdy's collection of poetry, reaffirming the link between the three works. ... Reverdy's 'Au soleil du plafond.' ” French ...
 
-  - **R** Both Nord-Sud and SIC advertised Reverdy's collection of poetry, reaffirming the link between the three works.  
-    <sub>names reverdy</sub>
-  - **R** Reverdy's 'Au soleil du plafond.' ” French ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Both Nord-Sud and SIC advertised Reverdy's collection of poetry, reaffirming the link between the three works.
+  - **R** Reverdy's 'Au soleil du plafond.' ” French ...
 
 **6. Juan Gris, María Blanchard y los cubismos.pdf**  
-`academia.edu` · tier `tier1`  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/36249052/Juan_Gris_Mar%C3%ADa_Blanchard_y_los_cubismos_pdf>  
 > ... Au Soleil du Plafond de Reverdy. Pero 22. Sobre las relaciones de Juan Gris con la luego, con inmediata posteridad a estas fechas, ni Gris ni Lipchitz ...
 
-  - **R** Au Soleil du Plafond de Reverdy.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** Sobre las relaciones de Juan Gris con la luego, con inmediata posteridad a estas fechas, ni Gris ni Lipchitz ...  
-    <sub>names juan gris, gris, juan</sub>
+  - **R** Au Soleil du Plafond de Reverdy.
+  - **R** Sobre las relaciones de Juan Gris con la luego, con inmediata posteridad a estas fechas, ni Gris ni Lipchitz ...
 
 **7. The Yale Anthology of Twentieth-Century French Poetry**  
-`epdf.pub` · tier `unverified`  
+`epdf.pub` · tier `unverified` · <https://epdf.pub/the-yale-anthology-of-twentieth-century-french-poetry-5ea6b1fa35744.html>  
 > ... Au soleil du plafond, 1955; La Liberté des mers, 1959; Sable mouvant, 1966. In the Fields or on the Hill No Historical ﬁgure And there the sun was coming ...
 
-  - **R** Au soleil du plafond, 1955; La Liberté des mers, 1959; Sable mouvant, 1966.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **X** In the Fields or on the Hill No Historical ﬁgure And there the sun was coming ...  
-    <sub>about someone else (Fields), not this stop</sub>
+  - **R** Au soleil du plafond, 1955; La Liberté des mers, 1959; Sable mouvant, 1966.
+  - **X** In the Fields or on the Hill No Historical ﬁgure And there the sun was coming ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, Reverdy's capacity to infuse words with structural beauty?`
 
-kind **eventful → eventful** · R6 w0 X0
+kind **eventful → eventful** · R5 w1 X0
 
-> Art dealer Léonce Rosenberg originally planned the collaborative project between Pierre Reverdy and Juan Gris around 1916–1917. 
+> *Au Soleil du Plafond* was originally conceived around 1916–1917 as a collaborative publication planned by art dealer Léonce Rosenberg.
 > 
-> The initial intention was for Gris to provide a plate for each of Reverdy's twenty poems. 
+> The project intended for Juan Gris to create a companion visual plate for each of Pierre Reverdy's twenty poems. 
 > 
-> Work came to a halt when Gris died prematurely in 1927 at age forty, having completed only eleven gouaches for the illustrations. 
+> Work on the book came to a complete halt when Gris died prematurely in 1927, leaving only eleven of the intended illustrations finished.
 > 
-> Nearly thirty years later, the art publisher Tériade revived the abandoned project in collaboration with Reverdy. 
+> Publisher Tériade resurrected the stalled project nearly thirty years later with Reverdy to complete the book as a posthumous tribute to Gris.
 > 
-> Fernand Mourlot’s atelier printed the volume in 1955, reproducing Gris’s gouaches as color lithographs alongside lithographs of Reverdy’s handwritten text. 
+> Reverdy's handwritten poetic text was reproduced alongside Gris’s gouaches via lithography printed by Fernand Mourlot Frères.
 > 
-> Reverdy included an introductory tribute to bring the delayed work to completion as a memorial to his late friend.
+> The reconstructed *livre d'artiste* was finally issued in 1955 in a limited print run of roughly 220 copies.
 
-  - **R** Art dealer Léonce Rosenberg originally planned the collaborative project between Pierre Reverdy and Juan Gris around 1916–1917.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** The initial intention was for Gris to provide a plate for each of Reverdy's twenty poems.  
-    <sub>names reverdy, gris</sub>
-  - **R** Work came to a halt when Gris died prematurely in 1927 at age forty, having completed only eleven gouaches for the illustrations.  
-    <sub>names gris</sub>
-  - **R** Nearly thirty years later, the art publisher Tériade revived the abandoned project in collaboration with Reverdy.  
-    <sub>names reverdy, teriade</sub>
-  - **R** Fernand Mourlot’s atelier printed the volume in 1955, reproducing Gris’s gouaches as color lithographs alongside lithographs of Reverdy’s handwritten text.  
-    <sub>names reverdy, gris</sub>
-  - **R** Reverdy included an introductory tribute to bring the delayed work to completion as a memorial to his late friend.  
-    <sub>names reverdy</sub>
+**SOURCES (4)** — pages Gemini actually read · searched: `Au Soleil du Plafond Juan Gris Pierre Reverdy Teriade`; `Au Soleil du Plafond Reverdy Gris 1955 history`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `artsy.net` — <https://www.artsy.net/artwork/juan-gris-pierre-reverdy-au-soleil-du-plafond-paris-teriade-editeur>
+3. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+4. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+
+  - **R** *Au Soleil du Plafond* was originally conceived around 1916–1917 as a collaborative publication planned by art dealer Léonce Rosenberg.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `artsy.net` <https://www.artsy.net/artwork/juan-gris-pierre-reverdy-au-soleil-du-plafond-paris-teriade-editeur>
+  - **R** The project intended for Juan Gris to create a companion visual plate for each of Pierre Reverdy's twenty poems.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Work on the book came to a complete halt when Gris died prematurely in 1927, leaving only eleven of the intended illustrations finished.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Publisher Tériade resurrected the stalled project nearly thirty years later with Reverdy to complete the book as a posthumous tribute to Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Reverdy's handwritten poetic text was reproduced alongside Gris’s gouaches via lithography printed by Fernand Mourlot Frères.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+  - w The reconstructed *livre d'artiste* was finally issued in 1955 in a limited print run of roughly 220 copies.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
 
 
 ## credit_line 6.1 — *evaluative* / relative
@@ -2365,101 +2303,89 @@ kind **eventful → eventful** · R6 w0 X0
 8 results · kind **inert → inert** · R10 w0 X4
 
 **1. A Cubist Glimpse | Prufrock's Dilemma - WordPress.com**  
-`prufrocksdilemma.wordpress.com` · tier `unverified`  
+`prufrocksdilemma.wordpress.com` · tier `unverified` · <https://prufrocksdilemma.wordpress.com/2014/11/23/a-cubist-glimpse/>  
 > Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
-  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** Each of the poems in his collection Au Soleil du plafond refers to a still life by Juan Gris, one of which, Compotier (The Fruit Bowl), is ...
 
-**2. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...**  
-`academia.edu` · tier `tier1`  
+**2. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & Harlequins ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105223968/The_cubism_of_Juan_Gris_Vol_II_Portraits_Pierrots_and_Harlequins_Drawings_Designs_for_the_theatre_Books_Lithographs_Pochoirs_Press_illustrations>  
 > ... Pierre Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc ...
 
-  - **R** Pierre Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **X** Pierrots, Drawings, Books, etc ...  
-    <sub>about someone else (Pierrots), not this stop</sub>
+  - **R** Pierre Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.
+  - **X** Pierrots, Drawings, Books, etc ...
 
-**3. Advance Exhibition Schedule**  
-`mfa.org` · tier `tier1`  
+**3. Advance Exhibition Schedule | Museum of Fine Arts Boston**  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/news/advance-exhibition-schedule>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on ... Archives.” By documenting injustices, repression, and state violence ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Archives.” By documenting injustices, repression, and state violence ...  
-    <sub>about someone else (Archives), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Archives.” By documenting injustices, repression, and state violence ...
 
-**4. Pierre Reverdy Chapter Summary**  
-`bookey.app` · tier `unverified`  
+**4. Pierre Reverdy Chapter Summary - Bookey**  
+`bookey.app` · tier `unverified` · <https://www.bookey.app/book/pierre-reverdy>  
 > His collection, "Au Soleil du plafond," showcases this artistic partnership and includes poems inspired by Gris's still lifes. Reverdy himself ...
 
-  - **R** His collection, "Au Soleil du plafond," showcases this artistic partnership and includes poems inspired by Gris's still lifes.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
+  - **R** His collection, "Au Soleil du plafond," showcases this artistic partnership and includes poems inspired by Gris's still lifes.
 
-**5. Letter from Paris**  
-`newyorker.com` · tier `tier2`  
+**5. Letter from Paris | The New Yorker**  
+`newyorker.com` · tier `tier2` · <https://www.newyorker.com/magazine/1955/07/30/letter-from-paris-185>  
 > The volume has just been published, under the title “Au Soleil du Plafond ... According to Reverdy, in 1917 Gris and he conceived the idea of this doubly ...
 
-  - **R** The volume has just been published, under the title “Au Soleil du Plafond ...  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** According to Reverdy, in 1917 Gris and he conceived the idea of this doubly ...  
-    <sub>names reverdy, gris</sub>
+  - **R** The volume has just been published, under the title “Au Soleil du Plafond ...
+  - **R** According to Reverdy, in 1917 Gris and he conceived the idea of this doubly ...
 
-**6. Objects Observed: The Poetry of Things in Twentieth ...**  
-`dokumen.pub` · tier `unverified`  
+**6. Objects Observed: The Poetry of Things in Twentieth-Century France ...**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > The complexity of Reverdy's engagement with the still life emerges again in the short collection of prose poems Au Soleil du plafond (At the Ceiling's Sun) ...
 
-  - **R** The complexity of Reverdy's engagement with the still life emerges again in the short collection of prose poems Au Soleil du plafond (At the Ceiling's Sun) ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** The complexity of Reverdy's engagement with the still life emerges again in the short collection of prose poems Au Soleil du plafond (At the Ceiling's Sun) ...
 
-**7. Coming Attractions: July 19 Through August 3 - What Will ...**  
-`artsfuse.org` · tier `unverified`  
+**7. Coming Attractions: July 19 Through August 3 - What Will Light Your Fire**  
+`artsfuse.org` · tier `unverified` · <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>  
 > ... Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy. Here, both text and ...
 
-  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
-  - **X** Here, both text and ...  
-    <sub>about someone else (Here), not this stop</sub>
+  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.
+  - **X** Here, both text and ...
 
-**8. Joan Miró Exhibitions: Current, Upcoming & Past Shows**  
-`mutualart.com` · tier `market`  
+**8. Joan Miró Exhibitions: Current, Upcoming & Past Shows - Mutual Art**  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artist/Joan-Miro/1321474326EE6DA8/artist-info/exhibitions>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, rarely emerge from the archives?`
 
-kind **eventful → eventful** · R5 w0 X1
+kind **eventful → eventful** · R5 w0 X0
 
-> Art dealer Léonce Rosenberg originally planned the project around 1916–1917 with Juan Gris and Pierre Reverdy.
-> 
-> The initial plan called for illustrating each of Reverdy's twenty poems, but production was halted when Gris died of kidney failure in 1927 after finishing only eleven illustrations.
-> 
-> The project was revived roughly thirty years later by the art publisher Tériade, who reconceived the publication alongside Reverdy as a posthumous tribute to Gris.
-> 
-> Reverdy had originally written the accompanying texts decades earlier solely for personal resolution before they were finally paired with Gris's lithographs in the 1955 edition.
-> 
-> Master printer Fernand Mourlot produced the lithographs in Paris from Gris's original 1916–1917 gouaches.
-> 
-> The work at the Museum of Fine Arts, Boston was gifted to the museum by collectors Boris and Galina Fridman.
+> * The project was originally commissioned around 1916–1917 by the art dealer Léonce Rosenberg as a direct collaboration between Juan Gris and poet Pierre Reverdy.
+> * The original plan called for Gris to create a matching illustration for each of Reverdy's twenty poems.
+> * Gris's premature death at age forty in 1927 brought the project to a complete halt before it could be finished.
+> * At the time of his death, Gris had completed only 11 of the planned gouache illustrations.
+> * Publisher Tériade revived and reconceived the abandoned project nearly three decades later with Reverdy's participation, finally publishing it in 1955 as a posthumous tribute to Gris.
 
-  - **R** Art dealer Léonce Rosenberg originally planned the project around 1916–1917 with Juan Gris and Pierre Reverdy.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** The initial plan called for illustrating each of Reverdy's twenty poems, but production was halted when Gris died of kidney failure in 1927 after finishing only eleven illustrations.  
-    <sub>names reverdy, gris</sub>
-  - **R** The project was revived roughly thirty years later by the art publisher Tériade, who reconceived the publication alongside Reverdy as a posthumous tribute to Gris.  
-    <sub>names reverdy, teriade, gris</sub>
-  - **R** Reverdy had originally written the accompanying texts decades earlier solely for personal resolution before they were finally paired with Gris's lithographs in the 1955 edition.  
-    <sub>names reverdy, gris</sub>
-  - **R** Master printer Fernand Mourlot produced the lithographs in Paris from Gris's original 1916–1917 gouaches.  
-    <sub>names gris</sub>
-  - **X** The work at the Museum of Fine Arts, Boston was gifted to the museum by collectors Boris and Galina Fridman.  
-    <sub>about someone else (Museum), not this stop</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Au Soleil du Plafond Juan Gris Pierre Reverdy MFA Boston Picasso Miro Dali Unbound`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+3. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+
+  - **R** * The project was originally commissioned around 1916–1917 by the art dealer Léonce Rosenberg as a direct collaboration between Juan Gris and poet Pierre Reverdy.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+  - **R** * The original plan called for Gris to create a matching illustration for each of Reverdy's twenty poems.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** * Gris's premature death at age forty in 1927 brought the project to a complete halt before it could be finished.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** * At the time of his death, Gris had completed only 11 of the planned gouache illustrations.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+  - **R** * Publisher Tériade revived and reconceived the abandoned project nearly three decades later with Reverdy's participation, finally publishing it in 1955 as a posthumous tribute to Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
 
 
 ## credit_line 6.2 — *evaluative* / participial
@@ -2470,98 +2396,105 @@ kind **eventful → eventful** · R5 w0 X1
 
 8 results · kind **inert → inert** · R11 w3 X2
 
-**1. Transforming the Horizon: Reverdy's World War I**  
-`jstor.org` · tier `tier2`  
+**1. Transforming the Horizon: Reverdy's World War I - jstor**  
+`jstor.org` · tier `tier2` · <https://www.jstor.org/stable/20467022>  
 > Asp Au soleil du plafond et autres po?mes (Paris ... Poulet's comment offers a visual model with which to understand Reverdy's ... be seen as the frontispiece to ...
 
-  - **R** Asp Au soleil du plafond et autres po?mes (Paris ...  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** Poulet's comment offers a visual model with which to understand Reverdy's ...  
-    <sub>names reverdy</sub>
-  - w be seen as the frontispiece to ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** Asp Au soleil du plafond et autres po?mes (Paris ...
+  - **R** Poulet's comment offers a visual model with which to understand Reverdy's ...
+  - w be seen as the frontispiece to ...
 
-**2. (PDF) Textual Spaces: The Poetry of Pierre Reverdy**  
-`researchgate.net` · tier `unverified`  
+**2. (PDF) Textual Spaces: The Poetry of Pierre Reverdy - ResearchGate**  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/374031362_Textual_Spaces_The_Poetry_of_Pierre_Reverdy>  
 > anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the. destructive wind: Le vent noir qui tordait les ...
 
-  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - w destructive wind: Le vent noir qui tordait les ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.
+  - w destructive wind: Le vent noir qui tordait les ...
 
-**3. Coming Attractions: July 19 Through August 3 - What Will ...**  
-`artsfuse.org` · tier `unverified`  
+**3. Coming Attractions: July 19 Through August 3 - What Will Light Your Fire**  
+`artsfuse.org` · tier `unverified` · <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>  
 > A glimpse of Kasandra ... Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.
 
-  - **X** A glimpse of Kasandra ...  
-    <sub>about someone else (Kasandra), not this stop</sub>
-  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
+  - **X** A glimpse of Kasandra ...
+  - **R** Au Soleil du Plafond (1955), the product of a close collaboration between Juan Gris and the poet Pierre Reverdy.
 
-**4. (PDF) The cubism of Juan Gris. Vol I. Still lifes, landscapes**  
-`academia.edu` · tier `tier1`  
+**4. The cubism of Juan Gris. Vol I. Still lifes, landscapes - Academia.edu**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105222311/The_cubism_of_Juan_Gris_Vol_I_Still_lifes_landscapes>  
 > ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco The cubism of Juan Gris. Vol I. Still lifes, landscapes Gris and ...
 
-  - **R** Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco The cubism of Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Still lifes, landscapes Gris and ...  
-    <sub>names gris</sub>
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco The cubism of Juan Gris.
+  - **R** Still lifes, landscapes Gris and ...
 
-**5. Objects Observed: The Poetry of Things in Twentieth ...**  
-`dokumen.pub` · tier `unverified`  
+**5. Objects Observed: The Poetry of Things in Twentieth-Century France ...**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear. Let us look, ...
 
-  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** If we turn now to some prose poems from Au Soleil du plafond, the links between Reverdy's Cubist poetics and the paintings of Gris will be clear.
 
-**6. Joan Miró Exhibitions: Current, Upcoming & Past Shows**  
-`mutualart.com` · tier `market`  
+**6. Joan Miró Exhibitions: Current, Upcoming & Past Shows - Mutual Art**  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artist/Joan-Miro/1321474326EE6DA8/artist-info/exhibitions>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-**7. # Un village, un homme : Pierre Reverdy à Solesmes ...**  
-`facebook.com` · tier `reject`  
+**7. # Un village, un homme : Pierre Reverdy à Solesmes ... - Facebook**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/groups/758863291728075/posts/2052822115665513/>  
 > Pierre Reverdy ( 1869-1960) Sable Mouvant Au soleil du plafond La liberté des mers (Poesie/Gallimard) 2003 Grâce au soutien du couturier-mécène Jacques ...
 
-  - **R** Pierre Reverdy ( 1869-1960) Sable Mouvant Au soleil du plafond La liberté des mers (Poesie/Gallimard) 2003 Grâce au soutien du couturier-mécène Jacques ...  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
+  - **R** Pierre Reverdy ( 1869-1960) Sable Mouvant Au soleil du plafond La liberté des mers (Poesie/Gallimard) 2003 Grâce au soutien du couturier-mécène Jacques ...
 
-**8. Pablo Picasso Exhibitions: Current, Upcoming & Past Shows**  
-`mutualart.com` · tier `market`  
+**8. Pablo Picasso Exhibitions: Current, Upcoming & Past Shows - Mutual Art**  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artist/Pablo-Picasso/68EFD50CBA356F91/artist-info/exhibitions>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on ... Their generous bequest offers a rare glimpse into the vision of two ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - w Their generous bequest offers a rare glimpse into the vision of two ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - w Their generous bequest offers a rare glimpse into the vision of two ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, offering a glimpse into the transformative collaborations of early-20th-century artists?`
 
-kind **eventful → eventful** · R4 w0 X0
+kind **eventful → eventful** · R5 w1 X0
 
-> The livre d'artiste was originally commissioned around 1916 by art dealer Léonce Rosenberg to feature 20 poems by Pierre Reverdy alongside 20 corresponding gouache illustrations by Juan Gris.
+> The art dealer Léonce Rosenberg originally planned the collaborative book around 1916–1917 to pair twenty poems by Pierre Reverdy with twenty illustrations by Juan Gris.
 > 
-> The project was abruptly halted when Gris died in 1927 at age 40, having completed only 11 of the intended artworks.
+> The initial production halted when Juan Gris died prematurely of kidney failure in 1927, having completed only eleven of the intended illustrations.
 > 
-> Nearly thirty years later, publisher Tériade revived the abandoned collaboration alongside Reverdy.
+> Nearly thirty years later, the publisher Tériade revived the abandoned project in collaboration with Reverdy.
 > 
-> Reverdy reconceived the book to finally bring their dialogue to print, dedicating the posthumous 1955 release as a tribute to his deceased friend.
+> The project had to be redesigned into its final format due to the missing illustrations.
+> 
+> Fernand Mourlot’s print shop produced the lithographs from Gris's surviving gouaches alongside Reverdy’s handwritten manuscript text, finally publishing the work in February 1955.
+> 
+> Reverdy published the completed volume as a posthumous tribute to his late friend.
 
-  - **R** The livre d'artiste was originally commissioned around 1916 by art dealer Léonce Rosenberg to feature 20 poems by Pierre Reverdy alongside 20 corresponding gouache illustrations by Juan Gris.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** The project was abruptly halted when Gris died in 1927 at age 40, having completed only 11 of the intended artworks.  
-    <sub>names gris</sub>
-  - **R** Nearly thirty years later, publisher Tériade revived the abandoned collaboration alongside Reverdy.  
-    <sub>names reverdy, teriade</sub>
-  - **R** Reverdy reconceived the book to finally bring their dialogue to print, dedicating the posthumous 1955 release as a tribute to his deceased friend.  
-    <sub>names reverdy</sub>
+**SOURCES (4)** — pages Gemini actually read · searched: `Au Soleil du Plafond Gris Reverdy Teriade Kahnweiler history`; `Au Soleil du Plafond Juan Gris Pierre Reverdy MFA Boston story publication`
+
+1. `metmuseum.org` — <https://www.metmuseum.org/art/collection/search/356117>
+2. `araderbooks.com` — <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+3. `etsy.com` — <https://www.etsy.com/listing/1843501536/juan-gris-compotier-kahnweiler-1969-au>
+4. `baumanrarebooks.com` — <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+
+  - **R** The art dealer Léonce Rosenberg originally planned the collaborative book around 1916–1917 to pair twenty poems by Pierre Reverdy with twenty illustrations by Juan Gris.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `etsy.com` <https://www.etsy.com/listing/1843501536/juan-gris-compotier-kahnweiler-1969-au>
+  - **R** The initial production halted when Juan Gris died prematurely of kidney failure in 1927, having completed only eleven of the intended illustrations.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - **R** Nearly thirty years later, the publisher Tériade revived the abandoned project in collaboration with Reverdy.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+  - w The project had to be redesigned into its final format due to the missing illustrations.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `etsy.com` <https://www.etsy.com/listing/1843501536/juan-gris-compotier-kahnweiler-1969-au>
+  - **R** Fernand Mourlot’s print shop produced the lithographs from Gris's surviving gouaches alongside Reverdy’s handwritten manuscript text, finally publishing the work in February 1955.
+      ↳ source: `metmuseum.org` <https://www.metmuseum.org/art/collection/search/356117>
+      ↳ source: `baumanrarebooks.com` <https://www.baumanrarebooks.com/rare-books/reverdy-pierre-gris-juan/au-soleil-du-plafond/56915.aspx>
+      ↳ source: `etsy.com` <https://www.etsy.com/listing/1843501536/juan-gris-compotier-kahnweiler-1969-au>
+  - **R** Reverdy published the completed volume as a posthumous tribute to his late friend.
+      ↳ source: `araderbooks.com` <https://www.araderbooks.com/pages/books/GRM0084/juan-gris-pierre-reverdy/au-soleil-du-plafond>
+      ↳ source: `etsy.com` <https://www.etsy.com/listing/1843501536/juan-gris-compotier-kahnweiler-1969-au>
 
 
 ## credit_line 7.1 — *evaluative* / relative
@@ -2570,110 +2503,96 @@ kind **eventful → eventful** · R4 w0 X0
 
 ### SERPER — `"Au Soleil du Plafond" Reverdy Gris why highlights visual`
 
-8 results · kind **inert → inert** · R15 w1 X1
+8 results · kind **inert → inert** · R14 w1 X2
 
 **1. Livre d'Artiste | The Tretyakov Gallery Magazine**  
-`tretyakovgallerymagazine.com` · tier `unverified`  
+`tretyakovgallerymagazine.com` · tier `unverified` · <https://www.tretyakovgallerymagazine.com/node/2960>  
 > A double-page spread from the book Pierre Reverdy. Au Soleil du plafond Paris, 1955. A colour lithograph by Juan Gris. 42 x 64 cm.
 
-  - **R** A double-page spread from the book Pierre Reverdy.  
-    <sub>names pierre reverdy, reverdy, pierre</sub>
-  - **R** Au Soleil du plafond Paris, 1955.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** A colour lithograph by Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
+  - **R** A double-page spread from the book Pierre Reverdy.
+  - **R** Au Soleil du plafond Paris, 1955.
+  - **R** A colour lithograph by Juan Gris.
 
 **2. Coffee Grinder, Cup and Glass on a Table — Juan Gris**  
-`wahooart.com` · tier `unverified`  
+`wahooart.com` · tier `unverified` · <https://wahooart.com/en/art/juan-gris-coffee-grinder-cup-and-glass-on-a-table-D3VJD5-en/>  
 > ... Reverdy that truly ignited his artistic revolution. Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
-  - **R** Reverdy that truly ignited his artistic revolution.  
-    <sub>names reverdy</sub>
-  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Reverdy that truly ignited his artistic revolution.
+  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
-**3. Juan Gris, Le Livre (kahnweiler 1969), Au Soleil Du ...**  
-`etsy.com` · tier `unverified`  
-> May include: A cubist style abstract still life painting featuring a book, a glass ... May include: A vintage book cover with the title "Au soleil du plafond".
+**3. Juan Gris, Violon (kahnweiler 1969), Au Soleil Du Plafond ...**  
+`etsy.com` · tier `unverified` · <https://www.etsy.com/listing/1857700055/juan-gris-violon-kahnweiler-1969-au>  
+> May include: Abstract geometric art print with a black, gray, and orange color ... May include: A vintage book cover with the title "Au soleil du plafond". zoom ...
 
-  - w May include: A cubist style abstract still life painting featuring a book, a glass ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
-  - **R** May include: A vintage book cover with the title "Au soleil du plafond".  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
+  - **X** May include: Abstract geometric art print with a black, gray, and orange color ...
+  - **R** May include: A vintage book cover with the title "Au soleil du plafond".
 
 **4. Coffee Grinder, Cup and Glass on a Table - Juan Gris**  
-`artsdot.com` · tier `unverified`  
+`artsdot.com` · tier `unverified` · <https://artsdot.com/en/orders/image/juan-gris-coffee-grinder-cup-and-glass-on-a-table-D3VJD5-en/>  
 > ... Reverdy that truly ignited his artistic revolution. Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
-  - **R** Reverdy that truly ignited his artistic revolution.  
-    <sub>names reverdy</sub>
-  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** Reverdy that truly ignited his artistic revolution.
+  - **R** Reverdy's poems, intended to accompany Gris's chromolithographs in Au soleil du plafond, weren't merely ...
 
 **5. Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston**  
-`thehistoryofart.org` · tier `unverified`  
+`thehistoryofart.org` · tier `unverified` · <https://www.thehistoryofart.org/exhibitions/picasso-miro-dali/>  
 > Juan Gris and the French poet Pierre Reverdy's Au Soleil du Plafond from 1955 show another, where artist and writer work in closer harmony from the outset.
 
-  - **R** Juan Gris and the French poet Pierre Reverdy's Au Soleil du Plafond from 1955 show another, where artist and writer work in closer harmony from the outset.  
-    <sub>names au soleil du plafond, pierre reverdy, juan gris</sub>
+  - **R** Juan Gris and the French poet Pierre Reverdy's Au Soleil du Plafond from 1955 show another, where artist and writer work in closer harmony from the outset.
 
 **6. (PDF) Textual Spaces: The Poetry of Pierre Reverdy**  
-`researchgate.net` · tier `unverified`  
-> anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the ... visual puns as evidence of Reverdy's desire to ...
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/374031362_Textual_Spaces_The_Poetry_of_Pierre_Reverdy>  
+> anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the. destructive wind: Le vent noir qui tordait les ...
 
-  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the ...  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** visual puns as evidence of Reverdy's desire to ...  
-    <sub>names reverdy</sub>
+  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.
+  - w destructive wind: Le vent noir qui tordait les ...
 
-**7. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...**  
-`academia.edu` · tier `tier1`  
-> ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc Gris ...
-
-  - **R** Reverdy, Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
-  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.  
-    <sub>names juan gris, gris, juan</sub>
-  - **R** Pierrots, Drawings, Books, etc Gris ...  
-    <sub>names gris</sub>
-
-**8. Advance Exhibition Schedule**  
-`mfa.org` · tier `tier1`  
+**7. Advance Exhibition Schedule**  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/news/advance-exhibition-schedule>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
+
+**8. (PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/105223968/The_cubism_of_Juan_Gris_Vol_II_Portraits_Pierrots_and_Harlequins_Drawings_Designs_for_the_theatre_Books_Lithographs_Pochoirs_Press_illustrations>  
+> ... Reverdy, Au soleil du plafond. The idea for this collaboration between 29 Miguel Orozco Juan Gris. Vol II. Portraits. Pierrots, Drawings, Books, etc Gris ...
+
+  - **R** Reverdy, Au soleil du plafond.
+  - **R** The idea for this collaboration between 29 Miguel Orozco Juan Gris.
+  - **R** Pierrots, Drawings, Books, etc Gris ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, highlights how visual artists?`
 
-kind **active → active** · R5 w1 X0
+kind **eventful → eventful** · R3 w0 X0
 
-> The project was originally planned around 1916–1917 by the art dealer Léonce Rosenberg to pair twenty poems by Pierre Reverdy with twenty accompanying illustrations by Juan Gris.
+> Juan Gris and poet Pierre Reverdy initiated the collaboration in 1916 to conceive imagery and prose together as an indivisible whole from the start. 
 > 
-> Gris was only able to complete eleven gouache designs before his early death in 1927 at the age of forty brought the collaboration to a halt.
+> The project was left unfinished when Gris died prematurely in 1927 at the age of forty. 
 > 
-> Nearly thirty years later, publisher Tériade revived the stalled project in collaboration with Reverdy.
-> 
-> The missing illustrations forced the creators to fundamentally redesign the layout from its original intended format.
-> 
-> Master printer Fernand Mourlot translated Gris's surviving gouaches into lithographs for the final publication in 1955.
-> 
-> Reverdy authorized and signed the posthumous edition as a tribute to his deceased friend.
+> The publisher Tériade ultimately brought the project to completion and issued the scaled-back portfolio in 1955.
 
-  - **R** The project was originally planned around 1916–1917 by the art dealer Léonce Rosenberg to pair twenty poems by Pierre Reverdy with twenty accompanying illustrations by Juan Gris.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** Gris was only able to complete eleven gouache designs before his early death in 1927 at the age of forty brought the collaboration to a halt.  
-    <sub>names gris</sub>
-  - **R** Nearly thirty years later, publisher Tériade revived the stalled project in collaboration with Reverdy.  
-    <sub>names reverdy, teriade</sub>
-  - w The missing illustrations forced the creators to fundamentally redesign the layout from its original intended format.  
-    <sub>no entity of its own; snippet names pierre reverdy</sub>
-  - **R** Master printer Fernand Mourlot translated Gris's surviving gouaches into lithographs for the final publication in 1955.  
-    <sub>names gris</sub>
-  - **R** Reverdy authorized and signed the posthumous edition as a tribute to his deceased friend.  
-    <sub>names reverdy</sub>
+**SOURCES (7)** — pages Gemini actually read · searched: `"Au Soleil du Plafond" "Juan Gris" "Pierre Reverdy" Tériade Kahnweiler history`; `"Au Soleil du Plafond" "Juan Gris" "Pierre Reverdy" "Picasso, Miró, Dalí: Unbound" OR "Museum of Fine Arts, Boston"`
+
+1. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+2. `bonart.cat` — <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+3. `academia.edu` — <https://www.academia.edu/35959154/The_Orozco_Collection_Vol_3_Juan_Gris_Antoni_Clav%C3%A9_Manuel_Ortiz_de_Z%C3%A1rate_Francisco_Bores_Ortega_Redondela>
+4. `artsfuse.org` — <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+5. `mchampetier.com` — <https://www.mchampetier.com/biography-Juan-Gris.html>
+6. `cuny.edu` — <https://henripeyrefi.ws.gc.cuny.edu/2016/11/28/compotier-by-anna-soo-hoo/>
+7. `over-blog.com` — <https://art-histoire-litterature.over-blog.com/2014/11/la-donation-teriade-a-donne-la-possibilite-au-musee-matisse-de-presenter-des-artistes-modernes-qui-etaient-de-la-meme-generation-qu>
+
+  - **R** Juan Gris and poet Pierre Reverdy initiated the collaboration in 1916 to conceive imagery and prose together as an indivisible whole from the start.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `bonart.cat` <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+      ↳ source: `academia.edu` <https://www.academia.edu/35959154/The_Orozco_Collection_Vol_3_Juan_Gris_Antoni_Clav%C3%A9_Manuel_Ortiz_de_Z%C3%A1rate_Francisco_Bores_Ortega_Redondela>
+  - **R** The project was left unfinished when Gris died prematurely in 1927 at the age of forty.
+      ↳ source: `artsfuse.org` <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+      ↳ source: `academia.edu` <https://www.academia.edu/35959154/The_Orozco_Collection_Vol_3_Juan_Gris_Antoni_Clav%C3%A9_Manuel_Ortiz_de_Z%C3%A1rate_Francisco_Bores_Ortega_Redondela>
+  - **R** The publisher Tériade ultimately brought the project to completion and issued the scaled-back portfolio in 1955.
+      ↳ source: `mchampetier.com` <https://www.mchampetier.com/biography-Juan-Gris.html>
+      ↳ source: `cuny.edu` <https://henripeyrefi.ws.gc.cuny.edu/2016/11/28/compotier-by-anna-soo-hoo/>
+      ↳ source: `over-blog.com` <https://art-histoire-litterature.over-blog.com/2014/11/la-donation-teriade-a-donne-la-possibilite-au-musee-matisse-de-presenter-des-artistes-modernes-qui-etaient-de-la-meme-generation-qu>
 
 
 ## credit_line 8.1 — *evaluative* / participial
@@ -2685,107 +2604,83 @@ kind **active → active** · R5 w1 X0
 8 results · kind **active → active** · R12 w2 X3
 
 **1. (PDF) Textual Spaces: The Poetry of Pierre Reverdy**  
-`researchgate.net` · tier `unverified`  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/374031362_Textual_Spaces_The_Poetry_of_Pierre_Reverdy>  
 > anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the. destructive wind: Le vent noir qui tordait les ...
 
-  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - w destructive wind: Le vent noir qui tordait les ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** anxiety in 'La Lampe' (Au soleil du plafond) about the possible extinction of the lamp by the.
+  - w destructive wind: Le vent noir qui tordait les ...
 
 **2. Advance Exhibition Schedule**  
-`mfa.org` · tier `tier1`  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/news/advance-exhibition-schedule>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
 **3. Objects Observed - The Poetry of Things in Twentieth**  
-`dokumen.pub` · tier `unverified`  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/download/objects-observed-the-poetry-of-things-in-twentieth-century-france-and-america-9781487513528.html>  
 > The complexity of Reverdy's engagement with the still life emerges again in the short collection of prose poems Au Soleil du plafond (At the. Ceiling's Sun) ...
 
-  - **R** The complexity of Reverdy's engagement with the still life emerges again in the short collection of prose poems Au Soleil du plafond (At the.  
-    <sub>names au soleil du plafond, au soleil, reverdy</sub>
+  - **R** The complexity of Reverdy's engagement with the still life emerges again in the short collection of prose poems Au Soleil du plafond (At the.
 
 **4. Salvador Dalí Exhibitions: Current, Upcoming & Past Shows**  
-`mutualart.com` · tier `market`  
+`mutualart.com` · tier `market` · <https://www.mutualart.com/Artist/Salvador-Dali/22E6B9CD238FB05A/artist-info/exhibitions>  
 > ... Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955). Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
-  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...  
-    <sub>about someone else (Rarely), not this stop</sub>
+  - **R** Gris and French poet Pierre Reverdy's Au Soleil du Plafond (1955).
+  - **X** Rarely on view, and resisting easy categorization, these livres d'artiste invite visitors ...
 
 **5. LE CORBUSIER Y EL POEMA DEL ÁNGULO RECTO**  
-`upcommons.upc.edu` · tier `tier1`  
+`upcommons.upc.edu` · tier `tier1` · <https://upcommons.upc.edu/server/api/core/bitstreams/8b08f257-f981-4eed-b8e5-60ee3e8fd781/content>  
 > by JM Rovira · Cited by 2 — ... Au Soleil du Plafond (illustrated by Gris). However, among the twenty-six livres de peintres Tériade published, such examples are rare.” Ver: ANTHO-. NIOZ ...
 
-  - **X** by JM Rovira · Cited by 2 — ...  
-    <sub>about someone else (Rovira), not this stop</sub>
-  - **R** Au Soleil du Plafond (illustrated by Gris).  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** However, among the twenty-six livres de peintres Tériade published, such examples are rare.” Ver: ANTHO-.  
-    <sub>names teriade</sub>
+  - **X** by JM Rovira · Cited by 2 — ...
+  - **R** Au Soleil du Plafond (illustrated by Gris).
+  - **R** However, among the twenty-six livres de peintres Tériade published, such examples are rare.” Ver: ANTHO-.
 
 **6. (Word & Image Interactions 7) v. Ronique Plesch, Jan ...**  
-`scribd.com` · tier `unverified`  
+`scribd.com` · tier `unverified` · <https://www.scribd.com/document/679568201/Word-Image-Interactions-7-v-Ronique-Plesch-Jan-Baetens-Catriona-MacLeod-Efficacite-Efficacy-How-to-Do-Things-With-Words-an-Images-Rodopi>  
 > morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La Liberté des mers, 1960), en reproduction de manuscrit. Quant à Cocteau, il
 
-  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La Liberté des mers, 1960), en reproduction de manuscrit.  
-    <sub>names au soleil du plafond, juan gris, au soleil</sub>
+  - **R** morts, 1948), Juan Gris (Au soleil du plafond, 1955) et Georges Braque (La Liberté des mers, 1960), en reproduction de manuscrit.
 
 **7. Salon International du Livre Rare et de l'Objet d'Art 2018**  
-`calameo.com` · tier `unverified`  
+`calameo.com` · tier `unverified` · <https://www.calameo.com/books/004525267b67d1de2ffb8>  
 > 06 80 47 25 69 hutinemmanuel@gmail.com REVERDY (Pierre). Au soleil du plafond. Paris, Tériade, 1955. In folio, en feuilles, couverture rempliée, chemise et ...
 
-  - **R** 06 80 47 25 69 hutinemmanuel@gmail.com REVERDY (Pierre).  
-    <sub>names reverdy, pierre</sub>
-  - **R** Au soleil du plafond.  
-    <sub>names au soleil du plafond, au soleil, plafond</sub>
-  - **R** Paris, Tériade, 1955.  
-    <sub>names teriade</sub>
-  - w In folio, en feuilles, couverture rempliée, chemise et ...  
-    <sub>no entity of its own; snippet names au soleil du plafond</sub>
+  - **R** 06 80 47 25 69 hutinemmanuel@gmail.com REVERDY (Pierre).
+  - **R** Au soleil du plafond.
+  - **R** Paris, Tériade, 1955.
+  - w In folio, en feuilles, couverture rempliée, chemise et ...
 
 **8. Approche de l'adjectif gradable par sa polarité et son ...**  
-`academia.edu` · tier `tier1`  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/108075456/Ethique_et_esth%C3%A9tique_dans_le_langage_Approche_de_ladjectif_gradable_par_sa_polarit%C3%A9_et_son_%C3%A9nonciation_en_fran%C3%A7ais_et_en_anglais>  
 > Tout le monde est parti Pierre Reverdy, Au soleil du plafond et autres ... ] J'ai voulu des gris fer, des gris demi-deuil, des gris aluminium… […] Je n ...
 
-  - **R** Tout le monde est parti Pierre Reverdy, Au soleil du plafond et autres ...  
-    <sub>names au soleil du plafond, pierre reverdy, au soleil</sub>
-  - **R** ] J'ai voulu des gris fer, des gris demi-deuil, des gris aluminium… […] Je n ...  
-    <sub>names gris</sub>
+  - **R** Tout le monde est parti Pierre Reverdy, Au soleil du plafond et autres ...
+  - **R** ] J'ai voulu des gris fer, des gris demi-deuil, des gris aluminium… […] Je n ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Au Soleil du Plafond, inviting reflection on art as a shared divine expression?`
 
-kind **eventful → eventful** · R6 w0 X0
+kind **eventful → eventful** · R5 w0 X0
 
-> The book was originally planned around 1916–1917 by art dealer and publisher Léonce Rosenberg as a joint venture between Juan Gris and poet Pierre Reverdy. 
+> The project was originally conceived around 1916 as an equal partnership between painter Juan Gris and poet Pierre Reverdy, sponsored by art dealer Léonce Rosenberg [PerQueryResult(index="1.1.5", source_title="Designed by Juan Gris - Au Soleil du Plafond - The Metropolitan Museum of Art", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFTx4o9wE8oPtueS-Ig81GZJwPqlSBdy4bO9TKNKajM4jWjECpaJpsAW3yNdnA6cUemOHGEbiPgz7y_o99UOPI6edCL8CqFd81MehvVpn2fHnvsbIYFGSDmwtcAgcms1a-7VoTpSH78EwXrxJo=")]. 
 > 
-> The original plan called for Gris to create illustrations for twenty poems written by Reverdy. 
+> The original plan stalled due to publisher inaction and was abruptly halted when Gris died prematurely in 1927, leaving only 11 gouache illustrations completed out of twenty intended plates [PerQueryResult(index="1.1.6", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOmceXctE2aQsdnuL_5k301uHflb-9CUlE5Fhj1BN7eUuEAlNttl8R4AH_S25xQonb1OkHOE6dFi5vDuOQTN5Yxehah9t-qHh4yViDEBqw6R46q_qRB6Imptgc-UzZO0_6718o7PMUB6F1tidzVJ9yrt7diNZ_umuoWlYR_saazlAzCttjYP6T3JkjctuwEM9W7aQ="), PerQueryResult(index="1.2.9", source_title="Juan GRIS - LE LIVRE. Lithographie pour \"Au soleil du plafond\" (1955) - Amorosart", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHK1G9uohkMf1lIbsNiOBTg_9_ZwO7KeVfjKiCds55vfsSbnblDj5STgvrTB-F08KNbDLapzCl9trO5q031HicdcxeQztHX_1ZQbKZHMZpWU5LeAg1N_UT6uHy3zCAWlLcGT07snK_g6SgRiYqfVKgUojshfB98krydEVBqwDBVJWycvqY5kLf-qN8WYVr-dXVabb0im7IVFWAdSvs=")]. 
 > 
-> Production was halted when Gris died prematurely in 1927 at age forty, leaving behind only eleven completed gouaches. 
+> Publisher Tériade revived the orphaned undertaking nearly thirty years later, engaging printer Fernand Mourlot to translate Gris's surviving gouaches into lithographs alongside Reverdy's handwritten texts [PerQueryResult(index="1.1.5", source_title="Designed by Juan Gris - Au Soleil du Plafond - The Metropolitan Museum of Art", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFTx4o9wE8oPtueS-Ig81GZJwPqlSBdy4bO9TKNKajM4jWjECpaJpsAW3yNdnA6cUemOHGEbiPgz7y_o99UOPI6edCL8CqFd81MehvVpn2fHnvsbIYFGSDmwtcAgcms1a-7VoTpSH78EwXrxJo="), PerQueryResult(index="1.1.6", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOmceXctE2aQsdnuL_5k301uHflb-9CUlE5Fhj1BN7eUuEAlNttl8R4AH_S25xQonb1OkHOE6dFi5vDuOQTN5Yxehah9t-qHh4yViDEBqw6R46q_qRB6Imptgc-UzZO0_6718o7PMUB6F1tidzVJ9yrt7diNZ_umuoWlYR_saazlAzCttjYP6T3JkjctuwEM9W7aQ="), PerQueryResult(index="1.1.7", source_title="Au Soleil du Plafond - First Edition - Signed - Pierre Reverdy - Bauman Rare Books", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFX65YWWfsFx_EzOwXsvCQKhV9hecC4PgzaIpHJdu5l2lzQ6pBZsNurtthGR5MPbgQRPGDvk4Gv9uTLDpbZ2nmJzbmI1hBylbzL1IoknLpSnfCm8P3scHJLlzx2LG3BO2ONUcb-NWsHxWp7ZDvFFxEq1khQ5UEMX19RbeMq9MRQrXw7GVfj8fsMMqnnpJq8uoJNiaqYmxz2Eds=")]. 
 > 
-> Publisher Tériade revived the abandoned project nearly three decades later with Reverdy's participation. 
-> 
-> The completed work was published posthumously in 1955 as a tribute to Gris, featuring lithographs printed by Fernand Mourlot alongside Reverdy's handwritten texts. 
-> 
-> In his preface, Reverdy wrote that completing the work allowed him to reunite with his deceased friend through art that "defies the grave."
+> Reverdy conceived the belated 1955 release as an intimate memorial, writing in the preface that the book allowed him to reunite with his late collaborator across the grave [PerQueryResult(index="1.1.6", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOmceXctE2aQsdnuL_5k301uHflb-9CUlE5Fhj1BN7eUuEAlNttl8R4AH_S25xQonb1OkHOE6dFi5vDuOQTN5Yxehah9t-qHh4yViDEBqw6R46q_qRB6Imptgc-UzZO0_6718o7PMUB6F1tidzVJ9yrt7diNZ_umuoWlYR_saazlAzCttjYP6T3JkjctuwEM9W7aQ=")].
 
-  - **R** The book was originally planned around 1916–1917 by art dealer and publisher Léonce Rosenberg as a joint venture between Juan Gris and poet Pierre Reverdy.  
-    <sub>names pierre reverdy, juan gris, reverdy</sub>
-  - **R** The original plan called for Gris to create illustrations for twenty poems written by Reverdy.  
-    <sub>names reverdy, gris</sub>
-  - **R** Production was halted when Gris died prematurely in 1927 at age forty, leaving behind only eleven completed gouaches.  
-    <sub>names gris</sub>
-  - **R** Publisher Tériade revived the abandoned project nearly three decades later with Reverdy's participation.  
-    <sub>names reverdy, teriade</sub>
-  - **R** The completed work was published posthumously in 1955 as a tribute to Gris, featuring lithographs printed by Fernand Mourlot alongside Reverdy's handwritten texts.  
-    <sub>names reverdy, gris</sub>
-  - **R** In his preface, Reverdy wrote that completing the work allowed him to reunite with his deceased friend through art that "defies the grave."  
-    <sub>names reverdy</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **R** The project was originally conceived around 1916 as an equal partnership between painter Juan Gris and poet Pierre Reverdy, sponsored by art dealer Léonce Rosenberg [PerQueryResult(index="1.1.5", source_title="Designed by Juan Gris - Au Soleil du Plafond - The Metropolitan Museum of Art", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFTx4o9wE8oPtueS-Ig81GZJwPqlSBdy4bO9TKNKajM4jWjECpaJpsAW3yNdnA6cUemOHGEbiPgz7y_o99UOPI6edCL8CqFd81MehvVpn2fHnvsbIYFGSDmwtcAgcms1a-7VoTpSH78EwXrxJo=")].
+  - **R** The original plan stalled due to publisher inaction and was abruptly halted when Gris died prematurely in 1927, leaving only 11 gouache illustrations completed out of twenty intended plates [PerQueryResult(index="1.1.6", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOmceXctE2aQsdnuL_5k301uHflb-9CUlE5Fhj1BN7eUuEAlNttl8R4AH_S25xQonb1OkHOE6dFi5vDuOQTN5Yxehah9t-qHh4yViDEBqw6R46q_qRB6Imptgc-UzZO0_6718o7PMUB6F1tidzVJ9yrt7diNZ_umuoWlYR_saazlAzCttjYP6T3JkjctuwEM9W7aQ="), PerQueryResult(index="1.2.9", source_title="Juan GRIS - LE LIVRE.
+  - **R** Lithographie pour \"Au soleil du plafond\" (1955) - Amorosart", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHK1G9uohkMf1lIbsNiOBTg_9_ZwO7KeVfjKiCds55vfsSbnblDj5STgvrTB-F08KNbDLapzCl9trO5q031HicdcxeQztHX_1ZQbKZHMZpWU5LeAg1N_UT6uHy3zCAWlLcGT07snK_g6SgRiYqfVKgUojshfB98krydEVBqwDBVJWycvqY5kLf-qN8WYVr-dXVabb0im7IVFWAdSvs=")].
+  - **R** Publisher Tériade revived the orphaned undertaking nearly thirty years later, engaging printer Fernand Mourlot to translate Gris's surviving gouaches into lithographs alongside Reverdy's handwritten texts [PerQueryResult(index="1.1.5", source_title="Designed by Juan Gris - Au Soleil du Plafond - The Metropolitan Museum of Art", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFTx4o9wE8oPtueS-Ig81GZJwPqlSBdy4bO9TKNKajM4jWjECpaJpsAW3yNdnA6cUemOHGEbiPgz7y_o99UOPI6edCL8CqFd81MehvVpn2fHnvsbIYFGSDmwtcAgcms1a-7VoTpSH78EwXrxJo="), PerQueryResult(index="1.1.6", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOmceXctE2aQsdnuL_5k301uHflb-9CUlE5Fhj1BN7eUuEAlNttl8R4AH_S25xQonb1OkHOE6dFi5vDuOQTN5Yxehah9t-qHh4yViDEBqw6R46q_qRB6Imptgc-UzZO0_6718o7PMUB6F1tidzVJ9yrt7diNZ_umuoWlYR_saazlAzCttjYP6T3JkjctuwEM9W7aQ="), PerQueryResult(index="1.1.7", source_title="Au Soleil du Plafond - First Edition - Signed - Pierre Reverdy - Bauman Rare Books", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFX65YWWfsFx_EzOwXsvCQKhV9hecC4PgzaIpHJdu5l2lzQ6pBZsNurtthGR5MPbgQRPGDvk4Gv9uTLDpbZ2nmJzbmI1hBylbzL1IoknLpSnfCm8P3scHJLlzx2LG3BO2ONUcb-NWsHxWp7ZDvFFxEq1khQ5UEMX19RbeMq9MRQrXw7GVfj8fsMMqnnpJq8uoJNiaqYmxz2Eds=")].
+  - **R** Reverdy conceived the belated 1955 release as an intimate memorial, writing in the preface that the book allowed him to reunite with his late collaborator across the grave [PerQueryResult(index="1.1.6", source_title="Gris and Reverdy\'s Au soleil du plafond | AraderBooks", url="https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHOmceXctE2aQsdnuL_5k301uHflb-9CUlE5Fhj1BN7eUuEAlNttl8R4AH_S25xQonb1OkHOE6dFi5vDuOQTN5Yxehah9t-qHh4yViDEBqw6R46q_qRB6Imptgc-UzZO0_6718o7PMUB6F1tidzVJ9yrt7diNZ_umuoWlYR_saazlAzCttjYP6T3JkjctuwEM9W7aQ=")].
 
 
 ---
@@ -2802,99 +2697,94 @@ kind **eventful → eventful** · R6 w0 X0
 8 results · kind **inert → inert** · R14 w2 X1
 
 **1. Freud had a lifelong fascination for the figure of Moses ...**  
-`facebook.com` · tier `reject`  
+`facebook.com` · tier `reject` · <https://www.facebook.com/FreudMuseum/posts/freud-had-a-lifelong-fascination-for-the-figure-of-moses-from-the-etching-of-mos/1480205927473513/>  
 > One of the many Jewish that impacted the world through knowledge was Sigmund Freud. I read his book, " Moses and Monotheism ". He believed Moses ...
 
-  - **R** One of the many Jewish that impacted the world through knowledge was Sigmund Freud.  
-    <sub>names sigmund freud, sigmund, freud</sub>
-  - **R** I read his book, " Moses and Monotheism ".  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** He believed Moses ...  
-    <sub>names moses</sub>
+  - **R** One of the many Jewish that impacted the world through knowledge was Sigmund Freud.
+  - **R** I read his book, " Moses and Monotheism ".
+  - **R** He believed Moses ...
 
 **2. New London Exhibition 'Freud's Antiquity' Unveils ...**  
-`uh.edu` · tier `tier1`  
+`uh.edu` · tier `tier1` · <https://www.uh.edu/class/news/archive/2023/march/new-london-exhibition-freuds-antiquity-unveils-freuds-personal-collection-of-artifacts/>  
 > ... Moses and Monotheism.” “Freud created the 'archaeological metaphor' to show how the mind resembles an archaeological site which the analyst ...
 
-  - **R** Moses and Monotheism.” “Freud created the 'archaeological metaphor' to show how the mind resembles an archaeological site which the analyst ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Moses and Monotheism.” “Freud created the 'archaeological metaphor' to show how the mind resembles an archaeological site which the analyst ...
 
 **3. Salvador Dalí Moses and Monotheism, 1979**  
-`1stdibs.com` · tier `market`  
+`1stdibs.com` · tier `market` · <https://www.1stdibs.com/art/sculptures/figurative-sculptures/salvador-dali-moses-monotheism/id-a_17338252/>  
 > This artwork titled, "Moses and Monotheism" 1979, is a copper embossed bas relief by artist Salvador Dali, 1904-1989. It is hand signed in felt pen at the ...
 
-  - **R** This artwork titled, "Moses and Monotheism" 1979, is a copper embossed bas relief by artist Salvador Dali, 1904-1989.  
-    <sub>names moses and monotheism, salvador dali, monotheism</sub>
-  - w It is hand signed in felt pen at the ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** This artwork titled, "Moses and Monotheism" 1979, is a copper embossed bas relief by artist Salvador Dali, 1904-1989.
+  - w It is hand signed in felt pen at the ...
 
 **4. Freuds Last Session**  
-`exhibits.wilson.edu` · tier `tier1`  
+`exhibits.wilson.edu` · tier `tier1` · <https://exhibits.wilson.edu/search/chap/nt/7N9628T/freuds__last-session.pdf>  
 > cancer, and wrote his most provocative book, Moses and Monotheism . 9de6d6e4c5. Taking us on a journey through the `site-responsive' artworks, exhibitions ...
 
-  - **R** cancer, and wrote his most provocative book, Moses and Monotheism .  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** Taking us on a journey through the `site-responsive' artworks, exhibitions ...  
-    <sub>about someone else (Taking), not this stop</sub>
+  - **R** cancer, and wrote his most provocative book, Moses and Monotheism .
+  - **X** Taking us on a journey through the `site-responsive' artworks, exhibitions ...
 
 **5. FINE ARTS EXHIBITION: Salvador Dalí – Recettes d' ...**  
-`gml.si` · tier `unverified`  
+`gml.si` · tier `unverified` · <https://www.gml.si/en/fine-arts-exhibition-salvador-dali-recettes-dimmortalite/>  
 > Texts from Freud's Moses and Monotheism (1939) accompany the artwork. The selection of its content came from Dalí's universal interest in Freud ...
 
-  - **R** Texts from Freud's Moses and Monotheism (1939) accompany the artwork.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **R** The selection of its content came from Dalí's universal interest in Freud ...  
-    <sub>names freud, dali</sub>
+  - **R** Texts from Freud's Moses and Monotheism (1939) accompany the artwork.
+  - **R** The selection of its content came from Dalí's universal interest in Freud ...
 
 **6. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
-`academia.edu` · tier `tier1`  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > Dalí was reading Freud, but not yet painting him. We should also give some ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-  - **R** Dalí was reading Freud, but not yet painting him.  
-    <sub>names freud, dali</sub>
-  - w We should also give some ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
-  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** Dalí was reading Freud, but not yet painting him.
+  - w We should also give some ...
+  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
 **7. DALÍ A HISTORY OF PAINTING 6 July to 8 September 2019**  
-`grimaldiforum.com` · tier `unverified`  
+`grimaldiforum.com` · tier `unverified` · <https://www.grimaldiforum.com/medias/event/665-_PDF_DPUK%20050719_.pdf>  
 > He writes the preface to and illustrates Sigmund Freud's book, Moses and Monotheism. On. 28 September, the Dalí Theatre-Museum is inaugurated. 1977. The ...
 
-  - **R** He writes the preface to and illustrates Sigmund Freud's book, Moses and Monotheism.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-  - **R** 28 September, the Dalí Theatre-Museum is inaugurated.  
-    <sub>names dali</sub>
+  - **R** He writes the preface to and illustrates Sigmund Freud's book, Moses and Monotheism.
+  - **R** 28 September, the Dalí Theatre-Museum is inaugurated.
 
 **8. Final Analysis**  
-`chicagoreader.com` · tier `unverified`  
+`chicagoreader.com` · tier `unverified` · <https://chicagoreader.com/arts-culture/final-analysis/>  
 > ... Moses and Monotheism, that the Hebrew lawgiver was actually an ... David Gropman's set re-creates Freud's study in vivid detail, from ...
 
-  - **R** Moses and Monotheism, that the Hebrew lawgiver was actually an ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** David Gropman's set re-creates Freud's study in vivid detail, from ...  
-    <sub>names freud</sub>
+  - **R** Moses and Monotheism, that the Hebrew lawgiver was actually an ...
+  - **R** David Gropman's set re-creates Freud's study in vivid detail, from ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, Dalí's vivid illustrations?`
 
-kind **active → active** · R3 w1 X1
+kind **active → active** · R3 w1 X0
 
-> * Salvador Dalí idolized Sigmund Freud as an intellectual father figure, having met him in London in 1938 just before Freud’s death.
-> * Dalí created this portfolio in 1974 to illustrate the French edition of Freud’s controversial final 1939 book, which argued that Moses was an Egyptian noble rather than Hebrew.
-> * The Paris publisher Art et Valeur issued the work in a limited edition of 300 copies.
-> * Dalí drew the illustrations with a diamond stylus directly onto massive gold printing plates, printing the images on soft lambskin and sheepskin.
-> * The publisher faced material challenges because the sheepskin reacts to humidity by shrinking and curling, making the loose sheets prone to slipping out from beneath frame matting.
+> Salvador Dalí created this portfolio of illustrations in 1974 as a visual interpretation of Sigmund Freud's final completed book. 
+> 
+> Dalí was deeply fascinated by psychoanalysis and had personally met Freud in London in 1938 with the help of writer Stefan Zweig. 
+> 
+> The original 1939 text proposed the controversial theory that Moses was an Egyptian nobleman rather than ethnically Jewish. 
+> 
+> The work is featured in the exhibition as an example of a *livre d'artiste*, where artists, publishers, and printmakers pushed traditional book formats into autonomous experimental art.
 
-  - **R** * Salvador Dalí idolized Sigmund Freud as an intellectual father figure, having met him in London in 1938 just before Freud’s death.  
-    <sub>names sigmund freud, salvador dali, salvador</sub>
-  - **R** * Dalí created this portfolio in 1974 to illustrate the French edition of Freud’s controversial final 1939 book, which argued that Moses was an Egyptian noble rather than Hebrew.  
-    <sub>names moses, freud, dali</sub>
-  - **X** * The Paris publisher Art et Valeur issued the work in a limited edition of 300 copies.  
-    <sub>about someone else (The Paris), not this stop</sub>
-  - **R** * Dalí drew the illustrations with a diamond stylus directly onto massive gold printing plates, printing the images on soft lambskin and sheepskin.  
-    <sub>names dali</sub>
-  - w * The publisher faced material challenges because the sheepskin reacts to humidity by shrinking and curling, making the loose sheets prone to slipping out from beneath frame matting.  
-    <sub>no entity of its own; snippet names sigmund freud</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `"Moses and Monotheism" Dali Leon Amiel`; `"Picasso, Miró, Dalí: Unbound" "Moses and Monotheism" OR "Moses" MFA Boston`
+
+1. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+2. `bonart.cat` — <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+3. `dokumen.pub` — <https://dokumen.pub/oxford-dictionary-of-national-biography-volume-21-freudgibberd-0198613717-9780198613718.html>
+4. `facebook.com` — <https://www.facebook.com/gychronicle/posts/tabitha-sarabo-halley-st-aquinas-and-sigmund-freudst-aquinas-was-the-official-ph/830657212936782/>
+5. `exploreboston.com` — <https://exploreboston.com/events/>
+
+  - **R** Salvador Dalí created this portfolio of illustrations in 1974 as a visual interpretation of Sigmund Freud's final completed book.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `bonart.cat` <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+  - **R** Dalí was deeply fascinated by psychoanalysis and had personally met Freud in London in 1938 with the help of writer Stefan Zweig.
+      ↳ source: `dokumen.pub` <https://dokumen.pub/oxford-dictionary-of-national-biography-volume-21-freudgibberd-0198613717-9780198613718.html>
+  - **R** The original 1939 text proposed the controversial theory that Moses was an Egyptian nobleman rather than ethnically Jewish.
+      ↳ source: `facebook.com` <https://www.facebook.com/gychronicle/posts/tabitha-sarabo-halley-st-aquinas-and-sigmund-freudst-aquinas-was-the-official-ph/830657212936782/>
+      ↳ source: `dokumen.pub` <https://dokumen.pub/oxford-dictionary-of-national-biography-volume-21-freudgibberd-0198613717-9780198613718.html>
+  - w The work is featured in the exhibition as an example of a *livre d'artiste*, where artists, publishers, and printmakers pushed traditional book formats into autonomous experimental art.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `bonart.cat` <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+      ↳ source: `exploreboston.com` <https://exploreboston.com/events/>
 
 
 ## credit_line 2.1 — *anchored* / relative
@@ -2905,104 +2795,91 @@ kind **active → active** · R3 w1 X1
 
 8 results · kind **active → active** · R15 w2 X0
 
-**1. What is Freud's psychoanalytic theory on the survival of Jewish ...**  
-`facebook.com` · tier `reject`  
+**1. What is Freud's psychoanalytic theory on the survival of ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/groups/165563067224915/posts/880362699078278/>  
 > In his work "Moses and Monotheism," he used his ideas of the Oedipal Complex to create a larger portrait of western religion. Mosaic monotheism, ...
 
-  - **R** In his work "Moses and Monotheism," he used his ideas of the Oedipal Complex to create a larger portrait of western religion.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** Mosaic monotheism, ...  
-    <sub>names monotheism</sub>
+  - **R** In his work "Moses and Monotheism," he used his ideas of the Oedipal Complex to create a larger portrait of western religion.
+  - **R** Mosaic monotheism, ...
 
 **2. Freud at Shalem | A discussion space for students of "Introduction to ...**  
-`freudatshalem.wordpress.com` · tier `unverified`  
+`freudatshalem.wordpress.com` · tier `unverified` · <https://freudatshalem.wordpress.com/>  
 > ... Moses and Monotheism, or in his letter to his fiancé in which he says he is neither European nor Austrian but rather a Jew). In the space between Freud's ...
 
-  - **R** Moses and Monotheism, or in his letter to his fiancé in which he says he is neither European nor Austrian but rather a Jew).  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** In the space between Freud's ...  
-    <sub>names freud</sub>
+  - **R** Moses and Monotheism, or in his letter to his fiancé in which he says he is neither European nor Austrian but rather a Jew).
+  - **R** In the space between Freud's ...
 
-**3. (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ...**  
-`academia.edu` · tier `tier1`  
+**3. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > It was around that time that Dalí became aware of Freud's essay 'The Uncanny ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-  - **R** It was around that time that Dalí became aware of Freud's essay 'The Uncanny ...  
-    <sub>names freud, dali</sub>
-  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** It was around that time that Dalí became aware of Freud's essay 'The Uncanny ...
+  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-**4. [EPUB] The Escape of Sigmund Freud - dokumen.pub**  
-`dokumen.pub` · tier `unverified`  
+**4. The Escape of Sigmund Freud**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/download/the-escape-of-sigmund-freud-9781468306774.html>  
 > There Freud was right and well ahead of specialist scholars. Freud published Moses and Monotheism in Amsterdam. It was, as he expected, very controversial ...
 
-  - **R** There Freud was right and well ahead of specialist scholars.  
-    <sub>names freud</sub>
-  - **R** Freud published Moses and Monotheism in Amsterdam.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - w It was, as he expected, very controversial ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** There Freud was right and well ahead of specialist scholars.
+  - **R** Freud published Moses and Monotheism in Amsterdam.
+  - w It was, as he expected, very controversial ...
 
-**5. (PDF) Freud's Foes: Psychoanalysis, Science and Resistance**  
-`researchgate.net` · tier `unverified`  
+**5. Freud's Foes: Psychoanalysis, Science and Resistance**  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/354325998_Freud's_Foes_Psychoanalysis_Science_and_Resistance>  
 > Freud, The Future of an Illusion, p. 160. 116. Freud, The Future of an Illusion, p. 175. 117. Freud, “Moses and Monotheism,” SE, 23:66. 118. See Paul ...
 
-  - **R** Freud, The Future of an Illusion, p.  
-    <sub>names freud</sub>
-  - **R** Freud, The Future of an Illusion, p.  
-    <sub>names freud</sub>
-  - **R** Freud, “Moses and Monotheism,” SE, 23:66.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Freud, The Future of an Illusion, p.
+  - **R** Freud, The Future of an Illusion, p.
+  - **R** Freud, “Moses and Monotheism,” SE, 23:66.
 
-**6. Kindred by Chance: Spontaneous Art and Neoliberal Order - eScholarship**  
-`escholarship.org` · tier `unverified`  
+**6. Kindred by Chance: Spontaneous Art and Neoliberal Order**  
+`escholarship.org` · tier `unverified` · <https://escholarship.org/uc/item/4t54k8bf>  
 > ... Freud's last book, Moses and Monotheism (1939), which traces the origin of ... narrative would seem a fitting intellectual afterimage of the death of ...
 
-  - **R** Freud's last book, Moses and Monotheism (1939), which traces the origin of ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - w narrative would seem a fitting intellectual afterimage of the death of ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** Freud's last book, Moses and Monotheism (1939), which traces the origin of ...
+  - w narrative would seem a fitting intellectual afterimage of the death of ...
 
-**7. Sigmund Freud is pictured on the menu of his favourite coffee house ...**  
-`instagram.com` · tier `reject`  
+**7. Sigmund Freud is pictured on the menu of his favourite ...**  
+`instagram.com` · tier `reject` · <https://www.instagram.com/p/DWidFvoj0fW/>  
 > It was here that Sigmund Freud started work on his book 'Moses and Monotheism' (1939) and this was his last summer residence before exile in ...
 
-  - **R** It was here that Sigmund Freud started work on his book 'Moses and Monotheism' (1939) and this was his last summer residence before exile in ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** It was here that Sigmund Freud started work on his book 'Moses and Monotheism' (1939) and this was his last summer residence before exile in ...
 
-**8. Dynamic Theories of Personality, Classical, Post-Modern, and Person ...**  
-`link.springer.com` · tier `unverified`  
+**8. Dynamic Theories of Personality, Classical, Post-Modern, and ...**  
+`link.springer.com` · tier `unverified` · <https://link.springer.com/rwe/10.1007/978-1-4419-0463-8_242>  
 > Freud, S. (1937). Moses and Monotheism. In F. Sigmund (Ed.), The standard edition of the complete psychological works of Sigmund Freud. London: Hogarth ...
 
-  - **R** Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** Sigmund (Ed.), The standard edition of the complete psychological works of Sigmund Freud.  
-    <sub>names sigmund freud, sigmund, freud</sub>
+  - **R** Moses and Monotheism.
+  - **R** Sigmund (Ed.), The standard edition of the complete psychological works of Sigmund Freud.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, breathe life into Freud’s narrative become evident?`
 
-kind **active → active** · R3 w2 X0
+kind **inert → inert** · R2 w1 X1
 
-> Salvador Dalí created this suite of illustrations in 1974 to reinterpret Sigmund Freud's controversial 1939 final book.
-> 
-> Dalí undertook the project as a direct engagement with Freudian psychoanalytic theory, which had profoundly influenced his surrealist method throughout his career.
-> 
-> Rather than a direct real-time collaboration with Freud, who died in 1939, the portfolio was conceived decades later as an artist's book (*livre d'artiste*) exploring Freud's thesis that Moses was an Egyptian noble.
-> 
-> The work was produced in a loose-leaf format printed on sheepskin and silk using pressed etchings and lithography.
-> 
-> The portfolio was originally issued in two large acrylic folios housed inside a velvet-lined case featuring a bas-relief metal front cover.
+> * Sigmund Freud originally published his controversial final book, *Moses and Monotheism*, in 1939, shortly before his death.
+> * Rather than collaborating during Freud’s lifetime, Salvador Dalí produced his visual interpretation of the foundational text decades later in 1974 as a *livre d'artiste*.
+> * The project was framed within the 20th-century avant-garde practice where artists, publishers, and printmakers transformed traditional book publishing into experimental art objects.
+> * Because these artist's books were printed in delicate, often unbound formats, they have rarely been removed from museum archives for public display.
 
-  - **R** Salvador Dalí created this suite of illustrations in 1974 to reinterpret Sigmund Freud's controversial 1939 final book.  
-    <sub>names sigmund freud, salvador dali, salvador</sub>
-  - **R** Dalí undertook the project as a direct engagement with Freudian psychoanalytic theory, which had profoundly influenced his surrealist method throughout his career.  
-    <sub>names freud, dali</sub>
-  - **R** Rather than a direct real-time collaboration with Freud, who died in 1939, the portfolio was conceived decades later as an artist's book (*livre d'artiste*) exploring Freud's thesis that Moses was an Egyptian noble.  
-    <sub>names moses, freud</sub>
-  - w The work was produced in a loose-leaf format printed on sheepskin and silk using pressed etchings and lithography.  
-    <sub>no entity of its own; snippet names sigmund freud</sub>
-  - w The portfolio was originally issued in two large acrylic folios housed inside a velvet-lined case featuring a bas-relief metal front cover.  
-    <sub>no entity of its own; snippet names sigmund freud</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `"Picasso, Miro, Dali: Unbound" "Moses and Monotheism"`; `"Moses and Monotheism" Dali MFA Boston`; `"Picasso, Miró, Dalí: Unbound" "Moses and Monotheism"`
+
+1. `artsfuse.org` — <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+2. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+3. `bonart.cat` — <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+4. `timeout.com` — <https://www.timeout.com/boston/things-to-do/picasso-miro-dali-unbound>
+5. `airmail.news` — <https://airmail.news/arts-intel/events/picasso-miro-dali-unbound>
+
+  - **R** * Sigmund Freud originally published his controversial final book, *Moses and Monotheism*, in 1939, shortly before his death.
+      ↳ source: `artsfuse.org` <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+  - **R** * Rather than collaborating during Freud’s lifetime, Salvador Dalí produced his visual interpretation of the foundational text decades later in 1974 as a *livre d'artiste*.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `artsfuse.org` <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+  - w * The project was framed within the 20th-century avant-garde practice where artists, publishers, and printmakers transformed traditional book publishing into experimental art objects.
+      ↳ source: `bonart.cat` <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+  - **X** * Because these artist's books were printed in delicate, often unbound formats, they have rarely been removed from museum archives for public display.
+      ↳ source: `timeout.com` <https://www.timeout.com/boston/things-to-do/picasso-miro-dali-unbound>
+      ↳ source: `airmail.news` <https://airmail.news/arts-intel/events/picasso-miro-dali-unbound>
 
 
 ## credit_line 3.1 — *evaluative* / participial
@@ -3013,100 +2890,92 @@ kind **active → active** · R3 w2 X0
 
 8 results · kind **active → active** · R12 w1 X4
 
-**1. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil on ...**  
-`facebook.com` · tier `reject`  
+**1. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/vksartcorner/posts/frida-kahlomexican-1907-1954-moses-1945oil-on-masonite-94-x-508-cm-private-colle/1343733264462609/>  
 > Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
 
-  - **R** Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
 
-**2. Sigmund Freud was an avid collector of figurines - Facebook**  
-`facebook.com` · tier `reject`  
+**2. Sigmund Freud was an avid collector of figurines**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/FreudMuseum/posts/sigmund-freud-was-an-avid-collector-of-figurines-especially-ancient-egyptian-ant/1436261891867917/>  
 > This point is not incidental because for Freud, in Moses and Monotheism ... Freud inspired us with his personality, character and ideas, and his ...
 
-  - **R** This point is not incidental because for Freud, in Moses and Monotheism ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **R** Freud inspired us with his personality, character and ideas, and his ...  
-    <sub>names freud</sub>
+  - **R** This point is not incidental because for Freud, in Moses and Monotheism ...
+  - **R** Freud inspired us with his personality, character and ideas, and his ...
 
-**3. (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ...**  
-`academia.edu` · tier `tier1`  
+**3. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > Dalí welcomed Freud's scientific theories of the forces at work within a ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-  - **R** Dalí welcomed Freud's scientific theories of the forces at work within a ...  
-    <sub>names freud, dali</sub>
-  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** Dalí welcomed Freud's scientific theories of the forces at work within a ...
+  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-**4. Frankenstein, Spellbound, and World War Z: Evolving concepts of the ...**  
-`doi.apa.org` · tier `unverified`  
+**4. Frankenstein, Spellbound, and World War Z**  
+`doi.apa.org` · tier `unverified` · <https://doi.apa.org/doi/10.1037/pap0000032?utm_source=researchgate.net&utm_medium=article>  
 > Freud, S. (1964). Moses and monotheism: Three essays. In J. Strachey (Ed. & Trans.), The standard edition of the complete psychological works of Sigmund Freud ( ...
 
-  - **R** Moses and monotheism: Three essays.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** & Trans.), The standard edition of the complete psychological works of Sigmund Freud ( ...  
-    <sub>names sigmund freud, sigmund, freud</sub>
+  - **R** Moses and monotheism: Three essays.
+  - **R** & Trans.), The standard edition of the complete psychological works of Sigmund Freud ( ...
 
-**5. Shabbat Reading List - Jewish Currents**  
-`jewishcurrents.org` · tier `unverified`  
+**5. Shabbat Reading List**  
+`jewishcurrents.org` · tier `unverified` · <https://jewishcurrents.org/shabbat-reading-list/p18?AND_1=1+OR+%28%3C%27%3EiKO%29%29>  
 > ... Freud's own final completed work, Moses and Monotheism (1939). In this puzzling and provocative text, Said explains, the founder of psychoanalysis indulges ...
 
-  - **R** Freud's own final completed work, Moses and Monotheism (1939).  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **X** In this puzzling and provocative text, Said explains, the founder of psychoanalysis indulges ...  
-    <sub>about someone else (Said), not this stop</sub>
+  - **R** Freud's own final completed work, Moses and Monotheism (1939).
+  - **X** In this puzzling and provocative text, Said explains, the founder of psychoanalysis indulges ...
 
-**6. Kindred by Chance: Spontaneous Art and Neoliberal Order - eScholarship**  
-`escholarship.org` · tier `unverified`  
+**6. Kindred by Chance: Spontaneous Art and Neoliberal Order**  
+`escholarship.org` · tier `unverified` · <https://escholarship.org/uc/item/4t54k8bf>  
 > ... Freud's last book, Moses and Monotheism (1939), which traces the origin of ... characteristic is the vertical “[d]evelopment of forms and the formation ...
 
-  - **R** Freud's last book, Moses and Monotheism (1939), which traces the origin of ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - w characteristic is the vertical “[d]evelopment of forms and the formation ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** Freud's last book, Moses and Monotheism (1939), which traces the origin of ...
+  - w characteristic is the vertical “[d]evelopment of forms and the formation ...
 
-**7. AFTERLIFE - Cambridge University Press & Assessment**  
-`cambridge.org` · tier `unverified`  
+**7. AFTERLIFE**  
+`cambridge.org` · tier `unverified` · <https://www.cambridge.org/core/services/aop-cambridge-core/content/view/35C2070E791A5510A6EDBCE25629A1FA/stamped-9781399501019c_p7-226_CBO.pdf/entries_az.pdf>  
 > Freud, S. (1964). Moses and Monotheism, trans. K. Jones, in The Standard. Edition of the Complete Psychological Works of Sigmund Freud, Vol. XXIII (1937–1939) ...
 
-  - **R** Moses and Monotheism, trans.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** Jones, in The Standard.  
-    <sub>about someone else (Jones), not this stop</sub>
-  - **R** Edition of the Complete Psychological Works of Sigmund Freud, Vol.  
-    <sub>names sigmund freud, sigmund, freud</sub>
-  - **X** XXIII (1937–1939) ...  
-    <sub>about someone else (XXIII), not this stop</sub>
+  - **R** Moses and Monotheism, trans.
+  - **X** Jones, in The Standard.
+  - **R** Edition of the Complete Psychological Works of Sigmund Freud, Vol.
+  - **X** XXIII (1937–1939) ...
 
-**8. [PDF] Idol fantasies: toward an ethics of image-making in Wilde, Conrad ...**  
-`open.bu.edu` · tier `tier1`  
+**8. Idol fantasies: toward an ethics of image-making in Wilde ...**  
+`open.bu.edu` · tier `tier1` · <https://open.bu.edu/bitstreams/1ee2bd3d-7c37-412f-ab43-2ba6a4705420/download>  
 > 104 Sigmund Freud, Moses and Monotheism, trans. Katherine Jones, with the assistance of James Strachey and Wilfred Trotter (New York: Vintage, 1939), 144 ...
 
-  - **R** 104 Sigmund Freud, Moses and Monotheism, trans.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-  - **X** Katherine Jones, with the assistance of James Strachey and Wilfred Trotter (New York: Vintage, 1939), 144 ...  
-    <sub>about someone else (Katherine Jones), not this stop</sub>
+  - **R** 104 Sigmund Freud, Moses and Monotheism, trans.
+  - **X** Katherine Jones, with the assistance of James Strachey and Wilfred Trotter (New York: Vintage, 1939), 144 ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, infusing it with his characteristic surrealism?`
 
-kind **active → active** · R3 w0 X1
+kind **active → active** · R3 w1 X0
 
-> Salvador Dalí created his illustrations for *Moses and Monotheism* in 1974 as a visual interpretation of Sigmund Freud's final 1939 book. 
+> Salvador Dalí created these illustrations in 1974 to visually interpret Sigmund Freud’s final completed book, originally published in 1939.
 > 
-> The project served as a late artistic tribute to Freud, whom Dalí had deeply idolized and met in London in 1938. 
+> The suite was conceived as an unbound *livre d'artiste*, a genre designed to merge fine art, literature, typography, and book design into a single experimental medium.
 > 
-> The portfolio was commissioned and published in Paris in 1975 by Éditions Art et Valeur in a limited edition of 250 copies. 
+> Rather than collaborating directly in person, Dalí engaged posthumously with Freud's psychoanalytic theories, which had served as a foundational influence on Surrealism.
 > 
-> Dalí chose unusual, tactile materials for the edition, executing the mixed-media lithographs and etchings on sheepskin.
+> The resulting suite paired Freud's text with ten mixed-media color prints and a sculptural relief portrait of Moses cast in silver.
 
-  - **R** Salvador Dalí created his illustrations for *Moses and Monotheism* in 1974 as a visual interpretation of Sigmund Freud's final 1939 book.  
-    <sub>names moses and monotheism, sigmund freud, salvador dali</sub>
-  - **R** The project served as a late artistic tribute to Freud, whom Dalí had deeply idolized and met in London in 1938.  
-    <sub>names freud, dali</sub>
-  - **X** The portfolio was commissioned and published in Paris in 1975 by Éditions Art et Valeur in a limited edition of 250 copies.  
-    <sub>about someone else (Paris), not this stop</sub>
-  - **R** Dalí chose unusual, tactile materials for the edition, executing the mixed-media lithographs and etchings on sheepskin.  
-    <sub>names dali</sub>
+**SOURCES (4)** — pages Gemini actually read · searched: `"Moses and Monotheism" Salvador Dali 1974 OR 1975 suite facts`; `"Moses and Monotheism" Dali "Picasso, Miró, Dalí: Unbound"`; `"Moses and Monotheism" Salvador Dali MFA Boston OR "Museum of Fine Arts"`
+
+1. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+2. `artsfuse.org` — <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+3. `bonart.cat` — <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+4. `thedali.org` — <https://thedali.org/exhibit/dalis-sacred-science-religion-and-mysticism/>
+
+  - **R** Salvador Dalí created these illustrations in 1974 to visually interpret Sigmund Freud’s final completed book, originally published in 1939.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `artsfuse.org` <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+  - w The suite was conceived as an unbound *livre d'artiste*, a genre designed to merge fine art, literature, typography, and book design into a single experimental medium.
+      ↳ source: `bonart.cat` <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+      ↳ source: `artsfuse.org` <https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/>
+  - **R** Rather than collaborating directly in person, Dalí engaged posthumously with Freud's psychoanalytic theories, which had served as a foundational influence on Surrealism.
+      ↳ source: `bonart.cat` <https://www.bonart.cat/internacional/en/n/47016/picasso-miro-and-dali-reinvent-the-book-as-a-work-of-art-at-the-mfa-in-boston>
+  - **R** The resulting suite paired Freud's text with ten mixed-media color prints and a sculptural relief portrait of Moses cast in silver.
+      ↳ source: `thedali.org` <https://thedali.org/exhibit/dalis-sacred-science-religion-and-mysticism/>
 
 
 ## credit_line 4.1 — *anchored* / possessive
@@ -3118,97 +2987,87 @@ kind **active → active** · R3 w0 X1
 8 results · kind **inert → inert** · R13 w0 X1
 
 **1. Illustrations and printed text of Sigmund Freud's Moses and ...**  
-`collections.museumofthebible.org` · tier `unverified`  
+`collections.museumofthebible.org` · tier `unverified` · <https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist>  
 > This oversize French edition of Sigmund Freud's 1939 published work, Moses and Monotheism, contains illustrations based on watercolor, pen-and-ink drawings, ...
 
-  - **R** This oversize French edition of Sigmund Freud's 1939 published work, Moses and Monotheism, contains illustrations based on watercolor, pen-and-ink drawings, ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** This oversize French edition of Sigmund Freud's 1939 published work, Moses and Monotheism, contains illustrations based on watercolor, pen-and-ink drawings, ...
 
-**2. Sigmund Freud - Salvador Dalí Museum**  
-`thedali.org` · tier `unverified`  
+**2. Sigmund Freud**  
+`thedali.org` · tier `unverified` · <https://thedali.org/dali-library-guide-1/sigmund-freud/>  
 > Freud, Sigmund. Moses and Monotheism. Vintage Books, 1967. This volume reflects Freud's commentaries on various aspects of religion, specifically his ...
 
-  - **R** Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** This volume reflects Freud's commentaries on various aspects of religion, specifically his ...  
-    <sub>names freud</sub>
+  - **R** Moses and Monotheism.
+  - **R** This volume reflects Freud's commentaries on various aspects of religion, specifically his ...
 
-**3. Freud had a lifelong fascination for the figure of Moses, from ... - Facebook**  
-`facebook.com` · tier `reject`  
+**3. Freud had a lifelong fascination for the figure of Moses ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/FreudMuseum/posts/freud-had-a-lifelong-fascination-for-the-figure-of-moses-from-the-etching-of-mos/1480205927473513/>  
 > One of the many Jewish that impacted the world through knowledge was Sigmund Freud. I read his book, " Moses and Monotheism ". He believed Moses ...
 
-  - **R** One of the many Jewish that impacted the world through knowledge was Sigmund Freud.  
-    <sub>names sigmund freud, sigmund, freud</sub>
-  - **R** I read his book, " Moses and Monotheism ".  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** He believed Moses ...  
-    <sub>names moses</sub>
+  - **R** One of the many Jewish that impacted the world through knowledge was Sigmund Freud.
+  - **R** I read his book, " Moses and Monotheism ".
+  - **R** He believed Moses ...
 
-**4. Moses and Monotheism - VKS ART**  
-`vksart.com` · tier `unverified`  
+**4. Moses and Monotheism**  
+`vksart.com` · tier `unverified` · <https://vksart.com/artwork/moses-and-monotheism/>  
 > In Moses and Monotheism Freud applies his psychoanalytic theory not to a person but to an event in history. He contradicts the biblical story of Moses, ...
 
-  - **R** In Moses and Monotheism Freud applies his psychoanalytic theory not to a person but to an event in history.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **R** He contradicts the biblical story of Moses, ...  
-    <sub>names moses</sub>
+  - **R** In Moses and Monotheism Freud applies his psychoanalytic theory not to a person but to an event in history.
+  - **R** He contradicts the biblical story of Moses, ...
 
-**5. Salvador Dali Meets Sigmund Freud: Paranoia, Narcissism, Snails**  
-`escipub.com` · tier `unverified`  
+**5. Salvador Dali Meets Sigmund Freud: Paranoia, Narcissism ...**  
+`escipub.com` · tier `unverified` · <https://escipub.com/ajprr-2020-10-2005/>  
 > Moses and monotheism: three essays. Standard Edition, 1939[1934-38]; 23 ... ...
 
-  - **R** Moses and monotheism: three essays.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** Standard Edition, 1939[1934-38]; 23 ...  
-    <sub>about someone else (Standard Edition), not this stop</sub>
+  - **R** Moses and monotheism: three essays.
+  - **X** Standard Edition, 1939[1934-38]; 23 ...
 
-**6. Beware the Boa Constructor! Freud, Modern Art and the Riddle of ...**  
-`88invisiblemirrors.blog` · tier `unverified`  
+**6. Beware the Boa Constructor! Freud, Modern Art and the ...**  
+`88invisiblemirrors.blog` · tier `unverified` · <https://88invisiblemirrors.blog/2020/09/13/beware-the-boa-constructor-freud-modern-art-and-the-riddle-of-interpretation/>  
 > If taken sequentially from his earliest work On Aphasia (1891) to Moses and Monotheism (1939), the story of psychoanalysis can be read as an ...
 
-  - **R** If taken sequentially from his earliest work On Aphasia (1891) to Moses and Monotheism (1939), the story of psychoanalysis can be read as an ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** If taken sequentially from his earliest work On Aphasia (1891) to Moses and Monotheism (1939), the story of psychoanalysis can be read as an ...
 
-**7. Did you catch our incredible exhibition 'Freud, Dali and the ...**  
-`instagram.com` · tier `reject`  
+**7. When Salvador Dalí met Sigmund Freud' with the exhibition ...**  
+`instagram.com` · tier `reject` · <https://www.instagram.com/reel/BziHrjFlMOA/>  
 > ... Moses and Monotheism'. Our latest afternoon session explores Freud's fascination with Moses through the years, included with your Museum admission. 24 ...
 
-  - **R** Moses and Monotheism'.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** Our latest afternoon session explores Freud's fascination with Moses through the years, included with your Museum admission.  
-    <sub>names moses, freud</sub>
+  - **R** Moses and Monotheism'.
+  - **R** Our latest afternoon session explores Freud's fascination with Moses through the years, included with your Museum admission.
 
-**8. Picasso, Miró, Dalí: Unbound | Museum of Fine Arts Boston**  
-`mfa.org` · tier `tier1`  
+**8. Picasso, Miró, Dalí: Unbound**  
+`mfa.org` · tier `tier1` · <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>  
 > Some artists interpreted foundational texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism; others ...
 
-  - **R** Some artists interpreted foundational texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism; others ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** Some artists interpreted foundational texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism; others ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, Freud's exploration of?`
 
-kind **inert → inert** · R3 w0 X2
+kind **active → active** · R3 w1 X1
 
-> Salvador Dalí revered Sigmund Freud's final 1939 book, writing in his diary that Freud had performed his most difficult and bitter task by arguing that Moses was Egyptian.
-> 
-> The luxury *livre d'artiste* edition was published in Paris by Art et Valeur in the mid-1970s with a limited print run.
-> 
-> Dalí created the ten portfolio illustrations by engraving directly onto massive gold plates with a diamond stylus before printing them onto lambskin and sheepskin.
-> 
-> Printers and conservators found sheepskin uniquely challenging because its sensitivity to humidity causes it to shrink, warp, and slip out of standard framing mats.
-> 
-> The resulting suite was issued unbound in loose-leaf sheets, protected inside Plexiglas folders and a custom velvet-lined box adorned with a sculpted bas-relief cover of Moses.
+> Salvador Dalí created this portfolio of illustrations around 1974 to visually interpret Sigmund Freud's provocative 1939 text. The project was issued by the Parisian publisher Éditions Art & Valeur in a limited edition of 250 copies. The prints were executed across a blend of lithography and drypoint etching directly onto sheepskin parchment rather than standard paper. Freud, whom Dalí revered as an intellectual hero, had died decades earlier in 1939 without ever seeing this visual collaboration. When Dalí and Freud met in person in London in 1938, Freud remarked that Dalí's art interested him not for its unconscious elements, but for its conscious calculation.
 
-  - **R** Salvador Dalí revered Sigmund Freud's final 1939 book, writing in his diary that Freud had performed his most difficult and bitter task by arguing that Moses was Egyptian.  
-    <sub>names sigmund freud, salvador dali, salvador</sub>
-  - **X** The luxury *livre d'artiste* edition was published in Paris by Art et Valeur in the mid-1970s with a limited print run.  
-    <sub>about someone else (Paris), not this stop</sub>
-  - **R** Dalí created the ten portfolio illustrations by engraving directly onto massive gold plates with a diamond stylus before printing them onto lambskin and sheepskin.  
-    <sub>names dali</sub>
-  - **X** Printers and conservators found sheepskin uniquely challenging because its sensitivity to humidity causes it to shrink, warp, and slip out of standard framing mats.  
-    <sub>about someone else (Printers), not this stop</sub>
-  - **R** The resulting suite was issued unbound in loose-leaf sheets, protected inside Plexiglas folders and a custom velvet-lined box adorned with a sculpted bas-relief cover of Moses.  
-    <sub>names moses</sub>
+**SOURCES (6)** — pages Gemini actually read · searched: `"Moses and Monotheism" Salvador Dali Sigmund Freud portfolio facts`; `"Moses and Monotheism" Dali "Picasso, Miró, Dalí: Unbound" OR "Picasso, Miro, Dali: Unbound" MFA Boston`; `"Moses and Monotheism" Dali 1974 OR 1975 portfolio publisher background facts`
+
+1. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+2. `leducq-encheres.com` — <https://www.leducq-encheres.com/en/lot/159969/27873116-salvador-dali-1904-1989-moses-and-monotheism-by-sigmund>
+3. `kcmgalleries.com` — <https://www.kcmgalleries.com/auction-lot/salvador-dali-moses-monotheism-etching-lithograph_d1043638c4>
+4. `invaluable.com` — <https://www.invaluable.com/artist/dali-salvador-9chkguv69j/sold-at-auction-prices/?page=14>
+5. `davidblumenthal.org` — <http://davidblumenthal.org/Salvador%20Dali%20Aliyah.htm>
+6. `galleryand.studio` — <https://www.galleryand.studio/wp-content/uploads/2020/09/VOL-07-1-Sept-Oct-2004.pdf>
+
+  - **R** Salvador Dalí created this portfolio of illustrations around 1974 to visually interpret Sigmund Freud's provocative 1939 text.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `leducq-encheres.com` <https://www.leducq-encheres.com/en/lot/159969/27873116-salvador-dali-1904-1989-moses-and-monotheism-by-sigmund>
+  - **X** The project was issued by the Parisian publisher Éditions Art & Valeur in a limited edition of 250 copies.
+      ↳ source: `kcmgalleries.com` <https://www.kcmgalleries.com/auction-lot/salvador-dali-moses-monotheism-etching-lithograph_d1043638c4>
+      ↳ source: `leducq-encheres.com` <https://www.leducq-encheres.com/en/lot/159969/27873116-salvador-dali-1904-1989-moses-and-monotheism-by-sigmund>
+  - w The prints were executed across a blend of lithography and drypoint etching directly onto sheepskin parchment rather than standard paper.
+      ↳ source: `kcmgalleries.com` <https://www.kcmgalleries.com/auction-lot/salvador-dali-moses-monotheism-etching-lithograph_d1043638c4>
+      ↳ source: `invaluable.com` <https://www.invaluable.com/artist/dali-salvador-9chkguv69j/sold-at-auction-prices/?page=14>
+  - **R** Freud, whom Dalí revered as an intellectual hero, had died decades earlier in 1939 without ever seeing this visual collaboration.
+      ↳ source: `davidblumenthal.org` <http://davidblumenthal.org/Salvador%20Dali%20Aliyah.htm>
+  - **R** When Dalí and Freud met in person in London in 1938, Freud remarked that Dalí's art interested him not for its unconscious elements, but for its conscious calculation.
+      ↳ source: `galleryand.studio` <https://www.galleryand.studio/wp-content/uploads/2020/09/VOL-07-1-Sept-Oct-2004.pdf>
 
 
 ## credit_line 4.2 — *evaluative* / participial
@@ -3219,96 +3078,72 @@ kind **inert → inert** · R3 w0 X2
 
 8 results · kind **active → active** · R11 w2 X2
 
-**1. Beethoven and Psychoanalysis** # ***(Freud · Jung · Lacan) - Facebook**  
-`facebook.com` · tier `reject`  
+**1. Beethoven and Psychoanalysis** # ***(Freud · Jung · Lacan)**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/groups/1287031385586017/posts/1776642089958275/>  
 > ... Moses and Monotheism" (1939), reflecting his relentless intellectual spirit. His extensive writings forged connections across psychology ...
 
-  - **R** Moses and Monotheism" (1939), reflecting his relentless intellectual spirit.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - w His extensive writings forged connections across psychology ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** Moses and Monotheism" (1939), reflecting his relentless intellectual spirit.
+  - w His extensive writings forged connections across psychology ...
 
-**2. “The Audacity Cannot Be Avoided” (Chapter 3) - The Late Sigmund Freud**  
-`cambridge.org` · tier `unverified`  
+**2. “The Audacity Cannot Be Avoided” (Chapter 3)**  
+`cambridge.org` · tier `unverified` · <https://www.cambridge.org/core/books/late-sigmund-freud/audacity-cannot-be-avoided/EB56FCC065A9E22EB4BEB2512C600CAF>  
 > Moses and Monotheism of 1939 is Freud's last significant work and one of his most controversial. It is the culmination of his thinking about religion and ...
 
-  - **R** Moses and Monotheism of 1939 is Freud's last significant work and one of his most controversial.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - w It is the culmination of his thinking about religion and ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** Moses and Monotheism of 1939 is Freud's last significant work and one of his most controversial.
+  - w It is the culmination of his thinking about religion and ...
 
-**3. (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ...**  
-`academia.edu` · tier `tier1`  
+**3. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > Freud was beginning to shape Dalí's thoughts on the psychological condition ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-  - **R** Freud was beginning to shape Dalí's thoughts on the psychological condition ...  
-    <sub>names freud, dali</sub>
-  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** Freud was beginning to shape Dalí's thoughts on the psychological condition ...
+  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-**4. [PDF] © 2019 Charles Emerson Riggs ALL RIGHTS RESERVED - RUcore**  
-`rucore.libraries.rutgers.edu` · tier `tier1`  
+**4. © 2019 Charles Emerson Riggs ALL RIGHTS RESERVED**  
+`rucore.libraries.rutgers.edu` · tier `tier1` · <https://rucore.libraries.rutgers.edu/rutgers-lib/61924/PDF/1/play/>  
 > between Christian theology and Freudian theory – to show the latter's psychological ... Moses and Monotheism, translated by Kathrine Jones. New York: Vintage, ...
 
-  - **R** between Christian theology and Freudian theory – to show the latter's psychological ...  
-    <sub>names freud</sub>
-  - **R** Moses and Monotheism, translated by Kathrine Jones.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** New York: Vintage, ...  
-    <sub>about someone else (New York), not this stop</sub>
+  - **R** between Christian theology and Freudian theory – to show the latter's psychological ...
+  - **R** Moses and Monotheism, translated by Kathrine Jones.
+  - **X** New York: Vintage, ...
 
-**5. [PDF] Hannah Höch's radical imagination - UCL Discovery**  
-`discovery.ucl.ac.uk` · tier `tier1`  
+**5. Hannah Höch's radical imagination**  
+`discovery.ucl.ac.uk` · tier `tier1` · <https://discovery.ucl.ac.uk/10040084/7/KayTabernacleThesisEditedVersion.pdf>  
 > The Standard Edition of the Complete Psychological Works of Sigmund. Freud, Volume XXIII (1937-1939): Moses and Monotheism, An Outline of Psycho-Analysis and ...
 
-  - **R** The Standard Edition of the Complete Psychological Works of Sigmund.  
-    <sub>names sigmund</sub>
-  - **R** Freud, Volume XXIII (1937-1939): Moses and Monotheism, An Outline of Psycho-Analysis and ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** The Standard Edition of the Complete Psychological Works of Sigmund.
+  - **R** Freud, Volume XXIII (1937-1939): Moses and Monotheism, An Outline of Psycho-Analysis and ...
 
-**6. Freud's Mexico - Into The Wilds of Psychoanalysis (DR - Soc) PDF**  
-`scribd.com` · tier `unverified`  
+**6. Freud's Mexico - Into The Wilds of Psychoanalysis (DR**  
+`scribd.com` · tier `unverified` · <https://www.scribd.com/document/448500456/Freud-s-Mexico-Into-the-Wilds-of-Psychoanalysis-Dr-Soc-pdf>  
 > The Labyrinth of Solitude is an original adaptation of Moses and Monotheism. to the Mexican context—an effort to use psychoanalytic concepts to theorize
 
-  - **R** The Labyrinth of Solitude is an original adaptation of Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** to the Mexican context—an effort to use psychoanalytic concepts to theorize  
-    <sub>about someone else (Mexican), not this stop</sub>
+  - **R** The Labyrinth of Solitude is an original adaptation of Moses and Monotheism.
+  - **X** to the Mexican context—an effort to use psychoanalytic concepts to theorize
 
-**7. Kindred by Chance: Spontaneous Art and Neoliberal Order - eScholarship**  
-`escholarship.org` · tier `unverified`  
+**7. Kindred by Chance: Spontaneous Art and Neoliberal Order**  
+`escholarship.org` · tier `unverified` · <https://escholarship.org/uc/item/4t54k8bf>  
 > ... Freud later returned in The Future of an Illusion (1927), Civilization and Its Discontents (1930), and Moses and Monotheism (1939)—built around Freud's ...
 
-  - **R** Freud later returned in The Future of an Illusion (1927), Civilization and Its Discontents (1930), and Moses and Monotheism (1939)—built around Freud's ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Freud later returned in The Future of an Illusion (1927), Civilization and Its Discontents (1930), and Moses and Monotheism (1939)—built around Freud's ...
 
 **8. The Psychological Fictions of J. G. Ballard 9781472542854 ...**  
-`dokumen.pub` · tier `unverified`  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/the-psychological-fictions-of-j-g-ballard-9781472542854-9781441161956.html>  
 > Reading Freud's Moses and Monotheism , Caruth suggests that 'By replacing factual history with the curious dynamics of trauma, Freud would seem to have ...
 
-  - **R** Reading Freud's Moses and Monotheism , Caruth suggests that 'By replacing factual history with the curious dynamics of trauma, Freud would seem to have ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Reading Freud's Moses and Monotheism , Caruth suggests that 'By replacing factual history with the curious dynamics of trauma, Freud would seem to have ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, visualizing the psychological and spiritual transition from polytheistic beliefs?`
 
-kind **inert → inert** · R4 w0 X0
+kind **inert → none** · R0 w0 X1 · NO RELIABLE INFORMATION
 
-> Salvador Dalí revered Sigmund Freud’s final book, *Moses and Monotheism*, considering Freud’s argument that Moses was an Egyptian prince rather than Jewish to be one of the thinker's most profound and bitter intellectual feats.
-> 
-> Published in 1974 by Éditions Art & Valeur in Paris, the deluxe portfolio was created thirty-five years after Freud’s death.
-> 
-> Dalí personally drew the designs using a diamond stylus directly onto solid gold printing plates.
-> 
-> The resulting suite of ten etchings and lithographs was printed directly on sheepskin and bound in a burgundy suede portfolio featuring a sculpted metal bas-relief cover inspired by Michelangelo’s *Moses*.
+> NO RELIABLE INFORMATION
 
-  - **R** Salvador Dalí revered Sigmund Freud’s final book, *Moses and Monotheism*, considering Freud’s argument that Moses was an Egyptian prince rather than Jewish to be one of the thinker's most profound and bitter intellectual feats.  
-    <sub>names moses and monotheism, sigmund freud, salvador dali</sub>
-  - **R** Published in 1974 by Éditions Art & Valeur in Paris, the deluxe portfolio was created thirty-five years after Freud’s death.  
-    <sub>names freud</sub>
-  - **R** Dalí personally drew the designs using a diamond stylus directly onto solid gold printing plates.  
-    <sub>names dali</sub>
-  - **R** The resulting suite of ten etchings and lithographs was printed directly on sheepskin and bound in a burgundy suede portfolio featuring a sculpted metal bas-relief cover inspired by Michelangelo’s *Moses*.  
-    <sub>names moses</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **X** NO RELIABLE INFORMATION
 
 
 ## credit_line 5.1 — *evaluative* / relative
@@ -3317,102 +3152,98 @@ kind **inert → inert** · R4 w0 X0
 
 ### SERPER — `"Moses and Monotheism" Freud Dalí why delves complexities religious origins`
 
-8 results · kind **active → active** · R11 w0 X4
+8 results · kind **active → active** · R11 w0 X3
 
 **1. 'Between Oedipus and the Sphinx: Freud and Egypt ...**  
-`facebook.com` · tier `reject`  
+`facebook.com` · tier `reject` · <https://www.facebook.com/FreudMuseum/posts/between-oedipus-and-the-sphinx-freud-and-egypt-explores-freuds-enduring-fascinat/10158993791214775/>  
 > Akhenaten features prominently in one of Sigmund Freud's last books, Moses and Monotheism, published in 1939 while he was living in exile in ...
 
-  - **R** Akhenaten features prominently in one of Sigmund Freud's last books, Moses and Monotheism, published in 1939 while he was living in exile in ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** Akhenaten features prominently in one of Sigmund Freud's last books, Moses and Monotheism, published in 1939 while he was living in exile in ...
 
 **2. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
-`academia.edu` · tier `tier1`  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > ... Dalí was in ill health (Puignau, 163-4) 4 Freud's 'The Moses of Michelangelo' [1914], supplemented by 'Moses and Monotheism: three essays' [1934-8], in ...
 
-  - **R** Dalí was in ill health (Puignau, 163-4) 4 Freud's 'The Moses of Michelangelo' [1914], supplemented by 'Moses and Monotheism: three essays' [1934-8], in ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Dalí was in ill health (Puignau, 163-4) 4 Freud's 'The Moses of Michelangelo' [1914], supplemented by 'Moses and Monotheism: three essays' [1934-8], in ...
 
-**3. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil ...**  
-`facebook.com` · tier `reject`  
-> Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
-
-  - **R** Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-
-**4. Max Horkheimer: Lectures Towards a Psychology of Anti ...**  
-`jamescrane.substack.com` · tier `unverified`  
+**3. Max Horkheimer: Lectures Towards a Psychology of Anti ...**  
+`jamescrane.substack.com` · tier `unverified` · <https://jamescrane.substack.com/p/max-horkheimer-lectures-towards-a>  
 > Salvador Dalí. Tear of Blood, Moses and Monotheism. 1975. “Civilization itself cannot be cleared of the responsibility of having engendered ...
 
-  - **R** Tear of Blood, Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** “Civilization itself cannot be cleared of the responsibility of having engendered ...  
-    <sub>about someone else (Civilization), not this stop</sub>
+  - **R** Tear of Blood, Moses and Monotheism.
+  - **X** “Civilization itself cannot be cleared of the responsibility of having engendered ...
+
+**4. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/vksartcorner/posts/frida-kahlomexican-1907-1954-moses-1945oil-on-masonite-94-x-508-cm-private-colle/1343733264462609/>  
+> Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
+
+  - **R** Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
 
 **5. (PDF) Person of Issue: Sigmund Freud (1856-1939)**  
-`researchgate.net` · tier `unverified`  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/266141594_Person_of_Issue_Sigmund_Freud_1856-1939>  
 > 1939 Moses and Monotheism. Case histories. 1905 Fragment of an Analysis of a Case of Hysteria (the Dora case history). 1909 Analysis of a ...
 
-  - **R** 1939 Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** 1905 Fragment of an Analysis of a Case of Hysteria (the Dora case history).  
-    <sub>about someone else (Fragment), not this stop</sub>
-  - **X** 1909 Analysis of a ...  
-    <sub>about someone else (Analysis), not this stop</sub>
+  - **R** 1939 Moses and Monotheism.
+  - **X** 1905 Fragment of an Analysis of a Case of Hysteria (the Dora case history).
+  - **X** 1909 Analysis of a ...
 
-**6. The Death of Sigmund Freud**  
-`cdn.bookey.app` · tier `unverified`  
+**6. Freud Sigmund, Studien über Hysterie. ...**  
+`instagram.com` · tier `reject` · <https://www.instagram.com/p/DUds3f2CKjb/>  
+> Moses and Monotheism By Sigmund Freud Price: R300.00. Condition: Good Format: Hardcover (No dust jacket) Sigmund Freud's final ...
+
+  - **R** Moses and Monotheism By Sigmund Freud Price: R300.00.
+  - **R** Condition: Good Format: Hardcover (No dust jacket) Sigmund Freud's final ...
+
+**7. The Death of Sigmund Freud**  
+`cdn.bookey.app` · tier `unverified` · <https://cdn.bookey.app/files/pdf/book/en/the-death-of-sigmund-freud.pdf>  
 > 1.Freud's reflections on anti-Semitism include influences from Mark Twain's essay. 2.Freud chose not to publish 'Moses and Monotheism' due to warnings about ...
 
-  - **R** 1.Freud's reflections on anti-Semitism include influences from Mark Twain's essay.  
-    <sub>names freud</sub>
-  - **R** 2.Freud chose not to publish 'Moses and Monotheism' due to warnings about ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** 1.Freud's reflections on anti-Semitism include influences from Mark Twain's essay.
+  - **R** 2.Freud chose not to publish 'Moses and Monotheism' due to warnings about ...
 
-**7. ❌Sold❌ Price: ₹299 📚 Psychopathology of Everyday Life ...**  
-`instagram.com` · tier `reject`  
-> ... Freudian Psychology introduces Freud's theories on ... The Origins of Religion TOTEM AND TABOO, MOSES AND MONOTHEISM AND OTHER WORKS 200 RS ...
+**8. Wittgenstein Reads Freud: The Myth of the Unconscious ...**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/wittgenstein-reads-freud-the-myth-of-the-unconscious-course-booknbsped-9781400821594.html>  
+> We might challenge a theory of religious belief like Freud's ... names, this inevitably demands a comparison with Freud's essay, Moses and Monotheism (cf.
 
-  - **R** Freudian Psychology introduces Freud's theories on ...  
-    <sub>names freud</sub>
-  - **R** The Origins of Religion TOTEM AND TABOO, MOSES AND MONOTHEISM AND OTHER WORKS 200 RS ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-
-**8. © 2019 Charles Emerson Riggs ALL RIGHTS RESERVED**  
-`rucore.libraries.rutgers.edu` · tier `tier1`  
-> approaches and to adopt Freud's critique of religious moralism as their own. ... Moses and Monotheism, trans. Kathrine Jones (New York: Vintage, 1939); ...
-
-  - **R** approaches and to adopt Freud's critique of religious moralism as their own.  
-    <sub>names freud</sub>
-  - **R** Moses and Monotheism, trans.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **X** Kathrine Jones (New York: Vintage, 1939); ...  
-    <sub>about someone else (Kathrine Jones), not this stop</sub>
+  - **R** We might challenge a theory of religious belief like Freud's ...
+  - **R** names, this inevitably demands a comparison with Freud's essay, Moses and Monotheism (cf.
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, delves into the complexities of religious origins?`
 
-kind **active → active** · R5 w0 X0
+kind **eventful → eventful** · R3 w1 X1
 
-> Salvador Dalí created this portfolio in 1974 to illustrate Sigmund Freud's final 1939 book, which controversially argued that Moses was an Egyptian nobleman rather than Hebrew and had imported monotheism from Pharaoh Akhenaten. 
+> Salvador Dalí created this portfolio to visually interpret Sigmund Freud’s controversial 1939 thesis claiming Moses was an Egyptian noble follower of Akhenaten rather than of Hebrew origin.
 > 
-> Dalí was a lifelong admirer of Freud's psychoanalytic theories and described Freud's thesis on Moses as both heroic and deeply tragic. 
+> Dalí regarded Freud's argument as a tragic heroic act that stripped the Jewish people of their greatest figure, writing in his diary that Freud’s treatise was both corrosive and bitter.
 > 
-> To produce the deluxe portfolio, Dalí engraved drawings with a diamond stylus directly onto gold printing plates and printed them onto lambskin. 
+> Publisher Éditions Art et Valeur in Paris commissioned and released the limited-edition artist's book between 1974 and 1975.
 > 
-> The resulting limited edition of 250 copies was published in Paris by Éditions Art & Valeur and housed in a burgundy suede case with a metal bas-relief depicting Moses. 
+> Dalí executed the central illustrations by drawing directly onto massive plates with a diamond stylus.
 > 
-> The work exhibited in *Picasso, Miró, Dalí: Unbound* is drawn from the collection of Boris and Galina Fridman.
+> The publisher chose soft lambskin and sheepskin parchment instead of standard paper, a notoriously difficult material that physically warps and shrinks with changes in ambient humidity.
 
-  - **R** Salvador Dalí created this portfolio in 1974 to illustrate Sigmund Freud's final 1939 book, which controversially argued that Moses was an Egyptian nobleman rather than Hebrew and had imported monotheism from Pharaoh Akhenaten.  
-    <sub>names sigmund freud, salvador dali, monotheism</sub>
-  - **R** Dalí was a lifelong admirer of Freud's psychoanalytic theories and described Freud's thesis on Moses as both heroic and deeply tragic.  
-    <sub>names moses, freud, dali</sub>
-  - **R** To produce the deluxe portfolio, Dalí engraved drawings with a diamond stylus directly onto gold printing plates and printed them onto lambskin.  
-    <sub>names dali</sub>
-  - **R** The resulting limited edition of 250 copies was published in Paris by Éditions Art & Valeur and housed in a burgundy suede case with a metal bas-relief depicting Moses.  
-    <sub>names moses</sub>
-  - **R** The work exhibited in *Picasso, Miró, Dalí: Unbound* is drawn from the collection of Boris and Galina Fridman.  
-    <sub>names dali</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `Picasso Miro Dali Unbound Moses and Monotheism Freud`; `Salvador Dali Moses and Monotheism 1974 facts`
+
+1. `museumofthebible.org` — <https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist>
+2. `daliparis.com` — <https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/>
+3. `vksart.com` — <https://vksart.com/artwork/moses-and-monotheism/>
+4. `lockportstreetgallery.com` — <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHSoQsiov9AkQxev9xC7pl0hy-rYKNFZLlGqE3AzlRznPNxBuceXEfaTCEnzRW_Amxne6kYQyMo9j2mQwd3_DDHWG30DfWq78Kvck_asCqVOhOtiGS9tLKeB1F-MwFbANDNBkkhrHL9B_FgZEeZ_hWnDMutrXsmT_lfnjNa05Eq>
+5. `sothebys.com` — <https://www.sothebys.com/en/buy/pdp/fine-art/print/_salvador-dali-moses-and-monotheism-197475-37ae>
+
+  - **R** Salvador Dalí created this portfolio to visually interpret Sigmund Freud’s controversial 1939 thesis claiming Moses was an Egyptian noble follower of Akhenaten rather than of Hebrew origin.
+      ↳ source: `museumofthebible.org` <https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist>
+      ↳ source: `daliparis.com` <https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/>
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - **R** Dalí regarded Freud's argument as a tragic heroic act that stripped the Jewish people of their greatest figure, writing in his diary that Freud’s treatise was both corrosive and bitter.
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - **X** Publisher Éditions Art et Valeur in Paris commissioned and released the limited-edition artist's book between 1974 and 1975.
+      ↳ source: `lockportstreetgallery.com` <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHSoQsiov9AkQxev9xC7pl0hy-rYKNFZLlGqE3AzlRznPNxBuceXEfaTCEnzRW_Amxne6kYQyMo9j2mQwd3_DDHWG30DfWq78Kvck_asCqVOhOtiGS9tLKeB1F-MwFbANDNBkkhrHL9B_FgZEeZ_hWnDMutrXsmT_lfnjNa05Eq>
+      ↳ source: `sothebys.com` <https://www.sothebys.com/en/buy/pdp/fine-art/print/_salvador-dali-moses-and-monotheism-197475-37ae>
+  - **R** Dalí executed the central illustrations by drawing directly onto massive plates with a diamond stylus.
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - w The publisher chose soft lambskin and sheepskin parchment instead of standard paper, a notoriously difficult material that physically warps and shrinks with changes in ambient humidity.
+      ↳ source: `lockportstreetgallery.com` <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHSoQsiov9AkQxev9xC7pl0hy-rYKNFZLlGqE3AzlRznPNxBuceXEfaTCEnzRW_Amxne6kYQyMo9j2mQwd3_DDHWG30DfWq78Kvck_asCqVOhOtiGS9tLKeB1F-MwFbANDNBkkhrHL9B_FgZEeZ_hWnDMutrXsmT_lfnjNa05Eq>
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
 
 
 ## credit_line 5.2 — *anchored* / participial
@@ -3421,106 +3252,94 @@ kind **active → active** · R5 w0 X0
 
 ### SERPER — `"Moses and Monotheism" Freud Dalí why setting stage evocative interpretations`
 
-8 results · kind **inert → inert** · R14 w1 X0
+8 results · kind **active → active** · R13 w0 X0
 
-**1. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil ...**  
-`facebook.com` · tier `reject`  
+**1. Illustrations and printed text of Sigmund Freud's Moses and ...**  
+`collections.museumofthebible.org` · tier `unverified` · <https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist>  
+> This oversize French edition of Sigmund Freud's 1939 published work, Moses and Monotheism, contains illustrations based on watercolor, pen-and-ink drawings, ...
+
+  - **R** This oversize French edition of Sigmund Freud's 1939 published work, Moses and Monotheism, contains illustrations based on watercolor, pen-and-ink drawings, ...
+
+**2. Sigmund Freud**  
+`thedali.org` · tier `unverified` · <https://thedali.org/dali-library-guide-1/sigmund-freud/>  
+> Dalí's extensive body of work has many interpretations of Freud's psychology as fixation, complexes, and psychosexual development. ... Moses and Monotheism.
+
+  - **R** Dalí's extensive body of work has many interpretations of Freud's psychology as fixation, complexes, and psychosexual development.
+  - **R** Moses and Monotheism.
+
+**3. Dream of Moses - Moses and Monotheism**  
+`daliparis.com` · tier `unverified` · <https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/>  
+> Moses and Monotheism is a book written in 1939 by Sigmund Freud. The book consists of three essays and is an extension of Freud's work on ...
+
+  - **R** Moses and Monotheism is a book written in 1939 by Sigmund Freud.
+  - **R** The book consists of three essays and is an extension of Freud's work on ...
+
+**4. Salvador Dali Moise et Monotheisme, Moses and ...**  
+`lockportstreetgallery.com` · tier `unverified` · <https://lockportstreetgallery.com/dali/salvador-dali-moise-et-monotheisme/>  
+> Salvador Dali Moise et Monotheisme, Moses and Monotheism illustrated book by Sigmund Freud is available at the Lockport Street Gallery.
+
+  - **R** Salvador Dali Moise et Monotheisme, Moses and Monotheism illustrated book by Sigmund Freud is available at the Lockport Street Gallery.
+
+**5. Moses and Monotheism**  
+`vksart.com` · tier `unverified` · <https://vksart.com/artwork/moses-and-monotheism/>  
+> In Moses and Monotheism Freud applies his psychoanalytic theory not to a person but to an event in history. He contradicts the biblical story of Moses, ...
+
+  - **R** In Moses and Monotheism Freud applies his psychoanalytic theory not to a person but to an event in history.
+  - **R** He contradicts the biblical story of Moses, ...
+
+**6. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/vksartcorner/posts/frida-kahlomexican-1907-1954-moses-1945oil-on-masonite-94-x-508-cm-private-colle/1343733264462609/>  
 > Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
 
-  - **R** Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** Her work Moses, painted as a reaction to Sigmund Freud's book Moses and Monotheism, exemplifies many of these social and political attitudes.
 
-**2. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
-`academia.edu` · tier `tier1`  
+**7. moses and monotheism by salvador dalí**  
+`artnet.com` · tier `market` · <https://www.artnet.com/artists/salvador-dal%C3%AD/moses-and-monotheism-VxN6GBQhq7wCiaoB1Ub26A2>  
+> View Moses and Monotheism by Salvador Dalí on artnet. Browse upcoming and past auction lots by Salvador Dalí.
+
+  - **R** View Moses and Monotheism by Salvador Dalí on artnet.
+  - **R** Browse upcoming and past auction lots by Salvador Dalí.
+
+**8. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > ... stage set for a drama of approximately Freudian inspiration. In any case, its ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-  - **R** stage set for a drama of approximately Freudian inspiration.  
-    <sub>names freud</sub>
-  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-
-**3. Frankenstein, Spellbound, and World War Z**  
-`doi.apa.org` · tier `unverified`  
-> Freud, S. (1964). Moses and monotheism: Three essays. In J. Strachey (Ed. & Trans.), The standard edition of the complete psychological works of Sigmund Freud ( ...
-
-  - **R** Moses and monotheism: Three essays.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** & Trans.), The standard edition of the complete psychological works of Sigmund Freud ( ...  
-    <sub>names sigmund freud, sigmund, freud</sub>
-
-**4. Sigmund Freud's extensive collection of antiquities features ...**  
-`facebook.com` · tier `reject`  
-> This point is not incidental because for Freud, in Moses and Monotheism, monotheism seems to represent a triumph of the mind, or what Freud ...
-
-  - **R** This point is not incidental because for Freud, in Moses and Monotheism, monotheism seems to represent a triumph of the mind, or what Freud ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-
-**5. Inside the Freud Museums: History, Memory and Site ...**  
-`dokumen.pub` · tier `unverified`  
-> ... Freud and Art, pp. 153–72. The interpretations of Freud's Moses and Monotheism are diverse and at times contradictory. The ones I found most useful for my ...
-
-  - **R** The interpretations of Freud's Moses and Monotheism are diverse and at times contradictory.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - w The ones I found most useful for my ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
-
-**6. (PDF) Freud's British Family: Reclaiming Lost Lives in ...**  
-`researchgate.net` · tier `unverified`  
-> 1939 book Moses and Monotheism. Jacob Freud was born in Tysmenitz ... Controversies in the English publication of Freud's The Interpretation of ...
-
-  - **R** 1939 book Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** Jacob Freud was born in Tysmenitz ...  
-    <sub>names freud</sub>
-  - **R** Controversies in the English publication of Freud's The Interpretation of ...  
-    <sub>names freud</sub>
-
-**7. Decade of the Drawing**  
-`galleryand.studio` · tier `unverified`  
-> prints that Dali executed for “Don. Quixote” and “Moses and Monotheism,” two other important livres d'artistes that demonstrate his ...
-
-  - **R** prints that Dali executed for “Don.  
-    <sub>names dali</sub>
-  - **R** Quixote” and “Moses and Monotheism,” two other important livres d'artistes that demonstrate his ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-
-**8. Coming Attractions: July 19 Through August 3 - What Will ...**  
-`artsfuse.org` · tier `unverified`  
-> The exhibition includes artists' interpretations of classic texts, such as the illustrations Dalí ... Moses and Monotheism, originally published ...
-
-  - **R** The exhibition includes artists' interpretations of classic texts, such as the illustrations Dalí ...  
-    <sub>names dali</sub>
-  - **R** Moses and Monotheism, originally published ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** stage set for a drama of approximately Freudian inspiration.
+  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, setting the stage for Dalí's evocative interpretations?`
 
-kind **active → active** · R5 w1 X0
+kind **inert → inert** · R3 w1 X1
 
-> Salvador Dalí created his illustration portfolio to accompany the French edition of Sigmund Freud’s final book, *Moses and Monotheism*, published in 1939. 
+> Salvador Dalí created his illustrations to accompany Sigmund Freud’s controversial final 1939 book, in which Freud argued that Moses was an Egyptian nobleman rather than a Hebrew.
 > 
-> Freud’s controversial thesis hypothesized that Moses was not born Hebrew, but was an Egyptian nobleman who followed the monotheistic pharaoh Akhenaten. 
+> Dalí had idolized Freud since his youth, noting in his diary that he placed the psychoanalyst among the greatest heroes for tackling this daring thesis.
 > 
-> Dalí long idolized Freud, explicitly writing in his 1957 diary that he placed Freud "among the heroes" for writing his tragic and difficult thesis on Moses. 
+> The project was produced as a luxury *livre d'artiste* published in Paris by Art et Valeur in an edition of only 300 copies.
 > 
-> Published in Paris by Art et Valeur in the mid-1970s, Dalí drew the portfolio's designs with a diamond stylus onto printing plates to produce limited-edition etchings over lithographs. 
+> Dalí drew his designs directly onto massive plates with a diamond stylus and had them printed across sheets of soft glove sheepskin.
 > 
-> The publisher printed the artwork directly onto glove sheepskin rather than paper, a material choice known to shrink and warp when exposed to ambient humidity. 
-> 
-> The completed project was housed loose-leaf in custom Plexiglas folders within a large case featuring a bas-relief relief cover based on Michelangelo's sculpture of Moses.
+> The sheepskin material proved notoriously difficult to manage because changes in ambient humidity cause it to shrink and warp over time.
 
-  - **R** Salvador Dalí created his illustration portfolio to accompany the French edition of Sigmund Freud’s final book, *Moses and Monotheism*, published in 1939.  
-    <sub>names moses and monotheism, sigmund freud, salvador dali</sub>
-  - **R** Freud’s controversial thesis hypothesized that Moses was not born Hebrew, but was an Egyptian nobleman who followed the monotheistic pharaoh Akhenaten.  
-    <sub>names moses, freud</sub>
-  - **R** Dalí long idolized Freud, explicitly writing in his 1957 diary that he placed Freud "among the heroes" for writing his tragic and difficult thesis on Moses.  
-    <sub>names moses, freud, dali</sub>
-  - **R** Published in Paris by Art et Valeur in the mid-1970s, Dalí drew the portfolio's designs with a diamond stylus onto printing plates to produce limited-edition etchings over lithographs.  
-    <sub>names dali</sub>
-  - w The publisher printed the artwork directly onto glove sheepskin rather than paper, a material choice known to shrink and warp when exposed to ambient humidity.  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
-  - **R** The completed project was housed loose-leaf in custom Plexiglas folders within a large case featuring a bas-relief relief cover based on Michelangelo's sculpture of Moses.  
-    <sub>names moses</sub>
+**SOURCES (3)** — pages Gemini actually read · searched: `Salvador Dali Moses and Monotheism portfolio 1975 history`
+
+1. `vksart.com` — <https://vksart.com/artwork/moses-and-monotheism/>
+2. `daliparis.com` — <https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/>
+3. `lockportstreetgallery.com` — <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFXaAsOm-13jV19e4V3wPROW5-uBmgbmxfNN2lHU9RN8gR_Z0Yn59_feGC_n31xjuHJsxMAuUsdTvSiUjfLUQuFKp0E_bPV-IjjRn-y1tx4GERZ6FH9w8AFP41zpgFxkvC0bc4TvGDyEKqytHX3YPWjkPg2-sfSriW4KERVQXlnYA==>
+
+  - **R** Salvador Dalí created his illustrations to accompany Sigmund Freud’s controversial final 1939 book, in which Freud argued that Moses was an Egyptian nobleman rather than a Hebrew.
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+      ↳ source: `daliparis.com` <https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/>
+  - **R** Dalí had idolized Freud since his youth, noting in his diary that he placed the psychoanalyst among the greatest heroes for tackling this daring thesis.
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - **X** The project was produced as a luxury *livre d'artiste* published in Paris by Art et Valeur in an edition of only 300 copies.
+      ↳ source: `daliparis.com` <https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/>
+      ↳ source: `lockportstreetgallery.com` <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFXaAsOm-13jV19e4V3wPROW5-uBmgbmxfNN2lHU9RN8gR_Z0Yn59_feGC_n31xjuHJsxMAuUsdTvSiUjfLUQuFKp0E_bPV-IjjRn-y1tx4GERZ6FH9w8AFP41zpgFxkvC0bc4TvGDyEKqytHX3YPWjkPg2-sfSriW4KERVQXlnYA==>
+  - **R** Dalí drew his designs directly onto massive plates with a diamond stylus and had them printed across sheets of soft glove sheepskin.
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+      ↳ source: `lockportstreetgallery.com` <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFXaAsOm-13jV19e4V3wPROW5-uBmgbmxfNN2lHU9RN8gR_Z0Yn59_feGC_n31xjuHJsxMAuUsdTvSiUjfLUQuFKp0E_bPV-IjjRn-y1tx4GERZ6FH9w8AFP41zpgFxkvC0bc4TvGDyEKqytHX3YPWjkPg2-sfSriW4KERVQXlnYA==>
+  - w The sheepskin material proved notoriously difficult to manage because changes in ambient humidity cause it to shrink and warp over time.
+      ↳ source: `lockportstreetgallery.com` <https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFXaAsOm-13jV19e4V3wPROW5-uBmgbmxfNN2lHU9RN8gR_Z0Yn59_feGC_n31xjuHJsxMAuUsdTvSiUjfLUQuFKp0E_bPV-IjjRn-y1tx4GERZ6FH9w8AFP41zpgFxkvC0bc4TvGDyEKqytHX3YPWjkPg2-sfSriW4KERVQXlnYA==>
 
 
 ## credit_line 6.1 — *evaluative* / relative
@@ -3529,102 +3348,89 @@ kind **active → active** · R5 w1 X0
 
 ### SERPER — `"Moses and Monotheism" Freud Dalí why itself artwork`
 
-8 results · kind **inert → inert** · R12 w1 X2
+8 results · kind **active → active** · R13 w1 X1
 
 **1. Sigmund Freud**  
-`thedali.org` · tier `unverified`  
+`thedali.org` · tier `unverified` · <https://thedali.org/dali-library-guide-1/sigmund-freud/>  
 > Freud, Sigmund. Moses and Monotheism. Vintage Books, 1967. This volume reflects Freud's commentaries on various aspects of religion, specifically his ...
 
-  - **R** Moses and Monotheism.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** This volume reflects Freud's commentaries on various aspects of religion, specifically his ...  
-    <sub>names freud</sub>
+  - **R** Moses and Monotheism.
+  - **R** This volume reflects Freud's commentaries on various aspects of religion, specifically his ...
 
 **2. Freud had a lifelong fascination for the figure of Moses ...**  
-`facebook.com` · tier `reject`  
+`facebook.com` · tier `reject` · <https://www.facebook.com/FreudMuseum/posts/freud-had-a-lifelong-fascination-for-the-figure-of-moses-from-the-etching-of-mos/1480205927473513/>  
 > ”― Sigmund Freud, MOSES AND MONOTHEISM ABOUT MOSES AND MONOTHEISM This volume contains Freud's speculations on various aspects of religion ...
 
-  - **R** ”― Sigmund Freud, MOSES AND MONOTHEISM ABOUT MOSES AND MONOTHEISM This volume contains Freud's speculations on various aspects of religion ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** ”― Sigmund Freud, MOSES AND MONOTHEISM ABOUT MOSES AND MONOTHEISM This volume contains Freud's speculations on various aspects of religion ...
 
 **3. Beware the Boa Constructor! Freud, Modern Art and the ...**  
-`88invisiblemirrors.blog` · tier `unverified`  
+`88invisiblemirrors.blog` · tier `unverified` · <https://88invisiblemirrors.blog/2020/09/13/beware-the-boa-constructor-freud-modern-art-and-the-riddle-of-interpretation/>  
 > Freud's appreciation of Dali's mastery of the medium of painting ... Sigmund Freud Moses and Monotheism (1939). Sigmund Freud An Outline ...
 
-  - **R** Freud's appreciation of Dali's mastery of the medium of painting ...  
-    <sub>names freud, dali</sub>
-  - **R** Sigmund Freud Moses and Monotheism (1939).  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-  - **R** Sigmund Freud An Outline ...  
-    <sub>names sigmund freud, sigmund, freud</sub>
+  - **R** Freud's appreciation of Dali's mastery of the medium of painting ...
+  - **R** Sigmund Freud Moses and Monotheism (1939).
+  - **R** Sigmund Freud An Outline ...
 
-**4. FREUD and EGYPT**  
-`miekezilverberg.com` · tier `unverified`  
-> Akhenaten features prominently in one of Sigmund Freud's last books, Moses and Monotheism ... The exhibition is best taken as a supplement to a ...
+**4. Sigmund and Monotheism: God, Jokes, and Eloquent Silence in ...**  
+`jstor.org` · tier `tier2` · <https://www.jstor.org/stable/soutatlarevi.79.1-2.196>  
+> Freud himself is ... 6 When Freud finally says he should not abandon art, Dali ... Egyptian, had begged Freud not to publish Moses and Monotheism, and later.
 
-  - **R** Akhenaten features prominently in one of Sigmund Freud's last books, Moses and Monotheism ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-  - w The exhibition is best taken as a supplement to a ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
+  - **R** 6 When Freud finally says he should not abandon art, Dali ...
+  - **R** Egyptian, had begged Freud not to publish Moses and Monotheism, and later.
 
-**5. A meeting of the minds**  
-`cltampa.com` · tier `unverified`  
-> Yehuda is incensed with Freud after having read a draft of Moses and Monotheism, and Dalí, in London to pay homage to Freud, is intrigued with the naked girl ...
+**5. About Salvador Dalí**  
+`modernamuseet.se` · tier `unverified` · <https://www.modernamuseet.se/en/stockholm/exhibitions/dali-dali/about-salvador-dali/>  
+> Provides the introduction and illustrations to Sigmund Freud's book Moses and Monotheism. ... Gala always calls herself 'Gala' and Dalí always calls himself 'Dalí ...
 
-  - **R** Yehuda is incensed with Freud after having read a draft of Moses and Monotheism, and Dalí, in London to pay homage to Freud, is intrigued with the naked girl ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Provides the introduction and illustrations to Sigmund Freud's book Moses and Monotheism.
+  - **R** Gala always calls herself 'Gala' and Dalí always calls himself 'Dalí ...
 
-**6. New London Exhibition 'Freud's Antiquity' Unveils ...**  
-`uh.edu` · tier `tier1`  
+**6. Dali and Freud: Art, Paranoia, Narcissism | PDF**  
+`scribd.com` · tier `unverified` · <https://www.scribd.com/document/495820488/216-Article-Text-327-1-10-20210117>  
+> 448-449). and his controversial Moses and Monotheism Freud saw in Dali's work confirmation of some of ... derstanding of narcissism (Kernberg, 1976; enced this ...
+
+  - **R** and his controversial Moses and Monotheism Freud saw in Dali's work confirmation of some of ...
+  - **X** derstanding of narcissism (Kernberg, 1976; enced this ...
+
+**7. //...Frida Kahlo...// (Mexican, 1907-1954) Moses, 1945. Oil ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/vksartcorner/posts/frida-kahlomexican-1907-1954-moses-1945oil-on-masonite-94-x-508-cm-private-colle/1343733264462609/>  
+> The inspiration for this painting was provided by Sigmund Freud's book, "Moses and Monotheism". She was fascinated by the book and painted ...
+
+  - **R** The inspiration for this painting was provided by Sigmund Freud's book, "Moses and Monotheism".
+  - w She was fascinated by the book and painted ...
+
+**8. New London Exhibition 'Freud's Antiquity' Unveils ...**  
+`uh.edu` · tier `tier1` · <https://www.uh.edu/class/news/archive/2023/march/new-london-exhibition-freuds-antiquity-unveils-freuds-personal-collection-of-artifacts/>  
 > ... Moses and Monotheism.” “Freud created the 'archaeological metaphor' to show how the mind resembles an archaeological site which the analyst ...
 
-  - **R** Moses and Monotheism.” “Freud created the 'archaeological metaphor' to show how the mind resembles an archaeological site which the analyst ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-
-**7. "Picasso, Miró, Dalí: Unbound" at the Museum of Fine Arts ...**  
-`airmail.news` · tier `unverified`  
-> Dalí's 1974 illustrations for Sigmund Freud's Moses and Monotheism is an example of an artist illustrating a foundational text. Resistant to easy ...
-
-  - **R** Dalí's 1974 illustrations for Sigmund Freud's Moses and Monotheism is an example of an artist illustrating a foundational text.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-  - **X** Resistant to easy ...  
-    <sub>about someone else (Resistant), not this stop</sub>
-
-**8. Frida Kahlo, Surrealism, and the Gradivian Myth**  
-`ahnp.ub.uni-heidelberg.de` · tier `unverified`  
-> Breton was an admirer of Freud's works, especially The Interpretation of ... Freud's Moses and Monotheism, ed. Ruth Ginsburg and Ilana Pardes, Tübingen ...
-
-  - **R** Breton was an admirer of Freud's works, especially The Interpretation of ...  
-    <sub>names freud</sub>
-  - **R** Freud's Moses and Monotheism, ed.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **X** Ruth Ginsburg and Ilana Pardes, Tübingen ...  
-    <sub>about someone else (Ruth Ginsburg), not this stop</sub>
+  - **R** Moses and Monotheism.” “Freud created the 'archaeological metaphor' to show how the mind resembles an archaeological site which the analyst ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, the book itself is an artwork?`
 
-kind **active → inert** · R4 w0 X1
+kind **active → inert** · R2 w0 X4
 
-> Salvador Dalí created this livre d'artiste portfolio in 1974 to illustrate the final, controversial 1939 book written by his intellectual hero Sigmund Freud.
+> Salvador Dalí's lifelong obsession with Sigmund Freud's psychoanalytic theories, combined with complex memories of his own authoritarian father, motivated him to create this visual response to Freud's final 1939 book [PerQueryResult(1.2.1), PerQueryResult(1.4.1)].
 > 
-> Dalí's interest in illustrating Freud's text stemmed in part from personal associations with his authoritarian father, who twisted his hair into a horn reminiscent of traditional depictions of Moses.
+> The project was designed and coordinated by art publisher Ariane Lancell and issued by Éditions Art & Valeur in Paris [PerQueryResult(1.3.1), PerQueryResult(1.3.2)].
 > 
-> The project was commissioned and issued by the Parisian publisher Éditions Art et Valeur in an edition limited to 250 numbered copies.
+> Rather than standard paper, the publisher produced the portfolio's prints directly on soft glove sheepskin [PerQueryResult(1.2.1), PerQueryResult(1.2.3)].
 > 
-> Dalí drew the compositions directly onto gold-plated printing plates using a diamond-tipped stylus before running them as colour etchings over lithographs onto lambskin parchment.
+> The portfolio was issued in a limited edition of 250 numbered copies, alongside 25 artist proofs [PerQueryResult(1.2.3)].
 > 
-> The complete artwork was issued not as a bound book, but as loose sheets housed inside Plexiglas folders and a suede-covered case cast with a bas-relief portrait of Moses.
+> The unbound sheets and texts were housed in individual Plexiglas sleeves within a burgundy suede clamshell case bearing a molded metal relief inspired by Michelangelo's Moses [PerQueryResult(1.3.2), PerQueryResult(1.4.1)].
+> 
+> The copy featured in the exhibition comes on loan from the private collection of Boris and Galina Fridman [PerQueryResult(1.3.5)].
 
-  - **R** Salvador Dalí created this livre d'artiste portfolio in 1974 to illustrate the final, controversial 1939 book written by his intellectual hero Sigmund Freud.  
-    <sub>names sigmund freud, salvador dali, salvador</sub>
-  - **R** Dalí's interest in illustrating Freud's text stemmed in part from personal associations with his authoritarian father, who twisted his hair into a horn reminiscent of traditional depictions of Moses.  
-    <sub>names moses, freud, dali</sub>
-  - **X** The project was commissioned and issued by the Parisian publisher Éditions Art et Valeur in an edition limited to 250 numbered copies.  
-    <sub>about someone else (Parisian), not this stop</sub>
-  - **R** Dalí drew the compositions directly onto gold-plated printing plates using a diamond-tipped stylus before running them as colour etchings over lithographs onto lambskin parchment.  
-    <sub>names dali</sub>
-  - **R** The complete artwork was issued not as a bound book, but as loose sheets housed inside Plexiglas folders and a suede-covered case cast with a bas-relief portrait of Moses.  
-    <sub>names moses</sub>
+**SOURCES (0)** — pages Gemini actually read
+
+_none reported — the answer is unattributed_
+
+  - **R** Salvador Dalí's lifelong obsession with Sigmund Freud's psychoanalytic theories, combined with complex memories of his own authoritarian father, motivated him to create this visual response to Freud's final 1939 book [PerQueryResult(1.2.1), PerQueryResult(1.4.1)].
+  - **X** The project was designed and coordinated by art publisher Ariane Lancell and issued by Éditions Art & Valeur in Paris [PerQueryResult(1.3.1), PerQueryResult(1.3.2)].
+  - **X** Rather than standard paper, the publisher produced the portfolio's prints directly on soft glove sheepskin [PerQueryResult(1.2.1), PerQueryResult(1.2.3)].
+  - **X** The portfolio was issued in a limited edition of 250 numbered copies, alongside 25 artist proofs [PerQueryResult(1.2.3)].
+  - **R** The unbound sheets and texts were housed in individual Plexiglas sleeves within a burgundy suede clamshell case bearing a molded metal relief inspired by Michelangelo's Moses [PerQueryResult(1.3.2), PerQueryResult(1.4.1)].
+  - **X** The copy featured in the exhibition comes on loan from the private collection of Boris and Galina Fridman [PerQueryResult(1.3.5)].
 
 
 ## credit_line 7.1 — *evaluative* / participial
@@ -3633,98 +3439,91 @@ kind **active → inert** · R4 w0 X1
 
 ### SERPER — `"Moses and Monotheism" Freud Dalí why bridging literary visual forms`
 
-8 results · kind **inert → inert** · R12 w1 X3
+8 results · kind **inert → inert** · R13 w1 X3
 
-**1. Beware the Boa Constructor! Freud, Modern Art and the Riddle of ...**  
-`88invisiblemirrors.blog` · tier `unverified`  
+**1. Beware the Boa Constructor! Freud, Modern Art and the ...**  
+`88invisiblemirrors.blog` · tier `unverified` · <https://88invisiblemirrors.blog/2020/09/13/beware-the-boa-constructor-freud-modern-art-and-the-riddle-of-interpretation/>  
 > If taken sequentially from his earliest work On Aphasia (1891) to Moses and Monotheism (1939), the story of psychoanalysis can be read as an ...
 
-  - **R** If taken sequentially from his earliest work On Aphasia (1891) to Moses and Monotheism (1939), the story of psychoanalysis can be read as an ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** If taken sequentially from his earliest work On Aphasia (1891) to Moses and Monotheism (1939), the story of psychoanalysis can be read as an ...
 
-**2. Sigmund Freud's extensive collection of antiquities features several horse ...**  
-`facebook.com` · tier `reject`  
+**2. Sigmund Freud's extensive collection of antiquities features ...**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/FreudMuseum/posts/sigmund-freuds-extensive-collection-of-antiquities-features-several-horse-statue/1445068000987306/>  
 > Returning to Moses twenty years later in his weird and wonderful book Moses and Monotheism, Freud gives final form to the possible virtues ...
 
-  - **R** Returning to Moses twenty years later in his weird and wonderful book Moses and Monotheism, Freud gives final form to the possible virtues ...  
-    <sub>names moses and monotheism, monotheism, freud</sub>
+  - **R** Returning to Moses twenty years later in his weird and wonderful book Moses and Monotheism, Freud gives final form to the possible virtues ...
 
-**3. Wading into Battle: Frida Kahlo, Surrealism, and the Gradivian Myth**  
-`ahnp.ub.uni-heidelberg.de` · tier `unverified`  
+**3. Frida Kahlo, Surrealism, and the Gradivian Myth**  
+`ahnp.ub.uni-heidelberg.de` · tier `unverified` · <https://ahnp.ub.uni-heidelberg.de/journals/rihajournal/article/view/85590/80810>  
 > ... visual and literary. [29] The female foot as marker of eroticism and ... Freud's Moses and Monotheism, ed. Ruth Ginsburg and Ilana Pardes, Tübingen ...
 
-  - w [29] The female foot as marker of eroticism and ...  
-    <sub>no entity of its own; snippet names moses and monotheism</sub>
-  - **R** Freud's Moses and Monotheism, ed.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **X** Ruth Ginsburg and Ilana Pardes, Tübingen ...  
-    <sub>about someone else (Ruth Ginsburg), not this stop</sub>
+  - w [29] The female foot as marker of eroticism and ...
+  - **R** Freud's Moses and Monotheism, ed.
+  - **X** Ruth Ginsburg and Ilana Pardes, Tübingen ...
 
-**4. Freud Museum London on Instagram: "April's 4pm Session promises to be ...**  
-`instagram.com` · tier `reject`  
-> ... book, 'Moses and Monotheism'. Our latest afternoon session explores Freud's fascination with Moses through the years, included with your ...
-
-  - **R** book, 'Moses and Monotheism'.  
-    <sub>names moses and monotheism, monotheism, moses</sub>
-  - **R** Our latest afternoon session explores Freud's fascination with Moses through the years, included with your ...  
-    <sub>names moses, freud</sub>
-
-**5. (PDF) Dalí's Religious Models: the Iconography of Martyrdom and its ...**  
-`academia.edu` · tier `tier1`  
+**4. Dalí's Religious Models: the Iconography of Martyrdom and ...**  
+`academia.edu` · tier `tier1` · <https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation>  
 > ... visual lexicon for the themes through which Freud was guiding him. Lorca ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-  - **R** visual lexicon for the themes through which Freud was guiding him.  
-    <sub>names freud</sub>
-  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** visual lexicon for the themes through which Freud was guiding him.
+  - **R** Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...
 
-**6. Sigmund Freud - Wikipedia**  
-`en.wikipedia.org` · tier `tier1`  
+**5. Sigmund Freud**  
+`en.wikipedia.org` · tier `tier1` · <https://en.wikipedia.org/wiki/Sigmund_Freud>  
 > ... book form. In contrast Allan Hobson believes that Freud, by ... 62–69, and Chaney, 'Moses and Monotheism, by Sigmund Freud', 'The Canon ...
 
-  - **R** In contrast Allan Hobson believes that Freud, by ...  
-    <sub>names freud</sub>
-  - **R** 62–69, and Chaney, 'Moses and Monotheism, by Sigmund Freud', 'The Canon ...  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
+  - **R** In contrast Allan Hobson believes that Freud, by ...
+  - **R** 62–69, and Chaney, 'Moses and Monotheism, by Sigmund Freud', 'The Canon ...
 
-**7. Sigmund Freud's influence on modern literature and art - Facebook**  
-`facebook.com` · tier `reject`  
+**6. Sigmund Freud's influence on modern literature and art**  
+`facebook.com` · tier `reject` · <https://www.facebook.com/groups/royaldepartment/posts/1725142474460500/>  
 > ... Freud had a profound impact on visual art. Here we examine the many ... Moses and Monotheism (1939); An Outline of Psychoanalysis (1940).
 
-  - **R** Freud had a profound impact on visual art.  
-    <sub>names freud</sub>
-  - **X** Here we examine the many ...  
-    <sub>about someone else (Here), not this stop</sub>
-  - **R** Moses and Monotheism (1939); An Outline of Psychoanalysis (1940).  
-    <sub>names moses and monotheism, monotheism, moses</sub>
+  - **R** Freud had a profound impact on visual art.
+  - **X** Here we examine the many ...
+  - **R** Moses and Monotheism (1939); An Outline of Psychoanalysis (1940).
 
-**8. Inside the Freud Museums: History, Memory and Site-Responsive Art ...**  
-`dokumen.pub` · tier `unverified`  
+**7. Inside the Freud Museums: History, Memory and Site ...**  
+`dokumen.pub` · tier `unverified` · <https://dokumen.pub/inside-the-freud-museums-history-memory-and-site-responsive-art-9781350986831-9781786733054.html>  
 > In his book Moses and Monotheism Freud compares the history of the Jews with trauma. Again he puts forward the idea that there is a form of forgetting and ...
 
-  - **R** In his book Moses and Monotheism Freud compares the history of the Jews with trauma.  
-    <sub>names moses and monotheism, monotheism, freud</sub>
-  - **X** Again he puts forward the idea that there is a form of forgetting and ...  
-    <sub>about someone else (Again), not this stop</sub>
+  - **R** In his book Moses and Monotheism Freud compares the history of the Jews with trauma.
+  - **X** Again he puts forward the idea that there is a form of forgetting and ...
+
+**8. (PDF) Freud's British Family: Reclaiming Lost Lives in ...**  
+`researchgate.net` · tier `unverified` · <https://www.researchgate.net/publication/381316583_Freud's_British_Family_Reclaiming_Lost_Lives_in_Manchester_and_London>  
+> 1939 book Moses and Monotheism. Jacob Freud was born in Tysmenitz ... Visual images of Freud abound in popular and psychoanalytic ...
+
+  - **R** 1939 book Moses and Monotheism.
+  - **R** Jacob Freud was born in Tysmenitz ...
+  - **R** Visual images of Freud abound in popular and psychoanalytic ...
 
 ### GEMINI — `What story can be told to visitors of Picasso, Miró, Dalí: Unbound about Moses and Monotheism, bridging literary and visual art forms?`
 
-kind **active → active** · R4 w0 X1
+kind **active → active** · R3 w0 X1
 
-> * Dalí held a lifelong fascination with Sigmund Freud’s psychoanalytic theories, describing Freud's 1939 text *Moses and Monotheism* in his 1957 journal as the author's "best and most tragic" work.
-> * Published in 1974 by Editions Art & Valeur in Paris, the project was conceived as an artist's book (*livre d'artiste*) uniting Freud's historical-psychoanalytic text with ten original prints by Dalí.
-> * To produce the suite, Dalí etched the illustrations directly onto large gold printing plates using a diamond stylus.
-> * Rather than conventional paper, the illustrations were printed onto sheets of soft lambskin suede, an unusual support prone to warping and shrinkage in shifting humidity.
-> * The entire edition was limited to 300 copies, all packaged in heavy portfolio cases featuring a relief of Moses based on Michelangelo's sculpture set within an Eye of Horus to reinforce Freud's thesis that Moses was Egyptian.
+> * Salvador Dalí created these illustrations in 1974 to visually interpret Sigmund Freud’s final completed book, *Moses and Monotheism*, a controversial text arguing that Moses was an Egyptian nobleman rather than of Hebrew origin.
+> * Dalí revered Freud as one of his greatest heroes and regarded this text as the psychoanalyst’s most ambitious and tragic work.
+> * Unlike traditional illustrated volumes, Dalí engraved the designs using a diamond stylus directly onto massive plates to produce impressions on lambskin.
+> * Published as a luxury *livre d’artiste* by Éditions Art & Valeur in Paris, the complete portfolio was issued in a limited edition of 250 copies.
 
-  - **R** * Dalí held a lifelong fascination with Sigmund Freud’s psychoanalytic theories, describing Freud's 1939 text *Moses and Monotheism* in his 1957 journal as the author's "best and most tragic" work.  
-    <sub>names moses and monotheism, sigmund freud, monotheism</sub>
-  - **R** * Published in 1974 by Editions Art & Valeur in Paris, the project was conceived as an artist's book (*livre d'artiste*) uniting Freud's historical-psychoanalytic text with ten original prints by Dalí.  
-    <sub>names freud, dali</sub>
-  - **R** * To produce the suite, Dalí etched the illustrations directly onto large gold printing plates using a diamond stylus.  
-    <sub>names dali</sub>
-  - **X** * Rather than conventional paper, the illustrations were printed onto sheets of soft lambskin suede, an unusual support prone to warping and shrinkage in shifting humidity.  
-    <sub>about someone else (Rather), not this stop</sub>
-  - **R** * The entire edition was limited to 300 copies, all packaged in heavy portfolio cases featuring a relief of Moses based on Michelangelo's sculpture set within an Eye of Horus to reinforce Freud's thesis that Moses was Egyptian.  
-    <sub>names moses, freud</sub>
+**SOURCES (5)** — pages Gemini actually read · searched: `Salvador Dali "Moses and Monotheism" portfolio publisher Sigmund Freud history`; `"Moses and Monotheism" Dali portfolio Art and World`; `"Moses and Monotheism" Dali "Picasso, Miro, Dali: Unbound" MFA Boston`
+
+1. `mfa.org` — <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+2. `dokumen.pub` — <https://dokumen.pub/ancient-egypt-in-the-modern-imagination-art-literature-and-culture-9781788313391-9781788319164-9781786736703.html>
+3. `vksart.com` — <https://vksart.com/artwork/moses-and-monotheism/>
+4. `davidblumenthal.org` — <http://davidblumenthal.org/Salvador%20Dali%20Aliyah.htm>
+5. `sothebys.com` — <https://www.sothebys.com/en/buy/pdp/fine-art/print/_salvador-dali-moses-and-monotheism-197475-37ae>
+
+  - **R** * Salvador Dalí created these illustrations in 1974 to visually interpret Sigmund Freud’s final completed book, *Moses and Monotheism*, a controversial text arguing that Moses was an Egyptian nobleman rather than of Hebrew origin.
+      ↳ source: `mfa.org` <https://www.mfa.org/exhibition/picasso-miro-dali-unbound>
+      ↳ source: `dokumen.pub` <https://dokumen.pub/ancient-egypt-in-the-modern-imagination-art-literature-and-culture-9781788313391-9781788319164-9781786736703.html>
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - **R** * Dalí revered Freud as one of his greatest heroes and regarded this text as the psychoanalyst’s most ambitious and tragic work.
+      ↳ source: `davidblumenthal.org` <http://davidblumenthal.org/Salvador%20Dali%20Aliyah.htm>
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - **R** * Unlike traditional illustrated volumes, Dalí engraved the designs using a diamond stylus directly onto massive plates to produce impressions on lambskin.
+      ↳ source: `vksart.com` <https://vksart.com/artwork/moses-and-monotheism/>
+  - **X** * Published as a luxury *livre d’artiste* by Éditions Art & Valeur in Paris, the complete portfolio was issued in a limited edition of 250 copies.
+      ↳ source: `sothebys.com` <https://www.sothebys.com/en/buy/pdp/fine-art/print/_salvador-dali-moses-and-monotheism-197475-37ae>
 

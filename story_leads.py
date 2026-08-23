@@ -141,6 +141,95 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
         return ''
 
 
+def gemini_with_sources(prompt: str, model: str = None,
+                        resolve: bool = True, timeout: int = 90) -> Dict:
+    """[D508] Grounded Gemini, returning its SOURCES as well as its text.
+
+    Michael, 2026-08-22: *"could you add another column to your matrix: sources,
+    so I can ask Gemini for verification?"*
+
+    A grounded response carries `groundingMetadata`, which we were discarding:
+
+      groundingChunks    the pages it actually read — domain + redirect URI
+      groundingSupports  WHICH SENTENCE came from WHICH chunk
+      webSearchQueries   what it searched for
+
+    That is per-sentence attribution from the engine itself, and it is far
+    better than asking the model to write brackets: on the 37-question run only
+    2 of 37 answers carried a bracketed source, while the metadata was present
+    on every one and being thrown away.
+
+    Chunk URIs are `vertexaisearch.cloud.google.com` redirects. `resolve=True`
+    follows each once to recover the real URL, so a source can be opened and
+    checked — which is the whole point of the column.
+
+    Returns {'text', 'sources': [{'domain','url'}], 'supports':
+    [{'text','sources':[...]}], 'queries': [...], 'error': str}.
+    """
+    model = model or os.environ.get('GEMINI_MODEL', 'gemini-flash-latest')
+    import requests
+    key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+    out = {'text': '', 'sources': [], 'supports': [], 'queries': [], 'error': ''}
+    if not key:
+        out['error'] = 'no GEMINI_API_KEY'
+        return out
+    try:
+        r = requests.post(
+            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+            headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
+            json={'contents': [{'parts': [{'text': prompt}]}],
+                  'generationConfig': {
+                      'temperature': 0.2,
+                      'maxOutputTokens': int(os.environ.get('GEMINI_MAX_TOKENS', '4000')),
+                      'thinkingConfig': {'thinkingBudget': 0}},
+                  'tools': [{'google_search': {}}]},
+            timeout=timeout)
+        r.raise_for_status()
+        d = r.json()
+    except Exception as e:
+        out['error'] = f'{type(e).__name__}: {e}'
+        return out
+
+    try:
+        cand = d['candidates'][0]
+    except (KeyError, IndexError):
+        out['error'] = 'no candidates'
+        return out
+
+    out['text'] = ''.join(p.get('text', '')
+                          for p in cand.get('content', {}).get('parts', []))
+    gm = cand.get('groundingMetadata', {}) or {}
+    out['queries'] = gm.get('webSearchQueries', []) or []
+
+    chunks = []
+    for ch in gm.get('groundingChunks', []) or []:
+        web = ch.get('web', {}) or {}
+        uri = web.get('uri', '') or ''
+        real = uri
+        if resolve and uri:
+            try:
+                import requests as _rq
+                real = _rq.head(uri, allow_redirects=True, timeout=20).url or uri
+            except Exception:
+                real = uri  # the redirect still identifies the source
+        chunks.append({'domain': web.get('title', ''), 'url': real})
+    # De-duplicated source list, order preserved — Gemini repeats chunks.
+    seen = set()
+    for c in chunks:
+        if c['url'] and c['url'] not in seen:
+            seen.add(c['url'])
+            out['sources'].append(c)
+
+    for sup in gm.get('groundingSupports', []) or []:
+        seg = (sup.get('segment', {}) or {}).get('text', '')
+        idx = sup.get('groundingChunkIndices', []) or []
+        out['supports'].append({
+            'text': seg,
+            'sources': [chunks[i] for i in idx if 0 <= i < len(chunks)],
+        })
+    return out
+
+
 def _gemini_grounded(prompt: str) -> str:
     return _gemini(prompt, grounded=True)
 
