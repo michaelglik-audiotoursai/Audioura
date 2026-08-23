@@ -1208,6 +1208,81 @@ Three clean runs: volume `COVERED` on **9 of 9** stop-observations; kind found n
 
 **No, and inconsistently.** `STORIED_COMMUNICATION_03.MD` had not been touched since 00:21 by the previous session while eight real questions were answered into `DECISIONS.md` and commit messages instead — the failure that file exists to prevent. Roughly half of replies carried the `[Storied_Tours]@date|time` prefix; mid-work replies had none, and printed times were estimated rather than read, drifting ~45 minutes by midday. Backfilled at 11:59.
 
+## A213 — Where did the Freud/Dalí London meeting go? Three failures, and the third is structural
+
+**Michael, 2026-08-22:** *"I do not understand why none of the stories about Moses
+and Monotheism was selected, especially the one that mentioned that they met."*
+
+The material exists. `MATRIX_QUERY_RESULTS.json` holds it three times, retrieved by
+the query `Sigmund Freud Salvador Dalí`:
+
+> *In London in 1938 Salvador Dalí finally met Sigmund Freud, who had recently fled
+> Vienna — the first and only meeting between the artist and the psychoanalyst.*
+
+It reached round 1 of Moses credit_line 5.1 and was then deleted:
+
+> `UNATTESTED  Dalí deeply idolized Freud, having met him in London in 1938 just
+> before the psychoanalyst died — no retrieved source supports this`
+
+**1. The challenge query was scoped to the wrong subject.** It was built as
+`"Moses and Monotheism" 1938 died deeply idolized` — anchored on the WORK TITLE.
+The meeting is not about the book; it is two men in a house in Hampstead.
+Searching a book title for a biographical event returns book pages. Dropping the
+title and querying the agents finds it immediately, which is what D506's matrix
+queries did.
+
+**2. So a true claim was marked UNATTESTED and cut** — the same false-negative
+class D510 fixed for Le Lézard, but caused by query SCOPE rather than snippet
+truncation. Two different causes, one symptom: true material deleted for want of
+evidence we failed to fetch.
+
+**3. And no credit_line points at the meeting at all.** All nine Moses
+credit_lines are evaluative modifiers lifted from the baseline stop text —
+*"Dalí's vivid illustrations"*, *"characteristic surrealism"*, *"complexities of
+religious origins"*. That text never mentions the meeting, so no seed can ask
+about it.
+
+**That is the structural finding: credit_lines derived from our own prose can
+only ask about what our prose already said.** Le Lézard and Au Soleil were lucky
+— their baseline text named Broder, Mourlot, Gris and Reverdy, so their seeds
+had people to chase. Moses' baseline text is pure evaluation, so its seeds are
+too, and the pipeline cannot discover what it was never told to look for.
+
+The fix is not a threshold. It is that the seed list must include the MATRIX
+agents as well as the prose modifiers, and that a challenge query must be free to
+drop the work title and interrogate the people.
+
+## A214 — Why Moses published nothing, and why that is correct
+
+Its best candidate scored 71 — above the index threshold — and is `active`, not
+`eventful`: Freud published, Dalí illustrated, sources disagree on 1974 vs 1975.
+Nobody does anything to anybody. Michael's ruling stands: *"correct gate behavior
+is to publish nothing rather than inert 74 — wrong tour outcome signals retrieval
+failure, not gate failure."*
+
+## A215 — The page-fetch fix was not the missing caller
+
+`fetch_pages_for_top_snippets` (LOCAL-459 R5) had zero callers, and wiring it in
+changed nothing. `_fetch_page` extracts from `<p>`, `<h1-4>`, `<figcaption>`,
+`<li>` and img alt **and nothing else**. The Christie's Lot Essay lives in a bare
+`<div class="content-zone chr-body">`. The page was fetched every time and the
+essay was never in what we extracted — which is behind D366 calling the story
+refuted, D507 calling it a fabrication, and D509 marking three true claims
+UNATTESTED. Fixed by reading leaf content divs and widening the passage window
+from 5 sentences/1000 chars to 14/3000; the old window stopped one sentence short
+of the decisive line. Unattested claims fell 53% → 34%; corrections tripled.
+
+## Code map — added 2026-08-22
+- [`story_seeds.py`](story_seeds.py) — D503, every modifier is a credit_line seed
+- [`story_relevance.py`](story_relevance.py) — D505, is this sentence about this stop
+- [`story_query.py`](story_query.py) — D507, one question, two engine encodings
+- [`story_adjudicate.py`](story_adjudicate.py) — D509/D510, challenge + entity linking
+- [`story_gate.py`](story_gate.py) — D510, eventful + index + confirmed, iterate-to-threshold
+- [`object_record.py`](object_record.py) — D501, the museum's own object record
+- [`story_hooks.py`](story_hooks.py) — D502, sentences that open a door and do not walk through it
+- [`story_roles.py`](story_roles.py) — D500, hero / sponsor / builder
+- `ADJUDICATED_STORIES.md`, `ADJUDICATED_EVALUATION.md` — the 37 stories and the verdict
+
 ## Code map — added 2026-08-19 (later)
 - [`STORY_DEFINITION.md`](STORY_DEFINITION.md) — the five encyclopedic definitions, with sources
 - [`material_kind.py`](material_kind.py) — D489a: is the material the right KIND, not how much

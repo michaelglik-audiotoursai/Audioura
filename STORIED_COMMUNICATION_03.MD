@@ -1125,3 +1125,120 @@ every run: `printed_by` is empty. The prompt reserves a "Printed by" slot, the L
 enrichment copies publisher/credit_line/medium/artist/english_title off the checklist, and
 **reads no printer field at all** — on an exhibition whose subject is printers and
 publishers.
+
+## Q8 (08-21 → 08-22) — the matrix, the object record, and the seeds
+
+**"Can we fix that?"** — the artist/publisher/printer ARE in a catalogue, just not
+the one we read. Production LLM-extracts the exhibition's MARKETING page. The object
+record at `collections.mfa.org` carries the fields structurally, **including Mourlot**
+— the `builder` role, empty in every production run ever made. Stop 1 went 2/3 agents
+→ 3/3. D501. Michael refused the one-line `mfa.org` seed patch and was right: the
+collections host is now derived from the venue domain, so the next venue is covered.
+
+**Role vocabulary adopted as his:** hero (who made it) / sponsor (who paid or willed
+it) / builder (who realised it), mapped per tour category — chef/owner, architect/
+engineer — so `printed_by` stops being a livre-d'artiste field a walking tour can
+never fill. D500.
+
+**"Not specified" is not a value.** Filtered where the checklist enters, so all four
+consumers see one absence. Stop 2's honest slot count fell 7/9 → 4/9.
+
+**The ordering correction was his:** LEAD said "the description is written from the
+matrix". Wrong. Both are written from the checklist — siblings, not parent and child.
+But the direction-of-flow objection survived: harvesting facts back out of generated
+prose would be circular. Harvesting **what needs substantiating** is not, and that is
+what he actually meant.
+
+## Q9 (08-22) — "does it make sense?" — the sentence decomposition
+
+His by-hand breakdown of Stop 2 — subject / action / modifiers, each modifier a
+credit_line — produces 10 seeds from 3 sentences where D502's trigger-matching found
+3. Built as `story_seeds.py`. **37 seeds across 3 stops, 13 anchored, 24 evaluative.
+Stop 2: 12 seeds, ONE anchored** — the stop is 92% our own adjectives, which is a
+sharper statement of why it had no story than any earlier measurement.
+
+## Q10 (08-22) — "how did you come up with such queries?"
+
+**He caught LEAD using a query builder LEAD had invented that afternoon**, while the
+real mechanism — `synthesize_queries`, LOCAL-406 extended by LOCAL-423 — had existed
+since 2026-08-11 carrying **his own framing** (D366): *"What story can be told to
+visitors of {exhibition} about {work}, {credit_line}?"*
+
+Then he caught the second layer: **LOCAL-423 implemented his sentence as keyword soup**
+— `"{title}" {artist} story visitors {exhibition}` — keeping the words `story` and
+`visitors` as bare search terms, losing the question, and omitting `credit_line`
+entirely. The comment above the line quotes him verbatim; the line does something else.
+
+**Two live production bugs fell out of using the real path:** `exhibition_name` never
+reached the stop record, so LOCAL-423 has never run (D426 diagnosed it 2026-08-13 and
+it was still true nine days later); and **every Gemini call has been truncated to ~60
+characters** because `maxOutputTokens: 600` is spent on internal reasoning first —
+which is why step 4 has reported "0 cross-model agreement" on every run. There was
+nothing to agree with. D506.
+
+## Q11 (08-22) — "I asked Gemini if the story is true... do you agree?"
+
+**Yes, and LEAD was wrong.** The Christie's Lot Essay states the 1967 abandonment
+verbatim. "Gemini fabricating" withdrawn.
+
+**How we missed it is the finding.** D366 cited as counter-evidence a Christie's
+listing — *the same lot*. The catalogue description is at the top of the page, the Lot
+Essay below it, and our 200-character snippet never reached the second. Nine Christie's
+results retrieved across all runs; zero snippets containing "abandoned".
+
+**And the fix was not the missing caller.** `_fetch_page` reads `<p>`, `<h1-4>`,
+`<figcaption>`, `<li>` and img alt and nothing else; the essay is in a bare `<div>`.
+The page was fetched every time and the essay was never in what we extracted. D510.
+
+## Q12 (08-22) — sources column, and the challenge loop
+
+Grounded Gemini returns `groundingMetadata` — the pages read, **which sentence came
+from which page**, and what it searched. We were discarding it. Only 2 of 37 answers
+wrote a bracket citation; the metadata was present on 30 of 37. D508.
+
+**His ruling on unattested claims — option (c), extended:** keep the underlying fact
+where another source corroborates it, drop only the appeal to authority, **and where
+sources genuinely disagree, say so in the story** — it is intriguing and it shows the
+accuracy we are aiming at. 11 of 37 stories now tell a disagreement out loud.
+
+**The loop that produced the accurate version was CHALLENGE, not verification** — his
+own D367, unbuilt since 2026-08-11. Claim → challenge with retrieval → adjudicate
+against the evidence → write. Over 37: CONFIRMED 114, CORRECTED 30, DISPUTED 22,
+UNATTESTED 87.
+
+## Q13 (08-22) — iterate-to-threshold, and the target scores
+
+**"We should not use all permutations then select the best."** Right, and it saves
+most of the spend: Au Soleil passes on its FIRST credit_line, so 11 of 12 rounds were
+waste.
+
+**The gate is two keys, not one score**, because the index cannot see the difference:
+Moses 6.1 scored **74, the highest of all 37, and is `inert`**. Approved as: `eventful`
+mandatory · index ≥ 60 · confirmed ≥ 3 · unattested = 0 **soft until page-fetch is
+proven** (his ruling — the false negatives were truncation, not invention). Length
+3/5/>5 at 60/70/80, with >5 requiring a told disagreement.
+
+**Result:** Le Lézard 0/16 → PASS at 13.1. Au Soleil PASS at 2.1, one candidate
+examined. Moses passes nothing — correct behaviour, and a retrieval failure to fix
+upstream.
+
+## Q14 (08-22) — "why was no Moses story selected, especially the one where they met?"
+
+Three failures, and the third is structural — full write-up at **A213**.
+
+1. The challenge query was anchored on the WORK TITLE (`"Moses and Monotheism" 1938
+   died deeply idolized`). The meeting is not about the book; it is two men in a house
+   in Hampstead. `Sigmund Freud Salvador Dalí` finds it immediately.
+2. So a true claim was marked UNATTESTED and cut — the same false-negative class D510
+   fixed for Le Lézard, but caused by query SCOPE rather than snippet truncation.
+3. **No credit_line points at the meeting at all.** All nine Moses seeds are evaluative
+   modifiers from the baseline text, which never mentions it.
+
+**Credit_lines derived from our own prose can only ask about what our prose already
+said.** Le Lézard and Au Soleil were lucky — their baseline text named Broder, Mourlot,
+Gris and Reverdy. Moses' is pure evaluation. The pipeline cannot discover what it was
+never told to look for.
+
+**The fix is not a threshold:** the seed list must include the MATRIX agents alongside
+the prose modifiers, and a challenge query must be free to drop the work title and
+interrogate the people.

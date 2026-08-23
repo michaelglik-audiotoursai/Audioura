@@ -9,6 +9,32 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
+      **regenerate the whole tour** `Picasso, Miro, Dali: Unbound exhibition at MFA,
+      Boston, MA` **with all stories now in place**, write it to a document and open it
+      in VS Code, then give LEAD's own evaluation of the tour and each stop.
+
+      **Read first:** `ADJUDICATED_EVALUATION.md`, then `A213-A215` in `ANSWERS.MD`,
+      then Q8-Q14 in `STORIED_COMMUNICATION_03.MD`.
+
+      **What is in production** (D495, D498, D500 placeholder filter, D506's two bug
+      fixes — the stop record now carries exhibition_name/printer/collaborator, and
+      Gemini is no longer truncated to 60 chars).
+
+      **What is NOT wired** and must be, or the tour will regenerate without any of
+      this week's work: `story_seeds`, `story_relevance`, `story_query`,
+      `story_adjudicate`, `story_gate`, `object_record`, `story_hooks`, `story_roles`.
+      Eight modules, no production callers. That is the same orphan pattern the
+      7-step plan opened by complaining about — **wiring them is the job**, and it is
+      what "with all stories now in place" means.
+
+      **Known open defect (A213), do not re-derive it:** Moses and Monotheism produces
+      no story because all nine of its credit_lines are evaluative modifiers from its
+      own baseline prose, which never mentions the Freud/Dalí 1938 London meeting. The
+      material exists — `MATRIX_QUERY_RESULTS.json` holds it three times under the
+      query `Sigmund Freud Salvador Dalí`. Fix: seed from the MATRIX AGENTS as well as
+      the prose modifiers, and let a challenge query drop the work title.
+
 - [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
       His words, 12:2x: *"I do not have time this week so it will go to the next week."*
       `tests/run_mobile_decryption.py` carries `boston_username`/`boston_password` and the
