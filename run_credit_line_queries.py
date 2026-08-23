@@ -113,79 +113,84 @@ def load_stops():
             for i in range(1, len(parts) - 1, 2)]
 
 
-set_venue_domain('http://www.mfa.org/')
-rows, n_serp, n_gem = [], 0, 0
-t0 = time.time()
+def main():
+    set_venue_domain('http://www.mfa.org/')
+    rows, n_serp, n_gem = [], 0, 0
+    t0 = time.time()
 
-for stop_title, body in load_stops():
-    matrix, extra = matrix_for(stop_title)
-    seeds = seeds_for_stop(body, KNOWN)
-    print(f"\n=== {stop_title[:52]} — {len(seeds)} credit_lines", file=sys.stderr)
+    for stop_title, body in load_stops():
+        matrix, extra = matrix_for(stop_title)
+        seeds = seeds_for_stop(body, KNOWN)
+        print(f"\n=== {stop_title[:52]} — {len(seeds)} credit_lines", file=sys.stderr)
 
-    for seed in seeds:
-        if search_cost(n_serp) + n_gem * GEMINI_COST > CEILING_USD:
-            print("  CEILING", file=sys.stderr)
-            break
-        cl = seed['seed']
-        sq = compile_for_serper(matrix, cl)
-        gq = compile_for_gemini(matrix, cl, EXHIBITION)
+        for seed in seeds:
+            if search_cost(n_serp) + n_gem * GEMINI_COST > CEILING_USD:
+                print("  CEILING", file=sys.stderr)
+                break
+            cl = seed['seed']
+            sq = compile_for_serper(matrix, cl)
+            gq = compile_for_gemini(matrix, cl, EXHIBITION)
 
-        raw, _ = _serp_search(sq)
-        n_serp += 1
-        results = []
-        for r in raw:
-            dom = normalize_domain(r.get('url', ''))
-            snip = r.get('snippet', '') or ''
-            sj, _b, _a = judge(sentences_of(snip), matrix, extra, snip)
-            results.append({'title': r.get('title', ''), 'url': r.get('url', ''),
-                            'domain': dom,
-                            'tier': _classify_domain_quick(dom) or 'unverified',
-                            'snippet': snip, 'sentences': sj})
-        sj = [j for r in results for j in r['sentences']]
-        kept = [j['sentence'] for j in sj if j['verdict'] in (RELEVANT, WEAK)]
-        s_before = classify_material([j['sentence'] for j in sj]) if sj else {}
-        s_after = classify_material(kept) if kept else {}
+            raw, _ = _serp_search(sq)
+            n_serp += 1
+            results = []
+            for r in raw:
+                dom = normalize_domain(r.get('url', ''))
+                snip = r.get('snippet', '') or ''
+                sj, _b, _a = judge(sentences_of(snip), matrix, extra, snip)
+                results.append({'title': r.get('title', ''), 'url': r.get('url', ''),
+                                'domain': dom,
+                                'tier': _classify_domain_quick(dom) or 'unverified',
+                                'snippet': snip, 'sentences': sj})
+            sj = [j for r in results for j in r['sentences']]
+            kept = [j['sentence'] for j in sj if j['verdict'] in (RELEVANT, WEAK)]
+            s_before = classify_material([j['sentence'] for j in sj]) if sj else {}
+            s_after = classify_material(kept) if kept else {}
 
-        mat = '\n'.join(f'  {k}: {v}' for k, v in matrix.items() if v)
-        gtext, gerr = '', ''
-        try:
-            gtext = _gemini(GEMINI_PROMPT.format(question=gq, matrix=mat),
-                            grounded=True) or ''
-        except Exception as e:
-            gerr = f'{type(e).__name__}: {e}'
-        n_gem += 1
-        gj, g_before, g_after = judge(sentences_of(gtext), matrix, extra, gtext)
+            mat = '\n'.join(f'  {k}: {v}' for k, v in matrix.items() if v)
+            gtext, gerr = '', ''
+            try:
+                gtext = _gemini(GEMINI_PROMPT.format(question=gq, matrix=mat),
+                                grounded=True) or ''
+            except Exception as e:
+                gerr = f'{type(e).__name__}: {e}'
+            n_gem += 1
+            gj, g_before, g_after = judge(sentences_of(gtext), matrix, extra, gtext)
 
-        rows.append({
-            'stop': stop_title, 'id': seed['id'], 'class': seed['class'],
-            'kind_of_seed': seed['kind'], 'credit_line': cl,
-            'serper': {'query': sq, 'n_results': len(results), 'results': results,
-                       'sentences': sj,
-                       'kind_before_gate': s_before.get('kind', 'none'),
-                       'kind_after_gate': s_after.get('kind', 'none'),
-                       'best_after': s_after.get('best_sentence', ''),
-                       'n_relevant': sum(1 for j in sj if j['verdict'] == RELEVANT),
-                       'n_weak': sum(1 for j in sj if j['verdict'] == WEAK),
-                       'n_irrelevant': sum(1 for j in sj if j['verdict'] == IRRELEVANT)},
-            'gemini': {'question': gq, 'text': gtext, 'error': gerr,
-                       'sentences': gj,
-                       'kind_before_gate': g_before.get('kind', 'none'),
-                       'kind_after_gate': g_after.get('kind', 'none'),
-                       'best_after': g_after.get('best_sentence', ''),
-                       'n_relevant': sum(1 for j in gj if j['verdict'] == RELEVANT),
-                       'n_weak': sum(1 for j in gj if j['verdict'] == WEAK),
-                       'n_irrelevant': sum(1 for j in gj if j['verdict'] == IRRELEVANT),
-                       'no_info': 'NO RELIABLE INFORMATION' in gtext.upper()},
-        })
-        print(f"  {seed['id']:<5} serp {s_before.get('kind','-'):<8}->"
-              f"{s_after.get('kind','-'):<8} gem {g_before.get('kind','-'):<8}->"
-              f"{g_after.get('kind','-'):<8} | {sq[:44]}", file=sys.stderr)
+            rows.append({
+                'stop': stop_title, 'id': seed['id'], 'class': seed['class'],
+                'kind_of_seed': seed['kind'], 'credit_line': cl,
+                'serper': {'query': sq, 'n_results': len(results), 'results': results,
+                           'sentences': sj,
+                           'kind_before_gate': s_before.get('kind', 'none'),
+                           'kind_after_gate': s_after.get('kind', 'none'),
+                           'best_after': s_after.get('best_sentence', ''),
+                           'n_relevant': sum(1 for j in sj if j['verdict'] == RELEVANT),
+                           'n_weak': sum(1 for j in sj if j['verdict'] == WEAK),
+                           'n_irrelevant': sum(1 for j in sj if j['verdict'] == IRRELEVANT)},
+                'gemini': {'question': gq, 'text': gtext, 'error': gerr,
+                           'sentences': gj,
+                           'kind_before_gate': g_before.get('kind', 'none'),
+                           'kind_after_gate': g_after.get('kind', 'none'),
+                           'best_after': g_after.get('best_sentence', ''),
+                           'n_relevant': sum(1 for j in gj if j['verdict'] == RELEVANT),
+                           'n_weak': sum(1 for j in gj if j['verdict'] == WEAK),
+                           'n_irrelevant': sum(1 for j in gj if j['verdict'] == IRRELEVANT),
+                           'no_info': 'NO RELIABLE INFORMATION' in gtext.upper()},
+            })
+            print(f"  {seed['id']:<5} serp {s_before.get('kind','-'):<8}->"
+                  f"{s_after.get('kind','-'):<8} gem {g_before.get('kind','-'):<8}->"
+                  f"{g_after.get('kind','-'):<8} | {sq[:44]}", file=sys.stderr)
 
-cost = search_cost(n_serp) + n_gem * GEMINI_COST
-json.dump({'serp_queries': n_serp, 'gemini_calls': n_gem,
-           'cost_usd': round(cost, 4), 'elapsed_s': round(time.time() - t0, 1),
-           'rows': rows},
-          open(os.path.join(HERE, 'CREDIT_LINE_RESULTS.json'), 'w'),
-          indent=2, ensure_ascii=False)
-print(f"\n{n_serp} serper + {n_gem} gemini = {n_serp + n_gem}, ~${cost:.3f}",
-      file=sys.stderr)
+    cost = search_cost(n_serp) + n_gem * GEMINI_COST
+    json.dump({'serp_queries': n_serp, 'gemini_calls': n_gem,
+               'cost_usd': round(cost, 4), 'elapsed_s': round(time.time() - t0, 1),
+               'rows': rows},
+              open(os.path.join(HERE, 'CREDIT_LINE_RESULTS.json'), 'w'),
+              indent=2, ensure_ascii=False)
+    print(f"\n{n_serp} serper + {n_gem} gemini = {n_serp + n_gem}, ~${cost:.3f}",
+          file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
