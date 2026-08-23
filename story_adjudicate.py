@@ -282,6 +282,19 @@ def ungrounded_names(story: str, evidence_text: str, matrix: Optional[Dict] = No
                 continue
         if any(t in _NOT_A_PERSON for t in f.split()):
             continue
+        # [D515] A capitalised word FOLLOWED by a role word is modifying that
+        # role, not naming anyone: "the Parisian publisher Art & Valeur",
+        # "the French poet", "the Catalan printer". Measured 2026-08-23 —
+        # `Parisian` was flagged ungrounded and discarded a candidate before the
+        # gate was consulted. This is the mirror of the role_before rule above:
+        # the role word tells you which side the name is on.
+        after = (story or '')[m.end():].lstrip()
+        if re.match(r'^(printer|publisher|artist|dealer|poet|collector|donor|'
+                    r'engraver|bookbinder|patron|author|editor|craftsman|'
+                    r'lithographer|photographer|sculptor|architect|chef|'
+                    r'atelier|workshop|firm|house|gallery|museum)\b',
+                    after, re.I):
+            continue
         # Present whole, or by any of its tokens longer than three characters —
         # evidence says "Mourlot" where the story says "Mourlot Frères".
         if f in haystack:
@@ -291,3 +304,75 @@ def ungrounded_names(story: str, evidence_text: str, matrix: Optional[Dict] = No
         if name not in bad:
             bad.append(name)
     return bad
+
+
+# ─── [D515] "Positively identified as factually wrong" ────────────────────────
+#
+# Michael, 2026-08-23, replacing the multi-key gate:
+#
+#   "The only reason for not accepting/fail should be positively identified as
+#    factual wrong events."
+#
+# That phrase has to be given a narrow, mechanical meaning or it becomes the old
+# gate under a new name. The four adjudication statuses are NOT four grades of
+# wrongness:
+#
+#   UNATTESTED  we found no source        -> NOT wrong. D510 measured that most
+#                                            of these were our own truncation.
+#   DISPUTED    sources disagree          -> NOT wrong. The prompt asks for the
+#                                            disagreement to be TOLD.
+#   CORRECTED   a source contradicts it   -> wrong when it was written, and PART 2
+#                                            is instructed to use the corrected
+#                                            version. Usually already fixed.
+#   CONFIRMED   supported                 -> not wrong.
+#
+# So the only positive identification available is: **the adjudicator corrected a
+# claim, and the delivered story still asserts the version it corrected.** That is
+# a fact we hold to be false, in text we are about to publish. Everything else is
+# an absence of evidence, which is what Michael's rule refuses to treat as a fail.
+#
+# Matching is by distinguishing tokens rather than substring: the adjudicator
+# paraphrases, so `"1974" -> "1975"` is caught by 1974 surviving with no 1975
+# present, and a rewording that keeps the meaning is not flagged.
+
+_CORRECTED_LINE = re.compile(
+    r'^[\s>*\-•]*\**\s*CORRECTED\b[:\s]*(.+?)\s*(?:->|→|=>)\s*(.+?)\s*(?:—|--|–)\s*.*$',
+    re.M | re.I)
+
+
+def _distinguishing(a: str, b: str) -> set:
+    """Tokens that carry a's meaning and are absent from b."""
+    ta = {t for t in re.findall(r'[\w’\']+', fold(a)) if len(t) > 3 and t not in _STOP}
+    tb = {t for t in re.findall(r'[\w’\']+', fold(b)) if len(t) > 3 and t not in _STOP}
+    return ta - tb
+
+
+def surviving_errors(story: str, adjudication: str) -> List[Dict]:
+    """Corrections the delivered story ignored — the D515 veto.
+
+    Returns [{'wrong', 'right', 'tokens'}]; empty is the pass condition.
+
+    Deliberately conservative: it fires only when EVERY distinguishing token of
+    the corrected-away version is present in the story and NONE of the correction's
+    own distinguishing tokens is. A story that adopted the correction, or reworded
+    around it, is not flagged — false vetoes are exactly what this rule exists to
+    stop.
+    """
+    # Token SET membership, not substring. Written as substring first, and the
+    # first test caught it: `release` (from the correction) is inside `released`
+    # (in the story), so every real error looked adopted and the veto never
+    # fired. A veto that cannot fire is the same failure class as D242.
+    story_tokens = set(re.findall(r'[\w’\']+', fold(story or '')))
+    out = []
+    for wrong, right in _CORRECTED_LINE.findall(adjudication or ''):
+        w_only = _distinguishing(wrong, right)
+        r_only = _distinguishing(right, wrong)
+        if not w_only:
+            continue
+        if not all(t in story_tokens for t in w_only):
+            continue
+        if any(t in story_tokens for t in r_only):
+            continue
+        out.append({'wrong': wrong.strip(), 'right': right.strip(),
+                    'tokens': sorted(w_only)})
+    return out

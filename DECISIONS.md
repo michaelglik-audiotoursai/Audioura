@@ -20426,3 +20426,82 @@ four times.
 a diamond stylus, printing onto lambskin — is ruled `active` because nothing is at risk, and that
 is right by the current definition. Making irreversibility and material risk count as stakes is a
 definition change for Michael to make deliberately, not a threshold to nudge.
+
+## D515 — Michael's acceptance rule: index ≥ 50, and only a proven error fails
+
+**2026-08-23, his ruling:** *"If none of the stories on a step pass, but the index is more than
+50 — accept with the highest index. If a story passes with index 50+, then this is the story and
+we do not need to verify more. The only reason for not accepting/fail should be positively
+identify as factual wrong events."* Tested, not assumed — `STORY_GATE_D515=0` restores the old
+gate exactly. Full evidence: `D515_RULE_TEST.md`.
+
+This reverses A214/D485 ("when nothing passes, publish nothing"). `eventful` and `confirmed ≥ 3`
+now report PREFERENCE and no longer decide admission; the index floor is 50.
+
+**"Positively identified as factually wrong" had to be defined narrowly or it would have become
+the old gate renamed.** UNATTESTED is *no source found* — D510 measured that most were our own
+truncation. DISPUTED is *sources disagree* — the prompt asks for it to be told. Neither is an
+error. The only positive identification available: **the adjudicator corrected a claim and the
+delivered story still asserts the version it corrected** (`surviving_errors`, matched on
+distinguishing tokens so `1974 → 1975` is caught and a rewording is not). Plus invented people.
+
+**Written as substring matching first, and my own test caught it**: `release` (correction) is
+inside `released` (story), so every real error looked adopted and the veto could never fire.
+Token-set membership now. A veto that cannot fire is D242's failure class.
+
+### Replay over 41 stories already on disk, before spending anything
+
+| work | old gate | D515 | examined |
+|---|---|---|---|
+| Le Lézard | publishes 13.1 | accepts 2.1 at 60 | 1 of 16 |
+| Au Soleil | publishes 2.1 | accepts 2.1 at 62 | 1 of 12 |
+| Moses (lab) | **nothing** | accepts 1.1 at 63 | 1 of 9 |
+| Moses (today) | **nothing** | accepts A1 at 51 | 1 of 4 |
+
+**4 of 4 instead of 2 of 4; 37 candidates not bought.** **The fallback clause never fired (0 of
+4)** — accepting anything ≥ 50 is permissive enough that the first candidate qualifies, so "if
+none pass, take the highest" has no case to handle. Implemented, correct, near-dead code.
+
+**It takes the FIRST above 50, not the best** — Moses accepts 63 and never sees 71. Order now
+decides the outcome. **On Le Lézard that favours the rule, and it is the strongest argument for
+it:** D515 accepts 2.1 — *a defect came to light, the plates had already been erased, Miró drew
+an entirely new series* — which `material_kind` classified **inert**, while the story the old
+gate published is *"collaborated with… printed by… a gift from Boris Fridman."* **The classifier
+had it backwards and the index did not.** That is a misclassification argument for dropping
+`eventful` as a blocker, not a threshold argument.
+
+### Live tour, rule on
+
+| | published | loop cost | loop time | tour mean |
+|---|---|---|---|---|
+| old gate, 3 runs (D513) | 1.3 of 3 | $0.10–0.17 | 290–465 s | 63.2 |
+| **D515, 1 run** | **3 of 3** | **$0.046** | **98 s** | **71.7** |
+
+72% cheaper, 3× faster, highest tour mean measured (previous best 64.0, loop-off 58.0). Moses
+publishes for the first time (59, was 42.7). One run — the noise caveat applies to 71.7, not to
+the 3-of-3 or the cost.
+
+### Two things it lets through
+
+**(a) Stop 3 published with `C0 X0` — zero confirmed claims.** The adjudication produced no
+parseable verdicts, so nothing was confirmed, nothing contradicted, and the veto had nothing to
+bite. `confirmed >= 3` was the only key that ever required that *something* be verified;
+removing it as an admission test removed the floor. **Recommend: require CONFIRMED+CORRECTED ≥ 1,
+and treat `C0 X0` as a failed adjudication rather than a clean one.** Neither reintroduces
+`eventful`.
+
+**(b) The veto is blind to errors the adjudicator never made.** Stop 2 published *"the Louis
+Broder Tériade revived the stalled undertaking"* — Broder is stop 1's publisher, and the sentence
+is simply wrong. It was introduced when PART 2 was written, so it was never adjudicated and
+nothing flags it. The old gate would not have caught it either, but it bounds what
+"positively identified" can mean.
+
+**Prerequisite fixed:** `ungrounded_names` flagged `Parisian` from *"the Parisian publisher Art &
+Valeur"* — a demonym discarding a candidate before the gate. Under D515 that check is one of only
+two hard vetoes, so it had to be right first. A capitalised word FOLLOWED by a role word now reads
+as modifying the role — the mirror of the existing preceding-role rule. `printer Celestin` still
+flags.
+
+**LEAD's recommendation: keep the rule**, add the two amendments in (a), and run three tours
+under it against the three loop-off runs already recorded (~$0.60, ~15 min) before treating 71.7
+as real.

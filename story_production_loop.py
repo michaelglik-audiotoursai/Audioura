@@ -116,7 +116,8 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     out = {'story': '', 'credit_line': '', 'gate': None, 'counts': {},
            'index': None, 'sources': [], 'examined': 0, 'candidates': [],
            'cost_usd': 0.0, 'elapsed_s': 0.0, 'matrix': dict(matrix),
-           'enabled': True}
+           'enabled': True, 'accepted_by': ''}
+    gate_best_of = None
     try:
         from object_record import enrich_matrix
         from story_seeds import seeds_for_stop
@@ -124,12 +125,16 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         from story_leads import gemini_with_sources
         from story_adjudicate import (claims_of, challenge_queries_for,
                                       ADJUDICATION_PROMPT, count_statuses,
-                                      ungrounded_names)
+                                      ungrounded_names, surviving_errors)
         from story_relevance import relevance_of, RELEVANT, WEAK
         from snippet_ranker import fetch_pages_for_top_snippets
         from material_kind import classify_material
         from story_index_pass import apply_story_index
         from story_publish_gate import evaluate as gate_evaluate
+        try:
+            from story_publish_gate import best_of as gate_best_of
+        except ImportError:
+            gate_best_of = None
         from work_story_searcher import (_serp_search, normalize_domain,
                                          _classify_domain_quick)
         from cost_rates import search_cost
@@ -252,21 +257,30 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             tells = bool(re.search(
                 r'some sources|others say|disagree|dispute|while other',
                 story, re.I))
+            # [D515] The only hard fail: a correction the story ignored. Read off
+            # PART 1 against the PART 2 we would publish — no extra model call.
+            errors = surviving_errors(story, text2)
+
             verdict = gate_evaluate({'story_kind': kind.get('kind', 'none'),
                                      'index': idx, 'counts': counts,
-                                     'tells_disagreement': tells})
+                                     'tells_disagreement': tells,
+                                     'factual_errors': errors,
+                                     'ungrounded': ungrounded})
             cand = {'credit_line': cl, 'seed_kind': seed['kind'],
                     'story': story, 'counts': counts, 'index': idx,
                     'kind': kind.get('kind', 'none'), 'gate': verdict,
-                    'ungrounded': ungrounded}
+                    'ungrounded': ungrounded, 'factual_errors': errors}
             out['candidates'].append(cand)
 
             if verbose:
+                legacy = verdict.get('legacy_failed', verdict['failed'])
                 print(f"    [D511] {seed['id']:<22} kind={cand['kind']:<8} "
                       f"idx={idx or 0:<3} C{counts.get('CONFIRMED',0)} "
                       f"X{counts.get('UNATTESTED',0)} "
                       f"{'PASS' if verdict['passes'] else 'fail:' + ','.join(verdict['failed'])}"
-                      f"{'  UNGROUNDED:' + ','.join(ungrounded) if ungrounded else ''}")
+                      f"{'  [old gate: ' + ('pass' if not legacy else ','.join(legacy)) + ']' if 'legacy_failed' in verdict else ''}"
+                      f"{'  UNGROUNDED:' + ','.join(ungrounded) if ungrounded else ''}"
+                      f"{'  WRONG:' + '; '.join(e['wrong'][:40] for e in errors) if errors else ''}")
 
             # An invented person is never published, whatever the gate says.
             if ungrounded:
@@ -277,13 +291,32 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                 cap = verdict['max_sentences'] or len(sents)
                 out.update(story=' '.join(sents[:cap]), credit_line=cl,
                            gate=verdict, counts=counts, index=idx,
-                           sources=r2.get('sources', []))
+                           sources=r2.get('sources', []),
+                           accepted_by='accepted')
                 break
         except Exception as e:
             if verbose:
                 print(f"    [D511] credit_line {seed.get('id')} failed "
                       f"(non-fatal): {type(e).__name__}: {e}")
             continue
+
+    # [D515] "If none of the stories on a stop pass, but the index is more than
+    # 50 — accept with the highest index." Nothing was accepted above, so take
+    # the best eligible candidate rather than publishing silence.
+    if not out['story'] and gate_best_of is not None:
+        fallback = gate_best_of(out['candidates'])
+        if fallback:
+            sents = _sentences(fallback['story'])
+            cap = (fallback['gate'].get('max_sentences') or len(sents))
+            out.update(story=' '.join(sents[:cap]),
+                       credit_line=fallback['credit_line'],
+                       gate=fallback['gate'], counts=fallback['counts'],
+                       index=fallback['index'], accepted_by='d515_fallback')
+            if verbose:
+                print(f"    [D511] no candidate accepted outright — "
+                      f"[D515] FALLBACK to the highest index: "
+                      f"{fallback['index']} ({fallback['kind']}), "
+                      f"credit_line '{fallback['credit_line'][:40]}'")
 
     try:
         from cost_rates import search_cost as _sc
@@ -322,6 +355,9 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                     'passes': _c['gate'].get('passes'),
                     'failed': _c['gate'].get('failed'),
                     'ungrounded': _c['ungrounded'],
+                    'factual_errors': _c.get('factual_errors') or [],
+                    'legacy_passes': _c['gate'].get('legacy_passes'),
+                    'legacy_failed': _c['gate'].get('legacy_failed'),
                     'story': _c['story'],
                 }, ensure_ascii=False) + '\n')
     except Exception as _e:

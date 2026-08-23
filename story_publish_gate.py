@@ -65,13 +65,46 @@ MIN_INDEX = int(os.environ.get('STORY_GATE_MIN_INDEX', '60'))
 MIN_CONFIRMED = int(os.environ.get('STORY_GATE_MIN_CONFIRMED', '3'))
 STRICT = os.environ.get('STORY_GATE_STRICT', '0').strip() == '1'
 
+# ─── [D515] Michael's rule, 2026-08-23 ────────────────────────────────────────
+#
+#   "if none of the stories on a stop pass, but the index is more than 50 —
+#    accept with the highest index. If a story passes with index 50+, then this
+#    is the story and we do not need to verify more. The only reason for not
+#    accepting/fail should be positively identified as factual wrong events."
+#
+# This reverses the ruling this module was built on ("when nothing passes,
+# publish nothing" — A214/D485), and Michael has asked to test it rather than
+# adopt it: `STORY_GATE_D515=0` restores the old behaviour exactly.
+#
+# Three parts, in the order he stated them:
+#
+#   ACCEPT     a candidate scoring >= 50 with no positively-identified error is
+#              published, and iteration STOPS there — no further candidates are
+#              bought. `eventful` and `confirmed >= 3` still decide PREFERENCE,
+#              they no longer decide admission.
+#   FALLBACK   if nothing was accepted, the highest-index candidate above 50 is
+#              published anyway.
+#   VETO       a positively identified factual error, or an invented person,
+#              blocks regardless of score. This is the only hard fail.
+#
+# The cost consequence is real and worth stating: under the old gate a stop with
+# no eventful candidate bought all four and published nothing. Under this rule it
+# usually stops at the first candidate — cheaper — but when it does not, it now
+# pays for all four AND publishes. Nothing here can spend more than the old cap.
+D515 = os.environ.get('STORY_GATE_D515', '1').strip() == '1'
+D515_ACCEPT_INDEX = int(os.environ.get('STORY_GATE_D515_INDEX', '50'))
+
 _LEN_TIERS = ((80, 8), (70, 5), (60, 3))
 
 
 def allowed_sentences(index: Optional[int], tells_disagreement: bool) -> int:
     """How long this story has earned the right to be."""
     idx = index or 0
-    for threshold, n in _LEN_TIERS:
+    # [D515] Without a tier at the new floor, a story accepted at 50–59 would be
+    # trimmed to zero sentences and published as nothing — the rule would look
+    # like it accepted and deliver silence. Three sentences, the same as 60.
+    tiers = _LEN_TIERS + ((D515_ACCEPT_INDEX, 3),) if D515 else _LEN_TIERS
+    for threshold, n in tiers:
         if idx >= threshold:
             # Above 5 sentences requires a told disagreement as well as the
             # score — the extra length is for the disagreement, not for padding.
@@ -102,6 +135,35 @@ def evaluate(story: Dict) -> Dict:
     # The soft key does not decide the verdict unless STRICT.
     hard = ['eventful', 'index', 'confirmed'] + (['no_unattested'] if STRICT else [])
     failed = [k for k in hard if not keys[k]]
+
+    # [D515] Errors are the only hard fail; the score is the only admission test.
+    errors = list(story.get('factual_errors') or [])
+    invented = list(story.get('ungrounded') or [])
+    keys['no_factual_error'] = not errors
+    keys['no_invented_person'] = not invented
+    keys['index_d515'] = (index or 0) >= D515_ACCEPT_INDEX
+
+    if D515:
+        d515_failed = [k for k in ('no_factual_error', 'no_invented_person',
+                                   'index_d515') if not keys[k]]
+        return {
+            'passes': not d515_failed,
+            'keys': keys,
+            'failed': d515_failed,
+            # What the OLD gate would have said, kept so every run can be read
+            # both ways while the rule is on trial.
+            'legacy_passes': not failed,
+            'legacy_failed': failed,
+            'factual_errors': errors,
+            'ungrounded': invented,
+            'preferred': not failed,          # eventful + 60 + confirmed >= 3
+            'unattested': unattested,
+            'confirmed': confirmed,
+            'soft_warning': (None if keys['no_unattested'] else
+                             f'{unattested} unattested claim(s) — not blocking (D515)'),
+            'max_sentences': allowed_sentences(index,
+                                               bool(story.get('tells_disagreement'))),
+        }
 
     return {
         'passes': not failed,
@@ -134,3 +196,32 @@ def first_passing(stories: List[Dict]) -> Dict:
                     'spent': i + 1}
     return {'chosen': None, 'index_of': -1, 'evaluated': evaluated,
             'spent': len(stories)}
+
+
+def best_of(candidates: List[Dict]) -> Optional[Dict]:
+    """[D515] The fallback: nothing was accepted, so take the best above 50.
+
+    `candidates` are the loop's own dicts — each needs `index`, `gate`, and
+    ideally `kind`. A candidate carrying a positively identified factual error or
+    an invented person is never eligible, however high it scores: that is the one
+    hard fail Michael left in place.
+
+    Ties break toward the richer material — eventful over active over inert —
+    because when two stories score the same the one where something happens is
+    the one he has wanted all along.
+    """
+    _RANK = {'eventful': 3, 'active': 2, 'inert': 1, 'none': 0}
+    eligible = []
+    for c in candidates or []:
+        g = c.get('gate') or {}
+        if g.get('factual_errors') or c.get('ungrounded'):
+            continue
+        if (c.get('index') or 0) <= D515_ACCEPT_INDEX:
+            continue
+        if not (c.get('story') or '').strip():
+            continue
+        eligible.append(c)
+    if not eligible:
+        return None
+    return max(eligible, key=lambda c: (c.get('index') or 0,
+                                        _RANK.get(c.get('kind'), 0)))
