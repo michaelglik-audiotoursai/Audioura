@@ -279,7 +279,7 @@ def merge_story_into_description(description: str, story: str,
     nothing is not a stop to edit.
     """
     report = {'dropped': [], 'kept': [], 'n_prose': 0, 'n_dropped': 0,
-              'capped': False, 'orphans': []}
+              'capped': False, 'orphans': [], 'story_first': False}
     if not (story or '').strip():
         return description, report
     if not (description or '').strip():
@@ -302,32 +302,56 @@ def merge_story_into_description(description: str, story: str,
         report['capped'] = True
     doomed = {id(d) for d in candidates}
 
-    # Repair the anaphora the dedupe just broke. Only ever at the head of the
-    # narration, only while the sentence it pointed at was itself dropped, never
-    # below one surviving prose sentence, and at most ORPHAN_BUDGET of them — a
-    # cascade here would delete a stop one dangling "It was" at a time.
+    # ── If the story replaced the OPENING, the story becomes the opening ──
+    #
+    # Measured on the live run of 2026-08-24, and it is the defect this fix
+    # introduced. A stop's first prose sentence is the one that introduces its
+    # subject, so it is also the one most likely to duplicate a story mined from
+    # it — and dropping it left all three stops opening on a reference to nobody:
+    #
+    #     "Broder published this limited edition book…"        (who is Broder?)
+    #     "The project, originally conceived by L. Rosenberg…" (which project?)
+    #     "Published by The Hogarth Press, Freud's theory…"    (which theory?)
+    #
+    # Moving the story to the front repairs every one of them without deleting a
+    # word, because the story always introduces its own subjects in full: "Joan
+    # Miró authored a surrealist poem and originally illustrated it in 1967 with a
+    # suite of eighteen lithographs printed for publisher Louis Broder" — and then
+    # "Broder published this limited edition book" has its antecedent.
+    #
+    # It is also the truer reading of "the story REPLACES the prose it overlaps":
+    # replacement should happen where the prose was, not always at the end.
+    story_first = bool(scored) and id(scored[0]) in doomed
+
+    # Repair the anaphora the dedupe broke, when the prose still opens the stop.
+    # Unnecessary when the story opens it — a following "This marked…" then points
+    # at the story, which is a real antecedent — so this only runs in the other
+    # case, and never deletes a sentence the reordering would have saved.
     orphans = []
-    head = 0
-    while (head < len(scored) and id(scored[head]) in doomed):
-        head += 1
-    while (head < len(scored) - 1 and len(orphans) < ORPHAN_BUDGET
-           and head > 0
-           and _is_orphaned_opener(scored[head]['sentence'])
-           and sum(1 for d in scored if id(d) not in doomed) > 1):
-        orphans.append(scored[head])
-        doomed.add(id(scored[head]))
-        head += 1
-        while head < len(scored) and id(scored[head]) in doomed:
+    if not story_first:
+        head = 0
+        while (head < len(scored) and id(scored[head]) in doomed):
             head += 1
+        while (head < len(scored) - 1 and len(orphans) < ORPHAN_BUDGET
+               and head > 0
+               and _is_orphaned_opener(scored[head]['sentence'])
+               and sum(1 for d in scored if id(d) not in doomed) > 1):
+            orphans.append(scored[head])
+            doomed.add(id(scored[head]))
+            head += 1
+            while head < len(scored) and id(scored[head]) in doomed:
+                head += 1
 
     kept_text = [d['sentence'] for d in scored if id(d) not in doomed]
     report['dropped'] = sorted(candidates, key=lambda d: d['rank'], reverse=True)
     report['orphans'] = [d['sentence'] for d in orphans]
     report['kept'] = kept_text
     report['n_dropped'] = len(candidates) + len(orphans)
+    report['story_first'] = story_first
 
-    merged = ' '.join([t.strip() for t in kept_text if t.strip()] + [story.strip()])
-    merged = re.sub(r'\s+', ' ', merged).strip()
+    ordered = [t.strip() for t in kept_text if t.strip()]
+    ordered = ([story.strip()] + ordered) if story_first else (ordered + [story.strip()])
+    merged = re.sub(r'\s+', ' ', ' '.join(ordered)).strip()
 
     if verbose and report['n_dropped']:
         for d in report['dropped']:

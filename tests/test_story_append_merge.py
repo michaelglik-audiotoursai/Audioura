@@ -187,21 +187,53 @@ def test_title_exclusion_is_what_saves_descriptive_prose():
           f"with={with_title['covered']} without={without_title['covered']}")
 
 
-def test_orphaned_opener_is_repaired():
-    """Dropping the first sentence must not leave the next one pointing at it.
+def test_story_opens_the_stop_when_it_replaced_the_opening():
+    """Measured on the live run of 2026-08-24 — the defect this fix introduced.
 
-    Stop 3 measured this: the duplicate opener went, and the stop began "This
-    marked a significant moment in Dalí's career" — marked what?
+    A stop's first prose sentence introduces its subject, so it is also the one
+    most likely to duplicate a story mined from it. Dropping it left all three
+    stops of that run opening on a reference to nobody: "Broder published this
+    limited edition book", "The project, originally conceived by L. Rosenberg",
+    "Published by The Hogarth Press, Freud's theory".
     """
     merged, report = merge_story_into_description(
         STOP3_PROSE, STOP3_STORY, work_titles=['Moses and Monotheism'])
-    check('stop 3: the dangling "This marked" opener went with it',
-          not merged.startswith('This marked'), merged[:80])
-    check('stop 3: it was recorded as an orphan, not as a duplicate',
-          any(s.startswith('This marked') for s in report['orphans']),
-          str(report['orphans']))
-    check('stop 3: a pronoun carrying its own noun is NOT treated as orphaned',
-          'This work exemplifies' in merged)
+    check('stop 3: the story opens the stop, because it replaced the opening',
+          report['story_first'] and merged.startswith('In 1939, Sigmund Freud'),
+          merged[:80])
+    check('stop 3: "This marked…" now has an antecedent instead of being deleted',
+          'This marked a significant moment' in merged)
+    check('stop 3: nothing was deleted as an orphan — reordering did the work',
+          report['orphans'] == [], str(report['orphans']))
+
+
+def test_prose_still_opens_when_its_first_sentence_survived():
+    merged, report = merge_story_into_description(
+        STOP2_PROSE, STOP2_STORY, work_titles=['Au Soleil du Plafond'])
+    check('stop 2: first prose sentence WAS dropped, so the story opens',
+          report['story_first'] and merged.startswith('Pierre Reverdy and Juan Gris'),
+          merged[:70])
+
+    prose = ('The edition is bound in publisher’s vellum. Louis Broder published '
+             'it in 1967 with Joan Miró.')
+    story = ('In 1967 Joan Miró and Louis Broder completed an edition, then found '
+             'a defect in the paper.')
+    m2, r2 = merge_story_into_description(prose, story)
+    check('when the opening survives, the story still comes last',
+          not r2['story_first'] and m2.startswith('The edition is bound'), m2[:60])
+
+
+def test_orphan_repair_when_the_prose_still_opens():
+    """The pronoun repair still applies in the case it was written for."""
+    prose = ('Juan Gris and Pierre Reverdy planned twenty poems in 1916. '
+             'The vellum binding is unusual. It was later famous. '
+             'The Torf Gallery holds it.')
+    story = ('Juan Gris and Pierre Reverdy planned twenty poems around 1916, and '
+             'Gris died in 1927.')
+    merged, report = merge_story_into_description(prose, story)
+    check('first sentence dropped here too, so the story opens',
+          report['story_first'], str(report))
+    check('the vellum sentence survives', 'vellum binding' in merged)
 
 
 def test_orphan_repair_cannot_eat_a_stop():
@@ -257,7 +289,9 @@ if __name__ == '__main__':
                test_stop2_episode_duplication_removed,
                test_stop1_keeps_what_the_story_never_says,
                test_title_exclusion_is_what_saves_descriptive_prose,
-               test_orphaned_opener_is_repaired,
+               test_story_opens_the_stop_when_it_replaced_the_opening,
+               test_prose_still_opens_when_its_first_sentence_survived,
+               test_orphan_repair_when_the_prose_still_opens,
                test_orphan_repair_cannot_eat_a_stop,
                test_no_story_is_a_no_op,
                test_never_strips_a_stop_bare,

@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-24T10:29:04.915017
+Generated: 2026-08-24T10:29:49.304965
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -424,7 +424,7 @@ satisfy this requirement. Your text will be REJECTED if "Miró" is absent.
 
 
 ━━━ THE STORY FOR THIS STOP (already written and fact-checked) ━━━
-In 1956, a partnership began between Joan Miró and Louis Broder, with the renowned Atelier Mourlot in Paris providing the lithographic expertise. This collaboration led to the creation of "Le Lézard aux plumes d'or" (The Lizard with Golden Feathers) in 1971, a limited edition illustrated book featuring 40 color lithographs. This project marked the final collaboration between Miró and Broder, as their friendship continued until Broder's death, leaving a lasting legacy in the art world.
+In 1971, publisher Louis Broder took on the ambitious project of bringing to life Joan Miró's illustrated book, "Le Lézard aux plumes d’or" (The Lizard with Golden Feathers). Broder's decision to publish this limited edition book involved collaborating with skilled craftsmen to produce 40 color lithographs that captured Miró's vibrant artistic vision. As a result of Broder's efforts, the book became one of Miró's celebrated works, solidifying its place in the world of art and literature.
 ━━━ END STORY ━━━
 
 This story is REQUIRED and comes first in your description. Reproduce its facts
@@ -436,8 +436,22 @@ After the story, add physical description and context if there is room. Do not
 introduce any further named person who does not appear above.
 
 
+CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
+- "In 1956, Joan Miró began a transformative partnership with Louis Broder, with the renowned Atelier Mourlot in Paris providing the lithographic expertise."
+- "This collaboration led to the creation of "Le Lézard aux plumes d’or" (The Lizard with Golden Feathers) in 1971, a limited edition illustrated book featuring 40 color lithographs."
+- "The project marked the final artistic venture between Miró and Broder, as their friendship continued until Broder's death, leaving a lasting legacy in the art world."
+- "Miró's deliberate use of publisher’s vellum and wove paper for this book showcases his commitment to the livre d'artiste tradition, where art and literature intertwine seamlessly."
+
+Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
+
+
+THIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.
+It may be accurate and well written; it is still a description. A story here means: ONE named person, across THREE OR MORE consecutive sentences, DOING something — deciding, refusing, persuading, travelling, failing — with something at stake for them. Not 'X was an artist who worked in Paris'. Something happened, to someone, and it mattered.
+Use only the source material supplied. If the material will not support such a story, write the shorter factual account rather than inventing one — an invented story is worse than none.
+
+
 ================================================================================
-Total user message length: 30712 chars
+Total user message length: 32564 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 5
