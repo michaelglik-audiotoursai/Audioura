@@ -366,3 +366,679 @@ Generating description for Stop 3: Autorretrato con espejo (Self-Portrait with M
   [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0058
     story: "In 1990, the William H. Lane Foundation made a significant donation to the Museum of Fine Arts, Boston. This donation included Marsden Hartley's paint"
 [LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:11367. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:12636. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0061
+    story: "Arthur Dove completed his painting, "That Red One," in 1944, using oil and wax on canvas to explore abstract forms. Later, this painting became part o"
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0060
+    story: "The Museum of Fine Arts in Boston had long sought to enhance its collection of politically charged, post-revolutionary Mexican art. In 2017, they took"
+Stop 3 API call cost: $0.0356 (7500 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/3)
+Stop 2 API call cost: $0.0358 (7539 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0372 (7839 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Autorretrato con espejo (Self-Portrait with Mirror)' or significant word)"]
+  [LOCAL-417]   verbatim: "In 2017, the Museum of Fine Arts took a decisive step by acquiring this significant work by Siqueiros, marking the first of his art to enter the museum's collection. This acquisition was made possible through the generosity of James, who donated the piece, thereby enriching the museum's presentation"
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 2 API call cost: $0.0375 (7885 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 2: WORD FLOOR — 113 words < 120, retrying (attempt 3/3)
+Stop 1 API call cost: $0.0413 (8701 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0376 (7922 tokens, model=gpt-4o)
+Stop 3 description word count: 174 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0381 (8014 tokens, model=gpt-4o)
+  [LOCAL-391] Stop 2: beat_unrecoverable name='John' — never fabricate, moving on
+Stop 2 description word count: 224 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0433 (9117 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/3)
+Stop 1 API call cost: $0.0450 (9473 tokens, model=gpt-4o)
+Stop 1 description word count: 169 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-388] PRE-GATE stop='The Great Good Man' beats_assigned=5 beats_in_output=1 dropped=['Lewis', 'Jessie', 'Bravo', 'Pollock']
+  [LOCAL-388] PRE-GATE stop='That Red One' beats_assigned=6 beats_in_output=3 dropped=['Knaths', 'Michael Rosenfeld', 'John']
+  [LOCAL-388] PRE-GATE stop='Autorretrato con espejo (Self-Portrait with Mirror)' beats_assigned=6 beats_in_output=3 dropped=['Georgia', 'Southwest', 'Bloom']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='The Great Good Man': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='That Red One': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Autorretrato con espejo (Self-Portrait with Mirror)': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001959 (input=8001, output=1265)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    [LOCAL-427] Venue page text injected as verification source (venue source, 18494 chars from https://www.mfa.org/gallery/stories-artists-tell)
+    ✓ PASS stop='The Great Good Man': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='1990' ← https://www.marsdenhartleylegacy.org/collections/entry.php?i
+        claim='in 1942' ← https://www.mfa.org/gallery/stories-artists-tell
+    ✓ PASS stop='That Red One': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='in 1944' ← https://www.mfa.org/gallery/stories-artists-tell
+        claim='World War II marks a period where artist' ← https://www.mfa.org/gallery/stories-artists-tell
+    ✓ PASS stop='Autorretrato con espejo (Self-Portrait with Mirror)': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='2017' ← https://www.mfa.org/press-release/remedios-varo-acquisition
+  [LOCAL-423] STORY VERIFICATION: ALL STOPS PASSED — every extracted claim is sourced
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 2 paragraphs retried, 2 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0008 (1039 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'That Red One': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/23)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 4
+    Glossed (composed): 0
+    Suppressed (already explained): 0
+    Degraded (name dropped): 4
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 1022 tokens, $0.0002, 2.8s
+    Gloss: 571 tokens, $0.0001, 1.7s
+    Compose: 0 tokens, $0.0000, 0.0s
+    Total added cost: $0.0003
+    Stops affected: 3
+    Glosses applied:
+      • Lane Foundation → DEGRADED (name dropped)
+      • American Modernist → DEGRADED (name dropped)
+      • Art Gallery → DEGRADED (name dropped)
+      • John Axelrod Gallery → DEGRADED (name dropped)
+
+  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...
+  [LOCAL-390] person 'David Alfaro Siqueiros' pre-grounded (story beat source) — keeping
+  [LOCAL-385] ungrounded person 'American Modernist' — will remove all mentions
+  [LOCAL-385] ungrounded person 'Abraham Lincoln' — will remove all mentions
+  [LOCAL-385] field=description stop='The Great Good Man' ungrounded person 'Abraham Lincoln' — dropping sentence: "Hartley's exploration of American identity captures Abraham Lincoln's essence, s..."
+  [LOCAL-385] field=description stop='The Great Good Man' ungrounded person 'American Modernist' — dropping sentence: "The Foundation's gift enabled the museum to enhance its Modernist collection sig..."
+  [LOCAL-385] field=orientation stop='The Great Good Man' ungrounded person 'American Modernist' — dropping sentence: "This work, rich with historical context, is best appreciated in the broader lens..."
+  [LOCAL-385] field=description stop='That Red One' ungrounded person 'American Modernist' — dropping sentence: "As part of his contribution, Lane ensured that Dove's piece would be displayed a..."
+  [LOCAL-385] Prose entity grounding gate summary:
+    Persons detected: 6
+    Persons grounded: 4
+    Persons ungrounded: 2
+    Sentences dropped: 4
+    Stops affected: 3
+    Ungrounded: ['American Modernist', 'Abraham Lincoln']
+
+  [LOCAL-458] PHASE 5.158b: Role-claim gate...
+  [LOCAL-458] entity gate: corpus=18494 chars, 0 role claims, 0 entities, 0 dropped
+
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate (corpus 56987 chars)...
+  [LOCAL-479] orgs detected=1 grounded=1 ungrounded=0 sentences_dropped=0
+
+  [LOCAL-385] PHASE 5.159: Form-claim gate (scans all prose fields)...
+  [LOCAL-385] field=description unsupported form claim 'painting' for medium 'UNKNOWN' — dropping sentence
+  [LOCAL-385] Form-claim gate summary:
+    Claims detected: 1
+    Claims kept (compatible): 0
+    Claims removed: 1
+    Metaphor-exempt (kept): 0
+    Sentences dropped: 1
+    Stops affected: 1
+    [LOCAL-385] field=description stop='The Great Good Man' term='painting' medium='UNKNOWN' dropped: "This donation included Marsden Hartley's painting, "The Great Good Man," created"
+
+  [LOCAL-389] PHASE 5.160: Numeric-claim gate (scans all prose fields)...
+  [LOCAL-389] Numeric-claim gate summary:
+    Claims detected: 1
+    Grounded (identity block): 0
+    Grounded (page text): 1
+    Ungrounded (dropped): 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 23
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Museum of Fine Arts, Boston'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 1
+    [2] DELETED: 'This integration' in: This integration underscores how artists and writers of the period sought new wa
+    [2] DELETED: 'This helps' in: This helps visitors ponder how abstract art might reflect the complexities of ou
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'That Red One' (index 54) — allowance 5 -> 7 sentences on regeneration, story currently 4 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'The Great Good Man': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'That Red One': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Autorretrato con espejo (Self-Portrait': the longest run (3 sentences, David Alfaro Siqueiros) has agency=0 stakes=1 — someone is described, but nothin
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'The Great Good Man' (index 33)
+
+  [LOCAL-474] PHASE 5.17: retry 'The Great Good Man' — 169w → 106w after gates, 7 sentence(s) removed
+    removed: "Lane Foundation made a significant donation to the Museum of Fine Arts, Boston."
+    removed: "This donation included Marsden Hartley's painting, "The Great Good Man," created in 1942."
+    removed: "As a result, the museum's collection was enriched with this notable work, allowing it to be viewed a"
+    removed: "The Foundation's gift enabled the museum to enhance its Modernist collection significantly."
+    removed: "In his exploration of American identity, Hartley captures the essence of Abraham Lincoln, symbolizin"
+    removed: "The presence of this piece in Boston's Museum of Fine Arts is entwined with Hartley's broader impact"
+    removed: "Silva, although not involved in the creation of this particular work, contributed to the dialogue ar"
+    [LOCAL-491] step 7b: rotating to the artist fact — the maker, when no other agent is available
+      focus: "Marsden Hartley made The Great Good Man."
+
+Generating description for Stop 1: The Great Good Man by Marsden Hartley, ...
+  [LOCAL-381] stop='The Great Good Man' matched_work=True medium='' work_identity_chars=1233
+  [LOCAL-383] Stop 1 beats: Lewis, Jessie, Bravo
+  [LOCAL-411] Stop 1 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=20 usable=17 (t1t2=4, t3=0, market=0)
+    Top scores: [('The Great Good Man 1942', 14, 'unverified'), ('The Last Look of John Donne, 1940 (Pt-0806) | Cata', 13, ''), ('Public Collection: Museum of Fine Arts, Boston', 13, 'unverified')]
+  [LOCAL-402] Stop 1: injected 20 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11951 after=33772 (+21821 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (33772)
+  [D498] Stop 1 matrix: 5/9 slots filled — empty: ['publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 1/3: hero=Marsden Hartley (artist), sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0074
+    story: "In 1942, Marsden Hartley painted "The Great Good Man," an artwork that marked a significant moment in his career. This painting, which portrays a bust"
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0436 (9185 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/3)
+Stop 1 API call cost: $0.0454 (9552 tokens, model=gpt-4o)
+Stop 1 description word count: 202 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 181w (was 106w)
+
+  [LOCAL-474] PHASE 5.17: retry 'That Red One' — 199w → 108w after gates, 4 sentence(s) removed
+    removed: "As part of his contribution, Lane ensured that Dove's piece would be displayed among other American "
+    removed: "This integration underscores how artists and writers of the period sought new ways to communicate th"
+    removed: "The museum's initial collection from the Athenæum's Art Gallery laid the foundation for such explora"
+    removed: "This helps visitors ponder how abstract art might reflect the complexities of our own inner worlds."
+    [LOCAL-491] step 7b: rotating to the artist fact — the maker, when no other agent is available
+      focus: "Arthur Dove made That Red One."
+
+Generating description for Stop 2: That Red One by Arthur Dove, ...
+  [LOCAL-381] stop='That Red One' matched_work=True medium='' work_identity_chars=1229
+  [LOCAL-383] Stop 2 beats: Siqueiros, View Image, William
+  [LOCAL-411] Stop 2 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=4 cap=20 output=20 usable=16 (t1t2=7, t3=0, market=0)
+    Top scores: [('Exhibition poster - Arthur Dove, That Red One', 21, 'tier1'), ('That Red One - Illustrations', 14, 'unverified'), ('Museum of Fine Arts, Boston sound recordings | AAA', 13, 'tier1')]
+  [LOCAL-402] Stop 2: injected 20 snippets as reference material
+  [LOCAL-417] Stop 2: SUPPRESSED 2 required names (no snippet evidence): ['Siqueiros', 'Michael Rosenfeld']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12783 after=28537 (+15754 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28537)
+  [D498] Stop 2 matrix: 5/9 slots filled — empty: ['publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 1/3: hero=Arthur Dove (artist), sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0072
+    story: "In 1944, Arthur Dove created the painting "That Red One," using oil and wax on canvas. This work marked a point in Dove's career where he continued to"
+Stop 2 API call cost: $0.0370 (7797 tokens, model=gpt-4o)
+  [LOCAL-391] Stop 2: scrubbed 1 unfilled role(s)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/3)
+Stop 2 API call cost: $0.0389 (8199 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 2: WORD FLOOR — 115 words < 120, retrying (attempt 3/3)
+Stop 2 API call cost: $0.0394 (8289 tokens, model=gpt-4o)
+Stop 2 description word count: 179 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+    [LOCAL-474] regenerated and re-gated: 179w (was 108w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Autorretrato con espejo (Self-Portrait with ' — 174w → 114w after gates, 4 sentence(s) removed
+    removed: "This unveiling was made possible in part due to the generosity of James, whose donation facilitated "
+    removed: "Located within the John Axelrod Gallery, this particular piece is part of an exhibition that emphasi"
+    removed: "Varo contributed to this effort by authoring the text that accompanies Siqueiros' illustrations, cra"
+    removed: "This collaborative spirit highlights how artists and authors united to redefine artistic expression,"
+    [LOCAL-491] step 7b: rotating to the artist fact — the maker, when no other agent is available
+      focus: "David Alfaro Siqueiros made Autorretrato con espejo (Self-Portrait with Mirror)."
+
+Generating description for Stop 3: Autorretrato con espejo (Self-Portrait with Mirror) by David Alfaro Siqueiros, ...
+  [LOCAL-381] stop='Autorretrato con espejo (Self-Portrait with Mirror)' matched_work=True medium='' work_identity_chars=1240
+  [LOCAL-383] Stop 3 beats: Varo, Georgia, Southwest
+  [LOCAL-411] Stop 3 snippet ranking: input=22 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=20 usable=15 (t1t2=10, t3=0, market=0)
+    Top scores: [('MFA builds modern art collection - The Boston Glob', 16, ''), ('MFA builds modern art collection', 14, 'tier2'), ('MFA builds modern art collection', 14, 'tier2')]
+  [LOCAL-402] Stop 3: injected 20 snippets as reference material
+  [LOCAL-417] Stop 3: SUPPRESSED 3 required names (no snippet evidence): ['Varo', 'James', 'John Axelrod']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12811 after=28639 (+15828 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28639)
+  [D498] Stop 3 matrix: 5/9 slots filled — empty: ['publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 1/3: hero=David Alfaro Siqueiros (artist), sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0071
+    story: "David Alfaro Siqueiros, a prominent Mexican artist, created "Autorretrato con espejo (Self-Portrait with Mirror)" in 1937 using cellulose nitrate pain"
+Stop 3 API call cost: $0.0368 (7755 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0388 (8158 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/3)
+Stop 3 API call cost: $0.0406 (8549 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Autorretrato con espejo (Self-Portrait with Mirror)' below_floor words=113 — kept (never dropped)
+Stop 3 description word count: 113 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 2 improved, 1 kept original
+  [LOCAL-487] triggers: 3 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=sMTNb1IzQLA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/exhibition/of-light-and-air-winslow-homer-in-watercolor (attempt 1)
+  [LOCAL-459] R5: Fetched 2208 chars from https://www.mfa.org/exhibition/of-light-and-air-wi
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/video/homers-immersive-ephemeral-watercolors (attempt 1)
+  [LOCAL-459] R5: Fetched 2748 chars from https://www.mfa.org/video/homers-immersive-ephemer
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.mfa.org/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/2113412635525801/posts/2674528049414254/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=Q-QfldafYsw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/video/calm-of-homers-blue-boat (attempt 1)
+  [LOCAL-459] R5: Fetched 2831 chars from https://www.mfa.org/video/calm-of-homers-blue-boat
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/press-release/of-light-and-air-winslow-homer-in-watercolor (attempt 1)
+  [LOCAL-459] R5: Fetched 2446 chars from https://www.mfa.org/press-release/of-light-and-air
+  [D512] verb discovery: query='exhibition blue green and silva in MFA Boston, MA printmaking pr' -> 6 new verb(s): transformed, asked, planned, advised, rugged, shaped
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: The Great Good Man
+    [D501] REJECTED https://collections.mfa.org/objects/35046 — title scored 1.00 but 'Marsden Hartley' appears nowhere in the record; a wrong record is worse than none
+    [D501] no object record for 'The Great Good Man' — matrix unchanged
+    [D511] 4 credit_line(s) to try (1 from the matrix, 3 from the text)
+  [LOCAL-427] HTTP 200 from https://mfaprints.org/products/1990-376 (attempt 1)
+  [LOCAL-459] R5: Fetched 2276 chars from https://mfaprints.org/products/1990-376
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/photo.php?fbid=10156272668262321&set=a.369237298568983&id=100064481482536 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://seearttoday.wordpress.com/2012/11/15/marsden-hartleys-a-good-great-man/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1184 chars from https://seearttoday.wordpress.com/2012/11/15/marsd
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DUsdXavDl7y/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.pinterest.com/oceansbridge/marsden-hartley-paintings/ (attempt 1)
+  [LOCAL-459] R5: Fetched 180 chars from https://www.pinterest.com/oceansbridge/marsden-har
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/photo.php?fbid=10156139129723044&set=a.261864465972607&id=100064471673218 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.nybooks.com/articles/2018/06/07/outsider-art-in-their-own-worlds/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2636 chars from https://www.nybooks.com/articles/2018/06/07/outsid
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/WoodyGuthrieCtr/posts/abraham-lincoln-was-born-on-this-day-in-1809-woody-painted-this-portrait-of-the-/2351755488201999/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://m.facebook.com/WoodyGuthrieCtr/posts/abraham-lincoln-was-born-on-this-day-in-1809-woody-painted-this-portrait-of-the-/2351755488201999/?locale=es_LA (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/487520944655933/posts/33212098795104725/ (attempt 1)
+    [D511] agent:artist           kind=inert    idx=35  C3 X3 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] Cache HIT: https://mfaprints.org/products/1990-376 (3364 chars)
+  [LOCAL-459] R5: Fetched 2276 chars from https://mfaprints.org/products/1990-376
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/mfaboston/photos/marsden-hartley-based-the-great-good-man-1942-one-of-his-three-portraits-of-abra/10156272668262321/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://seearttoday.wordpress.com/2012/11/15/marsden-hartleys-a-good-great-man/ (2751 chars)
+  [LOCAL-459] R5: Fetched 1184 chars from https://seearttoday.wordpress.com/2012/11/15/marsd
+  [LOCAL-427] Cache HIT: https://www.pinterest.com/oceansbridge/marsden-hartley-paintings/ (180 chars)
+  [LOCAL-459] R5: Fetched 180 chars from https://www.pinterest.com/oceansbridge/marsden-har
+  [LOCAL-427] HTTP 200 from http://www.davidrumsey.com/amica/amico4_list14.html (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from http://www.davidrumsey.com/amica/amico4_list14.htm
+  [LOCAL-427] Cache HIT: https://www.nybooks.com/articles/2018/06/07/outsider-art-in-their-own-worlds/ (23656 chars)
+  [LOCAL-459] R5: Fetched 2636 chars from https://www.nybooks.com/articles/2018/06/07/outsid
+  [LOCAL-427] HTTP 200 from https://fineartamerica.com/shop/posters/hartley (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://fineartamerica.com/shop/posters/hartley
+    [D511] 1.1                    kind=inert    idx=26  C2 X4 fail:no_invented_person,index_d515  [old gate: eventful,index,confirmed]  UNGROUNDED:Mathew Brady
+    [D511] 4.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://bha-test.inist.fr/vibad/index.php?action (attempt 1)
+  [LOCAL-459] R5: Fetched 311 chars from https://bha-test.inist.fr/vibad/index.php?action
+  [LOCAL-427] HTTP 200 from https://www.jstor.org/stable/23387462 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/23387462
+  [LOCAL-427] HTTP 429 from https://upload.wikimedia.org/wikipedia/commons/c/c6/Lives_of_the_presidents._Told_in_words_of_one_syllable._By_Jean_S._Remy_.._%28IA_cu31924028698664%29.pdf?utm_source — retrying in 7.5s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://upload.wikimedia.org/wikipedia/commons/c/c6/Lives_of_the_presidents._Told_in_words_of_one_syllable._By_Jean_S._Remy_.._%28IA_cu31924028698664%29.pdf?utm_source — retrying in 7.8s (attempt 2, 22s budget remaining)
+  [LOCAL-427] HTTP 429 from https://upload.wikimedia.org/wikipedia/commons/c/c6/Lives_of_the_presidents._Told_in_words_of_one_syllable._By_Jean_S._Remy_.._%28IA_cu31924028698664%29.pdf?utm_source — retrying in 11.0s (attempt 3, 14s budget remaining)
+  [LOCAL-427] HTTP 429 from https://upload.wikimedia.org/wikipedia/commons/c/c6/Lives_of_the_presidents._Told_in_words_of_one_syllable._By_Jean_S._Remy_.._%28IA_cu31924028698664%29.pdf?utm_source — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://archive.org/stream/historicalfictio007462mbp/historicalfictio007462mbp_djvu.txt (attempt 1)
+  [LOCAL-459] R5: Fetched 3514 chars from https://archive.org/stream/historicalfictio007462m
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/nationalgalleryofart/photos/abraham-lincoln-was-born-on-this-day-in-1809-take-a-look-at-the-great-good-man-p/10156139129723044/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://www.nybooks.com/articles/2018/06/07/outsider-art-in-their-own-worlds/ (23656 chars)
+  [LOCAL-459] R5: Fetched 2636 chars from https://www.nybooks.com/articles/2018/06/07/outsid
+  [LOCAL-427] Cache HIT: http://www.davidrumsey.com/amica/amico4_list14.html (23402 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from http://www.davidrumsey.com/amica/amico4_list14.htm
+  [LOCAL-427] HTTP 200 from https://archive.org/stream/catalogofcopyrig241libr/catalogofcopyrig241libr_djvu.txt (attempt 1)
+  [LOCAL-459] R5: Fetched 3579 chars from https://archive.org/stream/catalogofcopyrig241libr
+  [LOCAL-427] HTTP 200 from https://www.wikidata.org/wiki/Wikidata:WikiProject_sum_of_all_paintings/Creator/Marsden_Hartley (attempt 1)
+  [LOCAL-459] R5: Fetched 1882 chars from https://www.wikidata.org/wiki/Wikidata:WikiProject
+  [LOCAL-427] HTTP 200 from https://antiquesandthearts.com/four-decades-as-a-painter/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://antiquesandthearts.com/four-decades-as-a-p
+  [LOCAL-427] HTTP 200 from https://pt.most-famous-paintings.com/MostFamousPaintings.nsf/Buy-PrintsOnCanvas?Open&RA=8LSL94 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://pt.most-famous-paintings.com/MostFamousPai
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/mfaboston/photos/larger-than-life-abraham-lincolns-distinctive-visage-is-bold-and-iconic-in-marsd/10157462648072321/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.upi.com/Odd_News/2003/07/07/Analysis-Patriotic-art-no-mere-flagwaving/13431057597123/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2328 chars from https://www.upi.com/Odd_News/2003/07/07/Analysis-P
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/symphonyhall/posts/it-was-on-this-date-april-the-12th-1945-that-franklin-delano-roosevelt-thirty-se/1538524804947215/ (attempt 1)
+    [D511] 4.2                    kind=inert    idx=34  C5 X3 fail:no_invented_person,index_d515  [old gate: eventful,index]  UNGROUNDED:Mathew Brady
+    [D511] examined 4 credit_line(s) (indices 35, 26, 5, 34), no story passed, ~$0.056, 106s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: That Red One
+    [D501] object record https://collections.mfa.org/objects/35078
+           8 fields; filled ['medium', 'credit_line', 'provenance', 'accession_number']
+    [D511] 4 credit_line(s) to try (2 from the matrix, 2 from the text)
+  [LOCAL-427] HTTP 200 from https://www.pinterest.com/pin/that-red-one-1944-framed-white--567031409358247164/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2550 chars from https://www.pinterest.com/pin/that-red-one-1944-fr
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/203138520642/posts/10167886679890643/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.jstor.org/stable/23185086 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/23185086
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/mfaboston/posts/arthur-dove-born-onthisday-in-1880-spoke-about-wanting-to-show-the-point-where-a/10154673697987321/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://observer.com/1997/11/superb-exhibition-brings-arthur-dove-back-to-life/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2585 chars from https://observer.com/1997/11/superb-exhibition-bri
+  [SQ-S2] SERP query failed: timeout: The read operation timed out
+  [SQ-S2]   request payload: {"q": "\"That Red One\" 1957 purchased", "num": 8}
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/CgwqvJjLQHK/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/taggallery/posts/artist-talk-by-kathyparkart-yesterday-a-complete-adventure-of-art-and-insightsho/1652834023515966/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.chicagotribune.com/1990/04/04/painter-turns-her-teaching-into-a-form-of-artistry/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1442 chars from https://www.chicagotribune.com/1990/04/04/painter-
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DWVGW-NCTh1/?img_index (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.doi.gov/sites/default/files/documents/2026-04/region-5-21-jan-26.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/revolvermag/posts/the-artwork-for-cannibal-corpses-1990-debut-eaten-back-to-life-made-it-very-clea/10160101898227017/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://repository.arizona.edu/bitstream/handle/10150/105627/trantSteveResearchReport2008.pdf?sequence (attempt 1)
+    [D511] agent:artist           kind=inert    idx=34  C0 X0 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] Cache HIT: https://www.pinterest.com/pin/that-red-one-1944-framed-white--567031409358247164/ (3025 chars)
+  [LOCAL-459] R5: Fetched 2550 chars from https://www.pinterest.com/pin/that-red-one-1944-fr
+  [LOCAL-427] HTTP 200 from https://www.amazon.com/-/es/Wigonda/dp/B0H3TB6Q3F (attempt 1)
+  [LOCAL-427] Cache HIT: https://observer.com/1997/11/superb-exhibition-brings-arthur-dove-back-to-life/ (10975 chars)
+  [LOCAL-459] R5: Fetched 2354 chars from https://observer.com/1997/11/superb-exhibition-bri
+  [LOCAL-427] HTTP 200 from https://theincubator.live/tag/arthur-dove/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2069 chars from https://theincubator.live/tag/arthur-dove/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/crystalbridgesmuseum/posts/back-and-better-than-everthe-alfred-stieglitz-collection-has-returned-to-crystal/1443853191110052/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/everythingvictorian/posts/1809070639238538/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://www.mfa.org/gallery/stories-artists-tell (18494 chars)
+  [LOCAL-459] R5: Fetched 2352 chars from https://www.mfa.org/gallery/stories-artists-tell
+  [LOCAL-427] HTTP 200 from https://www.bostonglobe.com/2023/10/20/arts/fine-art-remaking-collection/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2465 chars from https://www.bostonglobe.com/2023/10/20/arts/fine-a
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DA65u3sSq6e/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://autre.love/interviewsmain/tag/william+eggleston (attempt 1)
+  [LOCAL-459] R5: Fetched 609 chars from https://autre.love/interviewsmain/tag/william+eggl
+  [LOCAL-427] HTTP 200 from https://westwood-living.com/issues/may26/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1454 chars from https://westwood-living.com/issues/may26/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/NYJewishWeek/posts/today-is-the-birthday-in-1922-of-herbert-vogel-a-new-york-postal-worker-who-alon/10159007645123511/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/Artlyst/posts/pat-steir-abstract-painter-of-waterfalls-dies-at-87-steir-described-herself-as-a/2101413460639672/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.inlibra.com/10.5771/9781442223226.pdf (attempt 1)
+  [LOCAL-459] R5: Fetched 20200 chars from https://www.inlibra.com/10.5771/9781442223226.pdf
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DbpyyO9mn58/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.scribd.com/document/511584052/Marek-Golebiowski-An-Encyclopedia-of-American-Culture-Peter-Lang-GmbH-2016 (attempt 1)
+  [LOCAL-459] R5: Fetched 3907 chars from https://www.scribd.com/document/511584052/Marek-Go
+    [D511] agent:donor            kind=inert    idx=34  C4 X5 fail:no_invented_person,index_d515  [old gate: eventful,index]  UNGROUNDED:Massachusetts
+  [LOCAL-427] Cache HIT: https://www.pinterest.com/pin/that-red-one-1944-framed-white--567031409358247164/ (3025 chars)
+  [LOCAL-459] R5: Fetched 2550 chars from https://www.pinterest.com/pin/that-red-one-1944-fr
+  [LOCAL-427] HTTP 200 from https://ahmet-asar.pixels.com/featured/that-red-one-garfield-dove.html (attempt 1)
+  [LOCAL-459] R5: Fetched 1625 chars from https://ahmet-asar.pixels.com/featured/that-red-on
+  [LOCAL-427] Cache HIT: https://www.jstor.org/stable/23185086 (323 chars)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/23185086
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/ManhattanBefore1990/posts/3344296035676665/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://www.bostonglobe.com/2023/10/20/arts/fine-art-remaking-collection/ (17799 chars)
+  [LOCAL-459] R5: Fetched 2295 chars from https://www.bostonglobe.com/2023/10/20/arts/fine-a
+  [LOCAL-427] Cache HIT: https://www.mfa.org/gallery/stories-artists-tell (18494 chars)
+  [LOCAL-459] R5: Fetched 2352 chars from https://www.mfa.org/gallery/stories-artists-tell
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/lasse.antonsen/posts/pat-steir-1938-2026-steir-was-raised-by-artists-she-resisted-her-fathers-unconve/10243378951477327/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://autre.love/interviewsmain/2018/2/20/baby-will-you-fix-me-again-an-interview-of-william-eggleston-in-memphis (attempt 1)
+  [LOCAL-459] R5: Fetched 773 chars from https://autre.love/interviewsmain/2018/2/20/baby-w
+    [D511] 1.1                    kind=inert    idx=34  C2 X4 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] Cache HIT: https://www.pinterest.com/pin/that-red-one-1944-framed-white--567031409358247164/ (3025 chars)
+  [LOCAL-459] R5: Fetched 2550 chars from https://www.pinterest.com/pin/that-red-one-1944-fr
+  [LOCAL-427] Cache HIT: https://www.jstor.org/stable/23185086 (323 chars)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/23185086
+  [LOCAL-427] Cache HIT: https://observer.com/1997/11/superb-exhibition-brings-arthur-dove-back-to-life/ (10975 chars)
+  [LOCAL-459] R5: Fetched 2585 chars from https://observer.com/1997/11/superb-exhibition-bri
+  [LOCAL-427] Cache HIT: https://autre.love/interviewsmain/tag/william+eggleston (48048 chars)
+  [LOCAL-459] R5: Fetched 773 chars from https://autre.love/interviewsmain/tag/william+eggl
+  [LOCAL-427] HTTP 200 from https://www.gtmotorsports.org/b-f-the-prancing-skunk-ferraris-online/ (attempt 1)
+  [LOCAL-459] R5: Fetched 927 chars from https://www.gtmotorsports.org/b-f-the-prancing-sku
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/TypewriterCollectors/posts/10159259583904678/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/HISTORYCountingCars/videos/extraordinary-classic-car-collection/916940596998287/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/exploringwithfightersofficial/posts/we-snuck-a-peek-at-thousands-of-rare-classic-cars/890305349354563/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/hirshhorn/posts/happy-birthday-to-arthur-g-dove-18801946-born-on-this-day-in-canandaigua-new-yor/1610287517327307/ (attempt 1)
+  [LOCAL-427] Timeout from https://www.washingtonpost.com/archive/lifestyle/1997/09/26/arthur-dove-in-the-abstract/3e4ce1f0-cced-4008-8711-a27fa49155d6/ — retrying in 2.0s
+  [LOCAL-427] Timeout from https://www.washingtonpost.com/archive/lifestyle/1997/09/26/arthur-dove-in-the-abstract/3e4ce1f0-cced-4008-8711-a27fa49155d6/ — budget exhausted (2 attempts)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/hulkhogan/posts/my-dad-had-a-66-impala/1273792384111101/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://scarc.library.oregonstate.edu/omeka/exhibits/show/brewingvoices/item/35146 (attempt 1)
+  [LOCAL-459] R5: Fetched 2044 chars from https://scarc.library.oregonstate.edu/omeka/exhibi
+  [LOCAL-427] HTTP 200 from https://www.capeannmuseum.org/wp-content/uploads/2024/01/VL50-Chance-Choice-Ralph-Coburn-in-Context-finding-aid.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DWVGW-NCTh1/?img_index=4 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/therealcreatorsclubgrouponfb/posts/2150675759027418/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DMlXd-4RteU/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.jstor.org/stable/3852666 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.jstor.org/stable/3852666
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/cobraexperience/videos/ends-531-win-this-gt350h-bonus-gt-fastback/1339351941419759/ (attempt 1)
+    [D511] 2.1                    kind=inert    idx=30  C6 X7 fail:index_d515  [old gate: eventful,index]
+    [D511] examined 4 credit_line(s) (indices 34, 34, 34, 30), no story passed, ~$0.060, 140s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: Autorretrato con espejo (Self-Portrait with 
+    [D501] object record https://collections.mfa.org/objects/654537
+           7 fields; filled ['medium', 'credit_line', 'provenance', 'accession_number']
+    [D511] 4 credit_line(s) to try (2 from the matrix, 2 from the text)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/artvisions.it/posts/1121084414892044/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/dan.cameron.129/posts/david-alfaro-siqueiros-collective-suicide-1936-lacquer-on-wood-with-applied-sect/10159448703472472/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://mamfa.com/wp-content/uploads/Siqueiros-Self-Portrait-with-Mirror-Essay-by-Dra.-Irene-Herner-Reiss.pdf (attempt 1)
+    [D511] agent:artist           kind=inert    idx=21  C0 X5 fail:no_invented_person,index_d515  [old gate: eventful,index,confirmed]  UNGROUNDED:United States
+  [LOCAL-427] HTTP 200 from https://www.bostonglobe.com/lifestyle/style/2017/11/09/mfa-builds-modern-art-collection/UdzqUEYDPHB3EIB4OH3gIP/story.html (attempt 1)
+  [LOCAL-459] R5: Fetched 2155 chars from https://www.bostonglobe.com/lifestyle/style/2017/1
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/CkLor4Wsahm/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/147119783294511/posts/1370634384276372/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/147119783294511/posts/1376384383701372/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/IRequireArt/posts/david-alfaro-siqueiros-mexican-1896-1974-peasants-c-1913-museo-nacional-de-arte-/3105925526128607/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://yamamanama.livejournal.com/461127.html (attempt 1)
+  [LOCAL-459] R5: Fetched 995 chars from https://yamamanama.livejournal.com/461127.html
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/annual-report-2018/acquisitions.html (attempt 1)
+  [LOCAL-459] R5: Fetched 2440 chars from https://www.mfa.org/annual-report-2018/acquisition
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/qnikkolas/reel/DbYV0ARO2Z9/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/293299548038644/posts/1457100254991895/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/147119783294511/posts/1548717533134722/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://research.baued.es/wp-content/uploads/2021/03/Inmaterial-10_web_alta.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/100063329553583/posts/mexican-artist-david-siqueiros-1896-1974-echo-of-a-scream-1937-122x915cm-enamel-/1173822918072016/ (attempt 1)
+    [D511] agent:donor            kind=active   idx=48  C4 X2 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://artisnaples.org/baker-museum/exhibitions/2023-24/george-gershwin-modern-art (attempt 1)
+  [LOCAL-459] R5: Fetched 1690 chars from https://artisnaples.org/baker-museum/exhibitions/2
+  [LOCAL-427] HTTP 200 from https://www.wbur.org/news/2018/01/10/mfa-siqueiros-painting (attempt 1)
+  [LOCAL-459] R5: Fetched 1955 chars from https://www.wbur.org/news/2018/01/10/mfa-siqueiros
+  [LOCAL-427] Cache HIT: https://www.bostonglobe.com/lifestyle/style/2017/11/09/mfa-builds-modern-art-collection/UdzqUEYDPHB3EIB4OH3gIP/story.html (4666 chars)
+  [LOCAL-459] R5: Fetched 2155 chars from https://www.bostonglobe.com/lifestyle/style/2017/1
+  [LOCAL-427] Cache HIT: https://www.mfa.org/gallery/stories-artists-tell (18494 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.mfa.org/gallery/stories-artists-tell
+  [LOCAL-427] Cache HIT: https://yamamanama.livejournal.com/461127.html (1007 chars)
+  [LOCAL-459] R5: Fetched 995 chars from https://yamamanama.livejournal.com/461127.html
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DbxwY6-xPRA/ (attempt 1)
+    [D511] 1.1                    kind=eventful idx=55  C4 X2 PASS  [old gate: index]
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/251683757919773/posts/452603944494419/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DWhjazFE7of/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://www.mfa.org/gallery/stories-artists-tell (18494 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.mfa.org/gallery/stories-artists-tell
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/281036280688347/posts/1223757349749564/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DUlwZOSjuY2/ (attempt 1)
+    [D511] 1.2                    kind=eventful idx=65  C0 X3 PASS  [old gate: confirmed]
+    [D511] examined 4 credit_line(s) (indices 21, 48, 55, 65), STORY ACCEPTED at 65, ~$0.062, 64s
+      [D518] dropped (anchors 0.75 alfaro,david,siqueiros | content 0.20): "David Alfaro Siqueiros, a prominent Mexican muralist, was renowned for his revolutionary"
+    [D518] 1 of 6 prose sentence(s) replaced by the story
+    [D511] story ACCEPTED from credit_line 'blending activism with powerful visual narra' (index 65, 3 sentences)
+
+  [D511] PHASE 5.20 summary: 1/3 stops got a gated story, ~$0.178, [D518] 1 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  The Great Good Man                         48    12     7    60
+     2  That Red One                               62    33    14    45
+     3  Autorretrato con espejo (Self-Portrait w   61    56     0    45
+    [LOCAL-485] index mean 57.0 over 3 stop(s), range 48-62
+    [LOCAL-485] weakest: 'The Great Good Man' at 48
+[TIMING] phase=story_first elapsed=414.8s cumulative=526.4s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-382] Thesis block injected into prolog (493 chars)
+  [R2] Prolog saved for Stop 1 (109 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 109 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 109 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 102
+    Words after:  102
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 1.8s, $0.0075, 1114 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [The Great Good Man] (cause): Hartley chose Lincoln as a subject to explore themes of leadership and resilienc...
+      [That Red One] (mystery): Arthur Dove was known for his collaborations, and although specific collaborator...
+      [Autorretrato con espejo (Self-Portrait with Mirror)] (reversal): The composer George Gershwin, an avid painter himself who died that same year, h...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0031 (523 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Stop 1: The Great Good Man, delve into themes of leadership and resilience through Hartley's portrayal of Lincoln. Then, explore the creative exchange milieu surrounding Arthur Dove's work at Stop 2: That Red One."
+      FAIL: vague language detected in Part 4
+    Part 4 LLM cost: $0.0032 (528 tokens) [attempt 2]
+    ✗ Part 4 attempt 2 FAILED verification:
+      Candidate: "At Stop 1: The Great Good Man, you will delve into themes of leadership and resilience through Hartley's portrayal of Lincoln. Moving on to Stop 2: That Red One, explore Arthur Dove's collaborative spirit during an era of creative exchange."
+      FAIL: vague language detected in Part 4
+    ✗ Part 4 FAILED all 2 attempts — omitting
+      Last candidate: "At Stop 1: The Great Good Man, you will delve into themes of leadership and resilience through Hartley's portrayal of Lincoln. Moving on to Stop 2: That Red One, explore Arthur Dove's collaborative spirit during an era of creative exchange."
+    Part 4 total cost: $0.0062
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Museum of Fine Arts, Boston — next is That ...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in Museum of Fine Arts, Boston: Autorretrato...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 2.2s, $0.0026, 444 tokens
+  [LOCAL-280] Recap built: 31 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Autorretrato con espejo (Self-Portrait with Mirror)] (reversal): "The composer George Gershwin, an avid painter himself who died that same year, h..."
+      → composed: "Autorretrato con espejo, painted after George Gershwin's departure from New York in 1936"
+    [That Red One] (mystery): "Arthur Dove was known for his collaborations, and although specific collaborator..."
+      → composed: "That Red One, created in an era of creative exchange by Arthur Dove"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Autorretrato con espejo, painted after George Gershwin's departure from New York in 1936 and that Red One, created in an era of creative exchange by Arthur Dove."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 (news): news_orchestrator_service.py confirmed
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='The Great Good Man' beats_assigned=5 beats_in_output=2 dropped=['Lewis', 'Bravo', 'Pollock'] causes=[Lewis=never_written, Bravo=never_written, Pollock=never_written]
+    stop='That Red One' beats_assigned=6 beats_in_output=3 dropped=['View Image', 'William', 'Knaths'] causes=[View Image=never_written, William=never_written, Knaths=never_written]
+    stop='Autorretrato con espejo (Self-Portrait with Mirror)' beats_assigned=6 beats_in_output=1 dropped=['Varo', 'Georgia', 'Southwest', 'Bloom', 'John Axelrod'] causes=[Varo=never_written, Georgia=never_written, Southwest=never_written, Bloom=never_written, John Axelrod=never_written]
+
+=== Word Count Statistics ===
+Stop 1: The Great Good Man - 169 words
+Stop 2: That Red One - 224 words
+Stop 3: Autorretrato con espejo (Self-Portrait with Mirror) - 174 words
+===========================
+
+
+Total API cost: $0.4056 (31010 tokens)
+CACHE STORE: exhibition blue green and silva in MFA Boston, MA / museum / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/Audioura/TOUR_D523_BLUEGREEN.txt
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: exhibition blue green and silva in MFA Boston, MA - Museum Tour
+Tour-Category: museum
+
+Stop 1: The Great Good Man by Marsden Hartley
+
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Coordinates: 42.3399, -71.0903
+
+Orientation: In Gallery 332, the exhibition "blue green and silva" at the MFA Boston invites you to explore the intricacies of identity through artistic expression. Featuring three captivating works, including "The Great Good Man" by Cyrus Edwin Dallin, "...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    The Great Good Man: serp_results=26 snippets_injected=36 beats_in_delivered_text=0
+    That Red One: serp_results=27 snippets_injected=35 beats_in_delivered_text=0
+    Autorretrato con espejo (Self-Portrait with Mirror: serp_results=18 snippets_injected=22 beats_in_delivered_text=4
+========================================================================
+[TIMING] phase=packing elapsed=10.0s cumulative=536.4s
+[TIMING] phase=verification elapsed=0.0s cumulative=536.4s
+[TIMING] TOTAL wall=536.4s phases: story_first=414.8s, external_lookups=67.1s, exhibition_checklist=21.8s, fact_sheets=13.1s, packing=10.0s, poi_selection=7.9s, intent=1.7s, narration=0.0s, verification=0.0s
+
+OK 5827 chars in 536s -> TOUR_D523_BLUEGREEN.txt

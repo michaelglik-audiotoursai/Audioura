@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-24T15:59:10.909421
+Generated: 2026-08-24T16:00:01.562323
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -419,7 +419,7 @@ satisfy this requirement. Your text will be REJECTED if "Hartley" is absent.
 
 
 ━━━ THE STORY FOR THIS STOP (already written and fact-checked) ━━━
-In 1990, the William H. Lane Foundation made a significant donation to the Museum of Fine Arts, Boston. This donation included Marsden Hartley's painting, "The Great Good Man," created in 1942. As a result, the museum's collection was enriched with this notable work, allowing it to be viewed and appreciated by the public within the context of American Modernist art.
+In 1942, Marsden Hartley painted "The Great Good Man," an artwork that marked a significant moment in his career. This painting, which portrays a bust of Abraham Lincoln against a blue background, was part of Hartley's exploration of American identity during a time of global upheaval. By choosing to depict Lincoln, Hartley connected deeply with themes of strength and leadership, reflecting the turbulent era in which he was creating. The painting now resides in the Museum of Fine Arts, Boston, where it serves as a testament to Hartley's artistic vision and his engagement with historical figures.
 ━━━ END STORY ━━━
 
 This story is REQUIRED and comes first in your description. Reproduce its facts
@@ -431,8 +431,25 @@ After the story, add physical description and context if there is room. Do not
 introduce any further named person who does not appear above.
 
 
+CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
+- "Lane Foundation made a significant donation to the Museum of Fine Arts, Boston."
+- "This donation included Marsden Hartley's painting, "The Great Good Man," created in 1942."
+- "As a result, the museum's collection was enriched with this notable work, allowing it to be viewed and appreciated by the public within the context of American Modernist art."
+- "The Foundation's gift enabled the museum to enhance its Modernist collection significantly."
+- "In his exploration of American identity, Hartley captures the essence of Abraham Lincoln, symbolizing ideals of strength and integrity during a turbulent period in history."
+- "The presence of this piece in Boston's Museum of Fine Arts is entwined with Hartley's broader impact on modern art and his deep exploration of character."
+- "Silva, although not involved in the creation of this particular work, contributed to the dialogue around the art form, illustrating the importance of intersections between text and image in advancing the book as an artwork."
+
+Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
+
+
+THIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.
+It may be accurate and well written; it is still a description. A story here means: ONE named person, across THREE OR MORE consecutive sentences, DOING something — deciding, refusing, persuading, travelling, failing — with something at stake for them. Not 'X was an artist who worked in Paris'. Something happened, to someone, and it mattered.
+Use only the source material supplied. If the material will not support such a story, write the shorter factual account rather than inventing one — an invented story is worse than none.
+
+
 ================================================================================
-Total user message length: 35188 chars
+Total user message length: 37590 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0

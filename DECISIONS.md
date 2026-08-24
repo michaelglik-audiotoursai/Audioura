@@ -20715,3 +20715,65 @@ is twice the length it should be. (2) Stop 2 states "Moses was an Egyptian pries
 checker finds self-contradiction, not confident error. (3) `At this work:` template seams and a
 stop-1 orientation that describes stop 3's work — same family as the label just removed.
 (4) Three runs before any number is treated as real. (5) The two D515 amendments, still unruled.
+
+## D524 — Two tours, one generation each: the selection fix works, and a fabricated request exposes something bigger
+
+**2026-08-24. Unbound (real subject), 15:57.** First run with D523's best-of selection.
+
+| stop | candidates examined | accepted | accept-first would have shipped |
+|---|---|---|---|
+| Le Lézard | 65, 64, 72, **77** | 77 | 65 |
+| Au Soleil | 71, **76**, 69, 71 | 76 | 71 |
+
+**Stop index mean 73.0, range 63-83** — best measured (previous: 67.8 over 3 D515 runs; 75.7,
+63.7, 69.7 single runs). **The floor is the real result: 63, against 44 in the 12:23 run.** The
+bad draw is what disappeared. Cost 4x: $0.178 and 644s against $0.044 and 325s. Stop 1's story
+names Sotheby's INSIDE the sentence because sources disagree — D521's rule working — and the tour
+contains no brackets. Stop 2 gained Leonce Rosenberg, the cause of death and the age: material the
+single draw never reached.
+
+**Two defects in the delivered Unbound tour, one of them LEAD's own.** The missing-space repair
+required two lowercase letters after the capital and could not cross a quotation mark, so the tour
+shipped `imagery."Au Soleil du Plafond"`; the checker had the identical blind spot and reported it
+clean. And `[LOCAL-392] Torf Gallery -> DEGRADED (name dropped)` left "the eleven lithographs,
+housed in are rarely on view". Both fixed. `"the Louis Broder Tériade"` returned: **4 of 8 runs**,
+untouched by anything built today, now the longest-lived unfixed defect.
+
+### "exhibition blue green and silva in MFA Boston, MA" — 16:06
+
+**No such exhibition exists. The system did not say so.** It produced a fluent 5,827-character
+tour of it. From the log:
+
+- `[venue_resolver] Resolved: 'Museum of Fine Arts, Boston' -> Q1565911 (Museum of Fine Arts,
+  HOUSTON)`, `URL: mfah.org`. Wrong museum, wrong city, run continued.
+- `[LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 1xVENUE_ONLY, 2xEMPTY` — it knew
+  it had no coverage for any candidate and filled the tour anyway.
+- `Knowledge validation passed`, twice.
+
+The tour misattributes its own stop 1 (heading says Marsden Hartley, orientation says Cyrus Edwin
+Dallin), calls a 1944 Arthur Dove abstract "Dutch Golden Age painting", and by pronoun chain hands
+a Siqueiros self-portrait to George Gershwin — which the closing recap then repeats, so it is the
+last thing a listener hears.
+
+**The story loop was the only honest component.** It refused 2 of 3 stops: candidates scored
+35/26/5/34 and 34/34/34/30 against 63-83 on the real subject the same hour. **The index floor is
+a working detector of "there is nothing here" and is currently the only part of the pipeline that
+noticed.**
+
+| | Unbound (real) | blue green (not real) |
+|---|---|---|
+| stops with a story | 3 of 3 | **1 of 3** |
+| candidate indices | 63-83 | **5-65** |
+| rubric base | 75.0 | **75.0** |
+| defect checks failing | 2 | **0** |
+
+**The rubric scores both 75.0 and the defect checker PREFERS the fictional one.** Neither
+instrument can tell a real subject from an invented one; the candidate indices can.
+
+**LEAD's recommendation, NOT implemented because it is a product decision:** (1) abort when the
+resolved venue's city contradicts the request; (2) make `0 COVERED` a stop condition rather than a
+fallback; (3) refuse a tour whose stops all score below 50. The change is small; the consequence
+is that some requests come back empty, and that is Michael's call.
+
+**The rubric base score has now read 75.0 for five consecutive runs across visibly different
+tours. It has stopped discriminating and should stop being quoted.**

@@ -1345,3 +1345,33 @@ argued Moses was an *Egyptian priest* — he argued nobleman — and nothing in 
 it, so my checker stays silent: it was built to find a self-contradiction, and confident error is
 worse. Stop 1 says the exhibition's thesis in three different sentences and is twice as long as
 the others; that is duplication BETWEEN sentences, the gap between the two fixes now built.
+
+## Q19 (08-24) — the six tasks, why the stories thinned, and two tours
+
+**Why fewer and worse stories — answered from `story_loop_candidates.jsonl`, not from
+impression.** Since D515 the loop bought exactly ONE credit_line per stop in 12 of 13
+stop-attempts: your rule says a story at 50+ "is the story and we do not need to verify more", and
+at a floor of 50 the first candidate always qualifies, so it stopped exploring. The same work
+scores across a 20-35 point spread between runs, so quality became a single draw from that. And
+because index maps to LENGTH (52 earns three sentences, 74 earns five), a low draw is a shorter
+story too — both halves of what you saw, one cause.
+
+**Fixed:** the loop examines up to four and keeps the best. Your floor of 50, your vetoes and your
+"eventful doesn't gate" all stay. It cost 4x — $0.178 and 644s a tour. **Measured: stop index mean
+73.0, range 63-83, the best yet, and the floor moved from 44 to 63.**
+
+**The other five tasks are done**, except the two D515 amendments, which I implemented and shipped
+**OFF** — against my own earlier recommendation. Both tighten the gate, and the decline was caused
+by selection, not permissiveness; turning them on would have cut stories further to fix a problem
+that was not there. `STORY_GATE_AMEND=1`.
+
+**Four documents in VS Code.** Unbound: `TOUR_MFA_UNBOUND_20260824_1557.md` + judgement.
+blue green and silva: `TOUR_MFA_BLUEGREEN_20260824_1606.md` + judgement.
+
+**READ THE SECOND JUDGEMENT FIRST.** There is no MFA exhibition called "blue green and silva", and
+the system did not say so — it resolved your Boston venue to the Museum of Fine Arts **Houston**,
+logged `0 COVERED` candidates, passed "knowledge validation" twice, and wrote a confident tour that
+misattributes its own first stop and hands a Siqueiros self-portrait to George Gershwin in the
+closing recap. **The rubric gives it 75.0, the same as the real tour, and every defect check passes
+it.** The only component that noticed was the story loop, which refused 2 of 3 stops because
+nothing scored above 35. Full record **D524**.
