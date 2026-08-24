@@ -479,6 +479,93 @@ def correct_stop(stop_text, tour_location, tour_anchor=None):
     return new_text, record
 
 
+def _swap_coord_line(stop_text):
+    """Return stop_text with its Coordinates pair reversed."""
+    return _COORD_RE.sub(lambda m: f"{m.group(1)}{m.group(3)}, {m.group(2)}", stop_text, count=1)
+
+
+def fix_reversed_coordinates(text_content):
+    """Repair tours whose stops were written longitude-first.
+
+    The generator sometimes emits the pair the wrong way round for an entire
+    tour. Every stop then plots on the far side of the world, and the tour is
+    not merely inaccurate but unusable. Observed in Madagascar tours:
+
+        Rova of Antananarivo   Coordinates: 47.5224, -18.9110
+            as written  9,899 km from Antananarivo
+            swapped         3.9 km
+
+    Two checks, cheapest first:
+
+    1. Latitude outside +/-90 is impossible. No reference data needed, and it is
+       always wrong. (It would NOT have caught the Madagascar case, where 47.52
+       is a perfectly valid latitude -- hence the second check.)
+
+    2. Compare the whole tour against its own city, taken from the stops'
+       addresses. If the stops are dramatically closer when swapped, the pair is
+       reversed. The margin is not subtle: ~9,900 km against ~4 km. Requiring a
+       10x improvement across a majority of stops makes a false positive
+       implausible -- a correctly-written tour cannot be 10x better mirrored
+       unless it sits almost exactly on the equator AND the prime meridian.
+
+    Runs before anything else, so the plausibility anchor is computed from
+    corrected values. Without that ordering the guard rejects the CORRECT
+    geocoder answers, because the anchor is itself in the wrong ocean.
+
+    Returns (text_content, record).
+    """
+    rec = {"checked": len(text_content), "action": "none", "reason": ""}
+    parsed = []
+    for t in text_content:
+        name, address, coords = _parse_stop(t)
+        if coords:
+            parsed.append((t, name, address, coords))
+    if not parsed:
+        return text_content, rec
+
+    impossible = [p for p in parsed if abs(p[3][0]) > 90]
+    if impossible:
+        logging.warning("[GEOCODE] %d stop(s) have an impossible latitude (>90)", len(impossible))
+        rec["impossible_latitude"] = len(impossible)
+
+    city = ""
+    for _, _, address, _ in parsed:
+        city = city_from_address(address)
+        if city:
+            break
+    if not city:
+        if impossible:
+            fixed = [_swap_coord_line(t) if abs(c[0]) > 90 else t for t, _, _, c in parsed]
+            rec.update(action="swapped", reason="latitude outside +/-90 and no city to check against")
+            return fixed, rec
+        rec.update(reason="no city available to test against")
+        return text_content, rec
+
+    ref = geocode(city)
+    if not ref:
+        rec.update(reason=f"could not geocode the tour city {city!r}")
+        return text_content, rec
+
+    better = 0
+    for _, _, _, coords in parsed:
+        as_is = haversine_m(coords, ref)
+        flipped = haversine_m((coords[1], coords[0]), ref)
+        if flipped * 10 < as_is:
+            better += 1
+
+    rec.update(city=city, stops_better_swapped=better)
+    if better > len(parsed) / 2:
+        logging.warning(
+            "[GEOCODE] REVERSED COORDINATES: %d of %d stops are >10x closer to %s when "
+            "swapped — correcting the whole tour", better, len(parsed), city)
+        rec.update(action="swapped",
+                   reason=f"{better}/{len(parsed)} stops are 10x closer to {city} when reversed")
+        return [_swap_coord_line(t) for t in text_content], rec
+
+    rec.update(reason="coordinate order looks correct")
+    return text_content, rec
+
+
 def _median_anchor(text_content):
     """A rough centre for the tour, taken from the model's own coordinates.
 
@@ -511,6 +598,14 @@ def correct_stops(text_content, tour_location, tour_anchor=None):
 
     Never raises: a geocoding problem must not fail tour generation.
     """
+    # Repair a wholly reversed tour FIRST. The anchor below is the median of the
+    # stops, so if every coordinate is mirrored the anchor lands in the wrong
+    # ocean and the guard then rejects the correct geocoder answers.
+    text_content, swap_rec = fix_reversed_coordinates(text_content)
+    if swap_rec.get("action") == "swapped":
+        logging.warning("[GEOCODE] tour coordinates were reversed and have been corrected: %s",
+                        swap_rec.get("reason"))
+
     # Prefer a geocoded anchor, but never proceed without one if the stops can
     # supply it themselves. An absent anchor silently disables the only guard
     # against a confidently wrong same-name match.
