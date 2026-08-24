@@ -185,6 +185,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                             f'The exhibition "{_exh_title}" closed on {_exh_date}. '
                             f'A tour cannot be generated for a dismounted show.'
                         )
+                    # [LOCAL-465] Exhibition not found — surface the user_message verbatim
+                    elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "exhibition_not_found":
+                        _error_msg = _LAST_CLEAN_FAIL_EVIDENCE.get("user_message", "Exhibition not found.")
+                        _error_extra["suggestions"] = _LAST_CLEAN_FAIL_EVIDENCE.get("suggestions", [])
                     else:
                         _error_msg = "This venue could not be verified with enough works to generate a quality tour."
                     import generate_tour_text as _gtt
