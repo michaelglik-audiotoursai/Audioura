@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""check_known_defects.py — the three defects Michael said to WATCH, not fix.
+
+His ruling, 2026-08-24: fix the append (D518) and the closing (D519) only; look for
+these in the new tour and say whether they appear.
+
+  (a) cross-stop name contamination — "the Louis Broder Tériade", where Broder is
+      stop 1's publisher and Tériade is stop 2's. Seen in two runs, produced by
+      two different generators, which is why shared per-tour context is the
+      suspect rather than either writer.
+  (b) the priest/nobility self-contradiction inside stop 3. D518 should kill this
+      one as a side effect — CHECK, do not assume.
+  (c) a missing space after a full stop (`depth.Boris Fridman`), third sighting.
+
+Usage: python3 check_known_defects.py TOUR_FILE.txt
+Exit 0 always — this reports, it does not gate.
+"""
+import re
+import sys
+
+
+def stops_of(text):
+    """Split a generated tour into (heading, body) per stop."""
+    parts = re.split(r'\n(?=Stop \d+:)', text)
+    return [(p.split('\n', 1)[0].strip(),
+             p.split('\n', 1)[1] if '\n' in p else '') for p in parts[1:]]
+
+
+def defect_a(text, stops):
+    """Two people's names fused into one noun phrase, across stops.
+
+    Generalised past the one string: 'the X Y' where X is a person named in their
+    own right elsewhere in the tour and Y is another capitalised name.
+
+    **The tail name is NOT required to appear anywhere else, and that correction
+    matters.** The first version of this check demanded it, and so reported the
+    17:46 run clean — where the tour says "the Louis Broder Tériade revived the
+    stalled undertaking" and the word Tériade appears exactly once, inside the
+    fusion. Requiring corroboration made the check blind to the worst case of the
+    thing it was written to find.
+    """
+    hits = []
+    for m in re.finditer(r'\bthe ((?:[A-ZÀ-Ý][\w’\'-]+ ){1,3})([A-ZÀ-Ý][\w’\'-]+)\b', text):
+        head, tail = m.group(1).strip(), m.group(2)
+        words = head.split()
+        if len(words) < 2:
+            continue
+        first_person = ' '.join(words[-2:])
+        # X must stand on its own somewhere else — that is what makes the phrase
+        # a fusion of two names rather than one long proper noun.
+        if len(re.findall(re.escape(first_person), text)) >= 2:
+            hits.append(m.group(0))
+    return hits
+
+
+def defect_b(text):
+    """The same subject given two incompatible descriptions inside one tour."""
+    pairs = [('Egyptian priest', 'Egyptian nobility'),
+             ('was not a Hebrew', 'rather than Hebrew origin')]
+    return [(a, b) for a, b in pairs if a in text and b in text]
+
+
+def defect_c(text):
+    """A full stop with no space after it, mid-sentence — `depth.Boris`."""
+    body = re.sub(r'https?://\S+', ' ', text)
+    body = re.sub(r'\b[A-Za-z0-9.-]+\.(com|org|net|edu|fr|gov|uk)\b', ' ', body)
+    return re.findall(r'[a-zà-ÿ]{2}\.[A-ZÀ-Ý][a-zà-ÿ]{2}', body)
+
+
+def main(path):
+    text = open(path, encoding='utf-8').read()
+    stops = stops_of(text)
+    print(f"{path} — {len(text)} chars, {len(stops)} stop(s)\n")
+
+    a = defect_a(text, stops)
+    print(f"(a) cross-stop name fusion : {'FOUND ' + str(a) if a else 'not found'}")
+    b = defect_b(text)
+    print(f"(b) priest/nobility clash  : {'FOUND ' + str(b) if b else 'not found'}")
+    c = defect_c(text)
+    print(f"(c) missing space after '.': {'FOUND ' + str(c) if c else 'not found'}")
+
+    print(f"\n(D519) 'Treat Page' in the tour: "
+          f"{'PRESENT — ' + str(text.count('Treat Page')) + 'x' if 'Treat Page' in text else 'absent'}")
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else 'TOUR_LOOP_20260823_1821.txt'))
