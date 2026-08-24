@@ -1320,3 +1320,28 @@ Tériade" is in 3 of the 4 08-23 runs, not 2** — the 18:16 run has it and nobo
 **Not shippable yet, and the loop is still not the reason.** Stop 3 scored 44 — its story
 published at index 52 with one confirmed claim and three unattested, which is exactly the case
 your D515 amendment (a) was written for and which you have not ruled on.
+
+## Q18 (08-24) — citations, duplicates, spoken labels, and generate once
+
+All four done, one generation, two documents in VS Code:
+[`TOUR_MFA_20260824_1223.md`](TOUR_MFA_20260824_1223.md) and
+[`TOUR_MFA_20260824_1223_JUDGEMENT.md`](TOUR_MFA_20260824_1223_JUDGEMENT.md). Record **D521/D522**.
+
+**Citations: 0 brackets**, against 3–4 in every previous run. Stop 3 tells its disagreement in
+words instead — *"While some records note that the illustrations were printed on lambskin, others
+describe the sheets as sheepskin and silk."*
+
+**`Closing:` gone**; `Orientation` and `Directions` kept exactly as you drew the line. Tours
+already on disk score identically, which was the risk worth checking.
+
+**The duplicate: I missed it, and the tour shows it.** My rule only looked at clauses in the
+middle of a sentence; this tour put the same Fridman repetition at the END — *"thanks to the
+generous gift of Boris Fridman, the collector who gave this work to the museum."* Fixed and
+proven against that exact sentence, **and I did not regenerate to hide it** — you said generate
+once, and a rerun after a fix is a different measurement, not a better one.
+
+**Two things in this tour I would not ship, neither of them asked about.** Stop 2 says Freud
+argued Moses was an *Egyptian priest* — he argued nobleman — and nothing in the tour contradicts
+it, so my checker stays silent: it was built to find a self-contradiction, and confident error is
+worse. Stop 1 says the exhibition's thesis in three different sentences and is twice as long as
+the others; that is duplication BETWEEN sentences, the gap between the two fixes now built.

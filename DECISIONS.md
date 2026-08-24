@@ -20648,3 +20648,70 @@ check that demands corroboration is blind to the worst form of what it hunts (D2
 one sentence; (3) stops 1 and 2 lost their inline citations between two runs an hour apart;
 (4) the two D515 amendments — stop 3 published at `C1 X3` and scored 44, which is the case
 amendment (a) was written for.
+
+## D521 — Nothing read aloud that a listener cannot use: citations, repetitions, labels
+
+**2026-08-24, Michael on the 10:36 tour.** Three fixes, one instruction each.
+
+**(1) Bracketed citations.** *"'…of Freud's text [collections.museumofthebible.org,
+lockportstreetgallery.com]' are not acceptable for the listeners as it will disturb them for no
+reason. Citations should be given only if there is a difference in the sources and then it should
+be incorporated in the sentence rather than in square brackets."*
+
+They arrive because the loop's FIRST prompt asks for sources in brackets — which is right, the
+adjudicator must know what backs what — and the model carries the habit into PART 2, the text we
+publish. Two changes, because either alone is insufficient: PART 2 now forbids brackets and asks
+for attribution BY INSTITUTION only where sources disagree ("Christie's records eleven plates;
+Sotheby's lists twelve"), and `strip_bracketed_citations()` is the deterministic guard behind it.
+A bracket is removed only when it holds a domain, opens with cite:/source:/see, or is a bare
+reference number; parentheses and genuine asides are untouched.
+
+**(2) Intra-sentence duplication.** An appositive is dropped when the rest of the sentence
+performs the same VERB FAMILY over at least half the same nouns. It needed its own noun set:
+the sentence-level stoplist drops `work` and `museum`, which are exactly the shared objects that
+prove the repetition — without them the two halves of the Fridman sentence have nothing in common.
+
+**THE FIRST VERSION MISSED, AND THE 12:23 TOUR PROVED IT.** It scanned only clauses in the
+MIDDLE of a sentence, because the 10:36 example had it there. 12:23 put it at the END —
+*"…thanks to the generous gift of Boris Fridman, the collector who gave this work to the museum"*
+— and the rule reported the tour clean. The final clause was excluded to protect trailing
+participles ("…, enriching the collection"), which `_CLAUSE_OPENERS` already protects: they open
+with neither a determiner nor a relative pronoun. The exclusion bought nothing and cost the fix.
+Now closed, with terminal punctuation carried across the removal, and proven against that exact
+sentence. **Third time today an instrument was blind to a case whose answer was already known**
+(after check (a)'s corroboration requirement and check (f)'s line-start anchor).
+
+**(3) The `Closing:` label.** *"title words such as Narration and Closing are not end up in the
+actual tour… 'Directions' and 'Orientation' are fine because they let listeners know that they
+are not part of the stop description."* **That distinction is the rule**: a label earns its place
+when it tells the listener what KIND of thing is coming. The label existed so the scorer need not
+guess where the closing begins; `_CLOSING_OFFER_RE` now carries that by content, plus a new
+alternative for the NEWS-ONLY closing that D519 made possible — before it, such a line matched
+nothing but the label being deleted, and its proper nouns would have been counted as narration
+facts. The label stays in the pattern; the three tours on disk score identically (75.0/66.7/75.0).
+
+## D522 — The 12:23 tour: one generation, delivered with its defect in it
+
+Michael: *"Generate the tour once (not multiple times and give me the best or worst — that
+defeats the purpose of randomness)."* Run once. The Fridman duplicate in §2 above was found by
+READING the delivered tour; the fix is committed and proven against that sentence deterministically,
+and **the tour was NOT regenerated to hide it** — a rerun after a fix is a different measurement,
+not a better one. Documents: `TOUR_MFA_20260824_1223.md`, `TOUR_MFA_20260824_1223_JUDGEMENT.md`.
+
+| | 10:26 | 10:36 | **12:23** |
+|---|---|---|---|
+| stop index mean (range) | 75.7 (69–82) | 63.7 (44–77) | **69.7 (68–72)** |
+| rubric base | 75.0 | 75.0 | **75.0** |
+| bracketed citations | 4 | 3 | **0** |
+| spoken `Closing:` | yes | yes | **no** |
+
+**The rubric base has been 75.0 for four consecutive runs and has stopped discriminating.** The
+stop index moves 12 points between runs of identical code. Neither instrument can detect a change
+of the size these fixes make; the evidence for them is that the text no longer contains the thing.
+
+**Open, in order:** (1) sentence-to-sentence duplication INSIDE one stop — the gap between D518
+(story vs prose) and D521 (inside one sentence); stop 1 says the exhibition thesis three times and
+is twice the length it should be. (2) Stop 2 states "Moses was an Egyptian priest" unopposed — the
+checker finds self-contradiction, not confident error. (3) `At this work:` template seams and a
+stop-1 orientation that describes stop 3's work — same family as the label just removed.
+(4) Three runs before any number is treated as real. (5) The two D515 amendments, still unruled.

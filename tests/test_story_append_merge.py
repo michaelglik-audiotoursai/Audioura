@@ -303,6 +303,30 @@ def test_a_sentence_may_not_say_the_same_thing_twice():
           got.startswith('Boris Fridman later donated'), got[:45])
 
 
+def test_the_duplicate_may_be_the_LAST_clause():
+    """Verbatim from the 12:23 tour, which the first version of the rule missed.
+
+    The 10:36 sentence put the repeated clause in the middle; this one puts it at
+    the end. A rule that stopped one segment short reported the tour clean, and
+    the sentence Michael had already objected to went out again in a new shape.
+    """
+    from story_append_merge import dedupe_within_sentence as D
+    got = D("This work is now part of the Museum of Fine Arts' collection, thanks "
+            "to the generous gift of Boris Fridman, the collector who gave this "
+            "work to the museum.")
+    check('the trailing restatement is gone',
+          'the collector who gave' not in got, got)
+    check('the gift itself survives', 'generous gift of Boris Fridman' in got)
+    check('the sentence still ends in a full stop', got.endswith('.'), repr(got[-30:]))
+
+    # And the middle-clause form still works — one rule, both positions.
+    mid = D("Boris Fridman, the collector who gave this work to the museum, later "
+            "donated this important work to the Museum of Fine Arts, Boston.")
+    check('the middle-clause form is still fixed',
+          mid == 'Boris Fridman later donated this important work to the Museum '
+                 'of Fine Arts, Boston.', mid)
+
+
 def test_dedupe_leaves_appositions_that_add_something():
     """The controls. Each of these repeats nothing and must survive intact."""
     from story_append_merge import dedupe_within_sentence as D
@@ -318,6 +342,11 @@ def test_dedupe_leaves_appositions_that_add_something():
         'Boris Fridman, a collector, donated the work.',
         # no shared verb family
         'The gallery, named after its patron Torf, displays works rarely seen.',
+        # trailing participle at the very end — the position the rule now reaches
+        'Boris Fridman donated the work to the museum, enriching the collection.',
+        # a real trailing relative clause that adds information
+        'The work is composed of 11 lithographs, printed by Mourlot Frères, '
+        'a renowned Parisian house, which was known for its high-quality work.',
     ]:
         check(f'kept: "{s[:52]}…"', D(s) == s, D(s))
 
@@ -385,6 +414,7 @@ if __name__ == '__main__':
                test_no_story_still_gets_cleaned,
                test_bracketed_citations_never_reach_the_listener,
                test_a_sentence_may_not_say_the_same_thing_twice,
+               test_the_duplicate_may_be_the_LAST_clause,
                test_dedupe_leaves_appositions_that_add_something,
                test_the_whole_stop_is_cleaned_end_to_end,
                test_never_strips_a_stop_bare,

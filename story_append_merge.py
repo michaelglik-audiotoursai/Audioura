@@ -359,10 +359,23 @@ def dedupe_within_sentence(sentence: str) -> str:
     only when the rest of the sentence performs the same verb family over at
     least half the same content words.
     """
-    parts = [p.strip() for p in sentence.split(',')]
+    # The terminal punctuation travels separately: when the clause that goes is
+    # the LAST one, it takes the full stop with it and the sentence ends bare.
+    m = re.search(r'([.!?]["”’\')\]]*)\s*$', sentence)
+    tail = m.group(1) if m else ''
+    body = sentence[:m.start(1)] if m else sentence
+
+    parts = [p.strip() for p in body.split(',')]
     if len(parts) < 3:
         return sentence
-    for i in range(1, len(parts) - 1):
+    # The final segment is IN RANGE, and it has to be. The 12:23 tour put the
+    # duplicate there — "…thanks to the generous gift of Boris Fridman, the
+    # collector who gave this work to the museum." — and a rule that stopped one
+    # segment short reported it clean. Excluding the tail was meant to protect
+    # trailing participles ("…, enriching the museum's collection"), but those
+    # are already protected: they do not open with a determiner or a relative
+    # pronoun, so `_CLAUSE_OPENERS` never admits them.
+    for i in range(1, len(parts)):
         cand = parts[i]
         words = _WORD_RE.findall(cand)
         if len(words) < 3 or _fold(words[0]) not in _CLAUSE_OPENERS:
@@ -382,13 +395,13 @@ def dedupe_within_sentence(sentence: str) -> str:
         # donated this work" — a comma between subject and predicate, which a
         # reader hears as a stumble. When the clause opened immediately after the
         # subject, the fence goes with it.
-        if i == 1:
+        if i == 1 and len(parts) > 2:
             rebuilt = ' '.join([parts[0]] + [', '.join(parts[2:])])
         else:
             rebuilt = ', '.join(parts[:i] + parts[i + 1:])
         if len(_WORD_RE.findall(rebuilt)) < 5:
             continue
-        return re.sub(r'\s{2,}', ' ', rebuilt).strip()
+        return re.sub(r'\s{2,}', ' ', rebuilt).strip() + tail
     return sentence
 
 
