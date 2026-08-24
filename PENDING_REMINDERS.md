@@ -9,6 +9,12 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [x] DONE 2026-08-24 10:4x — all four items. D518 (append), D519 (Treat Page), ONE tour
+      delivered as `TOUR_MFA_20260824.md` + `TOUR_MFA_20260824_JUDGEMENT.md` (both opened in
+      VS Code), three defects watched and all absent in this run. Full record D518-D520 / Q17.
+      **Two runs happened: 10:26 exposed a defect in the append fix itself, 10:36 has the fix
+      and is the deliverable even though it scores lower.** Original instruction below.
+
 - [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
       Do these in order. Everything needed is on disk; do not ask him to re-explain.
 

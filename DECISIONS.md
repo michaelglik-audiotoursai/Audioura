@@ -20566,3 +20566,85 @@ credits list. Michael's rule found that; the old thresholds hid it.
 **Order of work:** (1) fix the append so the story REPLACES overlapping prose — one change kills
 defects 2 and 3, needs no network; (2) find the Broder/Tériade contamination; (3) the two D515
 amendments, now known to be rare; (4) re-measure, at which point 67.8 becomes comparable.
+
+## D518 — The story replaces the prose it overlaps, and when it replaced the opening it becomes the opening
+
+**2026-08-24, Michael's instruction:** *"saying things twice is the worst for listeners — they
+hear that and get annoyed. Moreover, selecting the story topic based on the sentences made this
+problem so we need to fix it."*
+
+**The second sentence is the diagnosis and it is correct.** The loop's credit_lines are mined
+from the stop's own prose (`story_seeds.seeds_for_stop`), so the loop is *guaranteed* to research
+what the prose already said and then say it again. `description.rstrip() + ' ' + story` could
+never have been tuned into reading well; the duplication is structural. D516 §2 measured the
+worst case: stop 3 carried "an Egyptian priest" (wrong) and "of Egyptian nobility" (right, the
+adjudicator's correction) six sentences apart inside one stop.
+
+`story_append_merge.py` drops each prose sentence the story covers, on shared **anchors** —
+proper names, years, quantities — **with the work's own title excluded on both sides**. Without
+that exclusion a purely descriptive sentence is condemned for naming the book, which the fixtures
+caught first. Thresholds: >=2 shared anchors AND >=50% anchor coverage, or >=60% content
+coverage. At most 60% of a stop is ever removed, highest-overlap first.
+
+### The defect the fix introduced, found by reading a live tour and not by the fixtures
+
+The 10:26 run had the duplication gone and **all three stops of three opening on a reference to
+nobody**: *"Broder published this limited edition book"*, *"The project, originally conceived by
+L. Rosenberg"*, *"Published by The Hogarth Press, Freud's theory"*. A stop's first prose sentence
+is the one that introduces its subject, which makes it the one most likely to duplicate a story
+mined from it — so it is the one most likely to be dropped, and dropping it removes the
+introduction. The pronoun repair already in the module caught none of these; none is a pronoun.
+
+**Fix: when the story replaced the opening, the story becomes the opening.** It repairs all three
+without deleting a word, because the story introduces its own subjects in full — "...printed for
+publisher Louis Broder", after which "Broder published this limited edition book" resolves. It is
+also the truer reading of the instruction: replacement belongs where the prose was.
+
+**Every fixture passed while the code was producing three broken stops.** The live-artifact gate
+(Michael, 2026-07-27) is what caught it. 31 checks now; neutering the reorder turns 5 red.
+
+## D519 — The Treat Page must be earned
+
+**2026-08-24, Michael:** only mention the Treat Page **if it is genuinely near a stop of the
+tour, any tour type, and it must not be the obligatory closing of every tour.**
+
+It was unconditional — every tour ever generated ended with it, 4 of 4 in the 08-23 runs,
+including a Boston tour whose nearest treat row does not exist. `nearest_treat_to_any_stop()`
+(module-level, pure, so it is testable without a database) now requires a real treat within
+`TREAT_PAGE_NEAR_KM` (1.0) of a real stop. **Any stop, not the last** — the app's own Treat Page
+is location-aware and a listener stands at every stop in turn.
+
+**It fails closed:** no table, no coordinates, a query error, and the sentence is omitted.
+Silence costs nothing; an unbacked promise does. On this machine's DB there are zero treats with
+coordinates, so it is now absent from the MFA tour entirely — verified in both runs of 08-24.
+
+## D520 — The 08-24 tour: two runs, and I am handing over the worse one
+
+Michael asked for ONE tour, not three-and-pick-the-best. Two were generated: 10:26 exposed the
+D518 defect above, 10:36 has the fix. **10:36 is the deliverable even though it scores lower**
+(stop-index mean 63.7 vs 75.7) — choosing 10:26 because it scored better is the selection he
+ruled out. Documents: `TOUR_MFA_20260824.md` and `TOUR_MFA_20260824_JUDGEMENT.md`.
+
+| | D515 (D516, 3 runs) | 10:26 | 10:36 (delivered) |
+|---|---|---|---|
+| stop index mean | 67.8 (64.3-72.3) | 75.7 (69-82) | 63.7 (44-77) |
+| rubric base | 66.7 / 75.0 / 75.0 | 75.0 | 75.0 |
+| loop cost | $0.045-0.060 | $0.046 | $0.044 |
+| prose sentences replaced | n/a | 4 | 6 |
+
+**No claim that the fix moved the score, in either direction.** Two single runs 12 index points
+apart, against a measured single-run sd of ~5-7, is noise; the rubric base is identical. What the
+fix changed is what no metric here measures — the tour stops saying things twice.
+
+**The three watched defects were all absent (a, b, c), and that is one run against base rates of
+3/4, 1/4 and 4/4 — not three fixes.** `check_known_defects.py`, validated against the four known
+tours, **corrected the record: (a) is in 3 of 4 runs, not the 2 recorded in D516** — 18:16 has it
+and nobody looked. The first version of that check reported 17:46 clean because it required the
+second name to appear elsewhere, and there `Tériade` appears exactly once, inside the fusion: a
+check that demands corroboration is blind to the worst form of what it hunts (D242's class).
+
+**Open, in order:** (1) three runs under D518/D519 before any number here means anything;
+(2) intra-sentence duplication the merge cannot see — Boris Fridman gives the work away twice in
+one sentence; (3) stops 1 and 2 lost their inline citations between two runs an hour apart;
+(4) the two D515 amendments — stop 3 published at `C1 X3` and scored 44, which is the case
+amendment (a) was written for.

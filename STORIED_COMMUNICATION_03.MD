@@ -1288,3 +1288,35 @@ merged origin's 11 commits (clean, nothing in the story pipeline) and pushed —
 **Answer to "can I /clear + restart": yes, and it is cheap.** Everything is on disk —
 D511–D517, the judgement doc, and the next task list at the top of `PENDING_REMINDERS.md`.
 A fresh session reads those in a few thousand tokens instead of carrying this one.
+
+## Q17 (08-24) — "fix the append, fix the Treat Page closing, then generate ONE tour"
+
+Both fixed, one tour delivered, two documents in VS Code:
+[`TOUR_MFA_20260824.md`](TOUR_MFA_20260824.md) and
+[`TOUR_MFA_20260824_JUDGEMENT.md`](TOUR_MFA_20260824_JUDGEMENT.md). Full record **D518-D520**.
+
+**The append (D518).** Your second sentence was the design instruction — the credit_lines are
+mined from the stop's own prose, so the loop always researches what the prose already said. The
+story now REPLACES the sentences it overlaps, judged on shared names, years and quantities with
+the work's own title excluded. 6 prose sentences replaced across 3 stops.
+
+**The closing (D519).** The Treat Page now needs a real treat within 1 km of a real stop, any
+stop, and fails closed. This machine's DB has zero treats with coordinates, so it is gone from
+the tour. It had closed 4 of 4 previous runs unconditionally.
+
+**I generated two tours and am handing you the second, which is the worse one.** The first
+(10:26) showed that my own fix broke all three stops: dropping a stop's first sentence removes
+the sentence that INTRODUCES its subject, and every stop opened on a reference to nobody —
+"Broder published this limited edition book" (who is Broder?). The repair is to let the story
+open the stop when it replaced the opening; it fixes all three without deleting a word. The
+10:36 tour scores LOWER (stop index 63.7 vs 75.7) and it is still the deliverable, because
+picking 10:26 for its score is the selection you ruled out. **Every fixture passed while the
+code was producing three broken stops — only the live tour showed it.**
+
+**The three watched defects were all absent — one run, against base rates of 3/4, 1/4 and 4/4,
+so that is not three fixes.** Building the checker corrected the record: **"the Louis Broder
+Tériade" is in 3 of the 4 08-23 runs, not 2** — the 18:16 run has it and nobody looked.
+
+**Not shippable yet, and the loop is still not the reason.** Stop 3 scored 44 — its story
+published at index 52 with one confirmed claim and three unattested, which is exactly the case
+your D515 amendment (a) was written for and which you have not ruled on.
