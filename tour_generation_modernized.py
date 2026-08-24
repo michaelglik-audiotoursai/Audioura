@@ -339,7 +339,27 @@ def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchest
         # Parse the tour content using the same logic as the working system
         ACTIVE_JOBS.update(job_id, progress="Parsing tour content...")
         modernized_data = parse_tour_content_to_modernized(tour_content)
-        
+
+        # [BETA-4 / wdvrdaxqjn] Validate stop coordinates before anything consumes
+        # them. Coordinates arrive here as a "Coordinates:" line the language model
+        # wrote from memory, and nothing had ever checked them — measured errors of
+        # 1-2 km, and one stop that put a Toronto car park on an island reachable
+        # only by ferry. This runs before the zip is built, so both audio_N.txt
+        # (which the map reads) and the map buttons in the HTML get the corrected
+        # values. Fail-soft: any geocoder problem leaves the original untouched.
+        ACTIVE_JOBS.update(job_id, progress="Validating stop coordinates...")
+        try:
+            import geocode_stops
+            hint = geocode_stops.location_hint(modernized_data.get("tour_name", ""))
+            anchor = geocode_stops.geocode(hint) if hint else None
+            modernized_data["text_content"], geo_records = geocode_stops.correct_stops(
+                modernized_data["text_content"], hint, tour_anchor=anchor)
+            corrected = sum(1 for r in geo_records if r.get("action") == "replaced")
+            if corrected:
+                print(f"[GEOCODE] corrected {corrected} of {len(geo_records)} stop coordinates")
+        except Exception as e:
+            print(f"[GEOCODE] validation skipped ({e}); keeping model coordinates")
+
         # Generate audio using TTS service
         ACTIVE_JOBS.update(job_id, progress="Generating audio files...")
         audio_files = []
