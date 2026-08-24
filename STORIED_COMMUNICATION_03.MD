@@ -1375,3 +1375,40 @@ misattributes its own first stop and hands a Siqueiros self-portrait to George G
 closing recap. **The rubric gives it 75.0, the same as the real tour, and every defect check passes
 it.** The only component that noticed was the story loop, which refused 2 of 3 stops because
 nothing scored above 35. Full record **D524**.
+
+## Q20 (08-24) — the not-found rule, the wrong gallery, and why stop 3 was short
+
+**1. "Exhibition is not found", or a did-you-mean, never a fictional tour.** Dispatched as
+**LOCAL-465**. One correction to the record first: **the system DID create the fictional tour** —
+`TOUR_D523_BLUEGREEN.txt`, 5,827 characters, complete. LEAD caught it afterwards by reading it.
+The only component that refused was the story loop, on 2 of 3 stops. Nothing was wired to that
+refusal. The three signals needed are all already computed in that one run: the venue resolver
+returning Houston for a Boston request, `[LOCAL-212] 0 COVERED`, and candidate indices of 5-35
+against 63-83 for a real subject. It becomes an error to the user AND a log line, both.
+
+**3. The wrong gallery — not a regression. The check fired and an exemption overrode it.**
+Dispatched as **LOCAL-467**. From the log, in order: `Linde Family` is typed as a PERSON;
+`[LOCAL-392]` attaches it to stop 1; `[LOCAL-417] SUPPRESSED … ['Boris Fridman', 'Linde Family']`
+— correct; then `[LOCAL-390] person 'Linde Family' pre-grounded (story beat source) — keeping`
+puts it back. Meanwhile the correct gallery, `Torf`, was classified `exhibition_wide` and
+`never_written`. **The system held the right answer and shipped the wrong one.** Two bugs: a
+gallery classified as a person (D316's family — after `France`, `The Treat Page`, `visual
+tapestry` — fixed once for `France`, never generalised), and an exemption that proves EXISTENCE
+where the sentence asserts a RELATION. Linde Family Gallery is real; it is just not where that
+work hangs.
+
+**Why LEAD missed it:** every instrument built on 08-24 tests text MECHANICS — duplication,
+citations, labels, spacing — plus one curated fact table. **Nothing verifies a relation between a
+work and a place.** A tour can be mechanically perfect and wrong about where you are standing.
+
+**5. Stop 3 was short because we threw away three stories we had already bought.** Its four
+candidates scored **60, 61, 59, 55 — all four cleared your floor of 50.** D523 made the loop
+examine several and keep the best, which fixed quality, but it still publishes exactly one.
+Dispatched as **LOCAL-466**: publish up to two per stop, distinct credit_lines, each surviving
+the D518/D521 merge against what is already there, at no extra cost because the candidates are
+already paid for.
+
+**4. Length noted and LEAD's recommendation withdrawn.** Your words: *"I am not bothered that
+Stop 1 is long… as long as it is because of the stories not mere descriptions."* The judgement
+listed stop-1 bloat as a defect; that was the wrong target. The right one is the *errors* in it,
+which is LOCAL-467.

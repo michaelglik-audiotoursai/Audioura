@@ -1359,3 +1359,111 @@ him. The 1938 London meeting is still absent, 3 runs of 3.
 - [`text_fold.py`](text_fold.py) — THE accent-fold + whole-word primitive for the gate chain
 - [`test_local483_gate_fold_and_boundary.py`](test_local483_gate_fold_and_boundary.py) — the gate chain audited as a class
 - `LOCAL483_REMEASURE.log` — the three blocked runs (`credit_balance_exhausted`)
+
+## A217 — Michael's two fixes of 2026-08-24: the append, and the Treat Page
+
+**The append (D518).** `description + ' ' + story` said everything twice, and his diagnosis is
+the cause: the loop's credit_lines are mined from the stop's own prose, so it is *guaranteed* to
+research what the prose already said. The story now REPLACES the sentences it overlaps, judged on
+shared anchors — names, years, quantities — with the work's own title excluded on both sides.
+**When the story replaced the OPENING, the story becomes the opening** (D518b): a stop's first
+sentence is the one that introduces its subject, and dropping it left all three stops of the
+10:26 run opening on a reference to nobody. Code: [`story_append_merge.py`](story_append_merge.py).
+
+**The Treat Page (D519).** It closed 4 of 4 previous tours unconditionally. It now requires a real
+treat within `TREAT_PAGE_NEAR_KM` (1.0) of a real stop — **any** stop, not the last — and fails
+closed on a missing table or a query error. Zero treats have coordinates on this machine, so it is
+gone. Code: `nearest_treat_to_any_stop()` in [`generate_tour_text.py`](generate_tour_text.py).
+
+## A218 — Nothing read aloud that a listener cannot use (D521)
+
+**Citations**: the loop's FIRST prompt asks for sources in brackets, correctly, because the
+adjudicator must know what backs what — and the model carried the habit into PART 2, which is what
+we publish. PART 2 now forbids brackets and asks for attribution BY INSTITUTION only where sources
+disagree; `strip_bracketed_citations()` is the deterministic guard behind it.
+
+**Duplication inside one sentence**: an appositive is dropped when the rest of the sentence
+performs the same verb family over half the same nouns. It needed its own noun set — the
+sentence-level stoplist drops `work` and `museum`, the very words that prove the repetition.
+
+**The `Closing:` label**: removed. Michael's rule is the good one — `Orientation` and `Directions`
+stay *"because they let listeners know that they are not part of the stop description"*.
+
+## A219 — Why the stories got fewer and worse, answered from the candidate log (D523)
+
+Michael, 2026-08-24: *"I see way less stories and less quality stories from iteration to iteration
+and I wonder why."*
+
+**Since D515 the loop bought exactly ONE credit_line per stop in 12 of 13 stop-attempts.** His
+rule says a story at 50+ "is the story and we do not need to verify more", and at a floor of 50
+the first candidate always qualifies — so it stopped exploring. The same work scores across a
+**20-35 point spread** between runs, so quality became one draw from that distribution. And
+because `allowed_sentences()` maps index to LENGTH — 52 earns three sentences, 74 earns five — a
+low draw is a *shorter* story too. **One cause, both halves of the complaint.**
+
+Fixed by examining up to four and keeping the best (`STORY_LOOP_BEST_OF`, `STORY_LOOP_STOP_AT`).
+Measured on the 15:57 tour: **stop index mean 73.0, range 63-83**, the best recorded; the floor
+moved from 44 to 63. Costs 4x — $0.178 and 644s a tour. Evidence:
+[`story_loop_candidates.jsonl`](story_loop_candidates.jsonl), D514's persistence.
+
+**The two D515 amendments were implemented and shipped OFF, reversing LEAD's own earlier
+recommendation.** Both tighten the gate; the decline was caused by selection, not permissiveness.
+
+## A220 — A request that matches nothing produces a confident fictional tour (D524)
+
+`exhibition blue green and silva in MFA Boston, MA` produced a complete 5,827-character tour.
+**The system did not refuse; LEAD caught it by reading the output.** The venue resolver returned
+Museum of Fine Arts **Houston** for a Boston request; `[LOCAL-212]` logged `0 COVERED` and filled
+the tour anyway; `Knowledge validation passed` twice. The delivered tour misattributes its own
+stop 1, calls a 1944 Arthur Dove abstract "Dutch Golden Age painting", and by pronoun chain hands
+a Siqueiros self-portrait to George Gershwin — which the closing recap repeats.
+
+**The rubric scores it 75.0, identical to the real tour, and every defect check passes it.**
+Neither instrument distinguishes a real subject from an invented one. The story loop can and did:
+it refused 2 of 3 stops on candidates scoring 5-35 against 63-83 for a real subject the same hour.
+**The index floor is a working "there is nothing here" detector and was the only part of the
+pipeline that noticed.** Michael's rule, 2026-08-24: the right answer is *"Exhibition is not
+found"*, or a did-you-mean, **never a fictional tour**. Dispatched as **LOCAL-465**.
+
+## A221 — The wrong gallery: the check fired, an exemption overrode it
+
+Stop 1 of the 15:57 tour says the work is *"housed in the Linde Family Gallery"*. It is in the
+Torf Gallery. **Not a regression** — the chain, from `TOUR_D523_UNBOUND.log`:
+
+| line | what happened |
+|---|---|
+| 227 | `beat='Linde Family' source_work='Le Lézard…' -> stop 1` |
+| 229 | typed as one of the **named people** |
+| 329 | `[LOCAL-417] SUPPRESSED … ['Boris Fridman', 'Linde Family']` — the check works |
+| 476 | `[LOCAL-390] person 'Linde Family' pre-grounded (story beat source) — keeping` |
+| 1005 | the correct gallery: `dropped=['Torf'] causes=[Torf=never_written]` |
+
+Two bugs. **A gallery classified as a person** — D316's family, after `France`, `The Treat Page`
+and `visual tapestry`; fixed once for `France` and never generalised. And **`pre_grounded_names`
+proves EXISTENCE where the sentence asserts a RELATION**: Linde Family Gallery is real, it is
+simply not where that work hangs. Dispatched as **LOCAL-467**.
+
+**Why LEAD missed it:** every instrument built that day tests text MECHANICS plus one curated
+fact table. **Nothing verifies a relation between a work and a place.**
+
+## A222 — Stop 3 was short because three publishable stories were discarded
+
+Michael: *"Stop 3 … is good but too short, why did not we add another story to it?"*
+
+Its four candidates scored **60, 61, 59, 55 — all four cleared the floor of 50.** D523 made the
+loop examine several and keep the best, which fixed quality, but it still publishes exactly one
+and bins the rest. The extra stories were already bought and paid for. Dispatched as
+**LOCAL-466**: up to two per stop, distinct credit_lines, each required to survive the D518/D521
+merge against what is already in the stop, at no additional cost.
+
+**On length, Michael's ruling:** *"I am not bothered that Stop 1 is long… because of the stories
+not mere descriptions."* LEAD's "stop 1 is too long" recommendation is withdrawn — the target is
+the errors in it, not its length.
+
+## Code map — 2026-08-24
+- [`story_append_merge.py`](story_append_merge.py) — the story replaces overlapping prose; citation strip; intra- and inter-sentence dedupe
+- [`spoken_text_hygiene.py`](spoken_text_hygiene.py) — template seams, missing spaces, dangling prepositions, spoken labels
+- [`known_fact_corrections.py`](known_fact_corrections.py) — facts already established by retrieval, with a three-condition charter
+- [`story_production_loop.py`](story_production_loop.py) — `BEST_OF` / `STOP_AT`, the D523 selection fix
+- [`check_known_defects.py`](check_known_defects.py) — checks (a)-(i), each validated against a tour whose answer was known
+- [`story_loop_candidates.jsonl`](story_loop_candidates.jsonl) — D514's candidate log; the evidence for A219
