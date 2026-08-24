@@ -54,6 +54,36 @@ __all__ = ['run_for_stop', 'is_enabled', 'LOOP_ENABLED_ENV']
 
 LOOP_ENABLED_ENV = 'STORY_LOOP_ENABLED'
 MAX_CREDIT_LINES = int(os.environ.get('STORY_LOOP_MAX_CREDIT_LINES', '4'))
+
+# [D523] Examine several credit_lines and keep the BEST, instead of shipping the
+# first one over the floor.
+#
+# Michael, 2026-08-24: *"I see way less stories and less quality stories from
+# iteration to iteration and I wonder why."*
+#
+# Measured from `story_loop_candidates.jsonl`, 13 stop-attempts since D515: **12
+# examined exactly one credit_line.** His rule says "if a story passes with index
+# 50+, then this is the story and we do not need to verify more", and at a floor
+# of 50 the first candidate essentially always qualifies — so the loop stopped
+# exploring. What the same three works score across runs:
+#
+#     Au Soleil   64 · 50 · 71 · 73 · 78 · 60 · 72
+#     Le Lézard   61 · 79 · 56 · 65 · 73 · 74 · 69
+#     Moses       58 · 37 · 59 · 63 · 72 · 70 · 52
+#
+# A 20-35 point spread inside one work. Taking the first is one draw from that;
+# taking the best of three lands near the top. Both halves of what he noticed
+# follow: quality became a lottery, and because `allowed_sentences()` maps index
+# to length, a low draw is trimmed to THREE sentences where a high draw earns
+# five — fewer words, not only weaker ones.
+#
+# **This changes one clause of D515 and nothing else.** The floor is still 50,
+# `eventful` and `confirmed>=3` still do not gate, and a proven error is still
+# the only hard veto. What changes is that "we do not need to verify more"
+# becomes "we do not need to verify more ONCE WE HAVE SOMETHING VERY GOOD" —
+# `STORY_LOOP_STOP_AT`. `STORY_LOOP_BEST_OF=0` restores accept-first exactly.
+BEST_OF = os.environ.get('STORY_LOOP_BEST_OF', '1').strip() != '0'
+STOP_AT = int(os.environ.get('STORY_LOOP_STOP_AT', '78'))
 CLAIMS_PER_ANSWER = int(os.environ.get('STORY_LOOP_CLAIMS', '4'))
 PAGES_PER_QUERY = int(os.environ.get('STORY_LOOP_PAGES', '3'))
 
@@ -296,11 +326,21 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                 # Trim to what the score earned (3 / 5 / >5).
                 sents = _sentences(story)
                 cap = verdict['max_sentences'] or len(sents)
-                out.update(story=' '.join(sents[:cap]), credit_line=cl,
-                           gate=verdict, counts=counts, index=idx,
-                           sources=r2.get('sources', []),
-                           accepted_by='accepted')
-                break
+                _kept = ' '.join(sents[:cap])
+                _better = (out['index'] or -1) < (idx or 0)
+                if not out['story'] or _better:
+                    out.update(story=_kept, credit_line=cl,
+                               gate=verdict, counts=counts, index=idx,
+                               sources=r2.get('sources', []),
+                               accepted_by='accepted' if not BEST_OF else 'best_of')
+                if not BEST_OF:
+                    break
+                # [D523] Keep looking unless this one is already very good.
+                if (idx or 0) >= STOP_AT:
+                    if verbose:
+                        print(f"    [D523] index {idx} >= {STOP_AT} — good enough, "
+                              f"stopping without buying the rest")
+                    break
         except Exception as e:
             if verbose:
                 print(f"    [D511] credit_line {seed.get('id')} failed "
@@ -332,8 +372,10 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         pass
     out['elapsed_s'] = round(time.time() - t0, 1)
     if verbose:
-        print(f"    [D511] examined {out['examined']} credit_line(s), "
-              f"{'STORY ACCEPTED' if out['story'] else 'no story passed'}, "
+        _scores = [c['index'] for c in out['candidates'] if c.get('index') is not None]
+        print(f"    [D511] examined {out['examined']} credit_line(s)"
+              f"{' (indices ' + ', '.join(str(s) for s in _scores) + ')' if len(_scores) > 1 else ''}, "
+              f"{'STORY ACCEPTED at ' + str(out['index']) if out['story'] else 'no story passed'}, "
               f"~${out['cost_usd']:.3f}, {out['elapsed_s']:.0f}s")
 
     # [D514] Persist every candidate, not just the winner.

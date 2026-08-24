@@ -60,6 +60,7 @@ import unicodedata
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 __all__ = ['merge_story_into_description', 'sentences_of', 'anchors_of',
+           'INTER_SENTENCE_DROP',
            'strip_bracketed_citations', 'dedupe_within_sentence',
            'MIN_SHARED_ANCHORS', 'ANCHOR_COVERAGE_DROP', 'CONTENT_COVERAGE_DROP',
            'MAX_DROP_RATIO']
@@ -69,6 +70,7 @@ ANCHOR_COVERAGE_DROP = float(os.environ.get('STORY_MERGE_ANCHOR_COV', '0.5'))
 CONTENT_COVERAGE_DROP = float(os.environ.get('STORY_MERGE_CONTENT_COV', '0.6'))
 MAX_DROP_RATIO = float(os.environ.get('STORY_MERGE_MAX_DROP_RATIO', '0.6'))
 ORPHAN_BUDGET = int(os.environ.get('STORY_MERGE_ORPHAN_BUDGET', '2'))
+INTER_SENTENCE_DROP = float(os.environ.get('STORY_MERGE_RESTATE_COV', '0.67'))
 
 # Capitalised words that are capitalised for grammar, not because they name
 # anything. Without this list every sentence-initial "The" is an anchor and every
@@ -129,6 +131,34 @@ _OPENER_VERBS = {
     'became', 'begins', 'began', 'stands', 'shows', 'makes', 'made', 'brings',
     'gives', 'holds', 'remains', 'comes', 'goes', 'took', 'set', 'led',
 }
+
+# [D523] The exhibition's thesis may be stated ONCE per stop.
+#
+# Stop 1 of the 12:23 tour said it three times, in three sentences that share
+# almost no vocabulary — which is why plain content overlap cannot see them:
+#
+#   "…exemplifies the exhibition's argument that books can be revolutionary art
+#    forms."
+#   "…highlights the role of such collaborations in reshaping the book as an art
+#    form."
+#   "…resonating with the broader themes of the 'Unbound' exhibition."
+#
+# They are not paraphrases to be detected semantically; they are BOILERPLATE, and
+# boilerplate has a shape. A sentence matching one of these and introducing no new
+# name, date or quantity of its own is making a point the stop has already made.
+# The first one is kept — the thesis is worth saying — and the rest go.
+_THESIS_MARKER = re.compile(
+    r"exemplif\w+\s+(?:the\s+)?(?:exhibition|thesis|collaborat|spirit)"
+    r"|(?:the\s+)?exhibition'?s?\s+(?:thesis|argument|premise|themes?)"
+    r"|revolutioni[sz]\w+\s+the\s+book"
+    r"|(?:book|books)\s+as\s+an?\s+art\s+form"
+    r"|reshap\w+\s+the\s+book"
+    r"|broader\s+themes?\s+of\s+the\s+(?:exhibition|show)"
+    r"|speaks?\s+to\s+the\s+exhibition"
+    r"|resonat\w+\s+with\s+the\s+(?:broader|exhibition)"
+    r"|deeply\s+collaborative\s+(?:venture|ventures|nature)"
+    r"|transform\w+\s+(?:the\s+)?books?\s+into",
+    re.IGNORECASE)
 
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 _TOKEN_RE = re.compile(r"[\w'’\-]+", re.UNICODE)
@@ -452,7 +482,51 @@ def merge_story_into_description(description: str, story: str,
     """
     report = {'dropped': [], 'kept': [], 'n_prose': 0, 'n_dropped': 0,
               'capped': False, 'orphans': [], 'story_first': False,
-              'cited': 0, 'intra': []}
+              'cited': 0, 'intra': [], 'restated': []}
+
+    def _dedupe_across(sents: List[str]) -> List[str]:
+        """[D523] A stop may not make the same point twice in different words.
+
+        Michael, 2026-08-24, on stop 1 of the 12:23 tour, which said the
+        exhibition's thesis three times in three sentences and ran to twice the
+        length of the other stops:
+
+            "…exemplifies the exhibition's argument that books can be
+             revolutionary art forms."
+            "…highlights the role of such collaborations in reshaping the book as
+             an art form."
+            "…resonating with the broader themes of the 'Unbound' exhibition."
+
+        D518 compares the story against the prose; D521 works inside one sentence.
+        Neither can see this, which is prose against prose, sentence against
+        sentence — so it is its own pass.
+
+        Judged on CONTENT, not anchors: these sentences share almost no names,
+        which is exactly why the anchor test in `_overlap` misses them. A later
+        sentence goes when two thirds of its content words have already been said
+        AND it carries no anchor of its own that is new — a sentence bringing a
+        fresh name, date or quantity is never merely a restatement.
+        """
+        kept, seen_content, seen_anchors = [], set(), set()
+        thesis_said = False
+        for s in sents:
+            c, a = _content(s), anchors_of(s)
+            new_anchors = a - seen_anchors
+            is_thesis = bool(_THESIS_MARKER.search(s))
+            if kept and not new_anchors:
+                # (i) the exhibition's thesis, said again
+                if is_thesis and thesis_said:
+                    report['restated'].append(s)
+                    continue
+                # (ii) the same words again, whatever the subject
+                if c and len(c & seen_content) / len(c) >= INTER_SENTENCE_DROP:
+                    report['restated'].append(s)
+                    continue
+            kept.append(s)
+            thesis_said = thesis_said or is_thesis
+            seen_content |= c
+            seen_anchors |= a
+        return kept
 
     def _finish(text: str) -> str:
         """[D521] What the listener actually hears: no bracketed sources, and
@@ -468,6 +542,7 @@ def merge_story_into_description(description: str, story: str,
             if d != s:
                 report['intra'].append(s)
             out.append(d)
+        out = _dedupe_across(out)
         return re.sub(r'\s{2,}', ' ', ' '.join(out)).strip()
 
     if not (story or '').strip():
@@ -553,4 +628,6 @@ def merge_story_into_description(description: str, story: str,
     if verbose:
         for s in report['intra']:
             print(f"      [D521] said twice in one sentence: \"{s[:96]}\"")
+        for s in report['restated']:
+            print(f"      [D523] restates a point already made: \"{s[:96]}\"")
     return merged, report

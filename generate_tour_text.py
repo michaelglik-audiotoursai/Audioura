@@ -16290,6 +16290,44 @@ RULES:
         # Clean up resulting empty lines
         complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
 
+    # -------- [D523] Spoken-text hygiene: the last pass before a human hears it --
+    #
+    # Two defects that survived every gate because no gate reads the assembled
+    # text as SOUND. "At this work:" is spoken "at this work colon"; a full stop
+    # with nothing after it welds two words into one that does not exist.
+    #
+    # The template-seam strip already existed at the Part 4 verifier and the 12:23
+    # tour routed around it by putting the seam in the stop-1 orientation, which a
+    # different generator writes. Here it sees the finished tour, so there is no
+    # path around it. The missing space has now been reported as a "known defect"
+    # three times without being fixed, on the grounds that it is upstream; it is
+    # upstream, and it is also two lines to repair, and 5 of the last 6 runs
+    # shipped one.
+    try:
+        from spoken_text_hygiene import clean_spoken_text as _d523_clean
+        complete_tour, _d523_rep = _d523_clean(complete_tour, verbose=True)
+    except Exception as _d523_e:
+        print(f"  [D523] spoken-text hygiene skipped (non-fatal): {_d523_e}")
+
+    # -------- [D523] Facts we have already paid to verify --------
+    #
+    # The 12:23 tour asserted "Moses was an Egyptian priest" — Freud argued
+    # NOBLEMAN — with nothing in the tour contradicting it. The defect checker
+    # looks for a self-contradiction, so it stayed silent: a tour that is
+    # confidently wrong in one direction is worse, and nothing was watching it.
+    #
+    # Narrow by charter. See the module docstring for the three conditions an
+    # entry must meet; the short version is that the wrong version must have been
+    # observed in a delivered tour and the right one established by RETRIEVAL.
+    # The real fix is to ground the descriptive-prose generator in the same corpus
+    # the story loop retrieves; until then, a fact bought once should not be
+    # re-emitted wrongly on the next run.
+    try:
+        from known_fact_corrections import apply_corrections as _d523_fix
+        complete_tour, _d523_fired = _d523_fix(complete_tour, verbose=True)
+    except Exception as _d523_e2:
+        print(f"  [D523] fact corrections skipped (non-fatal): {_d523_e2}")
+
     # -------- [LOCAL-260] PHASE post-assembly: Prolog structure validation --------
     # Michael's four-part prolog specification: the opening must have (in order):
     #   1. Tour name + transportation mode

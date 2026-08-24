@@ -94,6 +94,25 @@ STRICT = os.environ.get('STORY_GATE_STRICT', '0').strip() == '1'
 D515 = os.environ.get('STORY_GATE_D515', '1').strip() == '1'
 D515_ACCEPT_INDEX = int(os.environ.get('STORY_GATE_D515_INDEX', '50'))
 
+# [D523] The two amendments LEAD proposed in D515, implemented and DEFAULTED OFF.
+#
+# They are: (a) require at least one CONFIRMED-or-CORRECTED claim, so a story that
+# verified nothing cannot publish; (b) treat `C0 X0` — an adjudication that
+# produced no parseable verdicts at all — as a FAILED adjudication rather than a
+# clean one. Both were written after stop 3 published with zero confirmed claims.
+#
+# **They ship off, and that is a decision made against LEAD's own earlier
+# recommendation.** Michael, 2026-08-24: *"I see way less stories and less quality
+# stories from iteration to iteration."* Both amendments make the gate STRICTER,
+# which moves the count of published stories the wrong way, and the measured cause
+# of the decline was never the gate's permissiveness — it was that the loop bought
+# one candidate per stop and shipped it (D523). Tightening admission before fixing
+# selection would have cut stories to fix a problem that was not there.
+#
+# `STORY_GATE_AMEND=1` turns them on, and they should be measured over three runs
+# against the same three without, once the selection fix has been measured first.
+AMEND = os.environ.get('STORY_GATE_AMEND', '0').strip() == '1'
+
 _LEN_TIERS = ((80, 8), (70, 5), (60, 3))
 
 
@@ -143,9 +162,20 @@ def evaluate(story: Dict) -> Dict:
     keys['no_invented_person'] = not invented
     keys['index_d515'] = (index or 0) >= D515_ACCEPT_INDEX
 
+    # [D523] The two amendments, off unless STORY_GATE_AMEND=1. See the note at
+    # AMEND for why they ship off: both tighten admission, and the measured cause
+    # of "fewer stories" was selection, not permissiveness.
+    keys['verified_something'] = confirmed >= 1
+    keys['adjudication_parsed'] = not (
+        confirmed == 0 and unattested == 0
+        and sum((counts or {}).values()) == 0)
+
     if D515:
         d515_failed = [k for k in ('no_factual_error', 'no_invented_person',
                                    'index_d515') if not keys[k]]
+        if AMEND:
+            d515_failed += [k for k in ('verified_something',
+                                        'adjudication_parsed') if not keys[k]]
         return {
             'passes': not d515_failed,
             'keys': keys,

@@ -99,6 +99,36 @@ def defect_f(text):
     return re.findall(r'\b(Closing|Narration|Body|Description|Summary):', text)
 
 
+def defect_g(text):
+    """[D523] A DIFFERENT exhibition named as though the listener were in it.
+
+    The 12:23 tour told a visitor standing in *Unbound* that the work "became an
+    integral part of the exhibition 'Dali: Disruption and Devotion'". Quoted
+    exhibition titles that are not the one being toured are the signal.
+    """
+    requested = re.search(r'Tour:\s*(.+?)\s+-\s+\w+ Tour', text)
+    req = (requested.group(1) if requested else '').lower()
+    out = []
+    for m in re.finditer(r'exhibition\s+[\u201c"\u2018\']([^\u201d"\u2019\']{4,60})[\u201d"\u2019\']', text, re.I):
+        name = m.group(1)
+        if name.lower() not in req and not any(w in req for w in name.lower().split() if len(w) > 5):
+            out.append(name)
+    return out
+
+
+def defect_h(text):
+    """[D523] A claim we have positively established to be wrong, stated alone.
+
+    Unlike (b), which needs BOTH versions present, this fires on the wrong one by
+    itself — the case the 12:23 tour shipped and nothing caught.
+    """
+    import sys as _s, os as _o
+    _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+    from known_fact_corrections import CORRECTIONS
+    return [m.group(0) for pat, _r, _w in CORRECTIONS
+            for m in [pat.search(text)] if m]
+
+
 def main(path):
     text = open(path, encoding='utf-8').read()
     stops = stops_of(text)
@@ -117,6 +147,11 @@ def main(path):
     print(f"(e) said twice in 1 sentence: {'FOUND ' + str([s[:70] for s in e]) if e else 'not found'}")
     f = defect_f(text)
     print(f"(f) spoken structural label : {'FOUND ' + str(set(f)) if f else 'not found'}")
+
+    g = defect_g(text)
+    print(f"(g) a different exhibition  : {'FOUND ' + str(g) if g else 'not found'}")
+    h = defect_h(text)
+    print(f"(h) established wrong fact  : {'FOUND ' + str(h) if h else 'not found'}")
 
     print(f"\n(D519) 'Treat Page' in the tour: "
           f"{'PRESENT — ' + str(text.count('Treat Page')) + 'x' if 'Treat Page' in text else 'absent'}")
