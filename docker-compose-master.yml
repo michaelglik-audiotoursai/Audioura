@@ -35,6 +35,12 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SERP_API_KEY=${SERP_API_KEY}
       - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      # [D517] The D511 story loop calls Gemini once per credit_line. This key
+      # was never passed in, so the loop would have failed inside the container
+      # on every stop — non-fatally and silently, which is the worst shape: the
+      # tour would generate, carry no stories, and log nothing a caller sees.
+      # Found while putting the loop into production, 2026-08-24.
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - STORIED_MODE=true
       - ATTESTATION_MODE=log_only
       - BASE_URL=http://localhost:5000

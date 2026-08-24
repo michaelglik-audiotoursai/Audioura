@@ -59,7 +59,14 @@ PAGES_PER_QUERY = int(os.environ.get('STORY_LOOP_PAGES', '3'))
 
 
 def is_enabled() -> bool:
-    return os.environ.get(LOOP_ENABLED_ENV, '0').strip() == '1'
+    # [D517] ON by default. It was off because it cost ~$0.05 and ~60s per stop
+    # and Michael's rule was that a spend like that must be a decision rather
+    # than a surprise. D515/D516 changed the facts underneath that rule: the loop
+    # now stops at the first candidate above 50, so it costs **$0.015 and ~35s
+    # per stop** — a third of the price — and publishes a story on 9 stops of 9
+    # instead of 4. Michael, 2026-08-24: *"Is everything in production? if not,
+    # put it there."* `STORY_LOOP_ENABLED=0` turns it off.
+    return os.environ.get(LOOP_ENABLED_ENV, '1').strip() != '0'
 
 
 def _sentences(text: str) -> List[str]:
