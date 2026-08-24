@@ -64,7 +64,11 @@ def defect_c(text):
     """A full stop with no space after it, mid-sentence — `depth.Boris`."""
     body = re.sub(r'https?://\S+', ' ', text)
     body = re.sub(r'\b[A-Za-z0-9.-]+\.(com|org|net|edu|fr|gov|uk)\b', ' ', body)
-    return re.findall(r'[a-zà-ÿ]{2}\.[A-ZÀ-Ý][a-zà-ÿ]{2}', body)
+    # A quotation mark may sit between the stop and the capital, and the next
+    # word may have a single lowercase letter ("Au"). The first version required
+    # neither and reported TOUR_D523_UNBOUND clean while it contained
+    # `imagery."Au Soleil du Plafond"`. Same blind spot as the repair it checks.
+    return re.findall(r'[a-zà-ÿ]{2}\.["\u201c\u2018\']?[A-ZÀ-Ý][a-zà-ÿ]+', body)
 
 
 def defect_d(text):
@@ -97,6 +101,14 @@ def defect_f(text):
     about is worth nothing.
     """
     return re.findall(r'\b(Closing|Narration|Body|Description|Summary):', text)
+
+
+def defect_i(text):
+    """[D523] A preposition whose object an upstream gate deleted."""
+    import sys as _s, os as _o
+    _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__)))
+    from spoken_text_hygiene import DANGLING_PHRASE_RE
+    return [m.group(0).strip() for m in DANGLING_PHRASE_RE.finditer(text)]
 
 
 def defect_g(text):
@@ -152,6 +164,9 @@ def main(path):
     print(f"(g) a different exhibition  : {'FOUND ' + str(g) if g else 'not found'}")
     h = defect_h(text)
     print(f"(h) established wrong fact  : {'FOUND ' + str(h) if h else 'not found'}")
+
+    i = defect_i(text)
+    print(f"(i) preposition with no object: {'FOUND ' + str(i) if i else 'not found'}")
 
     print(f"\n(D519) 'Treat Page' in the tour: "
           f"{'PRESENT — ' + str(text.count('Treat Page')) + 'x' if 'Treat Page' in text else 'absent'}")

@@ -1,0 +1,368 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+location: exhibition blue green and silva in MFA Boston, MA
+stops   : 3
+loop    : ON
+out     : TOUR_D523_BLUEGREEN.txt
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260824_155717.txt'
+
+======================================================================
+CALL #001 | 15:57:17.660 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: exhibition blue green and silva in MFA Boston, MA
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /Users/micha/Audioura/TOUR_D523_BLUEGREEN.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260824_155717.txt'
+
+======================================================================
+CALL #002 | 15:57:17.661 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: exhibition blue green and silva in MFA Boston, MA
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": "museum exhibition blue green and silva",
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Boston, MA
+   Requirements: museum exhibition blue green and silva
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+[TIMING] phase=intent elapsed=1.7s cumulative=1.7s
+
+Detected tour category: MUSEUM
+Using museum template for exhibition blue green and silva in MFA Boston, MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260824_155717.txt'
+
+======================================================================
+CALL #003 | 15:57:19.360 | GENERATING_PROMPT
+======================================================================
+  location: exhibition blue green and silva in MFA Boston, MA
+  user_request: museum exhibition blue green and silva in MFA Boston, MA
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for exhibition blue green and silva in MFA Boston, MA...
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q1565911 (Museum of Fine Arts, Houston)
+    URL: http://www.mfah.org/
+    Coords: 29.725605, -95.390539
+    Language: en
+  [venue_resolver] SPARQL: 100 works found for Q1565911
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-362] Scoped request detected (requirements='museum exhibition blue green and silva') — early deterministic bypass suppressed
+
+  [LOCAL-362] SCOPED REQUEST DETECTED:
+    Requirements: museum exhibition blue green and silva
+    POI type: museum exhibits
+    Artists extracted: []
+    → Deterministic bypass will be SUPPRESSED (venue-wide fill is wrong for scoped requests)
+[TIMING] phase=poi_selection elapsed=7.9s cumulative=9.6s
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+
+  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══
+  [LOCAL-364] Exhibition search term: 'exhibition blue green and silva in MFA Boston, MA'
+  [LOCAL-364] Venue URL: http://www.mfa.org/
+  [LOCAL-364] Searching for exhibition 'exhibition blue green and silva in MFA Boston, MA' on http://www.mfa.org
+  [LOCAL-427] HTTP 200 from http://www.mfa.org/exhibitions (attempt 1)
+  [LOCAL-364] Found exhibition listing: http://www.mfa.org/exhibitions (5232 chars)
+  [LOCAL-425] Searching: exhibition blue green and silva in MFA Boston, MA site:www.mfa.org
+  [LOCAL-425] Search hit: https://www.mfa.org/gallery/stories-artists-tell — Stories Artists Tell
+  [LOCAL-429] No match in Wayback listing — web search found: https://www.mfa.org/gallery/stories-artists-tell
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/gallery/stories-artists-tell (attempt 1)
+  [LOCAL-429] Direct exhibition detail page via web search (18494 chars)
+  [LOCAL-364] Matched exhibition: 'exhibition blue green and silva in MFA Boston, MA' (score: 1.00)
+  [LOCAL-364] Exhibition URL: https://www.mfa.org/gallery/stories-artists-tell
+  [LOCAL-427] Cache HIT: https://www.mfa.org/gallery/stories-artists-tell (18494 chars)
+  [LOCAL-364] No closing date found — assuming exhibition is current
+  [LOCAL-370] Plausibility gate: 1/15 entries implausible (7%) — below threshold, keeping
+  [LOCAL-364] Extracted 15 works from exhibition page (shape: structured_checklist)
+    - That Red One by Arthur Dove
+    - Autorretrato con espejo (Self-Portrait with Mirror) by David Alfaro Siqueiros
+    - Tailleur por dames by Remedios Varo
+    - Battleship Kate, about 1935 by August Coleman
+    - The Great Good Man by Marsden Hartley
+    - Bear Father, Bear Son by Norval Morrisseau
+    - Cochiti Redskins, about 2000 by Mateo Romero
+    - Drug Store by Edward Hopper
+    - Viktor Schreckengost for Cowan Pottery Studio by Jazz Bowl, designed 1930
+    - Reproduced with permission by Blackware with polished and matte decoration. Museum purchase with funds donated by Independence Investment Associates Inc
+    ... and 5 more
+  [LOCAL-364] Result: ExhibitionChecklistResult(path=checklist, works=15, title='exhibition blue green and silva in MFA Boston, MA', url='https://www.mfa.org/gallery/stories-artists-tell')
+  [LOCAL-364/368] ✓ CHECKLIST PATH: 6 works from exhibition page
+    Source: https://www.mfa.org/gallery/stories-artists-tell
+    Shape: structured_checklist
+    Stops from exhibition checklist:
+      - That Red One (by Arthur Dove)
+      - Autorretrato con espejo (Self-Portrait with Mirror) (by David Alfaro Siqueiros)
+      - Tailleur por dames (by Remedios Varo)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - That Red One
+   - Autorretrato con espejo (Self-Portrait with Mirror)
+   - Tailleur por dames
+   - Battleship Kate, about 1935
+   - The Great Good Man
+   - Bear Father, Bear Son
+  [D1/LOCAL-372] SKIP D1v2 — stops sourced from exhibition checklist (D1v2 checks the PERMANENT collection; a temporary show is not in it)
+  [D1/LOCAL-372] 6 exhibition stop(s) grounded against the venue page
+
+  [LOCAL-370] R4 replenishment SUPPRESSED (exhibition-scoped request)
+    Scope: museum exhibition blue green and silva
+    Honest stop count: 3 (no venue-wide backfill — D275)
+  [R4] Target reached: 6/3 stops
+  [LOCAL-16 GATE] All 6 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for exhibition blue green and silva in MFA Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 1×VENUE_ONLY, 2×EMPTY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['The Great Good Man=VENUE_ONLY', 'That Red One=EMPTY', 'Autorretrato con espejo (Self-Portrait with Mirror)=EMPTY']
+  [LOCAL-212] Dropped:  ['Tailleur por dames=EMPTY', 'Battleship Kate, about 1935=EMPTY', 'Bear Father, Bear Son=EMPTY']
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:7684. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:7685. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:8113. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition checklist (already grounded against venue page by LOCAL-372)
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260824_155717.txt'
+
+======================================================================
+CALL #004 | 15:57:30.494 | PHASE_3B_REQUEST
+======================================================================
+  location: exhibition blue green and silva in MFA Boston, MA
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0004 (552 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+  [LOCAL-355] Querying OSM for venue facts (city: MFA, hint: museum)
+  [LOCAL-355] The Great Good Man: no practical facts in OSM
+  [LOCAL-355] That Red One: no practical facts in OSM
+  [LOCAL-355] Autorretrato con espejo (Self-Portrait with Mirror): no practical facts in OSM
+   Coords cluster detected: 3 stops share '42.3397, -71.0942', refetching...
+   Cluster refetch OK 'Autorretrato con espejo (Self-Portrait with Mirror)': 42.3397, -71.0941
+   Cluster refetch OK 'That Red One': 42.3365, -71.0881
+   Cluster refetch OK 'The Great Good Man': 42.3399, -71.0903
+Extracted first POI coordinates: (42.3399, -71.0903)
+  [D4] Museum single-coordinate: all stops set to (42.3399, -71.0903) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. The Great Good Man
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3399, -71.0903
+   Directions: Head northeast on Museum Rd, then turn right onto Huntington Ave. You will see t...
+2. That Red One
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3399, -71.0903
+   Directions: Continue straight on Huntington Ave. That Red One will be on your right after pa...
+3. Autorretrato con espejo (Self-Portrait with Mirror)
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3399, -71.0903
+   Directions: Walk past the Shapiro Family Courtyard and turn left. Autorretrato con espejo wi...
+================================
+
+[TIMING] phase=exhibition_checklist elapsed=21.8s cumulative=31.4s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 1/1 corpus pages for 'Museum of Fine Arts, Boston'
+    page[0] score=1395 url=https://www.mfa.org/gallery/stories-artists-tell
+  [§3-adapter] No elements extracted from 1 pages
+  [LOCAL-369] Exhibition prose yielded no story elements
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Museum of Fine Arts, Boston model=gpt-4o tokens=1164 (in=657 out=507) cost=$0.0067 latency=8.6s
+[COST_METER] FRESH | spine_generate | $0.006713 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0067
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/3 stops have per-stop passages (12 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='The Great Good Man' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='That Red One' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Autorretrato con espejo (Self-Portrait with Mirror)' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 2 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=13.1s cumulative=44.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=exhibition source='OfficialMorrisseau.com
+Each room in this new suite of galleries presents a singl'
+  [LOCAL-392] beat='Michael Rosenfeld' source_work='Oil on canvas' -> stop 13
+  [LOCAL-392] beat='Lewis' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Jessie' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='View Image' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Georgia' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='James' source_work='© Mateo Romero' -> stop 12
+  [LOCAL-392] beat='John Axelrod' source_work='Oil on canvas' -> stop 13
+  [LOCAL-392] beat='John' source_work='Oil on canvas' -> stop 13
+  [LOCAL-392] beat='Bravo' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='William' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Southwest' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Varo' source_work='Tailleur por dames' -> stop 3
+  [LOCAL-392] beat='Silva' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Siqueiros' source_work='Autorretrato con espejo (Self-Portrait with Mirror)' -> stop 2
+  [LOCAL-392] beat='Knaths' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Bloom' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Pollock' -> exhibition_wide (no single work match)
+
+  [LOCAL-383] Extracted 17 story beats, 17 named people: Bloom, Bravo, Georgia, James, Jessie, John
+[TIMING] phase=narration elapsed=0.0s cumulative=44.5s
+  [D495] venue domain seeded tier1: mfa.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+    [LOCAL-419] Enriched stop 1 from checklist: publisher='' credit_line='' medium=''
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=2/4 mine=True — has named_agent, specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 15 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for oceansbridge.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for oceansbridge.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for books.google.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for trulyart.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for archive.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for arthistorynewsreport.blogspot.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ebay.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for kupdf.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for seearttoday.wordpress.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for dokumen.pub: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for business.walmart.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 15 unverified, 0 budget-expired
+    [D489] material kind: stop='The Great Good Man' kind=inert volume=COVERED sentences=66 active=0 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 1 needs more material (eventless): 26 passages, 3916 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "The Great Good Man" "Museum of Fine Arts, Boston" provenance
+      [LOCAL-498] after replenishment: kind inert -> inert, 3916 -> 5123 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 13 leads, 2 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 1 'The Great Good Man': queries=5 serp_results=26 snippets=36
+      → 1915 Marsden Hartley painted "The Great Good Man" as part of his War Motif series.
+      → 1943 Marsden Hartley died in Ellsworth, Maine.
+    [LOCAL-419] Enriched stop 2 from checklist: publisher='' credit_line='' medium=''
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=2/4 mine=True — has named_agent, specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 10 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 10 unverified, 0 budget-expired
+    [D489] material kind: stop='That Red One' kind=active volume=COVERED sentences=73 active=2 staked=1 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+         best: "MFA Trustee Saundra Lane donated more than 6,000 photographs, Arthur G."
+    [LOCAL-489] Stop 2 needs more material (eventless): 27 passages, 3816 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "That Red One" "Museum of Fine Arts, Boston" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3816 -> 5009 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "MFA Trustee Saundra Lane donated more than 6,000 photographs, Arthur G."
+    [LOCAL-488] step 4: 3 providers, 12 leads, 2 with cross-model agreement, 0 SERP-confirmed
+    Stop 2 'That Red One': queries=5 serp_results=27 snippets=35
+      → A painting of descending gold, yellow, blue, green, and black shapes are. Arthur Dove, That Red One, 1944. Oil and wax o
+      → Sheeler's painting On a Shaker Theme (1956), and Dove's That Red One (1944) are also on view. Beckmann in America, on vi
+    [LOCAL-419] Enriched stop 3 from checklist: publisher='' credit_line='' medium=''
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=2/4 mine=True — has named_agent, specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 2 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 2 unverified, 0 budget-expired
+    [D489] material kind: stop='Autorretrato con espejo (Self-Portrait' kind=active volume=COVERED sentences=36 active=3 staked=2 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Museum purchase with funds donated by Independence Investment Associates Inc. © David Alfaro Siqueiros / Artist Rights Society (ARS), New Yo"
+    [LOCAL-489] Stop 3 needs more material (eventless): 18 passages, 2646 chars, verdict=COVERED
+      [LOCAL-489] +4 from: "Autorretrato con espejo (Self-Portrait with Mirror)" "Museum of Fine Arts, Bo
+      [LOCAL-498] after replenishment: kind active -> active, 2646 -> 3205 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Museum purchase with funds donated by Independence Investment Associates Inc. © David Alfaro Siqueiros / Artis"
+    [LOCAL-488] step 4: 3 providers, 12 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'Autorretrato con espejo (Self-Portrait with Mirror': queries=5 serp_results=18 snippets=22
+      → Museum of Fine Arts facilities workers Bryan Campbell and Paul Picardi install “Autorretrato con Espejo (Self-Portrait w
+      → David Alfaro Siqueiros, Autorretrato con espejo (Self-Portrait with Mirror), 1937. Cellulose nitrate paint on board coat
+
+  [LOCAL-410] SERP search complete: 18 queries, 91 results, 93 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=20/stop, 93 raw → max 60 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    The Great Good Man: serp_results=26 elements_extracted=- beats_injected=- (measured post-generation)
+    That Red One: serp_results=27 elements_extracted=- beats_injected=- (measured post-generation)
+    Autorretrato con espejo (Self-Portrait with Mirror: serp_results=18 elements_extracted=- beats_injected=- (measured post-generation)
+[TIMING] phase=external_lookups elapsed=67.1s cumulative=111.7s
+
+Generating description for Stop 1: The Great Good Man by Marsden Hartley, ...
+
+Generating description for Stop 2: That Red One by Arthur Dove, ...
+
+Generating description for Stop 3: Autorretrato con espejo (Self-Portrait with Mirror) by David Alfaro Siqueiros, ...
+  [LOCAL-381] stop='The Great Good Man' matched_work=True medium='' work_identity_chars=1233
+  [LOCAL-383] Stop 1 beats: Lewis, Jessie, Bravo
+  [LOCAL-381] stop='Autorretrato con espejo (Self-Portrait with Mirror)' matched_work=True medium='' work_identity_chars=1240
+  [LOCAL-383] Stop 3 beats: Varo, Georgia, Southwest
+  [LOCAL-411] Stop 3 snippet ranking: input=22 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=20 usable=15 (t1t2=10, t3=0, market=0)
+    Top scores: [('MFA builds modern art collection - The Boston Glob', 16, ''), ('MFA builds modern art collection', 14, 'tier2'), ('MFA builds modern art collection', 14, 'tier2')]
+  [LOCAL-402] Stop 3: injected 20 snippets as reference material
+  [LOCAL-417] Stop 3: SUPPRESSED 3 required names (no snippet evidence): ['Varo', 'James', 'John Axelrod']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12811 after=28639 (+15828 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28639)
+  [LOCAL-411] Stop 1 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=20 usable=17 (t1t2=4, t3=0, market=0)
+    Top scores: [('The Great Good Man 1942', 14, 'unverified'), ('The Last Look of John Donne, 1940 (Pt-0806) | Cata', 13, ''), ('Public Collection: Museum of Fine Arts, Boston', 13, 'unverified')]
+  [LOCAL-402] Stop 1: injected 20 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11951 after=33772 (+21821 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (33772)
+  [LOCAL-381] stop='That Red One' matched_work=True medium='' work_identity_chars=1229
+  [LOCAL-383] Stop 2 beats: Siqueiros, View Image, William
+  [LOCAL-411] Stop 2 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=4 cap=20 output=20 usable=16 (t1t2=7, t3=0, market=0)
+    Top scores: [('Exhibition poster - Arthur Dove, That Red One', 21, 'tier1'), ('That Red One - Illustrations', 14, 'unverified'), ('Museum of Fine Arts, Boston sound recordings | AAA', 13, 'tier1')]
+  [LOCAL-402] Stop 2: injected 20 snippets as reference material
+  [LOCAL-417] Stop 2: SUPPRESSED 2 required names (no snippet evidence): ['Siqueiros', 'Michael Rosenfeld']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12783 after=28537 (+15754 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28537)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 1/3: hero=David Alfaro Siqueiros (artist), sponsor=—, builder=—
+  [D500] agents 1/3: hero=Marsden Hartley (artist), sponsor=—, builder=—
+  [D500] agents 1/3: hero=Arthur Dove (artist), sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0058
+    story: "In 1990, the William H. Lane Foundation made a significant donation to the Museum of Fine Arts, Boston. This donation included Marsden Hartley's paint"
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:11367. Caller should supply input_tokens and output_tokens separately.
