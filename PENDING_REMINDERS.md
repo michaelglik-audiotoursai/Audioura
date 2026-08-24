@@ -9,6 +9,53 @@ Durable across sessions. Delete a line once delivered.
       Practical steps to give him: `/clear`, then type `restart`.
 
 
+- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
+      Do these in order. Everything needed is on disk; do not ask him to re-explain.
+
+      **Read first, in this order:** `DECISIONS.md` tail (D511–D517), then
+      `TOUR_MFA_FINAL_20260823_JUDGEMENT.md`. That is the whole picture.
+
+      **STATE AS OF THE /clear (D517, all verified inside the running container):**
+      the D511 story loop is ON by default, D515's acceptance rule is live at index 50,
+      `GEMINI_API_KEY` now reaches the container, the image is rebuilt at the real HEAD,
+      `storied` is merged with origin and pushed. Nothing is pending in production.
+
+      **(1) FIX THE APPEND — this is the job.** `generate_tour_text.py:14209` is
+      `description.rstrip() + ' ' + story`: plain concatenation. **Michael, 2026-08-24:**
+      *"saying things twice is the worst for listeners — they hear that and get annoyed.
+      Moreover, selecting the story topic based on the sentences made this problem so we
+      need to fix it."*
+
+      **Read that second sentence carefully — it is a design instruction, not a
+      complaint.** The credit_line seeds are mined from the stop's own prose
+      (`story_seeds.seeds_for_stop(stop_text, ...)`), so the loop is *guaranteed* to
+      research whatever the prose already said, and then say it again better. The
+      duplication is structural, not stylistic. **The story must REPLACE the prose it
+      overlaps**, not follow it. Two measured examples in the judgement doc: Au Soleil
+      tells Gris's death, the eleven plates and Mourlot twice; stop 3 says "Egyptian
+      priest" in the prose and "Egyptian nobility" in the story — the corrected fact and
+      the uncorrected one, kept side by side.
+
+      **(2) FIX THE CLOSING.** Every tour ends with *"The Treat Page shows whether there
+      are real savings at local shops and restaurants around here…"* — unconditional.
+      Michael: **only mention the Treat Page if it is genuinely near a stop of the tour,
+      any tour type, and it must not be the obligatory closing of every tour.**
+
+      **(3) THEN GENERATE ONE TOUR. ONE.** Michael: *"have the one tour generated, not 3
+      and take the best — this defeats the purpose completely."* No best-of selection.
+      Put the tour and LEAD's evaluation in VS Code as two documents, as usual.
+
+      **(4) THE THREE KNOWN DEFECTS — do NOT fix them now, but look for them in the new
+      tour and say so if they appear.** Michael's ruling: fix only the append and the
+      closing for now; if these persist, persist on them.
+        (a) `"the Louis Broder Tériade"` — Broder is stop 1's publisher, Tériade is stop
+            2's. **Reproducible across two runs, in two different generators** (the
+            loop's sentence once, the descriptive prose once), so shared per-tour context
+            is the suspect.
+        (b) the priest/nobility self-contradiction inside stop 3 (fixed by (1) if (1) is
+            done properly — check, do not assume).
+        (c) missing space after a full stop (`depth.Boris Fridman`), third sighting.
+
 - [x] DONE 2026-08-23 13:0x — **the A/B ran, the tour and LEAD's evaluation are in
       [`TOUR_MFA_20260823_LOOP_ON_EVALUATION.md`](TOUR_MFA_20260823_LOOP_ON_EVALUATION.md),
       opened in VS Code.** Six generations, arms alternating, 36 min, ~$1.1.

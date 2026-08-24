@@ -1266,3 +1266,25 @@ publishes nothing, 3 of 3, and the gate is right to.
 **A213's fix did not reach Moses, and structurally cannot:** its matrix yields ONE agent
 (Dalí). Freud is the author, not a `collaborator` in the object record, so the one person
 worth asking about is still not a seed. The London meeting is still missing.
+
+## Q16 (08-24) — "is everything in production? if not, put it there"
+
+**It was not.** Three gaps, recorded as D517; two of them would have produced storyless
+tours in silence.
+
+1. **The loop was off by default** — `is_enabled()` defaulted to `'0'`, which was correct
+   when it cost ~$0.05 and ~60s per stop and wrong once D515 made it $0.015 and ~35s.
+2. **`GEMINI_API_KEY` was never passed to the container.** The loop calls Gemini once per
+   credit_line, so inside the container it would have failed on every stop — non-fatally,
+   which is the worst shape: the tour generates, carries no stories, and nothing says why.
+3. **The image predated every module.** `/app` had no `story_production_loop.py`, no
+   `story_publish_gate.py`, no `story_adjudicate.py`. The container the mobile app calls
+   was running code from before any of this week's work.
+
+All three closed and **verified inside the running container**, not on the host. Also
+merged origin's 11 commits (clean, nothing in the story pipeline) and pushed — origin was
+24 behind and we were 11 behind, in both directions.
+
+**Answer to "can I /clear + restart": yes, and it is cheap.** Everything is on disk —
+D511–D517, the judgement doc, and the next task list at the top of `PENDING_REMINDERS.md`.
+A fresh session reads those in a few thousand tokens instead of carrying this one.
