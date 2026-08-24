@@ -247,9 +247,98 @@ def test_orphan_repair_cannot_eat_a_stop():
           str(report['kept']))
 
 
+def test_no_story_still_gets_cleaned():
+    """A stop that published no story can still read a domain out loud."""
+    merged, report = merge_story_into_description(STOP1_PROSE, '')
+    check('no story: no sentence dropped as a duplicate', report['n_dropped'] == 0)
+    check('no story: the prose is otherwise untouched',
+          'Boris Fridman' in merged and 'vellum' in merged)
+    cited, _ = merge_story_into_description(
+        'Freud published it in 1939 [jstor.org, dokumen.pub].', '')
+    check('no story: bracketed citations are still stripped',
+          cited == 'Freud published it in 1939.', repr(cited))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# D521 — Michael, 2026-08-24, on the 10:36 tour.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_bracketed_citations_never_reach_the_listener():
+    """Verbatim from the 10:36 tour, which is the sentence he quoted."""
+    from story_append_merge import strip_bracketed_citations as S
+    got = S("Salvador Dalí later created a suite of artworks and illustrations "
+            "to accompany a deluxe French edition of Freud's text "
+            "[collections.museumofthebible.org, lockportstreetgallery.com].")
+    check('the domain list is gone', '[' not in got and 'lockportstreet' not in got)
+    check('and the full stop closed up, not left floating',
+          got.endswith("Freud's text."), repr(got[-40:]))
+
+    check('the [cite: …] form goes too',
+          S("publisher Tériade revived the work [cite: abebooks.com, artsy.net].")
+          == "publisher Tériade revived the work.")
+    check('mid-sentence brackets go without eating the comma',
+          S("In 1939, Freud published his final work [jstor.org], arguing a thesis.")
+          == "In 1939, Freud published his final work, arguing a thesis.")
+    check('bare reference numbers go', S("He noted the effect [12] on later work.")
+          == "He noted the effect on later work.")
+
+    kept = "The lithographs [which he redrew entirely] are unsigned."
+    check('a bracketed ASIDE is not a citation and is left alone', S(kept) == kept)
+    check('parentheses are never touched',
+          S("The lithographs (printed in Paris) are unsigned.")
+          == "The lithographs (printed in Paris) are unsigned.")
+
+
+def test_a_sentence_may_not_say_the_same_thing_twice():
+    """The sentence Michael pointed at: Fridman gives the work away twice."""
+    from story_append_merge import dedupe_within_sentence as D
+    got = D("Boris Fridman, the collector who gave this work to the museum, "
+            "later donated this important work to the Museum of Fine Arts, "
+            "Boston, enriching the museum's collection.")
+    check('the repeated apposition is gone',
+          'the collector who gave' not in got, got)
+    check('the surviving clause is the one with the detail',
+          'Museum of Fine Arts' in got and 'enriching' in got)
+    check('no comma left stranded between subject and verb',
+          got.startswith('Boris Fridman later donated'), got[:45])
+
+
+def test_dedupe_leaves_appositions_that_add_something():
+    """The controls. Each of these repeats nothing and must survive intact."""
+    from story_append_merge import dedupe_within_sentence as D
+    for s in [
+        # different verb family — describing vs writing
+        'Pierre Reverdy, the French poet linked to Surrealism, wrote twenty poems.',
+        # the middle segment is not an apposition at all
+        'The work consists of 11 lithographs, published by Éditions Verve and '
+        'printed by Mourlot Frères, a renowned lithography workshop in Paris.',
+        # same subject, different events
+        'Juan Gris, who died in 1927, left the work unfinished.',
+        # too short to be a restatement
+        'Boris Fridman, a collector, donated the work.',
+        # no shared verb family
+        'The gallery, named after its patron Torf, displays works rarely seen.',
+    ]:
+        check(f'kept: "{s[:52]}…"', D(s) == s, D(s))
+
+
+def test_the_whole_stop_is_cleaned_end_to_end():
+    prose = ('Boris Fridman, the collector who gave this work to the museum, '
+             'later donated this important work to the Museum of Fine Arts, '
+             'Boston. The edition is bound in vellum.')
+    story = ('In 1967 Joan Miró and Louis Broder completed an edition '
+             '[christies.com, sothebys.com].')
+    merged, report = merge_story_into_description(prose, story)
+    check('end to end: no brackets survive', '[' not in merged, merged)
+    check('end to end: no double giving', 'the collector who gave' not in merged)
+    check('end to end: the intra-sentence fix was reported',
+          len(report['intra']) == 1, str(report['intra']))
+    check('end to end: real content survives',
+          'vellum' in merged and 'Joan Miró' in merged)
+
+
 def test_no_story_is_a_no_op():
     merged, report = merge_story_into_description(STOP1_PROSE, '')
-    check('no story: description returned byte-identical', merged == STOP1_PROSE)
     check('no story: nothing reported dropped', report['n_dropped'] == 0)
 
 
@@ -293,7 +382,11 @@ if __name__ == '__main__':
                test_prose_still_opens_when_its_first_sentence_survived,
                test_orphan_repair_when_the_prose_still_opens,
                test_orphan_repair_cannot_eat_a_stop,
-               test_no_story_is_a_no_op,
+               test_no_story_still_gets_cleaned,
+               test_bracketed_citations_never_reach_the_listener,
+               test_a_sentence_may_not_say_the_same_thing_twice,
+               test_dedupe_leaves_appositions_that_add_something,
+               test_the_whole_stop_is_cleaned_end_to_end,
                test_never_strips_a_stop_bare,
                test_seam_has_no_missing_space,
                test_sentence_splitter_keeps_everything):

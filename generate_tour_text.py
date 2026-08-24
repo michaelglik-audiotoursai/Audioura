@@ -15945,10 +15945,24 @@ RULES:
                     sentence_budget=_offer_budget
                 )
                 if _closing_offer:
-                    # [LEAD] Explicit label so the scorer need not guess at
-                    # recap templates. Follows the existing Address:/Directions:/
-                    # Sources: convention and is stripped by SCHEMA_LABEL_RE.
-                    epilog += "Closing: " + _closing_offer.lstrip()
+                    # [D521] The "Closing:" label is GONE. Michael, 2026-08-24:
+                    # *"Make sure that the title words such as Narration and
+                    # Closing are not end up in the actual tour as that would be
+                    # annoying for the listeners. 'Directions' and 'Orientation'
+                    # are fine because they let listeners know that they are not
+                    # part of the stop description."*
+                    #
+                    # That distinction is the whole rule and it is a good one:
+                    # Directions and Orientation tell a listener what KIND of
+                    # thing is coming and why it is not about the object in front
+                    # of them. "Closing" tells them nothing they cannot hear.
+                    #
+                    # It was added so the scorer need not guess at recap
+                    # templates. The scorer no longer needs it — `_CLOSING_OFFER_RE`
+                    # matches the recap ("That's N stops"), the offer verbs and the
+                    # news offer by content, and still matches the old label so
+                    # tours already on disk score identically.
+                    epilog += _closing_offer.lstrip()
                 
                 poi_content += epilog
                 

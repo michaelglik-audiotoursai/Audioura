@@ -462,8 +462,15 @@ def parse_tour(text: str) -> List[dict]:
     # Measured across 419 tour files: 83 occurrences, 0 of them before 60% of the
     # way through a file. It never appears in narration.
     #
-    # "Closing:" is the explicit label now emitted by generate_tour_text so future
-    # tours need no heuristic at all.
+    # "Closing:" was an explicit label emitted by generate_tour_text. [D521]
+    # Michael, 2026-08-24: *"Make sure that the title words such as Narration and
+    # Closing are not end up in the actual tour as that would be annoying for the
+    # listeners. 'Directions' and 'Orientation' are fine because they let
+    # listeners know that they are not part of the stop description."* The label
+    # is no longer emitted — it is spoken, and unlike Directions/Orientation it
+    # tells the listener nothing. It stays in this pattern for tours already on
+    # disk, and the content alternatives below are what carry new ones: the
+    # closing always opens on the recap ("That's N stops") or on an offer verb.
     #
     # NOTE: the recap sentence is deliberately NOT stripped. Whether a recap
     # should contribute facts is a separate question (D201) and changing it here
@@ -476,6 +483,7 @@ def parse_tour(text: str) -> List[dict]:
         r"Closing:"                                          # explicit label (new tours)
         r"|.*\bwe can build\b"                               # gtt:1504, gtt:1542
         r"|.*\bThe Treat Page shows\b"                       # museum-offer variant
+        r"|We\s+can\s+also\s+generate\b"                     # news offer, gtt:1907
         r"|That[\u2019']?s\s+\d+\s+stops?\b"                # count-form recap, gtt:1123/1125
         r"|From\s+.{1,140}?\s+to\s+.{1,140}?,\s+you\s+have\s+followed\s+the\s+thread\b"
         r")",

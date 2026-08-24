@@ -60,6 +60,7 @@ import unicodedata
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 __all__ = ['merge_story_into_description', 'sentences_of', 'anchors_of',
+           'strip_bracketed_citations', 'dedupe_within_sentence',
            'MIN_SHARED_ANCHORS', 'ANCHOR_COVERAGE_DROP', 'CONTENT_COVERAGE_DROP',
            'MAX_DROP_RATIO']
 
@@ -233,6 +234,164 @@ def _title_tokens(*titles: str) -> Set[str]:
     return out
 
 
+# ── [D521] Bracketed citations are read aloud, so they must not survive ──────
+#
+# Michael, 2026-08-24: *"Citations as are given such as '…of Freud's text
+# [collections.museumofthebible.org, lockportstreetgallery.com]' are not
+# acceptable for the listeners as it will disturb them for no reason. Citations
+# should be given only if there is a difference in the sources and then it should
+# be incorporated in the sentence rather than in square brackets."*
+#
+# They arrive because the loop's FIRST prompt asks for "each one sentence, with
+# its source in brackets" — which is right, the adjudicator needs to know what
+# backs what — and the model then carries the habit into PART 2, the text we
+# publish. The prompt now forbids brackets in PART 2 (`story_adjudicate`), and
+# this is the guard behind it, because a prompt is a request and not a contract.
+#
+# Narrow on purpose. A bracket goes only when its content is a citation: it holds
+# a domain, or opens with cite:/source:/see, or is a bare reference number. Any
+# other bracketed aside is the writer's and is left alone.
+_CITATION_BRACKET_RE = re.compile(
+    r'\s*\[\s*(?:'
+    r'(?:cite|source|sources|see|ref|refs)\s*:[^\[\]]*'          # [cite: …]
+    r'|[^\[\]]*?\b[\w-]+\.(?:com|org|net|edu|gov|info|pub|museum|io|co|'
+    r'uk|fr|de|it|es|ru|nl|be|ch|se|pl|jp|cn|au|ca)\b[^\[\]]*'   # [christies.com, …]
+    r'|\d+(?:\s*[,;–-]\s*\d+)*'                                  # [12] / [3, 4]
+    r')\s*\]',
+    re.IGNORECASE)
+
+
+def strip_bracketed_citations(text: str) -> str:
+    """Remove `[christies.com, sothebys.com]` and friends; keep the sentence sane.
+
+    Bracket removal leaves a space before the full stop, so punctuation is closed
+    up afterwards — "…of Freud's text ." would be heard as a stumble.
+    """
+    if not text or '[' not in text:
+        return text or ''
+    out = _CITATION_BRACKET_RE.sub('', text)
+    out = re.sub(r'\s+([.,;:!?])', r'\1', out)
+    return re.sub(r'\s{2,}', ' ', out).strip()
+
+
+# ── [D521] The same thing said twice inside ONE sentence ─────────────────────
+#
+# Michael, 2026-08-24: *"duplicates are bad and need to get fixed"*, on this
+# sentence from the 10:36 tour:
+#
+#   "Boris Fridman, THE COLLECTOR WHO GAVE THIS WORK TO THE MUSEUM, later
+#    DONATED THIS IMPORTANT WORK TO THE MUSEUM OF FINE ARTS, BOSTON, enriching…"
+#
+# He gives the work away twice in one sentence. The sentence-level merge cannot
+# see it by construction — it compares whole sentences — so this works inside
+# one: an appositive or relative clause is dropped when the rest of the sentence
+# already performs the SAME ACTION on the SAME THINGS.
+#
+# "Same action" is a small closed set of verb families rather than a synonym
+# model. `gave` and `donated` have to land in one bucket or the sentence looks
+# like two different events; `linked` and `wrote` must not, or "Pierre Reverdy,
+# the French poet linked to Surrealism, wrote twenty poems" loses its apposition.
+_VERB_FAMILIES = {
+    'GIVE': ('give', 'gave', 'given', 'gift', 'gifted', 'donate', 'donated',
+             'donation', 'donor', 'bequeath', 'bequeathed', 'bequest',
+             'present', 'presented', 'presentation', 'gave'),
+    'PUBLISH': ('publish', 'published', 'publisher', 'publication', 'issue',
+                'issued', 'release', 'released', 'brought'),
+    'CREATE': ('create', 'created', 'creation', 'make', 'made', 'produce',
+               'produced', 'execute', 'executed', 'draw', 'drew', 'drawn'),
+    'ILLUSTRATE': ('illustrate', 'illustrated', 'illustration', 'illustrations'),
+    'PRINT': ('print', 'printed', 'printing', 'printer', 'pulled'),
+    'DIE': ('die', 'died', 'death', 'passed', 'dying'),
+    'COLLABORATE': ('collaborate', 'collaborated', 'collaboration', 'partner',
+                    'partnership', 'partnered', 'joined'),
+    'DESTROY': ('destroy', 'destroyed', 'erase', 'erased', 'effaced',
+                'cancelled', 'canceled', 'scrapped'),
+    'SIGN': ('sign', 'signed', 'signature'),
+    'ACQUIRE': ('acquire', 'acquired', 'acquisition', 'purchase', 'purchased',
+                'bought'),
+}
+_CLAUSE_OPENERS = {'the', 'a', 'an', 'who', 'which', 'that', 'whose', 'whom'}
+
+
+_ALL_FAMILY_WORDS = {w for forms in _VERB_FAMILIES.values() for w in forms}
+
+# Grammar only. Deliberately NOT `_STOPWORDS`, which drops `work`, `works` and
+# `museum` — written for the sentence-level anchor test, where they are noise
+# because every sentence in a museum stop contains them. Inside ONE sentence
+# they are exactly the shared objects that prove it repeated itself: without
+# them "the collector who gave this WORK to the MUSEUM" and "donated this
+# important WORK to the MUSEUM of Fine Arts" have nothing in common at all.
+_GRAMMAR_ONLY = {
+    'the', 'a', 'an', 'this', 'that', 'these', 'those', 'his', 'her', 'its',
+    'their', 'our', 'your', 'who', 'whom', 'whose', 'which', 'it', 'he', 'she',
+    'they', 'we', 'in', 'on', 'at', 'by', 'for', 'from', 'with', 'to', 'of',
+    'as', 'and', 'or', 'but', 'is', 'was', 'were', 'are', 'be', 'been', 'has',
+    'have', 'had', 'would', 'will', 'later', 'then', 'also', 'not', 'into',
+}
+
+
+def _families(text: str) -> Set[str]:
+    words = {_fold(w) for w in _WORD_RE.findall(text)}
+    return {fam for fam, forms in _VERB_FAMILIES.items()
+            if words & set(forms)}
+
+
+def _clause_nouns(text: str) -> Set[str]:
+    """What a clause is ABOUT — its things, not its verb.
+
+    The verb is already judged by family, so leaving its forms in here would
+    count `gave` against `donated` as a difference and defeat the whole test.
+    """
+    out = set()
+    for w in _WORD_RE.findall(text):
+        f = _fold(w)
+        if len(f) < 3 or f in _GRAMMAR_ONLY or f in _ALL_FAMILY_WORDS:
+            continue
+        out.add(_stem(f))
+    return out
+
+
+def dedupe_within_sentence(sentence: str) -> str:
+    """Drop an appositive that repeats what the rest of the sentence already says.
+
+    Conservative by design: only comma-delimited clauses that open like an
+    apposition, never the first or last segment, at most one per sentence, and
+    only when the rest of the sentence performs the same verb family over at
+    least half the same content words.
+    """
+    parts = [p.strip() for p in sentence.split(',')]
+    if len(parts) < 3:
+        return sentence
+    for i in range(1, len(parts) - 1):
+        cand = parts[i]
+        words = _WORD_RE.findall(cand)
+        if len(words) < 3 or _fold(words[0]) not in _CLAUSE_OPENERS:
+            continue
+        rest = ', '.join(parts[:i] + parts[i + 1:])
+        fam_c, fam_r = _families(cand), _families(rest)
+        if not (fam_c and fam_c & fam_r):
+            continue
+        c_content = _clause_nouns(cand)
+        if not c_content:
+            continue
+        shared = len(c_content & _clause_nouns(rest)) / len(c_content)
+        if shared < 0.5:
+            continue
+        # An apposition sits between a subject and its verb and is fenced by TWO
+        # commas. Removing it leaves one of them behind — "Boris Fridman, later
+        # donated this work" — a comma between subject and predicate, which a
+        # reader hears as a stumble. When the clause opened immediately after the
+        # subject, the fence goes with it.
+        if i == 1:
+            rebuilt = ' '.join([parts[0]] + [', '.join(parts[2:])])
+        else:
+            rebuilt = ', '.join(parts[:i] + parts[i + 1:])
+        if len(_WORD_RE.findall(rebuilt)) < 5:
+            continue
+        return re.sub(r'\s{2,}', ' ', rebuilt).strip()
+    return sentence
+
+
 def _is_orphaned_opener(sentence: str) -> bool:
     """Does this sentence start by pointing at a sentence that is no longer there?"""
     words = _TOKEN_RE.findall(sentence)
@@ -279,11 +438,29 @@ def merge_story_into_description(description: str, story: str,
     nothing is not a stop to edit.
     """
     report = {'dropped': [], 'kept': [], 'n_prose': 0, 'n_dropped': 0,
-              'capped': False, 'orphans': [], 'story_first': False}
+              'capped': False, 'orphans': [], 'story_first': False,
+              'cited': 0, 'intra': []}
+
+    def _finish(text: str) -> str:
+        """[D521] What the listener actually hears: no bracketed sources, and
+        nothing said twice inside a single sentence. Applied on every path,
+        including the one where no story published — a stop with no story can
+        still name a domain out loud or give the same work away twice."""
+        cleaned = strip_bracketed_citations(text)
+        if cleaned != text:
+            report['cited'] += 1
+        out = []
+        for s in sentences_of(cleaned):
+            d = dedupe_within_sentence(s)
+            if d != s:
+                report['intra'].append(s)
+            out.append(d)
+        return re.sub(r'\s{2,}', ' ', ' '.join(out)).strip()
+
     if not (story or '').strip():
-        return description, report
+        return _finish(description or ''), report
     if not (description or '').strip():
-        return story.strip(), report
+        return _finish(story), report
 
     excluded = _title_tokens(*work_titles)
     prose = sentences_of(description)
@@ -351,7 +528,7 @@ def merge_story_into_description(description: str, story: str,
 
     ordered = [t.strip() for t in kept_text if t.strip()]
     ordered = ([story.strip()] + ordered) if story_first else (ordered + [story.strip()])
-    merged = re.sub(r'\s+', ' ', ' '.join(ordered)).strip()
+    merged = _finish(re.sub(r'\s+', ' ', ' '.join(ordered)).strip())
 
     if verbose and report['n_dropped']:
         for d in report['dropped']:
@@ -360,4 +537,7 @@ def merge_story_into_description(description: str, story: str,
                   f"{d['content_coverage']:.2f}): \"{d['sentence'][:88]}\"")
         for s in report['orphans']:
             print(f"      [D518] dropped (orphaned opener): \"{s[:88]}\"")
+    if verbose:
+        for s in report['intra']:
+            print(f"      [D521] said twice in one sentence: \"{s[:96]}\"")
     return merged, report

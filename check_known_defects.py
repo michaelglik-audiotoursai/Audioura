@@ -67,6 +67,38 @@ def defect_c(text):
     return re.findall(r'[a-zà-ÿ]{2}\.[A-ZÀ-Ý][a-zà-ÿ]{2}', body)
 
 
+def defect_d(text):
+    """[D521] A bracketed citation, which is read aloud as noise."""
+    import sys as _s
+    _s.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
+    from story_append_merge import _CITATION_BRACKET_RE
+    return [m.group(0).strip() for m in _CITATION_BRACKET_RE.finditer(text)]
+
+
+def defect_e(text):
+    """[D521] A sentence that performs the same action twice on the same things."""
+    import sys as _s
+    _s.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
+    from story_append_merge import dedupe_within_sentence, sentences_of
+    return [s for s in sentences_of(text) if dedupe_within_sentence(s) != s]
+
+
+def defect_f(text):
+    """[D521] A structural label that is spoken but tells the listener nothing.
+
+    Orientation and Directions are deliberately absent from this list — Michael
+    kept them, because they say what kind of thing is coming.
+
+    **Not anchored to line start, and that is the point.** The first version was
+    (`^\\s*(Closing|…):`) and it reported every tour clean, including the two that
+    plainly contain the label — because the epilog puts the recap and the closing
+    on ONE line, so "Closing:" is mid-line. Same failure class as the first
+    version of check (a): an instrument that cannot see the case you already know
+    about is worth nothing.
+    """
+    return re.findall(r'\b(Closing|Narration|Body|Description|Summary):', text)
+
+
 def main(path):
     text = open(path, encoding='utf-8').read()
     stops = stops_of(text)
@@ -78,6 +110,13 @@ def main(path):
     print(f"(b) priest/nobility clash  : {'FOUND ' + str(b) if b else 'not found'}")
     c = defect_c(text)
     print(f"(c) missing space after '.': {'FOUND ' + str(c) if c else 'not found'}")
+
+    d = defect_d(text)
+    print(f"(d) bracketed citations    : {'FOUND ' + str(d[:4]) if d else 'not found'}")
+    e = defect_e(text)
+    print(f"(e) said twice in 1 sentence: {'FOUND ' + str([s[:70] for s in e]) if e else 'not found'}")
+    f = defect_f(text)
+    print(f"(f) spoken structural label : {'FOUND ' + str(set(f)) if f else 'not found'}")
 
     print(f"\n(D519) 'Treat Page' in the tour: "
           f"{'PRESENT — ' + str(text.count('Treat Page')) + 'x' if 'Treat Page' in text else 'absent'}")

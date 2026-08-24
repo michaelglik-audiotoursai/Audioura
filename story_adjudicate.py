@@ -191,6 +191,15 @@ PART 2 — WRITE THE STORY. 3 to 6 sentences, for a visitor standing in front of
 the work.
 
 - Use ONLY claims you marked CONFIRMED or CORRECTED.
+- THIS IS READ ALOUD. Never write a source, domain or URL in square brackets.
+  "[christies.com, sothebys.com]" is heard as noise and there is no way for a
+  listener to look it up. No brackets of any kind, no footnote markers.
+- Name a source ONLY where sources DISAGREE, and then say it inside the sentence
+  in words a listener understands — the institution, not the domain:
+      GOOD  "Christie's records eleven finished plates; Sotheby's lists twelve."
+      GOOD  "Some accounts say the sheets were lambskin, others sheepskin."
+      BAD   "The edition ran to eleven plates [christies.com]."
+  Where the sources agree, state the fact plainly and cite nothing.
 - Where a DISPUTED claim is interesting, TELL THE DISAGREEMENT: "some sources say
   X, others say Y". Do not pick a side and do not hide it. This is wanted.
 - Drop UNATTESTED claims. If the underlying fact is confirmed elsewhere, keep the
