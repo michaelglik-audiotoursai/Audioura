@@ -1586,15 +1586,56 @@ def _compose_recap_clauses_fallback(selected_highlights):
     return clauses
 
 
+def nearest_treat_to_any_stop(treat_rows, stop_points, radius_km):
+    """[D519] The nearest treat standing within `radius_km` of any stop, or None.
+
+    Pure, so it can be tested without a database — the reason it is out here
+    rather than inline in the 4,000-line closing builder it serves.
+
+    `treat_rows`   iterable of (name, lat, lng), straight off the `treats` table.
+    `stop_points`  iterable of (stop_name, (lat, lng)).
+
+    Returns `{'treat', 'stop', 'km'}` or None. A row with unparseable coordinates
+    is skipped, never guessed at.
+    """
+    from math import radians, sin, cos, asin, sqrt
+
+    def _h(a, b):
+        lat1, lon1 = a; lat2, lon2 = b
+        dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
+        x = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+        return 2 * 6371.0 * asin(sqrt(x))
+
+    best = None
+    for _row in treat_rows or []:
+        try:
+            _tname, _tlat, _tlng = _row[0], float(_row[1]), float(_row[2])
+        except (TypeError, ValueError, IndexError):
+            continue
+        for _sname, _sll in stop_points or []:
+            try:
+                d = _h((float(_sll[0]), float(_sll[1])), (_tlat, _tlng))
+            except (TypeError, ValueError, IndexError):
+                continue
+            if d <= radius_km and (best is None or d < best['km']):
+                best = {'treat': _tname, 'stop': _sname, 'km': d}
+    return best
+
+
 def _build_closing_offer(poi_list, tour_category, transport_mode, location, sentence_budget=3):
     """[LOCAL-273/275] Build a ≤3 sentence closing offer from verified data.
 
     Three sentences (Michael's spec, LOCAL-275 addendum):
       Sentence 1: A similar tour (same category) near the last stop — existence-verified.
       Sentence 2: Restaurant tour (verified in audio_tours) OR museum fallback,
-                  with Treat Page mention folded in. Never claims savings exist —
-                  only that the page shows *whether* there are any.
+                  with the Treat Page folded in **only when a real treat is within
+                  `TREAT_PAGE_NEAR_KM` of a real stop** (D519 — it used to close
+                  every tour unconditionally). Never claims savings exist — only
+                  that the page shows *whether* there are any.
       Sentence 3: News articles capability.
+
+    Every sentence here is optional. The closing may come back empty, and that is
+    a correct outcome, not a degraded one.
 
     Returns: str (the closing text, may be empty if nothing verifies).
     Falls back to a one-sentence factual summary if neither part can be built.
@@ -1607,20 +1648,27 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         h = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
         return 2 * 6371.0 * asin(sqrt(h))
 
+    def _poi_latlng(_p):
+        """(lat, lng) for one stop, or None. Same three sources, one place."""
+        _la = _p.get('latitude') or _p.get('wikidata_lat')
+        _ln = _p.get('longitude') or _p.get('wikidata_lng')
+        if not _la or not _ln:
+            _cm = re.match(r'\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)',
+                           _p.get('coordinates', '') or '')
+            if _cm:
+                _la, _ln = _cm.group(1), _cm.group(2)
+        try:
+            return (float(_la), float(_ln)) if _la and _ln else None
+        except (TypeError, ValueError):
+            return None
+
     # Get last stop coordinates
     last_poi = poi_list[-1]
-    last_lat = last_poi.get('latitude') or last_poi.get('wikidata_lat')
-    last_lng = last_poi.get('longitude') or last_poi.get('wikidata_lng')
-    if not last_lat or not last_lng:
-        _coord_str = last_poi.get('coordinates', '')
-        _m = re.match(r'\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)', _coord_str or '')
-        if _m:
-            last_lat, last_lng = float(_m.group(1)), float(_m.group(2))
-    if not last_lat or not last_lng:
+    _last_ll = _poi_latlng(last_poi)
+    if not _last_ll:
         print("  [LOCAL-273] No coordinates for last stop — closing offer skipped")
         return ""
-
-    last_lat, last_lng = float(last_lat), float(last_lng)
+    last_lat, last_lng = _last_ll
     last_name = last_poi.get('name', '')
     all_stop_names = {p['name'].lower() for p in poi_list}
 
@@ -1848,6 +1896,58 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
             else:
                 print("  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby")
 
+        # ─── [D519] Is there actually a treat near a stop? ────────────────
+        #
+        # Michael, 2026-08-24: **only mention the Treat Page if it is genuinely
+        # near a stop of the tour, any tour type, and it must not be the
+        # obligatory closing of every tour.**
+        #
+        # It was unconditional: every tour ever generated ended with it,
+        # including the three-stop MFA tour whose nearest treat is in another
+        # country. The sentence never claimed savings existed — but a listener
+        # who opens the page on a promise and finds it empty has been sent
+        # somewhere for nothing, and hearing the same sentence close every tour
+        # is what made it read as an advertisement rather than an offer.
+        #
+        # Near ANY stop, not just the last: the app's own Treat Page is
+        # location-aware (`treats_screen.dart` → `/treats-near/{lat}/{lng}`), and
+        # a listener is at every stop in turn, not only at the end.
+        #
+        # FAILS CLOSED. No `treats` table, no coordinates, a query error — the
+        # sentence is omitted. Silence costs nothing; an unbacked promise does.
+        _treat_near = None
+        try:
+            _treat_radius_km = float(os.environ.get('TREAT_PAGE_NEAR_KM', '1.0'))
+            _co_cur.execute("""
+                SELECT ad_name, lat, lng FROM treats
+                WHERE lat IS NOT NULL AND lng IS NOT NULL
+            """)
+            _treat_rows = _co_cur.fetchall()
+            _stop_points = [(p.get('name', ''), _poi_latlng(p)) for p in poi_list]
+            _stop_points = [(n, ll) for n, ll in _stop_points if ll]
+            _treat_near = nearest_treat_to_any_stop(
+                _treat_rows, _stop_points, _treat_radius_km)
+            if _treat_near:
+                print(f"  [D519] Treat Page: '{_treat_near['treat']}' is "
+                      f"{_treat_near['km']:.2f} km from stop "
+                      f"'{_treat_near['stop'][:40]}' — mention EARNED")
+            else:
+                print(f"  [D519] Treat Page: no treat within "
+                      f"{_treat_radius_km:.1f} km of any of "
+                      f"{len(_stop_points)} stop(s) ({len(_treat_rows)} treat(s) "
+                      f"with coordinates) — mention OMITTED")
+        except Exception as _tp_err:
+            print(f"  [D519] Treat Page: proximity unverifiable "
+                  f"({type(_tp_err).__name__}: {_tp_err}) — mention OMITTED")
+            try:
+                _co_conn.rollback()
+            except Exception:
+                pass
+
+        _treat_clause = ("the Treat Page shows whether there are real savings at "
+                         "local shops and restaurants around here"
+                         if _treat_near else "")
+
         # Build sentence(s) for Part 2: tour clause + Treat Page.
         # The Treat Page is location-aware (treats_screen.dart calls /treats-near/{lat}/{lng}).
         # Never claim savings exist — only that the page shows *whether* there are any.
@@ -1860,6 +1960,10 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         #   - sentence_budget=3 (no recap): original logic —
         #     When Part 1 produced a sentence: combine Part 2 + Treat Page into ONE.
         #     When Part 1 is absent: split into TWO sentences.
+        # [D519] Each of these four branches is now conditional on `_treat_clause`
+        # being non-empty. When no treat is near a stop the tour offer stands on
+        # its own, and when neither verifies Part 2 contributes nothing at all —
+        # which is the point: no sentence is owed a place in the closing.
         _has_part1 = len(sentences) > 0
         if _part2_tour_clause:
             if sentence_budget <= 2 and _has_part1:
@@ -1869,41 +1973,42 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
                 _part1_text = sentences.pop(0)  # Remove Part 1 standalone
                 # Extract the destination from Part 1 for a brief mention
                 _p1_dest_match = re.search(r'^(.+?)\s+is\s+\d+\s+kilomet', _part1_text)
+                _p2_tail = f", and {_treat_clause}" if _treat_clause else ""
                 if _p1_dest_match:
                     _p1_dest = _p1_dest_match.group(1)
                     sentences.append(
                         f"There is also a tour of {_p1_dest} nearby; "
-                        f"{_part2_tour_clause[0].lower() + _part2_tour_clause[1:]}, "
-                        f"and the Treat Page shows whether there are real savings "
-                        f"at local shops and restaurants around here."
+                        f"{_part2_tour_clause[0].lower() + _part2_tour_clause[1:]}"
+                        f"{_p2_tail}."
                     )
                 else:
-                    # Fallback: just use Part 2 + Treats (drop Part 1 text)
-                    sentences.append(
-                        f"{_part2_tour_clause}, and the Treat Page shows whether "
-                        f"there are real savings at local shops and restaurants around here."
-                    )
+                    # Fallback: just use Part 2 (+ Treats) — drop Part 1 text
+                    sentences.append(f"{_part2_tour_clause}{_p2_tail}.")
             elif _has_part1 or sentence_budget <= 2:
                 # Combined: fits the budget alongside Part 1 + news
                 sentences.append(
-                    f"{_part2_tour_clause}, and the Treat Page shows whether "
-                    f"there are real savings at local shops and restaurants around here."
+                    f"{_part2_tour_clause}"
+                    f"{(', and ' + _treat_clause) if _treat_clause else ''}."
                 )
             else:
                 # Split: two sentences to fill the Part 1 gap
                 sentences.append(f"{_part2_tour_clause}.")
-                sentences.append(
-                    "The Treat Page shows whether there are real savings at "
-                    "local shops and restaurants around here."
-                )
-            print(f"  [LOCAL-275] Part 2: Treat Page anchored to last stop ({last_lat:.4f}, {last_lng:.4f})")
+                if _treat_clause:
+                    sentences.append(_treat_clause[0].upper() + _treat_clause[1:] + ".")
+            if _treat_clause:
+                print(f"  [LOCAL-275/D519] Part 2: tour offer + Treat Page "
+                      f"(treat verified {_treat_near['km']:.2f} km from a stop)")
+            else:
+                print("  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop")
+        elif _treat_clause:
+            # No tour verified — Treat Page alone, and only because a real treat
+            # is standing next to a real stop.
+            sentences.append(_treat_clause[0].upper() + _treat_clause[1:] + ".")
+            print(f"  [LOCAL-275/D519] Part 2: Treat Page only, "
+                  f"{_treat_near['km']:.2f} km from stop '{_treat_near['stop'][:40]}'")
         else:
-            # No tour verified — Treat Page alone
-            sentences.append(
-                "The Treat Page shows whether there are real savings at "
-                "local shops and restaurants around here."
-            )
-            print(f"  [LOCAL-275] Part 2: Treat Page only (no tour verified), anchored to ({last_lat:.4f}, {last_lng:.4f})")
+            print("  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, "
+                  "no Treat Page")
 
         # News capability — always offer if the path exists on this branch
         # Verify: news_orchestrator_service.py exists and has /generate-news
@@ -14169,11 +14274,13 @@ REWRITE RULES (all mandatory):
     if _storied_mode and tour_category == 'museum':
         try:
             from story_production_loop import run_for_stop as _d511_run, is_enabled as _d511_on
+            from story_append_merge import merge_story_into_description as _d518_merge
             if _d511_on():
                 print(f"\n  [D511] PHASE 5.20: credit_line loop — "
                       f"object record, seeds, challenge, adjudicate, gate")
                 _d511_venue_url = getattr(locals().get('_det_entity'), 'official_url', '') or ''
-                _d511_stats = {'stops': 0, 'accepted': 0, 'cost': 0.0}
+                _d511_stats = {'stops': 0, 'accepted': 0, 'cost': 0.0,
+                               'replaced': 0}
                 for _d511_i, _d511_poi in enumerate(poi_list):
                     _d511_desc = _d511_poi.get('description') or ''
                     if not _d511_desc or _d511_desc.startswith('['):
@@ -14202,12 +14309,30 @@ REWRITE RULES (all mandatory):
                     total_cost += _d511_res.get('cost_usd', 0.0)
                     _d511_poi['_d511'] = _d511_res
                     if _d511_res.get('story'):
-                        # The adjudicated story REPLACES the story portion. The
-                        # descriptive prose the gates already cleared is kept —
-                        # this loop produces a story, not a whole stop.
+                        # [D518] The story REPLACES the prose it overlaps.
+                        #
+                        # This was `_d511_desc.rstrip() + ' ' + story` — plain
+                        # concatenation — and Michael, 2026-08-24: *"saying things
+                        # twice is the worst for listeners… Moreover, selecting the
+                        # story topic based on the sentences made this problem."*
+                        # The credit_lines are mined from this same prose, so the
+                        # loop is guaranteed to research what the prose already
+                        # said. On 2026-08-23 stop 3 ran "an Egyptian priest"
+                        # (wrong) and "of Egyptian nobility" (right, corrected by
+                        # the adjudicator) six sentences apart in one stop.
                         _d511_poi['_pre_d511_description'] = _d511_desc
-                        _d511_poi['description'] = (
-                            _d511_desc.rstrip() + ' ' + _d511_res['story'].strip())
+                        _d511_merged, _d511_mrep = _d518_merge(
+                            _d511_desc, _d511_res['story'],
+                            work_titles=[_d511_poi.get('name', ''),
+                                         _d511_poi.get('english_title', '')],
+                            verbose=True)
+                        _d511_poi['description'] = _d511_merged
+                        _d511_poi['_d518_merge'] = _d511_mrep
+                        _d511_stats['replaced'] += _d511_mrep['n_dropped']
+                        print(f"    [D518] {_d511_mrep['n_dropped']} of "
+                              f"{_d511_mrep['n_prose']} prose sentence(s) replaced "
+                              f"by the story"
+                              f"{' (drop cap hit)' if _d511_mrep['capped'] else ''}")
                         _d511_stats['accepted'] += 1
                         print(f"    [D511] story ACCEPTED from credit_line "
                               f"'{_d511_res['credit_line'][:44]}' "
@@ -14221,7 +14346,9 @@ REWRITE RULES (all mandatory):
                               f"its descriptive text and publishes no story")
                 print(f"\n  [D511] PHASE 5.20 summary: "
                       f"{_d511_stats['accepted']}/{_d511_stats['stops']} stops "
-                      f"got a gated story, ~${_d511_stats['cost']:.3f}")
+                      f"got a gated story, ~${_d511_stats['cost']:.3f}, "
+                      f"[D518] {_d511_stats['replaced']} duplicated prose "
+                      f"sentence(s) replaced")
         except ImportError as _d511_imp:
             print(f"  [D511] loop not importable, skipped (non-fatal): {_d511_imp}")
         except Exception as _d511_err:

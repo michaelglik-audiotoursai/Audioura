@@ -1,10 +1,10 @@
-# RESTART briefing — generated 2026-08-23 12:22 EDT
+# RESTART briefing — generated 2026-08-24 10:16 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     0503568 D512: adjacency, and verbs discovered per domain — both approved by Michael
-unpushed 19 commits
+HEAD     7faccb2 Handoff for the /clear: next session's task list, and Q16
+unpushed 0 commits
 dirty    1 files
 ```
 
@@ -13,7 +13,7 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      604
+cost_ledger rows:      614
 ```
 ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 
@@ -64,12 +64,13 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  12:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
-  48:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
-  71:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
-  75:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
-  82:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  166:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  12:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
+  69:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
+  105:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+  128:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  132:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  139:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  223:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules
