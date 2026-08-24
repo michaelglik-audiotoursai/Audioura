@@ -66,6 +66,90 @@ _KNOWN_NON_PERSON_STRINGS = {
     'stop number',
 }
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-467] FACILITY NAME DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+# A name that is followed by (or commonly precedes) a facility word is a
+# FACILITY, not a person. "Linde Family Gallery" → facility. "Boris Fridman" → person.
+# D316 family: France, The Treat Page, visual tapestry, ', in' — generalised here.
+#
+# This reuses the existing person detector (D304, D316) by adding a pre-filter,
+# not a second detector.
+
+_FACILITY_SUFFIX_WORDS = frozenset({
+    'gallery', 'wing', 'room', 'court', 'rotunda', 'pavilion',
+    'hall', 'foundation', 'trust', 'collection', 'center', 'centre',
+})
+
+# Words that commonly PRECEDE a facility word in named-space patterns.
+# "Linde Family Gallery" → "Family" precedes "Gallery" → the whole thing is a facility.
+# These words, when they appear as the LAST word of a candidate, indicate a
+# facility-patron name rather than a personal name.
+_FACILITY_PRECURSOR_WORDS = frozenset({
+    'family', 'memorial', 'endowment',
+})
+
+# Regex to detect facility context: candidate followed by a facility word
+_FACILITY_CONTEXT_RE = re.compile(
+    r'\b(?:Gallery|Wing|Room|Court|Rotunda|Pavilion|Hall|Foundation|Trust|Collection|Center|Centre)\b',
+    re.IGNORECASE,
+)
+
+
+def is_facility_name(candidate: str, source_text: str = '') -> bool:
+    """[LOCAL-467] Check if a candidate name is a FACILITY, not a person.
+
+    A name is a facility when:
+      1. It ends with a facility word itself ("Torf Gallery" → True)
+      2. Its last word is a facility precursor ("Linde Family" → True,
+         because "Family" commonly precedes Gallery/Wing/etc.)
+      3. It is immediately followed by a facility word in the source text
+
+    This check fires BEFORE person extraction, so it reuses (not duplicates)
+    the existing person detector per D304/D316.
+
+    Args:
+        candidate: The name string (e.g. "Linde Family")
+        source_text: Surrounding text where the candidate was found
+
+    Returns:
+        True if the candidate is a facility name, False otherwise.
+    """
+    if not candidate:
+        return False
+
+    words = candidate.split()
+    if not words:
+        return False
+
+    last_word = words[-1].lower()
+
+    # Direct check: does the candidate itself end with a facility word?
+    if last_word in _FACILITY_SUFFIX_WORDS:
+        return True
+
+    # Precursor check: does the candidate end with a word that commonly
+    # precedes a facility word? "X Family" → facility patron name.
+    if last_word in _FACILITY_PRECURSOR_WORDS:
+        return True
+
+    # Context check: is the candidate followed by a facility word in source text?
+    if source_text:
+        # Find the candidate in the source text and check what follows
+        esc = re.escape(candidate)
+        m = re.search(
+            esc + r'\s+(\w+)',
+            source_text,
+            re.IGNORECASE,
+        )
+        if m:
+            next_word = m.group(1).lower()
+            if next_word in _FACILITY_SUFFIX_WORDS:
+                return True
+
+    return False
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PERSON NAME DETECTION
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -120,6 +204,9 @@ def _looks_like_person_name(candidate: str) -> bool:
     A personal name has at least two words, each starting with a capital letter,
     and does NOT begin with a non-name opener word. At least one word must not
     be in the non-name vocabulary.
+
+    [LOCAL-467] Also returns False for facility-patron naming patterns:
+    "X Family" is almost always "X Family Gallery/Wing/etc.", NOT a person.
     """
     words = candidate.split()
     if len(words) < 2:
@@ -149,6 +236,14 @@ def _looks_like_person_name(candidate: str) -> bool:
     # gates now agree on what an organisation IS — which is the precondition for
     # them not fighting over the same span.
     if _ORG_MARKER_RE.search(candidate):
+        return False
+
+    # [LOCAL-467] A facility-patron naming pattern is NOT a person.
+    # "X Family" (where "Family" is the last word) is almost always a facility
+    # patron name: "Linde Family Gallery", "Torf Gallery", "Koch Family Wing".
+    # This is D316's family, generalised: a beat followed by or commonly preceding
+    # a facility word is a FACILITY, not a person.
+    if is_facility_name(candidate):
         return False
 
     # A personal name should have at least one word that is NOT a common noun/adj
@@ -377,7 +472,7 @@ def apply_prose_entity_grounding_gate(
     poi_list: List[Dict],
     exhibition_checklist_result,
     stop_names: Optional[List[str]] = None,
-    pre_grounded_names: Optional[List[str]] = None,
+    pre_grounded_names: Optional[List] = None,
 ) -> Dict:
     """Apply the prose entity grounding gate to all stop prose fields.
 
@@ -390,11 +485,18 @@ def apply_prose_entity_grounding_gate(
     story beat extraction. These are grounded by definition (they came from
     the same source as the page text) and must not be stripped.
 
+    [LOCAL-467] pre_grounded_names narrowed: accepts either a list of strings
+    (legacy, unconditional bypass) or a list of dicts with keys:
+      {person, source_work_index, exhibition_wide, stop_index}
+    When dicts are provided, the exemption is per-stop: a beat only grounds a
+    name for the stop whose work it was derived from. An exhibition_wide beat
+    does NOT ground a claim about any specific work.
+
     Args:
         poi_list: List of POI dicts (mutated in place — prose fields are rewritten).
         exhibition_checklist_result: ExhibitionChecklistResult with page_text and works.
         stop_names: List of stop names (excluded from person detection).
-        pre_grounded_names: List of person names known to be grounded (from story beats).
+        pre_grounded_names: List of person names or beat-metadata dicts.
 
     Returns:
         Stats dict with counts of detections, drops, etc.
@@ -419,17 +521,44 @@ def apply_prose_entity_grounding_gate(
         if artist:
             artist_names.add(artist)
 
-    # [LOCAL-390] Build set of pre-grounded person names (from story beat extraction).
-    # These names came from the exhibition page text itself, so they are grounded
-    # by definition and must not be stripped by this gate.
-    _pre_grounded_set: Set[str] = set()
+    # [LOCAL-467] Build per-stop pre-grounded sets.
+    # Two formats supported:
+    #   - Legacy: List[str] → unconditional bypass (all stops)
+    #   - New: List[Dict] → per-stop bypass (only for matched stops)
+    _pre_grounded_global: Set[str] = set()   # legacy: applies to all stops
+    _pre_grounded_per_stop: Dict[int, Set[str]] = {}  # new: stop_index → names
+
     if pre_grounded_names:
-        for pgn in pre_grounded_names:
-            _pre_grounded_set.add(pgn.lower())
-            # Also add surname for matching
-            _pg_surname = _surname_from_full_name(pgn)
-            if _pg_surname:
-                _pre_grounded_set.add(_pg_surname.lower())
+        if pre_grounded_names and isinstance(pre_grounded_names[0], str):
+            # Legacy format: list of strings — unconditional bypass
+            for pgn in pre_grounded_names:
+                _pre_grounded_global.add(pgn.lower())
+                _pg_surname = _surname_from_full_name(pgn)
+                if _pg_surname:
+                    _pre_grounded_global.add(_pg_surname.lower())
+        else:
+            # [LOCAL-467] New format: list of dicts with beat metadata
+            for beat_info in pre_grounded_names:
+                person = beat_info['person']
+                src_idx = beat_info.get('source_work_index')
+                is_wide = beat_info.get('exhibition_wide', False)
+                stop_idx = beat_info.get('stop_index')
+
+                # An exhibition_wide beat proves EXISTENCE, not RELATION to a
+                # specific work. It must NOT ground a claim about one work's stop.
+                if is_wide or src_idx is None:
+                    print(f"  [LOCAL-467] person '{person}' is exhibition_wide — "
+                          f"pre-grounded exemption does NOT apply per-stop")
+                    continue
+
+                # The beat grounds the name only for the stop it was derived from
+                target_stop = src_idx  # source_work_index IS the stop index
+                if target_stop not in _pre_grounded_per_stop:
+                    _pre_grounded_per_stop[target_stop] = set()
+                _pre_grounded_per_stop[target_stop].add(person.lower())
+                _pg_surname = _surname_from_full_name(person)
+                if _pg_surname:
+                    _pre_grounded_per_stop[target_stop].add(_pg_surname.lower())
 
     # Also consider stop names (the works on display) as context
     stop_name_set = set()
@@ -440,12 +569,13 @@ def apply_prose_entity_grounding_gate(
                 if len(w) > 3:
                     stop_name_set.add(w.lower())
 
-    # First pass: collect ALL ungrounded persons across all stops and ALL prose fields
-    # (a person ungrounded in one stop is ungrounded everywhere)
+    # First pass: collect ALL persons across all stops and ALL prose fields,
+    # tracking which stops mention which persons.
     all_persons: Set[str] = set()
-    ungrounded_persons: Set[str] = set()
+    # [LOCAL-467] Track person → set of stop indices where it appears
+    _person_stop_map: Dict[str, Set[int]] = {}
 
-    for poi in poi_list:
+    for stop_idx, poi in enumerate(poi_list):
         for field_key in GATED_PROSE_FIELDS:
             text = poi.get(field_key, '') or ''
             if not text or text.startswith('['):
@@ -458,17 +588,50 @@ def apply_prose_entity_grounding_gate(
                 if surname and surname.lower() in stop_name_set:
                     continue
                 all_persons.add(person)
+                if person not in _person_stop_map:
+                    _person_stop_map[person] = set()
+                _person_stop_map[person].add(stop_idx)
 
     stats['persons_detected'] = len(all_persons)
 
     # Check each person against the grounding corpus
+    ungrounded_persons: Set[str] = set()
+
     for person in all_persons:
-        # [LOCAL-390] Pre-grounded names (from story beat extraction) bypass the check
-        if _pre_grounded_set and (person.lower() in _pre_grounded_set
-                                   or _surname_from_full_name(person).lower() in _pre_grounded_set):
-            stats['persons_grounded'] += 1
-            print(f"  [LOCAL-390] person '{person}' pre-grounded (story beat source) — keeping")
-            continue
+        person_lower = person.lower()
+        surname_lower = _surname_from_full_name(person).lower()
+
+        # [LOCAL-467] Pre-grounded check: per-stop or global
+        if _pre_grounded_global:
+            # Legacy mode: unconditional bypass
+            if (person_lower in _pre_grounded_global
+                    or surname_lower in _pre_grounded_global):
+                stats['persons_grounded'] += 1
+                print(f"  [LOCAL-390] person '{person}' pre-grounded (story beat source) — keeping")
+                continue
+        elif _pre_grounded_per_stop:
+            # [LOCAL-467] New mode: per-stop bypass.
+            # A person is pre-grounded ONLY for the stops where it was derived.
+            # If the person appears in a stop where it's NOT pre-grounded,
+            # it must still pass the normal grounding check.
+            stops_where_used = _person_stop_map.get(person, set())
+            stops_where_grounded = set()
+            for sidx, names_set in _pre_grounded_per_stop.items():
+                if person_lower in names_set or surname_lower in names_set:
+                    stops_where_grounded.add(sidx)
+
+            if stops_where_grounded and stops_where_used.issubset(stops_where_grounded):
+                # Person is pre-grounded for ALL stops where it appears
+                stats['persons_grounded'] += 1
+                print(f"  [LOCAL-390] person '{person}' pre-grounded (story beat source) — keeping")
+                continue
+            elif stops_where_grounded:
+                # Person is grounded for some stops but not all — still check
+                # against the corpus for full grounding
+                print(f"  [LOCAL-467] person '{person}' pre-grounded for stops "
+                      f"{sorted(stops_where_grounded)} but used in {sorted(stops_where_used)} "
+                      f"— checking corpus")
+
         if check_person_grounded(person, page_text, artist_names):
             stats['persons_grounded'] += 1
         else:
@@ -528,6 +691,96 @@ def apply_prose_entity_grounding_gate(
             stats['stops_affected'] += 1
 
     return stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-467] FACILITY CONFLICT DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+# When a stop asserts a gallery/room name and an exhibition beat asserts a
+# DIFFERENT facility, that is a factual contradiction. The system held the
+# right answer (Torf) and shipped the wrong one (Linde Family).
+#
+# This function detects such conflicts and logs them loudly. It does NOT
+# automatically fix the text — it raises a flag so the generation loop can
+# either re-prompt or fail gracefully.
+
+def check_facility_conflicts(
+    poi_list: List[Dict],
+    exhibition_facility_beats: Optional[List[Dict]] = None,
+) -> List[Dict]:
+    """[LOCAL-467] Detect conflicts between stop-level facility claims and exhibition beats.
+
+    If a stop's prose claims the work is in "X Gallery" but an exhibition beat
+    says the facility is "Y Gallery", that is a factual contradiction.
+
+    Args:
+        poi_list: List of POI dicts with prose fields.
+        exhibition_facility_beats: List of facility beat dicts from beat extraction,
+            each having: {person (patron name), source_work_index, exhibition_wide}
+
+    Returns:
+        List of conflict dicts: [{stop_index, stop_name, claimed_facility,
+        exhibition_facility, severity}]
+    """
+    if not exhibition_facility_beats or not poi_list:
+        return []
+
+    conflicts = []
+
+    # Build a map: stop_index → known facility from exhibition beats
+    # Only use beats that are NOT exhibition_wide (those are the specific ones)
+    stop_facility_map: Dict[int, str] = {}
+    exhibition_wide_facility: Optional[str] = None
+
+    for beat in exhibition_facility_beats:
+        facility_name = beat.get('person', '')
+        src_idx = beat.get('source_work_index')
+        is_wide = beat.get('exhibition_wide', False)
+
+        if is_wide or src_idx is None:
+            # This is the exhibition-wide facility (e.g. "Torf Gallery")
+            exhibition_wide_facility = facility_name
+        else:
+            stop_facility_map[src_idx] = facility_name
+
+    # Scan each stop's prose for facility name mentions
+    # Pattern: 1-4 capitalized words immediately before a facility word
+    facility_claim_re = re.compile(
+        r'\b((?:[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+\s+){0,3}[A-ZÀ-ÖØ-Þ][a-zà-ÿ]+)\s+'
+        r'(Gallery|Wing|Room|Court|Rotunda|Pavilion|Hall)\b',
+        re.UNICODE,
+    )
+
+    for stop_idx, poi in enumerate(poi_list):
+        for field_key in GATED_PROSE_FIELDS:
+            text = poi.get(field_key, '') or ''
+            if not text:
+                continue
+
+            for m in facility_claim_re.finditer(text):
+                claimed_patron = m.group(1).strip()
+                claimed_type = m.group(2)
+                claimed_facility = f"{claimed_patron} {claimed_type}"
+
+                # Check against known facility for this stop
+                known_facility = stop_facility_map.get(stop_idx)
+                # Also check against exhibition-wide facility
+                reference_facility = known_facility or exhibition_wide_facility
+
+                if reference_facility and reference_facility.lower() != claimed_patron.lower():
+                    conflict = {
+                        'stop_index': stop_idx,
+                        'stop_name': poi.get('name', '?'),
+                        'claimed_facility': claimed_facility,
+                        'exhibition_facility': reference_facility,
+                        'severity': 'CONFLICT',
+                    }
+                    conflicts.append(conflict)
+                    print(f"  [LOCAL-467] FACILITY CONFLICT: stop {stop_idx + 1} claims "
+                          f"'{claimed_facility}', exhibition beat says "
+                          f"'{reference_facility}' — factual contradiction")
+
+    return conflicts
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

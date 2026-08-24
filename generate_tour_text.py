@@ -13185,12 +13185,25 @@ REWRITE RULES (all mandatory):
             # [LOCAL-390] Collect all person names from story beats — these are
             # grounded by definition (extracted from the page text) and must not
             # be stripped by the entity grounding gate.
+            # [LOCAL-467] Pass per-stop beat metadata so the exemption is narrower:
+            # a beat only grounds a name for the stop whose work it came from.
+            # exhibition_wide beats and gallery_patron beats do NOT ground claims
+            # about a specific work.
             _peg_pre_grounded = []
             if _story_beats_per_stop:
-                for _sblist in _story_beats_per_stop:
+                for _stop_idx, _sblist in enumerate(_story_beats_per_stop):
                     for _sb in _sblist:
-                        if _sb.get('role') not in ('circumstance', 'stakes'):
-                            _peg_pre_grounded.append(_sb['person'])
+                        if _sb.get('role') in ('circumstance', 'stakes'):
+                            continue
+                        # [LOCAL-467] gallery_patron beats are FACILITIES, not persons
+                        if _sb.get('role') == 'gallery_patron':
+                            continue
+                        _peg_pre_grounded.append({
+                            'person': _sb['person'],
+                            'source_work_index': _sb.get('source_work_index'),
+                            'exhibition_wide': _sb.get('exhibition_wide', False),
+                            'stop_index': _stop_idx,
+                        })
             _peg_stats = apply_prose_entity_grounding_gate(
                 poi_list,
                 _exhibition_checklist_result,
@@ -13206,6 +13219,28 @@ REWRITE RULES (all mandatory):
             if _peg_stats['ungrounded_names']:
                 print(f"    Ungrounded: {_peg_stats['ungrounded_names']}")
                 _gate_removed_names = list(_peg_stats['ungrounded_names'])
+
+            # [LOCAL-467] Check for facility conflicts: a stop claiming one gallery
+            # while the exhibition beat says another is a factual contradiction.
+            try:
+                from prose_entity_grounding_gate import check_facility_conflicts
+                _facility_beats = []
+                if _story_beats_per_stop:
+                    for _sblist in _story_beats_per_stop:
+                        for _sb in _sblist:
+                            if _sb.get('role') == 'gallery_patron':
+                                _facility_beats.append({
+                                    'person': _sb['person'],
+                                    'source_work_index': _sb.get('source_work_index'),
+                                    'exhibition_wide': _sb.get('exhibition_wide', False),
+                                })
+                if _facility_beats:
+                    _conflicts = check_facility_conflicts(poi_list, _facility_beats)
+                    if _conflicts:
+                        print(f"  [LOCAL-467] {len(_conflicts)} facility conflict(s) detected")
+            except Exception as _fc_err:
+                print(f"  [LOCAL-467] facility conflict check failed (non-fatal): {_fc_err}")
+
         except ImportError as _peg_err:
             print(f"  [LOCAL-385] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
         except Exception as _peg_err:
