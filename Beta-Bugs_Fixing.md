@@ -24,9 +24,21 @@ briefing. Work top to bottom.
 > **One exception: ask Michael before any GCloud deploy.** Use
 > `deploy_tour_modernized.sh`; runbook is [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
 
-> ## ✅ STATE AS OF 2026-08-20 — §§0–9 below are history, not a plan
+> ## ✅ STATE AS OF 2026-08-23 — §§0–9 below are history, not a plan
 >
 > Everything in §§3–7 is **done**. Read them for background only.
+>
+> ### ⚠️ Two things need Michael, and nothing else can move without him
+>
+> 1. **`main` has an undeployed fix.** Commit `16140ec` repairs tours written
+>    longitude-first (`wdvrdaxqte`). Production still runs `audioura:v33`, which does
+>    **not** contain it. Deploying is a hard stop — ask him.
+> 2. **Yury has not replied in 7 days.** Three tasks are assigned to him and waiting:
+>    `wdvrdaxmq2`, `wdvrdaxmq3`, `wdvrdaxqjn`. His last message was 2026-08-16; the DM
+>    asking him to verify went out 2026-08-20. Nothing can be closed until he answers.
+>
+> The Kiro session (`wdvrdaxqtg`) is **overdue since 2026-08-21** and blocked on
+> Michael installing the CLI and generating `KIRO_API_KEY`.
 >
 > ### After a reboot, do these three things
 >
@@ -60,6 +72,10 @@ briefing. Work top to bottom.
 > validation. Roll back with `./deploy_tour_modernized.sh --rollback`; `v32` is intact.
 > **Deploying is a hard stop — ask Michael first.** Runbook `wdvrdaxn9f`.
 >
+> **`main` is ahead of production.** `16140ec` (reversed lat/lng) is committed and
+> pushed but **not deployed**. Next deploy will pick it up; the script chooses the next
+> free tag from the registry, which is a shared sequence across all services.
+>
 > ### Git
 >
 > `main` and `storied` are both pushed and in sync with origin. `storied` was
@@ -80,14 +96,23 @@ briefing. Work top to bottom.
 > ("Leslie Spit parking" is a description, not a place) and OSM has no car parks
 > mapped near Tommy Thompson Park at all. The cure is `wdvrdaxqtf` in Storied.
 >
+> ### Fixed on 2026-08-23, awaiting deployment
+>
+> - **`wdvrdaxqte` — latitude/longitude reversed.** Fixed in `16140ec`. Two checks:
+>   impossible latitude (>±90), then compare the tour against its own city and reverse
+>   if a majority of stops are 10× closer swapped. All 9 Madagascar stops go from
+>   ~9,900 km to 2–7 km; Sydney, Kyoto and Boston untouched. Red test passes.
+>   The subtle part was **ordering** — it must run before the plausibility anchor is
+>   computed, because the anchor is the median of the stops and is itself in the wrong
+>   ocean when everything is mirrored.
+>
 > ### Open, deliberately unfixed
 >
-> - **`wdvrdaxqte` — latitude/longitude reversed in some tours.** The most severe
->   coordinate defect found: Madagascar tours put every stop 9,899 km out, in the
->   Indian Ocean. Swapping the pair lands 3.9 km from the city. 2 of 16 tours scanned.
->   Pre-existing, affects both tracks. `geocode_stops.py` cannot fix it — its anchor is
->   the median of the stops, so with everything reversed it rejects the *correct*
->   answers.
+> - **Madagascar tours now fail text generation entirely.** Three attempts on
+>   2026-08-23, all `"no stops could be generated (all filtered or knowledge
+>   insufficient)"`. The identical request succeeded on 2026-08-20. Unrelated to the
+>   coordinate work — the module never runs in that path. **No task filed yet.** May
+>   mean thin-coverage locations now fail outright rather than producing a poor tour.
 > - **`generate_tour_text.py:10` imports `enhanced_tour_templates_fixed`**, which is
 >   untracked. `tour-generator` will not start from a clean checkout. Flagged, not fixed.
 > - **Kiro CLI is not installed** on this machine and `kiro_dispatcher.py` cannot run
