@@ -50,7 +50,7 @@ import re
 import time
 from typing import Dict, List, Optional
 
-__all__ = ['run_for_stop', 'is_enabled', 'LOOP_ENABLED_ENV']
+__all__ = ['run_for_stop', 'is_enabled', 'LOOP_ENABLED_ENV', 'MAX_STORIES', 'SECOND_MIN']
 
 LOOP_ENABLED_ENV = 'STORY_LOOP_ENABLED'
 MAX_CREDIT_LINES = int(os.environ.get('STORY_LOOP_MAX_CREDIT_LINES', '4'))
@@ -86,6 +86,16 @@ BEST_OF = os.environ.get('STORY_LOOP_BEST_OF', '1').strip() != '0'
 STOP_AT = int(os.environ.get('STORY_LOOP_STOP_AT', '78'))
 CLAIMS_PER_ANSWER = int(os.environ.get('STORY_LOOP_CLAIMS', '4'))
 PAGES_PER_QUERY = int(os.environ.get('STORY_LOOP_PAGES', '3'))
+
+# [LOCAL-466] How many stories a single stop may publish. Default 2 — Michael's
+# request is "more than one story per stop", but a long stop with three stories
+# would run to >90 seconds of speech, so the cap stays conservative.
+MAX_STORIES = int(os.environ.get('STORY_LOOP_MAX_STORIES', '2'))
+
+# [LOCAL-466] A second story must clear a higher bar than the first. The floor
+# for being publishable AT ALL is 50 (D515); the bar for adding length should be
+# a little higher because the listener is paying attention time for it.
+SECOND_MIN = int(os.environ.get('STORY_LOOP_SECOND_MIN', '55'))
 
 
 def is_enabled() -> bool:
@@ -142,18 +152,27 @@ def _agent_seeds(matrix: Dict) -> List[Dict]:
 def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                  venue_url: str = '', extra_entities: Optional[List[str]] = None,
                  verbose: bool = True) -> Dict:
-    """The whole loop for one stop. Returns the first story that passes the gate.
+    """The whole loop for one stop. Returns the best story AND all accepted stories.
 
-    Returns {'story', 'credit_line', 'gate', 'counts', 'index', 'sources',
-             'examined', 'candidates', 'cost_usd', 'elapsed_s', 'matrix'}.
+    Returns {'story', 'stories', 'credit_line', 'gate', 'counts', 'index',
+             'sources', 'examined', 'candidates', 'cost_usd', 'elapsed_s',
+             'matrix'}.
+
+    `story` is the BEST one — identical to what was returned before LOCAL-466, so
+    nothing that reads the current key breaks.
+
+    `stories` is every candidate that passed the gate, best index first, each
+    with its `credit_line`, `index`, `gate`, `sources`, and `story` text. This
+    is the set LOCAL-466 publishes from.
+
     `story` is '' when nothing passes — which is a publishable outcome, not an
     error (Michael: "correct gate behavior is to publish nothing").
     """
     t0 = time.time()
-    out = {'story': '', 'credit_line': '', 'gate': None, 'counts': {},
-           'index': None, 'sources': [], 'examined': 0, 'candidates': [],
-           'cost_usd': 0.0, 'elapsed_s': 0.0, 'matrix': dict(matrix),
-           'enabled': True, 'accepted_by': ''}
+    out = {'story': '', 'stories': [], 'credit_line': '', 'gate': None,
+           'counts': {}, 'index': None, 'sources': [], 'examined': 0,
+           'candidates': [], 'cost_usd': 0.0, 'elapsed_s': 0.0,
+           'matrix': dict(matrix), 'enabled': True, 'accepted_by': ''}
     gate_best_of = None
     try:
         from object_record import enrich_matrix
@@ -333,6 +352,12 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                                gate=verdict, counts=counts, index=idx,
                                sources=r2.get('sources', []),
                                accepted_by='accepted' if not BEST_OF else 'best_of')
+                # [LOCAL-466] Accumulate every accepted story for multi-story.
+                out['stories'].append({
+                    'story': _kept, 'credit_line': cl, 'index': idx,
+                    'gate': verdict, 'sources': r2.get('sources', []),
+                    'counts': counts, 'kind': kind.get('kind', 'none'),
+                })
                 if not BEST_OF:
                     break
                 # [D523] Keep looking unless this one is already very good.
@@ -355,15 +380,27 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         if fallback:
             sents = _sentences(fallback['story'])
             cap = (fallback['gate'].get('max_sentences') or len(sents))
-            out.update(story=' '.join(sents[:cap]),
+            _fb_text = ' '.join(sents[:cap])
+            out.update(story=_fb_text,
                        credit_line=fallback['credit_line'],
                        gate=fallback['gate'], counts=fallback['counts'],
                        index=fallback['index'], accepted_by='d515_fallback')
+            # [LOCAL-466] The fallback is also the only story in the set.
+            out['stories'] = [{
+                'story': _fb_text, 'credit_line': fallback['credit_line'],
+                'index': fallback['index'], 'gate': fallback['gate'],
+                'sources': [], 'counts': fallback['counts'],
+                'kind': fallback.get('kind', 'none'),
+            }]
             if verbose:
                 print(f"    [D511] no candidate accepted outright — "
                       f"[D515] FALLBACK to the highest index: "
                       f"{fallback['index']} ({fallback['kind']}), "
                       f"credit_line '{fallback['credit_line'][:40]}'")
+
+    # [LOCAL-466] Sort stories by index (best first) — this is the order
+    # PHASE 5.20 publishes them in.
+    out['stories'].sort(key=lambda s: (s.get('index') or 0), reverse=True)
 
     try:
         from cost_rates import search_cost as _sc
