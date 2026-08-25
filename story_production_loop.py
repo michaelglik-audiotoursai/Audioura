@@ -222,9 +222,47 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         prose_seeds = seeds_for_stop(stop_text, set(extra))
     except Exception:
         prose_seeds = []
+
+    # [LOCAL-468] Drop prose seeds that cannot produce a sensible question.
+    # Cause 3: participial/relative fragments with no subject ("was to design
+    # it", "making it a multifaceted artwork that extend") cannot steer
+    # retrieval. A seed needs a subject to form a question about.
+    _rejected_seeds = []
+    _accepted_prose = []
+    for _ps in prose_seeds:
+        _ask = _ps.get('ask', '')
+        _seed_text = _ps.get('seed', '')
+        # A prose seed is rejected if:
+        #   - It appears truncated: last word is 1 char, OR total length >= 40
+        #     and doesn't end with sentence punctuation (clipped by char limit)
+        #   - It has no subject (anchor/subject) AND starts with a subordinating
+        #     word (participial, relative clause fragment)
+        _words = _seed_text.split()
+        _last_word = _words[-1] if _words else ''
+        _truncated = (len(_last_word) <= 1 and len(_words) > 1) or \
+                     (len(_seed_text) >= 40 and _seed_text[-1] not in '.!?')
+        _subj = _ps.get('anchor') or _ps.get('subject') or ''
+        _no_subject = (not _subj or _subj.lower() == 'this')
+        # Starts with a participial/relative/subordinating marker
+        _starts_subordinate = bool(re.match(
+            r'^(was|were|would|could|should|having|making|being|that|which|who)\b',
+            _seed_text.lower()))
+        if _truncated or (_no_subject and _starts_subordinate):
+            _rejected_seeds.append(_ps)
+        else:
+            _accepted_prose.append(_ps)
+    prose_seeds = _accepted_prose
+
     seeds = _agent_seeds(matrix) + prose_seeds
     seeds = seeds[:MAX_CREDIT_LINES]
     if verbose:
+        if _rejected_seeds:
+            print(f"    [LOCAL-468] rejected {len(_rejected_seeds)} prose seed(s) "
+                  f"(no subject or truncated):")
+            for _rs in _rejected_seeds[:5]:
+                print(f"      '{_rs['seed'][:60]}' — "
+                      f"anchor={_rs.get('anchor','')!r}, "
+                      f"subject={_rs.get('subject','')!r}")
         print(f"    [D511] {len(seeds)} credit_line(s) to try "
               f"({sum(1 for s in seeds if s['kind'] == 'matrix_agent')} from the "
               f"matrix, {len(seeds) - sum(1 for s in seeds if s['kind'] == 'matrix_agent')} from the text)")
@@ -237,16 +275,56 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         out['examined'] += 1
         cl = seed['seed']
         try:
-            gq = compile_for_gemini(matrix, cl, exhibition)
-            mat = '\n'.join(f'  {k}: {v}' for k, v in matrix.items() if v)
+            # [LOCAL-468] The seed's OWN question is what produces diversity.
+            # Before: "What story about {work}, {seed}?" — the work is the
+            # grammatical subject and every seed returns the same episode.
+            # After: seed['ask'] IS the question, and the work is context.
+            seed_ask = seed.get('ask') or compile_for_gemini(matrix, cl, exhibition)
+
+            # [LOCAL-468] Only the fields relevant to THIS seed, not the whole
+            # matrix. Identical context for all four seeds is why all four
+            # answers converge. Every seed gets the work title + artist (for
+            # attribution), but agent seeds get only their own role field.
+            _ctx_fields = ['canonical_title', 'artist', 'venue_name']
+            if seed.get('kind') == 'matrix_agent':
+                # Add the field this seed came from, so the model knows the
+                # relationship, but NOT the other agents.
+                _seed_field = (seed.get('id') or '').replace('agent:', '')
+                if _seed_field and _seed_field in matrix and _seed_field not in _ctx_fields:
+                    _ctx_fields.append(_seed_field)
+            else:
+                # Prose seeds get the full matrix — they don't have a specific
+                # agent to isolate.
+                _ctx_fields = [k for k in matrix if matrix.get(k)]
+            mat = '\n'.join(f'  {k}: {matrix[k]}' for k in _ctx_fields
+                           if matrix.get(k))
+
+            # [LOCAL-468] The instruction steers toward the seed's subject, not
+            # toward one canonical episode. For agent seeds: "what did THIS
+            # person do" — which is already what seed['ask'] says. For prose
+            # seeds: the original instruction is fine (they ARE about the work).
+            if seed.get('kind') == 'matrix_agent':
+                instruction = (
+                    f"Search, then answer with FACTS ONLY about {cl} — each one "
+                    "sentence, with its source in brackets. What did they do in "
+                    "relation to this work? What happened to them because of it? "
+                    "If you find nothing reliable about THIS PERSON, say exactly "
+                    '"NO RELIABLE INFORMATION". Do not discuss other people\'s '
+                    "contributions. Do not praise the work. Maximum 6 sentences.")
+            else:
+                instruction = (
+                    "Search, then answer with FACTS ONLY — each one sentence, with its "
+                    "source in brackets. Prefer what a visitor standing in front of it "
+                    "cannot see: why it was made, who decided, what went wrong, what it "
+                    "cost someone. If you find nothing reliable, say exactly "
+                    '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
+                    "how it looks. Maximum 6 sentences.")
+
             r1 = gemini_with_sources(
-                f"{gq}\n\nWhat is already known about the work:\n{mat}\n\n"
-                "Search, then answer with FACTS ONLY — each one sentence, with its "
-                "source in brackets. Prefer what a visitor standing in front of it "
-                "cannot see: why it was made, who decided, what went wrong, what it "
-                "cost someone. If you find nothing reliable, say exactly "
-                '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
-                "how it looks. Maximum 6 sentences.")
+                f"{seed_ask}\n\n"
+                f"Context — the work this concerns:\n{mat}\n"
+                f"Exhibition: {exhibition or 'this exhibition'}\n\n"
+                f"{instruction}")
             n_gem += 1
             if not (r1.get('text') or '').strip():
                 continue
@@ -402,6 +480,34 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     # PHASE 5.20 publishes them in.
     out['stories'].sort(key=lambda s: (s.get('index') or 0), reverse=True)
 
+    # [LOCAL-468] Pairwise content overlap between candidates — diversity
+    # measurement. A run where all four candidates exceed 0.6 overlap is a
+    # failure: the seeds produced the same story four times.
+    _overlap_pairs = []
+    _cand_stories = [(c['credit_line'], c['story']) for c in out['candidates']
+                     if c.get('story')]
+    if len(_cand_stories) >= 2:
+        from story_element_extractor import jaccard_similarity as _jacc
+        for _i in range(len(_cand_stories)):
+            for _j in range(_i + 1, len(_cand_stories)):
+                _ov = round(_jacc(_cand_stories[_i][1], _cand_stories[_j][1]), 3)
+                _overlap_pairs.append({
+                    'a': _cand_stories[_i][0][:40],
+                    'b': _cand_stories[_j][0][:40],
+                    'overlap': _ov,
+                })
+        out['pairwise_overlap'] = _overlap_pairs
+        _max_ov = max(p['overlap'] for p in _overlap_pairs)
+        _mean_ov = sum(p['overlap'] for p in _overlap_pairs) / len(_overlap_pairs)
+        out['max_overlap'] = _max_ov
+        out['mean_overlap'] = round(_mean_ov, 3)
+        if verbose:
+            print(f"    [LOCAL-468] pairwise overlap: "
+                  f"mean={_mean_ov:.3f}, max={_max_ov:.3f} "
+                  f"({'DIVERSE' if _max_ov < 0.6 else 'CONVERGED — seeds not working'})")
+            for _p in _overlap_pairs:
+                print(f"      {_p['a'][:20]:20} × {_p['b'][:20]:20} = {_p['overlap']:.3f}")
+
     try:
         from cost_rates import search_cost as _sc
         out['cost_usd'] = round(_sc(n_serp) + n_gem * 0.006, 4)
@@ -445,6 +551,9 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                     'legacy_passes': _c['gate'].get('legacy_passes'),
                     'legacy_failed': _c['gate'].get('legacy_failed'),
                     'story': _c['story'],
+                    'pairwise_overlap': out.get('pairwise_overlap', []),
+                    'mean_overlap': out.get('mean_overlap'),
+                    'max_overlap': out.get('max_overlap'),
                 }, ensure_ascii=False) + '\n')
     except Exception as _e:
         if verbose:
