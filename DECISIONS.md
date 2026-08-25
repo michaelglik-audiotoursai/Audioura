@@ -20971,3 +20971,76 @@ regex demands two capitalised words before the tail. **Written around one exampl
 within that example's shape** — the eighth occurrence of the pattern. Not fixed in this pass;
 widening a name check invites false positives on "the Museum of Fine Arts" and that trade needs
 measuring, not a same-day guess.
+
+---
+
+## D528 — The three runs produced no index number, because the tours were not the same tour
+
+**2026-08-25. Michael asked for three runs under build `c96f3fb` to get a meaningful index.
+The answer is that the measurement is invalid, and the reason is a live product defect.**
+
+```
+run 1  index mean 74.5 over 2 stop(s)   stops: Le Lézard | Le Lézard … (detail)
+run 2  index mean 67.0 over 2 stop(s)   stops: Le Lézard | Le Lézard … (detail)
+run 3  index mean 76.0 over 1 stop(s)   stops: Le Lézard
+```
+
+**Every stop in all three runs is the same work.** Au Soleil du Plafond and Moses and Monotheism
+are gone. Run 1 and run 2 ship a tour that visits Le Lézard twice — the second stop being the
+image caption *"(detail)"* promoted to an artwork. Run 3's 76.0 is the highest single number of
+the day and the worst tour: one stop.
+
+**These means cannot be compared to anything**, including each other and including the 75.7
+baseline. A mean over a different stop set is a different quantity. **Every index comparison made
+today rests on the tours having the same three stops**, which held for the 08-24 baseline and for
+both 08-25 runs (works=3 each) and did not hold here.
+
+**Cause, traced.** `prose_llm_extract_works` (LOCAL-368) returned across five runs on the same
+URL, same code path, same `path=prose_llm`:
+
+```
+11:22 and earlier  works=3   Le Lézard, Au Soleil, Moses
+12:58, 13:06       works=2   Le Lézard, Le Lézard (detail)
+13:15              works=1   Le Lézard
+```
+
+The page did not lose the works. The filtered page text is 2,761 chars — comfortably inside the
+5,000-char window, so **truncation is not the cause** (hypothesis tested and rejected). All four
+extractable items are present:
+
+- chars ~380–720: two **image credit lines**, both Le Lézard, one suffixed `(detail)`, each
+  carrying publisher/printer/date and reading exactly like checklist entries.
+- chars ~1,600–2,200: Moses and Monotheism and Au Soleil du Plafond mentioned **only inside body
+  prose**, in a flowing sentence.
+
+The extractor anchors on the formatted credit lines at the top and drops the prose mentions.
+Ten consecutive calls on identical input returned 1 work, 10/10, one distinct result set — so it
+is **not** run-to-run sampling noise at `temperature: 0.0`. Something changed between 11:22 and
+12:58 that is outside the repo: model serving, or the per-host page cache. **I did not identify
+which, and I am not guessing** — the two certain defects below do not depend on knowing.
+
+**Two defects that hold regardless of root cause:**
+
+1. **`(detail)` is a caption convention, never a work.** It denotes a cropped view of a work
+   already listed. Extracting it produces a duplicate stop, which is what shipped in runs 1 and 2.
+   A title-normalised dedupe belongs with it — a checklist must not list one work twice.
+2. **Works named only in body prose are missed.** The system prompt says "extract every
+   artwork/work mentioned" and carries no instruction distinguishing captions from prose. This is
+   the one that cost the exhibition two of its three works.
+
+**Not fixed in this pass, deliberately.** Fix 1 is safe and nearly mechanical. Fix 2 is a prompt
+change, and today produced three separate instances of a rule fitted to the single example in
+front of it (D526 twice, and check (a) in D527). A prompt edit validated only against this page
+would be the fourth. **The validation this needs, before any edit:** the extractor run N times
+against a set of exhibition pages whose correct work list is already known, scored in both
+directions — works missed and non-works admitted — with the current prompt as the baseline.
+
+**Also worth stating: `LOCAL-394` reported "Stop count invariant: OK (2 selected == 2 delivered)"
+on a tour with a duplicated stop.** It checks internal consistency of the pipeline, not that the
+count or the identities are right. It is not broken; it is measuring something narrower than its
+name suggests.
+
+**The standing index picture is unchanged from D527 and stays there:** 75.7 baseline, 60.7 under
+LOCAL-468 alone, 73.7 under LOCAL-468+D527, all three-stop tours, one run each. **There is still
+no n=3 measurement**, and there cannot be one until the checklist returns the same exhibition
+twice running.
