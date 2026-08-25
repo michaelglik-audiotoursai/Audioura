@@ -14503,11 +14503,16 @@ REWRITE RULES (all mandatory):
                             # Rule 2: merge against what is already in the stop.
                             # The first story merges against the original prose.
                             # Additional stories merge against prose+prior stories.
+                            # [LEAD review] Only the FIRST story may claim the
+                            # opening. Without this, a second story whose merge
+                            # drops the opening sentence gets fronted — weaker
+                            # story first, prose in the middle, best story last.
                             _d466_merged, _d466_mrep = _d518_merge(
                                 _d466_current_text, _d466_s_story,
                                 work_titles=[_d511_poi.get('name', ''),
                                              _d511_poi.get('english_title', '')],
-                                verbose=True)
+                                verbose=True,
+                                allow_story_first=not _d466_published)
 
                             # If the story was largely absorbed (fewer than 2
                             # sentences of the story survived in the merged text

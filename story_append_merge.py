@@ -470,7 +470,8 @@ def _overlap(prose_sentence: str, story_anchors: Set[str], story_content: Set[st
 
 def merge_story_into_description(description: str, story: str,
                                  work_titles: Sequence[str] = (),
-                                 verbose: bool = False) -> Tuple[str, Dict]:
+                                 verbose: bool = False,
+                                 allow_story_first: bool = True) -> Tuple[str, Dict]:
     """Join the gated story to the stop's prose, minus the prose it repeats.
 
     Returns `(merged_text, report)`. `report` carries `dropped` (the sentences
@@ -586,7 +587,15 @@ def merge_story_into_description(description: str, story: str,
     #
     # It is also the truer reading of "the story REPLACES the prose it overlaps":
     # replacement should happen where the prose was, not always at the end.
-    story_first = bool(scored) and id(scored[0]) in doomed
+    #
+    # **`allow_story_first=False` exists because LOCAL-466 publishes more than one
+    # story per stop.** The SECOND story merges against text that already contains
+    # the first; if that merge drops the opening sentence, this rule would front
+    # the second story — putting the weaker story first, the prose in the middle,
+    # and the best story last. Measured on a fixture during review, before the
+    # branch was merged. Only the first story may claim the opening.
+    story_first = (allow_story_first and bool(scored)
+                   and id(scored[0]) in doomed)
 
     # Repair the anaphora the dedupe broke, when the prose still opens the stop.
     # Unnecessary when the story opens it — a following "This marked…" then points

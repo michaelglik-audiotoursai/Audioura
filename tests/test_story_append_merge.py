@@ -247,6 +247,40 @@ def test_orphan_repair_cannot_eat_a_stop():
           str(report['kept']))
 
 
+def test_only_the_first_story_may_claim_the_opening():
+    """LOCAL-466 publishes more than one story per stop; order must survive.
+
+    Found by fixture during review of LOCAL-466, before it was merged. The second
+    story merges against text that already contains the first — and if that merge
+    drops the opening sentence, D518b's "story becomes the opening" rule fires
+    again and fronts the SECOND story: weaker story first, prose in the middle,
+    best story last.
+    """
+    prose = ("In 1974, Salvador Dali illustrated Freud's book. The edition is "
+             "bound in vellum. Boris Fridman gave the work to the museum.")
+    first = ("In 1939 Sigmund Freud published Moses and Monotheism, arguing "
+             "Moses was an Egyptian noble.")
+    second = ("Dali etched the designs onto gold plates with a diamond stylus "
+              "in 1974.")
+    text, published = prose, []
+    for s in (first, second):
+        text, rep = merge_story_into_description(
+            text, s, work_titles=['Moses and Monotheism'],
+            allow_story_first=not published)
+        published.append(s)
+    check('the best story still precedes the second',
+          text.index('Egyptian noble') < text.index('diamond stylus'), text[:90])
+    check('both stories survive',
+          'Egyptian noble' in text and 'diamond stylus' in text)
+
+    # And the flag must not disturb the single-story case it was carved out of.
+    solo, rep = merge_story_into_description(
+        STOP3_PROSE, STOP3_STORY, work_titles=['Moses and Monotheism'])
+    check('a single story still opens its stop when it replaced the opening',
+          rep['story_first'] and solo.startswith('In 1939, Sigmund Freud'),
+          solo[:60])
+
+
 def test_no_story_still_gets_cleaned():
     """A stop that published no story can still read a domain out loud."""
     merged, report = merge_story_into_description(STOP1_PROSE, '')
@@ -411,6 +445,7 @@ if __name__ == '__main__':
                test_prose_still_opens_when_its_first_sentence_survived,
                test_orphan_repair_when_the_prose_still_opens,
                test_orphan_repair_cannot_eat_a_stop,
+               test_only_the_first_story_may_claim_the_opening,
                test_no_story_still_gets_cleaned,
                test_bracketed_citations_never_reach_the_listener,
                test_a_sentence_may_not_say_the_same_thing_twice,
