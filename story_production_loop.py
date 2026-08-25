@@ -177,7 +177,8 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     try:
         from object_record import enrich_matrix
         from story_seeds import seeds_for_stop
-        from story_query import compile_for_serper, compile_for_gemini
+        from story_query import (compile_for_serper, compile_for_gemini,
+                                 compile_for_seed)
         from story_leads import gemini_with_sources
         from story_adjudicate import (claims_of, challenge_queries_for,
                                       ADJUDICATION_PROMPT, count_statuses,
@@ -222,6 +223,17 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         prose_seeds = seeds_for_stop(stop_text, set(extra))
     except Exception:
         prose_seeds = []
+
+    # [LOCAL-468 r2, LEAD] The submitted prose-seed filter was REMOVED, not
+    # tuned. Its premise — that seeds arrive truncated ("...that extend",
+    # "...the intended w") — came from a log line that had been clipped for
+    # display; `seeds_for_stop` emits the full phrase. Measured over
+    # TOUR_D525_UNBOUND: 0 of 33 seeds are truncated, and 0 end in sentence
+    # punctuation, because `_clean` strips it by construction. So the test
+    # `len(seed) >= 40 and seed[-1] not in '.!?'` reduced to `len(seed) >= 40`
+    # and discarded 16 of 33 prose seeds — among them complete, subject-bearing
+    # ones like "Mourlot Frères, a renowned French lithographic printing
+    # company", which is exactly the material this task exists to keep.
     seeds = _agent_seeds(matrix) + prose_seeds
     seeds = seeds[:MAX_CREDIT_LINES]
     if verbose:
@@ -237,16 +249,19 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         out['examined'] += 1
         cl = seed['seed']
         try:
-            gq = compile_for_gemini(matrix, cl, exhibition)
-            mat = '\n'.join(f'  {k}: {v}' for k, v in matrix.items() if v)
+            # [LOCAL-468] The seed's OWN question is what produces diversity.
+            # Before: "What story about {work}, {seed}?" — the work is the
+            # grammatical subject and every seed returns the same episode.
+            # After: seed['ask'] IS the question and the work is context, and
+            # each agent seed sees only its own role field so the model cannot
+            # answer about whoever is most prominent in the matrix.
+            #
+            # [r2, LEAD] This was an inline copy of `compile_for_seed`, which
+            # the submission added to story_query.py and then never imported —
+            # the D511 orphan pattern, inside the fix for D511. One call site,
+            # one definition.
             r1 = gemini_with_sources(
-                f"{gq}\n\nWhat is already known about the work:\n{mat}\n\n"
-                "Search, then answer with FACTS ONLY — each one sentence, with its "
-                "source in brackets. Prefer what a visitor standing in front of it "
-                "cannot see: why it was made, who decided, what went wrong, what it "
-                "cost someone. If you find nothing reliable, say exactly "
-                '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
-                "how it looks. Maximum 6 sentences.")
+                compile_for_seed(seed, matrix, exhibition))
             n_gem += 1
             if not (r1.get('text') or '').strip():
                 continue
@@ -402,6 +417,34 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     # PHASE 5.20 publishes them in.
     out['stories'].sort(key=lambda s: (s.get('index') or 0), reverse=True)
 
+    # [LOCAL-468] Pairwise content overlap between candidates — diversity
+    # measurement. A run where all four candidates exceed 0.6 overlap is a
+    # failure: the seeds produced the same story four times.
+    _overlap_pairs = []
+    _cand_stories = [(c['credit_line'], c['story']) for c in out['candidates']
+                     if c.get('story')]
+    if len(_cand_stories) >= 2:
+        from story_element_extractor import jaccard_similarity as _jacc
+        for _i in range(len(_cand_stories)):
+            for _j in range(_i + 1, len(_cand_stories)):
+                _ov = round(_jacc(_cand_stories[_i][1], _cand_stories[_j][1]), 3)
+                _overlap_pairs.append({
+                    'a': _cand_stories[_i][0][:40],
+                    'b': _cand_stories[_j][0][:40],
+                    'overlap': _ov,
+                })
+        out['pairwise_overlap'] = _overlap_pairs
+        _max_ov = max(p['overlap'] for p in _overlap_pairs)
+        _mean_ov = sum(p['overlap'] for p in _overlap_pairs) / len(_overlap_pairs)
+        out['max_overlap'] = _max_ov
+        out['mean_overlap'] = round(_mean_ov, 3)
+        if verbose:
+            print(f"    [LOCAL-468] pairwise overlap: "
+                  f"mean={_mean_ov:.3f}, max={_max_ov:.3f} "
+                  f"({'DIVERSE' if _max_ov < 0.6 else 'CONVERGED — seeds not working'})")
+            for _p in _overlap_pairs:
+                print(f"      {_p['a'][:20]:20} × {_p['b'][:20]:20} = {_p['overlap']:.3f}")
+
     try:
         from cost_rates import search_cost as _sc
         out['cost_usd'] = round(_sc(n_serp) + n_gem * 0.006, 4)
@@ -445,6 +488,9 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                     'legacy_passes': _c['gate'].get('legacy_passes'),
                     'legacy_failed': _c['gate'].get('legacy_failed'),
                     'story': _c['story'],
+                    'pairwise_overlap': out.get('pairwise_overlap', []),
+                    'mean_overlap': out.get('mean_overlap'),
+                    'max_overlap': out.get('max_overlap'),
                 }, ensure_ascii=False) + '\n')
     except Exception as _e:
         if verbose:

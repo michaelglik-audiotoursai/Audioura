@@ -48,8 +48,8 @@ from typing import Dict, List, Optional
 
 from text_fold import fold, is_placeholder
 
-__all__ = ['compile_for_serper', 'compile_for_gemini', 'agents_of',
-           'GEMINI_TEMPLATE']
+__all__ = ['compile_for_serper', 'compile_for_gemini', 'compile_for_seed',
+           'agents_of', 'GEMINI_TEMPLATE']
 
 GEMINI_TEMPLATE = (
     'What story can be told to visitors of {exhibition} about {work}'
@@ -173,3 +173,64 @@ def compile_for_gemini(matrix: Dict, credit_line_seed: str = '',
         exhibition=exhibition or 'this exhibition',
         work=_bare_title(matrix),
         credit=f', {credit}' if credit else '')
+
+
+def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
+    """[LOCAL-468] The question that makes each seed produce a DIFFERENT story.
+
+    Before: "What story about {work}, {seed}?" — the work is the subject and
+    the seed is a trailing comma-appendage that every model ignores.
+
+    After: seed['ask'] IS the question. The work is context, not subject.
+    Agent seeds get only their own role field, not the entire matrix.
+    """
+    seed_ask = seed.get('ask') or ''
+    if not seed_ask:
+        # Every producer of a seed — `_agent_seeds` and `seeds_for_stop` — sets
+        # 'ask', so this is unreachable today. It falls THROUGH rather than
+        # returning: an early return here would have shipped the bare question
+        # with no context and no FACTS-ONLY instruction, which is the one
+        # prompt shape this module exists to prevent.
+        credit = (seed.get('seed') or '').strip().rstrip('.?')
+        seed_ask = GEMINI_TEMPLATE.format(
+            exhibition=exhibition or 'this exhibition',
+            work=_bare_title(matrix),
+            credit=f', {credit}' if credit else '')
+
+    # Context: only the fields relevant to THIS seed
+    ctx_fields = ['canonical_title', 'artist', 'venue_name']
+    if seed.get('kind') == 'matrix_agent':
+        # 'agent:donor' is derived from credit_line and has no field of its own.
+        seed_field = (seed.get('id') or '').replace('agent:', '')
+        if seed_field == 'donor':
+            seed_field = 'credit_line'
+        if seed_field and seed_field in matrix and seed_field not in ctx_fields:
+            ctx_fields.append(seed_field)
+    else:
+        ctx_fields = [k for k in matrix if matrix.get(k)]
+
+    mat = '\n'.join(f'  {k}: {matrix[k]}' for k in ctx_fields if matrix.get(k))
+
+    # Instruction varies by seed kind
+    cl = seed.get('seed', '')
+    if seed.get('kind') == 'matrix_agent':
+        instruction = (
+            f"Search, then answer with FACTS ONLY about {cl} — each one "
+            "sentence, with its source in brackets. What did they do in "
+            "relation to this work? What happened to them because of it? "
+            "If you find nothing reliable about THIS PERSON, say exactly "
+            '"NO RELIABLE INFORMATION". Do not discuss other people\'s '
+            "contributions. Do not praise the work. Maximum 6 sentences.")
+    else:
+        instruction = (
+            "Search, then answer with FACTS ONLY — each one sentence, with its "
+            "source in brackets. Prefer what a visitor standing in front of it "
+            "cannot see: why it was made, who decided, what went wrong, what it "
+            "cost someone. If you find nothing reliable, say exactly "
+            '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
+            "how it looks. Maximum 6 sentences.")
+
+    return (f"{seed_ask}\n\n"
+            f"Context — the work this concerns:\n{mat}\n"
+            f"Exhibition: {exhibition or 'this exhibition'}\n\n"
+            f"{instruction}")
