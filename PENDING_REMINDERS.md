@@ -15,6 +15,62 @@ Durable across sessions. Delete a line once delivered.
       **Two runs happened: 10:26 exposed a defect in the append fix itself, 10:36 has the fix
       and is the deliverable even though it scores lower.** Original instruction below.
 
+- [ ] **2026-08-25 — NEXT SESSION'S FIRST TASK: review and merge LOCAL-468, then measure.**
+
+      **Read first:** `DECISIONS.md` tail (D518-D526), then
+      [`TOUR_MFA_UNBOUND_20260824_2259_JUDGEMENT.md`](TOUR_MFA_UNBOUND_20260824_2259_JUDGEMENT.md),
+      then Q22 in `STORIED_COMMUNICATION_03.MD`. That is the whole picture.
+
+      **STATE AT THE /clear.** `storied` pushed and clean. In production: D518 (story replaces
+      overlapping prose), D519 (Treat Page must be earned), D521 (no bracketed citations, no
+      intra-sentence duplication, no spoken `Closing:`), D523 (best-of-4 selection; spoken-text
+      hygiene; known-fact corrections), LOCAL-465 (exhibition not found — LEAD fixed a NameError
+      that made it dead on arrival), LOCAL-466 (multi-story, works but publishes none — see
+      below), LOCAL-467 (gallery attribution). Last tour: **index mean 75.7, range 73-81, the
+      best measured; floor moved 44 -> 73.**
+
+      **(1) LOCAL-468 IS COMPLETE AND UNREVIEWED** on branch `LOCAL-468-seed-diversity`
+      (1 commit, `SUBMISSION_LOCAL-468.md` in its worktree). It is the fix for the thing Michael
+      asked about on 08-25: four seeds naming FOUR DIFFERENT PEOPLE — Miró, Broder, Mourlot,
+      Boris Fridman — all returned the same story about the 1967 paper defect. **The Mourlot
+      answer never discusses Mourlot.** Causes, all three in `new_kiro_session_is_required_LOCAL-468.md`:
+      the seed is a comma-appendage in `GEMINI_TEMPLATE`; `seed['ask']` exists in
+      `_agent_seeds()` and production discards it (used only in the lab scripts —
+      **the orphan pattern D511 was created to end, recurring inside D511's own module**); and
+      prose seeds are subject-less fragments (`'was to design it'`).
+
+      **Review it against its acceptance criteria, which are deliberately hard:** a live tour
+      where stop 1's four candidates are about DIFFERENT things, pairwise overlap below 0.6,
+      **and the indices must not collapse** (baseline mean 75.7, range 73-81) — a diverse set of
+      weak stories is not an improvement.
+
+      **VERIFY THE WIRING, NOT THE FUNCTION.** LOCAL-465 shipped with 27 green unit tests and a
+      `NameError` on every live run, because every test called the decision function directly and
+      none exercised the call site. Paste a real query showing `seed['ask']` reaching Gemini.
+
+      **(2) THEN ONE TOUR.** Michael's standing rule: generate ONCE, never three-and-pick-the-best.
+      Two documents in VS Code — the tour verbatim and LEAD's judgement.
+
+      **(3) STANDING FINDINGS worth not re-deriving.**
+      - **LOCAL-466 publishes one story per stop and that is CORRECT for now.** Its duplicate
+        guard rejected every second story because they were the same story. Do NOT lower
+        `STORY_LOOP_SECOND_MIN` or raise `STORY_LOOP_MAX_STORIES` to force one through — the fix
+        is LOCAL-468, upstream.
+      - **The rubric base score is dead.** 75.0 for seven consecutive runs across tours that
+        differ enormously, INCLUDING a fictional one. Use the stop index; stop quoting the rubric.
+      - **Six instrument failures on 08-24, all the same shape** — a rule fitted to the single
+        example in front of it. Every new checker must be validated against a case whose answer
+        is already known, in BOTH directions.
+      - `"the Louis Broder Tériade"` cross-stop name fusion: **4 of 8 runs, untouched.** Longest-
+        lived unfixed defect.
+      - Michael on length: *"I am not bothered that Stop 1 is long… because of the stories not
+        mere descriptions."* LEAD's "too long" recommendation is WITHDRAWN.
+
+      **(4) Kiro auth expires.** All three tasks failed once on `OAuth error: Auth portal timed
+      out` with zero commits. Michael logs in from a separate Kiro session; verify with a real
+      headless call (`kiro-cli chat --trust-all-tools --no-interactive "..."`), not `whoami`.
+      `FAILED` counts as claimed — append `ABANDONED` to `kiro_sessions_ran.md` to re-dispatch.
+
 - [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
       Do these in order. Everything needed is on disk; do not ask him to re-explain.
 
