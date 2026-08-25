@@ -184,13 +184,25 @@ def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
     After: seed['ask'] IS the question. The work is context, not subject.
     Agent seeds get only their own role field, not the entire matrix.
     """
-    seed_ask = seed.get('ask') or ''
+    # [D527] `ask` is only a retrieval question for MATRIX AGENTS. `_agent_seeds`
+    # writes "What did Mourlot actually do, and what came of it?" — a question a
+    # search model can answer. `seeds_for_stop` writes something else entirely:
+    #
+    #     'What did {subj} actually DO that would justify "{phrase}"?
+    #      If nothing, cut the phrase.'
+    #
+    # That is an AUDIT question. It asks whether our own prose survives scrutiny,
+    # and its last clause is an instruction to a checklist — meaningless to a
+    # search model, and an open invitation to answer "nothing". Sending it to
+    # Gemini as the retrieval query was a scope error in LOCAL-468: it read
+    # `seed['ask']` for every seed kind because agent seeds happened to be the
+    # case in front of it.
+    #
+    # Prose seeds therefore keep the question they had before LOCAL-468 — the
+    # story-seeking one, with the phrase as the credit anchor. Nothing else about
+    # the prose path changed, so this restores it exactly.
+    seed_ask = seed.get('ask') if seed.get('kind') == 'matrix_agent' else ''
     if not seed_ask:
-        # Every producer of a seed — `_agent_seeds` and `seeds_for_stop` — sets
-        # 'ask', so this is unreachable today. It falls THROUGH rather than
-        # returning: an early return here would have shipped the bare question
-        # with no context and no FACTS-ONLY instruction, which is the one
-        # prompt shape this module exists to prevent.
         credit = (seed.get('seed') or '').strip().rstrip('.?')
         seed_ask = GEMINI_TEMPLATE.format(
             exhibition=exhibition or 'this exhibition',

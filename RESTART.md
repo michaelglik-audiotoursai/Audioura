@@ -1,9 +1,9 @@
-# RESTART briefing — generated 2026-08-24 10:16 EDT
+# RESTART briefing — generated 2026-08-25 09:58 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     7faccb2 Handoff for the /clear: next session's task list, and Q16
+HEAD     be1cb1a Handoff for the /clear: LOCAL-468 awaits review, and the findings not to re-derive
 unpushed 0 commits
 dirty    1 files
 ```
@@ -13,21 +13,21 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      614
+cost_ledger rows:      621
 ```
-ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
+ALERTS.md: 40 alert line(s) in the last 40 — read it if non-zero.
 
 ## Queue
 ```
 in flight:
 
 last 6 dispatcher events:
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-462.md | at=2026-08-13T20:00:15-04:00 | base=storied | dispatche
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-463.md | at=2026-08-13T20:00:15-04:00 | base=storied | dispatche
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-464.md | at=2026-08-13T20:00:15-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-462.md | id=TLOCAL-462 | branch=LOCAL-462-request-and-structure 
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-463.md | id=TLOCAL-463 | branch=LOCAL-463-validate-story | base=
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-464.md | id=TLOCAL-464 | branch=LOCAL-464-evaluate-story | base=
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-467.md | at=2026-08-24T19:27:55-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-466.md | id=TLOCAL-466 | branch=LOCAL-466-multi-story | base=sto
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-467.md | id=TLOCAL-467 | branch=LOCAL-467-gallery-attribution | 
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-465.md | id=TLOCAL-465 | branch=LOCAL-465-exhibition-not-found |
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-468.md | at=2026-08-25T01:11:14-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-468.md | id=TLOCAL-468 | branch=LOCAL-468-seed-diversity | base=
 ```
 
 ## Re-dispatchable (last status ABANDONED — a bounce awaiting pickup)
@@ -64,13 +64,14 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  12:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
-  69:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
-  105:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
-  128:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
-  132:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
-  139:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  223:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  18:- [ ] **2026-08-25 — NEXT SESSION'S FIRST TASK: review and merge LOCAL-468, then measure.**
+  74:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
+  131:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
+  167:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+  190:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  194:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  201:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  285:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules

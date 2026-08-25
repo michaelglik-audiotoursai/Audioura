@@ -20846,3 +20846,68 @@ name.** That is the honest measure of what the checks are worth.
 **Retire the rubric from these reports:** base score 75.0 for seven consecutive runs across tours
 that differ enormously, including the fictional one. The stop index tracks real quality; the
 rubric does not.
+
+---
+
+## D526 — A filter whose premise was a truncated log line, and the orphan inside the fix for orphans
+
+**2026-08-25. LOCAL-468 reviewed, two defects repaired, merged as r2.**
+
+The task was real and the fix works. Four seeds naming Miró, Broder, Mourlot and Fridman all
+returned the same story about the 1967 paper defect, and the Mourlot answer never discussed
+Mourlot. `seed['ask']` is now the question, the work is context, and each agent seed sees only
+its own role field. Live, stop 1: pairwise overlap **mean 0.170, max 0.247**, against ~1.0
+before. The Mourlot answer is about Mourlot; the Fridman answer is about a Boston collector of
+artists' books giving them to the MFA — material no earlier run produced at all. Two stories
+published, 76 and 52, so LOCAL-466's machinery finally has distinct material to merge.
+
+**What was removed, and why it matters beyond this task.**
+
+The submission added a fifth fix: a quality gate rejecting "truncated" prose seeds.
+
+```python
+_truncated = (len(_last_word) <= 1 and len(_words) > 1) or \
+             (len(_seed_text) >= 40 and _seed_text[-1] not in '.!?')
+```
+
+`_clean()` in `story_seeds.py` ends `.strip(' ,;:.')`. A prose seed therefore **cannot** end in
+sentence punctuation. The second clause reduces, by construction of the function producing its
+input, to `len(seed) >= 40`. Measured over every prose seed in `TOUR_D525_UNBOUND.txt`: 33
+seeds, **0 truncated, 0 ending in `.!?`, 16 rejected — all 16 by the length half, none by the
+no-subject half.** Among the discards: `'Mourlot Frères, a renowned French lithographic
+printing company'`, which is precisely the material LOCAL-468 exists to preserve.
+
+**The premise was false.** The five "truncated fragments" quoted in the task file were log
+lines clipped for display. The seed behind `'making it a multifaceted artwork that extend'` is
+`'making it a multifaceted artwork that extends beyond its original narrative'` — complete, and
+a verbatim span of its sentence. **I wrote that task file, and I wrote it from my own truncated
+output.** A dispatched agent then built an instrument to catch a defect that never existed, and
+because the only examples available were ≥40 characters, a length cutoff "passed".
+
+This is the 08-24 shape for the seventh time: *a rule fitted to the single example in front of
+it, validated in one direction only.* Standing check 3 exists for exactly this and was not run.
+
+**The rule that follows, and it binds task files as much as instruments:** a task file must
+quote evidence from the data, not from a log line. When a defect is described by an example
+string, the string must be produced by calling the function that emits it and printing it
+whole — not copied out of a print statement that may have applied `[:60]`. Half the review cost
+here was re-deriving a defect that did not exist.
+
+**Second defect: `compile_for_seed` had zero importers.** It was added to `story_query.py`,
+exported in `__all__`, and `story_production_loop.py` carried an inline copy of the same logic.
+That is the D511 orphan pattern **recreated inside the fix for D511** — and D511 was created to
+end it. The call site now calls the function. Two repairs while collapsing them: the `if not
+seed_ask` branch used to `return` the bare question, dropping the context block and the
+FACTS-ONLY instruction (unreachable today, but a landmine); and `agent:donor`, which maps to no
+matrix field, now maps to `credit_line` so the donor seed sees its own evidence.
+
+**And the acceptance script could not have caught either.** Its Part 0b re-implemented the
+filter inline and asserted against five hand-written dicts. It never called production — the
+LOCAL-465 failure exactly, in the task whose review brief was "verify the wiring, not the
+function". It now measures the real seed population instead. **An acceptance script that
+contains a copy of the logic it is testing is not evidence; it is the same author agreeing with
+himself twice.**
+
+**Not settled by the stop-1 run:** criterion 4, that indices must not collapse. Part 5 asserts
+`mean >= 50` — the D515 floor, not the stated 75.7 baseline. One stop cannot test it. The tour
+run decides it, and is recorded separately.
