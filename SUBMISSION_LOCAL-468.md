@@ -165,3 +165,109 @@ The Fridman seed reliably returns nothing useful because Boris Fridman is a priv
 collector with no public biography. This is correct behavior: "no reliable story"
 is better than fabricating one about a person whose only public trace is a museum
 credit line.
+
+---
+
+## LEAD REVIEW — 2026-08-25, r2. VERDICT: APPROVED WITH FIXES APPLIED
+
+Fixes 1, 2, 3 and 5 are correct and are the substance of the task. Fix 4 was
+removed. Two defects were found and repaired on this branch before merge.
+
+### Defect 1 (blocking, removed): the prose-seed filter is a 40-character cutoff
+
+`_clean()` in `story_seeds.py` ends with `.strip(' ,;:.')`. A prose seed
+therefore **cannot** end in sentence punctuation. So the submitted test
+
+```python
+_truncated = ... or (len(_seed_text) >= 40 and _seed_text[-1] not in '.!?')
+```
+
+reduces, by construction of the function that produces its input, to
+`len(_seed_text) >= 40`.
+
+Measured over every prose seed in `TOUR_D525_UNBOUND.txt`:
+
+```
+total prose seeds across tour:           33
+seeds ending in a <=2-char word:          0
+seeds ending in '.!?':                    0
+LOCAL-468 rejects:                       16 of 33  (48%)
+  by the >=40-char rule alone:           16
+  by the no-subject rule alone:           0
+```
+
+The no-subject half of the rule never fires. The length half discards half the
+prose seeds, including complete, subject-bearing ones:
+
+- `'Mourlot Frères, a renowned French lithographic printing company'` — REJECTED
+- `'altered and distorted the lithographic colors'` — REJECTED
+- `"ensuring Gris's unfinished designs were finally seen"` — REJECTED
+
+**The premise was false.** The five "truncated fragments" in the task file were
+log lines clipped for display, not seeds. The real seed behind
+`'making it a multifaceted artwork that extend'` is
+`'making it a multifaceted artwork that extends beyond its original narrative'`
+— complete, and a verbatim span of its sentence. Zero seeds in the tour are
+truncated.
+
+This is the 08-24 shape again: a rule fitted to the examples in front of it,
+validated in one direction only, against a fixture rather than the population.
+`run_local468_acceptance.py` Part 0b re-implemented the filter inline and
+asserted on five hand-written dicts — it never called the production path, so
+it could not have caught this. Part 0b now measures the real seed population.
+
+### Defect 2 (removed): `compile_for_seed` was an orphan
+
+`story_query.py` gained `compile_for_seed()`, exported in `__all__`, with zero
+importers; `story_production_loop.py` carried an inline copy of the same logic.
+That is the D511 orphan pattern, recreated inside the fix for D511. The call
+site now calls the function, and the duplicate is gone.
+
+Two repairs made while collapsing them:
+- The `if not seed_ask` branch used to `return` the bare question, dropping the
+  context block and the FACTS-ONLY instruction. It now falls through. Every
+  seed producer sets `ask`, so this was unreachable — but it was a landmine.
+- `agent:donor` maps to no matrix field, so the donor seed saw no credit_line.
+  It is now mapped to `credit_line`, which is that seed's own field.
+
+### Wiring proof, at the call site
+
+`story_leads.gemini_with_sources` monkey-patched, `run_for_stop` invoked,
+prompts captured verbatim. Each agent asks its own question and sees only its
+own role field — Mourlot gets `printed_by: Mourlot` and **not**
+`publisher: Louis Broder`, which is the whole mechanism:
+
+```
+prompt 3: "What did Mourlot actually do, and what came of it?"
+          Context: canonical_title, artist, venue_name, printed_by: Mourlot
+prompt 4: "Why did Boris Fridman acquire this, and why give it away?"
+          Context: canonical_title, artist, venue_name, credit_line: Gift of Boris Fridman
+```
+
+### Live run, r2 (stop 1, 177s, $0.055)
+
+```
+Joan Miró     idx=33 inert     FAIL:index_d515
+Louis Broder  idx=48 active    FAIL:index_d515
+Mourlot       idx=76 eventful  PASS
+Boris Fridman idx=52 active    PASS
+
+pairwise overlap  mean=0.170  max=0.247   (pre-fix: ~1.0)
+published: 2 stories — 76 (Mourlot), 52 (Fridman)
+```
+
+The reported defect is gone. The Mourlot answer is about Mourlot and the 1967
+paper flaw; the Fridman answer is about Fridman collecting artists' books and
+giving them to the MFA — material no previous run produced at all.
+
+### What this run does NOT establish
+
+- **Acceptance criterion 4 is unsettled.** Part 5 asserts `mean >= 50`, the
+  D515 floor — not the stated baseline of mean 75.7, range 73–81. One stop
+  cannot test it. The tour run is what decides it.
+- **Criterion 5 is untested here.** The hardcoded `STOP_TEXT` yields 0 prose
+  seeds, so the filter removal is not exercised by this script; it was measured
+  separately over the 33 seeds above.
+- **Part 3's diversity check is weak** — it only asks whether the seed's
+  surname appears in its own answer. Candidates 1 and 2 still tell much the
+  same catalogue story. The overlap number, not Part 3, is the real evidence.

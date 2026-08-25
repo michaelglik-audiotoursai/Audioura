@@ -104,8 +104,18 @@ print()
 print("  WIRING: PASS — all agent seeds use seed['ask'] as the question")
 print()
 
-# ── Part 0b: Prose seed quality gate ──────────────────────────────────────────
-print("── Part 0b: PROSE SEED QUALITY GATE ──")
+# ── Part 0b: Are prose seeds actually truncated? ──────────────────────────────
+# [r2, LEAD] This part used to assert that a hand-written list of five
+# fragments would be rejected by a filter re-implemented inline here — the same
+# shape as LOCAL-465, where every test called the function directly and none
+# touched the call site, and the same shape as the six instrument failures of
+# 08-24: a rule fitted to the examples in front of it.
+#
+# The premise was wrong. Those five "fragments" were log lines clipped for
+# display; `seeds_for_stop` emits the full phrase. So the check now measures
+# the real population instead of asserting against a fixture, and the filter it
+# was validating has been removed from production.
+print("── Part 0b: PROSE SEED TRUNCATION — measured, not asserted ──")
 print()
 
 from story_seeds import seeds_for_stop  # noqa: E402
@@ -114,35 +124,17 @@ prose_seeds = seeds_for_stop(STOP_TEXT, {'Joan Miró', 'Louis Broder',
                                           'Mourlot', 'Boris Fridman'})
 print(f"  {len(prose_seeds)} prose seed(s) found in stop text")
 
-# Check that fragments without subjects would be rejected by the production loop
-_test_fragments = [
-    {'seed': 'was to design it', 'anchor': '', 'subject': '', 'kind': 'relative'},
-    {'seed': 'would provide the text', 'anchor': '', 'subject': '', 'kind': 'relative'},
-    {'seed': "Freud's ideas to life", 'anchor': 'Freud', 'subject': '', 'kind': 'possessive'},
-    {'seed': 'making it a multifaceted artwork that extend', 'anchor': '', 'subject': '', 'kind': 'participial'},
-    {'seed': 'having only completed half of the intended w', 'anchor': '', 'subject': '', 'kind': 'participial'},
-]
-_rejected_count = 0
-for ps in _test_fragments:
-    seed_text = ps.get('seed', '')
-    words = seed_text.split()
-    last_word = words[-1] if words else ''
-    truncated = (len(last_word) <= 1 and len(words) > 1) or \
-                (len(seed_text) >= 40 and seed_text[-1] not in '.!?')
-    subj = ps.get('anchor') or ps.get('subject') or ''
-    no_subject = (not subj or subj.lower() == 'this')
-    starts_subordinate = bool(re.match(
-        r'^(was|were|would|could|should|having|making|being|that|which|who)\b',
-        seed_text.lower()))
-    if truncated or (no_subject and starts_subordinate):
-        _rejected_count += 1
-        reason = 'truncated' if truncated else 'no subject + subordinate'
-        print(f"    REJECTED: '{seed_text[:50]}' — {reason}")
-    else:
-        print(f"    ACCEPTED: '{seed_text[:50]}' — anchor={subj!r}")
-print(f"\n  {_rejected_count}/{len(_test_fragments)} known-bad fragments rejected")
-assert _rejected_count >= 4, f"Expected >=4 rejected, got {_rejected_count}"
-print("  QUALITY GATE: PASS")
+_clipped = [p for p in prose_seeds
+            if len(p['seed'].split()) > 1 and len(p['seed'].split()[-1]) <= 2]
+_verbatim = [p for p in prose_seeds
+             if p['seed'] not in p['sentence']
+             and p['seed'].replace("'", '’') not in p['sentence']]
+for p in prose_seeds:
+    print(f"    len={len(p['seed']):3d}  {p['seed']!r}")
+print(f"\n  ending in a <=2-char word (a real clip): {len(_clipped)}")
+print(f"  not a verbatim span of their sentence:   {len(_verbatim)}")
+assert not _clipped, f"seeds genuinely truncated: {[p['seed'] for p in _clipped]}"
+print("  TRUNCATION: none — the filter this replaced had nothing to catch")
 print()
 
 # ── Part 1: Run the production loop on stop 1 ────────────────────────────────

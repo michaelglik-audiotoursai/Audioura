@@ -177,7 +177,8 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     try:
         from object_record import enrich_matrix
         from story_seeds import seeds_for_stop
-        from story_query import compile_for_serper, compile_for_gemini
+        from story_query import (compile_for_serper, compile_for_gemini,
+                                 compile_for_seed)
         from story_leads import gemini_with_sources
         from story_adjudicate import (claims_of, challenge_queries_for,
                                       ADJUDICATION_PROMPT, count_statuses,
@@ -223,46 +224,19 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
     except Exception:
         prose_seeds = []
 
-    # [LOCAL-468] Drop prose seeds that cannot produce a sensible question.
-    # Cause 3: participial/relative fragments with no subject ("was to design
-    # it", "making it a multifaceted artwork that extend") cannot steer
-    # retrieval. A seed needs a subject to form a question about.
-    _rejected_seeds = []
-    _accepted_prose = []
-    for _ps in prose_seeds:
-        _ask = _ps.get('ask', '')
-        _seed_text = _ps.get('seed', '')
-        # A prose seed is rejected if:
-        #   - It appears truncated: last word is 1 char, OR total length >= 40
-        #     and doesn't end with sentence punctuation (clipped by char limit)
-        #   - It has no subject (anchor/subject) AND starts with a subordinating
-        #     word (participial, relative clause fragment)
-        _words = _seed_text.split()
-        _last_word = _words[-1] if _words else ''
-        _truncated = (len(_last_word) <= 1 and len(_words) > 1) or \
-                     (len(_seed_text) >= 40 and _seed_text[-1] not in '.!?')
-        _subj = _ps.get('anchor') or _ps.get('subject') or ''
-        _no_subject = (not _subj or _subj.lower() == 'this')
-        # Starts with a participial/relative/subordinating marker
-        _starts_subordinate = bool(re.match(
-            r'^(was|were|would|could|should|having|making|being|that|which|who)\b',
-            _seed_text.lower()))
-        if _truncated or (_no_subject and _starts_subordinate):
-            _rejected_seeds.append(_ps)
-        else:
-            _accepted_prose.append(_ps)
-    prose_seeds = _accepted_prose
-
+    # [LOCAL-468 r2, LEAD] The submitted prose-seed filter was REMOVED, not
+    # tuned. Its premise — that seeds arrive truncated ("...that extend",
+    # "...the intended w") — came from a log line that had been clipped for
+    # display; `seeds_for_stop` emits the full phrase. Measured over
+    # TOUR_D525_UNBOUND: 0 of 33 seeds are truncated, and 0 end in sentence
+    # punctuation, because `_clean` strips it by construction. So the test
+    # `len(seed) >= 40 and seed[-1] not in '.!?'` reduced to `len(seed) >= 40`
+    # and discarded 16 of 33 prose seeds — among them complete, subject-bearing
+    # ones like "Mourlot Frères, a renowned French lithographic printing
+    # company", which is exactly the material this task exists to keep.
     seeds = _agent_seeds(matrix) + prose_seeds
     seeds = seeds[:MAX_CREDIT_LINES]
     if verbose:
-        if _rejected_seeds:
-            print(f"    [LOCAL-468] rejected {len(_rejected_seeds)} prose seed(s) "
-                  f"(no subject or truncated):")
-            for _rs in _rejected_seeds[:5]:
-                print(f"      '{_rs['seed'][:60]}' — "
-                      f"anchor={_rs.get('anchor','')!r}, "
-                      f"subject={_rs.get('subject','')!r}")
         print(f"    [D511] {len(seeds)} credit_line(s) to try "
               f"({sum(1 for s in seeds if s['kind'] == 'matrix_agent')} from the "
               f"matrix, {len(seeds) - sum(1 for s in seeds if s['kind'] == 'matrix_agent')} from the text)")
@@ -278,53 +252,16 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             # [LOCAL-468] The seed's OWN question is what produces diversity.
             # Before: "What story about {work}, {seed}?" — the work is the
             # grammatical subject and every seed returns the same episode.
-            # After: seed['ask'] IS the question, and the work is context.
-            seed_ask = seed.get('ask') or compile_for_gemini(matrix, cl, exhibition)
-
-            # [LOCAL-468] Only the fields relevant to THIS seed, not the whole
-            # matrix. Identical context for all four seeds is why all four
-            # answers converge. Every seed gets the work title + artist (for
-            # attribution), but agent seeds get only their own role field.
-            _ctx_fields = ['canonical_title', 'artist', 'venue_name']
-            if seed.get('kind') == 'matrix_agent':
-                # Add the field this seed came from, so the model knows the
-                # relationship, but NOT the other agents.
-                _seed_field = (seed.get('id') or '').replace('agent:', '')
-                if _seed_field and _seed_field in matrix and _seed_field not in _ctx_fields:
-                    _ctx_fields.append(_seed_field)
-            else:
-                # Prose seeds get the full matrix — they don't have a specific
-                # agent to isolate.
-                _ctx_fields = [k for k in matrix if matrix.get(k)]
-            mat = '\n'.join(f'  {k}: {matrix[k]}' for k in _ctx_fields
-                           if matrix.get(k))
-
-            # [LOCAL-468] The instruction steers toward the seed's subject, not
-            # toward one canonical episode. For agent seeds: "what did THIS
-            # person do" — which is already what seed['ask'] says. For prose
-            # seeds: the original instruction is fine (they ARE about the work).
-            if seed.get('kind') == 'matrix_agent':
-                instruction = (
-                    f"Search, then answer with FACTS ONLY about {cl} — each one "
-                    "sentence, with its source in brackets. What did they do in "
-                    "relation to this work? What happened to them because of it? "
-                    "If you find nothing reliable about THIS PERSON, say exactly "
-                    '"NO RELIABLE INFORMATION". Do not discuss other people\'s '
-                    "contributions. Do not praise the work. Maximum 6 sentences.")
-            else:
-                instruction = (
-                    "Search, then answer with FACTS ONLY — each one sentence, with its "
-                    "source in brackets. Prefer what a visitor standing in front of it "
-                    "cannot see: why it was made, who decided, what went wrong, what it "
-                    "cost someone. If you find nothing reliable, say exactly "
-                    '"NO RELIABLE INFORMATION". Do not praise the work. Do not describe '
-                    "how it looks. Maximum 6 sentences.")
-
+            # After: seed['ask'] IS the question and the work is context, and
+            # each agent seed sees only its own role field so the model cannot
+            # answer about whoever is most prominent in the matrix.
+            #
+            # [r2, LEAD] This was an inline copy of `compile_for_seed`, which
+            # the submission added to story_query.py and then never imported —
+            # the D511 orphan pattern, inside the fix for D511. One call site,
+            # one definition.
             r1 = gemini_with_sources(
-                f"{seed_ask}\n\n"
-                f"Context — the work this concerns:\n{mat}\n"
-                f"Exhibition: {exhibition or 'this exhibition'}\n\n"
-                f"{instruction}")
+                compile_for_seed(seed, matrix, exhibition))
             n_gem += 1
             if not (r1.get('text') or '').strip():
                 continue

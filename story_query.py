@@ -186,9 +186,13 @@ def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
     """
     seed_ask = seed.get('ask') or ''
     if not seed_ask:
-        # Fallback for seeds that lack an ask — should not happen post-LOCAL-468
+        # Every producer of a seed — `_agent_seeds` and `seeds_for_stop` — sets
+        # 'ask', so this is unreachable today. It falls THROUGH rather than
+        # returning: an early return here would have shipped the bare question
+        # with no context and no FACTS-ONLY instruction, which is the one
+        # prompt shape this module exists to prevent.
         credit = (seed.get('seed') or '').strip().rstrip('.?')
-        return GEMINI_TEMPLATE.format(
+        seed_ask = GEMINI_TEMPLATE.format(
             exhibition=exhibition or 'this exhibition',
             work=_bare_title(matrix),
             credit=f', {credit}' if credit else '')
@@ -196,7 +200,10 @@ def compile_for_seed(seed: Dict, matrix: Dict, exhibition: str = '') -> str:
     # Context: only the fields relevant to THIS seed
     ctx_fields = ['canonical_title', 'artist', 'venue_name']
     if seed.get('kind') == 'matrix_agent':
+        # 'agent:donor' is derived from credit_line and has no field of its own.
         seed_field = (seed.get('id') or '').replace('agent:', '')
+        if seed_field == 'donor':
+            seed_field = 'credit_line'
         if seed_field and seed_field in matrix and seed_field not in ctx_fields:
             ctx_fields.append(seed_field)
     else:
