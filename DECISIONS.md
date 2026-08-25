@@ -21044,3 +21044,62 @@ name suggests.
 LOCAL-468 alone, 73.7 under LOCAL-468+D527, all three-stop tours, one run each. **There is still
 no n=3 measurement**, and there cannot be one until the checklist returns the same exhibition
 twice running.
+
+---
+
+## D529 — Michael's rollback test: the code is exonerated, the extractor's upstream changed
+
+**2026-08-25. Michael proposed the right procedure and it settled the question in one run.**
+
+His reasoning: three stops for days, then 1–2 stops today, therefore a regression was just checked
+in — roll back to the last known-good tree, confirm 3 stops return, then re-apply commits one at a
+time until the guilty one is found.
+
+**Run at `be1cb1a`, the commit before any of this session's work, in a clean worktree:**
+
+```
+[LOCAL-368] ✓ PROSE LLM PATH: 2 works extracted from prose
+    - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró (1971)
+    - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) (detail) by Joan Miró (1971)
+[LOCAL-485] index mean 76.0 over 2 stop(s)
+```
+
+**The same two-stop duplicate tour, on pre-session code.** There is no guilty check-in. The bisect
+had nothing to find, which is what the test was for.
+
+Supporting evidence gathered before the run, all consistent: only three `.py` files changed this
+session — `story_query.py`, `story_production_loop.py`, `run_local468_acceptance.py` — **none in
+the checklist path**, and all three were already present in the 11:22 run that produced 3 stops.
+The only commit between the last 3-stop run and the first 1-stop run, `c96f3fb`, is documentation.
+
+**Two stateful suspects a rollback would not have cleared were checked and are dead ends:**
+`_PAGE_CACHE` is an in-memory dict rebuilt per process, and `EXHIBITION_CACHE_TTL_DAYS` is a
+constant nothing reads — an orphan. No poisoned cache carried a bad result forward.
+
+**So the input to the system changed while the system did not.** Same code, same URL, same page
+text (Moses and Au Soleil verified still present in the fetched prose), and
+`prose_llm_extract_works` returned 3 works at 11:22 and 2 at 13:5x. Ten consecutive calls at 13:2x
+returned 1 work, 10/10 — deterministic within a window, different across the day. The remaining
+explanation is OpenAI serving behaviour on `gpt-4o-mini` for this prompt.
+
+**The lesson is not "it was not our fault."** It is that a tour's stop list depends on an
+un-pinned third-party model reading a museum page, with **no assertion anywhere that the result is
+stable or even plausible**. `LOCAL-394`'s "Stop count invariant: OK (2 selected == 2 delivered)"
+passed on a tour containing the same work twice. The pipeline had no way to notice.
+
+**The work this creates, in order:**
+
+1. **`(detail)` is a caption convention, never a work** — plus a title-normalised dedupe. Provably
+   correct independent of any model behaviour, and it is what shipped the duplicate stop.
+2. **Log the extractor's input and output** — `prose_llm_extract_works` already computes
+   `page_text=N chars, after nav filter=M chars` at `logger.info`, which does not reach the tour
+   logs. Today that one line would have replaced an afternoon of inference.
+3. **A stop-count plausibility gate.** The exhibition prose names three works; the tour shipped
+   one. Nothing objected.
+4. **Then the prompt**, validated across several exhibition pages whose correct work lists are
+   known, scored both directions — works missed and non-works admitted — against the current
+   prompt as baseline. Not fitted to this page.
+
+**And the standing measurement problem is now sharper:** there is still no n=3 index number, and
+there cannot be one while the stop list is drawn from an un-pinned model. **Pinning that call is a
+prerequisite for every quality measurement**, not a side quest.
