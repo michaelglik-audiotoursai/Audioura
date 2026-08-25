@@ -28,6 +28,78 @@ briefing. Work top to bottom.
 >
 > Everything in §§3–7 is **done**. Read them for background only.
 >
+> ## ▶️ NEXT ACTION — deploy `16140ec`, authorised by Michael 2026-08-25
+>
+> Michael authorised this deploy in advance, so it is **not** a hard stop this once.
+> Everything else on the hard-stop list still is.
+>
+> ```bat
+> ./deploy_tour_modernized.sh --dry-run    :: always dry-run first
+> ./deploy_tour_modernized.sh
+> ```
+>
+> The script picks the next free tag from the registry (a **shared** sequence across
+> all services — never "current + 1"), preserves `--no-cpu-throttling` and
+> `--max-instances=1`, and refuses to overwrite an existing tag.
+>
+> ### What this deploy changes
+>
+> Only `16140ec`: repair of tours written **longitude-first**. Nothing else — the
+> coordinate-agreement work already shipped in `v33`.
+>
+> ### Production verification — run all of it, in this order
+>
+> **1. The service is alive and has the right code.**
+> ```bash
+> gcloud run services describe tour-modernized --region us-central1 \
+>   --format="value(status.traffic[0].revisionName, spec.template.spec.containers[0].image)"
+> docker run --rm --entrypoint python <the image just deployed> -c \
+>   "import geocode_stops as g; print(hasattr(g,'fix_reversed_coordinates'))"
+> ```
+> Must print `True`. The script's own guard only checks the *audio* fix, so this
+> check is manual and easy to forget.
+>
+> **2. Controls first — these must NOT be altered.** This is the real risk: a correct
+> tour being wrongly "corrected". Generate through production and confirm every stop
+> lands in the right city.
+>
+> | tour | why it is the control |
+> |---|---|
+> | Sydney Harbour walking tour | negative latitude — the shape most likely to look "reversed" |
+> | Gion district, Kyoto walking tour | longitude 135°, larger than any valid latitude |
+> | Boston Common walking tour | ordinary northern-hemisphere baseline |
+>
+> A stop landing outside its own city on any of these is a **false positive** and
+> grounds for immediate rollback.
+>
+> **3. The target case.** Generate *"Antananarivo, Madagascar walking tour"*. Every
+> stop should sit within a few km of Antananarivo (≈ −18.88, 47.51) — latitude
+> negative, longitude positive.
+>
+> **Note the defect is intermittent.** It appeared on 2026-08-20 and did not recur in
+> two later generations of the same request. A correct Madagascar tour therefore does
+> **not** prove the fix fired — check the logs for
+> `REVERSED COORDINATES` to know whether it actually did anything.
+>
+> **4. Read the logs.**
+> ```bash
+> gcloud run services logs read tour-modernized --region us-central1 --limit 100 \
+>   | grep -i "GEOCODE"
+> ```
+> `REVERSED COORDINATES` on a control tour = false positive = roll back.
+>
+> **5. Rollback**, if any control is altered or a tour fails to generate:
+> ```bash
+> ./deploy_tour_modernized.sh --rollback
+> ```
+> Seconds to take effect; the previous image is untouched.
+>
+> ### What deploying does NOT affect
+>
+> Tours already on a device keep the coordinates they shipped with. **Only newly
+> generated tours change** — so asking Yury to check an existing tour will always look
+> like a failure.
+>
 > ### ⚠️ Two things need Michael, and nothing else can move without him
 >
 > 1. **`main` has an undeployed fix.** Commit `16140ec` repairs tours written
