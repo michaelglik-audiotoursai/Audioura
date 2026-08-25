@@ -20911,3 +20911,63 @@ himself twice.**
 **Not settled by the stop-1 run:** criterion 4, that indices must not collapse. Part 5 asserts
 `mean >= 50` — the D515 floor, not the stated 75.7 baseline. One stop cannot test it. The tour
 run decides it, and is recorded separately.
+
+---
+
+## D527 — `ask` is a retrieval question for agents and an audit question for prose; LOCAL-468 read it as one
+
+**2026-08-25. Two tours, two builds. Full evidence in `TOUR_MFA_UNBOUND_20260825_1122_JUDGEMENT.md`.**
+
+The first tour under LOCAL-468 dropped the **LOCAL-485 stop index from 75.7 to 60.7** and the floor
+from 73 to 45, while every stop's seeds were properly diverse (overlap 0.08–0.24). That is exactly
+the case acceptance criterion 4 was written to catch: *a diverse set of weak stories is not an
+improvement.*
+
+**The acceptance script could not have caught it.** It asserts `mean >= 50` over **candidate story
+indices** against the **D515 floor**, while the stated baseline is the **stop index**. Two different
+metrics on different objects, sharing a word. Criterion 4 was untestable by the instrument shipped
+to test it — the third instrument defect found in this task alone.
+
+**The cause is a scope error, and it is legible from the code without the run.** `ask` means two
+things:
+
+- `_agent_seeds` → `'What did Mourlot actually do, and what came of it?'` — a retrieval question.
+- `seeds_for_stop` → `'What did {subj} actually DO that would justify "{phrase}"? If nothing, cut
+  the phrase.'` — an **audit** question about our own prose, ending in an instruction to a
+  checklist that is meaningless to a search model and invites a null answer.
+
+LOCAL-468 read `seed['ask']` for every seed kind because agent seeds were the case in front of it.
+Prose seeds now revert to the pre-LOCAL-468 story-seeking question with the phrase as credit
+anchor; nothing else on the prose path changed, so it is restored exactly. **The fix was made on
+the code-reading argument, not on the run** — fitting a rule to the single run in front of me is
+the failure D526 was written about that same morning.
+
+**The confirmation is differential, which is why it is worth something.** Where D527 acts, the gain
+is large; where it barely acts, the stop moved on variance:
+
+| stop | seeds | LOCAL-468 | +D527 |
+|---|---|---|---|
+| Au Soleil | 3 prose | 45 | **83** |
+| Moses | 3 prose | 57 | **78** |
+| Le Lézard | mostly matrix | 80 | 60 |
+
+Mean 73.7, range 60–83, against a 75.7 baseline. **I do not claim 73.7 beats 75.7** — one run each.
+60.7 was a real regression; 73.7 is indistinguishable from baseline with diversity added on top.
+
+**And a stop published two stories for the first time** (index 77 and 70, stop 3, two different
+prose seeds). On 08-24 the answer to "why only one story" was "the second candidate is the first
+one paraphrased." That is no longer the answer.
+
+**Standing correction to the 08-24 ruling:** the note "do NOT lower `SECOND_MIN` or raise
+`MAX_STORIES` — the fix is LOCAL-468, upstream" was right, and the upstream fix has landed. The
+bottleneck that remains is D518's merge absorbing later stories into prose the earlier story
+already rewrote, not seed convergence. That is a different problem and needs its own measurement.
+
+**One defect shipped in the tour and the checks passed it:** stop 3 says *"The Louis Broder issued
+a limited run…"* of the Dalí portfolio, whose publisher it names two sentences earlier as Éditions
+Art and Valeur. Louis Broder is stop 1's publisher. Check (a) fires on the injected three-name
+fusion `"the Louis Broder Tériade"` in this same tour and not on this two-name transplant: its
+regex demands two capitalised words before the tail. **Written around one example, generalised only
+within that example's shape** — the eighth occurrence of the pattern. Not fixed in this pass;
+widening a name check invites false positives on "the Museum of Fine Arts" and that trade needs
+measuring, not a same-day guess.

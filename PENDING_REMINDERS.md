@@ -15,7 +15,10 @@ Durable across sessions. Delete a line once delivered.
       **Two runs happened: 10:26 exposed a defect in the append fix itself, 10:36 has the fix
       and is the deliverable even though it scores lower.** Original instruction below.
 
-- [ ] **2026-08-25 — NEXT SESSION'S FIRST TASK: review and merge LOCAL-468, then measure.**
+- [x] DONE 2026-08-25 11:2x — LOCAL-468 reviewed, two defects repaired, merged as r2 (D526); the
+      first tour under it regressed the stop index 75.7 -> 60.7, cause found and fixed as D527,
+      second tour 73.7 with a stop publishing TWO stories for the first time. Deliverables:
+      `TOUR_MFA_UNBOUND_20260825_1122.md` + `_JUDGEMENT.md`. Original instruction below.
 
       **Read first:** `DECISIONS.md` tail (D518-D526), then
       [`TOUR_MFA_UNBOUND_20260824_2259_JUDGEMENT.md`](TOUR_MFA_UNBOUND_20260824_2259_JUDGEMENT.md),
