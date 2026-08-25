@@ -1445,3 +1445,35 @@ pass dropped the rest, and the orphan fused with the next sentence. Fixed and te
 regenerated**, per your one-tour rule. It is the sixth instrument failure today, all the same
 shape — a rule fitted to the single example in front of me. The tour passed all nine checks and
 still contained a mangled name.
+
+## Q22 (08-25) — "why did we not find more seeds? these should produce different facts"
+
+**We found them. We then asked the same question four times.** No need to repeat anything — the
+candidate log and the code answer it. Dispatched as **LOCAL-468**; full record **D526**.
+
+Stop 1 used four seeds naming four different people — **Joan Miró, Louis Broder, Mourlot, Boris
+Fridman** — and all four returned the 1967 edition, the paper defect and the erased plates.
+**The Mourlot answer never discusses Mourlot; the Fridman answer never mentions Fridman.**
+
+Three causes:
+
+1. **The seed is a comma-appendage, not the subject.** `GEMINI_TEMPLATE` is *"What story can be
+   told to visitors of {exhibition} about {work}{credit}?"* → *"…about Le Lézard aux plumes d'or,
+   Mourlot?"*. The WORK is the grammatical subject; any model answers about the work.
+2. **The right question exists and production discards it.** `_agent_seeds()` builds
+   `'ask': f'What did {v} actually do, and what came of it?'` for every agent — exactly the
+   question that would have produced four different stories. It is used in `run_seed_queries.py`
+   and `run_seed_queries_v2.py`, the lab scripts, and **nowhere in `story_production_loop.py`**.
+   Production passes only the bare name. **This is the orphan pattern D511 was created to end.**
+3. **Prose seeds are fragments** — `'was to design it'`, `'would provide the text'`, `'making it a
+   multifaceted artwork that extend'` (truncated). Relative and participial clauses with no
+   subject cannot steer retrieval anywhere. Stops 2 and 3 had only ONE matrix agent each, so three
+   of four seeds were these.
+
+Also: the whole matrix is pasted into every query, giving all four seeds identical context, and
+the instruction *"why it was made, who decided, what went wrong"* describes exactly one episode
+for this work. Everything points at the same anecdote.
+
+**So LOCAL-466 was never given distinct material to publish.** Its duplicate guard was correct to
+reject the second story every time — those really were the same story. The fix is upstream, in
+what we ask, not in how many answers we keep.
