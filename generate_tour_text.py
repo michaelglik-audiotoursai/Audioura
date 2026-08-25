@@ -4767,6 +4767,42 @@ def verify_stop_claims(story_text: str, snippets: list, credit_line: str = '',
     return result
 
 
+def _extract_city_from_resolved_entity(venue_entity) -> str:
+    """Extract city name from a VenueEntity by inspecting its name and URL.
+
+    Used by LOCAL-465 exhibition resolution gate to compare the resolved
+    venue's city against the city in the user's request.
+    """
+    # Check if the venue name contains a city after a comma
+    # e.g. "Museum of Fine Arts, Houston" → "Houston"
+    name = getattr(venue_entity, 'name', '') or ''
+    if ',' in name:
+        parts = [p.strip() for p in name.split(',')]
+        for p in parts[1:]:
+            if p and p[0].isupper():
+                return p
+
+    # Heuristic from URL domain — known museum abbreviation patterns
+    url = getattr(venue_entity, 'official_url', '') or ''
+    _DOMAIN_CITY_MAP = {
+        'mfah.org': 'Houston',
+        'mfa.org': 'Boston',
+        'metmuseum.org': 'New York',
+        'artic.edu': 'Chicago',
+        'lacma.org': 'Los Angeles',
+        'sfmoma.org': 'San Francisco',
+        'nga.gov': 'Washington',
+        'philamuseum.org': 'Philadelphia',
+        'dma.org': 'Dallas',
+    }
+    url_lower = url.lower()
+    for domain, city in _DOMAIN_CITY_MAP.items():
+        if domain in url_lower:
+            return city
+
+    return ''
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -7255,6 +7291,86 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         elif _coverage_selection_disabled:
             print(f"  [LOCAL-212] Coverage selection: DISABLED by DISABLE_COVERAGE_SELECTION=1")
         # ──── END [LOCAL-212] COVERAGE-AWARE STOP SELECTION ───────────────────
+
+        # ──── [LOCAL-465] EXHIBITION RESOLUTION GATE ──────────────────────────
+        # After venue resolution and coverage selection, before descriptions.
+        # Detects: (1) venue city mismatch, (2) zero coverage, (3) near-match.
+        # On NOT_FOUND or DID_YOU_MEAN: abort without generating.
+        try:
+            from exhibition_resolution import resolve_request, ExhibitionNotFound, is_strict_mode
+
+            if is_strict_mode() and _exhibition_scope is not None and _venue_entity:
+                # Build coverage dict from LOCAL-212 results
+                _er_verdicts = {}
+                _er_covered_count = 0
+                _er_total_selected = len(poi_list[:total_stops])
+                try:
+                    _er_verdicts = _cs_verdicts
+                    _er_covered_count = _cs_covered_count
+                except NameError:
+                    # Coverage selection was disabled or DB unavailable — skip coverage check
+                    _er_covered_count = _er_total_selected  # Assume covered to avoid false reject
+
+                _er_coverage = {
+                    'covered_count': _er_covered_count,
+                    'total_selected': _er_total_selected,
+                    'verdicts': _er_verdicts,
+                    'fallback_reasons': [],
+                }
+
+                # Build resolved_venue dict
+                _er_resolved = {
+                    'name': _venue_entity.name,
+                    'qid': _venue_entity.qid,
+                    'official_url': _venue_entity.official_url,
+                    'city': _extract_city_from_resolved_entity(_venue_entity),
+                }
+
+                # Build candidates list from canonical_titles (already in scope from venue resolution)
+                _er_candidates = []
+                try:
+                    if canonical_titles:
+                        _er_candidates = [{'title': t} for t in canonical_titles if t]
+                except NameError:
+                    pass
+
+                _er_result = resolve_request(
+                    request=location,
+                    resolved_venue=_er_resolved,
+                    coverage=_er_coverage,
+                    candidates=_er_candidates,
+                )
+
+                if _er_result['verdict'] in ('NOT_FOUND', 'DID_YOU_MEAN'):
+                    # Log the rejection
+                    print(f"\n  [LOCAL-465] EXHIBITION NOT FOUND: {_er_result['reason']} "
+                          f"| request={location!r} "
+                          f"| resolved={_venue_entity.name} ({_venue_entity.qid}) "
+                          f"| coverage={_er_covered_count}/{_er_total_selected}")
+
+                    # Surface structured evidence for the service layer
+                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                        'error_type': 'exhibition_not_found',
+                        'verdict': _er_result['verdict'],
+                        'reason': _er_result['reason'],
+                        'user_message': _er_result['user_message'],
+                        'suggestions': _er_result['suggestions'],
+                        'request': location,
+                        'resolved_venue': _venue_entity.name,
+                    })
+                    _LAST_GENERATION_COST = {
+                        "total_cost": 0.0,
+                        "total_tokens": 0,
+                        "cache_hit": False,
+                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                    }
+                    return None, None, (None, None)
+        except ImportError:
+            pass  # exhibition_resolution not available — proceed normally
+        except Exception as _er_err:
+            print(f"  [LOCAL-465] Exhibition resolution gate error (non-fatal): {_er_err}")
+        # ──── END [LOCAL-465] EXHIBITION RESOLUTION GATE ──────────────────────
 
         # ──── [LOCAL-245] STOP-EXISTENCE GATE (INLINE ENFORCEMENT) ────────────
         # Three modes: off / log_only / enforce.
