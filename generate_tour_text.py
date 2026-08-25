@@ -14431,7 +14431,8 @@ REWRITE RULES (all mandatory):
                       f"object record, seeds, challenge, adjudicate, gate")
                 _d511_venue_url = getattr(locals().get('_det_entity'), 'official_url', '') or ''
                 _d511_stats = {'stops': 0, 'accepted': 0, 'cost': 0.0,
-                               'replaced': 0}
+                               'replaced': 0, 'multi': 0}
+                from story_production_loop import MAX_STORIES as _d466_max, SECOND_MIN as _d466_second_min
                 for _d511_i, _d511_poi in enumerate(poi_list):
                     _d511_desc = _d511_poi.get('description') or ''
                     if not _d511_desc or _d511_desc.startswith('['):
@@ -14460,35 +14461,111 @@ REWRITE RULES (all mandatory):
                     total_cost += _d511_res.get('cost_usd', 0.0)
                     _d511_poi['_d511'] = _d511_res
                     if _d511_res.get('story'):
-                        # [D518] The story REPLACES the prose it overlaps.
+                        # [LOCAL-466] Publish up to MAX_STORIES per stop.
                         #
-                        # This was `_d511_desc.rstrip() + ' ' + story` — plain
-                        # concatenation — and Michael, 2026-08-24: *"saying things
-                        # twice is the worst for listeners… Moreover, selecting the
-                        # story topic based on the sentences made this problem."*
-                        # The credit_lines are mined from this same prose, so the
-                        # loop is guaranteed to research what the prose already
-                        # said. On 2026-08-23 stop 3 ran "an Egyptian priest"
-                        # (wrong) and "of Egyptian nobility" (right, corrected by
-                        # the adjudicator) six sentences apart in one stop.
+                        # Rules, in this order:
+                        #   1. Distinct credit_lines only — two stories mined from
+                        #      the same seed are the same story told twice.
+                        #   2. Each additional story must survive the D518/D521 merge
+                        #      against everything already in the stop. If the merge
+                        #      absorbs most of it, it was a duplicate — drop it.
+                        #   3. Order by index, best first (already sorted by the loop).
+                        #   4. A second story must score >= SECOND_MIN.
                         _d511_poi['_pre_d511_description'] = _d511_desc
-                        _d511_merged, _d511_mrep = _d518_merge(
-                            _d511_desc, _d511_res['story'],
-                            work_titles=[_d511_poi.get('name', ''),
-                                         _d511_poi.get('english_title', '')],
-                            verbose=True)
-                        _d511_poi['description'] = _d511_merged
-                        _d511_poi['_d518_merge'] = _d511_mrep
-                        _d511_stats['replaced'] += _d511_mrep['n_dropped']
-                        print(f"    [D518] {_d511_mrep['n_dropped']} of "
-                              f"{_d511_mrep['n_prose']} prose sentence(s) replaced "
-                              f"by the story"
-                              f"{' (drop cap hit)' if _d511_mrep['capped'] else ''}")
-                        _d511_stats['accepted'] += 1
-                        print(f"    [D511] story ACCEPTED from credit_line "
-                              f"'{_d511_res['credit_line'][:44]}' "
-                              f"(index {_d511_res.get('index')}, "
-                              f"{_d511_res['gate']['max_sentences']} sentences)")
+                        _d466_all_stories = _d511_res.get('stories') or []
+                        _d466_published = []
+                        _d466_published_cls = set()
+                        _d466_current_text = _d511_desc
+
+                        for _d466_si, _d466_s in enumerate(_d466_all_stories):
+                            if len(_d466_published) >= _d466_max:
+                                break
+                            _d466_s_story = _d466_s.get('story', '')
+                            _d466_s_cl = _d466_s.get('credit_line', '')
+                            _d466_s_idx = _d466_s.get('index') or 0
+
+                            # Rule 1: distinct credit_lines only.
+                            if _d466_s_cl in _d466_published_cls:
+                                if True:  # verbose
+                                    print(f"    [LOCAL-466] story {_d466_si+1} "
+                                          f"skipped: same credit_line "
+                                          f"'{_d466_s_cl[:40]}'")
+                                continue
+
+                            # Rule 4: second story must score >= SECOND_MIN.
+                            if _d466_published and _d466_s_idx < _d466_second_min:
+                                if True:  # verbose
+                                    print(f"    [LOCAL-466] story {_d466_si+1} "
+                                          f"skipped: index {_d466_s_idx} < "
+                                          f"SECOND_MIN {_d466_second_min}")
+                                continue
+
+                            # Rule 2: merge against what is already in the stop.
+                            # The first story merges against the original prose.
+                            # Additional stories merge against prose+prior stories.
+                            _d466_merged, _d466_mrep = _d518_merge(
+                                _d466_current_text, _d466_s_story,
+                                work_titles=[_d511_poi.get('name', ''),
+                                             _d511_poi.get('english_title', '')],
+                                verbose=True)
+
+                            # If the story was largely absorbed (fewer than 2
+                            # sentences of the story survived in the merged text
+                            # versus the current text), it was a duplicate.
+                            _d466_new_sents = len(re.split(
+                                r'(?<=[.!?])\s+', _d466_merged)) - len(
+                                re.split(r'(?<=[.!?])\s+', _d466_current_text))
+                            if _d466_published and _d466_new_sents < 2:
+                                print(f"    [LOCAL-466] story {_d466_si+1} "
+                                      f"dropped: merge absorbed it "
+                                      f"(+{_d466_new_sents} sentences) — "
+                                      f"duplicate of already-published content")
+                                continue
+
+                            # Accept this story.
+                            _d466_current_text = _d466_merged
+                            _d466_published.append(_d466_s)
+                            _d466_published_cls.add(_d466_s_cl)
+                            _d511_stats['replaced'] += _d466_mrep['n_dropped']
+                            print(f"    [D518] {_d466_mrep['n_dropped']} of "
+                                  f"{_d466_mrep['n_prose']} prose sentence(s) "
+                                  f"replaced by story {len(_d466_published)}"
+                                  f"{' (drop cap hit)' if _d466_mrep['capped'] else ''}")
+
+                        if _d466_published:
+                            _d511_poi['description'] = _d466_current_text
+                            _d511_poi['_d518_merge'] = {'n_stories': len(_d466_published)}
+                            _d511_stats['accepted'] += 1
+                            if len(_d466_published) > 1:
+                                _d511_stats['multi'] += 1
+                            _d466_indices = [s.get('index', 0) for s in _d466_published]
+                            _d466_cls = [s.get('credit_line', '')[:40] for s in _d466_published]
+                            print(f"    [D511] stop {_d511_i+1}: "
+                                  f"{len(_d466_published)} "
+                                  f"{'stories' if len(_d466_published) > 1 else 'story'} "
+                                  f"published ({', '.join(str(i) for i in _d466_indices)}) "
+                                  f"from credit_lines "
+                                  f"{', '.join(repr(c) for c in _d466_cls)}")
+                        else:
+                            # Story existed but all were filtered — fall back to
+                            # single-story path (the best one always passes).
+                            _d511_merged, _d511_mrep = _d518_merge(
+                                _d511_desc, _d511_res['story'],
+                                work_titles=[_d511_poi.get('name', ''),
+                                             _d511_poi.get('english_title', '')],
+                                verbose=True)
+                            _d511_poi['description'] = _d511_merged
+                            _d511_poi['_d518_merge'] = _d511_mrep
+                            _d511_stats['replaced'] += _d511_mrep['n_dropped']
+                            _d511_stats['accepted'] += 1
+                            print(f"    [D518] {_d511_mrep['n_dropped']} of "
+                                  f"{_d511_mrep['n_prose']} prose sentence(s) replaced "
+                                  f"by the story"
+                                  f"{' (drop cap hit)' if _d511_mrep['capped'] else ''}")
+                            print(f"    [D511] story ACCEPTED from credit_line "
+                                  f"'{_d511_res['credit_line'][:44]}' "
+                                  f"(index {_d511_res.get('index')}, "
+                                  f"{_d511_res['gate']['max_sentences']} sentences)")
                     else:
                         # Michael's ruling: publishing nothing is correct, and a
                         # stop with no story is a retrieval failure to fix
@@ -14497,7 +14574,9 @@ REWRITE RULES (all mandatory):
                               f"its descriptive text and publishes no story")
                 print(f"\n  [D511] PHASE 5.20 summary: "
                       f"{_d511_stats['accepted']}/{_d511_stats['stops']} stops "
-                      f"got a gated story, ~${_d511_stats['cost']:.3f}, "
+                      f"got a gated story "
+                      f"({_d511_stats['multi']} with multiple stories), "
+                      f"~${_d511_stats['cost']:.3f}, "
                       f"[D518] {_d511_stats['replaced']} duplicated prose "
                       f"sentence(s) replaced")
         except ImportError as _d511_imp:
