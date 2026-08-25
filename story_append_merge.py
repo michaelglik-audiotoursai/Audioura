@@ -162,7 +162,26 @@ _THESIS_MARKER = re.compile(
 
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 _TOKEN_RE = re.compile(r"[\w'’\-]+", re.UNICODE)
-_SENTENCE_SPLIT_RE = re.compile(r'(?<=[.!?])["”’\')\]]*\s+')
+# A full stop does not always end a sentence.
+#
+# **Measured on the delivered 22:59 tour, and this one corrupted the text.** The
+# story read "In 1916-1917, L. Rosenberg planned a book project with Juan Gris…".
+# The splitter treated the initial `L.` as a sentence boundary, D518 dropped the
+# "Rosenberg planned…" half as a duplicate of the prose, and the orphaned
+# "In 1916-1917, L." fused with the next sentence to produce
+# "In 1916-1917, L. Gris's untimely death left Reverdy in a poignant position" —
+# a mangled name welded to the wrong event, in a tour that passed all nine checks.
+#
+# So: never split after a single capital letter (an initial), nor after the
+# common abbreviations that end in a period mid-sentence.
+_NO_SPLIT_AFTER = (
+    r'(?<!\b[A-Z]\.)'                                    # L. Rosenberg, J. M. W.
+    r'(?<!\bMr\.)(?<!\bMrs\.)(?<!\bMs\.)(?<!\bDr\.)'
+    r'(?<!\bSt\.)(?<!\bJr\.)(?<!\bSr\.)(?<!\bvs\.)'
+    r'(?<!\bNo\.)(?<!\bfig\.)(?<!\bFig\.)(?<!\bcf\.)'
+    r'(?<!\bed\.)(?<!\bEd\.)(?<!\bvol\.)(?<!\bVol\.)'
+)
+_SENTENCE_SPLIT_RE = re.compile(_NO_SPLIT_AFTER + r'(?<=[.!?])["”’\')\]]*\s+')
 
 
 def _fold(s: str) -> str:

@@ -20777,3 +20777,72 @@ is that some requests come back empty, and that is Michael's call.
 
 **The rubric base score has now read 75.0 for five consecutive runs across visibly different
 tours. It has stopped discriminating and should stop being quoted.**
+
+## D525 — LOCAL-465/466/467 verified live: two shipped broken, and the answer to "why only one story" changed
+
+**2026-08-24, 22:59.** Verification tour: `TOUR_MFA_UNBOUND_20260824_2259.md` + judgement.
+**Stop index mean 75.7, range 73-81 — best measured; the FLOOR moved from 44 to 73.** All nine
+defect checks clean, $0.178, 550s.
+
+**First: the Kiro auth failure was not a task failure.** All three died on
+`OAuth error: Auth portal timed out` with zero commits. Michael re-authenticated; the headless
+invocation was verified working before re-dispatch; all three then completed.
+
+### LOCAL-465 shipped broken and its own tests could not have caught it
+
+The gate raised `NameError: name '_venue_entity' is not defined` — a local of `_verify_works_v2`,
+never in scope at the gate — its non-fatal wrapper swallowed it, and **the fictional tour
+generated anyway, 7,331 characters.** The 27 unit tests all exercised `resolve_request` against
+fixtures and never the wiring. Fixed to `_det_entity`. Both directions now verified live: the
+bogus request logs `EXHIBITION NOT FOUND: zero coverage` and writes NO tour file (exit 1), and the
+real request generates normally.
+
+**The lesson is about LEAD, not Kiro:** the acceptance criterion was right ("show that no
+`TOUR_*.txt` was written") and was not checked against the submission before merging.
+
+### LOCAL-466 works — and published ZERO second stories, which changes the answer
+
+| stop | candidates | accepted | second story |
+|---|---|---|---|
+| Le Lézard | 72, 73, **76**, 51 | 76 | #2 dropped **+0 sentences**, #3 +1, #4 below 55 |
+| Moses | 25, 37, 63, **65** | 65 | #2 dropped **+1 sentence** |
+| Au Soleil | …, **69** | 69 | dropped |
+
+`+0 sentences` = the D518 merge absorbed the whole second story. **Yesterday's answer was "we
+bought four and binned three." Today's is: three of the four are the same story told again.** The
+extra candidates come from the same object record, the same retrieval, the same few sources, so a
+different credit_line mostly reorders the same facts.
+
+**Adding length needs diverse SEEDS, not more candidates** — a retrieval problem. Do NOT raise
+`STORY_LOOP_MAX_STORIES` or lower `SECOND_MIN` to force one through; the duplicate guard is the
+only thing preventing a return to stops that say everything twice.
+
+**LEAD found and fixed one bug before merging:** each additional story merges against text already
+containing the previous one, and when that merge dropped the opening, D518b's story-first rule
+fired again and put the SECOND story first. `allow_story_first` now restricts it to the first.
+
+### LOCAL-467 — the gallery is gone and the donor survived
+
+No gallery asserted anywhere (acceptance: "Torf, or none"), and **Boris Fridman is still in the
+tour** — the criterion that mattered more. `Linde Family` is no longer classified as a person, and
+`pre_grounded_names` now requires the beat's `source_work` to match the stop it grounds.
+
+### A defect this tour shipped, and it is LEAD's
+
+Stop 3: *"In 1916-1917, L. Gris's untimely death left Reverdy in a poignant position"* — Gris died
+in 1927. The retrieved story was correct: *"In 1916-1917, **L. Rosenberg** planned a book project
+…"*. **The D518 sentence splitter treated the initial `L.` as a sentence boundary**, D518 dropped
+the "Rosenberg planned…" half as a duplicate, and the orphan fused with the next sentence. Fixed
+(no split after a single capital or `Mr. Mrs. Dr. St. Jr. Sr. vs. No. cf. ed. vol.`), tested
+against that exact sentence. **Not regenerated** — Michael's one-tour rule stands and the
+judgement names the defect.
+
+**Sixth instrument failure of the day**, same shape every time — a rule fitted exactly to the one
+example in front of it: check (a)'s corroboration requirement, check (f)'s line-start anchor, the
+middle-clause-only dedupe, the missing-space repair that could not cross a quote, `ls -t` handing
+back a stale log, and now the splitter. **The tour passed all nine checks AND contained a mangled
+name.** That is the honest measure of what the checks are worth.
+
+**Retire the rubric from these reports:** base score 75.0 for seven consecutive runs across tours
+that differ enormously, including the fictional one. The stop index tracks real quality; the
+rubric does not.

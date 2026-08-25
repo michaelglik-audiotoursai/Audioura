@@ -7299,7 +7299,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         try:
             from exhibition_resolution import resolve_request, ExhibitionNotFound, is_strict_mode
 
-            if is_strict_mode() and _exhibition_scope is not None and _venue_entity:
+            # [LEAD] Was `_er_venue`, which is a local of `_verify_works_v2` and has
+            # never been in scope here — the gate raised NameError on every run and
+            # its own non-fatal wrapper swallowed it, so the fictional tour generated
+            # anyway. `_det_entity` is the resolved venue in THIS scope; it is what
+            # the D511 loop reads for `official_url`.
+            _er_venue = locals().get('_det_entity')
+            if is_strict_mode() and _exhibition_scope is not None and _er_venue:
                 # Build coverage dict from LOCAL-212 results
                 _er_verdicts = {}
                 _er_covered_count = 0
@@ -7320,10 +7326,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                 # Build resolved_venue dict
                 _er_resolved = {
-                    'name': _venue_entity.name,
-                    'qid': _venue_entity.qid,
-                    'official_url': _venue_entity.official_url,
-                    'city': _extract_city_from_resolved_entity(_venue_entity),
+                    'name': _er_venue.name,
+                    'qid': _er_venue.qid,
+                    'official_url': _er_venue.official_url,
+                    'city': _extract_city_from_resolved_entity(_er_venue),
                 }
 
                 # Build candidates list from canonical_titles (already in scope from venue resolution)
@@ -7345,7 +7351,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # Log the rejection
                     print(f"\n  [LOCAL-465] EXHIBITION NOT FOUND: {_er_result['reason']} "
                           f"| request={location!r} "
-                          f"| resolved={_venue_entity.name} ({_venue_entity.qid}) "
+                          f"| resolved={_er_venue.name} ({_er_venue.qid}) "
                           f"| coverage={_er_covered_count}/{_er_total_selected}")
 
                     # Surface structured evidence for the service layer
@@ -7357,7 +7363,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         'user_message': _er_result['user_message'],
                         'suggestions': _er_result['suggestions'],
                         'request': location,
-                        'resolved_venue': _venue_entity.name,
+                        'resolved_venue': _er_venue.name,
                     })
                     _LAST_GENERATION_COST = {
                         "total_cost": 0.0,

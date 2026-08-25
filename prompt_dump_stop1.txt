@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-24T16:00:01.562323
+Generated: 2026-08-24T22:53:43.154784
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -13,14 +13,22 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • Hartley (Marsden Hartley, artist)
+  • Broder (Louis Broder, publisher)
+  • Miró (Joan Miró, artist)
 ━━━ END REQUIRED NAMES ━━━
 
+━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
+  • material: on wove
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
+━━━ END CONCRETE FACTS ━━━
 
 
-Create a detailed audio description for The Great Good Man at exhibition blue green and silva in MFA Boston, MA, focusing on museum.
 
-Start with a brief orientation that names "The Great Good Man" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+Create a detailed audio description for Le Lézard aux plumes d’or (The Lizard with Golden Feathers) at Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA, focusing on museum.
+
+Start with a brief orientation that names "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit. Include:
 - What the work physically depicts or consists of — what the visitor sees
@@ -103,23 +111,31 @@ DO NOT USE these phrases: the building was erected, historically important, the 
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: curiosity
-- Unique angle to emphasize: This portrait by John Singleton Copley opens a window into the 18th-century American ideal of virtue and character, inviting us to question how these notions shape identity.
-- End with a forward-looking hook: What happens when this ideal is challenged by the raw, emotional expressions of modern art?
+- Unique angle to emphasize: This sculpture challenges the viewer to see beyond the ordinary, revealing the artist's journey from traditional to avant-garde through the use of unexpected materials.
+- End with a forward-looking hook: What other transformations could an artist undergo to reflect profound cultural shifts?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
-The Appeal to the Great Spirit, created by Cyrus Edwin Dallin in 1909, is a monumental bronze sculpture installed in front of the Museum of Fine Arts, Boston.; The Museum of Fine Arts (MFA Boston) is an art museum in Boston, Massachusetts, founded in 1870.; The Museum of Fine Arts moved to its current Fenway location in 1909.
+The Museum of Fine Arts (MFA) is located in Boston, Massachusetts.; The MFA is the 20th-largest art museum in the world by public gallery area.; The MFA contains 8,161 paintings and over 450,000 works of art.; The MFA is one of the most comprehensive art collections in the Americas.; The MFA was founded in 1870 in Copley Square.
 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
-The Museum of Fine Arts is the 20th-largest art museum in the world, measured by public gallery area.
+The MFA Boston has more than 1.2 million visitors annually, ranking as the 83rd-most-visited art museum in the world as of 2024.
+
+PROVENANCE (museum-published credit line — you MUST name the donor):
+  Gift of Boris Fridman
+
+MANDATORY: Name the donor "Boris Fridman" (surname "Fridman") in your text. Do NOT write "a gift to the museum" without naming who gave it.
+PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
+or any biographical predicate not contained in retrieved text. Stating "Gift of [name]"
+is the documented fact; "donated because…" or "could no longer afford…" is fabrication.
 
 WORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):
-  Artist: Marsden Hartley
-  Date: 1942
-  Medium: UNKNOWN — do NOT describe physical form, placement, or spatial relationship. Do NOT say 'painting', 'sculpture', 'ceiling', 'installation', 'mural', 'glass', or assert any medium. Do NOT tell the visitor where to stand or look. Do NOT use phrases like 'look up', 'stand beneath', 'positioned above you', or describe the work's physical orientation. The work's physical form is unknown — prefer stating what IS known (artist, date, collaborator, publisher) at greater length.
+  Artist: Joan Miró
+  Date: 1971
+  Medium: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+  Publisher: Louis Broder
+  Credit line: Gift of Boris Fridman
 
 You MUST name the artist in your description. If a collaborator or author is given, name them too. These are grounded facts — use them.
-ORIENTATION CONSTRAINT: Since the medium/form is unknown, your Orientation section must NOT give spatial directions (where to stand, where to look, what is above/below/beside). Instead, simply name the work and introduce what is known about it (artist, date, context).
-MINIMUM LENGTH: You have grounded facts (artist, date, collaborator, publisher). Write at LEAST 120 words using these facts — discuss the artist's career, the collaboration, the historical context. Do NOT cut the description short.
 
 EXHIBITION FRAMING (LOCAL-382 — this work is part of a curated exhibition):
 This is NOT a painting on a wall. The exhibition's thesis is that THE BOOK IS THE ARTWORK:
@@ -130,6 +146,9 @@ Your description MUST engage at least TWO of these dimensions:
 2. The FORM — lithographs, binding, plates, paper, printing technique.
 3. How IMAGES, WORDS, AND TYPOGRAPHY intersect — the exhibition's stated subject.
 
+KNOWN COLLABORATION/FORM FACTS for this work:
+  - Publisher: Louis Broder
+  - Medium/form: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
 
 THESIS THREADING (LOCAL-421 — NON-NEGOTIABLE):
 You MUST include ONE SENTENCE that explicitly states how THIS SPECIFIC WORK advances
@@ -157,64 +176,81 @@ illustrations must name Dalí. The story beat persons (publishers, printers, don
 are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
+━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
+  ✓ "Broder" — Louis Broder (publisher): published this work
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
+Write at least one sentence per person above that names them by surname.
+If you omit any of these surnames, your response will be REJECTED and regenerated.
+━━━ END REQUIRED CONTENT ━━━
+
 SUPPLEMENTARY PEOPLE (exhibition-wide — include if natural, not required):
-  ○ Lewis (author): authored the text that was illustrated
-  ○ Jessie (donor): gave this work as a gift to the museum
+  ○ Torf (gallery patron): the gallery where these works are displayed is named for this patron
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
-  • Lewis (Author): authored the text that was illustrated
-  • Jessie (Donor): gave this work as a gift to the museum
-  • Bravo (Author): authored the text that was illustrated
+  • Louis Broder (Publisher): published this work
+  • Boris Fridman (Donor): gave this work as a gift to the museum
+  • Torf (Gallery Patron): the gallery where these works are displayed is named for this patron
 
 STORY SERVES THE THESIS: The person/action you name should connect to WHY
 this exhibition exists — e.g., a printer matters because the show argues printers
 were essential collaborators, not because printers are inherently interesting.
+NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
+  'publisher' → use 'Louis Broder'
+  'donor' → use 'Boris Fridman'
+
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 "Published by Louis Broder in Paris" IS a story — it names who and what they did.
 A story has: a person, a specific circumstance, a consequence.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] The Great Good Man 1942
-      Introducing "The Great Good Man 1942," a stunning piece inspired by the extraordinary work of renowned artist Marsden Hartley. This captivating artwork ...
-  [2] The Last Look of John Donne, 1940 (Pt-0806) | Catalogue entry ...
-      Provenance ... Louis, November 15–December 15, 1961 (McCausland 1960); Museum of Fine Arts, Boston ... The Great Good Man, 1942 (Pt-0866). The Great Good ...
-  [3] Public Collection: Museum of Fine Arts, Boston
-      From The Marsden Hartley Legacy Project. Gift of the William H. Lane Foundation (1990.414) Produced with Artifact | Foundation for Artist Catalogues
-  [4] Stories Artists Tell
-      A painting of the bust of a hatless Abraham Lincoln against a blue background. Marsden Hartley, The Great Good Man, 1942. Oil on Masonite. Gift of William H ...
-  [5] Stories Artists Tell
-      Marsden Hartley, The Great Good Man, 1942 Oil on Masonite. Funds for the galleries are provided by the Jean S. and Frederic A. Sharf Exhibition Fund,
-  [6] Stories Artists Tell | Museum of Fine Arts Boston
-      Marsden Hartley, The Great Good Man, 1942. Oil on Masonite. Gift of William H ... © 2026 Museum of Fine Arts Boston. Back to Top.
-  [7] The Great Good Man by Marsden Hartley - Oil Painting Reproduction
-      The Great Good Man ; Artist Nationality: American ; Century: 20th Century ; Origin: 1942 ; Location: Museum of Fine Arts (Boston, Massachusetts, USA) ; Subject:.
-  [8] Maine Antique Digest - Facebook
-      Take a look at "The Great Good Man," painted by Marsden Hartley in 1942. This work of art, on loan from Museum of Fine Arts, Boston, is on view ...
-  [9] Marsden Hartley (American, 1878-1943) Finnish-Yankee ...
-      ... The Great Good Man (versions at Sheldon Memorial Art Gallery, Nebraska and Museum of Fine Arts, Boston), variants of Madawaska Light Heavy ...
-  [10] The Great Good Man 1942
-      Discover "The Great Good Man 1942," a captivating masterpiece by Marsden Hartley, housed in the prestigious Museum of Fine Arts, Boston. This hand-painted ...
-  [11] The Great Good Man 1942 - Ocean's Bridge Oil Paintings
-      Order a museum-quality reproduction of The Great Good Man 1942 by Marsden Hartley. Hand-painted oil art, custom sizes, and a 100% guarantee at Ocean's ...
-  [12] marsden hartley the great good man – canvas and crumpets
-      marsden hartley the great good man. Making Modern (Museum of Fine Arts- Boston) - 9 / 16. Site by: Subscribe. © 2026 Canvas and Crumpets. Loading Comments.
-  [13] Cross-model lead (openai)
-      1915 Marsden Hartley painted "The Great Good Man" as part of his War Motif series.
-  [14] The Great Good Man, (painting) - Smithsonian Institution
-      The Great Good Man, (painting). American Art Museum. Object Details. Notes ... Kornhauser, Elizabeth Mankin, "Marsden Hartley," New Haven, CT: Yale ...
-  [15] Marsden Hartley
-      Marsden Hartley (January 4, 1877 – September 2, 1943) was an American Modernist painter, poet, and essayist. Museum of Fine Arts, Boston Marsden Hartley
-  [16] 1927 PRINTING "THE GREAT GOOD MAN" BY WILLIAM E. ...
-      This 1927 printing of "The Great Good Man" by William E. Barton is a must-have for any collector of presidential history books.
-  [17] This War Ain't Over: Fighting The Civil War In New Deal ...
-      The artist Marsden Hartley portrayed a strong and confident Lincoln in his 1942 painting The Great Good Man. Robert Sherwood played a vital role, even ...
-  [18] The Collected Poems of Muriel R - Muriel Rukeyser
-      When I see my father, the great good man, Father Thomas Jefferson, he'll shed great tears with grief.) A sortment, a sortment is good in a ...
-  [19] Young Worshipper of the Truth, 1940 (Pt-0798) | Catalogue entry ...
-      Provenance ... Museum of Fine Arts, Boston, January 1–31, 1962 ... Hartley's three portraits of Abraham Lincoln, Young Worshipper of Truth (1940), The Great Good ...
-  [20] Cross-model lead (gemini+gemini_grounded+openai)
-      1943 Marsden Hartley died in Ellsworth, Maine.
+  [1] Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery
+      Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
+  [2] Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery
+      Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
+  [3] Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery
+      Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
+  [4] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [5] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
+      Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...
+  [6] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [7] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [8] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
+  [9] Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ...
+      Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ( ...
+  [10] Joan Miró. Cover front from Le Lézard aux plumes d'or ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [11] Joan Miró. Cover front from Le Lézard aux plumes d'or ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [12] Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or ... - MoMA
+      Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+  [13] Joan Miró. Cover front from Le Lézard aux plumes d'or ( The Lizard with ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [14] Joan Miró. Plate (folio 11) from Le Lézard aux plumes d'or ( The ...
+      Joan Miró. Plate (folio 11) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+  [15] Joan Miró. Cover front from Le Lézard aux plumes d'or ( The Lizard with ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [16] Joan Miró. Cover front from Le Lézard aux plumes d'or ( The Lizard with ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [17] Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ( The Lizard ...
+      Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+  [18] Joan Miró's Broder Collection: How One Artist Revolutionized Lithography
+      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
+  [19] Louis Broder - National Gallery of Art
+      Joan Miró, Louis Broder, Crommelynck and Dutrou · 1957 · color etching and aquatint on wove paper mounted to cardboard · Accession ID 2010.73.1. 1 of 3. Site ...
+  [20] Louis Broder Archives - Park West Gallery
+      Joan Miró's “Broder Collection” is a series of color lithographs that, until 2004, had been inaccessible for over 30 years. The Broder Collection's vivid colors ...
+
+━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
+  • material: on wove
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
+━━━ END CANDIDATE SPECIFICS ━━━
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -285,10 +321,10 @@ appear BY NAME in your text. Never write "the generous donation" when the data s
 IS the story's starting point.
 
 ARTIST ATTRIBUTION (LOCAL-407 — NON-NEGOTIABLE):
-The artist for this work is Marsden Hartley. The surname "Hartley" MUST appear
+The artist for this work is Joan Miró. The surname "Miró" MUST appear
 in your text. The people named in the snippets (publishers, printers, donors) are
 IN ADDITION TO the artist, never instead of. If you write about Broder or Mourlot
-without mentioning Hartley, your response will be REJECTED.
+without mentioning Miró, your response will be REJECTED.
 
 CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at 'Museum of Fine Arts, Boston'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
 
@@ -355,71 +391,41 @@ DO NOT include directions to the next stop - these will be added separately.
 
 LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
-CRITICAL CORPUS GATE RESTRICTION (D50 enforcement — LOCAL-198):
-The corpus for this stop does NOT contain information about the specific artwork/exhibit
-"The Great Good Man". The available text is about the venue generally.
+CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
+There is NO verified source material for "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" — no stop-level corpus,
+no venue-level corpus, nothing. Every specific claim you might generate about
+this place comes from your training data and CANNOT be verified.
 
 YOU MUST NOT:
-- Describe the artwork's appearance, materials, technique, or composition
-- Name the artist's practice, style, or art-historical movement
-- Claim anything about what the visitor will see at this specific stop
-- Invent details about the work from your training data
+- Assert any specific date, year, century, or historical period
+- State any measurement (depth, height, distance, area)
+- Attribute a nickname, title, or epithet to this place
+- Name specific people, architects, artists, or historical figures
+- Claim specific events happened here
+- Describe specific architectural features as fact
 
 YOU MAY ONLY:
-- Note the stop's name and its location within the venue
-- Share venue-level facts that ARE in the corpus (opening date, general collection scope)
-- Describe the physical surroundings and wayfinding
-- Acknowledge that detailed information about this specific work is limited
+- Name the stop and its general geographic context (e.g. "a coastal town east of Nice")
+- Describe what is physically visible to a cyclist arriving now (sea, buildings, streets)
+- Provide wayfinding and orientation ("look to your left", "the harbor is ahead")
+- Use hedging language ("this area is known for…", "visitors often notice…")
+- Note the atmosphere and sensory experience (sounds, smells, light)
 
-Write 80-100 words maximum. This is a venue-grounded placeholder, not a full stop narration.
-
-PER-STOP SOURCE MATERIAL for "The Great Good Man" (from verified sources — use this as your primary factual basis):
-  Passage 1: The Appeal to the Great Spirit, created by Cyrus Edwin Dallin in 1909, is a monumental bronze sculpture installed in front of Boston's ...
-  Passage 2: The Art of the Americas department studies, presents, and cares for the paintings, sculpture, and decorative arts made throughout North, Central, and South America and the Caribbean by artists from many cultures and nations. Spanning 3,000 years, from the ancient civilizations of Mesoamerica to the modern art capitals of Mexico City and New York, these objects embody the essential human desire to create meaning and beauty through art and craft, a drive shared by artists free and enslaved, traine
-  Passage 3: Ancient Egyptian artifacts including sculptures, sarcophagi, and jewelry dating back to approximately 6500 BCE to 600 CE, which were primarily obtained through excavations conducted by George A. Reisner in Egypt and Sudan between 1905 and 1942.
-The Nubian arts, including Kerma pottery, colossal royal statues of Napatan kings, jewels, and imports from Greece and Rome, are represented in the collection of Nubian art.
-Dutch Golden Age painting, including 113 works given in 2017 by collectors Rose-M
-  Passage 4: == Community relations ==
-The MFA also has a longstanding initiative within the Community Arts program called the Community Artist Initiative Artist Project, where the museum invites a Lead Artist to spend nine months creating works with youth from twelve after-school community organizations in the Boston area. The Artist and the children create a collaborative work of art inspired by the Museum's encyclopedic collection, and the completed project is exhibited in the Edward H. Linde Gallery (168
-  Passage 5: Appeal to the Great Spirit is a 1908 equestrian statue by Cyrus Dallin, located in front of the Museum of Fine Arts, Boston. It portrays a Native American ...
-  Passage 6: In this period, an equestrian statue titled Appeal to the Great Spirit became contentious. The work of local artist Cyrus Dallin (1861–1944) ...
-  Sources:
-  [Venue page for Museum of Fine Arts, Boston] http://www.mfa.org/collections/americas (tier 1)
-  [Venue page for Museum of Fine Arts, Boston] https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston (tier 1)
-  [Appeal to the Great Spirit — interpretive search] https://en.wikipedia.org/wiki/Appeal_to_the_Great_Spirit (tier 1)
-  [Appeal to the Great Spirit — interpretive search] https://artsfuse.org/286368/visual-arts-commentary-the-problematics-of-multiculturalism-at-the-mfa-on-the-dallin-front/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://centerofthewest.org/2016/05/11/treasures-from-our-west-appeal-to-the-great-spirit-by-cyrus-e-dallin/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://worldheritageusa.org/monumentstoolkit/publications/appeal-to-the-great-spirit/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://www.mfa.org/collections/americas/appeal-to-the-great-spirit (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://www.flickr.com/photos/wallyg/54190283288 (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://museumanthropology.org/heres-how-the-museum-of-fine-arts-plans-to-address-the-controversial-statue-that-greets-visitors/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://artsfuse.org/332371/visual-arts-commentary-the-great-spirit-gets-company/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://www.digitalcommonwealth.org/search/commonwealth:k930f268t (tier 3)
-
-GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
-
-BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
-
-NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
-  - If a passage names WHERE someone came from and WHERE they went, state both.
-  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
-  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
-  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
-  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
 
 ━━━ ARTIST ATTRIBUTION (LOCAL-414 — NON-NEGOTIABLE, FINAL AUTHORITY) ━━━
-The artist of THIS specific work is: Marsden Hartley
-The surname "Hartley" MUST appear in your text.
+The artist of THIS specific work is: Joan Miró
+The surname "Miró" MUST appear in your text.
 
 If the reference material above mentions OTHER artists or OTHER works (by different
 artists), you may reference them only as CONTEXT — but your text MUST primarily be
-about THIS work by Marsden Hartley. Naming a different artist's different work does NOT
-satisfy this requirement. Your text will be REJECTED if "Hartley" is absent.
+about THIS work by Joan Miró. Naming a different artist's different work does NOT
+satisfy this requirement. Your text will be REJECTED if "Miró" is absent.
 ━━━ END ARTIST ATTRIBUTION ━━━
 
 
 ━━━ THE STORY FOR THIS STOP (already written and fact-checked) ━━━
-In 1942, Marsden Hartley painted "The Great Good Man," an artwork that marked a significant moment in his career. This painting, which portrays a bust of Abraham Lincoln against a blue background, was part of Hartley's exploration of American identity during a time of global upheaval. By choosing to depict Lincoln, Hartley connected deeply with themes of strength and leadership, reflecting the turbulent era in which he was creating. The painting now resides in the Museum of Fine Arts, Boston, where it serves as a testament to Hartley's artistic vision and his engagement with historical figures.
+In 1971, Louis Broder took on the ambitious task of publishing Le Lézard aux plumes d'or, an illustrated book by Joan Miró. This task involved producing a limited edition that featured 40 vibrant color lithographs, a significant undertaking that required careful planning and execution. As a result of Broder's efforts, the book became one of Miró's most celebrated works, showcasing the artist's unique fusion of poetry and printmaking.
 ━━━ END STORY ━━━
 
 This story is REQUIRED and comes first in your description. Reproduce its facts
@@ -432,13 +438,12 @@ introduce any further named person who does not appear above.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "Lane Foundation made a significant donation to the Museum of Fine Arts, Boston."
-- "This donation included Marsden Hartley's painting, "The Great Good Man," created in 1942."
-- "As a result, the museum's collection was enriched with this notable work, allowing it to be viewed and appreciated by the public within the context of American Modernist art."
-- "The Foundation's gift enabled the museum to enhance its Modernist collection significantly."
-- "In his exploration of American identity, Hartley captures the essence of Abraham Lincoln, symbolizing ideals of strength and integrity during a turbulent period in history."
-- "The presence of this piece in Boston's Museum of Fine Arts is entwined with Hartley's broader impact on modern art and his deep exploration of character."
-- "Silva, although not involved in the creation of this particular work, contributed to the dialogue around the art form, illustrating the importance of intersections between text and image in advancing the book as an artwork."
+- "In 1956, Louis Broder began a fruitful partnership with Joan Miró and the renowned Atelier Mourlot lithographic studio."
+- "This collaboration culminated in the 1971 creation of the illustrated book, Le Lézard aux plumes d’or, featuring 40 vibrant color lithographs."
+- "Broder published the work, highlighting a fusion of poetry and printmaking that became one of Miró's most celebrated artistic achievements.The contribution of this work to the Museum of Fine Arts, Boston, was made possible by Boris Fridman, who generously donated it to enrich the museum's extensive collection."
+- "With over 1.2 million annual visitors, the MFA stands as the 83rd-most-visited art museum in the world."
+- "By integrating Le Lézard aux plumes d’or into its collection, the museum allows its audience to experience firsthand the transformative power of collaboration between artists and publishers."
+- "This work exemplifies the exhibition's thesis: that revolutionary art forms emerge through deeply collaborative ventures."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
@@ -449,12 +454,15 @@ Use only the source material supplied. If the material will not support such a s
 
 
 ================================================================================
-Total user message length: 37590 chars
+Total user message length: 33225 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 0
-  (none extracted — snippets may be empty or regex missed)
+candidate_specifics found: 4
+  • material: on wove
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['The Great Good Man', '__stop_0__', 'That Red One', '__stop_1__', 'Autorretrato con espejo (Self-Portrait with Mirror)', '__stop_2__']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Moses and Monotheism', '__stop_1__', 'Au Soleil du Plafond', '__stop_2__']

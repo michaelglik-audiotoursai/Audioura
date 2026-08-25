@@ -429,6 +429,31 @@ def test_seam_has_no_missing_space():
           repr(merged))
 
 
+def test_an_initial_is_not_a_sentence_boundary():
+    """Measured on the delivered 22:59 tour — this one corrupted the text.
+
+    The story read "In 1916-1917, L. Rosenberg planned a book project with Juan
+    Gris…". The splitter treated `L.` as a sentence end, D518 dropped the
+    "Rosenberg planned…" half as a duplicate of the prose, and the orphan
+    "In 1916-1917, L." fused with the next sentence into "In 1916-1917, L. Gris's
+    untimely death left Reverdy in a poignant position" — a mangled name welded
+    to the wrong event, in a tour that passed all nine defect checks.
+    """
+    got = sentences_of("In 1916-1917, L. Rosenberg planned a book project with "
+                       "Juan Gris. However, Gris died in 1927.")
+    check('an initial does not split the sentence', len(got) == 2, str(got))
+    check('the name survives whole', 'L. Rosenberg planned' in got[0], got[0])
+
+    for text, want, label in [
+        ("J. M. W. Turner painted it. The work is small.", 2, 'multiple initials'),
+        ("Dr. Freud published in 1939. Dali illustrated it.", 2, 'a title'),
+        ("He worked at St. Petersburg. It was 1905.", 2, 'St.'),
+        ("The plates were erased. Miro redrew them.", 2, 'an ordinary boundary'),
+    ]:
+        check(f'{label}: {want} sentence(s)', len(sentences_of(text)) == want,
+              str(sentences_of(text)))
+
+
 def test_sentence_splitter_keeps_everything():
     text = 'One. Two! Three? "Four." Five.'
     check('splitter loses no sentence', len(sentences_of(text)) == 5,
@@ -454,6 +479,7 @@ if __name__ == '__main__':
                test_the_whole_stop_is_cleaned_end_to_end,
                test_never_strips_a_stop_bare,
                test_seam_has_no_missing_space,
+               test_an_initial_is_not_a_sentence_boundary,
                test_sentence_splitter_keeps_everything):
         print(f"\n{fn.__name__}")
         fn()

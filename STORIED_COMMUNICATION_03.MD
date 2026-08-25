@@ -1412,3 +1412,36 @@ already paid for.
 Stop 1 is long… as long as it is because of the stories not mere descriptions."* The judgement
 listed stop-1 bloat as a defect; that was the wrong target. The right one is the *errors* in it,
 which is LOCAL-467.
+
+## Q21 (08-24) — are 465/466/467 done, and a verification tour
+
+**Auth was the whole problem the first time** — all three died on `OAuth error: Auth portal timed
+out` with zero commits. After you logged in, I verified the headless invocation directly, then
+re-dispatched; all three completed.
+
+**Two documents in VS Code:** `TOUR_MFA_UNBOUND_20260824_2259.md` and its judgement.
+**Stop index mean 75.7, range 73-81 — the best measured, and the floor moved from 44 to 73.** All
+nine defect checks clean. Full record **D525**.
+
+**LOCAL-465 shipped broken.** The gate threw a NameError on every run, its non-fatal wrapper
+swallowed it, and the fictional tour generated anyway. Its 27 tests only ever exercised the
+decision function, never the wiring. Fixed; now verified both ways — the bogus request writes NO
+tour and logs the reason, the real request generates normally.
+
+**LOCAL-466 works and published zero second stories, and that changes the answer to your
+question.** Yesterday: "we bought four stories and binned three." Today, measured: **three of the
+four are the same story told again** — the merge absorbed the second entirely (+0 sentences on
+stop 1). The extra candidates come from the same object record and the same sources, so a
+different credit_line mostly reorders the same facts. **Length needs diverse SEEDS, not more
+candidates.** I did not force a second story through by lowering the bar; the duplicate guard is
+the only thing keeping us from stops that say everything twice.
+
+**LOCAL-467 works** — no gallery asserted, and Boris Fridman survives, which was the criterion
+that mattered more.
+
+**One defect this tour shipped is mine.** Stop 3 says *"In 1916-1917, L. Gris's untimely death…"*
+— my sentence splitter treated the initial in *"L. Rosenberg"* as a sentence end, the duplicate
+pass dropped the rest, and the orphan fused with the next sentence. Fixed and tested; **not
+regenerated**, per your one-tour rule. It is the sixth instrument failure today, all the same
+shape — a rule fitted to the single example in front of me. The tour passed all nine checks and
+still contained a mangled name.
