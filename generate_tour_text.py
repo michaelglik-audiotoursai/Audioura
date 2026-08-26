@@ -10211,8 +10211,19 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 _kf_snips = facts_as_snippets(_kf_res, _kf_name)
                 _kf_high = sum(1 for f in _kf_res['facts'] if f['confidence'] == 'high')
                 _DIRECT_SNIPPETS_PER_STOP.setdefault(_kf_name, []).extend(_kf_snips)
-                # The listener must be told where this came from (D532 option C).
-                _kf_poi['confirmation'] = 'knowledge'
+                # [D534] NOT `confirmation = 'knowledge'`. That flag means "the
+                # venue's own listing does not name this WORK", and D532's option-C
+                # disclosure says so aloud. Setting it here conflated two different
+                # things and shipped a false statement: the v4 tour told listeners
+                # "the museum's listing doesn't name this one, so it may or may not
+                # be out today" about the Turner viol — a D1v2-verified object in
+                # the permanent collection, sitting in the venue's own corpus.
+                #
+                # What is unconfirmed here is the PROVENANCE OF SOME FACTS, not the
+                # presence of the object. Telling a listener a real exhibit might be
+                # absent is worse than saying nothing: it spends the trust that the
+                # disclosure exists to protect.
+                _kf_poi['facts_from_fallback'] = True
                 _kf_filled += 1
                 print(f"  [D533] +{len(_kf_snips)} fact(s) via {_kf_res['provider']} "
                       f"({_kf_high} high-confidence) — stop will be labelled aloud")
