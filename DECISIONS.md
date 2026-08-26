@@ -21359,3 +21359,92 @@ it. Its own defects are in `TOUR_PALAIS_LASCARIS_20260826_JUDGEMENT.md`; the ser
 1825, and the tour ships "the quartet founded by Antoine Gautier in 1825". Also found there:
 `[LOCAL-458] entity gate SKIPPED: no exhibition scope` — **the entity gate does not run on plain
 museum tours**, which are the ones with the least other checking.
+
+---
+
+## D533 — Michael's three fixes: the fabrication, the twice-told story, the starved stop
+
+**2026-08-26, after his review of `TOUR_PALAIS_LASCARIS_20260826.md`.**
+
+### 1. The fabrication — and the reason it is not a retrieval bug
+
+```
+corpus:  "Antoine Gautier, a passionate collector and amateur musician BORN IN NICE IN 1825"
+tour:    "...to the quartet FOUNDED BY Antoine Gautier IN 1825"
+```
+
+**The correct fact was in the retrieved passage.** The generation step turned `born in` into
+`founded`. Every gate passed — D1v2 6/6, existence gate 100%, LOCAL-16 green — because **the gates
+verify that the STOP exists, not that the SENTENCE is true.**
+
+`story_fact_guard.py` compares the role the TOUR gives a `(person, year)` pair against the role the
+CORPUS gives the same pair, and refuses the mismatch. Deliberately deterministic: this is a
+comparison of two texts we already hold, and D526/D528 record six LLM rules in one day fitted to
+the single example in front of them.
+
+**It DELETES rather than rewrites.** A rewrite has to assert something, and the only thing known is
+that the current assertion is wrong — rewriting is how a second fabrication gets introduced while
+fixing the first. Deletion can subtract information; it cannot add a falsehood.
+
+### 2. Cross-stop fact repetition — the threshold was never the problem
+
+Michael: *"the same facts are not repeated not only in the same sentence and in the same stop, but
+across all stops: listener should not listen the same story many times."*
+
+The existing S27 check compares SENTENCES by Jaccard overlap. The two tellings of the 1942 purchase
+scored **0.692** against a **0.70** threshold and passed. **Lowering the threshold would have
+caught that pair and still missed the target** — the same fact told in different words scores near
+zero, and the listener does not hear word overlap.
+
+Facts are keyed `(year, entity)`. Two false-positive shapes had to die first, both found by running
+it against the real tour:
+
+- **scaffolding** — `Stop N:`, `Coordinates:`, `Directions:` are not narration
+- **list sentences** — stop 1's orientation named all three works with all three dates, yielding
+  **nine phantom facts** and making every later stop look like a repeat. Fixed with a proximity
+  limit between year and entity, plus a skip for sentences carrying 3+ distinct years.
+
+First run against the real tour: 25 "repeats", 5 removals, mostly headers. After: **3 signatures,
+1 removal, the correct one.**
+
+### 3. The starved stop — which was not starved
+
+Michael: *"The third stop has no information about it and that is strange because when I asked for
+it at Gemini I got plenty."* He was right, and the cause was not missing sources:
+
+```
+Stop 3 'Violes gambe by William Turner': queries=3 serp_results=8 snippets=8
+[LOCAL-411] Stop 3 snippet ranking: input=8 ... output=5 usable=0
+[CORPUS-GATE] stop='Violes gambe...' verdict=VENUE_ONLY action=SHORTENED
+```
+
+**The corpus gate runs BEFORE the SERP search.** Its verdict described what was known at that
+moment, and the SHORTENED restriction explicitly forbids describing the object — so the stop
+narrated the building's purchase and admitted *"specific details about this viol's appearance are
+limited"* while 8 snippets about the viol sat unused.
+
+Two fixes: the stale verdict is **lifted** once material arrives, and `stop_knowledge_fallback.py`
+fills a genuinely empty stop.
+
+**Grounding is what makes the fallback safe, and it is measurable.** From memory alone, gpt-4o
+returned five facts about the Turner viol, three of them restatements of the question ("the viol
+was made in 1652", "it is in this museum"). With web evidence: Turner's **1647–1656** working
+range, the **Gautier bequest**, six strings, inventory number **C36** — the substance of Michael's
+Gemini answer. Filled stops are marked `confirmation='knowledge'`, so **D532's option-C disclosure
+is what tells the listener** — its second caller, built yesterday for a different reason.
+
+### Evidence
+
+Both suites verified to fail under a **disabled** guard AND an **over-greedy** one — four broken
+variants, all detected. 59 existing assertions pass.
+
+**One defect this process caught in itself, and it is the D530 shape again.** The role guard's first
+wiring assumed `stop_corpus.passages` was a string; it is a list for some rows. Live, it printed
+`Role guard error (non-fatal): sequence item 1: expected str instance, list found` — **the
+fabrication guard silently did not run on the very tour it was written for.** A non-fatal
+try/except around an unrun check is indistinguishable from a passing check. Coerced, and pinned by
+a test.
+
+**Verified live on the re-run** (`81b48c8`): corpus-gate restriction lifted on all 3 stops, and the
+1942 purchase — told **three** times that run — removed from stops 2 and 3. Stop 3 gained
+"worked in Aldgate, London, between 1647 and 1656" and "signature heart-shaped motifs".
