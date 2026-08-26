@@ -14413,7 +14413,8 @@ REWRITE RULES (all mandatory):
 
     _retry_stats = {'eligible': 0, 'retried': 0, 'improved': 0, 'kept_original': 0,
                     'trigger_floor': 0, 'trigger_no_story': 0,
-                    'trigger_top_value': 0}  # [D498]
+                    'trigger_top_value': 0,
+                    'trigger_repeats': 0, 'trigger_thin': 0}  # [D498, D534]
     # [D499] `DISABLE_STORY_RETRY=1` switches off the WHOLE of PHASE 5.17 — the
     # LOCAL-474 hollowed-by-gates retry, step 7a, step 7b's rotation and step 7c's
     # allowance. Added because there was no way to generate a tour with step 7
@@ -14430,6 +14431,20 @@ REWRITE RULES (all mandatory):
               "7c inactive, and the LOCAL-474 hollowed-stop retry with them")
     if _storied_mode and not _phase5_ceiling_breached and not _retry_disabled:
         _RETRY_FLOOR = 120
+        # [D534] Michael, 2026-08-26: "stops 2 and 3 are too small, we must add
+        # another story to them. What is our size to require a story?"
+        #
+        # The answer was 120 words, and it is why nothing fired: stop 2 came in at
+        # 226 words and stop 3 at 259, both comfortably clear of the floor, while
+        # stop 1 ran to 509. A 120-word floor is not "a story" — LOCAL-439 defines
+        # a story-unit as >=3 sentences with a named person, real actions and an
+        # arc, and the D394 baseline for a museum stop is 300-500 words.
+        #
+        # `_THIN_FLOOR` is the second, higher bar: a stop above the hollowing
+        # floor but below this has room for ANOTHER story, and LOCAL-491's
+        # rotation already knows how to fetch the next fact rather than re-asking
+        # for the same one. Set TOUR_THIN_STOP_FLOOR=0 to disable.
+        _THIN_FLOOR = int(os.environ.get('TOUR_THIN_STOP_FLOOR', '300'))
 
         # -------- [LOCAL-487] STEP 7a: retry on "NO VALID STORY" --------
         # Michael's step 7 says: "If there are no valid stories, we go to the next
@@ -14557,12 +14572,52 @@ REWRITE RULES (all mandatory):
             print(f"  [LOCAL-487] story_opportunity_scan not importable — "
                   f"7a falls back to the word floor alone ({_sos_err})")
 
+        # [D534] Cross-stop repetition, computed ONCE over the current drafts, so
+        # a repeating stop can be REGENERATED rather than have the sentence cut
+        # out from under it. Michael asked for the generous form of the rule —
+        # "ANY information should not be repeated among stops of the tour" — and
+        # the two detectors cover different halves of it:
+        #   * semantic (embeddings) catches paraphrase with no shared vocabulary
+        #   * (year, term) catches the diluted case embeddings score too low,
+        #     e.g. the 1946 monument classification told at stops 1 and 3
+        _d534_repeats_by_stop = {}
+        try:
+            from derepetition_guard import (repeated_assertions_by_stop,
+                                            check_cross_stop_fact_repetition)
+            _d534_draft = '\n'.join(
+                f"\nStop {i+1}: {p.get('name','')}\n\n{p.get('description','') or ''}"
+                for i, p in enumerate(poi_list))
+            for _st, _asserts in repeated_assertions_by_stop(
+                    _d534_draft, api_key, threshold=0.78).items():
+                _d534_repeats_by_stop.setdefault(_st, []).extend(_asserts)
+            for _fr in check_cross_stop_fact_repetition(_d534_draft):
+                _lst = _d534_repeats_by_stop.setdefault(_fr['repeat_stop'], [])
+                if _fr['first_sentence'] not in _lst:
+                    _lst.append(_fr['first_sentence'])
+            if _d534_repeats_by_stop:
+                for _st, _a in sorted(_d534_repeats_by_stop.items()):
+                    print(f"  [D534] Stop {_st} repeats {len(_a)} thing(s) said earlier "
+                          f"— will regenerate with them banned")
+                    for _x in _a[:4]:
+                        print(f"      already told: {_x[:100]}")
+            else:
+                print(f"  [D534] No cross-stop repetition in the drafts")
+        except ImportError as _d534_err:
+            _import_logger.error(f"[D534] MISSING: derepetition_guard cross-stop "
+                                 f"detectors — repetition retry DISABLED: {_d534_err}")
+        except Exception as _d534_err:
+            print(f"  [D534] Cross-stop repetition scan error (non-fatal): {_d534_err}")
+
         for _ri, _rpoi in enumerate(poi_list):
             _now = _rpoi.get('description') or ''
             _before = _pre_gate_prose.get(_ri, '')
             if not _now or _now.startswith('['):
                 continue
             _now_wc = len(_now.split())
+            # [D534] Trigger 4: this stop restates something an earlier stop said.
+            _d534_repeats = _d534_repeats_by_stop.get(_ri + 1, [])
+            # [D534] Trigger 5: the stop is thin enough to carry another story.
+            _thin = bool(_THIN_FLOOR) and _now_wc < _THIN_FLOOR
 
             # Trigger 1 (LOCAL-474, unchanged): the gates hollowed the stop out.
             _hollowed = (_now_wc < _RETRY_FLOOR
@@ -14583,12 +14638,13 @@ REWRITE RULES (all mandatory):
                 _top_value = bool(_sp_r) and 0 < _D498_sent(
                     _sp_r.get('story') or '') <= _D498_MAX
 
-            if not _hollowed and not _storyless and not _top_value:
+            if (not _hollowed and not _storyless and not _top_value
+                    and not _d534_repeats and not _thin):
                 continue
             # A stop that was never worth mining has no second fact to rotate to;
             # retrying it spends money on the same absent corpus. Step 2 already
             # decided this, so read its answer rather than guessing again.
-            if _storyless and not _hollowed:
+            if _storyless and not _hollowed and not _d534_repeats and not _thin:
                 _w = _rpoi.get('_worthiness') or {}
                 if _w.get('worth_mining') is False:
                     continue
@@ -14604,6 +14660,13 @@ REWRITE RULES (all mandatory):
                 _retry_stats['trigger_no_story'] += 1
             if _top_value and not _hollowed and not _storyless:
                 _retry_stats['trigger_top_value'] += 1
+            # [D534] Counted independently — a stop can be both thin AND repeating,
+            # and D498 recorded what a ternary does to overlapping triggers: it
+            # credits one and reports the other as zero.
+            if _d534_repeats:
+                _retry_stats['trigger_repeats'] += 1
+            if _thin:
+                _retry_stats['trigger_thin'] += 1
             _retry_stats['eligible'] += 1
 
             _removed = _sentences_removed_by_gates(_before, _now)
@@ -14612,7 +14675,7 @@ REWRITE RULES (all mandatory):
             # on an empty `_removed`, as the LOCAL-474 version did, would have
             # made trigger 2 fire and then do nothing at all, which is the exact
             # silent-no-op shape this session has been fixing since 21:00.
-            if not _removed and not _storyless:
+            if not _removed and not _storyless and not _d534_repeats and not _thin:
                 continue
 
             _stop_label = _rpoi.get('name', f'Stop {_ri + 1}')
@@ -14640,6 +14703,34 @@ REWRITE RULES (all mandatory):
             # naming the underlying assertion is the only version that cannot be
             # satisfied by a paraphrase.
             _instruction = ''
+            # [D534] Michael: "ANY information should not be repeated among stops
+            # of the tour." The ban names the ASSERTION as an EARLIER STOP told
+            # it, not this stop's wording — LOCAL-476 measured what happens when
+            # you ban a sentence instead of a claim: the model nominalised the
+            # verb and shipped the same content in a form the gate could not see.
+            if _d534_repeats:
+                _already = '\n'.join(f'- "{a.strip()}"' for a in _d534_repeats[:6])
+                _instruction += (
+                    "\n\nALREADY TOLD AT AN EARLIER STOP OF THIS TOUR. The listener "
+                    "has heard each of these on the way here:\n" + _already + "\n\n"
+                    "Do not tell any of them again, in any form. This bans the "
+                    "INFORMATION, not the phrasing: restating it in different words, "
+                    "summarising it, alluding to it, or building a sentence whose "
+                    "point depends on it all count as telling it again. You may "
+                    "mention the museum, the building and the collection — you must "
+                    "not re-narrate these events. Spend the words on THIS object "
+                    "instead: what it is made of, who made it, what happened to it, "
+                    "what makes it different from the others here.\n")
+            if _thin:
+                _instruction += (
+                    f"\n\nTHIS STOP IS TOO SHORT AT {_now_wc} WORDS. Every other stop "
+                    f"on this tour carries more. Add ANOTHER story about this object — "
+                    f"a second, DIFFERENT episode with a named person, real actions and "
+                    f"a consequence, drawn from the source material below. Do not pad "
+                    f"the existing story with adjectives or restate it at greater "
+                    f"length; find a second thing that actually happened. If the source "
+                    f"material genuinely supports only one story, write that one well "
+                    f"and stop — a short honest stop beats a padded one.\n")
             if _removed:
                 _forbidden = '\n'.join(f'- "{s.strip()}"' for s in _removed)
                 _instruction += (
@@ -14803,8 +14894,11 @@ REWRITE RULES (all mandatory):
                   f"by gates, {_retry_stats['trigger_no_story']} storyless "
                   f"(step 7a — Michael's bar, independent of length), "
                   f"{_retry_stats['trigger_top_value']} top-value "
-                  f"(step 7c — larger allowance). Triggers overlap and are counted "
-                  f"separately; they do not sum to 'eligible'.")
+                  f"(step 7c — larger allowance), "
+                  f"{_retry_stats['trigger_repeats']} repeating an earlier stop "
+                  f"(D534), {_retry_stats['trigger_thin']} thin enough for another "
+                  f"story (D534, floor={_THIN_FLOOR}w). Triggers overlap and are "
+                  f"counted separately; they do not sum to 'eligible'.")
             print(f"  [LOCAL-474] each regenerated stop was re-gated before being "
                   f"accepted; a retry can only replace text it beats after gating.")
 

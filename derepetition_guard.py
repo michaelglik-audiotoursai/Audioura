@@ -413,6 +413,42 @@ _FACT_NAME_STOPWORDS = {
 }
 
 
+# [D534] Content words that carry a fact when paired with a year. Proper nouns
+# alone were not enough: the v2 tour told the 1946 monument classification twice
+# as "its classification as a historical monument in 1946" (stop 1) and "the
+# building was declared a historical monument by 1946" (stop 3). NEITHER has a
+# capitalised subject — "this decision", "the building" — so a proper-noun
+# signature is blind to both, and the sentences are worded differently enough
+# that embeddings score them below any usable threshold once stop 3's extra
+# clauses dilute the vector.
+#
+# A shared YEAR plus a shared uncommon noun is a strong joint signal: the year
+# constrains it hard enough that "monument" alone cannot false-positive across
+# unrelated facts.
+_FACT_GENERIC_WORDS = {
+    'museum', 'collection', 'collections', 'instrument', 'instruments', 'visitor',
+    'visitors', 'listener', 'history', 'historical', 'century', 'centuries',
+    'building', 'palace', 'city', 'public', 'cultural', 'culture', 'heritage',
+    'important', 'significant', 'remarkable', 'crafted', 'created', 'housing',
+    'featuring', 'including', 'showcasing', 'preserving', 'transformation',
+    'transforming', 'stands', 'standing', 'placed', 'display', 'displayed',
+}
+
+
+def _fact_content_words(sentence, window=None):
+    """Uncommon content words in a sentence — the noun half of a (year, X) fact."""
+    words = re.findall(r"[a-zA-Zà-þ']{6,}", sentence or '')
+    out = set()
+    for w in words:
+        import unicodedata
+        f = unicodedata.normalize('NFKD', w.lower())
+        f = ''.join(c for c in f if not unicodedata.combining(c))
+        if f in _FACT_GENERIC_WORDS or f in _FACT_NAME_STOPWORDS:
+            continue
+        out.add(f)
+    return out
+
+
 def _fact_entities(sentence: str):
     """Capitalised entities in a sentence, folded, minus sentence-start noise."""
     import unicodedata
@@ -460,7 +496,9 @@ def fact_signatures(sentence: str):
     years = [(m.group(1), m.start()) for m in _FACT_YEAR_RE.finditer(s)]
     if not years or len(set(y for y, _ in years)) >= 3:
         return set()
-    ents = _fact_entities(s)
+    # [D534] Proper nouns AND uncommon content words. See the note above
+    # `_FACT_GENERIC_WORDS`: the 1946 case has no proper noun at all.
+    ents = _fact_entities(s) | _fact_content_words(s)
     if not ents:
         return set()
     sigs = set()
@@ -502,8 +540,21 @@ def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2):
         # A stop repeating itself is a different problem; dedupe within the stop
         # first so one stop's two mentions do not both count against the next.
         local = set()
-        narration = '\n'.join(ln for ln in block.split('\n')
-                              if not _FACT_SKIP_LINE.match(ln))
+        # Drop the block's FIRST line: _stop_blocks splits on "Stop N:", so each
+        # block opens with the stop TITLE, which _FACT_SKIP_LINE cannot match and
+        # which otherwise reads as a fact ("... (Nuremberg, 1581)").
+        _lines = block.split('\n')[1:]
+        # [D534] Stop 1's ORIENTATION previews the whole tour, and Michael asked
+        # for that to stay: "Stop 1's orientation: stop previewing later stops.
+        # -- I actually like it." (2026-08-26). It must therefore never count as
+        # the FIRST telling of anything, or every stop that describes its own
+        # object gets flagged for repeating the preview — measured, it produced
+        # four false positives on the v2 tour (1581/schnitzer and friends) and
+        # would have had stop 2 regenerated for saying what it is there to say.
+        if num == 1:
+            _lines = [ln for ln in _lines
+                      if not ln.strip().lower().startswith('orientation:')]
+        narration = '\n'.join(ln for ln in _lines if not _FACT_SKIP_LINE.match(ln))
         for sent in _split_into_sentences(narration):
             for sig in fact_signatures(sent):
                 if sig in local:
@@ -583,3 +634,139 @@ def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
         out = out.replace(block, new_block, 1)
         actions.append(dict(r, removed=True, reason=''))
     return out, actions
+
+
+# ---------------------------------------------------------------------------
+# [D534] GENERIC cross-stop repetition — Michael, 2026-08-26:
+#   "error identification should have triggered in this generic case, try it and
+#    try a more generous solution: ANY information should not be repeated among
+#    stops of the tour."
+#
+# He is right and the case he found proves it. The v2 tour told the 1946 monument
+# classification at stop 1 AND stop 3:
+#
+#   stop 1  "This pivotal decision set the stage for its classification as a
+#            historical monument in 1946."
+#   stop 3  "The building was declared a historical monument by 1946..."
+#
+# Both carry the year. The (year, entity) signature STILL missed them, because
+# neither sentence contains a capitalised entity — "this decision", "the
+# building". A signature keyed on proper nouns cannot see a fact whose subject is
+# a pronoun or a definite description, and that is most sentences in running
+# prose.
+#
+# Word overlap misses it too: Jaccard here is ~0.35.
+#
+# So the generic instrument is MEANING, which means embeddings. Two sentences
+# that say the same thing land near each other in embedding space however they
+# are worded, whatever their subjects are called, dated or not.
+#
+# EXEMPT, deliberately: stop 1's Orientation and the closing recap. Michael,
+# 2026-08-26: "Stop 1's orientation: stop previewing later stops. -- I actually
+# like it." The preview and the recap are SUPPOSED to restate other stops; a
+# generic no-repetition rule would strip exactly the thing he asked to keep.
+# ---------------------------------------------------------------------------
+
+_EMBED_MODEL = 'text-embedding-3-small'
+
+
+def _embed(texts, api_key, model=None, timeout=60):
+    """Batch-embed. Returns list of vectors, or None if the call did not run."""
+    if not texts or not api_key:
+        return None
+    import json
+    import requests
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/embeddings",
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+            data=json.dumps({"model": model or _EMBED_MODEL, "input": texts}),
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            return None
+        return [d['embedding'] for d in resp.json()['data']]
+    except Exception:
+        return None
+
+
+def _cosine(a, b):
+    num = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(x * x for x in b) ** 0.5
+    return num / (na * nb) if na and nb else 0.0
+
+
+def narration_sentences_by_stop(tour_text, skip_first_orientation=True):
+    """[(stop_number, sentence)] for real narration only.
+
+    Scaffolding, the closing recap, and — by Michael's instruction — stop 1's
+    orientation preview are excluded.
+    """
+    out = []
+    for num, block in _stop_blocks(tour_text or ''):
+        # First line is the stop TITLE (see the note in
+        # check_cross_stop_fact_repetition) — never narration.
+        for line in block.split('\n')[1:]:
+            if _FACT_SKIP_LINE.match(line) or not line.strip():
+                continue
+            body = line
+            if line.strip().lower().startswith('orientation:'):
+                if num == 1 and skip_first_orientation:
+                    continue
+                body = line.split(':', 1)[1]
+            for sent in _split_into_sentences(body):
+                s = sent.strip()
+                if len(s.split()) >= 6 and not _FACT_RECAP.search(s):
+                    out.append((num, s))
+    return out
+
+
+def check_cross_stop_semantic_repetition(tour_text, api_key, threshold=0.82):
+    """ANY information restated at a later stop, however worded.
+
+    Returns [{first_stop, repeat_stop, first_sentence, sentence, similarity}],
+    one per repeat, later telling second. Empty list if the check could not run —
+    and the caller must treat that as UNKNOWN, not as clean.
+    """
+    pairs = narration_sentences_by_stop(tour_text)
+    if len(pairs) < 2:
+        return []
+    vecs = _embed([s for _, s in pairs], api_key)
+    if vecs is None:
+        return []
+    out = []
+    for i in range(len(pairs)):
+        for j in range(i + 1, len(pairs)):
+            (sa, ta), (sb, tb) = pairs[i], pairs[j]
+            if sa == sb:
+                continue
+            sim = _cosine(vecs[i], vecs[j])
+            if sim >= threshold:
+                first, second = (sa, ta), (sb, tb)
+                if sb < sa:
+                    first, second = (sb, tb), (sa, ta)
+                out.append({
+                    'first_stop': first[0], 'first_sentence': first[1],
+                    'repeat_stop': second[0], 'sentence': second[1],
+                    'similarity': round(sim, 3),
+                })
+    # Strongest first, so a capped repair fixes the worst offenders.
+    return sorted(out, key=lambda d: -d['similarity'])
+
+
+def repeated_assertions_by_stop(tour_text, api_key, threshold=0.82):
+    """{stop_number: [assertion, ...]} — what each stop restates from earlier.
+
+    Feeds the PHASE 5.17 regeneration ban list. The ASSERTION handed over is the
+    EARLIER telling, not the later one: LOCAL-476 established that naming the
+    sentence teaches the model which words to avoid, while naming the underlying
+    claim is the only form a paraphrase cannot satisfy.
+    """
+    by_stop = {}
+    for r in check_cross_stop_semantic_repetition(tour_text, api_key, threshold):
+        by_stop.setdefault(r['repeat_stop'], [])
+        if r['first_sentence'] not in by_stop[r['repeat_stop']]:
+            by_stop[r['repeat_stop']].append(r['first_sentence'])
+    return by_stop
