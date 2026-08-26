@@ -17,7 +17,8 @@ if _MODULE_DIR not in _sys.path:
 # ──── [LOCAL-437] MODULE-SCOPE PREDICATE: checklist exemption from existence gate ────
 # This predicate is the SINGLE source of truth for whether exhibition-sourced
 # stops bypass the existence gate. Tests IMPORT this — do not re-type it.
-def should_exempt_from_existence_gate(deterministic_fill_used: bool, exhibition_stops_source: str) -> bool:
+def should_exempt_from_existence_gate(deterministic_fill_used: bool, exhibition_stops_source: str,
+                                      page_sourced: bool = False) -> bool:
     """Return True if stops should be exempt from the LOCAL-245 existence gate.
 
     The existence gate (LOCAL-245) verifies stops against independent web evidence
@@ -31,7 +32,17 @@ def should_exempt_from_existence_gate(deterministic_fill_used: bool, exhibition_
 
     The exemption covers: 'checklist', 'partial', 'prose_llm' sources.
     It does NOT cover: 'creator_filter', 'none', or non-deterministic paths.
+
+    [D532] `page_sourced` is the per-POI form and it OVERRIDES the run-wide flag.
+    `deterministic_fill_used` describes the whole run, so a single Phase 3A
+    candidate appended to a thin checklist used to flip it False and strip the
+    exemption from the venue's OWN works — which is the D530 failure repeating
+    one layer below D1v2, and with the same outcome: the works the museum named
+    on its own page get deleted for lacking independent web evidence that, by
+    definition, a temporary loan does not have. A work carries its provenance.
     """
+    if page_sourced:
+        return True
     return (
         deterministic_fill_used
         and exhibition_stops_source in ('checklist', 'partial', 'prose_llm')
@@ -2655,6 +2666,253 @@ def title_appears_in_page(title, page_text, min_word_overlap=0.7):
     return (present / len(words)) >= min_word_overlap
 
 
+# [D532] Option B-real. Michael selected "B with C's labelling" on 2026-08-26,
+# after rejecting the naive reading of B out loud. Both halves matter:
+#
+#   B  — knowledge may propose a stop; the venue page vetoes it only on
+#        CONTRADICTION. Silence is not evidence, so a work the page never
+#        mentions is not thereby excluded.
+#   C  — any stop not confirmed by the page is LABELLED ALOUD to the listener.
+#
+# The trap this function exists to avoid is that B has an obvious wrong
+# implementation which tests green. If "contradiction" means "the page refutes
+# this specific title", the veto never fires — museum pages do not write
+# "Guernica is not in this show" — and B silently degrades into option A, which
+# is what put Guernica and The Persistence of Memory into an MFA livres
+# d'artiste show (D530). That is a guard that CANNOT FAIL, and CLAUDE.md's first
+# standing check exists because of guards like it.
+#
+# So contradiction here is defined against the scope the page has ALREADY
+# DECLARED — medium/form, artist set, date range, theme, venue — not against the
+# title. The MFA page never names Guernica, but it does say the show is livres
+# d'artiste by Spanish artists, Sept-Oct 2026. A painting on canvas in Madrid
+# contradicts that without the page ever mentioning it.
+# [D532] THE VETO RUNS IN THREE UNCONTAMINATED STAGES, and the reason is measured.
+#
+# The single-call version — page text and candidate in one prompt, "does this
+# contradict?" — was built first and FAILED on the case that matters most. Asked
+# with the MFA page in context, gpt-4o-mini called Picasso's 1931 Vollard livre
+# d'artiste `Le Chef-d'œuvre inconnu` a PAINTING and vetoed it on the very form
+# dimension that work helped define. Asked cold, with no page and no exhibition,
+# the same model on the same day answered "illustrated book" correctly.
+#
+# The page was PRIMING it. A prompt that says livres d'artiste, Picasso, Miró,
+# Dalí and then asks "is there a contradiction?" gets a contradiction found. That
+# is not a knowledge failure to be prompted away — it is contamination, and the
+# fix is structural: never let the page text and the work meet in the same call.
+#
+#   Stage 1  declare_scope(page)      — what the page states. Page only, no work.
+#   Stage 2  identify_work(title)     — what the work is. Work only, no page.
+#   Stage 3  compare(scope, work)     — two small JSON blobs, no prose either side.
+#
+# Stage 1 is cached per tour: the page does not change between candidates.
+_SCOPE_DECLARE_SYSTEM = (
+    "Read a museum exhibition page and report ONLY what it DECLARES about the show's scope. "
+    "Do not infer, do not guess, do not complete from your own knowledge of the museum.\n"
+    "\n"
+    "For each dimension, quote or paraphrase what the page states. Use \"\" when the page is "
+    "silent on that dimension — silence is the correct answer far more often than not.\n"
+    "  form    — the physical kind of object the show is of (paintings, illustrated books, "
+    "prints, sculpture...). A show described as being of one form declares that form.\n"
+    "  artists — the artist or group named as the show's subject.\n"
+    "  dates   — the period the WORKS come from (NOT the exhibition's opening hours or run "
+    "dates — those are when you can visit, not when the works were made).\n"
+    "  venue   — the museum holding the show.\n"
+    "\n"
+    'Return ONLY JSON: {"form": "", "artists": "", "dates": "", "venue": ""}'
+)
+
+_WORK_IDENTIFY_SYSTEM = (
+    "Identify a single artwork from its title and artist. You are given NO other context, and "
+    "you must not ask for any — answer from what you know of the work itself.\n"
+    "\n"
+    "form: the physical kind of object — painting, illustrated book, print, sculpture, "
+    "photograph, drawing, other, or unknown.\n"
+    "held_by: the museum that permanently holds it, or \"\" if you do not know.\n"
+    "known: true only if you are confident you know THIS SPECIFIC work. Many artists famous "
+    "for paintings also made illustrated books and prints — do not infer the form from the "
+    "artist's reputation. If you are inferring rather than recalling, say known=false and "
+    "form=unknown.\n"
+    "\n"
+    'Return ONLY JSON: {"form": "", "held_by": "", "known": true|false}'
+)
+
+_SCOPE_COMPARE_SYSTEM = (
+    "You are given two JSON objects: the scope a museum exhibition page DECLARES, and the "
+    "properties of a proposed artwork. Neither was written by the other.\n"
+    "\n"
+    "Judge each dimension SEPARATELY and give each its own verdict:\n"
+    "  \"not_declared\" — the page's value for this dimension is empty. Most common answer.\n"
+    "  \"compatible\"   — the work could belong under this declaration.\n"
+    "  \"incompatible\" — the work's property positively RULES OUT belonging under it.\n"
+    "\n"
+    "DIFFERENT WORDS ARE NOT A CONTRADICTION. You are comparing meanings, not strings. "
+    "'illustrated book', 'livre d'artiste', 'livres d'artiste', 'artist's book' and "
+    "'illustrated volume' are ONE form and are compatible with each other. 'print' and "
+    "'lithograph' are compatible. A dimension is incompatible only when the two values cannot "
+    "both be true of the same object — a PAINTING cannot be an ILLUSTRATED BOOK, so that pair "
+    "is incompatible; an illustrated book and a livre d'artiste are the same thing, so that "
+    "pair is compatible.\n"
+    "\n"
+    "For artists: the declared group is who the show is ABOUT. A collaborator, printer, "
+    "publisher or co-author who is not in the headline group is still compatible — shows name "
+    "their headline artists, not their full contributor list.\n"
+    "\n"
+    "For dates: compare against when the WORKS were made. Exhibition run dates are not a "
+    "constraint on the works and must be treated as not_declared.\n"
+    "\n"
+    "THE OVERRIDING RULES:\n"
+    "1. An EMPTY declaration is \"not_declared\" and can never veto.\n"
+    "2. You are NOT deciding whether the work is IN the show. Nothing here tells you that. A "
+    "work compatible with every declared dimension is admitted even though the page never "
+    "mentions it. Being unmentioned is not incompatibility.\n"
+    "3. If you find yourself reasoning 'the page doesn't list this work', STOP — that is not a "
+    "dimension and not your question.\n"
+    "\n"
+    'Return ONLY JSON: {"form": "...", "artist": "...", "date": "...", "venue": "...", '
+    '"reason": "<one clause; if any dimension is incompatible, name the work property and the '
+    'declaration it rules out>"}\n'
+    "where each of form/artist/date/venue is one of not_declared, compatible, incompatible."
+)
+
+# Stage-1 cache: {id(page_text-prefix): declared-scope dict}. The page is constant
+# across every candidate in a tour, so it is read once.
+_SCOPE_DECLARED_CACHE = {}
+
+
+def _veto_llm(system, user, api_key, model=None, timeout=30, max_tokens=250):
+    """One small pinned JSON call. Returns dict, or None if the call did not run."""
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+            data=json.dumps({
+                # Pinned, unlike the stop-list oracle (D530 item 4): the veto must
+                # not be a source of run-to-run variance in the stop list.
+                "model": model or os.environ.get("TOUR_SCOPE_VETO_MODEL", "gpt-4o-mini"),
+                "messages": [{"role": "system", "content": system},
+                             {"role": "user", "content": user}],
+                "temperature": 0.0,
+                "seed": 7,
+                "max_tokens": max_tokens,
+                "response_format": {"type": "json_object"},
+            }),
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            return None
+        return json.loads(resp.json()["choices"][0]["message"]["content"])
+    except Exception:
+        return None
+
+
+def declare_scope(page_text, exhibition_scope, api_key, model=None, timeout=30):
+    """[D532] Stage 1 — what the page DECLARES. Sees the page, never the candidate."""
+    _key = (page_text or '')[:200]
+    if _key in _SCOPE_DECLARED_CACHE:
+        return _SCOPE_DECLARED_CACHE[_key]
+    _requested = (exhibition_scope or {}).get('requirements', '') or ''
+    _r = _veto_llm(
+        _SCOPE_DECLARE_SYSTEM,
+        f"Exhibition as requested: {_requested or '(not stated)'}\n\n"
+        f"PAGE TEXT:\n{(page_text or '')[:5000]}",
+        api_key, model, timeout)
+    if _r is None:
+        return None
+    _scope = {k: str(_r.get(k, '') or '') for k in ('form', 'artists', 'dates', 'venue')}
+    _SCOPE_DECLARED_CACHE[_key] = _scope
+    return _scope
+
+
+def identify_work(title, artist, api_key, model=None, timeout=30):
+    """[D532] Stage 2 — what the work IS. Sees the work, never the page.
+
+    The isolation is the point. See the block comment above `_SCOPE_DECLARE_SYSTEM`.
+    """
+    _r = _veto_llm(_WORK_IDENTIFY_SYSTEM,
+                   f"Work: {title}" + (f" by {artist}" if artist else ""),
+                   api_key, model, timeout, max_tokens=150)
+    if _r is None:
+        return None
+    return {'form': str(_r.get('form', '') or 'unknown'),
+            'held_by': str(_r.get('held_by', '') or ''),
+            'known': bool(_r.get('known', False))}
+
+
+def scope_contradicts(title, artist, page_text, exhibition_scope, api_key,
+                      model=None, timeout=30):
+    """[D532] Option B-real: does the page's DECLARED scope exclude this work?
+
+    Returns {'vetoed', 'dimension', 'reason', 'ok', 'declared', 'work'}.
+    `ok` is False when the check could not be run (no key, no page, API error).
+
+    **A check that could not run never vetoes** — silence is not evidence, and
+    that includes our own silence. The work survives, and C's labelling is what
+    tells the listener it is unconfirmed.
+    """
+    _out = {'vetoed': False, 'dimension': 'none', 'reason': '', 'ok': False,
+            'declared': None, 'work': None}
+    if not title or not page_text or not api_key:
+        _out['reason'] = 'check not run (missing title, page text, or api key)'
+        return _out
+
+    _declared = declare_scope(page_text, exhibition_scope, api_key, model, timeout)
+    if _declared is None:
+        _out['reason'] = 'check not run (scope declaration failed)'
+        return _out
+    _out['declared'] = _declared
+
+    _work = identify_work(title, artist, api_key, model, timeout)
+    if _work is None:
+        _out['reason'] = 'check not run (work identification failed)'
+        return _out
+    _out['work'] = _work
+
+    # Rule 2, enforced here rather than trusted to the prompt: an unknown work has
+    # no property to contradict with, so the comparison is not even asked.
+    if not _work['known'] or _work['form'] in ('unknown', ''):
+        _out['ok'] = True
+        _out['reason'] = 'work not confidently identified — no property to contradict with'
+        return _out
+    # Rule 1, likewise: nothing declared means nothing can veto.
+    if not any(_declared.values()):
+        _out['ok'] = True
+        _out['reason'] = 'page declares no scope on any dimension'
+        return _out
+
+    # Stage 3 is the judgement that DELETES a work, so it gets the stronger model.
+    # The mini model failed this stage on 4 of 7 cases while getting stages 1 and 2
+    # right — it read 'illustrated book' vs 'livres d'artiste' as a contradiction,
+    # i.e. it compared strings where the question is about meanings.
+    _compare_model = model or os.environ.get("TOUR_SCOPE_COMPARE_MODEL", "gpt-4o")
+    _r = _veto_llm(_SCOPE_COMPARE_SYSTEM,
+                   f"DECLARED SCOPE (from the page):\n{json.dumps(_declared, ensure_ascii=False)}\n\n"
+                   f"PROPOSED WORK:\n{json.dumps(dict(_work, title=title, artist=artist), ensure_ascii=False)}",
+                   api_key, _compare_model, timeout)
+    if _r is None:
+        _out['reason'] = 'check not run (comparison failed)'
+        return _out
+
+    _out['ok'] = True
+    _out['reason'] = str(_r.get('reason', ''))
+    _out['verdicts'] = {d: str(_r.get(d, 'not_declared')) for d in
+                        ('form', 'artist', 'date', 'venue')}
+    # The veto fires only on an explicit 'incompatible', and only on a dimension
+    # the page actually declared. Rule 1 is enforced HERE, on our side — the
+    # comparison model does not get the last word on whether the page spoke.
+    _dim_key = {'form': 'form', 'artist': 'artists', 'date': 'dates', 'venue': 'venue'}
+    _fired = [d for d, v in _out['verdicts'].items()
+              if v == 'incompatible' and _declared.get(_dim_key[d])]
+    _claimed = [d for d, v in _out['verdicts'].items() if v == 'incompatible']
+    if _claimed and not _fired:
+        _out['reason'] = (f"veto refused — page declares nothing on {_claimed} "
+                          f"({_out['reason']})")
+    _out['vetoed'] = bool(_fired)
+    _out['dimension'] = '|'.join(_fired) if _fired else 'none'
+    return _out
+
+
 def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     """[D1 v2] In-collection verification using story_miner canonical title matching.
     
@@ -5217,7 +5475,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"   X  Excluded {poi['name']} - {verification['reason']}")
         return survivors, excluded
 
-    def _new_poi(name, address=""):
+    def _new_poi(name, address="", page_sourced=False):
         return {
             "stop_number": 0,
             "name": (name or "").strip(),
@@ -5230,6 +5488,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             "specific_examples": "",
             "operational_details": "",
             "description": "",
+            # [D532] Provenance travels WITH the work, which is the thing D530
+            # found missing: `_deterministic_fill_used` was a property of the
+            # whole run, so the moment Phase 3A appended one candidate, the
+            # checklist's own works lost their trust and went through D1v2 with
+            # it — and D1v2 dropped them, because a temporary show is not in the
+            # permanent catalogue. A per-POI flag cannot be lost that way.
+            "page_sourced": bool(page_sourced),
+            # 'page' | 'knowledge' | '' — set at verification, read by Phase 5
+            # to decide whether this stop must be labelled aloud (option C).
+            "confirmation": "",
         }
 
     # Determine poi_type hint for prompts
@@ -5851,31 +6119,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # untouched: both return before this branch, which is only
                     # reached when the checklist HAS works.
                     _det_take = min(len(_checklist_works), max(_requested_stops, 1) * 2)
-                    poi_list = [_new_poi(w['title']) for w in _checklist_works[:_det_take]]
+                    # [D532] page_sourced=True is the trust. The venue named these
+                    # works on its own page; that is why they are exempt from a
+                    # permanent-collection check, and the exemption now rides on
+                    # the work rather than on a run-wide flag.
+                    poi_list = [_new_poi(w['title'], page_sourced=True)
+                                for w in _checklist_works[:_det_take]]
 
-                    # [D530] DEFAULT OFF — verified live 2026-08-26 and it made the
-                    # outcome WORSE, so it does not ship enabled.
+                    # [D530 -> D532] NOW ON BY DEFAULT. D530 shipped this OFF for one
+                    # specific reason, and that reason has been removed.
                     #
-                    # Letting Phase 3A fill the remainder works: the shortfall was
-                    # announced, the 2 checklist works were kept, and Phase 3A was
-                    # asked for more. It returned Guernica, The Birth of the World
-                    # and The Persistence of Memory — none of them in this livres
-                    # d'artiste show, two of them not even in this museum. That is
-                    # the LOCAL-465 fabrication risk, exactly as predicted.
+                    # D530's failure: Phase 3A filled the gap with Guernica, The Birth
+                    # of the World and The Persistence of Memory — none in this livres
+                    # d'artiste show, two not in this museum — and then D1v2 dropped
+                    # ALL FIVE including the museum's own two, because deterministic
+                    # fill had flipped `_deterministic_fill_used` to False and sent
+                    # everything down the permanent-collection path. A degraded 2-stop
+                    # tour became zero stops.
                     #
-                    # Then D1v2 dropped ALL FIVE, including the two works taken from
-                    # the museum's own exhibition page, because an exhibition's
-                    # livres d'artiste have no canonical title match in the venue's
-                    # permanent catalogue. Tier went `unresolvable` and NO TOUR was
-                    # produced. A degraded 2-stop tour became zero stops.
+                    # D532 fixes both halves. Trust now travels per-POI (`page_sourced`),
+                    # so the checklist's works keep their exemption no matter what
+                    # Phase 3A appends; and knowledge-proposed works face the option-B
+                    # scope veto (`scope_contradicts`) before they can ship, with
+                    # survivors labelled aloud per option C.
                     #
-                    # The missing piece is that deterministic fill BYPASSES D1v2 —
-                    # measured: 0 `D1v2 DROPPED` lines in every deterministic run.
-                    # Checklist works are trusted precisely because the venue named
-                    # them. Routing them through D1v2 discards that trust. Whoever
-                    # finishes this must carry the trust with the works, not just
-                    # move them into a different list.
-                    _thin_fill_on = os.environ.get('TOUR_THIN_CHECKLIST_FILL', '0') == '1'
+                    # Set TOUR_THIN_CHECKLIST_FILL=0 to return to D530's behaviour.
+                    _thin_fill_on = os.environ.get('TOUR_THIN_CHECKLIST_FILL', '1') == '1'
                     if _checklist_is_thin and _thin_fill_on:
                         _deterministic_fill_used = False   # let Phase 3A run and append
                         _checklist_base_used = True        # but NOT the creator-filter fallback
@@ -6460,18 +6729,29 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # exhibition page. These works are already grounded by their source — 
             # verifying them against SPARQL/Wikidata would reject exhibition-specific
             # works that aren't individually catalogued in the museum's permanent collection.
-            if _deterministic_fill_used and _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
-                print(f"  [D1/LOCAL-372] SKIP D1v2 — stops sourced from exhibition {_exhibition_stops_source} "
-                      f"(D1v2 checks the PERMANENT collection; a temporary show is not in it)")
+            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
+                # [D532] The condition no longer includes `_deterministic_fill_used`.
+                # That flag describes the RUN, so one appended Phase 3A candidate used
+                # to drag the venue's own works into the permanent-collection check
+                # with it (D530). Provenance is now per-POI and the list is split.
+                print(f"  [D1/LOCAL-372] Exhibition path ({_exhibition_stops_source}) — "
+                      f"D1v2 checks the PERMANENT collection; a temporary show is not in it")
+                _exh_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                _page_pois = [_p for _p in poi_list if _p.get('page_sourced')]
+                _knowledge_pois = [_p for _p in poi_list if not _p.get('page_sourced')]
+                print(f"  [D532] Provenance: {len(_page_pois)} page-sourced, "
+                      f"{len(_knowledge_pois)} knowledge-proposed")
+
+                # ---- Page-sourced works: grounded against the page, never D1v2 ----
                 # [LOCAL-372 LEAD] Skipping D1v2 is right, but these stops still need
                 # grounding — just against the source that IS authoritative here. Verify
                 # each title actually appears on the venue page it was extracted from,
                 # otherwise an invented title ships unchallenged.
-                _exh_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
                 if _exh_page_text:
                     _grounded, _ungrounded = [], []
-                    for _p in poi_list:
+                    for _p in _page_pois:
                         if title_appears_in_page(_p.get('name', ''), _exh_page_text):
+                            _p['confirmation'] = 'page'
                             _grounded.append(_p)
                         else:
                             _ungrounded.append(_p.get('name', ''))
@@ -6480,13 +6760,61 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                               f"exhibition page (not extracted from it — likely invented):")
                         for _u in _ungrounded:
                             print(f"      - {_u}")
-                    poi_list = _grounded
-                    if not poi_list:
-                        print(f"  [D1/LOCAL-372] No exhibition stop survived page grounding — clean fail")
+                    _page_pois = _grounded
                 else:
                     print(f"  [D1/LOCAL-372] WARNING: no page_text captured — exhibition stops "
                           f"are ungrounded this run")
-                print(f"  [D1/LOCAL-372] {len(poi_list)} exhibition stop(s) grounded against the venue page")
+                    for _p in _page_pois:
+                        _p['confirmation'] = 'page'
+
+                # ---- Knowledge-proposed works: option B-real scope veto ----
+                # Not "is it on the page" — that is option D, and it would delete every
+                # fill by construction. The question is whether the scope the page
+                # DECLARES contradicts the work. Silence does not.
+                _kept_knowledge = []
+                for _p in _knowledge_pois:
+                    # [D532] PROMOTION, and it is the whole point of reading the page
+                    # rather than the extractor's JSON. The checklist extractor anchors
+                    # on formatted credit lines and drops works named in body prose —
+                    # that is D528 defect 2, and it cost this exhibition two of its
+                    # three works. When knowledge proposes a work the page DOES name,
+                    # the page corroborates it and it becomes confirmed, not merely
+                    # unvetoed. Au Soleil du Plafond and Moses and Monotheism come back
+                    # exactly here.
+                    #
+                    # It also protects against the veto's own weakness: stage 2 misreads
+                    # lesser-known works by famous painters as paintings, which would
+                    # veto them out of a book show. A work the page names never reaches
+                    # that judgement.
+                    if _exh_page_text and title_appears_in_page(_p.get('name', ''), _exh_page_text):
+                        _p['page_sourced'] = True
+                        _p['confirmation'] = 'page'
+                        _page_pois.append(_p)
+                        print(f"  [D532] PROMOTED '{_p.get('name','')[:60]}' — proposed from "
+                              f"knowledge, but the venue's page names it; treated as confirmed")
+                        continue
+                    _v = scope_contradicts(_p.get('name', ''), _p.get('artist', ''),
+                                           _exh_page_text, _exhibition_scope, api_key)
+                    if _v['vetoed']:
+                        print(f"  [D532] SCOPE VETO '{_p.get('name','')[:60]}' — "
+                              f"dimension={_v['dimension']}: {_v['reason'][:120]}")
+                        continue
+                    _p['confirmation'] = 'knowledge'
+                    _kept_knowledge.append(_p)
+                    if _v['ok']:
+                        print(f"  [D532] ADMITTED (unconfirmed) '{_p.get('name','')[:60]}' — "
+                              f"page declares no contradiction; will be labelled aloud")
+                    else:
+                        print(f"  [D532] ADMITTED (unconfirmed, veto not run) "
+                              f"'{_p.get('name','')[:60]}' — {_v['reason'][:100]}")
+
+                # Page-sourced first: the confirmed works lead the tour.
+                poi_list = _page_pois + _kept_knowledge
+                if not poi_list:
+                    print(f"  [D1/LOCAL-372] No exhibition stop survived grounding — clean fail")
+                _n_unconf = sum(1 for _p in poi_list if _p.get('confirmation') == 'knowledge')
+                print(f"  [D532] {len(poi_list)} stop(s): {len(poi_list) - _n_unconf} confirmed by "
+                      f"the venue page, {_n_unconf} unconfirmed and labelled")
                 _verification_tier = 'exhibit_museum'
                 _LAST_VERIFICATION_TIER = _verification_tier
             else:
@@ -7478,8 +7806,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # independent-web-evidence requirement. Uses the module-scope predicate
         # should_exempt_from_existence_gate() which is imported by the test.
         _seg_requested_stops = total_stops  # [LOCAL-290] Save original request count for replenishment
+        # [D532] Skip the gate wholesale only when EVERY stop is page-sourced. In the
+        # mixed case (thin checklist + Phase 3A fill) the gate runs, and the per-POI
+        # exemption inside it protects the venue's own works while still checking the
+        # knowledge-proposed ones. That is the point: the fill is what needs checking.
+        _seg_all_page_sourced = bool(poi_list) and all(p.get('page_sourced') for p in poi_list)
         _seg_checklist_exempt = should_exempt_from_existence_gate(
-            _deterministic_fill_used, _exhibition_stops_source
+            _deterministic_fill_used, _exhibition_stops_source,
+            page_sourced=_seg_all_page_sourced,
         )
         if _seg_checklist_exempt:
             print(f"  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition "
@@ -7507,16 +7841,29 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                 if _seg_conn:
                     _seg_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
-                    _seg_stop_names = [p['name'] for p in poi_list]
+                    # [D532] Per-POI exemption. Page-sourced works are never sent to
+                    # the gate — the venue naming them on its own page is the stronger
+                    # evidence, and independent web evidence for a temporary loan does
+                    # not exist. Only knowledge-proposed stops are checked.
+                    _seg_exempt_pois = [p for p in poi_list if p.get('page_sourced')]
+                    _seg_checked_pois = [p for p in poi_list if not p.get('page_sourced')]
+                    if _seg_exempt_pois:
+                        print(f"  [D532] EXISTENCE-GATE: {len(_seg_exempt_pois)} page-sourced stop(s) "
+                              f"exempt, {len(_seg_checked_pois)} checked")
+                    _seg_stop_names = [p['name'] for p in _seg_checked_pois]
                     # LOCAL-313: pass tour_category so dining tours use the correct
                     # verification path (Nominatim/OSM) instead of museum-shaped checks
-                    _seg_result = run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn, tour_type=tour_category)
+                    _seg_result = (run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn,
+                                                     tour_type=tour_category)
+                                   if _seg_stop_names
+                                   else {'unverified_stops': [], 'inconclusive_stops': []})
                     _seg_conn.close()
 
                     if _seg_mode == 'enforce' and _seg_result['unverified_stops']:
                         _seg_unverified_set = set(_seg_result['unverified_stops'])
                         _seg_before = len(poi_list)
-                        poi_list = [p for p in poi_list if p['name'] not in _seg_unverified_set]
+                        poi_list = [p for p in poi_list
+                                    if p.get('page_sourced') or p['name'] not in _seg_unverified_set]
                         _seg_after = len(poi_list)
                         _seg_dropped = _seg_before - _seg_after
                         if _seg_dropped > 0:
@@ -10081,9 +10428,27 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     "Do NOT say 'As you step into [museum name]' or 'Welcome to'. "
                     "Begin directly with this specific exhibit.\n"
                 )
+            # [D532 / option C] A stop that the venue's own page did not confirm must
+            # SAY SO, in the narration, in the listener's ear. This is the half of
+            # Michael's ruling that keeps option B honest: B lets a work in on the
+            # grounds that the page does not contradict it, and the listener is the
+            # one standing in the gallery who can see whether it is actually there.
+            # An unlabelled unconfirmed stop is indistinguishable from a fabricated
+            # one (D530's Guernica), which is the whole failure this replaces.
+            _unconfirmed_line = ""
+            if poi.get('confirmation') == 'knowledge':
+                _unconfirmed_line = (
+                    "\nMANDATORY DISCLOSURE — THIS STOP IS NOT CONFIRMED BY THE MUSEUM'S OWN "
+                    "LISTING. Somewhere in the first two sentences, tell the listener plainly "
+                    "that this work is not named on the museum's published list for this show "
+                    "and may not be on view — one short clause, in the narrator's own voice, "
+                    "e.g. 'the museum's listing doesn't name this one, so it may or may not be "
+                    "out today'. Do NOT dress it up, do NOT apologise for it, and do NOT skip "
+                    "it. Then continue normally.\n"
+                )
             # [LOCAL-41 Fix 4] Rotate connective framing — never say "broader context" every stop
             description_prompt = f"""Create a detailed audio description for {poi_name} at {location}, focusing on {tour_type}.
-{_stop_context_line}
+{_stop_context_line}{_unconfirmed_line}
 Start with a brief orientation that names "{poi_name}" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit. Include:

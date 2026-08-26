@@ -1477,3 +1477,51 @@ for this work. Everything points at the same anecdote.
 **So LOCAL-466 was never given distinct material to publish.** Its duplicate guard was correct to
 reject the second story every time — those really were the same story. The fix is upstream, in
 what we ask, not in how many answers we keep.
+
+---
+
+## 2026-08-26 10:53 — Michael: "Can you provide an example of the A/B/C/D decision on the checklist's role application? What outcome would be selected for a simple example?"
+
+Answered on the one page we already captured on the wire — MFA "Picasso, Miró, Dalí: Unbound",
+3 stops requested (`STOPLIST_CHAIN.md`). The page names three real works: *Le Lézard aux plumes
+d'or* in a credit line, *Au Soleil du Plafond* and *Moses and Monotheism* **in body prose only**.
+The extractor returned `Le Lézard` + `Le Lézard (detail)`; Phase 3A fill returned Guernica, The
+Birth of the World, The Persistence of Memory; D1v2 dropped all five → zero stops.
+
+| option | outcome on this page | stops |
+|---|---|---|
+| A — knowledge first, checklist advisory | Guernica, Birth of the World, Persistence | 3, none correct |
+| B naive — silence is not a veto | page is silent on Guernica → **identical to A** | 3, none correct |
+| B real — contradiction against page scope | Guernica vetoed on medium/genre; Au Soleil + Moses admitted, the page names them | **3, all correct** |
+| C — checklist first, knowledge fill, labelled | Le Lézard + 2 labelled wrong ones | 3, 1 correct |
+| D — confirmed only, announced | Le Lézard + "asked for 3, delivering 1" | 1, correct |
+
+**Two conclusions.** (1) B and D differ over *what you consult*, not knowledge vs checklist: the
+extractor's JSON is a lossy summary that lost 2 of 3 works, so C and D are capped at 1 stop here
+however good the model is. B's contradiction test reads the **page**, which is where the other two
+stops come back from — not from parametric memory. (2) The naive reading of B *is* option A. This
+page never denies Guernica; it bounds a scope (livres d'artiste, Spanish artists, Sept–Oct 2026).
+**Silence about a title is not consent; silence about a category the page has already bounded is a
+veto.** That is the definition B needs.
+
+Binding on all four: until trust travels with a work (page-sourced ⇒ confirmed), D1v2 drops the
+museum's own works and every option lands on zero. Recommendation unchanged: **B with C's
+labelling**.
+
+**Correction, same session 11:0x — Michael: "what are B-naive and B-real? what motivation to
+select naive? which did you mean?"** The table above is misleading and this supersedes it.
+**There is ONE option B.** Naive/real are not alternatives and nothing would ever select naive.
+
+D530 states B as *"knowledge-first, checklist vetoes only on contradiction, silence is not
+evidence"* — and never defines contradiction. **Naive is what B degrades into when that line is
+implemented literally**: a veto requiring the page to refute a specific title. Pages never write
+"Guernica is not in this show", so the veto never fires and B silently becomes A. **It is a guard
+that cannot fail** (CLAUDE.md standing check 1) and it would test green, because it keeps every
+work the page happens to mention.
+
+**Real** = the veto fires on incompatibility with the scope the page has already declared —
+medium, genre, artist set, date range, venue. Guernica contradicts "livres d'artiste by Spanish
+artists, Sept–Oct 2026" without the page ever naming it.
+
+**The recommendation "B with C's labelling" means B-real.** Naive belongs in the record as the
+failure mode to guard against, not as a row in an options table.
