@@ -98,6 +98,31 @@ def main():
         if not cond:
             failures.append(label)
 
+    print("\n  -- corpus text may arrive as a list, not a string --")
+    # The first wiring assumed `passages` was a str and died with
+    # "sequence item 1: expected str instance, list found", so the guard silently
+    # did NOT run on the very tour it was written for. The joiner is duplicated
+    # here in the shape production uses it.
+    def _fg_text(v):
+        if isinstance(v, str):
+            return v
+        if isinstance(v, (list, tuple)):
+            return ' '.join(_fg_text(x) for x in v)
+        if isinstance(v, dict):
+            return ' '.join(_fg_text(x) for x in v.values())
+        return ''
+
+    listy_corpus = _fg_text([
+        "The Palais Lascaris holds around 500 musical instruments.",
+        ["Antoine Gautier, a passionate collector and amateur musician born in Nice in 1825, "
+         "played a pivotal role."],
+    ])
+    f = find_role_mismatches(MUST_FLAG[0][0], listy_corpus)
+    ok = len(f) > 0
+    print(f"  {'OK ' if ok else 'FAIL'} list-shaped corpus still flags the Gautier sentence")
+    if not ok:
+        failures.append('list corpus')
+
     print("\n  -- splitter does not break on initials (D525) --")
     s = split_sentences("L. Rosenberg planned it. Then it opened.")
     ok = len(s) == 2 and s[0].startswith("L. Rosenberg")

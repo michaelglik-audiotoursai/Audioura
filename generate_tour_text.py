@@ -16926,11 +16926,24 @@ RULES:
     # storied-mode concern.
     try:
         from story_fact_guard import repair_role_mismatches
-        _fg_parts = [_d1_venue_corpus or '']
+        # `passages` is a LIST for some corpus rows and a STRING for others — the
+        # first version of this assumed str and died with "sequence item 1:
+        # expected str instance, list found", which meant the fabrication guard
+        # silently did not run on the very tour it was written for. Coerce both.
+        def _fg_text(v):
+            if isinstance(v, str):
+                return v
+            if isinstance(v, (list, tuple)):
+                return ' '.join(_fg_text(x) for x in v)
+            if isinstance(v, dict):
+                return ' '.join(_fg_text(x) for x in v.values())
+            return ''
+
+        _fg_parts = [_fg_text(_d1_venue_corpus)]
         if isinstance(_stop_corpus_data, dict):
             for _sc in _stop_corpus_data.values():
                 if isinstance(_sc, dict):
-                    _fg_parts.append(_sc.get('passages', '') or '')
+                    _fg_parts.append(_fg_text(_sc.get('passages', '')))
         _fg_corpus = ' '.join(p for p in _fg_parts if p)
         if _fg_corpus:
             complete_tour, _fg_found = repair_role_mismatches(complete_tour, _fg_corpus)
