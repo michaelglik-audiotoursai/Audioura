@@ -10157,6 +10157,59 @@ Exempt: navigation directions ("Turn left", "Continue past").
             print(f"  [LOCAL-410] work_story_searcher import failed — SERP search DISABLED: {_s410_err}")
         except Exception as _s410_err:
             print(f"  [LOCAL-410] SERP search error (non-fatal, generation continues without stories): {_s410_err}")
+
+        # -------- [D533] Knowledge fallback for stops nothing reached --------
+        # Michael, 2026-08-26, on stop 3 of the Palais Lascaris tour: "The third
+        # stop has no information about it and that is strange because when I
+        # asked for it at Gemini I got plenty. [...] So should have the system,
+        # if other sources failed to deliver."
+        #
+        # He was right, and the log agreed: that stop had 8 SERP snippets and the
+        # ranker scored `usable=0`, so the narration fell back to the building's
+        # history and admitted "specific details about this viol's appearance are
+        # limited". The facts existed — heart carved in the scroll, the Gautier
+        # bequest, dated instruments spanning 1647-1656.
+        #
+        # This runs LAST and only for stops still holding nothing. It never
+        # competes with corpus or SERP material; it fills a hole that would
+        # otherwise be filled with padding about the venue. Stops it feeds are
+        # marked confirmation='knowledge', so D532's option-C disclosure tells
+        # the listener the museum's own sources did not cover this object.
+        try:
+            from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
+            _kf_venue = _museum_venue_name or location
+            _kf_filled = 0
+            for _kf_idx, _kf_poi in enumerate(poi_list):
+                _kf_name = _kf_poi.get('name', '')
+                _kf_have = (_DIRECT_SNIPPETS_PER_STOP.get(_kf_name, [])
+                            or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_kf_idx}__", []))
+                # "Starved" means the grounded path produced nothing for THIS
+                # object — not merely that the corpus gate shortened it.
+                if len(_kf_have) >= 2:
+                    continue
+                print(f"  [D533] Stop {_kf_idx+1} '{_kf_name[:50]}' has "
+                      f"{len(_kf_have)} snippet(s) — asking the knowledge fallback")
+                _kf_res = fetch_stop_knowledge(_kf_name, _kf_venue, api_key)
+                if not _kf_res['ok']:
+                    print(f"  [D533] fallback returned nothing: {_kf_res['reason']}")
+                    continue
+                _kf_snips = facts_as_snippets(_kf_res, _kf_name)
+                _kf_high = sum(1 for f in _kf_res['facts'] if f['confidence'] == 'high')
+                _DIRECT_SNIPPETS_PER_STOP.setdefault(_kf_name, []).extend(_kf_snips)
+                # The listener must be told where this came from (D532 option C).
+                _kf_poi['confirmation'] = 'knowledge'
+                _kf_filled += 1
+                print(f"  [D533] +{len(_kf_snips)} fact(s) via {_kf_res['provider']} "
+                      f"({_kf_high} high-confidence) — stop will be labelled aloud")
+                for _f in _kf_res['facts'][:6]:
+                    print(f"      [{_f['confidence']}] {_f['fact'][:110]}")
+            if _kf_filled:
+                print(f"  [D533] Knowledge fallback filled {_kf_filled} starved stop(s)")
+        except ImportError as _kf_err:
+            _import_logger.error(f"[D533] MISSING: stop_knowledge_fallback — "
+                                 f"starved stops will NOT be filled: {_kf_err}")
+        except Exception as _kf_err:
+            print(f"  [D533] Knowledge fallback error (non-fatal): {_kf_err}")
             import traceback
             traceback.print_exc()
 
@@ -11386,7 +11439,27 @@ DO NOT include directions to the next stop - these will be added separately.
         # [LOCAL-209] CORPUS GATE: EMPTY — no corpus exists for this stop at all.
         # Stricter than VENUE_ONLY: there is no venue-level material either.
         # The paragraph must not assert dates, measurements, nicknames, or attributions.
-        if hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_empty_stops:
+        # [D533] The corpus gate runs BEFORE the SERP search and the knowledge
+        # fallback, so its verdict describes what was known at that moment, not
+        # what the stop ends up holding. On the Palais Lascaris run stop 3 was
+        # marked VENUE_ONLY/SHORTENED, then received 8 snippets, and the
+        # restriction below still forbade describing the object — which is why
+        # that stop narrated the building's purchase instead of the viol and
+        # admitted "specific details about this viol's appearance are limited".
+        #
+        # If material for this stop has since arrived, the verdict is stale and
+        # the restriction is lifted. The material itself is still governed by the
+        # ordinary grounding rules; this only stops a gate from silencing sources
+        # that landed after it ran.
+        _d533_material = []
+        if _DIRECT_SNIPPETS_PER_STOP and poi_name:
+            _d533_material = (_DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
+                              or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", []))
+        if _d533_material and (poi_name in _corpus_gate_empty_stops
+                               or poi_name in _corpus_gate_shortened_stops):
+            print(f"  [D533] Stop {stop_num} corpus-gate restriction LIFTED — "
+                  f"{len(_d533_material)} source item(s) arrived after the gate ran")
+        elif hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_empty_stops:
             description_prompt += f"""
 CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
 There is NO verified source material for "{poi_name}" — no stop-level corpus,
@@ -16806,6 +16879,76 @@ RULES:
             print(f"  [S27] derepetition_guard not available — repetition check skipped")
         except Exception as e:
             print(f"  [S27] Repetition check error: {e}")
+
+        # -------- [D533] Cross-stop FACT repetition --------
+        # Michael, 2026-08-26: "make sure the same facts are not repeated not only
+        # in the same sentence and in the same stop, but across all stops:
+        # listener should not listen the same story many times."
+        #
+        # S27 above compares SENTENCES by word overlap. On the Palais Lascaris run
+        # the museum's 1942 purchase was told at stop 1 and again at stop 3 and
+        # scored **0.692** against a 0.70 threshold — it passed. Lowering the
+        # threshold would have caught that pair and would still miss the target,
+        # because the same fact can be told in words that barely overlap. The
+        # listener does not hear word overlap; they hear the same thing twice.
+        try:
+            from derepetition_guard import strip_repeated_facts
+            complete_tour, _fact_actions = strip_repeated_facts(complete_tour)
+            if _fact_actions:
+                for _fa in _fact_actions:
+                    if _fa['removed']:
+                        print(f"  [D533] REPEATED FACT removed from stop {_fa['repeat_stop']} "
+                              f"(first told at stop {_fa['first_stop']}, {_fa['signature']}): "
+                              f"{_fa['sentence'][:80]}")
+                    else:
+                        print(f"  [D533] REPEATED FACT kept in stop {_fa['repeat_stop']} "
+                              f"({_fa['signature']}) — {_fa['reason']}")
+                print(f"  [D533] {sum(1 for a in _fact_actions if a['removed'])} repeated "
+                      f"fact(s) removed, {sum(1 for a in _fact_actions if not a['removed'])} kept")
+            else:
+                print(f"  [D533] No cross-stop fact repetition detected")
+        except ImportError:
+            _import_logger.error("[D533] MISSING: derepetition_guard.strip_repeated_facts — "
+                                 "cross-stop FACT repetition check DISABLED")
+        except Exception as e:
+            print(f"  [D533] Fact repetition check error: {e}")
+
+    # -------- [D533] The person-year role guard: the birth-year fabrication --------
+    # Michael, 2026-08-26: "Please fix the fabrication."
+    #
+    #   corpus: "Antoine Gautier, ... born in Nice in 1825"
+    #   tour:   "...the quartet founded by Antoine Gautier in 1825"
+    #
+    # A newborn founding a quartet. Every gate on that tour passed, because the
+    # gates verify that the STOP exists, not that the SENTENCE is true. This one
+    # compares the tour against the corpus it was built from, and it runs
+    # unconditionally — not only in storied mode — because a fabrication is not a
+    # storied-mode concern.
+    try:
+        from story_fact_guard import repair_role_mismatches
+        _fg_parts = [_d1_venue_corpus or '']
+        if isinstance(_stop_corpus_data, dict):
+            for _sc in _stop_corpus_data.values():
+                if isinstance(_sc, dict):
+                    _fg_parts.append(_sc.get('passages', '') or '')
+        _fg_corpus = ' '.join(p for p in _fg_parts if p)
+        if _fg_corpus:
+            complete_tour, _fg_found = repair_role_mismatches(complete_tour, _fg_corpus)
+            for _f in _fg_found:
+                print(f"  [D533] ROLE MISMATCH {'REPAIRED' if _f.get('repaired') else 'FOUND'}: "
+                      f"'{_f['person']}' + {_f['year']} — corpus says {_f['role']}, "
+                      f"tour says '{_f['action']}'")
+                print(f"      removed: {_f['sentence'][:110]}")
+            if not _fg_found:
+                print(f"  [D533] Person-year role guard: no mismatches "
+                      f"({len(_fg_corpus)} chars of corpus checked)")
+        else:
+            print(f"  [D533] Person-year role guard: no corpus available — check SKIPPED")
+    except ImportError:
+        _import_logger.error("[D533] MISSING: story_fact_guard — birth-year fabrication "
+                             "check DISABLED")
+    except Exception as e:
+        print(f"  [D533] Role guard error (non-fatal): {e}")
 
     # -------- [LOCAL-47] Tour-title / location repetition cap --------
     if tour_category != 'museum':

@@ -371,3 +371,191 @@ def count_phrase_occurrences(text: str, phrase: str) -> int:
     if not text or not phrase:
         return 0
     return len(re.findall(re.escape(phrase), text, re.IGNORECASE))
+
+
+# ---------------------------------------------------------------------------
+# [D533] Cross-stop FACT repetition — Michael, 2026-08-26:
+#   "make sure the same facts are not repeated not only in the same sentence and
+#    in the same stop, but across all stops: listener should not listen the same
+#    story many times."
+#
+# Why the existing check was not enough. `check_cross_stop_repetition` compares
+# SENTENCES by Jaccard word overlap. On the Palais Lascaris run the two tellings
+# of the museum's founding scored **0.692** against a 0.70 threshold and passed:
+#
+#   stop 1  "In 1942, the city of Nice purchased the Palais Lascaris, a
+#            seventeenth-century aristocratic building, with the goal of
+#            transforming it into a museum."
+#   stop 3  "In 1942, the city of Nice purchased the seventeenth-century Palais
+#            Lascaris with the intention of transforming it into a museum."
+#
+# Lowering the threshold would have caught that pair and would still miss the
+# real target, because **the same fact can be told in words that barely overlap.**
+# The listener does not hear word overlap; they hear the same thing twice.
+#
+# So this works on FACTS, not sentences. A fact signature is the pair
+# (year, subject-entity) — the unit a listener actually remembers. The same
+# (1942, palais lascaris) asserted in two stops is one story told twice however
+# it is phrased.
+# ---------------------------------------------------------------------------
+
+_FACT_YEAR_RE = re.compile(r'\b(1[0-9]{3}|20[0-9]{2})\b')
+_FACT_NAME_RE = re.compile(
+    r'\b([A-ZÀ-Þ][\w\'’\-]+(?:\s+(?:de|du|van|von|della|di|le|la)?\s*[A-ZÀ-Þ][\w\'’\-]+)*)\b')
+
+# Words that look like names at a sentence start but carry no fact.
+_FACT_NAME_STOPWORDS = {
+    'the', 'this', 'that', 'these', 'those', 'stand', 'pause', 'notice', 'look',
+    'your', 'you', 'from', 'here', 'now', 'then', 'while', 'when', 'as', 'in',
+    'at', 'on', 'it', 'its', 'a', 'an', 'and', 'but', 'orientation', 'directions',
+    'stop', 'unlike', 'because', 'although', 'today', 'originally', 'following',
+    'such', 'each', 'both', 'after', 'before', 'during',
+}
+
+
+def _fact_entities(sentence: str):
+    """Capitalised entities in a sentence, folded, minus sentence-start noise."""
+    import unicodedata
+    ents = set()
+    for m in _FACT_NAME_RE.findall(sentence or ''):
+        f = unicodedata.normalize('NFKD', m.lower())
+        f = ''.join(c for c in f if not unicodedata.combining(c)).strip()
+        if not f or f in _FACT_NAME_STOPWORDS:
+            continue
+        if len(f) < 4:
+            continue
+        ents.add(f)
+        # Also index the last token, so 'Palais Lascaris' and 'the Lascaris
+        # palace' meet on 'lascaris'.
+        parts = f.split()
+        if len(parts) > 1 and parts[-1] not in _FACT_NAME_STOPWORDS and len(parts[-1]) >= 4:
+            ents.add(parts[-1])
+    return ents
+
+
+# Lines that are not narration and must never contribute facts: the machine-
+# readable scaffolding, and the closing recap whose whole JOB is to mention
+# earlier stops again.
+_FACT_SKIP_LINE = re.compile(
+    r'^\s*(Stop\s+\d+:|Coordinates:|Directions:|Sources:|Tour-Category:|Orientation:\s*$)',
+    re.IGNORECASE)
+_FACT_RECAP = re.compile(r"That'?s\s+\d+\s+stops?\b|If you would like another", re.IGNORECASE)
+
+# A year and an entity belong to the same fact only if they are near each other.
+# Without this, one sentence listing three works with three dates yields nine
+# cross-product "facts", and every later stop then looks like a repeat. That is
+# exactly what stop 1's front-loaded orientation produced on the Palais run.
+_FACT_PROXIMITY_CHARS = 120
+
+
+def fact_signatures(sentence: str):
+    """(year, entity) pairs asserted by a sentence — its atomic facts.
+
+    Pairs are formed only within `_FACT_PROXIMITY_CHARS`, and list-shaped
+    sentences (three or more years, or a recap) assert nothing and are skipped.
+    """
+    s = sentence or ''
+    if _FACT_RECAP.search(s):
+        return set()
+    years = [(m.group(1), m.start()) for m in _FACT_YEAR_RE.finditer(s)]
+    if not years or len(set(y for y, _ in years)) >= 3:
+        return set()
+    ents = _fact_entities(s)
+    if not ents:
+        return set()
+    sigs = set()
+    low = s.lower()
+    for ent in ents:
+        # Position of the entity as it appears (accent-folded compare is done in
+        # _fact_entities; here we locate the first plausible occurrence).
+        pos = low.find(ent.split()[0])
+        if pos < 0:
+            pos = 0
+        for year, ypos in years:
+            if abs(ypos - pos) <= _FACT_PROXIMITY_CHARS:
+                sigs.add((year, ent))
+    return sigs
+
+
+def _stop_blocks(tour_text: str):
+    """Split a tour into (stop_number, block_text). Stop 1 is the first block."""
+    parts = re.split(r'\n(Stop\s+\d+:)', tour_text or '')
+    blocks = []
+    for i in range(1, len(parts), 2):
+        num = int(re.search(r'\d+', parts[i]).group())
+        blocks.append((num, parts[i + 1] if i + 1 < len(parts) else ''))
+    return blocks
+
+
+def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2):
+    """Facts asserted in more than one stop.
+
+    Returns [{signature, first_stop, repeat_stop, sentence}] — one entry per
+    REPEAT (the first telling is never reported; it is the one to keep).
+    """
+    blocks = _stop_blocks(tour_text)
+    if len(blocks) < min_stops:
+        return []
+    seen = {}          # signature -> (stop_number, sentence)
+    repeats = []
+    for num, block in blocks:
+        # A stop repeating itself is a different problem; dedupe within the stop
+        # first so one stop's two mentions do not both count against the next.
+        local = set()
+        narration = '\n'.join(ln for ln in block.split('\n')
+                              if not _FACT_SKIP_LINE.match(ln))
+        for sent in _split_into_sentences(narration):
+            for sig in fact_signatures(sent):
+                if sig in local:
+                    continue
+                local.add(sig)
+                if sig in seen and seen[sig][0] != num:
+                    repeats.append({
+                        'signature': f"{sig[0]}/{sig[1]}",
+                        'first_stop': seen[sig][0],
+                        'repeat_stop': num,
+                        'sentence': sent,
+                        'first_sentence': seen[sig][1],
+                    })
+                elif sig not in seen:
+                    seen[sig] = (num, sent)
+    return repeats
+
+
+def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
+    """Delete later re-tellings of a fact already told at an earlier stop.
+
+    **Deletion, not rewriting** — the same reasoning as `story_fact_guard`: a
+    rewrite has to assert something, and all we know is that this sentence is
+    redundant. Removing it cannot introduce a falsehood.
+
+    A stop is never stripped below `min_remaining_words`; a thin stop keeps its
+    repeated sentence and the caller is told, because an empty stop is worse for
+    the listener than a repeated one.
+
+    Returns (new_text, actions) where actions have 'removed': bool.
+    """
+    repeats = check_cross_stop_fact_repetition(tour_text)
+    if not repeats:
+        return tour_text, []
+    out, actions = tour_text, []
+    # One sentence can carry several repeated signatures; remove it once.
+    handled = set()
+    for r in repeats:
+        sent = r['sentence']
+        if sent in handled:
+            continue
+        handled.add(sent)
+        blocks = dict(_stop_blocks(out))
+        block = blocks.get(r['repeat_stop'], '')
+        if sent not in block:
+            actions.append(dict(r, removed=False, reason='sentence not in stop block'))
+            continue
+        if len(block.split()) - len(sent.split()) < min_remaining_words:
+            actions.append(dict(r, removed=False, reason='stop would fall below minimum'))
+            continue
+        new_block = block.replace(sent, '', 1)
+        new_block = re.sub(r'[ \t]{2,}', ' ', new_block)
+        out = out.replace(block, new_block, 1)
+        actions.append(dict(r, removed=True, reason=''))
+    return out, actions
