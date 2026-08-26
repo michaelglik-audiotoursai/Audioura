@@ -2227,6 +2227,16 @@ _LAST_VERIFICATION_TIER = ""
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# [D530] Module-level: populated whenever the delivered stop count differs from
+# what the listener asked for. Empty dict means the request was met.
+#
+# Measured 2026-08-25: a 3-stop request returned a 1-stop tour and NOTHING said
+# so. The exhibition-checklist branch reassigned `total_stops` to the number of
+# works a scrape happened to yield, and by Phase 3A the log printed "asking for
+# 2 candidates" as though 1 had always been the ask. The request left no trace.
+# Keys: requested, delivered, reason, source.
+_LAST_STOP_COUNT_NOTICE = {}
+
 # ──────────────────────────────────────────────────────────────────────────────
 def _sentences_removed_by_gates(before: str, after: str):
     """[LOCAL-474] Sentences present before the gate chain and absent after it.
@@ -5664,6 +5674,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # use those directly as Phase 3A output. No GPT randomness, no fabrication.
     # This is the ONLY path that guarantees reproducibility.
     _deterministic_fill_used = False
+    # [D530] True when the checklist supplied works but too few to cover the
+    # request. Distinct from `_deterministic_fill_used`: Phase 3A must still run
+    # to fill the remainder, but the creator-filter fallback must NOT — the
+    # checklist was not "unavailable", it was merely thin.
+    _checklist_base_used = False
     # [LOCAL-364] Track which path produced the stops for exhibition-scoped requests.
     # Used downstream for honest-degradation labelling in the tour text.
     _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'prose_llm', 'creator_filter', 'none'
@@ -5807,17 +5822,74 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _checklist_works = _exhibition_checklist_result.works
                     _exhibition_stops_source = _exhibition_checklist_result.path  # 'checklist', 'partial', or 'prose_llm'
 
-                    if len(_checklist_works) < total_stops and _exhibition_checklist_result.path == 'partial':
-                        print(f"  [LOCAL-364] Partial checklist: {len(_checklist_works)} works "
-                              f"(site shows highlights only), requested {total_stops}")
-                        # Use what we have; shortfall is honestly stated
-                        total_stops = min(total_stops, len(_checklist_works))
-                    elif len(_checklist_works) < total_stops:
-                        total_stops = len(_checklist_works)
+                    # [D530] The listener's ask, captured before anything reduces it.
+                    _requested_stops = total_stops
+                    _checklist_is_thin = len(_checklist_works) < _requested_stops
 
-                    _det_take = min(len(_checklist_works), total_stops * 2)
+                    if _checklist_is_thin:
+                        # [D530] FIX 1 — the shortfall is announced on EVERY path.
+                        # The 'partial' branch always printed this; the 'prose_llm'
+                        # branch silently reassigned total_stops, which is how a
+                        # 3-stop request became a 1-stop tour in total silence.
+                        _shortfall_why = (
+                            'site shows highlights only'
+                            if _exhibition_checklist_result.path == 'partial'
+                            else f"'{_exhibition_checklist_result.path}' extraction "
+                                 f"yielded fewer works than requested")
+                        print(f"  [LOCAL-364/D530] SHORTFALL: exhibition page yielded "
+                              f"{len(_checklist_works)} work(s), listener requested "
+                              f"{_requested_stops} ({_shortfall_why})")
+
+                    # [D530] FIX 2 — a thin checklist must not SUPPRESS the question.
+                    # Skipping Phase 3A is only safe when the checklist can actually
+                    # cover the request. When it cannot, the works we did find stay
+                    # as the documented base and Phase 3A fills the remainder — the
+                    # LOCAL-30 pattern — instead of one scraped photo caption
+                    # silencing the call that knows the exhibition.
+                    #
+                    # The LOCAL-365 (closed) and LOCAL-465 (not found) gates are
+                    # untouched: both return before this branch, which is only
+                    # reached when the checklist HAS works.
+                    _det_take = min(len(_checklist_works), max(_requested_stops, 1) * 2)
                     poi_list = [_new_poi(w['title']) for w in _checklist_works[:_det_take]]
-                    _deterministic_fill_used = True
+
+                    # [D530] DEFAULT OFF — verified live 2026-08-26 and it made the
+                    # outcome WORSE, so it does not ship enabled.
+                    #
+                    # Letting Phase 3A fill the remainder works: the shortfall was
+                    # announced, the 2 checklist works were kept, and Phase 3A was
+                    # asked for more. It returned Guernica, The Birth of the World
+                    # and The Persistence of Memory — none of them in this livres
+                    # d'artiste show, two of them not even in this museum. That is
+                    # the LOCAL-465 fabrication risk, exactly as predicted.
+                    #
+                    # Then D1v2 dropped ALL FIVE, including the two works taken from
+                    # the museum's own exhibition page, because an exhibition's
+                    # livres d'artiste have no canonical title match in the venue's
+                    # permanent catalogue. Tier went `unresolvable` and NO TOUR was
+                    # produced. A degraded 2-stop tour became zero stops.
+                    #
+                    # The missing piece is that deterministic fill BYPASSES D1v2 —
+                    # measured: 0 `D1v2 DROPPED` lines in every deterministic run.
+                    # Checklist works are trusted precisely because the venue named
+                    # them. Routing them through D1v2 discards that trust. Whoever
+                    # finishes this must carry the trust with the works, not just
+                    # move them into a different list.
+                    _thin_fill_on = os.environ.get('TOUR_THIN_CHECKLIST_FILL', '0') == '1'
+                    if _checklist_is_thin and _thin_fill_on:
+                        _deterministic_fill_used = False   # let Phase 3A run and append
+                        _checklist_base_used = True        # but NOT the creator-filter fallback
+                        total_stops = _requested_stops     # the request stands
+                        print(f"  [LOCAL-364/D530] Keeping {len(poi_list)} checklist work(s) as the "
+                              f"documented base; Phase 3A will be asked for the remainder "
+                              f"(request of {_requested_stops} stands)")
+                    else:
+                        if _checklist_is_thin:
+                            total_stops = min(_requested_stops, len(_checklist_works))
+                            print(f"  [LOCAL-364/D530] Delivering {total_stops} stop(s) from the "
+                                  f"checklist. Phase 3A fill is OFF "
+                                  f"(TOUR_THIN_CHECKLIST_FILL=1 to enable — see D530).")
+                        _deterministic_fill_used = True
 
                     _path_label = _exhibition_checklist_result.path.upper()
                     print(f"  [LOCAL-364/368] ✓ {_path_label} PATH: {len(poi_list)} works from exhibition page")
@@ -5841,7 +5913,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # If checklist retrieval failed (no exhibition page found, prose-only,
             # no venue URL), fall back to LOCAL-362's creator filter.
             # The key difference: we LABEL this fallback honestly.
-            if not _deterministic_fill_used:
+            # [D530] `_checklist_base_used` means the checklist DID supply works,
+            # just not enough. That is not "unavailable" and must not trigger the
+            # creator filter — doing so would discard the venue's own works in
+            # favour of the venue's permanent collection.
+            if not _deterministic_fill_used and not _checklist_base_used:
                 _fallback_reason = ''
                 if _exhibition_checklist_result:
                     _fallback_reason = _exhibition_checklist_result.reason
@@ -6339,6 +6415,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _hollow_reason_rejects.append(name)
                         print(f"   ! [LOCAL-329] Hollow reason for '{name}': '{reason[:80]}'")
                         continue  # skip this candidate
+
+                # [D530] Phase 3A APPENDS, and under the thin-checklist path it
+                # appends onto works already taken from the exhibition page. A
+                # candidate naming one of those is the same stop twice — which is
+                # exactly what shipped on 2026-08-25 when "Le Lézard" and
+                # "Le Lézard … (detail)" both became stops.
+                # `_det_norm` is imported inside conditional blocks upstream and is
+                # NOT reliably bound here — importing it locally is what keeps this
+                # from being another NameError that only fires on live runs.
+                from story_miner import _normalize as _d530_norm
+                if any(_d530_norm(name) == _d530_norm(p.get('name', '')) for p in poi_list):
+                    print(f"   ! [D530] Duplicate of an existing stop, skipped: '{name[:60]}'")
+                    continue
 
                 poi_list.append(_new_poi(name, c.get("address") or ""))
 
@@ -15916,6 +16005,27 @@ RULES:
             print(f"    [LOCAL-394] LOST: '{_l394_name}'")
     else:
         print(f"  [LOCAL-394] Stop count invariant: OK ({len(poi_list)} selected == {len(poi_list)} delivered)")
+
+    # [D530] LOCAL-394 above compares SELECTED against DELIVERED, so it runs after
+    # anything that reduced the selection and reports OK on a tour that shrank —
+    # it said "OK (1 selected == 1 delivered)" on a 3-stop request. This compares
+    # against what the LISTENER asked for, which is the only number they know.
+    global _LAST_STOP_COUNT_NOTICE
+    _LAST_STOP_COUNT_NOTICE = {}
+    try:
+        _d530_requested = int(_requested_stops)
+    except (NameError, TypeError, ValueError):
+        _d530_requested = None
+    if _d530_requested and len(poi_list) != _d530_requested:
+        _LAST_STOP_COUNT_NOTICE = {
+            'requested': _d530_requested,
+            'delivered': len(poi_list),
+            'source': _exhibition_stops_source,
+            'reason': (f"the exhibition source yielded {len(poi_list)} work(s) that could be "
+                       f"verified; {_d530_requested} were requested"),
+        }
+        print(f"  [D530] ⚠️  LISTENER ASKED FOR {_d530_requested} STOP(S), DELIVERING "
+              f"{len(poi_list)} — source='{_exhibition_stops_source}'")
 
     # [LOCAL-361] Track actually-rendered headers for D2 and heading-count invariant
     _rendered_headers = []

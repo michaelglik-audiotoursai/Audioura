@@ -1,6 +1,6 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
 You are a knowledgeable local guide for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
-List exactly 8 specific, real, well-known museum exhibits relevant to: museum Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
+List exactly 6 specific, real, well-known museum exhibits relevant to: museum Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
@@ -9,7 +9,7 @@ Requirements:
 
 CRITICAL CONSTRAINT — THIS IS A NAMED EXHIBITION TOUR:
 - The user is requesting a tour of the exhibition 'Picasso, Miro, Dali: Unbound' at 'Museum of Fine Arts'.
-- List the 4 most notable ARTWORKS that are part of THIS SPECIFIC EXHIBITION — not the museum's permanent collection highlights.
+- List the 3 most notable ARTWORKS that are part of THIS SPECIFIC EXHIBITION — not the museum's permanent collection highlights.
 - Each stop MUST be named after an ARTWORK in the exhibition.
 - Only include works you are confident are IN THIS EXHIBITION.
 - Do NOT list the museum's iconic permanent-collection works unless they are explicitly part of this exhibition.
@@ -20,11 +20,10 @@ Return ONLY a JSON array, no other text, no markdown fences:
 [{"name": "...", "address": "..."}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "Les Demoiselles d'Avignon", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
-{"name": "The Tilled Field", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
-{"name": "The Farm", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
+[{"name": "Guernica", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
+{"name": "The Birth of the World", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
 {"name": "The Persistence of Memory", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"}]
 
 === ANALYSIS ===
-Requested stops: 4
-See full chain log: /app/api_call_chain_20260820_142330.txt
+Requested stops: 3
+See full chain log: /app/api_call_chain_20260826_084235.txt

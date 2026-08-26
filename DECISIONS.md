@@ -21103,3 +21103,84 @@ passed on a tour containing the same work twice. The pipeline had no way to noti
 **And the standing measurement problem is now sharper:** there is still no n=3 index number, and
 there cannot be one while the stop list is drawn from an un-pinned model. **Pinning that call is a
 prerequisite for every quality measurement**, not a side quest.
+
+---
+
+## D530 — The request is no longer overwritten in silence; filling the gap made things worse and ships OFF
+
+**2026-08-26. Michael: "Services in container must specify the number of stops listener asked to
+generate, do[n't] they?" They did not.**
+
+### Fix 1 — SHIPPED and verified live
+
+`generate_tour_text.py:5810` had two branches. The `partial` one announced the shortfall and named
+the requested count. The other silently reassigned `total_stops = len(_checklist_works)`:
+
+```python
+elif len(_checklist_works) < total_stops:
+    total_stops = len(_checklist_works)          # no message
+```
+
+Every run took the second branch. A 3-stop request became a 1-stop tour, and by Phase 3A the log
+read "asking for 2 candidates" as though 1 had always been the ask — **the request left no trace
+anywhere in the system.**
+
+Now: the shortfall is announced on every path, and `_LAST_STOP_COUNT_NOTICE`
+(`{requested, delivered, source, reason}`) carries it to the service layer, following the
+`_LAST_CLEAN_FAIL_EVIDENCE` pattern. Verified live:
+
+```
+[LOCAL-364/D530] SHORTFALL: exhibition page yielded 2 work(s), listener requested 3
+[LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+[D530] ⚠️  LISTENER ASKED FOR 3 STOP(S), DELIVERING 2 — source='prose_llm'
+```
+
+Those last two lines are consecutive and are the whole point. **LOCAL-394 compares SELECTED against
+DELIVERED, so it runs after whatever reduced the selection and reports OK on a tour that shrank.**
+It is not broken; it never measured the listener's request. Now something does.
+
+### Fix 2 — BUILT, VERIFIED, AND DEFAULTED OFF because it made the outcome worse
+
+The intent was right and Michael's diagnosis of it was right: a thin checklist should not *suppress*
+Phase 3A. One scraped photo caption was silencing the call that knows the exhibition.
+
+It works as designed, and the result was a **worse** outcome than the bug:
+
+1. Shortfall announced, 2 checklist works kept as base, Phase 3A asked for the remainder. Correct.
+2. Phase 3A returned **Guernica, The Birth of the World, The Persistence of Memory** — none in this
+   livres d'artiste show, two not even in this museum. **The LOCAL-465 fabrication risk, exactly as
+   predicted before writing the code.**
+3. D1v2 then dropped **all five, including the two works taken from the museum's own exhibition
+   page**, because an exhibition's livres d'artiste have no canonical title match in the venue's
+   permanent catalogue. Tier `unresolvable`, clean fail, **no tour at all**.
+
+A degraded 2-stop tour became zero stops.
+
+**The missing piece, measured:** deterministic fill **bypasses D1v2** — `0` occurrences of
+`D1v2 DROPPED` in every deterministic run. Checklist works are trusted precisely because the venue
+named them, and routing them into the Phase 3A list silently discards that trust. Whoever finishes
+this must **carry the trust with the works**, not merely move them into a different list.
+
+Gated behind `TOUR_THIN_CHECKLIST_FILL=1`, default off. The code, its evidence and its failure mode
+are in the source comment at the branch.
+
+### Also fixed
+
+A dedupe at the Phase 3A append site, since that path can now append onto real works.
+**It does not catch `"… (detail)"`** — a different string — so the duplicate-stop defect is only
+half addressed; the caption filter belongs with the extractor work (D528 item 1).
+
+**One near-miss worth recording:** the dedupe first used `_det_norm`, which is imported inside
+conditional blocks upstream and would have been **unbound** at that call site on any non-exhibition
+tour. That is the LOCAL-465 NameError shape precisely — caught before shipping only because the
+import was checked rather than assumed. It now imports locally.
+
+### The standing options on the real fix
+
+The axis is what happens to a work we can name but cannot confirm. **A** knowledge-first with the
+checklist advisory (re-opens LOCAL-465). **B** knowledge-first, checklist vetoes only on
+contradiction, silence is not evidence. **C** checklist-first with knowledge fill and unconfirmed
+stops labelled aloud. **D** confirmed-only but never silent — the status quo with better manners.
+**LEAD recommends B with C's labelling**, and D530's live run is the evidence for why B needs a real
+definition of "contradiction": today's page is *silence*, and unguarded knowledge-fill invented three
+works.
