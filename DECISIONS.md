@@ -21448,3 +21448,35 @@ a test.
 **Verified live on the re-run** (`81b48c8`): corpus-gate restriction lifted on all 3 stops, and the
 1942 purchase — told **three** times that run — removed from stops 2 and 3. Stop 3 gained
 "worked in Aldgate, London, between 1647 and 1656" and "signature heart-shaped motifs".
+
+### D533 addendum — the v2 run: two of three asks met, and the fix is narrower than the defect
+
+**Build `1259f6e`, 2026-08-26 15:2x.** All three guards ran (the first re-run's role guard had
+crashed on list-shaped corpus).
+
+**Worked:** corpus-gate restriction lifted on all 3 stops, so stop 3 describes the viol instead of
+the building. Role guard executed clean over 30,312 chars. 1942 purchase down from 3 tellings to 2.
+
+**Three honest shortfalls, all recorded because they define the next work:**
+
+1. **The role guard is narrower than the defect it was built for.** Stop 2 shipped *"a vision
+   realized by its opening as a public institution in 1946"* — the corpus says 1946 is the
+   **monument classification**, which stop 1 states correctly in the same tour. **A year reattached
+   to the wrong EVENT is the Gautier defect exactly**, and a `(person, year)` guard cannot see it.
+2. **`(year, entity)` signatures miss undated stories.** The Gautier bequest is told at stop 2 and
+   again at stop 3, neither with a year, so both are invisible. Much of what a listener
+   experiences as repetition is undated.
+3. **The orphan guard catches demonstratives, not definite descriptions.** Stop 3 still opens
+   *"The building was declared a historical monument by 1946"* after its referent was removed.
+   Widening the regex to `The <noun>` would refuse nearly every removal; this needs a referent
+   check.
+
+**The structural conclusion:** every defect in (2) and (3) comes from editing finished prose.
+**De-repetition belongs BEFORE generation** — tell the stop-writer which facts are already spoken
+for — not after, where it can only trade one defect for another.
+
+**Also:** the stops were the same three objects both runs. Selection is driven by the venue corpus
+and LOCAL-349 yield scores, untouched by D533. And the previous run's best details — Turner's
+Aldgate workshop, 1647-1656, the heart motif — did NOT reappear. The ranker's `usable=0` verdict
+means what reaches the prompt is unstable run to run: **retrieval is working, selection from it is
+a lottery.**
