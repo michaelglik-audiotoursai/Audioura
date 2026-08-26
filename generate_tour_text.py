@@ -10183,10 +10183,25 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 _kf_name = _kf_poi.get('name', '')
                 _kf_have = (_DIRECT_SNIPPETS_PER_STOP.get(_kf_name, [])
                             or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_kf_idx}__", []))
-                # "Starved" means the grounded path produced nothing for THIS
-                # object — not merely that the corpus gate shortened it.
-                if len(_kf_have) >= 2:
+                # [D534] The trigger is ABSENCE OF OBJECT-LEVEL MATERIAL, not a low
+                # snippet count. Measured on the v3 run: all three stops had 7-8
+                # snippets, so the old `< 2` test never fired — and all three were
+                # `volume=VENUE_ONLY`, meaning every snippet was about the museum
+                # rather than the instrument. LOCAL-491's rotation then had only
+                # one "next fact" to reach for on every stop, the venue's own
+                # institutional history, which is precisely the material the D534
+                # repetition ban forbids. The two mechanisms were fighting, and
+                # the stop got shorter instead of gaining a second story.
+                #
+                # A VENUE_ONLY stop needs object-level facts fetched, however many
+                # venue-level snippets it already holds.
+                _kf_venue_only = (_kf_name in _corpus_gate_shortened_stops
+                                  or _kf_name in _corpus_gate_empty_stops)
+                if len(_kf_have) >= 2 and not _kf_venue_only:
                     continue
+                if _kf_venue_only and len(_kf_have) >= 2:
+                    print(f"  [D534] Stop {_kf_idx+1} has {len(_kf_have)} snippet(s) but "
+                          f"they are VENUE-level only — fetching object-level facts")
                 print(f"  [D533] Stop {_kf_idx+1} '{_kf_name[:50]}' has "
                       f"{len(_kf_have)} snippet(s) — asking the knowledge fallback")
                 _kf_res = fetch_stop_knowledge(_kf_name, _kf_venue, api_key)
