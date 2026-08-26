@@ -21480,3 +21480,60 @@ and LOCAL-349 yield scores, untouched by D533. And the previous run's best detai
 Aldgate workshop, 1647-1656, the heart motif — did NOT reappear. The ranker's `usable=0` verdict
 means what reaches the prompt is unstable run to run: **retrieval is working, selection from it is
 a lottery.**
+
+---
+
+## D534 — "ANY information should not be repeated", the 300-word bar, and two defects inside my own fixes
+
+**2026-08-26.** Michael found the case that broke D533: the 1946 monument classification told at
+stops 1 and 3. **Neither sentence has a capitalised subject** — "this decision", "the building" —
+so the `(year, proper-noun)` signature was blind to both, word overlap is ~0.35, and embeddings
+score it below any usable threshold because stop 3 buries the claim under three other clauses.
+
+**It needed two detectors, not a better threshold:** semantic (embeddings) for paraphrase with no
+shared vocabulary, `(year, uncommon-noun)` for the diluted case.
+
+**Michael's exemption is load-bearing.** *"Stop 1's orientation: stop previewing later stops. -- I
+actually like it."* The preview restates every stop by design; counting it as a first telling
+produced **four false positives** and would have regenerated stop 2 for describing its own object.
+Exempt in both detectors, pinned by a test.
+
+**Repair is now REGENERATION, not deletion**, feeding the repeated assertions to PHASE 5.17 as a
+ban on the INFORMATION (LOCAL-476's lesson). This removes the orphaned-back-reference class by
+construction.
+
+### The size question, answered and half-solved
+
+**It was 120 words** — which is why nothing fired on stops of 226 and 259. Added `_THIN_FLOOR=300`.
+Result across the day: 994 → 890 → 963 → **1,049 words**. Stop 3 clears the bar and passes the
+story gate; **stop 2 does not**.
+
+**The finding that mattered:** with the thin trigger on, all three stops rotated to the SAME next
+fact — `[LOCAL-491] rotating to the venue fact — institutional context` — which is exactly what the
+repetition ban forbids. **The two new mechanisms fought and stop 2 got SHORTER (226 → 179).**
+`D489` explained it: every stop `volume=VENUE_ONLY`, every snippet about the museum, none about the
+instrument. **No second object-level story existed to rotate to.**
+
+Fixed at retrieval: the knowledge fallback triggered on a snippet count (`<2`) and these stops had
+7, so it never ran. **The real condition is absence of OBJECT-level material**, which the corpus
+gate already knew. Retriggered, it fetched 4/4/5 web-grounded facts.
+
+**Still short, and the reason is worth keeping:** the fallback delivers FACTS and the story gate
+wants a STORY. More facts is not more story. Stop 2 has a maker and an object and no episode.
+Padding was explicitly instructed against — a short honest stop beats a padded one.
+
+### Two defects inside the fixes, both caught by running them
+
+1. **A user-facing FALSE statement.** v4 told listeners *"the museum's listing doesn't name this
+   one, so it may or may not be out today"* about the Turner viol — **a D1v2-verified object in the
+   permanent collection.** The knowledge fallback had set `confirmation='knowledge'`, which is
+   D532's flag for "the venue's listing does not name this WORK", and option C said so aloud.
+   **Two different claims under one flag.** What is unconfirmed after a fallback is the provenance
+   of some FACTS, not the presence of the object. Telling a listener a real exhibit might be absent
+   spends the exact trust the disclosure exists to protect.
+2. **Deletion is safe for TRUTH but not for COHERENCE.** Removing repeated sentences left stops
+   opening *"This action set in motion…"* with the action gone. Hence the anaphora guard, and hence
+   the move to regeneration.
+
+**The standing conclusion, unchanged and now demonstrated three times:** editing finished prose can
+only trade one defect for another. De-repetition belongs in generation, and it now is.
