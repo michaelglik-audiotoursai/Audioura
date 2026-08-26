@@ -2,16 +2,16 @@
 
 Durable across sessions. Delete a line once delivered.
 
-- [ ] **2026-08-26 — NEXT SESSION: the container is STALE, and that outranks more measurement.**
+- [ ] **2026-08-26 — the container was stale. FIXED 10:4x, see D531. The rest of this item stands.**
 
-      **Read first:** `DECISIONS.md` D526–D530, then `STOPLIST_CHAIN.md`. That is the whole picture.
+      **Read first:** `DECISIONS.md` D526–D531, then `STOPLIST_CHAIN.md`. That is the whole picture.
 
-      **(1) THE LIVE SERVICE DOES NOT HAVE ANY OF THIS WORK.** `audioura-tour-generator-1` was
-      built 2026-08-25 02:50 and its code predates LOCAL-468. Three `.py` files differ from the
-      host: `story_query.py`, `story_production_loop.py`, `story_append_merge.py`. The third is
-      missing the `L. Rosenberg` splitter fix, which was committed BEFORE the image was built —
-      **so build time is not evidence of image contents; a stale Docker COPY layer is served from
-      cache. Verify a rebuild by md5 against the host, never by timestamp.**
+      **(1) DONE — the live service now has this work.** It was four files stale, not three:
+      `generate_tour_text.py` differed too, so D530 fix 1 was not running at all. Cause was NOT a
+      cached COPY layer — the image had been rebuilt and the **container was never recreated**.
+      `build` + `up -d --force-recreate` fixed it on the first try, no `--no-cache`. Verified by
+      md5 across all 529 root `.py` files: **529 matched, 0 differing**; `/health` reports
+      `code_sha b15290d`, `manifest_ok true`. **The md5-not-timestamp rule stands as the check.**
 
       **(2) MICHAEL'S DECISION IS PENDING on option 3** — checklist as verifier rather than source.
       Options A/B/C/D are written up at the end of D530. LEAD recommends **B with C's labelling**.

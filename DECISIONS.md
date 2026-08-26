@@ -21184,3 +21184,51 @@ stops labelled aloud. **D** confirmed-only but never silent — the status quo w
 **LEAD recommends B with C's labelling**, and D530's live run is the evidence for why B needs a real
 definition of "contradiction": today's page is *silence*, and unguarded knowledge-fill invented three
 works.
+
+---
+
+## D531 — The container was stale because the image was never swapped in, not because a COPY layer cached
+
+**2026-08-26, session start.** The handoff (`PENDING_REMINDERS.md`, D526–D530) said three `.py`
+files in `audioura-tour-generator-1` differed from the host and hypothesised **"a stale Docker COPY
+layer is served from cache."** Both halves were checked.
+
+**The staleness was worse than reported: four files, not three.** `generate_tour_text.py` also
+differed — and that is the file holding D530 fix 1. The service was not running the shortfall
+announcement at all.
+
+```
+story_query.py           host=e7d649bb…  container=86313ac0…
+story_production_loop.py host=08bcb546…  container=a931b391…
+story_append_merge.py    host=915f9690…  container=6498ffa3…
+generate_tour_text.py    host=ad8837eb…  container=cbbf8d60…   <- not on the handoff's list
+```
+
+**The cache hypothesis is wrong, and this matters for the next person.** `Dockerfile.generator`
+line 5 is `COPY *.py /app/` — content-addressed, so an edited file always invalidates it — and
+`.dockerignore` excludes no `story_*.py` and no `generate_tour_text.py`. A plain
+`docker-compose build tour-generator` picked all four up on the first try, no `--no-cache` needed.
+
+**What actually happened is that the image was rebuilt and the running container was never
+recreated.** `docker ps` reported the container created 2026-08-24 22:50 while the image on disk
+was newer. `build` alone does not restart anything; `up -d` alone will not replace a container whose
+compose config is unchanged. **The step that was missing is `up -d --force-recreate`.**
+
+**The handoff's operational rule survives and is now the standing check** — verify a rebuild by md5
+against the host, never by timestamp. Applied to all 529 root-level `.py` files:
+
+```
+--- matched=529 differing=0 ---
+/health -> code_sha b15290d, manifest_ok true, 531 files
+grep -c D530 /app/generate_tour_text.py -> 15
+```
+
+**Also cleared:** the `*** SECRET DETECTED ***` alerts ending 2026-08-25T14:37Z are stale. The
+scanner's window is `origin/storied~20..origin/storied`; origin moved past the finding. Re-run on
+`storied~20..storied` today: `No secrets detected.` The single `ROW LOSS` line in `ALERTS.md` is the
+known 2026-08-05 event, not new.
+
+**Still open and untouched by this:** D530's option A/B/C/D decision, `TOUR_THIN_CHECKLIST_FILL`
+defaulted off for the reason in D530, and the `"… (detail)"` caption filter. No measurement was
+taken here — per the handoff, the stale container outranked it, and any number produced before this
+rebuild would have described code that was not running.

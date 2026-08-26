@@ -1,9 +1,9 @@
-# RESTART briefing — generated 2026-08-25 09:58 EDT
+# RESTART briefing — generated 2026-08-26 10:37 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     be1cb1a Handoff for the /clear: LOCAL-468 awaits review, and the findings not to re-derive
+HEAD     b15290d Handoff for the /clear: the container is stale, and that outranks more measurement
 unpushed 0 commits
 dirty    1 files
 ```
@@ -13,7 +13,7 @@ dirty    1 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      621
+cost_ledger rows:      628
 ```
 ALERTS.md: 40 alert line(s) in the last 40 — read it if non-zero.
 
@@ -64,14 +64,14 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  18:- [ ] **2026-08-25 — NEXT SESSION'S FIRST TASK: review and merge LOCAL-468, then measure.**
-  74:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
-  131:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
-  167:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
-  190:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
-  194:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
-  201:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  285:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  5:- [ ] **2026-08-26 — NEXT SESSION: the container is STALE, and that outranks more measurement.**
+  106:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
+  163:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
+  199:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+  222:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  226:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  233:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  317:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules
