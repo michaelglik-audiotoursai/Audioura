@@ -21232,3 +21232,130 @@ known 2026-08-05 event, not new.
 defaulted off for the reason in D530, and the `"… (detail)"` caption filter. No measurement was
 taken here — per the handoff, the stale container outranked it, and any number produced before this
 rebuild would have described code that was not running.
+
+---
+
+## D532 — Option B-real with C's labelling, implemented; the veto's first build was contaminated by its own evidence
+
+**2026-08-26. Michael selected "B with C's labelling" after making me separate B-naive from
+B-real out loud.** His question — *"what motivation would there be to select naive?"* — has no
+answer, and that is the finding: **naive is not an option, it is what B degrades into** when
+D530's one-line description is implemented literally. Recorded in `STORIED_COMMUNICATION_03.MD`.
+
+### What shipped
+
+**1. Trust travels with the work.** `_deterministic_fill_used` described the RUN, so the moment
+Phase 3A appended one candidate to a thin checklist, the venue's OWN works lost their D1v2
+exemption and were deleted against a permanent catalogue that cannot contain a temporary loan.
+That is D530's zero-stop tour. POIs now carry `page_sourced`, and the verification branch splits
+the list by provenance instead of taking an all-or-nothing decision for the run.
+
+**The same defect existed one layer down and would have reproduced the same failure.**
+`should_exempt_from_existence_gate(_deterministic_fill_used, ...)` (LOCAL-437) reads the identical
+flag, so with fill enabled the page-sourced works would have gone to the existence gate and been
+dropped for lacking independent web evidence — which a livre d'artiste on loan does not have.
+Fixed per-POI as well. **Found by reading the flag's other callers, not by testing.**
+
+**2. The veto runs in three uncontaminated stages, because the single-call version failed live.**
+First build: page text and candidate in one prompt, "does this contradict?". On the case that
+matters most it called Picasso's 1931 Vollard livre d'artiste *Le Chef-d'œuvre inconnu* a
+**painting** and vetoed it on the very form dimension that work helped define. Asked cold, same
+model, same day, same seed: **"illustrated book"**, correct.
+
+**The page was priming it.** A prompt that says livres d'artiste, Picasso, Miró, Dalí and then
+asks "is there a contradiction?" gets a contradiction found. Not a knowledge failure and not
+promptable away — so the page and the work never meet in one call again:
+
+```
+stage 1  declare_scope(page)     page only, no candidate   (cached per tour)
+stage 2  identify_work(title)    candidate only, no page
+stage 3  compare(scope, work)    two JSON blobs, no prose either side
+```
+
+Stage 3 uses `gpt-4o`, not mini: mini failed 4/7 at that stage while getting 1 and 2 right,
+reading *"illustrated book"* against *"livres d'artiste"* as a contradiction — comparing strings
+where the question is about meanings. Rules 1 and 2 (an empty declaration cannot veto; an
+unidentified work cannot veto) are enforced **in Python after the call**, not trusted to the
+prompt.
+
+**3. Promotion — and this is where the two lost works come back.** A knowledge-proposed work that
+the PAGE NAMES is promoted to confirmed and never reaches the veto. The extractor anchors on
+credit lines and drops body prose (D528 defect 2), which is what cost this exhibition *Au Soleil
+du Plafond* and *Moses and Monotheism*. Knowledge re-proposes them; the page corroborates them.
+**This is the B-vs-D distinction made concrete: the extractor's JSON is a lossy summary, and B
+goes back to the page.**
+
+Promotion also covers the veto's residual weakness (below): a work the page names is never put to
+a judgement that could misidentify it.
+
+**4. Option C.** `confirmation == 'knowledge'` injects a mandatory disclosure into the Phase 5
+stop prompt — the narrator tells the listener, in the first two sentences, that the museum's
+listing does not name this work and it may not be on view. An unlabelled unconfirmed stop is
+indistinguishable from a fabricated one, which is the failure this replaces.
+
+**`TOUR_THIN_CHECKLIST_FILL` now defaults ON.** D530 shipped it off for exactly one reason —
+the trust loss in (1) — and that reason is gone.
+
+### Evidence
+
+`tests/test_d532_scope_veto.py`, on the real MFA page captured in `STOPLIST_CHAIN.md`, scored in
+all three directions as D528 demanded: **7/7**. Guernica, The Persistence of Memory and Nighthawks
+vetoed on a declared dimension; *Le Chef-d'œuvre inconnu* — silence — admitted; the three
+page-named works promoted.
+
+**The suite was then verified to FAIL, per CLAUDE.md standing check 1.** Naive-B (never vetoes)
+goes red on all 3 veto cases; membership-B (option D wearing B's name) goes red on the crucial
+admit case. It detects both wrong implementations. 59 existing assertions across LOCAL-437/372/357
+still pass.
+
+### The residual limit, stated rather than papered over
+
+**Stage 2 misidentifies lesser-known works by famous painters as paintings.** Asked cold, it calls
+*Le Lézard aux plumes d'or* and *Au Soleil du Plafond* paintings; both are illustrated books. For
+a work the page names this is harmless — promotion runs first. For a work the page is silent
+about, a wrong form claim can veto a legitimate stop, and the bias points one way: toward deleting
+exactly the class of work a book exhibition is made of.
+
+**Not fixed with a heuristic, deliberately.** The tempting rule — trust `held_by` as a fame proxy,
+since the famous works returned a museum and the obscure ones returned "" — is fitted to four
+examples, which is the failure D526/D528 recorded six times in one day. The real fix is
+corroborating the work's form against Wikidata rather than parametric memory, and it is not in
+this change.
+
+### D532 addendum — the live exhibition run, and where B-real stops short
+
+**Same build `5b8a30f`, 2026-08-26 16:2x.** `Picasso, Miro, Dali: Unbound at MFA`, 3 stops:
+
+```
+[D532] Provenance: 2 page-sourced, 3 knowledge-proposed
+[D532] SCOPE VETO 'Woman in a Hat'            — form: painting vs livres d'artiste
+[D532] SCOPE VETO 'The Farm'                  — form: painting vs livres d'artiste
+[D532] SCOPE VETO 'The Persistence of Memory' — form: painting vs livres d'artiste
+[D532] 2 stop(s): 2 confirmed by the venue page, 0 unconfirmed and labelled
+```
+
+**Phase 3A reached for famous paintings again, including the exact work D530 recorded, and the
+veto stopped all three.** D530's run: 5 works in, all 5 dropped by D1v2 including the museum's
+own, **zero stops**. This run: the page-sourced works survived. The trust travelled.
+
+**Where it stops short, stated plainly:**
+
+1. **2 stops, not 3. B-real prevented fabrication; it did not fill the gap.** The promotion path
+   never fired because Phase 3A never proposed *Au Soleil du Plafond* or *Moses and Monotheism* —
+   it proposes greatest hits, which are all paintings, which all get vetoed. **The worked example
+   given to Michael predicted "3 stops, all correct"; the live answer is 2 correct plus an
+   announced shortfall.** The gap is that Phase 3A is never told the declared form. Small fix,
+   named as next.
+2. **Both delivered stops are the same work** — `Le Lézard` and `Le Lézard (detail)`. D528 defect
+   1, still open, untouched by D532.
+3. **Option C has not spoken to a listener yet.** 0 stops labelled in this run; the disclosure is
+   unit-tested only.
+
+**Palais Lascaris control run** (`TOUR_PALAIS_LASCARIS_20260826.md`, 3/3 stops, D1v2 path,
+tier `exhibit_museum`) confirms D532 did not break the unscoped museum route. **It does not
+exercise D532** — no exhibition scope, no veto, no labelling — and is not offered as evidence for
+it. Its own defects are in `TOUR_PALAIS_LASCARIS_20260826_JUDGEMENT.md`; the serious one is a
+**fabrication that passed every gate**: the corpus says Antoine Gautier was *born* in Nice in
+1825, and the tour ships "the quartet founded by Antoine Gautier in 1825". Also found there:
+`[LOCAL-458] entity gate SKIPPED: no exhibition scope` — **the entity gate does not run on plain
+museum tours**, which are the ones with the least other checking.
