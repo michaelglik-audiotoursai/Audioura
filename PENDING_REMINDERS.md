@@ -2,6 +2,35 @@
 
 Durable across sessions. Delete a line once delivered.
 
+- [ ] **2026-08-26 — NEXT SESSION: the container is STALE, and that outranks more measurement.**
+
+      **Read first:** `DECISIONS.md` D526–D530, then `STOPLIST_CHAIN.md`. That is the whole picture.
+
+      **(1) THE LIVE SERVICE DOES NOT HAVE ANY OF THIS WORK.** `audioura-tour-generator-1` was
+      built 2026-08-25 02:50 and its code predates LOCAL-468. Three `.py` files differ from the
+      host: `story_query.py`, `story_production_loop.py`, `story_append_merge.py`. The third is
+      missing the `L. Rosenberg` splitter fix, which was committed BEFORE the image was built —
+      **so build time is not evidence of image contents; a stale Docker COPY layer is served from
+      cache. Verify a rebuild by md5 against the host, never by timestamp.**
+
+      **(2) MICHAEL'S DECISION IS PENDING on option 3** — checklist as verifier rather than source.
+      Options A/B/C/D are written up at the end of D530. LEAD recommends **B with C's labelling**.
+      D530's live run is the evidence for why B needs a real definition of "contradiction".
+
+      **(3) D530 fix 2 is built and OFF** (`TOUR_THIN_CHECKLIST_FILL=1`). It made things worse:
+      Phase 3A invented Guernica / Persistence of Memory, then D1v2 dropped all five including the
+      museum's own works. **Deterministic fill bypasses D1v2 — the trust must travel with the
+      works.** Do not simply switch it on.
+
+      **(4) DO NOT re-derive these.** The stop-list oracle is an unpinned `gpt-4o-mini` reading a
+      page that contains no checklist; `seed` is absent from the call. It returned 3, 3, 2, 2, 1
+      works across five runs on identical input. **There is no n=3 index measurement and there
+      cannot be one until the stop list is stable** — 75.7 baseline, 60.7 under LOCAL-468 alone,
+      73.7 under LOCAL-468+D527, one run each, three-stop tours only.
+
+      **(5) The `(detail)` caption filter is still open** — the D530 dedupe does not catch it.
+
+
 - [x] DELIVERED 2026-08-07 12:4x — **Tell Michael to restart** once **LOCAL-354** (price band from guides) and
       **LOCAL-355** (practical facts for all venue kinds) are both reviewed and
       merged or bounced. He asked for this explicitly on 2026-08-07 ~12:00,
