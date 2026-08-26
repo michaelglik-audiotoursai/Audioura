@@ -122,6 +122,24 @@ def main():
     if not cond:
         failures.append('thin-stop guard')
 
+    print("\n  -- a removal must not orphan a back-reference --")
+    # The 2026-08-26 re-run regression: deleting the repeated 1942 sentence left
+    # stop 2 opening with "This action set in motion...", pointing at nothing.
+    anaphor = TOUR.replace(
+        "In 1942, the city of Nice purchased the seventeenth-century Palais Lascaris with the intention of transforming it into a museum.",
+        "In 1942, the city of Nice purchased the seventeenth-century Palais Lascaris with the intention of transforming it into a museum. This action set in motion a series of restorations that continue today and shaped every gallery you will walk through on the rest of this visit.")
+    out2, acts2 = strip_repeated_facts(anaphor)
+    kept = [a for a in acts2 if not a['removed'] and 'refers back' in a['reason']]
+    checks2 = [
+        ("removal refused", len(kept) >= 1),
+        ("repeated sentence still present", "with the intention of transforming it into a museum" in out2),
+        ("back-reference not orphaned", "This action set in motion" in out2),
+    ]
+    for label, cond in checks2:
+        print(f"  {'OK ' if cond else 'FAIL'} {label}")
+        if not cond:
+            failures.append(label)
+
     print()
     if failures:
         print(f"FAILED: {failures}")

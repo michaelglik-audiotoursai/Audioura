@@ -522,6 +522,23 @@ def check_cross_stop_fact_repetition(tour_text: str, min_stops: int = 2):
     return repeats
 
 
+# A sentence opening with one of these points BACKWARDS. Delete the sentence it
+# points at and the listener hears "This action set in motion a series of
+# restorations" with no action ever named — which is exactly what happened on the
+# 2026-08-26 re-run, at stops 2 and 3, caused by this guard's own removals.
+#
+# Deletion is safe for TRUTH (it cannot add a falsehood) but not for COHERENCE.
+# So a removal that would orphan a back-reference is refused, and the repetition
+# is kept instead: hearing a fact twice is a smaller harm than hearing a sentence
+# that refers to nothing. Repairing the anaphor instead would mean generating
+# replacement prose, which is the door this guard exists to keep shut.
+_ANAPHORIC_OPENER = re.compile(
+    r'^\s*(This|That|These|Those|Such|Its|His|Her|Their|It|They|As a result|'
+    r'Consequently|Therefore|Thus|Following this|After this|Because of this|'
+    r'In turn|Under their|Under his|Under her)\b',
+    re.IGNORECASE)
+
+
 def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
     """Delete later re-tellings of a fact already told at an earlier stop.
 
@@ -553,6 +570,13 @@ def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
             continue
         if len(block.split()) - len(sent.split()) < min_remaining_words:
             actions.append(dict(r, removed=False, reason='stop would fall below minimum'))
+            continue
+        # Would removing this sentence orphan the one after it?
+        _tail = block.split(sent, 1)[1] if sent in block else ''
+        _next = next((s for s in _split_into_sentences(_tail) if s.strip()), '')
+        if _next and _ANAPHORIC_OPENER.match(_next):
+            actions.append(dict(r, removed=False,
+                                reason=f'next sentence refers back to it ("{_next[:40]}...")'))
             continue
         new_block = block.replace(sent, '', 1)
         new_block = re.sub(r'[ \t]{2,}', ' ', new_block)
