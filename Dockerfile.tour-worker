@@ -11,8 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy worker service
-COPY tour_worker_service.py .
+# Copy every service module. tour_worker_service.py imports no siblings today,
+# but copying only the entry point is the same trap that broke the other
+# services (see note in Dockerfile.orchestrator): a future import would fail
+# closed at runtime. Dockerfile.cloudrun copies *.py for exactly this reason.
+COPY *.py .
 
 # Create tours directory
 RUN mkdir -p /app/tours

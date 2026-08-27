@@ -54,14 +54,12 @@ services:
       - ./tours:/app/tours
     restart: unless-stopped
 
-  # Built from Dockerfile.cloudrun: Dockerfile.orchestrator copies only
-  # tour_orchestrator_service.py and omits entitlements.py, so the quota check
-  # fails closed with ModuleNotFoundError and every generation returns 503.
-  # Pre-existing breakage, left alone; cloudrun copies all *.py.
+  # Built from its own Dockerfile.orchestrator, now repaired to COPY *.py so
+  # entitlements.py and other siblings are present (Decision B, wdvrdaxvvc).
   tour-orchestrator:
     build:
       context: .
-      dockerfile: Dockerfile.cloudrun
+      dockerfile: Dockerfile.orchestrator
     container_name: development-tour-orchestrator-1
     command: python tour_orchestrator_service.py
     ports:
@@ -101,14 +99,14 @@ services:
       - ./tours:/app/tours
     restart: unless-stopped
 
-  # Built from Dockerfile.cloudrun, not Dockerfile.tour-worker: the latter pins
-  # psycopg2-binary==2.9.1 via requirements.txt, which has no Python 3.11 wheel
-  # and fails its source build on pg_config. Pre-existing breakage, left alone.
-  # Unused in GENERATION_MODE=thread anyway; present for parity.
+  # Built from its own Dockerfile.tour-worker, now repaired to COPY *.py.
+  # requirements.txt now pins psycopg2-binary==2.9.9 (has a Python 3.11 wheel),
+  # so the old pg_config source-build failure is gone. Unused in
+  # GENERATION_MODE=thread anyway; present for parity.
   tour-worker:
     build:
       context: .
-      dockerfile: Dockerfile.cloudrun
+      dockerfile: Dockerfile.tour-worker
     container_name: development-tour-worker-1
     command: python tour_worker_service.py
     # Host 5045: port 5040 is held by a Windows svchost service on this machine.
@@ -237,13 +235,12 @@ services:
     restart: unless-stopped
 
   # ---------- news / newsletter ----------
-  # Built from Dockerfile.cloudrun: Dockerfile.news-generator copies only its own
-  # service file and omits entitlements.py, which it imports. Same pre-existing
-  # single-file-COPY problem as the orchestrator. Left alone; cloudrun copies all.
+  # Built from its own Dockerfile.news-generator, now repaired to COPY *.py so
+  # entitlements.py is present (Decision B, wdvrdaxvvc).
   news-generator-1:
     build:
       context: .
-      dockerfile: Dockerfile.cloudrun
+      dockerfile: Dockerfile.news-generator
     container_name: news-generator-1
     command: python news_generator_service.py
     ports:
@@ -278,12 +275,12 @@ services:
       - postgres-2
     restart: unless-stopped
 
-  # Built from Dockerfile.cloudrun: omits entitlements.py, so the news quota
-  # check fails closed and every article generation is denied. See above.
+  # Built from its own Dockerfile.news-orchestrator, now repaired to COPY *.py so
+  # entitlements.py is present (Decision B, wdvrdaxvvc).
   news-orchestrator-1:
     build:
       context: .
-      dockerfile: Dockerfile.cloudrun
+      dockerfile: Dockerfile.news-orchestrator
     container_name: news-orchestrator-1
     command: python news_orchestrator_service.py
     ports:
@@ -300,14 +297,13 @@ services:
       - postgres-2
     restart: unless-stopped
 
-  # Built from Dockerfile.cloudrun: Dockerfile.newsletter-processor copies only
-  # newsletter_processor_service.py and omits apple_podcasts_processor.py, which
-  # that service imports — it crash-loops on ModuleNotFoundError from a clean
-  # build. Pre-existing breakage, left alone; cloudrun copies all *.py.
+  # Built from its own Dockerfile.newsletter-processor, now repaired to COPY *.py
+  # so apple_podcasts_processor.py and its other 12 sibling imports are present
+  # (Decision B, wdvrdaxvvc).
   newsletter-processor:
     build:
       context: .
-      dockerfile: Dockerfile.cloudrun
+      dockerfile: Dockerfile.newsletter-processor
     container_name: newsletter-processor-1
     command: python newsletter_processor_service.py
     ports:
