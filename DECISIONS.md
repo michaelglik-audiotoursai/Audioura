@@ -21584,3 +21584,69 @@ Cagnes-sur-Mer address under a different name.
 - **Cost/time, text only** (3-stop museum): $0.1791 / $0.2547 / $0.2140 and 3m50s / 4m00s / 4m27s.
   The 5-stop biking run: $0.1244, 3m37s. **`cost_ledger` recorded none of these** — it only logs
   service-layer calls carrying a job_id, so these come from run logs.
+
+---
+
+## D536 — The biking path catches up, and the answer to "does this help every tour type?"
+
+**2026-08-27.** Michael rejected the 2-stop Riviera tour and asked for the itemized fixes, plus:
+*"I hope any tour would benefit from the work we have done on Museum type tours."*
+
+**Answer, from the biking run's own log rather than assumption: mostly yes.** D533/D534's
+repetition guards, the person-year role guard and the thin-stop trigger all ran on the biking tour.
+**The exception was my own error:** the D535 prompt rules (already-visited acknowledgement,
+no-unexplained-importance-claims) were written inside `if tour_category == 'museum':` and could
+never reach a walking, biking or dining tour. Lifted out. D532's exhibition veto stays museum-only,
+correctly — it is about a published checklist.
+
+### Result
+
+| | before | after |
+|---|---|---|
+| delivered / requested | 2 / 5 | **5 / 5** |
+| independently verified | 3/5, gate ignored | **5/5** |
+| the requested Hippodrome | absent | **stop 4** |
+| plausibly invented stops | 4 of 5 | **0** |
+
+### The fix that did most of the work
+
+`[BLOCKER1]` and `[LOCAL-46]` strip "tour" and transport words for AREA RESOLUTION, and the
+stripped string was reused to ask the intent model what the tour is ABOUT:
+
+```
+before: poi_type = "horse racing tracks"
+after : poi_type = "Biking tour with a stop at Hippodrome de la Cote d'Azur"
+```
+
+**A string prepared for one consumer was fed to another.** Everything downstream — five
+racecourses, the scope check deleting three of them — followed from that one substitution.
+
+### The opposite failure, caught before delivery
+
+Refusing the waypoint as a SCOPE produced a tour of five real Riviera destinations **without the
+Hippodrome** — the one place the request named. The existing user-explicit protection requires the
+plural `"stops at"` (Michael wrote `"a stop at"`) and in any case only PROTECTS a stop already
+present. `named_waypoints()` now serves three jobs: refuse as scope, insert if absent, protect from
+gates.
+
+### Standing note, three instances in one day
+
+**Every fix today opened its own opposite failure**, and each was caught by running the thing and
+reading the output while the test suites were green:
+
+1. the de-repetition guard removed sentences and orphaned the back-references after them;
+2. the knowledge fallback reused D532's flag and told listeners a real exhibit might be absent;
+3. the waypoint was rescued from being a boundary and then left out of the tour entirely.
+
+**A green suite means the cases you thought of still pass. It says nothing about the direction you
+did not think of.**
+
+### Defects remaining on this path
+
+- **FORBIDDEN_PHRASES is enforced on stop descriptions only.** "stands as a testament",
+  "breathtaking views" and "stands as a timeless beacon" shipped in an orientation, a Directions
+  line and the closing recap. Same shape as the museum-only prompt rules: a good check wired to one
+  part of the artifact.
+- **Route order is not optimised** — Èze → Cagnes → Saint-Jean sends the rider ~30 km west and back
+  east; GEO-CHECK validates total distance and outliers, not sequence.
+- **A stated origin is not honoured** — "starting from Nice" produced a tour beginning at Cap d'Ail.
