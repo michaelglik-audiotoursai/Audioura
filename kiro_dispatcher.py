@@ -20,7 +20,6 @@ Usage:
   python3 kiro_dispatcher.py --worker <path>  # do not call this directly
 """
 import argparse
-import fcntl
 import json
 import os
 import re
@@ -31,9 +30,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import continuous_dev_lib as cdl
+import portable_lock
 
 WATCH_DIR = cdl.WATCH_DIR
-WORKTREE_BASE = WATCH_DIR.parent / "audioura-worktrees"
+# Worktree root. On Windows the default path is long enough that `git worktree
+# add` fails PART WAY THROUGH checkout on this repo's deeply-nested generated
+# tour directories ("Filename too long"), leaving a half-created worktree that
+# looks like a success to anything checking only the exit code. Verified
+# 2026-08-18: it only succeeds from a short root. Overridable everywhere; the
+# macOS default is unchanged.
+WORKTREE_BASE = Path(
+    os.environ.get("AUDIOURA_WORKTREE_BASE")
+    or (Path("C:/adev-wt") if sys.platform.startswith("win")
+        else WATCH_DIR.parent / "audioura-worktrees")
+)
+# Long paths must ALSO be enabled per-command; a short root alone is not enough.
+GIT_LONGPATHS = ["-c", "core.longpaths=true"]
 LOG_FILE = WATCH_DIR / "kiro_sessions_ran.md"
 LOCK_FILE = WATCH_DIR / ".kiro_dispatcher.lock"
 SESSION_LOG_DIR = WATCH_DIR / "kiro_session_logs"
@@ -56,7 +68,7 @@ def locked_append(text):
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     LOCK_FILE.touch(exist_ok=True)
     with open(LOCK_FILE, "r+") as lock_fh:
-        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+        portable_lock.lock_exclusive(lock_fh)
         try:
             if not LOG_FILE.exists():
                 LOG_FILE.write_text(
@@ -68,7 +80,7 @@ def locked_append(text):
             with open(LOG_FILE, "a") as fh:
                 fh.write(text if text.endswith("\n") else text + "\n")
         finally:
-            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+            portable_lock.unlock(lock_fh)
 
 
 def last_status_for(task_filename):
@@ -272,7 +284,11 @@ def dispatch():
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,  # detach: survives the dispatcher process exiting
+            # Detach so the worker survives the dispatcher exiting. This is NOT
+            # one flag: start_new_session is POSIX-only and Windows ignores it
+            # SILENTLY, which would tie every worker to the scheduled run that
+            # spawned it and kill it mid-session. See portable_lock.
+            **portable_lock.detached_popen_kwargs(),
             cwd=str(WATCH_DIR),
         )
         locked_append(
@@ -435,9 +451,9 @@ def setup_worktree(task_id, branch, base):
     ).returncode == 0
 
     if branch_exists:
-        cmd = ["git", "worktree", "add", str(path), branch]
+        cmd = ["git"] + GIT_LONGPATHS + ["worktree", "add", str(path), branch]
     else:
-        cmd = ["git", "worktree", "add", "-b", branch, str(path), base]
+        cmd = ["git"] + GIT_LONGPATHS + ["worktree", "add", "-b", branch, str(path), base]
     subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, check=True)
 
     # [LOCAL-412 review] Link .env into the worktree.
@@ -451,7 +467,14 @@ def setup_worktree(task_id, branch, base):
     env_dst = path / ".env"
     if env_src.exists() and not env_dst.exists():
         try:
-            env_dst.symlink_to(env_src)
+            # Windows refuses unprivileged symlinks unless Developer Mode is on,
+            # so fall back to a hard link -- same inode, so the "one source of
+            # truth" property the symlink existed for is preserved. A copy is
+            # the last resort and is reported, because it does duplicate secrets.
+            how = portable_lock.link_or_copy(env_src, env_dst)
+            if how == "copy":
+                print(f"[dispatcher] NOTE: .env COPIED into {path} (no symlink or "
+                      f"hardlink possible) -- secrets are now duplicated there")
         except OSError as e:
             print(f"[dispatcher] WARNING: could not link .env into {path}: {e}")
 
@@ -593,15 +616,113 @@ def worker(task_path_str):
     )
 
 
+def require_kiro_api_key():
+    """Refuse to start without KIRO_API_KEY, rather than forking agents that cannot log in.
+
+    Headless kiro-cli authenticates with an API key, not the browser AWS Builder
+    ID flow the dispatcher was written against. Without it every forked worker
+    starts, fails to authenticate, and writes a FAILED line -- burning a
+    concurrency slot and a worktree per task to discover one missing variable.
+    Failing here costs one message instead.
+
+    .env is exported first, so a key living there counts.
+    """
+    export_dotenv_into_environ()
+    if os.environ.get("KIRO_API_KEY"):
+        return
+    sys.exit(
+        "[dispatcher] REFUSING TO START: KIRO_API_KEY is not set.\n"
+        "  Headless `kiro-cli chat --no-interactive` needs an API key; the browser\n"
+        "  AWS Builder ID / IAM Identity Center flow does not apply.\n"
+        "  Generate one in the Kiro portal (Settings -> API Keys) and either export\n"
+        f"  KIRO_API_KEY or add it to {WATCH_DIR / '.env'}.\n"
+        "  Requires a Pro, Pro+ or Power plan -- it is not available on Free."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", metavar="TASK_FILE", help=argparse.SUPPRESS)
+    parser.add_argument("--preflight", action="store_true",
+                        help="Check this machine can dispatch, then exit without dispatching.")
     args = parser.parse_args()
+
+    if args.preflight:
+        preflight()
+        return
+
+    require_kiro_api_key()
 
     if args.worker:
         worker(args.worker)
     else:
         dispatch()
+
+
+def preflight():
+    """Report whether this machine can dispatch, WITHOUT forking anything.
+
+    Exists because every other way of finding out costs a real dispatch, and a
+    real dispatch costs money. Safe to run anywhere, any time.
+    """
+    import shutil
+
+    ok = True
+
+    def check(label, passed, detail=""):
+        nonlocal ok
+        if not passed:
+            ok = False
+        print(f"  [{'OK ' if passed else 'XX '}] {label}{(' -- ' + detail) if detail else ''}")
+
+    print(f"[dispatcher] preflight on {sys.platform}, python {sys.version.split()[0]}")
+    check("file locking imports and works", _selftest_lock())
+    check("watch dir exists", WATCH_DIR.is_dir(), str(WATCH_DIR))
+    check("watch dir is a git repo", (WATCH_DIR / ".git").exists(), str(WATCH_DIR / ".git"))
+    check("worktree root is writable", _selftest_worktree_base(), str(WORKTREE_BASE))
+    check("kiro-cli on PATH", shutil.which("kiro-cli") is not None,
+          "install: irm https://cli.kiro.dev/install.ps1 | iex" if not shutil.which("kiro-cli") else "")
+    export_dotenv_into_environ()
+    check("KIRO_API_KEY set", bool(os.environ.get("KIRO_API_KEY")),
+          "Kiro portal -> Settings -> API Keys (Pro/Pro+/Power only)")
+    print(f"[dispatcher] preflight {'PASSED' if ok else 'FAILED'}")
+    sys.exit(0 if ok else 1)
+
+
+def _selftest_lock():
+    """Take and release a real lock. Proves the platform primitive works here."""
+    import tempfile
+
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "preflight.lock"
+            p.touch()
+            with open(p, "r+") as a:
+                portable_lock.lock_exclusive(a)
+                try:
+                    with open(p, "r+") as b:
+                        try:
+                            portable_lock.lock_exclusive(b, blocking=False)
+                            portable_lock.unlock(b)
+                            return False  # a second holder got in: the lock is a no-op
+                        except BlockingIOError:
+                            pass
+                finally:
+                    portable_lock.unlock(a)
+        return True
+    except Exception:
+        return False
+
+
+def _selftest_worktree_base():
+    try:
+        WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
+        probe = WORKTREE_BASE / ".preflight_probe"
+        probe.write_text("x")
+        probe.unlink()
+        return True
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

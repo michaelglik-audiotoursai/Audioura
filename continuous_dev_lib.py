@@ -5,13 +5,20 @@ in CLAUDE.md ("CONTINUOUS DEVELOPMENT — CONTROL INTERFACE"). Used by both
 kiro_dispatcher.py and isolated_test.py so pause/reboot/concurrency behavior
 stays consistent between the Kiro-dispatch side and the LEAD-review side.
 """
-import fcntl
+import os
 import re
 import subprocess
 import time
 from pathlib import Path
 
-WATCH_DIR = Path.home() / "Audioura"
+import portable_lock
+
+# WATCH_DIR is the repo root. It was hardcoded to the Mac Mini's layout, which
+# does not exist on the Windows laptop (the clone lives under
+# eclipse-workspace\AudioTours\development). Overridable so one code path serves
+# both machines; the default is unchanged, so the Mac Mini behaves exactly as
+# before.
+WATCH_DIR = Path(os.environ.get("AUDIOURA_WATCH_DIR") or (Path.home() / "Audioura"))
 CONTROL_DIR = WATCH_DIR / ".continuous_dev"
 PAUSE_FILE = CONTROL_DIR / "PAUSE"
 STATUS_FILE = CONTROL_DIR / "STATUS.md"
@@ -27,15 +34,13 @@ def is_paused():
 
 
 def get_boot_time():
-    """Returns the machine's boot epoch (as a string) via sysctl, or None if unavailable."""
-    try:
-        out = subprocess.run(
-            ["sysctl", "-n", "kern.boottime"], capture_output=True, text=True, timeout=5
-        ).stdout
-        m = re.search(r"sec\s*=\s*(\d+)", out)
-        return m.group(1) if m else None
-    except Exception:
-        return None
+    """Returns the machine's boot epoch (as a string), or None if unavailable.
+
+    Was sysctl-only, which returns None on Windows -- and a None boot time means
+    check_and_record_reboot() can never fire, so reboot recovery silently never
+    happens rather than failing visibly. portable_lock.boot_time() handles both.
+    """
+    return portable_lock.boot_time()
 
 
 def check_and_record_reboot():
@@ -77,7 +82,7 @@ class Semaphore:
                 path = self.dir / f"slot_{i}.lock"
                 fh = open(path, "w")
                 try:
-                    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    portable_lock.lock_exclusive(fh, blocking=False)
                     self._fh = fh
                     return True
                 except BlockingIOError:
@@ -88,7 +93,7 @@ class Semaphore:
 
     def release(self):
         if self._fh is not None:
-            fcntl.flock(self._fh, fcntl.LOCK_UN)
+            portable_lock.unlock(self._fh)
             self._fh.close()
             self._fh = None
 
@@ -112,8 +117,8 @@ def active_slot_count(name, max_slots):
             continue
         fh = open(path, "w")
         try:
-            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            fcntl.flock(fh, fcntl.LOCK_UN)
+            portable_lock.lock_exclusive(fh, blocking=False)
+            portable_lock.unlock(fh)
         except BlockingIOError:
             held += 1
         finally:
