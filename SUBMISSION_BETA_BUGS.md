@@ -291,6 +291,101 @@ accordingly; `main` must not move while Storied churns.
 
 ---
 
+## BETA-4 — stop coordinates are LLM-guessed and unvalidated — `wdvrdaxqjn`
+
+### Verdict: `CONFIRMED` — fixed, deployed, awaiting a device check
+
+Yury's reports #3 and #4: stop #6 plotted over Central Islands, and every pin offset.
+
+**Root cause.** Stop coordinates were never looked up anywhere. The model that writes the
+tour text emitted a `Coordinates:` line from memory, and nothing checked it. The decisive
+evidence needs no external ground truth: the live service placed *"Leslie Spit parking"*
+and *"Tommy Thompson Park entrance"* — the same physical place — **1.3 km apart**. A
+geocoder cannot be self-inconsistent like that.
+
+**The fix.** `geocode_stops.py`, called from `tour_generation_modernized.py` right after the
+tour text is parsed, so both `audio_N.txt` (which the map reads) and the HTML map buttons
+get corrected values. Each stop gathers up to three independent estimates — the model's own
+coordinate, `name + city`, and the full address — and a coordinate is replaced only when two
+agree within 200 m.
+
+Measured over 40 stops in 8 cities against Wikidata: median error **87 m → 46 m**, worst
+1,616 m → 558 m, **zero regressions**. High-confidence stops average 26 m; low-confidence
+303 m, and every error over 500 m is in the low-confidence group.
+
+**Shipped** in `audioura:v33` (2026-08-20).
+
+**Limits, deliberately not hidden.** It cannot resolve names the model invents — *"Leslie
+Spit parking"* is a description, not a place — and OSM has no car parks mapped near Tommy
+Thompson Park at all. The cure is `wdvrdaxqtf` in Storied.
+
+**Still open:** confirmation that a real pin lands where the place is, on a device. See
+`wdvrdaxvvv`.
+
+---
+
+## BETA-5 — latitude and longitude reversed — `wdvrdaxqte`
+
+### Verdict: `CONFIRMED` — fixed in `16140ec`, deployed and verified in production
+
+Worse than any other coordinate defect found: a 1 km error is an annoyance, this made the
+whole tour unusable. Madagascar tours were written **longitude-first**, putting every stop
+~9,900 km away in the Indian Ocean off Somalia.
+
+`geocode_stops.py` could not repair it, and that was not a flaw in it. Its plausibility
+guard is anchored on the median of the tour's own stops — when every stop is mirrored, the
+anchor is in the wrong ocean too, and the *correct* geocoded answers are then discarded as
+implausible. The guard reasoned correctly from poisoned input.
+
+**The fix.** Two checks, cheapest first: latitude outside ±90 is impossible; then compare the
+tour against its own city and reverse the whole tour if a majority of stops are 10× closer
+swapped. The subtle part was **ordering** — it must run *before* the plausibility anchor is
+computed, for the reason above.
+
+### Deployed and verified — 2026-08-27
+
+`audioura:v34`, revision `tour-modernized-00010-84r`, replacing `v33`. Authorised by Michael
+in advance.
+
+Verification was run against the **deployed image**, not the source tree:
+
+| check | result |
+|---|---|
+| image contains `fix_reversed_coordinates` | `True` — the deploy script's own guard only checks the audio fix, so this is manual |
+| reversed tour through production `/process` | 9,900 km → **4.2 km**; read from the delivered ZIP's `audio_N.txt` |
+| reversal logged | `[GEOCODE] REVERSED COORDINATES: 3 of 3 stops` in Cloud Run logs |
+| Sydney / Kyoto / Boston / correct-Antananarivo controls | all `action: none` |
+| Sydney end-to-end through production | stayed in Sydney, no `REVERSED` log line |
+| **red test** — repair stubbed out | **9,900.0 km** vs 4.4 km shipped |
+
+The controls mattered most: the real risk of this deploy was a *correct* tour being wrongly
+"corrected". None was.
+
+**The defect is intermittent.** A fresh Antananarivo generation on 2026-08-27 produced
+correctly-ordered coordinates unprompted. A correct Madagascar tour therefore proves
+nothing — verification must use deliberately reversed input, which is what the above does.
+
+### Found during verification, filed not fixed
+
+`city_from_address()` returned `'Madagascar'` — the country, not the city — so the anchor was
+a country centroid. It is wrong on **8 of 12** real address shapes, because `_COUNTRIES`
+(`geocode_stops.py:169`) is a hardcoded 16-country allowlist. A second, independent bug in
+`_clean_component()` (`geocode_stops.py:182`) matches `[A-Z]{2}` for state codes, so
+three-letter Australian states (`NSW`, `QLD`, `VIC`) survive and `Sydney NSW 2000` is
+returned as the city.
+
+Impact was **measured rather than assumed, and is close to nil**: Nominatim resolves the
+country-qualified and city-qualified query forms identically (0.00 km apart on three tested
+pairs), and correct tours in Brazil, India, Kenya and Turkey — all anchored on country
+centroids — produced no false positives. The docstring's claim that `Sydney NSW 2000` causes
+a 12.75 km error **does not reproduce today**; that number should not be repeated as fact.
+
+Filed as `wdvrdaxvvt`, low priority. It is a correctness-of-intent problem, not an accuracy
+loss — the concern is that the reversal anchor is coarser than designed everywhere outside
+16 countries, which erodes a safety margin nobody would know had been weakened.
+
+---
+
 ## Separate finding — not one of Yury's bugs
 
 **`generate_tour_text.py:10` imports a module that is not tracked in git.**

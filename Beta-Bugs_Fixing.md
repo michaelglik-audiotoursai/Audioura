@@ -24,93 +24,59 @@ briefing. Work top to bottom.
 > **One exception: ask Michael before any GCloud deploy.** Use
 > `deploy_tour_modernized.sh`; runbook is [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
 
-> ## ✅ STATE AS OF 2026-08-23 — §§0–9 below are history, not a plan
+> ## ✅ STATE AS OF 2026-08-27 — §§0–9 below are history, not a plan
 >
 > Everything in §§3–7 is **done**. Read them for background only.
 >
-> ## ▶️ NEXT ACTION — deploy `16140ec`, authorised by Michael 2026-08-25
+> ## ✅ DONE — `16140ec` deployed as `v34` on 2026-08-27 and verified
 >
-> Michael authorised this deploy in advance, so it is **not** a hard stop this once.
-> Everything else on the hard-stop list still is.
+> `main` is no longer ahead of production. `tour-modernized` runs **`audioura:v34`**,
+> revision **`tour-modernized-00010-84r`**. `v33` is intact and immutable, so
+> `./deploy_tour_modernized.sh --rollback` takes seconds.
 >
-> ```bat
-> ./deploy_tour_modernized.sh --dry-run    :: always dry-run first
-> ./deploy_tour_modernized.sh
-> ```
+> Verification was run against the **deployed image**, not the source tree:
 >
-> The script picks the next free tag from the registry (a **shared** sequence across
-> all services — never "current + 1"), preserves `--no-cpu-throttling` and
-> `--max-instances=1`, and refuses to overwrite an existing tag.
->
-> ### What this deploy changes
->
-> Only `16140ec`: repair of tours written **longitude-first**. Nothing else — the
-> coordinate-agreement work already shipped in `v33`.
->
-> ### Production verification — run all of it, in this order
->
-> **1. The service is alive and has the right code.**
-> ```bash
-> gcloud run services describe tour-modernized --region us-central1 \
->   --format="value(status.traffic[0].revisionName, spec.template.spec.containers[0].image)"
-> docker run --rm --entrypoint python <the image just deployed> -c \
->   "import geocode_stops as g; print(hasattr(g,'fix_reversed_coordinates'))"
-> ```
-> Must print `True`. The script's own guard only checks the *audio* fix, so this
-> check is manual and easy to forget.
->
-> **2. Controls first — these must NOT be altered.** This is the real risk: a correct
-> tour being wrongly "corrected". Generate through production and confirm every stop
-> lands in the right city.
->
-> | tour | why it is the control |
+> | check | result |
 > |---|---|
-> | Sydney Harbour walking tour | negative latitude — the shape most likely to look "reversed" |
-> | Gion district, Kyoto walking tour | longitude 135°, larger than any valid latitude |
-> | Boston Common walking tour | ordinary northern-hemisphere baseline |
+> | image contains `fix_reversed_coordinates` | `True` |
+> | reversed tour through production `/process` | 9,900 km → **4.2 km**, read from the ZIP's `audio_N.txt` |
+> | reversal logged | `[GEOCODE] REVERSED COORDINATES: 3 of 3 stops` |
+> | Sydney / Kyoto / Boston / correct-Antananarivo controls | all `action: none` |
+> | Sydney end-to-end through production | stayed in Sydney, no `REVERSED` log line |
+> | red test — repair stubbed out | **9,900.0 km** vs 4.4 km shipped |
+> | Brazil / India / Kenya / Turkey controls (country-centroid anchor) | all `action: none` |
 >
-> A stop landing outside its own city on any of these is a **false positive** and
-> grounds for immediate rollback.
+> Full evidence is on `wdvrdaxqte`, now **complete**, and in `SUBMISSION_BETA_BUGS.md`.
 >
-> **3. The target case.** Generate *"Antananarivo, Madagascar walking tour"*. Every
-> stop should sit within a few km of Antananarivo (≈ −18.88, 47.51) — latitude
-> negative, longitude positive.
+> **The verification probes are reusable** and live in the session scratchpad:
+> `control_check.py`, `red_test.py`, `city_probe.py`, `bigcountry_controls.py`. Each
+> runs against a built image in one command and needs no live service.
 >
-> **Note the defect is intermittent.** It appeared on 2026-08-20 and did not recur in
-> two later generations of the same request. A correct Madagascar tour therefore does
-> **not** prove the fix fired — check the logs for
-> `REVERSED COORDINATES` to know whether it actually did anything.
+> ## ▶️ NEXT ACTION — nothing on the services side; it is all waiting on people
 >
-> **4. Read the logs.**
-> ```bash
-> gcloud run services logs read tour-modernized --region us-central1 --limit 100 \
->   | grep -i "GEOCODE"
-> ```
-> `REVERSED COORDINATES` on a control tour = false positive = roll back.
+> Three tasks now sit in 👤 Michael (Beta):
 >
-> **5. Rollback**, if any control is altered or a tour fails to generate:
-> ```bash
-> ./deploy_tour_modernized.sh --rollback
-> ```
-> Seconds to take effect; the previous image is untouched.
+> | task | what it needs |
+> |---|---|
+> | [`wdvrdaxvvv`](https://app.clickup.com/t/wdvrdaxvvv) | a phone. One newly generated tour answers all three open Yury reports. |
+> | [`wdvrdaxvvc`](https://app.clickup.com/t/wdvrdaxvvc) | three rulings: Dockerfile repair, the `#0` label, how to handle Yury's silence |
+> | [`wdvrdaxvvg`](https://app.clickup.com/t/wdvrdaxvvg) | nothing from Michael — it is Claude work, see below |
+>
+> ### ⚠️ Only one thing genuinely needs Michael now
+>
+> **Yury has not replied in 11 days.** Three tasks are assigned to him and waiting:
+> `wdvrdaxmq2`, `wdvrdaxmq3`, `wdvrdaxqjn`. His last message was 2026-08-16; the DM
+> asking him to verify went out 2026-08-20. `wdvrdaxqjn` can be closed on Michael's
+> own device check; `wdvrdaxmq3` needs Yury's tour and cannot be closed without him.
+>
+> The Kiro session (`wdvrdaxqtg`) is **overdue since 2026-08-21** and blocked on
+> Michael installing the CLI and generating `KIRO_API_KEY`.
 >
 > ### What deploying does NOT affect
 >
 > Tours already on a device keep the coordinates they shipped with. **Only newly
 > generated tours change** — so asking Yury to check an existing tour will always look
 > like a failure.
->
-> ### ⚠️ Two things need Michael, and nothing else can move without him
->
-> 1. **`main` has an undeployed fix.** Commit `16140ec` repairs tours written
->    longitude-first (`wdvrdaxqte`). Production still runs `audioura:v33`, which does
->    **not** contain it. Deploying is a hard stop — ask him.
-> 2. **Yury has not replied in 7 days.** Three tasks are assigned to him and waiting:
->    `wdvrdaxmq2`, `wdvrdaxmq3`, `wdvrdaxqjn`. His last message was 2026-08-16; the DM
->    asking him to verify went out 2026-08-20. Nothing can be closed until he answers.
->
-> The Kiro session (`wdvrdaxqtg`) is **overdue since 2026-08-21** and blocked on
-> Michael installing the CLI and generating `KIRO_API_KEY`.
 >
 > ### After a reboot, do these three things
 >
@@ -139,14 +105,13 @@ briefing. Work top to bottom.
 >
 > ### What is deployed
 >
-> `tour-modernized` runs **`audioura:v33`**, revision **`tour-modernized-00009-99b`**
-> (deployed 2026-08-20). Contains the concurrent-audio fix *and* coordinate
-> validation. Roll back with `./deploy_tour_modernized.sh --rollback`; `v32` is intact.
+> `tour-modernized` runs **`audioura:v34`**, revision **`tour-modernized-00010-84r`**
+> (deployed 2026-08-27). Contains the concurrent-audio fix, coordinate validation,
+> *and* the reversed lat/lng repair. Roll back with
+> `./deploy_tour_modernized.sh --rollback`; `v33` is intact.
 > **Deploying is a hard stop — ask Michael first.** Runbook `wdvrdaxn9f`.
 >
-> **`main` is ahead of production.** `16140ec` (reversed lat/lng) is committed and
-> pushed but **not deployed**. Next deploy will pick it up; the script chooses the next
-> free tag from the registry, which is a shared sequence across all services.
+> **`main` and production are in sync.** Nothing is committed-but-undeployed.
 >
 > ### Git
 >
@@ -168,7 +133,7 @@ briefing. Work top to bottom.
 > ("Leslie Spit parking" is a description, not a place) and OSM has no car parks
 > mapped near Tommy Thompson Park at all. The cure is `wdvrdaxqtf` in Storied.
 >
-> ### Fixed on 2026-08-23, awaiting deployment
+> ### Fixed on 2026-08-23, deployed 2026-08-27 as `v34`
 >
 > - **`wdvrdaxqte` — latitude/longitude reversed.** Fixed in `16140ec`. Two checks:
 >   impossible latitude (>±90), then compare the tour against its own city and reverse
@@ -180,11 +145,22 @@ briefing. Work top to bottom.
 >
 > ### Open, deliberately unfixed
 >
-> - **Madagascar tours now fail text generation entirely.** Three attempts on
->   2026-08-23, all `"no stops could be generated (all filtered or knowledge
->   insufficient)"`. The identical request succeeded on 2026-08-20. Unrelated to the
->   coordinate work — the module never runs in that path. **No task filed yet.** May
->   mean thin-coverage locations now fail outright rather than producing a poor tour.
+> - **Madagascar text-generation failure — now filed as `wdvrdaxvvg`.** Three attempts
+>   on 2026-08-23 all returned `"no stops could be generated"`. **Re-tested 2026-08-27
+>   and it works** — 5 stops, correctly-ordered coordinates, all within ~4 km of
+>   Antananarivo. Verdict `UNPROVEN — not reproducible`, not `NOT REPRODUCIBLE`.
+>   **Do not assume thin coverage.** That same error string meant a bad
+>   `OPENAI_API_KEY` in Secret Manager on 2026-06-07
+>   (`claude_review_secret_fixes_final_2026_06_07.md:13`). `generate_tour_text()`
+>   returns `None` from **nine** places and `generate_tour_text_service.py:62`
+>   collapses all nine into one message — making the failure legible is the real fix.
+> - **`city_from_address()` returns the country for most of the world — `wdvrdaxvvt`.**
+>   Wrong on 8 of 12 real address shapes; `_COUNTRIES` is a hardcoded 16-country
+>   allowlist and `_clean_component()`'s state-code regex is `[A-Z]{2}`, so `NSW`
+>   survives. **Measured impact is close to nil** — Nominatim resolves both query forms
+>   identically, and country-centroid anchors produced no false positives in Brazil,
+>   India, Kenya or Turkey. The docstring's 12.75 km claim **does not reproduce**; do
+>   not repeat it as fact. Low priority, let it ride with the next deploy.
 > - **`generate_tour_text.py:10` imports `enhanced_tour_templates_fixed`**, which is
 >   untracked. `tour-generator` will not start from a clean checkout. Flagged, not fixed.
 > - **Kiro CLI is not installed** on this machine and `kiro_dispatcher.py` cannot run
