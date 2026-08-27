@@ -1024,6 +1024,62 @@ Example: For "Paul Revere House" and poi_type "restaurant":
         return {"matches": True, "reason": "verification failed", "confidence": "low"}
 
 
+# [D536] "with a stop at X" makes X a WAYPOINT, not the tour's boundary.
+#
+# The 2026-08-27 Riviera run: the request was "Biking tour in French Riviera with
+# a stop at Hippodrome de la Cote d'Azur starting from Nice, France". Intent
+# returned `location: "French Riviera"` — correct — and then
+# `geographic_scope: "Hippodrome de la Cote d'Azur", scope_precision: "BUILDING"`.
+#
+# PHASE 5.6 duly checked every stop against that BUILDING and removed three for
+# being "outside" it. They were: a racecourse is not inside another racecourse.
+# The check was right; the scope was wrong. A 5-stop request delivered 2.
+#
+# A named stop cannot be the container of the tour that stops at it. This is
+# deterministic on purpose — it is a fact about English phrasing, and D526/D528
+# record what happens when a rule like this is handed to a model instead.
+_WAYPOINT_RE = re.compile(
+    r"\b(?:with|including|include|and)?\s*(?:a\s+)?stop(?:s|ping|ped)?\s+(?:at|in|by|near)\s+"
+    r"(.+?)(?=\s*(?:,|\.|;|$|\bstarting\b|\bbeginning\b|\bfrom\b|\bending\b|\bwith\b|\band\s+a\s+stop\b))",
+    re.IGNORECASE)
+
+
+def named_waypoints(request_text):
+    """Places the request names as STOPS ON the tour, not as its extent."""
+    out = []
+    for m in _WAYPOINT_RE.finditer(request_text or ''):
+        w = (m.group(1) or '').strip(' ,.;')
+        if w and len(w) > 2:
+            out.append(w)
+    return out
+
+
+def _norm_place(s):
+    n = unicodedata.normalize('NFKD', (s or '').lower())
+    n = ''.join(c for c in n if not unicodedata.combining(c))
+    return re.sub(r'\s+', ' ', re.sub(r"[^\w\s]", ' ', n)).strip()
+
+
+def scope_is_a_waypoint(scope_name, request_text):
+    """True when the proposed geographic scope is merely a named stop.
+
+    Used to refuse a scope, never to choose one — refusing degrades to no scope
+    check, which loses a filter. Promoting a waypoint to a boundary loses stops.
+    """
+    if not scope_name or not request_text:
+        return False
+    s = _norm_place(scope_name)
+    if not s:
+        return False
+    for w in named_waypoints(request_text):
+        wn = _norm_place(w)
+        if not wn:
+            continue
+        if s == wn or s in wn or wn in s:
+            return True
+    return False
+
+
 def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
     """
     PHASE 5.6 — Geographic-scope containment guard.
@@ -2247,6 +2303,20 @@ _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": Fals
 # 2 candidates" as though 1 had always been the ask. The request left no trace.
 # Keys: requested, delivered, reason, source.
 _LAST_STOP_COUNT_NOTICE = {}
+
+
+def _set_stop_count_notice(requested, delivered, source, reason):
+    """[D536] Record the listener's ask vs what shipped.
+
+    A module-level setter rather than an inline `global`: generate_tour_text
+    already declares `global _LAST_STOP_COUNT_NOTICE` further down, and touching
+    the name before that declaration is a SyntaxError.
+    """
+    _LAST_STOP_COUNT_NOTICE.clear()
+    _LAST_STOP_COUNT_NOTICE.update({
+        'requested': requested, 'delivered': delivered,
+        'source': source, 'reason': reason,
+    })
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _sentences_removed_by_gates(before: str, after: str):
@@ -5107,6 +5177,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     except ImportError:
         pass
 
+    # [D536] The listener's ask, captured at the top of the function, before any
+    # gate, scope check, dedupe or filter can touch it. Every other stop-count
+    # variable in this function is downstream of something that can reduce it —
+    # which is precisely how a 5-stop request delivered 2 stops on 2026-08-27 and
+    # reported "Stop count invariant: OK".
+    _requested_stop_count_original = total_stops
+
     # --- Storied: persona handling ---
     _storied_mode = os.environ.get("STORIED_MODE", "false").lower() == "true"
     _persona_enum = None
@@ -5252,12 +5329,34 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"  [LOCAL-46] Stripped transport words: '{_loc_before_transport_strip}' → '{_location_normalized}'")
     
     _pre_category = _classify_tour_category(_location_normalized, "")
+    # [D536] INTENT SEES THE ORIGINAL REQUEST, NOT THE STRIPPED ONE.
+    #
+    # The strippers above exist for AREA RESOLUTION: `[BLOCKER1]` removes "tour"
+    # and `[LOCAL-46]` removes transport words because "French Riviera biking"
+    # cannot be resolved on Wikidata. Both are correct for that job. Their output
+    # was then reused to ask the intent model what the tour is ABOUT, and the
+    # 2026-08-27 Riviera run shows what that costs:
+    #
+    #   request : "Biking tour in French Riviera with a stop at Hippodrome de la
+    #              Cote d'Azur starting from Nice, France"
+    #   stripped: "in French Riviera with a stop at Hippodrome de la Cote d'Azur
+    #              starting from Nice, France"       (+ tour_type='biking' suppressed)
+    #   intent  : poi_type = "horse racing tracks"
+    #
+    # The request names ONE hippodrome as a waypoint. With every transport signal
+    # removed, the only concrete noun left was the hippodrome, so the model
+    # concluded the tour was ABOUT hippodromes. Phase 3A returned five racecourses,
+    # the scope check then deleted three of them, and a 5-stop request delivered 2.
+    #
+    # Area resolution keeps the stripped string; intent gets the sentence the
+    # listener actually typed.
     if _pre_category in ('restaurant', 'walking', 'specialized'):
         # Location string already encodes the real intent — don't prepend tour_type
-        user_request = _location_normalized
-        print(f"  [Bug2Fix] tour_type='{tour_type}' suppressed for intent analysis (pre_category='{_pre_category}'); using location only")
+        user_request = location
+        print(f"  [Bug2Fix/D536] tour_type='{tour_type}' not prepended (pre_category="
+              f"'{_pre_category}'); intent sees the ORIGINAL request, not the stripped one")
     else:
-        user_request = f"{tour_type} {_location_normalized}"
+        user_request = f"{tour_type} {location}"
     intent = analyze_tour_intent(user_request, api_key)
 
     # Transport mode detection (Layer 1: keyword, Layer 2: intent field)
@@ -8796,7 +8895,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 elif outliers:
                     print(f"   GEO-CHECK: all stops flagged — keeping original list (advisory only)")
                 else:
-                    print(f"   GEO-CHECK: all {len(poi_list)} stops within walking distance (max leg {max(legs):.2f} km, total {total_route_km:.2f} km)")
+                    # [D536] The mode, not the word "walking". This printed "within walking
+                    # distance (max leg 42.26 km)" on a BIKE tour — the check itself used
+                    # _TRANSPORT_TOTAL_HARD_KM[transport_mode] and was correct; only the
+                    # message was hardcoded, which makes a correct check read as a broken one.
+                    _geo_mode_word = {"bike": "cycling", "animal": "riding",
+                                      "vehicle": "driving", "country_scale": "travel"
+                                      }.get(transport_mode, "walking")
+                    print(f"   GEO-CHECK: all {len(poi_list)} stops within {_geo_mode_word} distance (max leg {max(legs):.2f} km, total {total_route_km:.2f} km, limit {_total_limit:.0f} km)")
             else:
                 print(f"   GEO-CHECK: skipped (fewer than 3 stops have coordinates)")
 
@@ -10494,6 +10600,45 @@ Exempt: navigation directions ("Turn left", "Continue past").
         print(f"\nGenerating description for Stop {stop_num}: {poi_name} by {artist}, {year}...")
 
         description_prompt = ""
+        # [D536] These two rules were written inside the museum branch on
+        # 2026-08-26 and therefore never reached a walking, biking or dining
+        # tour. Michael, 2026-08-27: "I hope any tour would benefit from the work
+        # we have done on Museum type tours, not only museum type tours." He is
+        # right, and this is one of the two places where it was not true.
+            # [D535] Michael's review of the Palais Lascaris v3 tour, 2026-08-26.
+        #
+        # Stop 1: "claims innovation should provide description how" — the tour
+        # said the harp "would become a centerpiece of musical innovation" and
+        # never said what changed. EXPLAIN-WHAT-YOU-NAME covers nouns; this is
+        # an unexplained CLAIM, which the rule below did not reach.
+        #
+        # Stop 3: "Reference to the exponent already visited, but not mentioned
+        # this fact that it was just visited in this tour." The stop named the
+        # Schnitzer sackbut without telling the listener they had just stood in
+        # front of it. The stop-writer never knew the running order — so give
+        # it, and require the acknowledgement.
+        _visited_line = ""
+        if stop_num > 1:
+            _earlier = [p.get('name', '') for p in poi_list[:idx] if p.get('name')]
+            if _earlier:
+                _visited_line = (
+                    "\nSTOPS THE LISTENER HAS ALREADY VISITED ON THIS TOUR, in order:\n"
+                    + "\n".join(f"  {i+1}. {n}" for i, n in enumerate(_earlier))
+                    + "\nIf you mention any of them, SAY that the listener has already seen "
+                      "it — 'the sackbut you stopped at a moment ago', 'the harp from the "
+                      "first room'. Never introduce one as though it were new. Do not "
+                      "re-tell its story; a single connecting clause is the whole budget.\n"
+                )
+        _claims_line = (
+            "\nNO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, "
+            "pioneering, revolutionary, groundbreaking, influential or a turning point, "
+            "the SAME SENTENCE or the next must say what specifically changed — what "
+            "could be done afterwards that could not be done before, and for whom. "
+            "'A centerpiece of musical innovation' states nothing. 'The first with a "
+            "pedal mechanism that let a player change key mid-piece' states something. "
+            "If the source material does not tell you what changed, do not make the "
+            "claim at all.\n"
+        )
         if tour_category == 'museum':
             # [LOCAL-41] Audio-native prompt: no rhetorical questions, no mid-tour
             # re-introductions, orientation states WHY not just where, varied
@@ -10525,40 +10670,6 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     "out today'. Do NOT dress it up, do NOT apologise for it, and do NOT skip "
                     "it. Then continue normally.\n"
                 )
-            # [D535] Michael's review of the Palais Lascaris v3 tour, 2026-08-26.
-            #
-            # Stop 1: "claims innovation should provide description how" — the tour
-            # said the harp "would become a centerpiece of musical innovation" and
-            # never said what changed. EXPLAIN-WHAT-YOU-NAME covers nouns; this is
-            # an unexplained CLAIM, which the rule below did not reach.
-            #
-            # Stop 3: "Reference to the exponent already visited, but not mentioned
-            # this fact that it was just visited in this tour." The stop named the
-            # Schnitzer sackbut without telling the listener they had just stood in
-            # front of it. The stop-writer never knew the running order — so give
-            # it, and require the acknowledgement.
-            _visited_line = ""
-            if stop_num > 1:
-                _earlier = [p.get('name', '') for p in poi_list[:idx] if p.get('name')]
-                if _earlier:
-                    _visited_line = (
-                        "\nSTOPS THE LISTENER HAS ALREADY VISITED ON THIS TOUR, in order:\n"
-                        + "\n".join(f"  {i+1}. {n}" for i, n in enumerate(_earlier))
-                        + "\nIf you mention any of them, SAY that the listener has already seen "
-                          "it — 'the sackbut you stopped at a moment ago', 'the harp from the "
-                          "first room'. Never introduce one as though it were new. Do not "
-                          "re-tell its story; a single connecting clause is the whole budget.\n"
-                    )
-            _claims_line = (
-                "\nNO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, "
-                "pioneering, revolutionary, groundbreaking, influential or a turning point, "
-                "the SAME SENTENCE or the next must say what specifically changed — what "
-                "could be done afterwards that could not be done before, and for whom. "
-                "'A centerpiece of musical innovation' states nothing. 'The first with a "
-                "pedal mechanism that let a player change key mid-piece' states something. "
-                "If the source material does not tell you what changed, do not make the "
-                "claim at all.\n"
-            )
             # [LOCAL-41 Fix 4] Rotate connective framing — never say "broader context" every stop
             description_prompt = f"""Create a detailed audio description for {poi_name} at {location}, focusing on {tour_type}.
 {_stop_context_line}{_unconfirmed_line}{_visited_line}{_claims_line}
@@ -10634,7 +10745,7 @@ NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
             # 300-500 words per stop; constraining that thins content.
             
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
-
+{_visited_line}{_claims_line}
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
 
 Then provide a detailed description. Include:
@@ -14315,6 +14426,15 @@ REWRITE RULES (all mandatory):
         _scope_for_check = ''
         if intent and intent.get('geographic_scope') and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT', 'CORRIDOR'):
             _scope_for_check = intent['geographic_scope']
+        # [D536] Refuse a scope that is only a named stop on the route.
+        if _scope_for_check and scope_is_a_waypoint(_scope_for_check, location):
+            _wider = (intent.get('location') or '').strip() if intent else ''
+            print(f"\n  [D536] SCOPE REFUSED: '{_scope_for_check}' is named in the request as a "
+                  f"STOP, not as the tour's extent — it cannot contain the tour that visits it.")
+            if _wider and _norm_place(_wider) != _norm_place(_scope_for_check):
+                print(f"  [D536] Falling back to the tour's stated area: '{_wider}' "
+                      f"(too wide for a stop-by-stop containment check — skipping PHASE 5.6)")
+            _scope_for_check = ''
         if _scope_for_check:
             _before = len(poi_list)
             print(f"\nPHASE 5.6: Validating stops are within '{_scope_for_check}'...")
@@ -16608,6 +16728,31 @@ RULES:
             print(f"    [LOCAL-394] LOST: '{_l394_name}'")
     else:
         print(f"  [LOCAL-394] Stop count invariant: OK ({len(poi_list)} selected == {len(poi_list)} delivered)")
+
+    # [D536] THE LISTENER'S ASK, CHECKED ON EVERY PATH.
+    #
+    # LOCAL-394 above compares SELECTED against DELIVERED, so it reports OK on a
+    # tour that lost most of its stops before selection finished. D530 recorded
+    # this once (a 3-stop request delivering 2) and fixed it — but wired the fix
+    # to the exhibition-checklist branch only. On 2026-08-27 a 5-stop biking
+    # request delivered 2 stops and printed:
+    #
+    #     [LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+    #
+    # Nothing else said a word. Michael: "I hope any tour would benefit from the
+    # work we have done on Museum type tours, not only museum type tours."
+    #
+    # `_requested_stop_count_original` is the number the listener asked for,
+    # captured before any gate, filter or scope check could reduce it.
+    _d536_asked = _requested_stop_count_original
+    _d536_got = len(poi_list)
+    if _d536_asked and _d536_got < _d536_asked:
+        _d536_reason = (globals().get('_LAST_STOP_COUNT_NOTICE') or {}).get('reason', '') or 'stops removed by gates or filters'
+        print(f"  [D536] ⚠️  LISTENER ASKED FOR {_d536_asked} STOP(S), DELIVERING {_d536_got} "
+              f"— category='{tour_category}', reason='{_d536_reason}'")
+        _set_stop_count_notice(_d536_asked, _d536_got, tour_category, _d536_reason)
+    elif _d536_asked:
+        print(f"  [D536] Listener asked for {_d536_asked} stop(s), delivering {_d536_got} — request met")
 
     # [D530] LOCAL-394 above compares SELECTED against DELIVERED, so it runs after
     # anything that reduced the selection and reports OK on a tour that shrank —
