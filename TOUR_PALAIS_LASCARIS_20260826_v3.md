@@ -2,7 +2,7 @@
 
 **Generated** 2026-08-26 ~18:1x · **build** `3bde6e8` · **STORIED_MODE**=true ·
 `DISABLE_TOUR_CACHE=1` · generated from the requested string
-`"Musee du Palais Lascaris, Nice, France"` · 3 requested, **3 delivered** · 6,766 chars ·
+`"Musee du Palais Lascaris, Nice, France"` · 3 requested, **3 delivered** · 7,447 chars ·
 **1,049 words** (425 / 246 / 378)
 
 ```

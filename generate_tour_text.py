@@ -10525,9 +10525,43 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     "out today'. Do NOT dress it up, do NOT apologise for it, and do NOT skip "
                     "it. Then continue normally.\n"
                 )
+            # [D535] Michael's review of the Palais Lascaris v3 tour, 2026-08-26.
+            #
+            # Stop 1: "claims innovation should provide description how" — the tour
+            # said the harp "would become a centerpiece of musical innovation" and
+            # never said what changed. EXPLAIN-WHAT-YOU-NAME covers nouns; this is
+            # an unexplained CLAIM, which the rule below did not reach.
+            #
+            # Stop 3: "Reference to the exponent already visited, but not mentioned
+            # this fact that it was just visited in this tour." The stop named the
+            # Schnitzer sackbut without telling the listener they had just stood in
+            # front of it. The stop-writer never knew the running order — so give
+            # it, and require the acknowledgement.
+            _visited_line = ""
+            if stop_num > 1:
+                _earlier = [p.get('name', '') for p in poi_list[:idx] if p.get('name')]
+                if _earlier:
+                    _visited_line = (
+                        "\nSTOPS THE LISTENER HAS ALREADY VISITED ON THIS TOUR, in order:\n"
+                        + "\n".join(f"  {i+1}. {n}" for i, n in enumerate(_earlier))
+                        + "\nIf you mention any of them, SAY that the listener has already seen "
+                          "it — 'the sackbut you stopped at a moment ago', 'the harp from the "
+                          "first room'. Never introduce one as though it were new. Do not "
+                          "re-tell its story; a single connecting clause is the whole budget.\n"
+                    )
+            _claims_line = (
+                "\nNO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, "
+                "pioneering, revolutionary, groundbreaking, influential or a turning point, "
+                "the SAME SENTENCE or the next must say what specifically changed — what "
+                "could be done afterwards that could not be done before, and for whom. "
+                "'A centerpiece of musical innovation' states nothing. 'The first with a "
+                "pedal mechanism that let a player change key mid-piece' states something. "
+                "If the source material does not tell you what changed, do not make the "
+                "claim at all.\n"
+            )
             # [LOCAL-41 Fix 4] Rotate connective framing — never say "broader context" every stop
             description_prompt = f"""Create a detailed audio description for {poi_name} at {location}, focusing on {tour_type}.
-{_stop_context_line}{_unconfirmed_line}
+{_stop_context_line}{_unconfirmed_line}{_visited_line}{_claims_line}
 Start with a brief orientation that names "{poi_name}" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit. Include:
@@ -15470,12 +15504,23 @@ REWRITE RULES (all mandatory):
                     'Example shape: "You are about to explore the [venue name] in [city]." '
                     'Name the venue and its collection or character.'
                 )
+                # [D535] Michael's review, 2026-08-26: the opening is "a bit long and
+                # seems to be repetitive about the content of the stops ahead."
+                #
+                # He asked separately to KEEP the preview — "I actually like it" — so
+                # this shortens it rather than removing it. The failure mode is that
+                # the preview told each work's maker, city, date and significance, all
+                # of which the stop itself then tells again a minute later. A preview
+                # names what is coming; it does not deliver it.
                 _part2_instruction = (
-                    f"Describe what the visitor will encounter: {len(_prolog_stop_names)} works "
-                    f"from the collection. Do NOT use geographic language like 'route', 'stretches', "
-                    f"'journey', or state a distance — these are rooms, not a road. "
-                    f"Say something true about the tour's shape: the number of works, the nature of "
-                    f"the collection, or a unifying medium/period if the stop names suggest one. "
+                    f"Say what the visitor will encounter: {len(_prolog_stop_names)} works from "
+                    f"the collection. NAME them, briefly — the work and its maker, nothing more. "
+                    f"Do NOT give their dates, cities, materials, significance or stories here; "
+                    f"each stop tells its own, and repeating it makes the listener hear "
+                    f"everything twice. TWO SENTENCES MAXIMUM for this part. "
+                    f"Do NOT use geographic language like 'route', 'stretches', 'journey', or "
+                    f"state a distance — these are rooms, not a road. You may add one clause on "
+                    f"what unites the works (a medium, a period) if the stop names support it. "
                     f"Do NOT invent floor or wing locations unless the sourced facts explicitly state them."
                 )
             else:

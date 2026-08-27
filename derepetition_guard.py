@@ -68,6 +68,19 @@ FORBIDDEN_PHRASES: List[re.Pattern] = [
     re.compile(r"it\s+is\s+(worth|important)\s+(noting|to\s+note|to\s+understand)", re.IGNORECASE),
     re.compile(r"the\s+next\s+journey\s+awaits", re.IGNORECASE),
     re.compile(r"ask\s+museum\s+staff\s+for\s+directions", re.IGNORECASE),
+    # [D535] Michael's review of the Palais Lascaris v3 tour, 2026-08-26, stop 2:
+    # "Should avoid the sentence asking listeners to do something such as 'As you
+    # reflect on this piece, consider how it might have inspired subsequent
+    # innovations in musical instrument craftsmanship.'"
+    #
+    # The LOCAL-44 pattern above only catches the "as you stand before ...,
+    # consider" shape. This is the same instruction with a different opener, and
+    # the tell is the speculative invitation: the listener is asked to imagine a
+    # connection the tour cannot source. Say the thing or cut it.
+    re.compile(r"as\s+you\s+(reflect|contemplate|ponder|think)\s+(on|about|upon)", re.IGNORECASE),
+    re.compile(r"consider\s+how\s+(it|this|these|they|the)\s+\w*\s*(might|may|could|would)", re.IGNORECASE),
+    re.compile(r"imagine\s+(how|the|what)\s+\w+\s+(might|may|could|would)", re.IGNORECASE),
+    re.compile(r"invite[sd]?\s+(you|us|visitors|listeners)\s+to\s+(reflect|consider|ponder|imagine)", re.IGNORECASE),
 ]
 
 
