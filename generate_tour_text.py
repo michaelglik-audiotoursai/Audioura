@@ -10431,51 +10431,57 @@ Exempt: navigation directions ("Turn left", "Continue past").
         except Exception as _kf_err:
             print(f"  [D533] Knowledge fallback error (non-fatal): {_kf_err}")
 
-        # -------- [D538] Restaurant practicals: acquire, then gate --------
-        # Michael, 2026-08-27: "for the restaurants the tour stop can not be a stop
-        # if the restaurant is closed or the menu is overpriced. If the information
-        # does not come from the first request to OpenAI.API, we should be querying
-        # this from Gemini and SERP."
-        #
-        # The Monaco tour printed "PRACTICAL FACTS GATE: PASSED (0 verified)" over
-        # three restaurants with no hours, no prices and no booking requirement.
-        # LOCAL-36 is SUBTRACTIVE — it drops claims it cannot trace — so it is
-        # silent when the narration made no claims at all. This is the acquisition
-        # half, and it runs for restaurant tours only, where the practicals ARE the
-        # content rather than a convenience.
-        if tour_category == 'restaurant':
-            try:
-                from restaurant_practicals import fetch_practicals
-                _rp_city = location
-                _rp_keep, _rp_dropped = [], []
-                for _rp_poi in poi_list:
-                    _rp = fetch_practicals(_rp_poi.get('name', ''), _rp_city, api_key)
-                    _rp_poi['_practicals'] = _rp
-                    _rp_bits = [f"{k}={_rp[k][:40]}" for k in
-                                ('hours', 'closed_days', 'reservation', 'price_band')
-                                if _rp.get(k)]
-                    print(f"  [D538] '{_rp_poi.get('name','')[:44]}' via {_rp['provider']}: "
-                          f"{', '.join(_rp_bits) if _rp_bits else 'nothing actionable'}")
-                    if not _rp['deliverable']:
-                        # The one hard rule. "unknown" is NOT closed — absence of
-                        # evidence never removes a stop, only positive evidence does.
-                        _rp_dropped.append(_rp_poi.get('name', ''))
-                        print(f"  [D538] ⚠️  DROPPED '{_rp_poi.get('name','')[:44]}' — {_rp['reason']}")
-                        continue
-                    _rp_keep.append(_rp_poi)
-                if _rp_dropped:
-                    poi_list = _rp_keep
-                    print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
-                          f"{len(poi_list)} remain")
-                _rp_usable = sum(1 for p in poi_list if (p.get('_practicals') or {}).get('usable'))
-                print(f"  [D538] Practicals acquired for {_rp_usable}/{len(poi_list)} stop(s)")
-            except ImportError as _rp_err:
-                _import_logger.error(f"[D538] MISSING: restaurant_practicals — a restaurant "
-                                     f"tour will ship with no hours or prices: {_rp_err}")
-            except Exception as _rp_err:
-                print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
             import traceback
             traceback.print_exc()
+
+    # [D538] MOVED OUT of the museum-gated block above (line ~9792,
+    # `if _storied_mode and tour_category == 'museum'`). Placed inside it, the
+    # restaurant practicals could never run on a restaurant tour — the Monaco
+    # re-run printed not one [D538] line. Fifth instance of a check wired to the
+    # museum path and named as if it were general.
+    # -------- [D538] Restaurant practicals: acquire, then gate --------
+    # Michael, 2026-08-27: "for the restaurants the tour stop can not be a stop
+    # if the restaurant is closed or the menu is overpriced. If the information
+    # does not come from the first request to OpenAI.API, we should be querying
+    # this from Gemini and SERP."
+    #
+    # The Monaco tour printed "PRACTICAL FACTS GATE: PASSED (0 verified)" over
+    # three restaurants with no hours, no prices and no booking requirement.
+    # LOCAL-36 is SUBTRACTIVE — it drops claims it cannot trace — so it is
+    # silent when the narration made no claims at all. This is the acquisition
+    # half, and it runs for restaurant tours only, where the practicals ARE the
+    # content rather than a convenience.
+    if tour_category == 'restaurant':
+        try:
+            from restaurant_practicals import fetch_practicals
+            _rp_city = location
+            _rp_keep, _rp_dropped = [], []
+            for _rp_poi in poi_list:
+                _rp = fetch_practicals(_rp_poi.get('name', ''), _rp_city, api_key)
+                _rp_poi['_practicals'] = _rp
+                _rp_bits = [f"{k}={_rp[k][:40]}" for k in
+                            ('hours', 'closed_days', 'reservation', 'price_band')
+                            if _rp.get(k)]
+                print(f"  [D538] '{_rp_poi.get('name','')[:44]}' via {_rp['provider']}: "
+                      f"{', '.join(_rp_bits) if _rp_bits else 'nothing actionable'}")
+                if not _rp['deliverable']:
+                    # The one hard rule. "unknown" is NOT closed — absence of
+                    # evidence never removes a stop, only positive evidence does.
+                    _rp_dropped.append(_rp_poi.get('name', ''))
+                    print(f"  [D538] ⚠️  DROPPED '{_rp_poi.get('name','')[:44]}' — {_rp['reason']}")
+                    continue
+                _rp_keep.append(_rp_poi)
+            if _rp_dropped:
+                poi_list = _rp_keep
+                print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
+                      f"{len(poi_list)} remain")
+            _rp_usable = sum(1 for p in poi_list if (p.get('_practicals') or {}).get('usable'))
+            print(f"  [D538] Practicals acquired for {_rp_usable}/{len(poi_list)} stop(s)")
+        except ImportError as _rp_err:
+            _import_logger.error(f"[D538] MISSING: restaurant_practicals — a restaurant "
+                                 f"tour will ship with no hours or prices: {_rp_err}")
+        except Exception as _rp_err:
+            print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
 
     # -------- [LOCAL-440/445] Story-first pipeline: seek + verify + size-adapt --------
     _phase_timer.start('story_first')
