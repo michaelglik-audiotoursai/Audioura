@@ -65,17 +65,23 @@ _SYSTEM = (
 )
 
 
-def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None):
+def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None,
+                  focus='object'):
     import requests
+    _noun = 'Place' if focus == 'place' else 'Object'
+    _ctx = 'Area' if focus == 'place' else 'Museum'
+    _ask = ('What actually happened at this place, and to whom?'
+            if focus == 'place' else
+            'What is actually known about this specific object?')
     if evidence:
         ev = "\n".join(f"- {e['snippet']}  [{e.get('url','')}]" for e in evidence[:12])
-        user = (f"Object: {work}\nMuseum: {venue}\n\n"
-                f"WEB EVIDENCE about this object:\n{ev}\n\n"
-                f"Extract the checkable facts. PREFER the evidence above over your own "
-                f"memory, and mark a fact 'high' only when the evidence supports it.")
+        user = (f"{_noun}: {work}\n{_ctx}: {venue}\n\n"
+                f"WEB EVIDENCE:\n{ev}\n\n"
+                f"Extract what is asked for. PREFER the evidence above over your own "
+                f"memory, and mark an item 'high' only when the evidence supports it.\n"
+                f"{_ask}")
     else:
-        user = (f"Object: {work}\nMuseum: {venue}\n\n"
-                f"What is actually known about this specific object?")
+        user = (f"{_noun}: {work}\n{_ctx}: {venue}\n\n{_ask}")
     try:
         resp = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -84,7 +90,7 @@ def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None):
             data=json.dumps({
                 "model": model or os.environ.get("TOUR_FALLBACK_MODEL", "gpt-4o"),
                 "messages": [
-                    {"role": "system", "content": _SYSTEM},
+                    {"role": "system", "content": _SYSTEM_PLACE if focus == 'place' else _SYSTEM},
                     {"role": "user", "content": user},
                 ],
                 "temperature": 0.0,
@@ -123,7 +129,7 @@ def _gemini_facts(work, venue, timeout=45):
         return None, f"gemini error: {e}"
 
 
-def _web_evidence(work, venue, max_results=8):
+def _web_evidence(work, venue, max_results=8, focus='object'):
     """Targeted web search for THIS object, using the existing Serper path.
 
     **This is what makes the fallback grounded rather than parametric**, and the
@@ -143,7 +149,13 @@ def _web_evidence(work, venue, max_results=8):
         return []
     bare = re.sub(r'\s*\([^)]*\)\s*', ' ', work or '').strip()
     venue_short = (venue or '').split(',')[0].strip()
-    queries = [f'"{bare}" {venue_short}', f'{bare} {venue_short} history provenance']
+    if focus == 'place':
+        # [D537] Ask the web for episodes, not for the place's description. The
+        # object queries ("provenance") return catalogue text for a town.
+        queries = [f'"{bare}" history famous people',
+                   f'"{bare}" historic events who lived']
+    else:
+        queries = [f'"{bare}" {venue_short}', f'{bare} {venue_short} history provenance']
     seen, out = set(), []
     for q in queries:
         try:
@@ -159,7 +171,51 @@ def _web_evidence(work, venue, max_results=8):
     return out
 
 
-def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45):
+# [D537] Michael, 2026-08-27, on the Riviera tour: "What I would like to listen
+# are the stories of horses, important people, historic events here."
+#
+# The default system prompt above is written for a MUSEUM OBJECT — maker,
+# materials, dimensions, provenance. Applied to Cap d'Ail or Saint-Jean-Cap-Ferrat
+# it returns geography, which is why those stops read as descriptions rather than
+# stories.
+#
+# This variant asks the same grounded question about a PLACE, and asks for the
+# thing a story needs and a fact does not: a named person, a date, and a
+# consequence. It is retrieval, not invention — the web-evidence step still runs
+# and 'high' confidence still requires the evidence to support it.
+#
+# Used ONLY for non-museum tours. The museum path keeps the object prompt
+# unchanged, deliberately: that is the path behind the Palais Lascaris tour
+# Michael called the best he had seen, and a late-release prompt change there
+# risks a regression for no stated benefit.
+_SYSTEM_PLACE = (
+    "You supply factual reference material about ONE place for an audio tour. The listener is "
+    "standing there. Ordinary sources produced only geography, so you are the fallback for the "
+    "thing geography leaves out: WHAT HAPPENED HERE, AND TO WHOM.\n"
+    "\n"
+    "Return episodes, not attributes. Every item must carry at least two of:\n"
+    "  - a NAMED person or group\n"
+    "  - a DATE or period\n"
+    "  - an ACTION someone took, and what came of it\n"
+    "\n"
+    "Good: who built it and why, who lived or died there, what was decided there, what was won "
+    "or lost, a race and its winner, a scandal, a refusal, a fire, a rescue, a first.\n"
+    "Useless here, do not return it: 'a charming coastal town', 'popular with visitors', "
+    "'offers stunning views', 'rich in history' — the last is the exact failure this exists to "
+    "fix. 'Rich in history' with no episode attached is worth nothing to a listener.\n"
+    "\n"
+    "Set confidence per item: \"high\" only if you are confident THIS episode happened at THIS "
+    "place. If you are recalling something similar, or generalising from the region, say \"low\". "
+    "Returning three real episodes beats returning eight with two invented — an invented person "
+    "or date is the worst possible outcome here.\n"
+    "\n"
+    'Return ONLY JSON: {"facts": [{"fact": "<one sentence naming who, when, and what came of '
+    'it>", "confidence": "high|low"}]}'
+)
+
+
+def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45,
+                         focus='object'):
     """Facts about one object when grounded retrieval came back empty.
 
     Returns {'facts': [{'fact','confidence'}], 'provider': str, 'sources': [...],
@@ -184,10 +240,10 @@ def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45):
             out['reason'] += 'no OPENAI_API_KEY'
             return out
         # Ground it in the web before falling back to memory alone.
-        evidence = _web_evidence(work, venue)
+        evidence = _web_evidence(work, venue, focus=focus)
         out['sources'] = [e['url'] for e in evidence if e.get('url')][:6]
         parsed, provider = _openai_facts(work, venue, api_key, timeout=timeout,
-                                         evidence=evidence)
+                                         evidence=evidence, focus=focus)
         if evidence:
             provider = f"{provider}+web({len(evidence)})"
     if parsed is None:

@@ -10351,7 +10351,14 @@ Exempt: navigation directions ("Turn left", "Continue past").
                           f"they are VENUE-level only — fetching object-level facts")
                 print(f"  [D533] Stop {_kf_idx+1} '{_kf_name[:50]}' has "
                       f"{len(_kf_have)} snippet(s) — asking the knowledge fallback")
-                _kf_res = fetch_stop_knowledge(_kf_name, _kf_venue, api_key)
+                # [D537] A place needs episodes; an object needs provenance.
+                # Museum tours keep the object prompt unchanged — that is the path
+                # behind the tour Michael called the best he had seen, and a
+                # late-release prompt change there risks a regression for no
+                # stated benefit.
+                _kf_focus = 'object' if tour_category == 'museum' else 'place'
+                _kf_res = fetch_stop_knowledge(_kf_name, _kf_venue, api_key,
+                                               focus=_kf_focus)
                 if not _kf_res['ok']:
                     print(f"  [D533] fallback returned nothing: {_kf_res['reason']}")
                     continue
@@ -10670,7 +10677,46 @@ Exempt: navigation directions ("Turn left", "Continue past").
                       "first room'. Never introduce one as though it were new. Do not "
                       "re-tell its story; a single connecting clause is the whole budget.\n"
                 )
-        _claims_line = (
+        # [D537] Michael's review of the Riviera v2 tour, 2026-08-27. His two
+        # quotes are the whole specification:
+        #
+        #   "the Four Seasons Hotel, looms with its storied past of hosting luminaries"
+        #   "a silent witness to countless chapters of history, each echoing with
+        #    laughter and whispers of clandestine meetings"
+        #
+        #   "What I would like to listen are the stories about these luminaries,
+        #    countless chapters of history, and especially clandestine meetings."
+        #
+        # He is not asking for more words. He is pointing at sentences that PROMISE
+        # a story and then walk away from it. The prose gestures at luminaries and
+        # names none, at clandestine meetings and describes none. That is a tease,
+        # and it is worse than saying nothing, because it tells the listener there
+        # is something here and then withholds it.
+        #
+        # Same family as the importance-claim rule below, which Michael raised on
+        # the Palais tour and which worked. The remedy is identical: deliver the
+        # instance or drop the gesture. It must NOT be satisfied by inventing one —
+        # that is D530's Guernica and D533's Gautier birth year, both measured.
+        _story_gesture_line = (
+            "\nNAME THE STORY OR DROP THE GESTURE. Never write that a place has a "
+            "'storied past', hosted 'luminaries', 'notable figures' or 'countless "
+            "chapters of history', witnessed 'clandestine meetings', 'intrigue', "
+            "'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives "
+            "ONE of them concretely: who, when, what they did, what came of it.\n"
+            "- BAD:  'a storied past of hosting luminaries'\n"
+            "- GOOD: 'Churchill painted on that terrace in the winters after 1945, "
+            "and the hotel still keeps the room number he asked for'\n"
+            "- BAD:  'whispers of clandestine meetings'\n"
+            "- GOOD: 'the 1922 Genoa Conference delegates met here off the record, "
+            "which is how the Rapallo treaty was drafted away from the press'\n"
+            "These GOOD examples are illustrations of the SHAPE required, not facts "
+            "to reuse. If the source material below does not contain a specific "
+            "person, date and consequence for this place, then WRITE NO SUCH "
+            "SENTENCE AT ALL. Do not invent a name, a date or an episode to satisfy "
+            "this rule — a plain description of what is actually here is correct and "
+            "acceptable; a promise you cannot keep is not.\n"
+        )
+        _claims_line = _story_gesture_line + (
             "\nNO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, "
             "pioneering, revolutionary, groundbreaking, influential or a turning point, "
             "the SAME SENTENCE or the next must say what specifically changed — what "
@@ -13088,7 +13134,11 @@ Write the story FIRST, then add physical description if space allows.
             print(f"  [LOCAL-388] Beat verification error (non-fatal): {_v388_err}")
 
     # [LOCAL-421] Story gate — verify each stop has ≥3 story sentences + named entities
-    if _storied_mode and tour_category == 'museum' and not _phase5_ceiling_breached:
+    # [D537] Runs on EVERY tour type now, not just museums. It is informational
+    # unless L421_GATE_BLOCKS=true, so this cannot refuse a delivery — but until
+    # now a walking or biking tour's stories were never measured at all, which is
+    # why Michael's "needs a story or two" had no number behind it.
+    if _storied_mode and not _phase5_ceiling_breached:
         try:
             from story_gate import verify_stop_story, extract_story_sentences, get_classification_cost, reset_classification_cost
             reset_classification_cost()
