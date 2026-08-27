@@ -567,9 +567,26 @@ def _stop_in_country_scope(stop_address, country_scope):
 # "pedal off from Île Sainte-Marguerite ... towards Cannes", i.e. to cycle across
 # open sea.
 #
-# The check is ADVISORY by construction — on any failure it keeps the stop — so
-# widening it cannot delete a good stop, only flag an impossible one.
-_UNUSUAL_TRANSPORT_MODES = {'animal', 'bike'}
+# **REVERTED THE SAME DAY. Do not re-add 'bike' without replacing the check.**
+#
+# I widened this on the reasoning that it is advisory and "cannot delete a good
+# stop, only flag an impossible one". That reasoning was wrong: advisory means it
+# keeps stops when the CALL FAILS, not when the call answers confidently and
+# wrongly. Measured on the very next run:
+#
+#   [TRANSPORT-VERIFY] Excluding 1 stop(s) not reachable by bike:
+#       ["Hippodrome de la Cote d'Azur"]   <- Michael's explicitly requested stop
+#       ['Fort Carré']                     <- on the Antibes seafront
+#       ['Promenade du Paillon']           <- a park in central Nice
+#
+# All three are trivially reachable by bicycle. And Île Sainte-Marguerite — the
+# actual island, the one case this was added for — SURVIVED. The check is tuned
+# for "can a dogsled get here", where the answer is almost always no; asked about
+# a bicycle it produces confident nonsense in both directions.
+#
+# It also deleted a stop the listener had named, overriding D536's insertion. That
+# is fixed separately below and is worth keeping regardless.
+_UNUSUAL_TRANSPORT_MODES = {'animal'}
 
 
 def _verify_transport_accessibility(poi_list, transport_mode, location, api_key):
@@ -611,7 +628,19 @@ def _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
             if excluded_names:
                 print(f"  [TRANSPORT-VERIFY] Excluding {len(excluded_names)} stop(s) not reachable by {transport_mode}: {excluded_names}")
                 excluded_set = set(n.lower() for n in excluded_names)
-                return [p for p in poi_list if p['name'].lower() not in excluded_set]
+                # [D537] A stop the LISTENER NAMED is never removed by this check.
+                # On 2026-08-27 it excluded "Hippodrome de la Cote d'Azur" — the one
+                # place the request asked for by name, inserted moments earlier by
+                # D536 — on the grounds that it is not reachable by bicycle. It is.
+                # When the listener has named a place, they know it is reachable;
+                # an advisory model's opinion does not outrank that.
+                _kept_explicit = [p for p in poi_list
+                                  if p.get('user_explicit') and p['name'].lower() in excluded_set]
+                for _ke in _kept_explicit:
+                    print(f"  [D537] KEPT '{_ke['name']}' — the listener named this stop; "
+                          f"the reachability check does not get to remove it")
+                return [p for p in poi_list
+                        if p.get('user_explicit') or p['name'].lower() not in excluded_set]
             else:
                 print(f"  [TRANSPORT-VERIFY] All stops OK for {transport_mode}")
     except Exception as e:
