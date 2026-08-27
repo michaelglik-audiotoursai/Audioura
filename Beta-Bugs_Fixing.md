@@ -163,8 +163,18 @@ briefing. Work top to bottom.
 >   not repeat it as fact. Low priority, let it ride with the next deploy.
 > - **`generate_tour_text.py:10` imports `enhanced_tour_templates_fixed`**, which is
 >   untracked. `tour-generator` will not start from a clean checkout. Flagged, not fixed.
-> - **Kiro CLI is not installed** on this machine and `kiro_dispatcher.py` cannot run
->   on Windows (`import fcntl`). Session planned — `wdvrdaxqtg`, detail in `wdvrdaxqnz`.
+> - **Kiro CLI is not installed** on this machine. Session planned — `wdvrdaxqtg`.
+>   **The `import fcntl` blocker is fixed** (2026-08-27): branch
+>   `port/kiro-dispatcher-windows`, commit `e40fa34`, cut from `storied` and pushed.
+>   New `portable_lock.py` gives both machines one locking implementation. Verified on
+>   Windows: lock holds across 8 processes (red test: 1 of 8 survives without it),
+>   semaphore bound holds, a real `storied` worktree checks out all 3,248 files at
+>   `C:\adev-wt`, and a forked worker inherits `KIRO_API_KEY` and outlives its parent.
+>   **Not verified on macOS** — the POSIX path is unchanged by construction, but one
+>   `git worktree add` on the Mac Mini would settle `core.longpaths`. Still blocked on
+>   Michael: install the CLI and generate `KIRO_API_KEY`. Detail in `wdvrdaxqnz`.
+>   Run `python kiro_dispatcher.py --preflight` to see what a machine is missing —
+>   it forks nothing and costs nothing.
 > - **Unruled by Michael:** whether the current-location dot should be labelled `#0`.
 >
 > ### Hard-won gotchas — all cost real time
