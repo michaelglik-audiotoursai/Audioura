@@ -21537,3 +21537,50 @@ Padding was explicitly instructed against — a short honest stop beats a padded
 
 **The standing conclusion, unchanged and now demonstrated three times:** editing finished prose can
 only trade one defect for another. De-repetition belongs in generation, and it now is.
+
+---
+
+## D535 — Michael's review items, and the biking tour that shows none of it transferred
+
+**2026-08-26/27.** Michael reviewed the Palais Lascaris v3 tour: **every stop Acceptable, three of
+four judged Excellent.** His four improvements are implemented (opening shortened but KEPT — he
+likes the preview; importance-claims must state what changed; four listener-instruction patterns
+added; the stop-writer now receives the running order and must acknowledge already-visited stops).
+
+**Then the 5-stop Riviera biking request delivered 2 stops, and the listener was told nothing.**
+
+**The chain, fully traced:**
+
+1. `[BLOCKER1]` strips "tour", `[LOCAL-46]` strips "Biking", `[Bug2Fix]` suppresses
+   `tour_type='biking'` — and the **intent model is then asked what the tour is about using the
+   stripped string**. It answered `poi_type: "horse racing tracks"`. The request names ONE
+   hippodrome as a waypoint; the system concluded the tour is about hippodromes.
+   **The strippers exist for AREA RESOLUTION and their output is being reused for INTENT.**
+2. Phase 3A returned five racecourses, four with no evidence I can find. The existence gate agreed
+   — `3/5 verified, 2 would be dropped` — and is in **LOG_ONLY**, so it dropped nothing.
+3. **SCOPE-CHECK then removed three stops for being "outside 'Hippodrome de la Cote d'Azur'"** —
+   the named waypoint had been promoted to the tour's BOUNDARY. The logic is sound; the premise
+   was wrong.
+4. `[LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)` — **D530 exactly, on a
+   different path.** The shortfall notice and `⚠️ LISTENER ASKED FOR N STOPS` line exist and are
+   wired only to the exhibition branch. Nothing fired.
+
+**The standing conclusion: every fix from 2026-08-26 was on the museum/exhibition path. The
+walking/biking path has none of it, and is roughly where the museum path was before.**
+
+Also recorded: both delivered stops are probably the same racecourse — stop 1 carries a
+Mandelieu-la-Napoule address for a venue that is in Cagnes-sur-Mer, and stop 2 is at the correct
+Cagnes-sur-Mer address under a different name.
+
+### Michael's operational questions, answered with evidence
+
+- **Phone flow:** `generate_tour_text_service.py:167` calls the identical `generate_tour_text`;
+  `STORIED_MODE=true` is in the compose environment; orchestrator healthy on 5002 and its code
+  unchanged since its image was built. **The Mac Mini is at 192.168.0.136** — the app default was
+  `192.168.0.218` and CLAUDE.md says `.137`; both stale. `config.dart` updated.
+- **The cache will hide a real test:** `tour_cache` is keyed on (location, type, stops) and holds
+  the exact v5 Palais tour. Requesting it from the phone returns the cached copy instantly and
+  free. Test with an ungenerated location.
+- **Cost/time, text only** (3-stop museum): $0.1791 / $0.2547 / $0.2140 and 3m50s / 4m00s / 4m27s.
+  The 5-stop biking run: $0.1244, 3m37s. **`cost_ledger` recorded none of these** — it only logs
+  service-layer calls carrying a job_id, so these come from run logs.
