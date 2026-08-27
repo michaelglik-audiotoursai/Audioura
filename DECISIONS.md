@@ -21650,3 +21650,76 @@ did not think of.**
 - **Route order is not optimised** — Èze → Cagnes → Saint-Jean sends the rider ~30 km west and back
   east; GEO-CHECK validates total distance and outliers, not sequence.
 - **A stated origin is not honoured** — "starting from Nice" produced a tour beginning at Cap d'Ail.
+
+---
+
+## D537 — The story work did not land; two of my own fixes were wrong; the third path is the riskiest
+
+**2026-08-27.** Michael accepted the Riviera v2 tour (three stops Excellent) and asked for more
+history-and-people stories, explicitly offering the alternative: *"if you think the modifications
+may not lead to a better tour and can damage what we have achieved already"*, do the Monaco
+restaurant tour instead. **I judged the story work safe. Two of the three changes were wrong.**
+
+### What his review actually specified
+
+Not "more content". His two quotes — *"storied past of hosting luminaries"*, *"countless chapters
+of history … whispers of clandestine meetings"* — are prose that PROMISES a story and walks away.
+Same failure as the "innovation" claim he caught on the Palais tour, same remedy: **deliver the
+instance or drop the gesture**, and never satisfy it by inventing one.
+
+### Measured result: noise, not improvement
+
+The LOCAL-439 story gate now runs on **every** tour type (informational; it was museum-only, which
+is why "needs a story or two" had no number behind it). Across four runs of the same request:
+
+```
+before D537   never measured
+run 1         1 / 5
+run 2         2 / 5
+this run      0 / 5
+```
+
+**That spread is noise. The story work cannot be claimed to have raised story quality.** Concrete
+dates did rise, and the place-focused retrieval demonstrably fetches real episodes in isolation
+(Duke Emmanuel Philibert's 1561 fort, Cocteau, the Hippodrome's 1928 founding). **The narration is
+not reliably using what retrieval finds** — that is the real ceiling and it is post-release work.
+
+### Two wrong fixes, both reverted
+
+**1. `bike` added to `_UNUSUAL_TRANSPORT_MODES`.** My reasoning: the check is advisory, so it "can
+only flag an impossible stop, never delete a good one." **Wrong — advisory means it keeps stops
+when the CALL FAILS, not when the call answers confidently and wrongly.** Next run excluded as
+unreachable by bicycle: the Hippodrome (Michael's named stop), Fort Carré (Antibes seafront),
+Promenade du Paillon (a park in Nice) — and KEPT Île Sainte-Marguerite, the ferry-only island it
+was added for. The check is tuned for "can a dogsled get here".
+
+**Kept from it, because it is correct:** a stop the LISTENER NAMED is now immune to that check.
+
+**2. A causal claim I could not support.** I told Michael the story bias caused the island
+selection. It did not: the gesture rule edits the DESCRIPTION prompt, the fallback runs AFTER
+selection, the gate change is informational. **Phase 3A is unseeded — three runs of the identical
+string gave three different stop sets before D537 existed.**
+
+### The restaurant path, first look, and it is the riskiest of the three
+
+`"Restaurant tour in Monaco"`, 3/3 delivered, 3/3 verified, **1/3 story units — the best non-museum
+ratio today** — and zero banned phrases, the only such tour today.
+
+**Two defects, both category-specific:**
+
+1. **`[LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)`** — no hours, prices, booking or dress
+   code, in the one category where those ARE the content. **A gate that reports PASSED on zero
+   evidence**, the same family as LOCAL-394's "OK" on a tour that lost 60% of its stops.
+2. **No closure check.** Joël Robuchon Monte-Carlo shipped as a stop; Robuchon died in 2018 and
+   that restaurant has likely since closed (unverified, and stated as unverified). The existence
+   gate checks whether an entity is KNOWN, not whether it is OPERATING. **`LOCAL-365` already
+   refuses to tour a dismounted exhibition — a closed restaurant is the same problem with a
+   higher cost: it sends a real person to a real door.**
+
+### Standing note — four instances in two days
+
+Every fix opened its own opposite failure: the de-repetition guard broke coherence; the knowledge
+fallback's flag produced a false disclosure about a real exhibit; the waypoint was rescued from
+being a boundary and then dropped from the tour; the reachability check deleted three reachable
+stops while keeping an island. **All four were caught by running the thing and reading the output,
+with green suites every time.**
