@@ -21723,3 +21723,67 @@ fallback's flag produced a false disclosure about a real exhibit; the waypoint w
 being a boundary and then dropped from the tour; the reachability check deleted three reachable
 stops while keeping an island. **All four were caught by running the thing and reading the output,
 with green suites every time.**
+
+---
+
+## D538 — For a restaurant the practicals ARE the content; and the fifth museum-gated check
+
+**2026-08-27.** Michael, agreeing with the Monaco judgement: *"for the restaurants the tour stop
+can not be a stop if the restaurant is closed or the menu is overpriced. If the information does
+not come from the first request to OpenAI.API, we should be querying this from Gemini and SERP."*
+
+**`practical_facts_gate` is SUBTRACTIVE** — it drops claims it cannot trace to a source. Correct
+for a museum; useless when the narration made no claims at all, which is why three Monaco
+restaurants shipped with no hours, no price and no booking requirement under
+`PASSED (0 verified)`. `restaurant_practicals.py` is the ACQUISITION half.
+
+**Chain, in his order:** SERP (three angles: hours/reservation, menu/price, permanent closure) →
+OpenAI extracting FROM those results and forbidden to fill gaps from memory → Gemini only if both
+came back thin and only when `GEMINI_API_KEY` is set (empty today, so the chain stops at step 2).
+
+**Result:** practicals acquired 3/3, and they REACHED THE LISTENER — *"The gourmet menu is set at
+360 EUR, while the Jardins de Provence vegetarian menu is offered at 240 EUR"*, *"a reservation is
+essential"*. Cost fell from $0.1614 to $0.1171.
+
+**The finding worth keeping: the name format was the whole difference.** Searching
+`"Le Louis XV - Alain Ducasse à l'Hôtel de Paris" Monaco hours` returned **3 snippets**; splitting
+on the dash and searching the house name returned **33**, with every field populated.
+
+### Two judgement calls, recorded for Michael to overturn
+
+1. **Only POSITIVE evidence of closure drops a stop.** "unknown" is not "closed" — the same lesson
+   as the exhibition work, where treating silence as proof deleted real works.
+2. **Price is NOT a drop criterion, deliberately.** Michael said an overpriced menu means it cannot
+   be a stop; I implemented DISCLOSURE instead, because Le Louis XV at 360 EUR is among Europe's
+   most expensive restaurants and is the best stop in the tour. The narrator must state the band
+   and the booking requirement before the stop ends. A hard ceiling is a one-line change if he
+   wants it.
+
+### THE FIFTH MUSEUM-GATED CHECK — this is now a structural finding, not a bug
+
+The first attempt printed **not one `[D538]` line**: the acquisition sat inside
+`if (_storied_mode and tour_category == 'museum'` (line ~9792), so **the restaurant practicals
+could not run on a restaurant tour.**
+
+Today's five, all the same shape:
+
+1. D535 prompt rules (already-visited, importance-claims) — inside the museum prompt branch
+2. LOCAL-439 story gate — `tour_category == 'museum'`
+3. Knowledge-fallback trigger — keyed on the museum corpus gate's sets
+4. LOCAL-192 phrase filter — stop descriptions only, not orientations/directions/recap
+5. D538 restaurant practicals — inside the museum block
+
+**The museum path is where this codebase grew, and new work lands inside it by default.** One
+structural pass after the release, rather than five more discoveries.
+
+**And the unit tests were green every time.** `test_d538_restaurant_practicals.py` exercises the
+module in isolation; **a unit test cannot see that nothing calls the unit.**
+
+### Open
+
+- `story_units` 0/3 here, 0/5 on biking, 1/3 on the museum tour at best — the real ceiling, unstable
+  run to run, post-release work.
+- One acquired value was junk (`La Marée hours=19:12-00:22`). It did NOT reach the narration —
+  the "state only what is listed" instruction held — but the extractor accepted nonsense.
+- The closure path is implemented and unit-tested and **has not yet fired on a live tour**; Joël
+  Robuchon Monte-Carlo simply was not proposed this run (Phase 3A is unseeded).
