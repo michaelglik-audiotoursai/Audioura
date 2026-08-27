@@ -558,7 +558,18 @@ def _stop_in_country_scope(stop_address, country_scope):
 
 
 # Unusual transport modes that get the verification call (cost control — common modes skip it)
-_UNUSUAL_TRANSPORT_MODES = {'animal'}
+# [D537] 'bike' added 2026-08-27. The check was scoped to modes nobody expects to
+# work (dogsled, camel) on the assumption that a bicycle can reach anything a
+# walker can. It cannot reach an ISLAND, and the D537 story bias made that
+# concrete: asked for places with episodes rather than places on a coast road,
+# the selector chose Île Sainte-Marguerite — reachable only by ferry from Cannes.
+# The tour told the listener to "park your bike near the ferry dock" and then to
+# "pedal off from Île Sainte-Marguerite ... towards Cannes", i.e. to cycle across
+# open sea.
+#
+# The check is ADVISORY by construction — on any failure it keeps the stop — so
+# widening it cannot delete a good stop, only flag an impossible one.
+_UNUSUAL_TRANSPORT_MODES = {'animal', 'bike'}
 
 
 def _verify_transport_accessibility(poi_list, transport_mode, location, api_key):
