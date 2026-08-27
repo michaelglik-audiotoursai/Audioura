@@ -6814,6 +6814,39 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             for p in poi_list:
                 print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
 
+            # [D536] A STOP THE LISTENER NAMED MUST BE IN THE TOUR.
+            #
+            # Refusing the waypoint as a SCOPE (above) fixed the deletion of three
+            # stops, and created the opposite failure: the 2026-08-27 re-run
+            # delivered five real Riviera destinations and **not the Hippodrome**,
+            # which is the one place the request actually asked for. The word
+            # appeared twice in the output, both times inside the echoed title.
+            #
+            # The existing user-explicit protection (PHASE 3C / GEO-CHECK) requires
+            # the plural "stops at" and Michael wrote "with a stop at", so it never
+            # fired — and in any case it only PROTECTS a stop already present. It
+            # cannot put one back.
+            #
+            # `named_waypoints()` is the single source of truth for both jobs now.
+            _d536_waypoints = named_waypoints(location)
+            if _d536_waypoints:
+                _present = {_norm_place(p.get('name', '')) for p in poi_list}
+                for _wp in _d536_waypoints:
+                    _wpn = _norm_place(_wp)
+                    if not _wpn:
+                        continue
+                    if any(_wpn == q or _wpn in q or q in _wpn for q in _present if q):
+                        print(f"  [D536] Requested stop '{_wp}' is already among the candidates")
+                        continue
+                    _wp_poi = _new_poi(_wp)
+                    _wp_poi['user_explicit'] = True
+                    # Front of the list: later phases trim the tail to total_stops,
+                    # and a stop the listener asked for by name must not be what
+                    # falls off the end.
+                    poi_list.insert(0, _wp_poi)
+                    print(f"  [D536] ⚠️  Requested stop '{_wp}' was NOT among the candidates "
+                          f"— INSERTED as a user-explicit stop")
+
             # [TRANSPORT-VERIFY] For unusual transport modes, verify stops are reachable
             poi_list = _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
 
@@ -7478,6 +7511,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # those POI names are sacrosanct — PHASE 3C must NOT remove them based on address.
         # The user knows better than the address validator which stops they want.
         _explicit_stop_names = set()
+        # [D536] Same source of truth as the scope refusal and the insertion above.
+        # The regex below requires the PLURAL "stops at"; "with a stop at X" — the
+        # phrasing in Michael's 2026-08-27 request — never matched it, so the stop
+        # he named by hand had no protection from either gate.
+        for _wp in named_waypoints(location):
+            _explicit_stop_names.add(_normalize_name(_wp))
+        if _explicit_stop_names:
+            print(f"   [D536] User-explicit stops from waypoint phrasing: {_explicit_stop_names}")
         _explicit_match = re.search(r'(?:with\s+)?stops\s+(?:at|:)\s*(.+?)(?:,\s*(?:[A-Z]{2})\s*$|$)', location, re.IGNORECASE)
         if _explicit_match:
             _explicit_raw = _explicit_match.group(1)
