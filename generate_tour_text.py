@@ -10430,6 +10430,50 @@ Exempt: navigation directions ("Turn left", "Continue past").
                                  f"starved stops will NOT be filled: {_kf_err}")
         except Exception as _kf_err:
             print(f"  [D533] Knowledge fallback error (non-fatal): {_kf_err}")
+
+        # -------- [D538] Restaurant practicals: acquire, then gate --------
+        # Michael, 2026-08-27: "for the restaurants the tour stop can not be a stop
+        # if the restaurant is closed or the menu is overpriced. If the information
+        # does not come from the first request to OpenAI.API, we should be querying
+        # this from Gemini and SERP."
+        #
+        # The Monaco tour printed "PRACTICAL FACTS GATE: PASSED (0 verified)" over
+        # three restaurants with no hours, no prices and no booking requirement.
+        # LOCAL-36 is SUBTRACTIVE — it drops claims it cannot trace — so it is
+        # silent when the narration made no claims at all. This is the acquisition
+        # half, and it runs for restaurant tours only, where the practicals ARE the
+        # content rather than a convenience.
+        if tour_category == 'restaurant':
+            try:
+                from restaurant_practicals import fetch_practicals
+                _rp_city = location
+                _rp_keep, _rp_dropped = [], []
+                for _rp_poi in poi_list:
+                    _rp = fetch_practicals(_rp_poi.get('name', ''), _rp_city, api_key)
+                    _rp_poi['_practicals'] = _rp
+                    _rp_bits = [f"{k}={_rp[k][:40]}" for k in
+                                ('hours', 'closed_days', 'reservation', 'price_band')
+                                if _rp.get(k)]
+                    print(f"  [D538] '{_rp_poi.get('name','')[:44]}' via {_rp['provider']}: "
+                          f"{', '.join(_rp_bits) if _rp_bits else 'nothing actionable'}")
+                    if not _rp['deliverable']:
+                        # The one hard rule. "unknown" is NOT closed — absence of
+                        # evidence never removes a stop, only positive evidence does.
+                        _rp_dropped.append(_rp_poi.get('name', ''))
+                        print(f"  [D538] ⚠️  DROPPED '{_rp_poi.get('name','')[:44]}' — {_rp['reason']}")
+                        continue
+                    _rp_keep.append(_rp_poi)
+                if _rp_dropped:
+                    poi_list = _rp_keep
+                    print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
+                          f"{len(poi_list)} remain")
+                _rp_usable = sum(1 for p in poi_list if (p.get('_practicals') or {}).get('usable'))
+                print(f"  [D538] Practicals acquired for {_rp_usable}/{len(poi_list)} stop(s)")
+            except ImportError as _rp_err:
+                _import_logger.error(f"[D538] MISSING: restaurant_practicals — a restaurant "
+                                     f"tour will ship with no hours or prices: {_rp_err}")
+            except Exception as _rp_err:
+                print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
             import traceback
             traceback.print_exc()
 
@@ -10871,8 +10915,16 @@ NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
             # but we don't constrain the LLM's natural length. The baseline produced
             # 300-500 words per stop; constraining that thins content.
             
+            _practicals_block = ""
+            if tour_category == 'restaurant':
+                # [D538] The listener is outside deciding whether to go in.
+                try:
+                    from restaurant_practicals import practicals_prompt_block
+                    _practicals_block = practicals_prompt_block(poi.get('_practicals'))
+                except Exception:
+                    _practicals_block = ""
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
-{_visited_line}{_claims_line}
+{_visited_line}{_claims_line}{_practicals_block}
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
 
 Then provide a detailed description. Include:
@@ -17477,7 +17529,20 @@ RULES:
         if not _pf_result.passed:
             print(f"  [LOCAL-36] PRACTICAL FACTS GATE: {len(_pf_result.dropped_claims)} claim(s) dropped")
         else:
-            print(f"  [LOCAL-36] PRACTICAL FACTS GATE: PASSED ({len(_pf_result.verified_claims)} verified)")
+            # [D538] "PASSED (0 verified)" is not a pass, it is a check that found
+            # nothing to check. Michael, 2026-08-27: it "passed because it verified
+            # nothing, not because everything checked out". For a restaurant that is
+            # a delivery defect, not a note.
+            if len(_pf_result.verified_claims) == 0:
+                _pf_sev = "⚠️  NO PRACTICAL CLAIMS FOUND TO VERIFY"
+                if tour_category == 'restaurant':
+                    print(f"  [LOCAL-36/D538] {_pf_sev} — and this is a RESTAURANT tour, "
+                          f"where hours, booking and price are the content, not a bonus")
+                else:
+                    print(f"  [LOCAL-36] {_pf_sev} (informational for tour_category="
+                          f"'{tour_category}')")
+            else:
+                print(f"  [LOCAL-36] PRACTICAL FACTS GATE: PASSED ({len(_pf_result.verified_claims)} verified)")
     except ImportError:
         _import_logger.error("[LOCAL-36] MISSING: practical_facts_gate — practical facts verification DISABLED")
         print("  [LOCAL-36] practical_facts_gate not available — skipped")
