@@ -158,6 +158,60 @@ def _gemini(name, city, timeout=45):
         return None
 
 
+# [D539] CLOSURE IS ASYMMETRIC, AND THE FIRST VERSION TREATED IT AS SYMMETRIC.
+#
+# La Marée Monaco closed on 30 September 2020. D538 cleared it and it shipped as a
+# stop. Michael found it. The diagnosis is not "the model was wrong" — it is that
+# the SAME restaurant returns OPPOSITE verdicts depending on the spelling searched:
+#
+#   "La Maree"  -> closed_permanently   "La Marée Monaco. Permanently closed."
+#   "La Marée"  -> open                 "Don't miss La Marée ... open 7 days a week"
+#
+# Both kinds of page exist at once. Aggregators keep stale listings with plausible
+# hours long after a closure, and marketing copy outlives the business. So a
+# verdict formed by weighing "evidence of closure" against "evidence of operation"
+# is decided by whichever snippets SERP happens to return.
+#
+# The two costs are not equal. Skipping a restaurant that is actually open costs
+# the listener one stop. Sending them to a locked door is the harm this exists to
+# prevent. So closure evidence is DECISIVE: a credible "permanently closed" signal
+# ends the question, whatever else the page set contains.
+_CLOSED_MARKERS = (
+    'permanently closed', 'closed permanently', 'now closed', 'has closed',
+    'closed down', 'définitivement fermé', 'fermé définitivement',
+    'ferme definitivement', 'closed its doors', 'ceased trading',
+    'no longer in business', 'no longer open', 'out of business',
+)
+
+
+def closure_scan(name, city):
+    """A dedicated closure probe, run across spelling variants.
+
+    Deterministic string matching over search snippets — not an LLM judgement.
+    The LLM half already proved it will believe whichever page it is shown; this
+    asks one narrow question of the raw text instead.
+
+    Returns (is_closed: bool, evidence: str).
+    """
+    import unicodedata
+    bare = re.sub(r'\s*\([^)]*\)\s*', ' ', name or '').strip()
+    core = re.split(r'\s+[-–—]\s+|\s+à\s+l', bare)[0].strip()
+    # Accent-folded AND accented: they return different result sets, which is the
+    # whole reason this defect reached a listener.
+    folded = ''.join(c for c in unicodedata.normalize('NFKD', core)
+                     if not unicodedata.combining(c))
+    place = (city or '').split(',')[0].strip()
+    variants = [v for v in dict.fromkeys([core, folded, bare]) if v]
+    for v in variants:
+        for q in (f'"{v}" {place} permanently closed',
+                  f'"{v}" {place} closed down'):
+            for item in _serp(q, max_results=8):
+                low = item['snippet'].lower()
+                if any(m in low for m in _CLOSED_MARKERS):
+                    return True, f"{item['snippet'][:160]} [{item.get('url','')}]"
+    return False, ''
+
+
 def _fields(d):
     return {k: str((d or {}).get(k, '') or '').strip()
             for k in ('status', 'hours', 'closed_days', 'reservation',
@@ -206,11 +260,19 @@ def fetch_practicals(name, city, api_key, timeout=45):
     out['provider'] = provider or 'none'
     out['usable'] = not _thin(fields)
 
+    # [D539] The closure probe runs ALWAYS and OVERRIDES, including when the
+    # extractor confidently reported hours. That combination is exactly what
+    # shipped La Marée: stale aggregator hours outvoted a closure notice.
+    _closed, _closed_ev = closure_scan(name, city)
+    if _closed:
+        out['status'] = 'closed_permanently'
+        out['evidence'] = _closed_ev or fields.get('evidence', '')
+
     # The one hard rule. A permanently closed restaurant cannot be a stop, and
     # "unknown" is NOT closed — absence of evidence never removes a stop.
-    if fields.get('status') == 'closed_permanently':
+    if out.get('status') == 'closed_permanently':
         out['deliverable'] = False
-        out['reason'] = f"reported permanently closed: {fields.get('evidence', '')[:120]}"
+        out['reason'] = f"reported permanently closed: {out.get('evidence', '')[:150]}"
     elif not out['usable']:
         out['reason'] = 'no actionable practical facts found (SERP, OpenAI, Gemini)'
     return out

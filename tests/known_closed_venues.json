@@ -1,0 +1,28 @@
+{
+  "_purpose": "Venues that were SHIPPED IN A TOUR and turned out to be closed, wrong, or otherwise not visitable. Every entry is a real miss caught by a human, not a hypothetical. The suite in test_d539_closure_regression.py replays them on every change, so a defect reality has already found can never silently come back.",
+  "_rule": "Add an entry the same day a miss is found. Never delete one — a venue that reopens gets `expect: open` and keeps its history, because the case still tests the machinery.",
+  "_why_this_exists": "La Maree Monaco closed 2020-09-30 and shipped as stop 3 of TOUR_MONACO_RESTAURANT_20260827_v2. The closure check ran and cleared it. Michael found it by searching the name himself. Nothing in the pipeline would have caught it on the next run either, because the verdict depended on which spelling was searched.",
+  "venues": [
+    {
+      "name": "La Maree",
+      "aliases": ["La Marée", "La Maree Monaco", "La Marée Monaco"],
+      "city": "Monaco",
+      "expect": "closed",
+      "closed_on": "2020-09-30",
+      "found_by": "Michael, 2026-08-27",
+      "shipped_in": "TOUR_MONACO_RESTAURANT_20260827_v2.md, stop 3",
+      "why_it_was_missed": "SERP returns opposite evidence for the accented and unaccented spellings. Unaccented gave 'La Marée Monaco. Permanently closed. 1615 votes.'; accented gave 'open 7 days a week'. The extractor believed whichever it was shown, and stale aggregator hours outvoted the closure notice.",
+      "ground_truth": "Port Palace Hotel acquired by Madar Group in 2020; the 7-year management lease expired April 2020 and extension talks failed; staff were locked out and brought a bailiff to record the denial of access."
+    },
+    {
+      "name": "Joel Robuchon Monte-Carlo",
+      "aliases": ["Joël Robuchon Monte-Carlo", "Joel Robuchon Monaco"],
+      "city": "Monaco",
+      "expect": "verify",
+      "found_by": "LEAD, 2026-08-27 (unverified suspicion, recorded rather than asserted)",
+      "shipped_in": "TOUR_MONACO_RESTAURANT_20260827.md, stop 2",
+      "why_it_was_missed": "Existence gate verified it at 100% - it checks whether an entity is KNOWN, not whether it is OPERATING. Those are different questions and only the second one matters for a restaurant.",
+      "ground_truth": "Joel Robuchon died in 2018. Whether the Hotel Metropole restaurant of that name still operates was NOT confirmed. This entry is 'verify', not 'closed' - it must not be asserted as fact until someone checks."
+    }
+  ]
+}
