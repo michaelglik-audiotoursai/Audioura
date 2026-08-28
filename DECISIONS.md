@@ -21900,3 +21900,63 @@ now replays 3 venues — La Marée (closed), Le Vistamar (rebranded), Joël Robu
 **Gemini was in the code, keyed, working, and unreachable in practice** because it sat behind a
 condition that a healthy-looking venue never satisfies. Same shape as the five museum-gated checks:
 capability present, wiring wrong, and only a human reading the output found it.
+
+---
+
+## D541-D543 — Seven attempts to drop two dead restaurants, and what survived scrutiny
+
+**2026-08-28.** Michael found two venues that shipped in tours: **La Marée** (closed 2020-09-30)
+and **Le Vistamar** (replaced by Pavyllon Monte-Carlo, 2022). Closing that took seven attempts.
+Recording which worked, because the answer is narrower than the effort suggests.
+
+### Le Vistamar shipped THREE times after LEAD reported it handled
+
+1. The rebrand check did not exist — closure_scan only knew "permanently closed".
+2. The Gemini check is probabilistic and answered "operating" that run.
+3. **`known_bad_venue()` compared cities by EQUALITY.** Production passes the tour's location
+   string — `"Restaurant tour in Monaco"` — not `"Monaco"`, so every corpus entry was skipped.
+   `k('Le Vistamar','Monaco')` was True while `k('Le Vistamar','Restaurant tour in Monaco')` was
+   False. **The unit test passed 'Monaco' because that is what a test author writes.**
+
+### Two fixes caused worse harm than the defect
+
+- **D541:** the rebrand markers dropped ALL THREE Monaco restaurants and the run died with
+  `max_workers must be greater than 0`, acting on *"Built by Louis XIII back in 1623, the estate is
+  now home to …"*. A snippet holds several unrelated clauses; name-containment cannot bind a marker
+  to a subject. **Path removed.** Also added: **a check may not empty the tour** — when a verifier
+  rejects every candidate the verifier is the likelier fault, so all stops are kept and flagged.
+- **D543:** `closure_scan` deleted an OPEN Monaco restaurant on *"The Bevy in Old Naples
+  permanently closed … a new concept, La Salière Naples, will open in its place"* — Florida. The
+  **city** is now required in the snippet, because a closure notice names where.
+
+### Reliability, ranked from evidence
+
+1. **The known-closed corpus** — deterministic, zero cost, never wrong. It removed La Marée in the
+   final run. **D542 also had to ship it INTO the image**: `.dockerignore` excludes `*.json` and
+   the Dockerfile copied two files from `tests/`, so the lookup was inert in the container while
+   passing every test on the host.
+2. **Practicals acquisition (SERP → OpenAI)** — solid. The decisive detail was mundane: the
+   compound name returned 3 snippets, the house name 33.
+3. **Gemini operating check** — probabilistic; let Le Vistamar through twice.
+4. **Keyword marker paths** — structurally unsound; both bound markers to the wrong subject.
+
+**Honest framing: a human-curated list protects listeners, and everything automated is an assist.**
+
+### The standing lesson — seven wiring failures in one day
+
+Five museum-gated checks, a data file that never entered the image, and a city comparison that
+never matched. **Every one was correct code running nowhere that mattered, and every one was found
+by reading tour output, never by a green suite.**
+
+**New standard before any guard is called done: not "do the tests pass" but "show the line in a
+real run where it fired."**
+
+### Final tour
+
+`TOUR_MONACO_RESTAURANT_20260828.md` — 2 of 3 stops, shortfall announced, **story gate 2/2 PASS**
+(best on any path this week), practicals spoken. Known-bad venues verified absent **from the
+delivered text**, not from a log line.
+
+**Open:** `LOCAL-36` now cries wolf — it warns `NO PRACTICAL CLAIMS FOUND TO VERIFY` on a tour that
+states price, booking and hours, because acquisition and verification do not share a source. And
+dropping remains subtractive: **replenishment is the highest-value next item on this path.**
