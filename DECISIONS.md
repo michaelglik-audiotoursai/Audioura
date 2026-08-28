@@ -21960,3 +21960,40 @@ delivered text**, not from a log line.
 **Open:** `LOCAL-36` now cries wolf — it warns `NO PRACTICAL CLAIMS FOUND TO VERIFY` on a tour that
 states price, booking and hours, because acquisition and verification do not share a source. And
 dropping remains subtractive: **replenishment is the highest-value next item on this path.**
+
+---
+
+## D544 — The gate was not failing to verify; it never saw them. And the obvious fix deleted data.
+
+**2026-08-28. Michael: "Why do not you fix the defect?"** — the `LOCAL-36` false alarm LEAD had
+reported and left unfixed. Fair, and fixing it corrected a published diagnosis.
+
+**D543's judgement claimed** the gate could not VERIFY the practicals because acquisition and
+verification did not share a source. **Wrong.** `extract_practical_claims()` reads ONLY
+`Museum Information:` and `Operational Details:` lines and never touches narration prose. D538 puts
+a restaurant's practicals in the PROSE so the listener hears them. **The gate found nothing because
+nothing was where it looks.**
+
+**The obvious fix was tried, measured, and reverted.** Writing the practicals into
+`Operational Details:` made the gate see them (0 verified → 1 verified) and stripped the field:
+
+```
+BEFORE: Open: 12:00-13:30, 19:30-21:00; Closed: Wednesday, Sunday; Booking: essential;
+        Price: Gourmet Menu 360 EUR
+AFTER:  Open: 12:00-13:30, 19:30-21:00
+```
+
+`gate_and_fix` rebuilds that line from the claims it can parse. It would have **deleted the exact
+structured data the offline-Q&A design depends on** (Michael, 08-27: *"the listener asks if it is
+open … the text file contains that information"*). The measurement is recorded in the source
+comment so nobody retries it blind.
+
+**Shipped:** the warning asks D538 what it acquired, rather than inferring from this gate's reach.
+The loud warning survives for a restaurant tour that genuinely has no practicals.
+
+**Final tour** `TOUR_MONACO_RESTAURANT_20260828_v2.md`: 2 of 3 stops (La Marée removed by the
+known-closed corpus, citing the lease dispute), practicals acquired 2/2 and spoken, known-bad
+venues verified absent from the DELIVERED TEXT, story gate 1/2.
+
+**Still open:** replenishment after a drop — the single highest-value item on this path — then
+`story_units`, the five museum-gated checks, and the offline-Q&A wiring.
