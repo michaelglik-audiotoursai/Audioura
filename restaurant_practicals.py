@@ -273,7 +273,14 @@ def known_bad_venue(name, city):
     for v in _KNOWN_CACHE:
         if v.get('expect') != 'closed':
             continue
-        if c and _fold_name(v.get('city', '')) and _fold_name(v.get('city', '')) != c:
+        # [D542] CONTAINMENT, NOT EQUALITY. The caller passes the tour's location
+        # string, which is the user's whole request — "Restaurant tour in Monaco",
+        # not "Monaco". Exact comparison made this lookup skip every entry, so the
+        # corpus worked when called directly and did nothing inside a tour, and
+        # Le Vistamar shipped a third time. Verified: k('Le Vistamar','Monaco')
+        # was True while k('Le Vistamar','Restaurant tour in Monaco') was False.
+        vc = _fold_name(v.get('city', ''))
+        if c and vc and vc not in c and c not in vc:
             continue
         for cand in [v.get('name', '')] + list(v.get('aliases', [])):
             f = _fold_name(cand)
