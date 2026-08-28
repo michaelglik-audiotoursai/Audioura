@@ -163,18 +163,31 @@ briefing. Work top to bottom.
 >   not repeat it as fact. Low priority, let it ride with the next deploy.
 > - **`generate_tour_text.py:10` imports `enhanced_tour_templates_fixed`**, which is
 >   untracked. `tour-generator` will not start from a clean checkout. Flagged, not fixed.
-> - **Kiro CLI is not installed** on this machine. Session planned — `wdvrdaxqtg`.
->   **The `import fcntl` blocker is fixed** (2026-08-27): branch
->   `port/kiro-dispatcher-windows`, commit `e40fa34`, cut from `storied` and pushed.
->   New `portable_lock.py` gives both machines one locking implementation. Verified on
->   Windows: lock holds across 8 processes (red test: 1 of 8 survives without it),
->   semaphore bound holds, a real `storied` worktree checks out all 3,248 files at
->   `C:\adev-wt`, and a forked worker inherits `KIRO_API_KEY` and outlives its parent.
+> - **Kiro continuous development is READY on this machine** (2026-08-28) — only a first
+>   supervised dispatch is outstanding, and that needs Michael's go-ahead because forked
+>   sessions are unattended spend. Session planned — `wdvrdaxqtg`.
+>   Branch `port/kiro-dispatcher-windows` (`e40fa34`, `937cc24`), cut from `storied` and
+>   pushed. New `portable_lock.py` gives both machines one locking implementation.
+>   `python kiro_dispatcher.py --preflight` **passes all six checks**; it forks nothing
+>   and costs nothing, so run it first on any machine.
+>   Verified on Windows: the lock holds across 8 processes (red test: 1 of 8 survives
+>   without it), the semaphore bound holds, a real `storied` worktree checks out all
+>   3,248 files at `C:\adev-wt`, and a detached worker outlives a parent that exits in
+>   0.09 s.
+>   **Two corrections worth carrying forward** — `wdvrdaxqnz` stated both wrongly and its
+>   description has been fixed:
+>   1. **There is no `KIRO_API_KEY` and no "Kiro portal".** `kiro-cli` authenticates with
+>      a stored **login session** (`kiro-cli login --license pro` — Michael's account is
+>      Pro / IAM Identity Center; `--license free` is Builder ID). That is why detached
+>      headless workers work at all: they inherit the machine's session. A guard built on
+>      the API-key claim would have refused to start on a correctly logged-in machine.
+>   2. **The installer misreports its path.** It prints `C:\Program Files\Kiro-Cli\`,
+>      which does not exist; the binary is at `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe`.
+>      Don't reinstall thinking it failed.
 >   **Not verified on macOS** — the POSIX path is unchanged by construction, but one
->   `git worktree add` on the Mac Mini would settle `core.longpaths`. Still blocked on
->   Michael: install the CLI and generate `KIRO_API_KEY`. Detail in `wdvrdaxqnz`.
->   Run `python kiro_dispatcher.py --preflight` to see what a machine is missing —
->   it forks nothing and costs nothing.
+>   `git worktree add` on the Mac Mini would settle `core.longpaths`.
+>   ⚠️ **No `.continuous_dev/PAUSE` file exists, so dispatch is armed:** any
+>   `new_kiro_session_is_required_*.md` at the repo root forks a real session.
 > - **Unruled by Michael:** whether the current-location dot should be labelled `#0`.
 >
 > ### Hard-won gotchas — all cost real time
