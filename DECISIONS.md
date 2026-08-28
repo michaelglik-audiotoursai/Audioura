@@ -21844,3 +21844,59 @@ reality supplied the case. This file makes that pattern explicit rather than acc
 - **Depends on someone publishing the closure in indexable form.** Raises the floor, guarantees
   nothing.
 - `story_units` 0/2, unchanged, still the ceiling on every path.
+
+---
+
+## D540 — "How is it that I can get info from Gemini and you can not?" — because we never asked it
+
+**2026-08-28. Michael's second live miss in two days: Le Vistamar.** It shipped as stop 2 while
+the space has traded as **Pavyllon Monte-Carlo** (Yannick Alléno) since 2022.
+
+### The answer to his question, in four parts
+
+**1. I was wrong that we had no Gemini key.** I wrote "GEMINI_API_KEY is currently EMPTY in .env"
+in code and in a judgement document. **The key is present and works — 53 characters, verified in
+the container.** I had grepped `^GEMINI_API_KEY=` with `-oE`, which prints only the matched PREFIX,
+and read the blank output as an empty value. **A wrong measurement, repeated as fact.** Corrected
+in `stop_knowledge_fallback.py` and the v2 judgement.
+
+**2. We never asked Gemini about this restaurant.** D538 wired Gemini as a LAST RESORT — consulted
+only when SERP+OpenAI returned nothing actionable. Le Vistamar returned hours, a price band and
+closed days, so it looked healthy and Gemini was never called. **Michael asked it directly; we
+asked it never.** Asked directly it answers in one sentence: *"It closed in 2021 and was
+transformed into Pavyllon Monte-Carlo … which has operated in that space since 2022."*
+
+**3. D539's closure check could not have caught it anyway.** A rebrand has a different linguistic
+signature: closure says *"permanently closed"*, a rebrand says *"now home to Pavyllon"*. Verified:
+`closure_scan('Le Vistamar','Monaco') -> (False, '')`.
+
+**4. AND WE HAD THE EVIDENCE AND MISREAD IT.** The delivered tour said: *"It was recently announced
+that Michelin-starred chef Yannick Alléno will be taking the helm, promising a fresh chapter for
+Le Vistamar."* Retrieval found the right chef and the right event, then concluded **"new chef, same
+restaurant"** instead of **"restaurant replaced"**. The failure was interpretation, not access.
+
+### The fix
+
+`venue_still_operating()` — Gemini FIRST for restaurant stops, asking one narrow question: does
+this venue still trade under this name? Closure and rebrand are one question to a listener standing
+outside. Falls back to tightened search markers when Gemini does not answer.
+
+### Two over-corrections caught in the building, both by the D539 suite
+
+- **Marker fired on unrelated text.** `"La Maree" Monaco ... "now home to"` matched a snippet about
+  Agatha Christie and Torquay. Fixed by requiring the venue name in the same snippet.
+- **Running the marker path unconditionally reported Le Louis XV and Cipriani as GONE**, on
+  snippets about Ducasse's stars and the Grand Prix. The first marker list contained 'renamed',
+  'has become', 'in its place', 'took over the space' — phrasing that is ordinary in restaurant
+  prose. Narrowed to wording that can ONLY mean replacement, and the Gemini answer short-circuits
+  again, with the name NORMALISED first so 'Le Vistamar', 'Le Vistamar Monaco' and 'Vistamar Hotel
+  Hermitage' ask the same question.
+
+**The corpus proved its worth on the day it was created:** it caught both over-corrections, and it
+now replays 3 venues — La Marée (closed), Le Vistamar (rebranded), Joël Robuchon (verify).
+
+### The standing lesson
+
+**Gemini was in the code, keyed, working, and unreachable in practice** because it sat behind a
+condition that a healthy-looking venue never satisfies. Same shape as the five museum-gated checks:
+capability present, wiring wrong, and only a human reading the output found it.

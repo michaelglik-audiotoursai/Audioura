@@ -31,7 +31,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from restaurant_practicals import closure_scan, fetch_practicals, _CLOSED_MARKERS
+from restaurant_practicals import (closure_scan, venue_still_operating,
+                                   fetch_practicals, _CLOSED_MARKERS)
 
 CORPUS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       'known_closed_venues.json')
@@ -92,10 +93,15 @@ def main():
             print(f"  ..  {v['name'][:34]:36s} expect={v['expect']} — not asserted, skipped")
             continue
         for name in [v['name']] + v.get('aliases', []):
-            closed, ev = closure_scan(name, v['city'])
-            ok = closed
-            print(f"  {'OK ' if ok else 'FAIL'} closure_scan({name[:26]!r:28s}) -> {closed}")
-            if not ok:
+            # [D540] Production asks BOTH questions: has it closed, and does it
+            # still trade under this name? Le Vistamar answers no only to the
+            # second — a rebrand carries no closure words.
+            closed, _ = closure_scan(name, v['city'])
+            operating, detail = (True, '') if closed else venue_still_operating(name, v['city'])
+            gone = closed or not operating
+            print(f"  {'OK ' if gone else 'FAIL'} {name[:28]!r:30s} -> gone={gone} "
+                  f"(closed={closed}, operating={operating})")
+            if not gone:
                 print(f"       {v['why_it_was_missed'][:150]}")
                 failures.append(f"{name}: not detected")
         p = fetch_practicals(v['name'], v['city'], api_key)

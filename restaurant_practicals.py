@@ -184,6 +184,122 @@ _CLOSED_MARKERS = (
 )
 
 
+# [D540] A REBRAND IS NOT A CLOSURE, AND THE CHECK ONLY KNEW THE WORD "CLOSED".
+#
+# Michael, 2026-08-28: "Le Vistamar no longer exists under that name ... The space
+# is now home to Pavyllon Monte-Carlo." Second live miss he has found, and it got
+# past D539 because a rebrand has a different linguistic signature:
+#
+#   closure  "La Marée Monaco. Permanently closed."
+#   rebrand  "now home to Pavyllon Monte-Carlo"     <- no closure words at all
+#
+# Verified: closure_scan('Le Vistamar', 'Monaco') -> (False, '').
+#
+# **And we already had the evidence and misread it.** The delivered tour said:
+#   "It was recently announced that Michelin-starred chef Yannick Alléno will be
+#    taking the helm, promising a fresh chapter for Le Vistamar."
+# Retrieval found the right chef and the right event, then concluded "new chef at
+# the same restaurant" rather than "this restaurant was replaced". The failure was
+# interpretation, not access.
+_REBRAND_MARKERS = (
+    # Deliberately narrow. The first version included 'renamed', 'has become',
+    # 'in its place' and 'took over the space', and with those the check reported
+    # Le Louis XV and Cipriani as gone — on a snippet about Ducasse's stars and one
+    # about the Grand Prix. Ordinary restaurant prose is full of near-miss phrasing;
+    # only wording that can ONLY mean "this venue trades under a different name now"
+    # belongs here.
+    'now home to', 'is now called', 'now known as', 'was rebranded',
+    'rebranded as', 'was replaced by', 'reopened as', 'transformed into',
+    'no longer exists under', 'no longer operates under',
+)
+
+_OPERATING_SYSTEM = (
+    "You answer ONE question about a restaurant: is it still operating under the name given?\n"
+    "\n"
+    "A restaurant fails this if it has closed, OR if the venue was rebranded, replaced or taken "
+    "over and now trades under a different name. Both cases mean the same thing to a listener "
+    "standing outside: the place they were told to visit is not there.\n"
+    "\n"
+    "Search the web before answering. Be current — a change of chef is NOT a change of "
+    "restaurant, but a change of NAME is.\n"
+    "\n"
+    'Return ONLY JSON: {"still_operating": true|false, "successor": "<the name it trades under '
+    'now, or \\"\\">", "changed_on": "<year or date, or \\"\\">", "reason": "<one sentence>"}'
+)
+
+
+def venue_still_operating(name, city, timeout=45):
+    """[D540] Is this venue still trading under THIS name?
+
+    Gemini FIRST, not as a last resort. That ordering is the direct answer to
+    Michael's question — "how is it that I can get info from Gemini and you can
+    not?" We hold a working GEMINI_API_KEY; the D538 chain only consulted it when
+    SERP and OpenAI returned nothing actionable, and Le Vistamar returned hours,
+    a price band and closed days, so it looked healthy and Gemini was never asked.
+    He asked it directly and got the right answer in one sentence.
+
+    Returns (still_operating: bool, detail: str). Unknown answers return True —
+    absence of evidence must never delete a stop.
+    """
+    if os.environ.get('GEMINI_API_KEY'):
+        try:
+            from story_leads import gemini_with_sources
+            # Normalised name: the D539 suite caught 'Le Vistamar Monaco' and
+            # 'Vistamar Hotel Hermitage' getting a different verdict from
+            # 'Le Vistamar'. Strip the city and any trailing venue qualifier so
+            # every phrasing of the same restaurant asks the same question.
+            _q = re.sub(r'\s*\([^)]*\)\s*', ' ', name or '').strip()
+            _q = re.split(r'\s+[-–—]\s+|\s+à\s+l', _q)[0].strip()
+            _city_word = (city or '').split(',')[0].strip()
+            if _city_word:
+                _q = re.sub(rf'\s+{re.escape(_city_word)}$', '', _q, flags=re.I).strip()
+            res = gemini_with_sources(
+                f"{_OPERATING_SYSTEM}\n\nRestaurant: {_q}\nCity: {city}\n\n"
+                f"Is it still open under this exact name today? Return only the JSON.")
+            text = res.get('text', '') if isinstance(res, dict) else str(res)
+            m = re.search(r'\{.*\}', text, re.S)
+            if m:
+                d = json.loads(m.group(0))
+                if d.get('still_operating') is False:
+                    succ = str(d.get('successor', '') or '').strip()
+                    when = str(d.get('changed_on', '') or '').strip()
+                    detail = str(d.get('reason', '') or '').strip()
+                    bits = [b for b in (detail, f"now: {succ}" if succ else '',
+                                        f"changed {when}" if when else '') if b]
+                    return False, ' — '.join(bits)[:220]
+                if d.get('still_operating') is True:
+                    return True, ''
+        except Exception:
+            pass  # fall through to the search-marker path
+
+    # Rebrand language in search results — run for its own sake, not only as a
+    # fallback, so one phrasing of a name cannot clear a venue another phrasing
+    # would have caught.
+    import unicodedata
+    bare = re.sub(r'\s*\([^)]*\)\s*', ' ', name or '').strip()
+    core = re.split(r'\s+[-–—]\s+|\s+à\s+l', bare)[0].strip()
+    folded = ''.join(c for c in unicodedata.normalize('NFKD', core)
+                     if not unicodedata.combining(c))
+    place = (city or '').split(',')[0].strip()
+    # The snippet must be ABOUT this venue. Without this the marker matches
+    # anywhere: searching "La Maree" Monaco returned a snippet reading "Agatha
+    # Christie spent most of her life here, and the city is now home to multiple
+    # film companies" — "now home to" fired on Torquay. Right verdict for La Marée
+    # by luck, wholly wrong evidence, and it would delete an open restaurant the
+    # first time an unrelated page used the phrase.
+    _keys = {k for k in (core.lower(), folded.lower()) if len(k) >= 4}
+    for v in [x for x in dict.fromkeys([core, folded]) if x]:
+        for q in (f'"{v}" {place} renamed OR rebranded OR "now home to"',
+                  f'"{v}" {place} replaced by restaurant'):
+            for item in _serp(q, max_results=8):
+                low = item['snippet'].lower()
+                if not any(k in low for k in _keys):
+                    continue
+                if any(mk in low for mk in _REBRAND_MARKERS):
+                    return False, f"{item['snippet'][:170]} [{item.get('url','')}]"
+    return True, ''
+
+
 def closure_scan(name, city):
     """A dedicated closure probe, run across spelling variants.
 
@@ -267,6 +383,16 @@ def fetch_practicals(name, city, api_key, timeout=45):
     if _closed:
         out['status'] = 'closed_permanently'
         out['evidence'] = _closed_ev or fields.get('evidence', '')
+
+    # [D540] And the rebrand case, which carries no closure words at all. Runs
+    # even when everything above looked healthy — Le Vistamar had hours, a price
+    # band and closed days, and had not existed under that name since 2021.
+    if out['status'] != 'closed_permanently':
+        _open_now, _op_detail = venue_still_operating(name, city, timeout=timeout)
+        if not _open_now:
+            out['status'] = 'closed_permanently'
+            out['evidence'] = _op_detail
+            out['successor_note'] = _op_detail
 
     # The one hard rule. A permanently closed restaurant cannot be a stop, and
     # "unknown" is NOT closed — absence of evidence never removes a stop.

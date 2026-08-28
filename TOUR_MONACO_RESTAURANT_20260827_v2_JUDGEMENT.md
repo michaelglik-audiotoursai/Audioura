@@ -35,7 +35,7 @@ That is the difference between a story about a restaurant and a tour you can use
 2. **OpenAI** extracts structured fields **from those results**, explicitly forbidden to fill gaps
    from memory: an invented opening time sends someone to a locked door.
 3. **Gemini** runs only if the first two came back with nothing actionable, and only when
-   `GEMINI_API_KEY` is set — it is currently empty in `.env`, so today the chain stops at step 2.
+   `GEMINI_API_KEY` is set — **this claim was WRONG and is corrected 2026-08-28: the key is present and works.** I had misread a grep that printed only the matched prefix. The chain stopped at step 2 because Gemini was wired as a last resort, not because it was unavailable. See D540.
    It found what was needed anyway (32, 21 and 22 snippets per restaurant).
 
 **One discovery worth keeping.** Searching the full compound name —

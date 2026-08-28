@@ -32,8 +32,13 @@ written about. Three things keep it honest:
      caller.
 
 Provider: Gemini with sources when `GEMINI_API_KEY` is set (grounded, returns
-citations), OpenAI otherwise. `GEMINI_API_KEY` is currently EMPTY in `.env`, so
-the OpenAI path is what runs today.
+citations), OpenAI otherwise.
+
+**Correction, 2026-08-28:** an earlier version of this note said `GEMINI_API_KEY`
+was EMPTY in `.env`. It is not — the key is present and works (53 chars, verified
+in the container). I had grepped a pattern that printed only the matched PREFIX,
+not the value, and read the blank as an empty key. That mistake is why the Gemini
+step was treated as unreachable and left as a last resort. See D540.
 """
 import json
 import os
