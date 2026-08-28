@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -616,27 +617,51 @@ def worker(task_path_str):
     )
 
 
-def require_kiro_api_key():
-    """Refuse to start without KIRO_API_KEY, rather than forking agents that cannot log in.
+def kiro_login_state():
+    """(logged_in, detail). Asks the CLI itself rather than inferring from config.
 
-    Headless kiro-cli authenticates with an API key, not the browser AWS Builder
-    ID flow the dispatcher was written against. Without it every forked worker
-    starts, fails to authenticate, and writes a FAILED line -- burning a
-    concurrency slot and a worktree per task to discover one missing variable.
-    Failing here costs one message instead.
+    CORRECTION 2026-08-28: an earlier version of this guard required a
+    KIRO_API_KEY environment variable. That was wrong. `kiro-cli login --help`
+    offers only Builder ID (--license free), Identity Center (--license pro),
+    social providers and a device flow -- there is NO API-key authentication in
+    this CLI, and KIRO_API_KEY appears nowhere in the codebase. The guard would
+    have refused to start on a machine that was correctly logged in.
 
-    .env is exported first, so a key living there counts.
+    Auth is a stored login session, which is why the detached headless workers
+    work at all: they inherit the machine's session, not a variable.
     """
-    export_dotenv_into_environ()
-    if os.environ.get("KIRO_API_KEY"):
+    exe = shutil.which("kiro-cli")
+    if not exe:
+        return False, "kiro-cli is not on PATH"
+    try:
+        r = subprocess.run([exe, "whoami"], capture_output=True, text=True, timeout=30)
+    except Exception as e:
+        return False, f"could not run `kiro-cli whoami`: {e}"
+    out = ((r.stdout or "") + (r.stderr or "")).strip()
+    if r.returncode == 0 and "not logged in" not in out.lower():
+        return True, out.splitlines()[0] if out else "logged in"
+    return False, out.splitlines()[0] if out else "not logged in"
+
+
+def require_kiro_login():
+    """Refuse to start unless this machine has a usable kiro-cli login.
+
+    Without it every forked worker starts, fails to authenticate and writes a
+    FAILED line -- burning a concurrency slot and a worktree per task to
+    discover one missing login. Failing here costs one message instead.
+    """
+    export_dotenv_into_environ()  # still needed: OPENAI_API_KEY, SERP_API_KEY, ...
+    ok, detail = kiro_login_state()
+    if ok:
         return
     sys.exit(
-        "[dispatcher] REFUSING TO START: KIRO_API_KEY is not set.\n"
-        "  Headless `kiro-cli chat --no-interactive` needs an API key; the browser\n"
-        "  AWS Builder ID / IAM Identity Center flow does not apply.\n"
-        "  Generate one in the Kiro portal (Settings -> API Keys) and either export\n"
-        f"  KIRO_API_KEY or add it to {WATCH_DIR / '.env'}.\n"
-        "  Requires a Pro, Pro+ or Power plan -- it is not available on Free."
+        f"[dispatcher] REFUSING TO START: {detail}.\n"
+        "  Headless `kiro-cli chat --no-interactive` runs off this machine's stored\n"
+        "  login session. Log in once, interactively:\n"
+        "      kiro-cli login --license free          # Builder ID\n"
+        "      kiro-cli login --license pro           # Identity Center\n"
+        "      kiro-cli login --use-device-flow       # if browser redirect fails\n"
+        "  Confirm with `kiro-cli whoami`, then re-run this dispatcher."
     )
 
 
@@ -651,7 +676,7 @@ def main():
         preflight()
         return
 
-    require_kiro_api_key()
+    require_kiro_login()
 
     if args.worker:
         worker(args.worker)
@@ -665,8 +690,6 @@ def preflight():
     Exists because every other way of finding out costs a real dispatch, and a
     real dispatch costs money. Safe to run anywhere, any time.
     """
-    import shutil
-
     ok = True
 
     def check(label, passed, detail=""):
@@ -680,11 +703,13 @@ def preflight():
     check("watch dir exists", WATCH_DIR.is_dir(), str(WATCH_DIR))
     check("watch dir is a git repo", (WATCH_DIR / ".git").exists(), str(WATCH_DIR / ".git"))
     check("worktree root is writable", _selftest_worktree_base(), str(WORKTREE_BASE))
-    check("kiro-cli on PATH", shutil.which("kiro-cli") is not None,
-          "install: irm https://cli.kiro.dev/install.ps1 | iex" if not shutil.which("kiro-cli") else "")
+    exe = shutil.which("kiro-cli")
+    check("kiro-cli on PATH", exe is not None,
+          exe or "install: irm https://cli.kiro.dev/install.ps1 | iex")
+    logged_in, detail = kiro_login_state()
+    check("kiro-cli logged in", logged_in,
+          detail if logged_in else f"{detail} -- run: kiro-cli login --license free")
     export_dotenv_into_environ()
-    check("KIRO_API_KEY set", bool(os.environ.get("KIRO_API_KEY")),
-          "Kiro portal -> Settings -> API Keys (Pro/Pro+/Power only)")
     print(f"[dispatcher] preflight {'PASSED' if ok else 'FAILED'}")
     sys.exit(0 if ok else 1)
 

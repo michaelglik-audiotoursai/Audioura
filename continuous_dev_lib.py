@@ -13,12 +13,29 @@ from pathlib import Path
 
 import portable_lock
 
-# WATCH_DIR is the repo root. It was hardcoded to the Mac Mini's layout, which
-# does not exist on the Windows laptop (the clone lives under
-# eclipse-workspace\AudioTours\development). Overridable so one code path serves
-# both machines; the default is unchanged, so the Mac Mini behaves exactly as
-# before.
-WATCH_DIR = Path(os.environ.get("AUDIOURA_WATCH_DIR") or (Path.home() / "Audioura"))
+def _default_watch_dir():
+    """The repo root, found rather than assumed.
+
+    This was hardcoded to ~/Audioura, which is the Mac Mini's layout. On the
+    Windows laptop the clone lives under eclipse-workspace\\AudioTours\\development,
+    so every invocation needed AUDIOURA_WATCH_DIR set by hand -- easy to forget,
+    and forgetting it points the dispatcher at a directory that does not exist.
+
+    Resolution order, first hit wins:
+      1. AUDIOURA_WATCH_DIR, for anyone who wants to be explicit
+      2. ~/Audioura if it exists -- so the Mac Mini is completely unaffected
+      3. the directory this file sits in, which IS the repo root on the laptop
+    """
+    explicit = os.environ.get("AUDIOURA_WATCH_DIR")
+    if explicit:
+        return Path(explicit)
+    mac_default = Path.home() / "Audioura"
+    if mac_default.is_dir():
+        return mac_default
+    return Path(__file__).resolve().parent
+
+
+WATCH_DIR = _default_watch_dir()
 CONTROL_DIR = WATCH_DIR / ".continuous_dev"
 PAUSE_FILE = CONTROL_DIR / "PAUSE"
 STATUS_FILE = CONTROL_DIR / "STATUS.md"
