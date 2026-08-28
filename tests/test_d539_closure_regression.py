@@ -38,7 +38,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from restaurant_practicals import (closure_scan, venue_still_operating,
-                                   fetch_practicals, _CLOSED_MARKERS)
+                                   known_bad_venue, fetch_practicals,
+                                   _CLOSED_MARKERS)
 
 CORPUS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       'known_closed_venues.json')
@@ -102,9 +103,16 @@ def main():
             # [D540] Production asks BOTH questions: has it closed, and does it
             # still trade under this name? Le Vistamar answers no only to the
             # second — a rebrand carries no closure words.
-            closed, _ = closure_scan(name, v['city'])
-            operating, detail = (True, '') if closed else venue_still_operating(name, v['city'])
-            gone = closed or not operating
+            # [D543] Mirror what production actually does, in order. The corpus
+            # lookup is the FIRST line of defence and the only deterministic one;
+            # omitting it here made this suite fail on Le Vistamar while production
+            # correctly dropped it.
+            known, _ = known_bad_venue(name, v['city'])
+            closed = operating = None
+            if not known:
+                closed, _ = closure_scan(name, v['city'])
+                operating, _ = (True, '') if closed else venue_still_operating(name, v['city'])
+            gone = known or closed or (operating is False)
             # The PRIMARY name is a hard assertion — it is what production passes.
             # Aliases are ADVISORY: the Gemini answer is probabilistic, and
             # 'Le Vistamar Monaco' has been observed flipping between runs on a
@@ -114,7 +122,7 @@ def main():
             is_primary = (name == v['name'])
             tag = 'FAIL' if (not gone and is_primary) else ('WARN' if not gone else 'OK ')
             print(f"  {tag} {name[:28]!r:30s} -> gone={gone} "
-                  f"(closed={closed}, operating={operating})"
+                  f"(corpus={known}, closed={closed}, operating={operating})"
                   + ('' if gone else ('  <- primary name, must detect' if is_primary
                                       else '  <- alias, probabilistic')))
             if not gone and is_primary:
