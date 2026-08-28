@@ -21787,3 +21787,60 @@ module in isolation; **a unit test cannot see that nothing calls the unit.**
   the "state only what is listed" instruction held — but the extractor accepted nonsense.
 - The closure path is implemented and unit-tested and **has not yet fired on a live tour**; Joël
   Robuchon Monte-Carlo simply was not proposed this run (Phase 3A is unseeded).
+
+---
+
+## D539 — Closure is decisive, not one vote among many; and the mechanism for learning from a miss
+
+**2026-08-27. Michael found La Marée Monaco — closed 2020-09-30 — shipped as stop 3 of the tour
+delivered that afternoon. The D538 closure check ran on it and cleared it.**
+
+### Why it failed
+
+**A logic error, not a tuning problem.** The same restaurant returns opposite verdicts by spelling:
+
+```
+"La Maree"  -> closed_permanently   "La Marée Monaco. Permanently closed. 1615 votes."
+"La Marée"  -> open                 "open 7 days a week in Monaco"
+```
+
+Closure notices and stale listings **coexist**. In the very run that dropped it, the extractor
+still reported `hours=19:12-00:22, price_band=Average price 79 EUR` for a restaurant shut for six
+years — aggregators keep plausible hours alive indefinitely.
+
+D538 weighed evidence-of-closure against evidence-of-operation, which makes the verdict a coin toss
+decided by whichever snippets SERP returns. **The costs are not symmetric:** skipping an open
+restaurant costs one stop; sending a listener to a locked door is the harm. `closure_scan()` now
+runs ALWAYS, across accented and unaccented variants, by deterministic marker match rather than LLM
+judgement, and **OVERRIDES** a confident "open" with hours.
+
+Guarded against the obvious over-correction: *"closed on Mondays"*, *"the kitchen closed at 22:30"*
+must not delete a restaurant. Tested.
+
+### The mechanism — Michael: *"Is there a mechanism for us to learn to make sure we do validate stops?"*
+
+**`tests/known_closed_venues.json`**, replayed by `tests/test_d539_closure_regression.py`.
+
+Every venue that SHIPPED IN A TOUR and turned out not to be visitable, carrying the tour it shipped
+in, who found it, **why it was missed**, and the ground truth. **Never deleted** — a venue that
+reopens becomes `expect: open` and keeps its history, because the case still exercises the
+machinery.
+
+- **La Marée** — `closed`, full spelling-dependence diagnosis.
+- **Joël Robuchon Monte-Carlo** — **`verify`, not `closed`.** Suspected, not confirmed. The corpus
+  separates what we know from what we suspect so a suspicion cannot harden into a fact by being
+  written down.
+
+**Why this shape is right:** every guard built over these two days came from ONE real failure —
+Guernica, the Gautier birth year, the 1946 repetition, the Hippodrome waypoint. They hold because
+reality supplied the case. This file makes that pattern explicit rather than accidental.
+
+### Limitations, stated
+
+- **2 stops delivered, not 3.** Dropping a closed restaurant leaves a hole; nothing refills it.
+  Announced correctly by D536. Replenishment touches selection — post-release.
+- **Restaurant-only.** A closed museum or demolished landmark still ships. LOCAL-365 covers
+  exhibitions; nothing covers the rest.
+- **Depends on someone publishing the closure in indexable form.** Raises the floor, guarantees
+  nothing.
+- `story_units` 0/2, unchanged, still the ceiling on every path.
