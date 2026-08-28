@@ -1460,6 +1460,152 @@ merge against what is already in the stop, at no additional cost.
 not mere descriptions."* LEAD's "stop 1 is too long" recommendation is withdrawn — the target is
 the errors in it, not its length.
 
+## A223 — B-naive is not an option, it is what B decays into (D532)
+
+Michael chose **B with C's labelling** and asked the question that settled it: *"what motivation
+would there be to select naive?"* None. If "contradiction" means "the page refutes this title",
+the veto never fires — museum pages do not write *"Guernica is not in this show"* — and B silently
+becomes A. **A guard that cannot fail.** Real B vetoes on the scope the page DECLARES: medium,
+artist set, date range, venue. Silence about a title is not consent; silence about a category the
+page has already bounded is a veto.
+
+Live: Phase 3A proposed Woman in a Hat, The Farm and The Persistence of Memory; all three vetoed on
+form. Against D530, where five works entered D1v2 and all five were dropped for a zero-stop tour.
+
+## A224 — A tour can pass every gate and still contradict its own source (D533)
+
+Corpus: *"Antoine Gautier … born in Nice in 1825."* Tour: *"the quartet founded by Antoine Gautier
+in 1825."* A newborn founding a quartet. D1v2 6/6, existence gate 100%, LOCAL-16 green.
+
+**The gates verify that the STOP exists, not that the SENTENCE is true.** `story_fact_guard.py`
+compares the role the tour gives a (person, year) pair against the role the CORPUS gives it, and
+DELETES a mismatch rather than rewriting — a rewrite has to assert something, which is how a second
+fabrication enters while fixing the first.
+
+**It did not run on the first attempt.** `stop_corpus.passages` is a list for some rows; the wiring
+assumed str and printed `Role guard error (non-fatal)`. **A non-fatal except around a check that
+never ran is indistinguishable from a check that passed.**
+
+## A225 — "Listener should not listen the same story many times" (D533/D534)
+
+Michael's framing was the fix. Sentence-Jaccard scored the repeated 1942 purchase at **0.692**
+against a 0.70 threshold; lowering the threshold would have caught that pair and still missed the
+target, because the same fact can be told in words that barely overlap.
+
+He then found the case that broke the first fix: the 1946 monument classification, told at stops 1
+and 3, where **neither sentence has a capitalised subject** — *"this decision"*, *"the building"*.
+Two detectors now: semantic embeddings for paraphrase, and (year, uncommon-noun) for the case
+embeddings score too low once extra clauses dilute the vector.
+
+**Exempt by his instruction:** stop 1's orientation preview. *"I actually like it."* Counting it as
+a first telling produced four false positives and would have regenerated stop 2 for describing its
+own object.
+
+## A226 — The stop was not starved; a gate that ran too early silenced it (D533)
+
+*"The third stop has no information about it and that is strange because when I asked for it at
+Gemini I got plenty."* Correct, and the cause was not missing sources: the stop had **8 SERP
+snippets** and the corpus gate — which runs BEFORE the search — had marked it `VENUE_ONLY
+action=SHORTENED`, a verdict that forbids describing the object. Stale verdicts are now lifted when
+material arrives. Grounding is what makes the fallback safe: from memory alone gpt-4o gave five
+facts, three of them restatements of the question; with web evidence it gave Turner's 1647-1656
+working range, the Gautier bequest, six strings and inventory number C36.
+
+## A227 — A string prepared for one consumer, fed to another (D536)
+
+The Riviera request delivered **2 stops of 5**. `[BLOCKER1]` strips "tour" and `[LOCAL-46]` strips
+transport words for AREA RESOLUTION — correct for that job — and the stripped string was then used
+to ask the intent model what the tour is ABOUT. With "Biking" gone and `tour_type` suppressed, the
+only concrete noun left was the hippodrome, so intent answered `poi_type: "horse racing tracks"`.
+
+Then `geographic_scope` was set to the named waypoint and PHASE 5.6 removed three stops for being
+"outside" it. **Every removal was correct; a racecourse is not inside another racecourse. The check
+was right and the scope was wrong.** A named stop cannot contain the tour that visits it.
+
+And the opposite failure, caught before delivery: refusing the waypoint as a scope produced a tour
+without it. `named_waypoints()` now refuses it as scope, inserts it if absent, and protects it from
+the address and distance gates.
+
+## A228 — Does the museum work help every tour type? Mostly, and five places where it did not
+
+Verified from the logs, not assumed. The repetition guards, the person-year role guard and the
+thin-stop trigger all ran on a biking tour. **Five checks were museum-gated while named as
+general:** the D535 prompt rules, the LOCAL-439 story gate, the knowledge-fallback trigger, the
+LOCAL-192 phrase filter (stop descriptions only — orientations, Directions and the recap are
+unfiltered), and the D538 restaurant practicals, which sat inside
+`if (_storied_mode and tour_category == 'museum')` and could never run on a restaurant tour.
+
+**The museum path is where this codebase grew, and new work lands inside it by default.** One
+structural pass is owed, not five more discoveries.
+
+## A229 — What size requires a story, and why more facts is not more story (D534/D537)
+
+The floor was **120 words**, which is why nothing fired on stops of 226 and 259. A story-unit is
+separately defined as **>=3 sentences with a named person, real actions and an arc** (LOCAL-439).
+`_THIN_FLOOR=300` added as a second bar.
+
+**The story work Michael asked for did not land.** With the gate finally running on non-museum
+tours: 1/5, 2/5, 0/5 across identical runs — noise. The place-focused retrieval demonstrably
+fetches real episodes; the narration does not reliably use them. **That gap is the remaining
+quality ceiling on every path.**
+
+## A230 — For a restaurant, the practicals ARE the content (D538)
+
+`PRACTICAL FACTS GATE: PASSED (0 verified)` over three restaurants with no hours, no price and no
+booking. **It passed because it verified nothing.** `practical_facts_gate` is SUBTRACTIVE — it
+drops claims it cannot trace — so it is silent when the narration made no claims at all.
+
+Acquisition added in Michael's order: SERP → OpenAI extracting FROM those results → Gemini. **The
+name format was the whole difference:** the full compound `"Le Louis XV - Alain Ducasse à l'Hôtel
+de Paris"` returned **3 snippets**; the house name alone returned **33**, with every field
+populated.
+
+**Price is disclosure, not deletion** — Le Louis XV at 360 EUR is among Europe's most expensive
+restaurants and was the best stop in the tour.
+
+## A231 — Closure is asymmetric, and the mechanism for learning from a miss (D539)
+
+**La Marée Monaco**, closed 2020-09-30, shipped as a stop; the closure check cleared it. The same
+restaurant returns opposite verdicts by spelling — unaccented gave *"Permanently closed"*, accented
+gave *"open 7 days a week"* — because closure notices and stale listings coexist. Weighing one
+against the other makes the verdict a coin toss.
+
+**The costs are not symmetric.** Skipping an open restaurant costs one stop; sending a listener to
+a locked door is the harm. Closure is now decisive, probed across spellings by deterministic marker
+match.
+
+Michael: *"Is there a mechanism for us to learn to make sure we do validate stops?"*
+**`tests/known_closed_venues.json`** — every venue that shipped in a tour and turned out not to be
+visitable, with why it was missed, replayed on every change, never deleted. Joël Robuchon is
+recorded as `verify`, not `closed`, because it is suspected and unconfirmed.
+
+## A232 — "How is it that I can get info from Gemini and you can not?" (D540)
+
+**Because we never asked it.** Four parts:
+
+1. LEAD had claimed `GEMINI_API_KEY` was EMPTY. **It is present and works** — the claim came from a
+   grep that printed only the matched PREFIX. A wrong measurement repeated as fact.
+2. Gemini was wired as a LAST RESORT, consulted only when SERP+OpenAI returned nothing actionable.
+   Le Vistamar returned hours, price and closed days, so it looked healthy and Gemini was never
+   called.
+3. D539's closure check could not catch it anyway — a rebrand says *"now home to Pavyllon"*, not
+   *"permanently closed"*.
+4. **And the evidence was in hand and misread.** The tour said Alléno *"will be taking the helm …
+   a fresh chapter for Le Vistamar"* — reading a replacement as a change of chef. Interpretation,
+   not access.
+
+`venue_still_operating()` asks Gemini first: does this venue still trade under this name? The
+known-closed corpus caught two over-corrections during the build — a marker firing on an Agatha
+Christie snippet, and an unconditional pass reporting Le Louis XV and Cipriani as gone.
+
+## Code map — 2026-08-28
+- [`story_fact_guard.py`](story_fact_guard.py) — person-year role mismatch; deletes rather than rewrites (D533)
+- [`derepetition_guard.py`](derepetition_guard.py) — cross-stop FACT and SEMANTIC repetition, orientation preview exempt (D533/D534)
+- [`stop_knowledge_fallback.py`](stop_knowledge_fallback.py) — web-grounded fill for starved stops; object vs place focus (D533/D537)
+- [`restaurant_practicals.py`](restaurant_practicals.py) — SERP→OpenAI→Gemini acquisition, closure and rebrand checks (D538/D539/D540)
+- [`tests/known_closed_venues.json`](tests/known_closed_venues.json) — venues reality caught us on; never deleted (D539)
+- [`generate_tour_text.py`](generate_tour_text.py) — `named_waypoints`, `scope_is_a_waypoint` (D536); `scope_contradicts` (D532)
+
 ## Code map — 2026-08-24
 - [`story_append_merge.py`](story_append_merge.py) — the story replaces overlapping prose; citation strip; intra- and inter-sentence dedupe
 - [`spoken_text_hygiene.py`](spoken_text_hygiene.py) — template seams, missing spaces, dangling prepositions, spoken labels

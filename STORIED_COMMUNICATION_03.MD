@@ -1525,3 +1525,66 @@ artists, Sept–Oct 2026" without the page ever naming it.
 
 **The recommendation "B with C's labelling" means B-real.** Naive belongs in the record as the
 failure mode to guard against, not as a row in an options table.
+
+---
+
+## 2026-08-26 → 08-28 — the three-path stretch: museum, biking, restaurant
+
+**Michael's ruling on the checklist (08-26).** He chose **B with C's labelling** after making LEAD
+separate "B-naive" from "B-real" out loud. His question — *"what motivation would there be to
+select naive?"* — has no answer, and that was the finding: naive is not an option, it is what B
+degrades into if implemented literally. Built as D532.
+
+**His review of the Palais Lascaris tour (08-26).** *"The best tour with the best stops I have
+seen."* Every stop Acceptable, three Excellent. Four improvements: the opening repeats the stops
+ahead; stop 1 claims "innovation" without saying how; stop 2 instructs the listener ("As you
+reflect on this piece, consider…"); stop 3 names a work already visited without saying so. All
+four implemented (D535). Separately: *"Stop 1's orientation: stop previewing later stops — I
+actually like it."* The preview stays, and both repetition detectors now exempt it.
+
+**Three defects he found that LEAD had shipped:**
+
+1. **A fabrication that passed every gate.** Corpus: *"Antoine Gautier … born in Nice in 1825"*.
+   Tour: *"the quartet founded by Antoine Gautier in 1825"*. D1v2 6/6, existence gate 100%,
+   LOCAL-16 green — the gates verify the STOP exists, not that the SENTENCE is true. (D533)
+2. **The same fact told in three stops.** His framing was the important part: *"listener should
+   not listen the same story many times."* Sentence-similarity was the wrong instrument; the 1946
+   case had no proper noun and no shared vocabulary. Two detectors now — semantic and
+   (year, uncommon-noun). (D533/D534)
+3. **A stop with no information.** *"When I asked for it at Gemini I got plenty."* He was right and
+   the cause was not missing sources: the stop had 8 snippets and the corpus gate — which runs
+   BEFORE the search — still forbade describing the object. (D533)
+
+**The biking tour (08-27).** First attempt delivered **2 stops of 5** and told the listener
+nothing. Cause: `[BLOCKER1]` and `[LOCAL-46]` strip "tour" and transport words for AREA
+RESOLUTION, and the stripped string was reused to ask what the tour is ABOUT — so intent answered
+`poi_type: "horse racing tracks"`. Then the named waypoint became the tour's BOUNDARY and the scope
+check deleted three stops. Fixed as D536; 5/5 delivered, all verified, Hippodrome present.
+
+**His confirmation question:** *"I hope any tour would benefit from the work we have done on Museum
+type tours."* Mostly yes — verified from the logs. **But five checks were museum-gated and named as
+if general**: the D535 prompt rules, the story gate, the knowledge-fallback trigger, the phrase
+filter's scope, and the restaurant practicals. Structural finding, not five bugs.
+
+**The story work he asked for did not land (D537).** With the story gate finally measuring
+non-museum tours: 1/5, 2/5, 0/5 across identical runs. Noise. Recorded as a negative result.
+
+**The restaurant path (08-27/28), and two live misses he found:**
+
+- **`PRACTICAL FACTS GATE: PASSED (0 verified)`** on three restaurants with no hours, no price, no
+  booking. His ruling: *"for the restaurants the tour stop can not be a stop if the restaurant is
+  closed or the menu is overpriced."* Built the acquisition half — SERP → OpenAI → Gemini (D538).
+- **La Marée Monaco**, closed 2020, shipped as a stop. The check cleared it because the same
+  restaurant returns opposite verdicts by spelling. Closure is now decisive (D539), and his
+  question — *"is there a mechanism for us to learn?"* — is answered by
+  `tests/known_closed_venues.json`.
+- **Le Vistamar**, replaced by Pavyllon Monte-Carlo in 2022, shipped as a stop. His question:
+  *"how is it that I can get info from Gemini and you can not?"* **Because we never asked it.**
+  LEAD had also claimed the Gemini key was empty — it is present and works; the claim came from a
+  grep that printed only the matched prefix. (D540)
+
+**Standing pattern across the stretch:** every fix opened its own opposite failure — the
+de-repetition guard broke coherence, the fallback flag produced a false disclosure about a real
+exhibit, the waypoint was rescued from being a boundary then dropped from the tour, the bike
+reachability check deleted three reachable stops while keeping an island. **All were caught by
+running the thing and reading the output; the suites were green every time.**
