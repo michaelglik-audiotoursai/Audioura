@@ -10453,7 +10453,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
     # content rather than a convenience.
     if tour_category == 'restaurant':
         try:
-            from restaurant_practicals import fetch_practicals
+            from restaurant_practicals import (fetch_practicals,
+                                               propose_replacements)
             _rp_city = location
             _rp_keep, _rp_dropped = [], []
             for _rp_poi in poi_list:
