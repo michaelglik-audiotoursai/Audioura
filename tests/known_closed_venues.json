@@ -1,6 +1,6 @@
 {
   "_purpose": "Venues that were SHIPPED IN A TOUR and turned out to be closed, wrong, or otherwise not visitable. Every entry is a real miss caught by a human, not a hypothetical. The suite in test_d539_closure_regression.py replays them on every change, so a defect reality has already found can never silently come back.",
-  "_rule": "Add an entry the same day a miss is found. Never delete one — a venue that reopens gets `expect: open` and keeps its history, because the case still tests the machinery. A venue fails this check if it has CLOSED or if it now trades under a DIFFERENT NAME - both mean the listener cannot find the place they were sent to.",
+  "_rule": "Add an entry the same day a miss is found. Never delete one — a venue that reopens gets `expect: open` and keeps its history, because the case still tests the machinery. A venue fails this check if it has CLOSED or if it now trades under a DIFFERENT NAME - both mean the listener cannot find the place they were sent to. A 'verify' entry is a TASK, not a resting state: settle it and promote it to 'closed' or 'open'. Joel Robuchon sat unresolved for a day and shipped again.",
   "_why_this_exists": "La Maree Monaco closed 2020-09-30 and shipped as stop 3 of TOUR_MONACO_RESTAURANT_20260827_v2. The closure check ran and cleared it. Michael found it by searching the name himself. Nothing in the pipeline would have caught it on the next run either, because the verdict depended on which spelling was searched.",
   "venues": [
     {
@@ -39,11 +39,12 @@
         "Joel Robuchon Monaco"
       ],
       "city": "Monaco",
-      "expect": "verify",
-      "found_by": "LEAD, 2026-08-27 (unverified suspicion, recorded rather than asserted)",
-      "shipped_in": "TOUR_MONACO_RESTAURANT_20260827.md, stop 2",
-      "why_it_was_missed": "Existence gate verified it at 100% - it checks whether an entity is KNOWN, not whether it is OPERATING. Those are different questions and only the second one matters for a restaurant.",
-      "ground_truth": "Joel Robuchon died in 2018. Whether the Hotel Metropole restaurant of that name still operates was NOT confirmed. This entry is 'verify', not 'closed' - it must not be asserted as fact until someone checks."
+      "expect": "closed",
+      "found_by": "LEAD suspicion 2026-08-27, CONFIRMED via Gemini 2026-08-28 after it shipped as stop 3",
+      "shipped_in": "TOUR_MONACO_RESTAURANT_20260827.md stop 2; again 2026-08-28 under D545 replenishment",
+      "why_it_was_missed": "Recorded as 'verify' rather than 'closed' because it was a suspicion, and known_bad_venue() deliberately drops only 'closed' entries. That was the right rule and the wrong outcome: an UNRESOLVED suspicion sat in the corpus for a day and shipped again. A 'verify' entry is a task, not a state - it must be settled, not stored.",
+      "ground_truth": "The Joel Robuchon brand partnership at the Hotel Metropole Monte-Carlo ended in 2020 ahead of renovations. In June 2023 the flagship dining room reopened as Les Ambassadeurs by Christophe Cussac, Robuchon's longtime executive chef. Joel Robuchon died in 2018.",
+      "closed_on": "2020 (brand partnership ended); replaced June 2023"
     }
   ]
 }
