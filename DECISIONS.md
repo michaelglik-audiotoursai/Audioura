@@ -21997,3 +21997,75 @@ venues verified absent from the DELIVERED TEXT, story gate 1/2.
 
 **Still open:** replenishment after a drop — the single highest-value item on this path — then
 `story_units`, the five museum-gated checks, and the offline-Q&A wiring.
+
+---
+
+## D545 — Replenishment, restaurant lore, and the three dead restaurants Michael found
+
+**2026-08-28. Michael: "why would you recommend shipping while the wrong number of stops at the
+place where the stops can be plentiful is a terrible bug! The system can not find 3 restaurants in
+Monaco, really???"**
+
+**He was right and the D544 recommendation was wrong.** Dropping a dead restaurant is correct;
+delivering 2 of 3 because of it is not. LEAD treated the D536 shortfall notice as if it discharged
+the problem — **announcing a failure is not the same as not failing.**
+
+### Shipped
+
+**Replenishment.** After drops, propose more real open restaurants excluding everything seen or
+rejected, vet each through the SAME corpus + closure checks that removed the original, append until
+the count is met. Additive only, max 2 rounds. **Live it refused a dead venue mid-replenishment:**
+
+```
+[D545]   ADDED 'Café de Paris Monte-Carlo'
+[D545]   rejected 'La Marée' — recorded in known_closed_venues.json
+[D545]   ADDED 'Le Grill'
+[D536] Listener asked for 3 stop(s), delivering 3 — request met
+```
+
+**Three dead restaurants proposed in one run — Robuchon, Vistamar, La Marée — none reached the
+listener.**
+
+**Restaurant lore.** Michael: *"for restaurants it is very important to talk about people and
+people's experience."* His Gemini answer for Le Louis XV was the spec. The practicals chain asks
+what a place COSTS and never who was HERE. A restaurant focus now demands a named person, a date
+and a consequence, and forbids "renowned for its exquisite cuisine". Result, stop 2:
+**François Blanc 1868 · the Prince of Wales 1896 · Rainier's 21 July 1988 inauguration · the crêpe
+Suzette invented there.** That register did not exist in a restaurant tour before today.
+
+### Joël Robuchon: a suspicion that shipped because it was never settled
+
+Recorded 08-27 as `expect: "verify"`; `known_bad_venue()` drops only `closed` entries, so it passed
+through and shipped as stop 3. **The rule was right; leaving the entry unresolved was not.**
+Confirmed via Gemini: brand partnership ended 2020, room reopened June 2023 as **Les Ambassadeurs
+by Christophe Cussac**. Promoted to `closed`. **Corpus rule amended: a `verify` entry is a TASK,
+not a resting state.**
+
+### The eighth wiring failure, and it was carelessness
+
+```
+[D538] Restaurant practicals error (non-fatal): name 'propose_replacements' is not defined
+```
+
+The import was edited with a `str.replace()` **without an assert**. It no-op'd silently, the
+exception aborted the block, and neither replenishment nor lore ran — 1 stop delivered. The
+`non-fatal` except turned a hard failure into a log line nobody would look for.
+
+**Also lost one run to intermittent DNS on this Mac** (`api.openai.com` unresolvable for Python and
+curl while `nslookup` worked and other hosts were fine). Environmental; recorded so it is not later
+mistaken for a defect.
+
+### Open
+
+- **Le Grill has no story** — its lore came back as a floor number, a chef and a festival. **The
+  `why` from the replenishment proposal — "retractable roof" — appears NOWHERE in the tour.** The
+  system knew what made the stop interesting and dropped it. Small fix, next.
+- `story_units` 1/3, the standing ceiling.
+- Café de Paris is 205 words despite being the richest stop.
+
+### The standing lesson, proven eight times in one day
+
+Museum-gated blocks, a data file that never entered the image, a city compared by equality, an
+import that never applied. **Every one was correct code running nowhere that mattered, and every
+one was found by reading tour output rather than by a green suite.** Before a guard is called done:
+**show the line in a real run where it fired.**
