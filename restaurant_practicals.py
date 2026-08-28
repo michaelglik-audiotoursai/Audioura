@@ -272,31 +272,27 @@ def venue_still_operating(name, city, timeout=45):
         except Exception:
             pass  # fall through to the search-marker path
 
-    # Rebrand language in search results — run for its own sake, not only as a
-    # fallback, so one phrasing of a name cannot clear a venue another phrasing
-    # would have caught.
-    import unicodedata
-    bare = re.sub(r'\s*\([^)]*\)\s*', ' ', name or '').strip()
-    core = re.split(r'\s+[-–—]\s+|\s+à\s+l', bare)[0].strip()
-    folded = ''.join(c for c in unicodedata.normalize('NFKD', core)
-                     if not unicodedata.combining(c))
-    place = (city or '').split(',')[0].strip()
-    # The snippet must be ABOUT this venue. Without this the marker matches
-    # anywhere: searching "La Maree" Monaco returned a snippet reading "Agatha
-    # Christie spent most of her life here, and the city is now home to multiple
-    # film companies" — "now home to" fired on Torquay. Right verdict for La Marée
-    # by luck, wholly wrong evidence, and it would delete an open restaurant the
-    # first time an unrelated page used the phrase.
-    _keys = {k for k in (core.lower(), folded.lower()) if len(k) >= 4}
-    for v in [x for x in dict.fromkeys([core, folded]) if x]:
-        for q in (f'"{v}" {place} renamed OR rebranded OR "now home to"',
-                  f'"{v}" {place} replaced by restaurant'):
-            for item in _serp(q, max_results=8):
-                low = item['snippet'].lower()
-                if not any(k in low for k in _keys):
-                    continue
-                if any(mk in low for mk in _REBRAND_MARKERS):
-                    return False, f"{item['snippet'][:170]} [{item.get('url','')}]"
+    # [D541] THE SEARCH-MARKER FALLBACK IS REMOVED. It emptied a tour.
+    #
+    # On its first live run it dropped ALL THREE Monaco restaurants and the tour
+    # crashed with `max_workers must be greater than 0`. The evidence it acted on:
+    #
+    #   Le Louis XV  "Built by Louis XIII back in 1623, the estate is now home to
+    #                 ... Le Louis XV is a French rest..."
+    #   Le Grill     "... now home to Lebanese restaurant concept, Em Sherif.
+    #                 The menu at Omer ... Le Grill on the ..."
+    #
+    # The name-containment guard I added was not enough: a single snippet holds
+    # several unrelated clauses, so the venue name and "now home to" can both be
+    # present and be about different things. There is no reliable way to bind a
+    # marker to a subject with substring matching, and the cost of getting it
+    # wrong is deleting a restaurant that is open.
+    #
+    # Gemini answers this question correctly and cheaply. When it does not answer,
+    # the honest result is "unknown", and unknown never removes a stop. The marker
+    # list is kept only as documentation of the phrasings observed, and is used by
+    # the D539 regression suite to test the CLOSURE path, which matches far more
+    # specific wording ("permanently closed") and has not misfired.
     return True, ''
 
 

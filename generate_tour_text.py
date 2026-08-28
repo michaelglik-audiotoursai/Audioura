@@ -10471,6 +10471,21 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     print(f"  [D538] ⚠️  DROPPED '{_rp_poi.get('name','')[:44]}' — {_rp['reason']}")
                     continue
                 _rp_keep.append(_rp_poi)
+            # [D541] A CHECK MAY NOT EMPTY THE TOUR.
+            #
+            # On 2026-08-28 this dropped all three Monaco restaurants and the run
+            # died with `max_workers must be greater than 0`. When a verifier
+            # rejects EVERY candidate, the likelier explanation is a broken
+            # verifier than a city with no open restaurants — and a flagged tour
+            # serves the listener better than a crash. Delivery is the last thing
+            # a guard gets to take away.
+            if _rp_dropped and not _rp_keep:
+                print(f"  [D541] ⚠️  ALL {len(_rp_dropped)} restaurant(s) were rejected as "
+                      f"closed. Refusing to empty the tour — a check that rejects everything "
+                      f"is more likely broken than the city is. Keeping all stops, flagged:")
+                for _rd in _rp_dropped:
+                    print(f"        UNVERIFIED: {_rd}")
+                _rp_dropped = []
             if _rp_dropped:
                 poi_list = _rp_keep
                 print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
