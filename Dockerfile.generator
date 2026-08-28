@@ -11,6 +11,9 @@ COPY templates/ /app/templates/
 # `from db_connection import ...` resolves; the tests/ sys.path.insert above
 # them is a no-op here because /app/tests does not exist.
 COPY tests/db_connection.py tests/stop_anchor_detector_v2.py /app/
+# [D542] Read at runtime by known_bad_venue() — a venue a human confirmed dead
+# must not depend on a model answering the same way twice.
+COPY tests/known_closed_venues.json /app/tests/
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

@@ -67,6 +67,10 @@ Temp/
 !requirements-newsletter.txt
 !requirements*.txt
 !story_type_taxonomy.json
+# [D542] The known-closed venue corpus is READ AT RUNTIME by
+# restaurant_practicals.known_bad_venue(). Without this line *.json above
+# excludes it and the lookup silently finds nothing in the container.
+!tests/known_closed_venues.json
 !source_tier_rules.json
 !docker-compose-master.yml
 !templates/
