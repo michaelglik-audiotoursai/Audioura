@@ -375,12 +375,25 @@ def closure_scan(name, city):
     folded = ''.join(c for c in unicodedata.normalize('NFKD', core)
                      if not unicodedata.combining(c))
     place = (city or '').split(',')[0].strip()
+    # [D543] Last word of the location is the city in practice —
+    # 'Restaurant tour in Monaco' -> 'monaco'.
+    _place_key = (place.split()[-1].lower() if place.split() else '')
     variants = [v for v in dict.fromkeys([core, folded, bare]) if v]
     for v in variants:
         for q in (f'"{v}" {place} permanently closed',
                   f'"{v}" {place} closed down'):
             for item in _serp(q, max_results=8):
                 low = item['snippet'].lower()
+                # [D543] The snippet must be about a venue IN THIS CITY. Without
+                # this, "La Salière" Monaco returned "The Bevy in Old Naples
+                # permanently closed this summer, and a new concept, La Salière
+                # Naples, will open in its place" — a restaurant in Florida — and
+                # an open Monaco restaurant was deleted from the tour. Same
+                # subject-binding flaw that made the rebrand markers unusable
+                # (D541); here the city is the binding that works, because a
+                # closure notice names where.
+                if _place_key and _place_key not in low:
+                    continue
                 if any(m in low for m in _CLOSED_MARKERS):
                     return True, f"{item['snippet'][:160]} [{item.get('url','')}]"
     return False, ''
