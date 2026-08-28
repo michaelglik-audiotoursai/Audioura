@@ -22,9 +22,9 @@ saw them.**
 `Operational Details:` did make the gate see them — 0 verified → 1 verified. It also did this:
 
 ```
-FIELD BEFORE: Open: 12:00-13:30, 19:30-21:00; Closed: Wednesday, Sunday; Booking: essential;
+WHAT I WROTE (correct, 4 facts): Open: 12:00-13:30, 19:30-21:00; Closed: Wednesday, Sunday; Booking: essential;
               Price: Gourmet Menu 360 EUR
-FIELD AFTER:  Open: 12:00-13:30, 19:30-21:00
+WHAT THE GATE LEFT (damage, 1 fact): Open: 12:00-13:30, 19:30-21:00
 ```
 
 `gate_and_fix` rebuilds that line from the claims it can parse, so **Closed days, Booking and Price

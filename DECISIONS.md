@@ -21978,9 +21978,9 @@ nothing was where it looks.**
 `Operational Details:` made the gate see them (0 verified → 1 verified) and stripped the field:
 
 ```
-BEFORE: Open: 12:00-13:30, 19:30-21:00; Closed: Wednesday, Sunday; Booking: essential;
+WHAT I WROTE (correct, 4 facts):    Open: 12:00-13:30, 19:30-21:00; Closed: Wednesday, Sunday; Booking: essential;
         Price: Gourmet Menu 360 EUR
-AFTER:  Open: 12:00-13:30, 19:30-21:00
+WHAT THE GATE LEFT (damage):        Open: 12:00-13:30, 19:30-21:00
 ```
 
 `gate_and_fix` rebuilds that line from the claims it can parse. It would have **deleted the exact
