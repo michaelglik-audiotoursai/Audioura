@@ -506,3 +506,73 @@ def practicals_prompt_block(p):
         "has failed them. State these as fact — they are sourced. Do NOT invent any practical "
         "detail that is not listed above.\n"
     )
+
+
+# ---------------------------------------------------------------------------
+# [D545] REPLENISHMENT — Michael, 2026-08-28:
+#   "why would you recommend shipping while the wrong number of stops at the
+#    place where the stops can be plentiful is a terrible bug! The system can not
+#    find 3 restaurants in Monaco, really???"
+#
+# He is right and the previous judgement was wrong. Dropping a dead restaurant is
+# correct; delivering 2 of 3 because of it is not, and announcing the shortfall
+# does not discharge it. Monaco has hundreds of restaurants.
+#
+# Bounded and ADDITIVE by construction: this can only propose extra candidates,
+# never remove one. Every proposal is vetted by the same corpus + closure checks
+# that dropped the original, so replenishment cannot smuggle a dead venue back in.
+# ---------------------------------------------------------------------------
+
+_REPLACE_SYSTEM = (
+    "You name real restaurants for an audio walking tour. Return ONLY establishments that are "
+    "CURRENTLY OPEN and that a visitor could walk into this month.\n"
+    "\n"
+    "Rules:\n"
+    "- Real, specific, named restaurants. No categories, no invented names.\n"
+    "- Do NOT return any name on the exclusion list, or a rebranded version of one.\n"
+    "- Prefer places with a STORY: a founding dare, a famous regular, a chef who trained there, "
+    "a wartime episode, a ritual the room is known for. A tour needs something to say.\n"
+    "- If you are not confident a place is still open under that name, leave it out.\n"
+    "\n"
+    'Return ONLY JSON: {"restaurants": [{"name": "", "why": "<the story in one clause>"}]}'
+)
+
+
+def propose_replacements(city, exclude, n, api_key, model=None, timeout=45):
+    """Name `n` more real, open restaurants in `city`, excluding `exclude`.
+
+    Returns a list of {'name','why'}. Never raises; an empty list simply means the
+    tour stays short and the D536 shortfall notice reports it honestly.
+    """
+    if not city or n <= 0 or not api_key:
+        return []
+    import requests
+    _ex = ', '.join(sorted({e for e in (exclude or []) if e})) or '(none)'
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            data=json.dumps({
+                "model": model or os.environ.get("TOUR_PRACTICALS_MODEL", "gpt-4o"),
+                "messages": [
+                    {"role": "system", "content": _REPLACE_SYSTEM},
+                    {"role": "user", "content":
+                        f"City: {city}\nExclude: {_ex}\n\nName {n + 2} restaurants."},
+                ],
+                "temperature": 0.3, "seed": 7, "max_tokens": 600,
+                "response_format": {"type": "json_object"},
+            }),
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            return []
+        out = []
+        for r in (json.loads(resp.json()["choices"][0]["message"]["content"])
+                  .get('restaurants') or []):
+            nm = (r.get('name') or '').strip() if isinstance(r, dict) else str(r).strip()
+            if nm:
+                out.append({'name': nm,
+                            'why': (r.get('why', '') if isinstance(r, dict) else '')})
+        return out
+    except Exception:
+        return []

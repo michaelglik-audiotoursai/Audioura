@@ -10490,6 +10490,77 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 poi_list = _rp_keep
                 print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
                       f"{len(poi_list)} remain")
+
+            # -------- [D545] REPLENISH. A dead restaurant is not a lost stop. --------
+            # Michael, 2026-08-28: "why would you recommend shipping while the wrong
+            # number of stops at the place where the stops can be plentiful is a
+            # terrible bug! The system can not find 3 restaurants in Monaco,
+            # really???" He is right. Dropping is correct; delivering 2 of 3 because
+            # of it is not, and the D536 shortfall notice does not discharge it —
+            # announcing a failure is not the same as not failing.
+            #
+            # ADDITIVE and BOUNDED: only ever appends, max 2 rounds, and every
+            # candidate goes through the same corpus + closure checks that removed
+            # the original, so this cannot smuggle a dead venue back in.
+            _rp_want = _requested_stop_count_original or len(poi_list)
+            _rp_round = 0
+            _rp_seen = {(_p.get('name') or '').lower() for _p in poi_list}
+            _rp_seen |= {d.lower() for d in _rp_dropped}
+            while len(poi_list) < _rp_want and _rp_round < 2:
+                _rp_round += 1
+                _need = _rp_want - len(poi_list)
+                _cands = propose_replacements(location, list(_rp_seen), _need, api_key)
+                print(f"  [D545] Replenish round {_rp_round}: need {_need}, "
+                      f"proposed {len(_cands)}")
+                for _c in _cands:
+                    if len(poi_list) >= _rp_want:
+                        break
+                    _cn = _c['name']
+                    if _cn.lower() in _rp_seen:
+                        continue
+                    _rp_seen.add(_cn.lower())
+                    _cp = fetch_practicals(_cn, _rp_city, api_key)
+                    if not _cp['deliverable']:
+                        print(f"  [D545]   rejected '{_cn[:40]}' — {_cp['reason'][:80]}")
+                        continue
+                    _new = _new_poi(_cn)
+                    _new['_practicals'] = _cp
+                    poi_list.append(_new)
+                    print(f"  [D545]   ADDED '{_cn[:44]}' — {_c.get('why','')[:70]}")
+                if not _cands:
+                    break
+            if len(poi_list) < _rp_want:
+                print(f"  [D545] ⚠️  Still short: {len(poi_list)}/{_rp_want} after "
+                      f"{_rp_round} round(s)")
+
+            # -------- [D545] LORE. For a restaurant, people ARE the story. --------
+            # Michael: "for restaurants it is very important to talk about people
+            # and people's experience." His Gemini answer for Le Louis XV is the
+            # specification — Prince Rainier III's 1986 dare, three stars in 33
+            # months, Prince Albert's 2011 wedding gala, the chefs who trained
+            # there, the cellar walled up in WWII, the clock stopped at 12:00.
+            # None of that is hours or a price, and none of it was reaching the
+            # tour: the practicals chain asks what it COSTS, never who was HERE.
+            try:
+                from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
+                for _lp in poi_list:
+                    _ln = _lp.get('name', '')
+                    _lr = fetch_stop_knowledge(_ln, _rp_city, api_key, focus='restaurant')
+                    if not _lr.get('ok'):
+                        print(f"  [D545] no lore for '{_ln[:40]}': {_lr.get('reason','')[:60]}")
+                        continue
+                    _hi = sum(1 for f in _lr['facts'] if f.get('confidence') == 'high')
+                    _DIRECT_SNIPPETS_PER_STOP.setdefault(_ln, []).extend(
+                        facts_as_snippets(_lr, _ln))
+                    print(f"  [D545] +{len(_lr['facts'])} story fact(s) for "
+                          f"'{_ln[:40]}' via {_lr['provider']} ({_hi} high)")
+                    for _f in _lr['facts'][:3]:
+                        print(f"        [{_f['confidence']}] {_f['fact'][:110]}")
+            except ImportError as _lo_err:
+                _import_logger.error(f"[D545] MISSING: stop_knowledge_fallback — restaurant "
+                                     f"stops will have no people stories: {_lo_err}")
+            except Exception as _lo_err:
+                print(f"  [D545] Lore fetch error (non-fatal): {_lo_err}")
             _rp_usable = sum(1 for p in poi_list if (p.get('_practicals') or {}).get('usable'))
             print(f"  [D538] Practicals acquired for {_rp_usable}/{len(poi_list)} stop(s)")
         except ImportError as _rp_err:

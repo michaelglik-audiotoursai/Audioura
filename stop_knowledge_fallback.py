@@ -73,11 +73,12 @@ _SYSTEM = (
 def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None,
                   focus='object'):
     import requests
-    _noun = 'Place' if focus == 'place' else 'Object'
-    _ctx = 'Area' if focus == 'place' else 'Museum'
-    _ask = ('What actually happened at this place, and to whom?'
-            if focus == 'place' else
-            'What is actually known about this specific object?')
+    _noun = {'place': 'Place', 'restaurant': 'Restaurant'}.get(focus, 'Object')
+    _ctx = {'place': 'Area', 'restaurant': 'City'}.get(focus, 'Museum')
+    _ask = {'place': 'What actually happened at this place, and to whom?',
+            'restaurant': ('Who made this restaurant what it is, who has eaten here, and what '
+                           'happened? Named people, dates, consequences.')
+            }.get(focus, 'What is actually known about this specific object?')
     if evidence:
         ev = "\n".join(f"- {e['snippet']}  [{e.get('url','')}]" for e in evidence[:12])
         user = (f"{_noun}: {work}\n{_ctx}: {venue}\n\n"
@@ -95,7 +96,9 @@ def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None,
             data=json.dumps({
                 "model": model or os.environ.get("TOUR_FALLBACK_MODEL", "gpt-4o"),
                 "messages": [
-                    {"role": "system", "content": _SYSTEM_PLACE if focus == 'place' else _SYSTEM},
+                    {"role": "system", "content": (_SYSTEM_RESTAURANT if focus == 'restaurant'
+                                                    else _SYSTEM_PLACE if focus == 'place'
+                                                    else _SYSTEM)},
                     {"role": "user", "content": user},
                 ],
                 "temperature": 0.0,
@@ -154,7 +157,14 @@ def _web_evidence(work, venue, max_results=8, focus='object'):
         return []
     bare = re.sub(r'\s*\([^)]*\)\s*', ' ', work or '').strip()
     venue_short = (venue or '').split(',')[0].strip()
-    if focus == 'place':
+    if focus == 'restaurant':
+        # [D545] Ask for the lore, not the listing. "provenance" returns catalogue
+        # text; "menu" returns aggregators. People and episodes live elsewhere.
+        core_r = re.split(r'\s+[-–—]\s+|\s+à\s+l', bare)[0].strip() or bare
+        queries = [f'"{core_r}" {venue_short} history famous guests',
+                   f'"{core_r}" {venue_short} chef story founded',
+                   f'"{core_r}" {venue_short} anecdote OR tradition OR ritual']
+    elif focus == 'place':
         # [D537] Ask the web for episodes, not for the place's description. The
         # object queries ("provenance") return catalogue text for a town.
         queries = [f'"{bare}" history famous people',
@@ -216,6 +226,51 @@ _SYSTEM_PLACE = (
     "\n"
     'Return ONLY JSON: {"facts": [{"fact": "<one sentence naming who, when, and what came of '
     'it>", "confidence": "high|low"}]}'
+)
+
+
+# [D545] Michael, 2026-08-28, on the Monaco tour: "for restaurants it is very
+# important to talk about people and people's experience." He asked Gemini about
+# Le Louis XV and got what a restaurant stop should contain:
+#
+#   - Prince Rainier III dared a 30-year-old Ducasse in 1986 to win 3 stars in 4
+#     years or be out; Ducasse refused the expected cream-laden Parisian cooking,
+#     went vegetable-forward, and took all three in 33 months.
+#   - Prince Albert II held his royal wedding gala dinner there in 2011.
+#   - Bottura, Clare Smyth and Helene Darroze all trained in that kitchen.
+#   - During WWII the staff bricked up the cellar behind a wall of empty barrels
+#     to hide 400,000 bottles from occupying forces. It was never found.
+#   - The dining-room clock is permanently stopped at 12:00, on purpose.
+#
+# None of that is hours or a price. It is people doing things, and it is what
+# makes a restaurant worth stopping at rather than merely eating at. The place
+# prompt asks about a TOWN; a restaurant needs its own question.
+_SYSTEM_RESTAURANT = (
+    "You supply STORY material about ONE restaurant for an audio tour. The listener is standing "
+    "outside deciding whether to go in, and has already been told the hours and the price. Give "
+    "them the reason to care.\n"
+    "\n"
+    "What is wanted, in rough order of value:\n"
+    "  - the founding: who backed it, who dared whom, what was at stake if it failed\n"
+    "  - the people who ate there: named guests, and WHAT HAPPENED - a wedding dinner, a deal, a "
+    "refusal, a scene. 'Celebrities dine here' is worthless; 'Prince Albert II held his wedding "
+    "gala dinner here in 2011' is the standard.\n"
+    "  - the kitchen as a lineage: chefs who trained there and what they went on to do\n"
+    "  - a ritual or object the room is known for, described concretely\n"
+    "  - an episode from its history: a war, a fire, a closure, a rescue, a record\n"
+    "\n"
+    "Every item needs a NAMED person or a DATE, and preferably both, plus what came of it. "
+    "Reject your own output if it would be equally true of any expensive restaurant.\n"
+    "\n"
+    "FORBIDDEN: 'renowned for its exquisite cuisine', 'a favourite among discerning diners', "
+    "'an unforgettable experience'. Atmosphere words are not stories.\n"
+    "\n"
+    "Do not invent a guest, a date or an anecdote. Three real episodes beat eight with two made "
+    "up - a fabricated famous diner is the worst possible outcome here. Mark an item \"high\" "
+    "only if you are confident it happened at THIS restaurant.\n"
+    "\n"
+    'Return ONLY JSON: {"facts": [{"fact": "<one sentence: who, when, what came of it>", '
+    '"confidence": "high|low"}]}'
 )
 
 
