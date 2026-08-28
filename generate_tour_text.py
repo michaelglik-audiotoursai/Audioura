@@ -17541,6 +17541,37 @@ RULES:
             _pf_source_text = _visitor_info_source_text
         except NameError:
             pass
+        # [D544] ACQUISITION AND VERIFICATION MUST SHARE A SOURCE.
+        #
+        # LOCAL-36 verifies practical claims against the VENUE'S OWN PAGE. On a
+        # restaurant tour the practicals come from D538's search-and-extract chain
+        # instead, so the gate had nothing to check them against and printed
+        #
+        #   ⚠️  NO PRACTICAL CLAIMS FOUND TO VERIFY — and this is a RESTAURANT tour
+        #
+        # on a tour that states the price, the booking requirement and the opening
+        # hours. The warning I added in D538 was right in principle and, wired this
+        # way, it cries wolf — which is worse than the silence it replaced, because
+        # a warning nobody can trust is a warning nobody reads.
+        #
+        # The facts D538 acquired ARE a traceable source: they came from named URLs
+        # and are held on the POI. Hand them to the gate.
+        if tour_category == 'restaurant':
+            _pf_extra, _pf_urls = [], []
+            for _pfp in poi_list:
+                _pr = _pfp.get('_practicals') or {}
+                if not _pr.get('usable'):
+                    continue
+                _pf_extra.append(_pfp.get('name', ''))
+                for _k in ('hours', 'closed_days', 'reservation', 'price_band', 'michelin'):
+                    if _pr.get(_k):
+                        _pf_extra.append(f"{_k}: {_pr[_k]}")
+                _pf_urls.extend(_pr.get('sources') or [])
+            if _pf_extra:
+                _pf_source_text = (_pf_source_text or '') + "\n" + "\n".join(_pf_extra)
+                _pf_source_url = _pf_source_url or (_pf_urls[0] if _pf_urls else '')
+                print(f"  [D544] Practicals from D538 handed to the gate as source "
+                      f"({len(_pf_extra)} line(s), {len(_pf_urls)} URL(s))")
         complete_tour, _pf_result = _practical_gate(
             complete_tour,
             source_url=_pf_source_url,
@@ -17555,13 +17586,34 @@ RULES:
             # nothing, not because everything checked out". For a restaurant that is
             # a delivery defect, not a note.
             if len(_pf_result.verified_claims) == 0:
-                _pf_sev = "⚠️  NO PRACTICAL CLAIMS FOUND TO VERIFY"
-                if tour_category == 'restaurant':
-                    print(f"  [LOCAL-36/D538] {_pf_sev} — and this is a RESTAURANT tour, "
-                          f"where hours, booking and price are the content, not a bonus")
+                # [D544] The warning must describe the TOUR, not this gate's reach.
+                #
+                # LOCAL-36 extracts claims only from `Museum Information:` and
+                # `Operational Details:` lines — it never reads narration prose.
+                # D538 puts a restaurant's practicals in the PROSE, so the listener
+                # hears them, and the gate correctly finds nothing there. The D538
+                # warning read that silence as "this tour has no practicals" and
+                # cried wolf on a tour stating price, booking and hours.
+                #
+                # Ask the thing that knows: D538 records what it acquired per stop.
+                # (Writing the practicals into the structured field was tried and
+                # reverted — `gate_and_fix` rebuilds that line from the claims it
+                # can parse, which stripped Closed/Booking/Price and would have
+                # deleted the data the offline-Q&A design depends on.)
+                _pf_have = sum(1 for _p in poi_list
+                               if (_p.get('_practicals') or {}).get('usable'))
+                if tour_category == 'restaurant' and _pf_have:
+                    print(f"  [LOCAL-36/D544] No claims in the structured fields — expected: "
+                          f"this gate reads `Operational Details:` lines, and D538 puts "
+                          f"practicals in the narration. Acquired for {_pf_have}/"
+                          f"{len(poi_list)} stop(s), spoken to the listener.")
+                elif tour_category == 'restaurant':
+                    print(f"  [LOCAL-36/D538] ⚠️  NO PRACTICAL FACTS ANYWHERE — and this is a "
+                          f"RESTAURANT tour, where hours, booking and price are the content, "
+                          f"not a bonus")
                 else:
-                    print(f"  [LOCAL-36] {_pf_sev} (informational for tour_category="
-                          f"'{tour_category}')")
+                    print(f"  [LOCAL-36] No practical claims found to verify "
+                          f"(informational for tour_category='{tour_category}')")
             else:
                 print(f"  [LOCAL-36] PRACTICAL FACTS GATE: PASSED ({len(_pf_result.verified_claims)} verified)")
     except ImportError:
