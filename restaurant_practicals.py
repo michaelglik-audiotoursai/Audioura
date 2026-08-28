@@ -228,6 +228,61 @@ _OPERATING_SYSTEM = (
 )
 
 
+def _fold_name(s):
+    import unicodedata
+    n = unicodedata.normalize('NFKD', (s or '').lower())
+    n = ''.join(c for c in n if not unicodedata.combining(c))
+    return re.sub(r'\s+', ' ', re.sub(r"[^\w\s]", ' ', n)).strip()
+
+
+_KNOWN_CACHE = None
+
+
+def known_bad_venue(name, city):
+    """[D542] Consult the known-closed corpus IN PRODUCTION, not only in tests.
+
+    `tests/known_closed_venues.json` was built as the answer to Michael's question
+    about a mechanism for learning from a miss. It was a test fixture only — and
+    on 2026-08-28 **Le Vistamar shipped in a tour again while sitting in that
+    file**, because the Gemini rebrand verdict is probabilistic and came back
+    "operating" that run.
+
+    A venue a human has already confirmed dead should never depend on a model
+    answering the same way twice. This lookup is deterministic, costs nothing, and
+    closes the loop between the learning mechanism and the thing it was meant to
+    protect.
+
+    Only `expect: "closed"` entries drop. `verify` entries are suspicions and must
+    not remove a stop.
+    """
+    global _KNOWN_CACHE
+    if _KNOWN_CACHE is None:
+        _KNOWN_CACHE = []
+        for cand in (os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  'tests', 'known_closed_venues.json'),
+                     '/app/tests/known_closed_venues.json'):
+            try:
+                with open(cand, encoding='utf-8') as fh:
+                    _KNOWN_CACHE = json.load(fh).get('venues', [])
+                break
+            except Exception:
+                continue
+    if not _KNOWN_CACHE:
+        return False, ''
+    n, c = _fold_name(name), _fold_name(city)
+    for v in _KNOWN_CACHE:
+        if v.get('expect') != 'closed':
+            continue
+        if c and _fold_name(v.get('city', '')) and _fold_name(v.get('city', '')) != c:
+            continue
+        for cand in [v.get('name', '')] + list(v.get('aliases', [])):
+            f = _fold_name(cand)
+            if f and (f == n or f in n or n in f):
+                return True, (f"recorded in known_closed_venues.json: "
+                              f"{v.get('ground_truth', '')[:150]}")
+    return False, ''
+
+
 def venue_still_operating(name, city, timeout=45):
     """[D540] Is this venue still trading under THIS name?
 
@@ -375,6 +430,16 @@ def fetch_practicals(name, city, api_key, timeout=45):
     # [D539] The closure probe runs ALWAYS and OVERRIDES, including when the
     # extractor confidently reported hours. That combination is exactly what
     # shipped La Marée: stale aggregator hours outvoted a closure notice.
+    # [D542] The corpus first — deterministic, and it cannot flip between runs.
+    _known, _known_ev = known_bad_venue(name, city)
+    if _known:
+        out['status'] = 'closed_permanently'
+        out['evidence'] = _known_ev
+        out['deliverable'] = False
+        out['reason'] = _known_ev
+        out['provider'] = (out['provider'] or '') + '+known_corpus'
+        return out
+
     _closed, _closed_ev = closure_scan(name, city)
     if _closed:
         out['status'] = 'closed_permanently'
