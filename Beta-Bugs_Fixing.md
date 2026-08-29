@@ -130,15 +130,21 @@ briefing. Work top to bottom.
 > `./deploy_tour_modernized.sh --rollback`; `v33` is intact.
 > **Deploying is a hard stop — ask Michael first.** Runbook `wdvrdaxn9f`.
 >
-> **⚠️ `main` is AHEAD of production again** as of 2026-08-29. Two commits are
-> committed, pushed and **not deployed**:
+> **✅ `main` and production are in sync** as of 2026-08-29.
 >
-> | commit | what | task |
-> |---|---|---|
-> | `8395f59` | failure attribution — ten generator failure paths now carry a code and an upstream/content kind, and `/status` returns `error_type` | `wdvrdaxvvg` |
-> | `3f8c998` | `city_from_address()` returned the country for most of the world; anchors are now cities | `wdvrdaxvvt` |
+> | service | image | revision | carries |
+> |---|---|---|---|
+> | `tour-modernized` | **`audioura:v37`** | `tour-modernized-00012-7sg` | all geocode work incl. the thread-safe throttle |
+> | `tour-generator` | **`audioura:v36`** | `tour-generator-00022-wgn` | failure attribution (was on `v15`, built 2026-06-10) |
 >
-> Neither warrants a deploy of its own. **Ask Michael** — deploying is a hard stop.
+> Roll back with `./deploy_tour_modernized.sh --rollback` or
+> `./deploy_cloudrun_service.sh tour-generator --rollback`. Old tags are immutable.
+>
+> **The two fixes were in DIFFERENT services** — `geocode_stops.py` runs in
+> `tour-modernized`, `generate_tour_text*.py` in `tour-generator`.
+> `deploy_tour_modernized.sh` only covers the first; use
+> `deploy_cloudrun_service.sh <service>` for anything else. Check which service runs
+> the file you changed before assuming one deploy covers it.
 >
 > ### Git
 >
