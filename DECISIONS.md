@@ -22069,3 +22069,61 @@ Museum-gated blocks, a data file that never entered the image, a city compared b
 import that never applied. **Every one was correct code running nowhere that mattered, and every
 one was found by reading tour output rather than by a green suite.** Before a guard is called done:
 **show the line in a real run where it fired.**
+
+---
+
+## D546/D547 — The four facts, the prolog leak, and two self-inflicted failures
+
+**2026-08-29. Michael:** *"specifically for restaurant tours people would want to know when it
+opens: days and hours, is reservation required, the price ... and type of food"*, adding
+*"it is okay occasionally miss that information if it is not available, please do not invent."*
+
+### Three causes, all LEAD's
+
+1. **CUISINE WAS NEVER ACQUIRED** — no such field existed. Added, with its own SERP query.
+2. **THE PROMPT MANDATED TWO OF FOUR** — "you MUST tell the listener the booking requirement and
+   the price band". Hours and cuisine were optional, so the model dropped them. All four now
+   required when present.
+3. **GEMINI ONLY RAN WHEN EVERYTHING WAS MISSING.** Café de Paris had hours + cuisine from SERP, so
+   the all-or-nothing `_thin` test never escalated — while Michael's own Gemini query returned
+   starters €15-35, mains €35-80, €70-130 per head. Now escalates when ANY key field is missing and
+   fills ONLY gaps, never overwriting grounded SERP data.
+
+### D547 — the tour advertised a restaurant it had dropped
+
+The delivered tour opened with *"Explore how La Marée's Russian-inspired concept marries with
+Monaco's upscale culinary scene."* Closed since 2020, correctly dropped from the STOPS — but the
+spine (arc and prolog) is written from `poi_list` BEFORE the D538 block runs.
+
+**Only the CORPUS lookup moved earlier** — deterministic, no network, cannot misfire. Moving the
+whole block was attempted, broke indentation, and was reverted from backup. A pipeline reorder is
+not what this defect required.
+
+### Two self-inflicted failures, both unguarded string edits
+
+- **D545's import edit matched nothing.** `propose_replacements` was never imported, the whole
+  vetting block was skipped, and a tour shipped with NO protections while reporting success.
+- **D546's prompt edit sliced to the END OF FILE** and deleted `propose_replacements` outright.
+  The next run shipped **Le Vistamar and La Marée together**, both already in the corpus.
+
+The third attempt asserted its anchor appeared exactly once, found two, and wrote nothing.
+**That assertion is the standing practice now.**
+
+**`try/except ImportError` around the vetting block is itself a hazard** — twice it turned total
+failure into a log line and let an unvetted tour ship. For a restaurant tour a missing
+`restaurant_practicals` should FAIL the generation.
+
+### Result and open defects
+
+3 of 3 stops, four dead-or-rejected venues kept out, no dead venue anywhere **including the
+opening**. **Elsa carries all four facts plus a named-people story** — the design working.
+
+1. **`closure_scan` rejected Café de Paris, which is open.** THIRD false positive from that path
+   (La Salière on a Florida snippet, now this). The corpus lookup and Gemini check have produced
+   **zero**. **Demote or remove it.**
+2. **Replenished stops are thin** — Le Grill 144w, Elsa 119w — they arrive without the corpus and
+   fact-sheet material an originally-selected stop receives.
+3. **Elsa opens mid-thought** — placeholder orientation then a dangling demonstrative.
+4. **Booking dropped on 2 of 3 stops** despite being acquired.
+
+**NOT ready for mobile testing until (1) is fixed** — it rejects real restaurants.
