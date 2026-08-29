@@ -37,7 +37,11 @@ import os
 import re
 
 # What a restaurant stop must be able to answer before it is deliverable.
-_REQUIRED_ANY = ('hours', 'closed_days', 'reservation', 'price_band')
+# [D546] Michael, 2026-08-29: a restaurant stop should tell the listener when it
+# is open, whether a booking is needed, roughly what it costs, AND WHAT KIND OF
+# FOOD IT SERVES. Stop 1 of the v3 tour did all four and he called it fabulous;
+# stops 2 and 3 did not. `cuisine` was never acquired at all.
+_REQUIRED_ANY = ('hours', 'closed_days', 'reservation', 'price_band', 'cuisine')
 
 _EXTRACT_SYSTEM = (
     "You extract PRACTICAL VISITOR FACTS about one restaurant from web search results. A "
@@ -57,6 +61,9 @@ _EXTRACT_SYSTEM = (
     "  price_band   — what a meal costs, as concretely as the results allow, e.g. "
     "\"tasting menu around 390 EUR\" or \"main courses 45-70 EUR\"\n"
     "  michelin     — stars or other rating if stated\n"
+    "  cuisine      — the KIND of food, as a visitor would describe it: \"classic French "
+    "brasserie with Mediterranean touches\", \"seafood\", \"Monegasque traditional\", "
+    "\"something for every taste\". Name a signature dish if the results give one.\n"
     "  evidence     — one short quote from the results supporting status\n"
     "\n"
     'Return ONLY JSON with exactly those keys, using "" for anything the results do not state.'
@@ -93,7 +100,8 @@ def _search_evidence(name, city):
     queries = []
     for n in names:
         queries += [f'"{n}" {place} opening hours reservation',
-                    f'"{n}" {place} menu price']
+                    f'"{n}" {place} menu price',
+                    f'"{n}" {place} cuisine type of food signature dish']
     queries.append(f'"{names[0]}" {place} closed permanently')
     seen, ev = set(), []
     for q in queries:
@@ -144,8 +152,10 @@ def _gemini(name, city, timeout=45):
     try:
         res = gemini_with_sources(
             f"{_EXTRACT_SYSTEM}\n\nRestaurant: {name}\nCity: {city}\n\n"
-            f"Search the web for its current opening hours, closed days, reservation policy, "
-            f"price band, and whether it is still open. Return only the JSON.")
+            f"Search the web for its current opening days and hours, reservation policy, what a "
+            f"visitor should expect to pay for lunch or dinner (or a typical main course), the "
+            f"TYPE OF FOOD served, and whether it is still open. Leave a field empty rather than "
+            f"guess. Return only the JSON.")
         text = res.get('text', '') if isinstance(res, dict) else str(res)
         m = re.search(r'\{.*\}', text, re.S)
         if not m:
@@ -402,7 +412,7 @@ def closure_scan(name, city):
 def _fields(d):
     return {k: str((d or {}).get(k, '') or '').strip()
             for k in ('status', 'hours', 'closed_days', 'reservation',
-                      'price_band', 'michelin', 'evidence')}
+                      'price_band', 'michelin', 'cuisine', 'evidence')}
 
 
 def _thin(f):
@@ -420,7 +430,7 @@ def fetch_practicals(name, city, api_key, timeout=45):
     it must not be able to break a tour.
     """
     out = {'status': 'unknown', 'hours': '', 'closed_days': '', 'reservation': '',
-           'price_band': '', 'michelin': '', 'evidence': '', 'sources': [],
+           'price_band': '', 'michelin': '', 'cuisine': '', 'evidence': '', 'sources': [],
            'provider': '', 'usable': False, 'deliverable': True, 'reason': ''}
     if not name:
         out['reason'] = 'no name'
@@ -432,15 +442,29 @@ def fetch_practicals(name, city, api_key, timeout=45):
     provider = f"serp({len(evidence)})+openai" if parsed else ''
 
     fields = _fields(parsed)
-    if _thin(fields):
-        # Step 3 only when the cheap grounded path produced nothing actionable.
+    # [D546] Escalate to Gemini when ANY key field is missing, not only when
+    # everything is. Michael, 2026-08-29: "If we add this to each restaurant that
+    # has that information easily available in SERPER and/or Gemini".
+    #
+    # Measured: SERP+OpenAI gave Cafe de Paris its hours and cuisine but no price
+    # and no booking policy, so the old all-or-nothing `_thin` test never
+    # escalated — while his own Gemini query returned starters EUR 15-35, mains
+    # EUR 35-80, and EUR 70-130 per head. The data was one call away.
+    #
+    # Gemini fills ONLY the empty fields. It never overwrites something the
+    # grounded SERP path already established.
+    _KEY = ('hours', 'closed_days', 'reservation', 'price_band', 'cuisine')
+    _missing = [k for k in _KEY if not fields.get(k)]
+    if _missing:
         g = _gemini(name, city, timeout=timeout)
         if g:
             gf = _fields(g)
-            if not _thin(gf):
-                fields = gf
+            _filled = [k for k in _missing if gf.get(k)]
+            for k in _filled:
+                fields[k] = gf[k]
+            if _filled:
                 provider = (provider + '+gemini') if provider else 'gemini'
-                if g.get('_sources'):
+                if g.get('_sources') and not out['sources']:
                     out['sources'] = list(g['_sources'])[:6]
 
     out.update(fields)
@@ -492,7 +516,7 @@ def practicals_prompt_block(p):
     lines = []
     for label, key in (('Opening hours', 'hours'), ('Closed', 'closed_days'),
                        ('Booking', 'reservation'), ('Price', 'price_band'),
-                       ('Rating', 'michelin')):
+                       ('Cuisine / type of food', 'cuisine'), ('Rating', 'michelin')):
         if p.get(key):
             lines.append(f"  - {label}: {p[key]}")
     if not lines:
@@ -500,79 +524,13 @@ def practicals_prompt_block(p):
     return (
         "\nPRACTICAL FACTS FOR THIS RESTAURANT — VERIFIED FROM PUBLISHED SOURCES.\n"
         + "\n".join(lines) + "\n"
-        "You MUST tell the listener the booking requirement and the price band if they appear "
-        "above, in plain words, before the stop ends. They are standing outside deciding whether "
-        "to go in; a story about the chef that omits 'you will not get a table without booking' "
-        "has failed them. State these as fact — they are sourced. Do NOT invent any practical "
-        "detail that is not listed above.\n"
+        "TELL THE LISTENER EVERY ONE OF THESE THAT APPEARS ABOVE, in the narrator's own voice, "
+        "before the stop ends: WHEN IT IS OPEN (days and hours), WHETHER A BOOKING IS NEEDED, "
+        "ROUGHLY WHAT IT COSTS, and WHAT KIND OF FOOD IT SERVES.\n"
+        "They are standing outside deciding whether to go in. A story about the chef that never "
+        "says the place shuts on Mondays, or what a meal costs, or whether it is seafood or a "
+        "brasserie, has failed them. Weave them into the prose - do not read a list.\n"
+        "State these as fact; they are sourced. **If one of them is NOT listed above, say nothing "
+        "about it** - do not guess an opening time, a price or a cuisine. An invented opening hour "
+        "sends someone to a locked door.\n"
     )
-
-
-# ---------------------------------------------------------------------------
-# [D545] REPLENISHMENT — Michael, 2026-08-28:
-#   "why would you recommend shipping while the wrong number of stops at the
-#    place where the stops can be plentiful is a terrible bug! The system can not
-#    find 3 restaurants in Monaco, really???"
-#
-# He is right and the previous judgement was wrong. Dropping a dead restaurant is
-# correct; delivering 2 of 3 because of it is not, and announcing the shortfall
-# does not discharge it. Monaco has hundreds of restaurants.
-#
-# Bounded and ADDITIVE by construction: this can only propose extra candidates,
-# never remove one. Every proposal is vetted by the same corpus + closure checks
-# that dropped the original, so replenishment cannot smuggle a dead venue back in.
-# ---------------------------------------------------------------------------
-
-_REPLACE_SYSTEM = (
-    "You name real restaurants for an audio walking tour. Return ONLY establishments that are "
-    "CURRENTLY OPEN and that a visitor could walk into this month.\n"
-    "\n"
-    "Rules:\n"
-    "- Real, specific, named restaurants. No categories, no invented names.\n"
-    "- Do NOT return any name on the exclusion list, or a rebranded version of one.\n"
-    "- Prefer places with a STORY: a founding dare, a famous regular, a chef who trained there, "
-    "a wartime episode, a ritual the room is known for. A tour needs something to say.\n"
-    "- If you are not confident a place is still open under that name, leave it out.\n"
-    "\n"
-    'Return ONLY JSON: {"restaurants": [{"name": "", "why": "<the story in one clause>"}]}'
-)
-
-
-def propose_replacements(city, exclude, n, api_key, model=None, timeout=45):
-    """Name `n` more real, open restaurants in `city`, excluding `exclude`.
-
-    Returns a list of {'name','why'}. Never raises; an empty list simply means the
-    tour stays short and the D536 shortfall notice reports it honestly.
-    """
-    if not city or n <= 0 or not api_key:
-        return []
-    import requests
-    _ex = ', '.join(sorted({e for e in (exclude or []) if e})) or '(none)'
-    try:
-        resp = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            data=json.dumps({
-                "model": model or os.environ.get("TOUR_PRACTICALS_MODEL", "gpt-4o"),
-                "messages": [
-                    {"role": "system", "content": _REPLACE_SYSTEM},
-                    {"role": "user", "content":
-                        f"City: {city}\nExclude: {_ex}\n\nName {n + 2} restaurants."},
-                ],
-                "temperature": 0.3, "seed": 7, "max_tokens": 600,
-                "response_format": {"type": "json_object"},
-            }),
-            timeout=timeout,
-        )
-        if resp.status_code != 200:
-            return []
-        out = []
-        for r in (json.loads(resp.json()["choices"][0]["message"]["content"])
-                  .get('restaurants') or []):
-            nm = (r.get('name') or '').strip() if isinstance(r, dict) else str(r).strip()
-            if nm:
-                out.append({'name': nm,
-                            'why': (r.get('why', '') if isinstance(r, dict) else '')})
-        return out
-    except Exception:
-        return []

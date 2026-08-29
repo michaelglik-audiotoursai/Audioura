@@ -10526,8 +10526,24 @@ Exempt: navigation directions ("Turn left", "Continue past").
                         continue
                     _new = _new_poi(_cn)
                     _new['_practicals'] = _cp
+                    # [D546] Carry the reason this stop was proposed into its material.
+                    # 'Le Grill — retractable roof' was the whole point of choosing it
+                    # and the phrase appeared NOWHERE in the delivered tour. The system
+                    # knew what made the stop interesting and threw it away.
+                    if _c.get('why'):
+                        _new['_replenish_why'] = _c['why']
+                        _DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
+                            'snippet': f"{_cn}: {_c['why']}", 'title': _cn,
+                            'link': '', 'source': 'replenishment_rationale'})
                     poi_list.append(_new)
-                    print(f"  [D545]   ADDED '{_cn[:44]}' — {_c.get('why','')[:70]}")
+                    # [D546] Log what was acquired. Last run these stops' practicals were
+                    # invisible in the log, so "why did stop 2 omit the hours" could not be
+                    # answered without re-deriving it.
+                    _cb = [f"{k}={_cp[k][:34]}" for k in
+                           ('hours', 'closed_days', 'reservation', 'price_band', 'cuisine')
+                           if _cp.get(k)]
+                    print(f"  [D545]   ADDED '{_cn[:44]}' — {_c.get('why','')[:60]}")
+                    print(f"  [D546]     practicals: {', '.join(_cb) if _cb else 'none'}")
                 if not _cands:
                     break
             if len(poi_list) < _rp_want:
