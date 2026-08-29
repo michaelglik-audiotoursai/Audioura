@@ -58,8 +58,54 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
         tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops)
         
         if tour_text is None:
-            ACTIVE_JOBS.update(job_id, status="error",
-                              error=f"Tour generation failed for '{location}' — no stops could be generated (all filtered or knowledge insufficient).")
+            # Attribute the failure. generate_tour_text() gives up in ten distinct
+            # places and this message used to collapse all ten into one sentence,
+            # so "no stops could be generated" could mean an OpenAI outage OR a
+            # genuine content decision, with no way to tell them apart afterwards.
+            # That ambiguity cost real time on 2026-08-23 (ClickUp wdvrdaxvvg), and
+            # in 2026-06 the same string turned out to be a bad OPENAI_API_KEY.
+            from generate_tour_text import get_last_failure
+            code, detail, kind = get_last_failure()
+
+            # error_type feeds the app's existing switch in
+            # tour_generator_screen.dart:372. 'service_unavailable' there renders
+            # "temporarily unavailable, please try again in a few minutes", which is
+            # the truthful thing to show a tester for an upstream fault -- and quite
+            # different from the "try a broader area" advice a content failure gets.
+            error_type = None
+
+            if kind == "upstream":
+                error_type = "service_unavailable"
+                message = (f"Tour generation failed for '{location}' — upstream error "
+                           f"[{code}]. Not a content problem; the request did not get a "
+                           f"usable answer from the model. {detail}")
+            elif kind == "content":
+                # Must keep the literal "no stops could be generated" -- the app
+                # matches on that substring (tour_generator_screen.dart:369) to show
+                # the "try a broader area" guidance. Changing the wording silently
+                # downgrades a helpful message to a generic one.
+                error_type = code
+                message = (f"Tour generation failed for '{location}' — no stops could be "
+                           f"generated [{code}]. The request reached the model; it could "
+                           f"not produce a usable tour for this location. {detail}")
+            else:
+                # No reason recorded — a return path that does not go through _fail().
+                # Say so plainly rather than guessing at a cause.
+                message = (f"Tour generation failed for '{location}' — no stops could be "
+                           f"generated, and no reason was recorded. This is a gap in the "
+                           f"failure attribution, not a diagnosis: see the service log.")
+
+            api_call_logger.log("GENERATE_TOUR_TEXT_FAILED", {
+                "job_id": job_id,
+                "location": location,
+                "tour_type": tour_type,
+                "failure_code": code,
+                "failure_kind": kind,
+                "failure_detail": detail,
+            })
+            print(f"[GENERATOR] job {job_id} failed: kind={kind} code={code} detail={detail}")
+            ACTIVE_JOBS.update(job_id, status="error", error=message,
+                               error_type=error_type, failure_kind=kind)
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
             return
@@ -178,7 +224,14 @@ def get_job_status(job_id):
             response["tour_content"] = job["tour_content"]
     elif job["status"] == "error":
         response["error"] = job["error"]
-    
+        # Additive: older clients ignore unknown fields, and the app already has a
+        # switch on error_type (tour_generator_screen.dart:372) that could never
+        # fire before because this endpoint never sent it.
+        if job.get("error_type"):
+            response["error_type"] = job["error_type"]
+        if job.get("failure_kind"):
+            response["failure_kind"] = job["failure_kind"]
+
     return jsonify(response)
 
 @app.route('/download/<job_id>', methods=['GET'])

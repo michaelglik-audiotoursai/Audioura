@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import time
+import threading
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enhanced_tour_templates_fixed import get_enhanced_tour_template, validate_enhanced_poi_knowledge
@@ -529,6 +530,62 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     return [first_stop] + all_survivors
 
 
+# --- failure attribution ------------------------------------------------------
+# generate_tour_text() returns "no result" from TEN distinct places, and the
+# service collapsed all ten into a single sentence:
+#
+#     "Tour generation failed for '<location>' — no stops could be generated
+#      (all filtered or knowledge insufficient)."
+#
+# That message cannot distinguish "OpenAI returned 500" from "the model refused
+# for lack of knowledge", which sends the reader into the POI filtering logic
+# when the cause may be upstream. It has misled before: on 2026-06-07 the same
+# string turned out to be a bad OPENAI_API_KEY in Secret Manager
+# (claude_review_secret_fixes_final_2026_06_07.md:13), nothing to do with
+# coverage. Three unexplained Madagascar failures on 2026-08-23 could not be
+# attributed afterwards for exactly this reason -- see ClickUp wdvrdaxvvg.
+#
+# Thread-local: the service runs one generation per thread
+# (generate_tour_text_service.py:147), so a global would cross jobs.
+_failure = threading.local()
+
+# Which failures are the caller's problem vs ours. The distinction is the whole
+# point: UPSTREAM means retry or check credentials, CONTENT means the model
+# genuinely could not produce a usable tour for this location.
+_UPSTREAM_CODES = {"no_openai_api_key", "phase3a_http_error", "pipeline_exception"}
+
+
+def _clear_failure():
+    _failure.code = None
+    _failure.detail = ""
+
+
+def get_last_failure():
+    """(code, detail, kind) for the most recent failure on THIS thread.
+
+    kind is "upstream", "content", or None when there has been no failure.
+    """
+    code = getattr(_failure, "code", None)
+    if code is None:
+        return None, "", None
+    return code, getattr(_failure, "detail", ""), (
+        "upstream" if code in _UPSTREAM_CODES else "content")
+
+
+def _fail(code, detail=""):
+    """Record WHY generation failed, then return the standard empty result.
+
+    Every `return None, None, (None, None)` in this function goes through here.
+    If you add another failure path, add it here too -- an unattributed failure
+    is the thing this exists to prevent.
+    """
+    _failure.code = code
+    _failure.detail = str(detail).replace("\n", " ")[:300]
+    kind = "upstream" if code in _UPSTREAM_CODES else "content"
+    print(f"X GENERATION FAILED [{kind}/{code}] {_failure.detail}")
+    return None, None, (None, None)
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -542,6 +599,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
     Returns:
         tuple: (tour_text, output_file, coordinates)
     """
+    _clear_failure()   # so a stale reason from an earlier job on this thread cannot leak
     import api_call_logger
     api_call_logger.log("GENERATE_TOUR_TEXT_FUNCTION_ENTRY", {
         "location": location,
@@ -557,7 +615,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             api_key = input("Enter your OpenAI API key: ")
         if not api_key:
             print("Error: OpenAI API key is required")
-            return None, None, (None, None)
+            return _fail("no_openai_api_key",
+                         "OPENAI_API_KEY is not set in this process environment")
 
     # Headers for API calls
     headers = {
@@ -901,7 +960,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         if info_response.status_code != 200:
             print(f"X PHASE 3A failed: status {info_response.status_code}")
             print(info_response.text)
-            return None, None, (None, None)
+            return _fail("phase3a_http_error",
+                         f"PHASE 3A status {info_response.status_code}: {info_response.text[:200]}")
 
         info_result = info_response.json()
         info_text = info_result["choices"][0]["message"]["content"]
@@ -932,12 +992,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         for indicator in insufficient_knowledge_indicators:
             if indicator.lower() in info_text.lower():
                 print(f"X AI KNOWLEDGE INSUFFICIENT: {info_text[:200]}...")
-                return None, None, (None, None)
+                return _fail("knowledge_insufficient",
+                             f"model declined, matched {indicator!r}: {info_text[:150]}")
 
         candidates = _parse_json_array_loose(info_text)
         if not candidates or not isinstance(candidates, list):
             print(f"X PHASE 3A returned unparseable response: {info_text[:300]}")
-            return None, None, (None, None)
+            return _fail("phase3a_unparseable", info_text[:200])
 
         for c in candidates:
             if not isinstance(c, dict):
@@ -952,7 +1013,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
         if len(poi_list) == 0:
             print(f"X PHASE 3A: no usable POIs after parsing")
-            return None, None, (None, None)
+            return _fail("phase3a_no_usable_pois",
+                         f"{len(candidates)} candidate(s) returned, none usable")
 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
@@ -966,7 +1028,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         knowledge_valid, knowledge_message = validate_enhanced_poi_knowledge(poi_list, intent, location)
         if not knowledge_valid:
             print(f"X Knowledge validation failed: {knowledge_message}")
-            return None, None, (None, None)
+            return _fail("knowledge_validation_failed", knowledge_message)
         print(f"OK Knowledge validation passed: {knowledge_message}")
 
         # Snapshot before PHASE 4
@@ -1136,7 +1198,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             poi_list = poi_list[:total_stops]
         if len(poi_list) == 0:
             print(f"X All POIs were filtered out; cannot continue")
-            return None, None, (None, None)
+            return _fail("all_pois_filtered",
+                         "every POI was removed by the inclusion filters")
         if len(poi_list) < total_stops:
             print(f"! Final count {len(poi_list)} < requested {total_stops}; orchestrator will surface stop_count_warning")
 
@@ -1487,7 +1550,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         # Must be caught BEFORE the generic Exception handler to prevent the last-resort
         # fallback from producing a 'completed' tour full of 'Location N' placeholders.
         print(f"X PHASE 3C rejected all stops: {e}")
-        return None, None, (None, None)
+        return _fail("phase3c_rejected_all_stops", e)
     except Exception as e:
         print(f"Error in PHASE 3A/3B pipeline: {str(e)}")
         import traceback
@@ -1495,7 +1558,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         if intent:
             poi_type = intent.get('poi_type', 'locations')
             print(f"X Unable to generate tour: Insufficient data available for {poi_type} in {location}.")
-            return None, None, (None, None)
+            return _fail("pipeline_exception", f"{type(e).__name__}: {e}")
         # Last-resort fallback (no intent): keep behaviour for robustness
         for i in range(total_stops):
             poi_list.append({
@@ -1614,7 +1677,7 @@ DO NOT include directions to the next stop - these will be added separately.
     knowledge_valid2, knowledge_message2 = validate_enhanced_poi_knowledge(poi_list, intent, location)
     if not knowledge_valid2:
         print(f"X Post-description validation failed: {knowledge_message2}")
-        return None, None, (None, None)
+        return _fail("post_description_validation_failed", knowledge_message2)
     print(f"OK Post-description validation passed: {knowledge_message2}")
 
     if tour_category == 'museum' and _museum_venue_name:
