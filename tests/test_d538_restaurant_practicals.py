@@ -93,13 +93,23 @@ def main():
     print("\n  -- the prompt block forces disclosure, and stays silent when thin --")
     block = practicals_prompt_block({
         'usable': True, 'hours': '19:30-21:15', 'closed_days': 'Sunday, Monday',
-        'reservation': 'essential', 'price_band': 'tasting from 313 USD', 'michelin': '3 stars'})
+        'reservation': 'essential', 'price_band': 'tasting from 313 USD',
+        'cuisine': 'classic French brasserie', 'michelin': '3 stars'})
+    # [D546] Michael's four: when it is open, whether to book, what it costs, and
+    # what kind of food. Stop 1 of the v3 tour carried all four; stops 2 and 3 did
+    # not, because the prompt mandated only booking and price.
     checks = [
         ("hours reach the prompt", '19:30-21:15' in block),
         ("closed days reach the prompt", 'Sunday, Monday' in block),
         ("price reaches the prompt", '313' in block),
-        ("booking disclosure is mandatory", 'MUST tell the listener' in block),
-        ("invention is forbidden", 'Do NOT invent' in block),
+        ("CUISINE reaches the prompt", 'classic French brasserie' in block),
+        ("all four are mandated, not just two",
+         all(k in block for k in ('WHEN IT IS OPEN', 'WHETHER A BOOKING IS NEEDED',
+                                  'ROUGHLY WHAT IT COSTS', 'WHAT KIND OF FOOD'))),
+        ("invention is forbidden",
+         'do not guess' in block and 'locked door' in block),
+        ("absent fields must be left unsaid",
+         'say nothing about it' in block),
         ("thin practicals produce no block", practicals_prompt_block(
             {'usable': False, 'hours': ''}) == ""),
     ]
