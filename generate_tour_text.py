@@ -9167,6 +9167,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             from spine_generator import generate_spine
             from fact_extractor import generate_fact_sheets_parallel
 
+            # [D547] Drop corpus-known-dead venues BEFORE the spine is written.
+            #
+            # The 2026-08-29 tour opened with "Explore how La Marée's Russian-inspired
+            # concept marries with Monaco's upscale culinary scene" — a restaurant that
+            # closed in 2020 and that the D538 block had correctly dropped. The stops
+            # were right and the tour still advertised a dead venue, because the spine
+            # (story arc and prolog) is written from poi_list BEFORE D538 runs.
+            #
+            # Only the CORPUS lookup runs here: deterministic, zero network, and it
+            # cannot misfire the way the search-marker paths did (D541/D543). The full
+            # practicals acquisition stays where it is — moving that whole block would
+            # be a pipeline reorder, and this session has broken enough by reaching
+            # further than the defect required.
+            if tour_category == 'restaurant':
+                try:
+                    from restaurant_practicals import known_bad_venue as _kbv
+                    _d547_keep, _d547_gone = [], []
+                    for _p in poi_list:
+                        if _kbv(_p.get('name', ''), location)[0]:
+                            _d547_gone.append(_p.get('name', ''))
+                        else:
+                            _d547_keep.append(_p)
+                    if _d547_gone and _d547_keep:
+                        for _g in _d547_gone:
+                            print(f"  [D547] Pre-spine drop '{_g[:44]}' — in "
+                                  f"known_closed_venues.json; the tour must not describe it")
+                        poi_list = _d547_keep
+                except Exception as _d547_err:
+                    print(f"  [D547] Pre-spine corpus check error (non-fatal): {_d547_err}")
+
             _poi_names = [p["name"] for p in poi_list]
             _venue_name = (_museum_venue_name or location) if tour_category == 'museum' else location
 
