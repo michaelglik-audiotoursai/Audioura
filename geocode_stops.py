@@ -50,8 +50,11 @@ import math
 import time
 import json
 import logging
+import threading
+import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 # --- configuration -----------------------------------------------------------
 
@@ -62,7 +65,28 @@ NOMINATIM_URL = os.getenv("NOMINATIM_URL", "https://nominatim.openstreetmap.org/
 USER_AGENT = os.getenv("GEOCODE_USER_AGENT", "Audioura/1.0 (audio tour generator; info@audioura.com)")
 
 # Nominatim allows at most 1 request/second.
+# Nominatim's free tier permits 1 request/second. Set to 0 to remove the wait
+# entirely -- that is the single knob to turn on the day a paid geocoder or a
+# self-hosted instance removes the limit. No rebuild and no code change: it is
+# read from the environment, so `gcloud run services update --set-env-vars
+# GEOCODE_MIN_INTERVAL=0` is the whole migration for this half.
+#
+# NOTE, so the expectation is right: setting this to 0 alone makes tours only
+# modestly faster, because lookups still run one after another. The remaining
+# win needs them to overlap -- see GEOCODE_MAX_PARALLEL below.
 _MIN_INTERVAL_S = float(os.getenv("GEOCODE_MIN_INTERVAL", "1.1"))
+
+# How many stops may be resolved concurrently. 1 keeps today's strictly
+# sequential behaviour, which is what the free tier requires. Raising it is the
+# other half of the paid-geocoder migration, and it is what actually makes tour
+# generation faster: a 10-stop tour issues roughly 32 lookups, so at 1.1s apart
+# it spends about 35 seconds waiting. Both knobs are read here so that day is a
+# configuration change rather than a project.
+_MAX_PARALLEL = max(1, int(os.getenv("GEOCODE_MAX_PARALLEL", "1")))
+
+# A 429 means we asked too fast, not that the place is unknown. Retry once.
+_MAX_ATTEMPTS = max(1, int(os.getenv("GEOCODE_MAX_ATTEMPTS", "2")))
+_RETRY_BACKOFF_S = float(os.getenv("GEOCODE_RETRY_BACKOFF", "1.5"))
 
 # Disagreement beyond this and we trust the geocoder over the model.
 #
@@ -104,6 +128,40 @@ _COORD_RE = re.compile(r'^(Coordinates:[^\S\n]*)([-\d.]+)[^\S\n]*,[^\S\n]*([-\d.
 _ADDRESS_RE = re.compile(r'^Address:[^\S\n]*(\S.*)$', re.IGNORECASE | re.MULTILINE)
 
 _last_request_at = 0.0
+_throttle_lock = threading.Lock()
+
+# Per-tour counters, thread-local so concurrent generations do not pollute each
+# other's numbers. These exist to answer one question with evidence rather than
+# opinion: IS THE 1 REQ/SEC LIMIT ACTUALLY COSTING US ANYTHING YET?
+#
+# Until there are real users the answer is "no", and paying for a commercial
+# geocoder would be premature. The metric line emitted at the end of every tour
+# makes the moment it starts to matter observable instead of a guess:
+#
+#   [GEOCODE] tour summary | stops=10 lookups=32 throttle_wait=34.8s
+#             rate_limited=0 replaced=4 unverified=2
+#
+# Suggested trigger to revisit: any tour where rate_limited > 0 outside a test,
+# or where throttle_wait exceeds roughly a third of total generation time.
+_stats = threading.local()
+
+
+def _stats_reset():
+    _stats.data = {"lookups": 0, "throttle_wait_s": 0.0, "rate_limited": 0}
+
+
+def _stats_add(key, amount):
+    d = getattr(_stats, "data", None)
+    if d is None:
+        _stats_reset()
+        d = _stats.data
+    d[key] = d.get(key, 0) + amount
+
+
+def get_stats():
+    """Counters for the current tour on this thread."""
+    return dict(getattr(_stats, "data", None) or
+                {"lookups": 0, "throttle_wait_s": 0.0, "rate_limited": 0})
 
 
 def haversine_m(a, b):
@@ -116,36 +174,84 @@ def haversine_m(a, b):
     return 2 * R * math.asin(math.sqrt(h))
 
 
+def _throttle():
+    """Wait until it is our turn to call Nominatim. Returns seconds spent waiting.
+
+    WHY A LOCK. This was a bare `global _last_request_at` with a read, a sleep and
+    a write, and no lock. That enforces 1 req/sec for a single sequential caller,
+    which is how it was measured. Production is not that: tour-modernized runs
+    --concurrency=5 on --max-instances=1 and each tour generates in its own
+    thread, so every thread read the same _last_request_at before any of them
+    updated it, all slept the same short interval, and all fired together. The
+    effective rate became N req/sec against a policy of 1.
+
+    Observed in production 2026-08-29 with three tours submitted together:
+
+        [GEOCODE] lookup failed for '584 Komatsucho, ... Kyoto, Japan':
+                  HTTP Error 429: Too many requests
+
+    Nothing broke -- the module fails soft -- but coordinate correction silently
+    stopped for those stops, which is the failure this module exists to prevent,
+    happening precisely when the service is busiest and invisibly.
+
+    Set GEOCODE_MIN_INTERVAL=0 to disable the wait entirely (see _MIN_INTERVAL_S).
+    """
+    global _last_request_at
+    if _MIN_INTERVAL_S <= 0:
+        return 0.0
+    with _throttle_lock:
+        elapsed = time.time() - _last_request_at
+        wait = _MIN_INTERVAL_S - elapsed
+        if wait > 0:
+            time.sleep(wait)
+        else:
+            wait = 0.0
+        _last_request_at = time.time()
+        return wait
+
+
 def geocode(query):
     """Resolve a free-text place to (lat, lng), or None.
 
     Returns None on any failure — no network, rate limited, no match, malformed
     response. Callers must treat None as "no opinion", never as an error.
     """
-    global _last_request_at
     if not query or not query.strip():
         return None
-
-    # Respect Nominatim's 1 req/sec policy.
-    elapsed = time.time() - _last_request_at
-    if elapsed < _MIN_INTERVAL_S:
-        time.sleep(_MIN_INTERVAL_S - elapsed)
 
     url = NOMINATIM_URL + "?" + urllib.parse.urlencode({
         "q": query, "format": "json", "limit": 1,
     })
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
-            payload = json.load(resp)
-        _last_request_at = time.time()
-        if not payload:
+
+    # One retry on 429. A rate-limit answer is not "no opinion" -- it means we
+    # asked too fast, and giving up turns a throttling event into a permanently
+    # unverified stop.
+    for attempt in range(_MAX_ATTEMPTS):
+        waited = _throttle()
+        _stats_add("throttle_wait_s", waited)
+        _stats_add("lookups", 1)
+        try:
+            with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+                payload = json.load(resp)
+            if not payload:
+                return None
+            return float(payload[0]["lat"]), float(payload[0]["lon"])
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                _stats_add("rate_limited", 1)
+                if attempt + 1 < _MAX_ATTEMPTS:
+                    backoff = _RETRY_BACKOFF_S * (2 ** attempt)
+                    logging.warning("[GEOCODE] rate limited on %r, retrying in %.1fs",
+                                    query, backoff)
+                    time.sleep(backoff)
+                    continue
+            logging.warning("[GEOCODE] lookup failed for %r: %s", query, e)
             return None
-        return float(payload[0]["lat"]), float(payload[0]["lon"])
-    except Exception as e:
-        _last_request_at = time.time()
-        logging.warning("[GEOCODE] lookup failed for %r: %s", query, e)
-        return None
+        except Exception as e:
+            logging.warning("[GEOCODE] lookup failed for %r: %s", query, e)
+            return None
+    return None
 
 
 def _parse_stop(stop_text):
@@ -692,15 +798,28 @@ def correct_stops(text_content, tour_location, tour_anchor=None):
         if tour_anchor:
             logging.info("[GEOCODE] anchor from stop median: %.4f, %.4f", *tour_anchor)
 
-    new_content, records = [], []
-    for stop_text in text_content:
+    _stats_reset()
+    started = time.time()
+
+    def _one(stop_text):
         try:
-            fixed, record = resolve_stop(stop_text, tour_location, tour_anchor)
+            return resolve_stop(stop_text, tour_location, tour_anchor)
         except Exception as e:                      # pragma: no cover - defensive
             logging.warning("[GEOCODE] stop validation errored, keeping original: %s", e)
-            fixed, record = stop_text, {"action": "error", "reason": str(e)}
-        new_content.append(fixed)
-        records.append(record)
+            return stop_text, {"action": "error", "reason": str(e)}
+
+    if _MAX_PARALLEL > 1 and len(text_content) > 1:
+        # Only reachable once GEOCODE_MAX_PARALLEL is raised, which is the paid-
+        # geocoder path. The throttle still applies per request, so this is safe
+        # to enable at any interval -- it just stops being a bottleneck when the
+        # interval is 0. Order is preserved: map() returns results in order.
+        with ThreadPoolExecutor(max_workers=_MAX_PARALLEL) as pool:
+            results = list(pool.map(_one, text_content))
+    else:
+        results = [_one(s) for s in text_content]
+
+    new_content = [r[0] for r in results]
+    records = [r[1] for r in results]
 
     replaced = sum(1 for r in records if r["action"] == "replaced")
     flagged = sum(1 for r in records if r["action"] == "flagged")
@@ -709,4 +828,16 @@ def correct_stops(text_content, tour_location, tour_anchor=None):
         if r["action"] in ("replaced", "flagged"):
             logging.info("[GEOCODE]   %s: %s -> %s (%s)",
                          r.get("stop"), r.get("llm"), r.get("geocoded"), r["reason"])
+
+    # One greppable line per tour. This is the evidence for deciding WHEN the
+    # free-tier rate limit starts costing something -- see the note on _stats.
+    s = get_stats()
+    unverified = sum(1 for r in records if r["action"] not in ("replaced", "kept"))
+    logging.warning(
+        "[GEOCODE] tour summary | stops=%d lookups=%d throttle_wait=%.1fs "
+        "rate_limited=%d replaced=%d unverified=%d elapsed=%.1fs "
+        "min_interval=%.2f max_parallel=%d",
+        len(records), s["lookups"], s["throttle_wait_s"], s["rate_limited"],
+        replaced, unverified, time.time() - started, _MIN_INTERVAL_S, _MAX_PARALLEL)
+
     return new_content, records
