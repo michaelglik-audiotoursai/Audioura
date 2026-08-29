@@ -10599,6 +10599,11 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     _hi = sum(1 for f in _lr['facts'] if f.get('confidence') == 'high')
                     _DIRECT_SNIPPETS_PER_STOP.setdefault(_ln, []).extend(
                         facts_as_snippets(_lr, _ln))
+                    # [D548] Also keep them ON THE POI, so Phase 5 can require one
+                    # be told. As snippets alone they compete with search results
+                    # and the ranker can score them usable=0 — which is why good
+                    # episodes were being retrieved and never spoken.
+                    _lp['_lore'] = _lr['facts']
                     print(f"  [D545] +{len(_lr['facts'])} story fact(s) for "
                           f"'{_ln[:40]}' via {_lr['provider']} ({_hi} high)")
                     for _f in _lr['facts'][:3]:
@@ -11062,6 +11067,13 @@ NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
                     _practicals_block = practicals_prompt_block(poi.get('_practicals'))
                 except Exception:
                     _practicals_block = ""
+                # [D548] And the story, as a requirement rather than as context.
+                try:
+                    from stop_knowledge_fallback import story_prompt_block
+                    _practicals_block = (story_prompt_block(poi.get('_lore'), poi_name)
+                                         + _practicals_block)
+                except Exception:
+                    pass
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
 {_visited_line}{_claims_line}{_practicals_block}
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.

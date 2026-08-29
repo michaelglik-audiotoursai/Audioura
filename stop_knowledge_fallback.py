@@ -115,16 +115,41 @@ def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None,
         return None, f"openai error: {e}"
 
 
-def _gemini_facts(work, venue, timeout=45):
-    """Grounded variant — returns citations, so its facts carry sources."""
+def _gemini_facts(work, venue, timeout=45, focus='object'):
+    """Grounded variant — returns citations, so its facts carry sources.
+
+    [D548] **This asked Gemini about a MUSEUM OBJECT no matter what the stop was.**
+    The system prompt and the "Object:/Museum:" framing were hardcoded, so a
+    restaurant stop produced:
+
+        "You supply factual reference material about ONE museum object ...
+         Object: Elsa   Museum: Restaurant tour in Monaco
+         ... maker, materials, dimensions, provenance"
+
+    Gemini answered that question honestly and uselessly, `_thin()` rejected the
+    result, and the caller fell through to OpenAI+web — which is why every
+    restaurant stop came back flat while Michael's own Gemini query ("something
+    juicy ... actual events not fabrications") returned Elsa Maxwell's
+    manufactured-gossip parties, Chef Sari's "green dictatorship", and the lost
+    Michelin star Marcel Ravin won back.
+
+    **The strongest source in the system was being asked the wrong question.**
+    """
     try:
         from story_leads import gemini_with_sources
     except Exception as e:
         return None, f"gemini unavailable: {e}"
     try:
+        _sys = {'restaurant': _SYSTEM_RESTAURANT,
+                'place': _SYSTEM_PLACE}.get(focus, _SYSTEM)
+        _noun = {'restaurant': 'Restaurant', 'place': 'Place'}.get(focus, 'Object')
+        _ctx = {'restaurant': 'City', 'place': 'Area'}.get(focus, 'Museum')
+        _ask = {'restaurant': ('Who made this restaurant what it is, who has eaten here, and what '
+                               'actually happened? Real incidents with named people and dates.'),
+                'place': 'What actually happened at this place, and to whom?'
+                }.get(focus, 'What is actually known about this specific object?')
         res = gemini_with_sources(
-            f"{_SYSTEM}\n\nObject: {work}\nMuseum: {venue}\n\n"
-            f"What is actually known about this specific object? Return only the JSON.")
+            f"{_sys}\n\n{_noun}: {work}\n{_ctx}: {venue}\n\n{_ask} Return only the JSON.")
         text = res.get('text', '') if isinstance(res, dict) else str(res)
         m = re.search(r'\{.*\}', text, re.S)
         if not m:
@@ -247,27 +272,34 @@ _SYSTEM_PLACE = (
 # prompt asks about a TOWN; a restaurant needs its own question.
 _SYSTEM_RESTAURANT = (
     "You supply STORY material about ONE restaurant for an audio tour. The listener is standing "
-    "outside deciding whether to go in, and has already been told the hours and the price. Give "
-    "them the reason to care.\n"
+    "outside and has already been told the hours and the price. Give them the reason to care.\n"
     "\n"
-    "What is wanted, in rough order of value:\n"
-    "  - the founding: who backed it, who dared whom, what was at stake if it failed\n"
-    "  - the people who ate there: named guests, and WHAT HAPPENED - a wedding dinner, a deal, a "
-    "refusal, a scene. 'Celebrities dine here' is worthless; 'Prince Albert II held his wedding "
-    "gala dinner here in 2011' is the standard.\n"
-    "  - the kitchen as a lineage: chefs who trained there and what they went on to do\n"
+    "Michael's own request is the standard to hit: \"some stories about people or incidents ... "
+    "something juicy for people to know. Just make sure these are actual events and not "
+    "fabrications.\"\n"
+    "\n"
+    "Look for INCIDENTS, not attributes:\n"
+    "  - who the place is NAMED AFTER and what they actually did\n"
+    "  - a founding dare, an ultimatum, a bet, a deadline someone had to beat\n"
+    "  - a chef's obsession, feud, refusal, or rule that annoyed powerful customers\n"
+    "  - a star won, LOST, and won back; a rebrand; a rescue; a collapse\n"
+    "  - a named guest and WHAT HAPPENED - a wedding, a deal, a row, a scene\n"
     "  - a ritual or object the room is known for, described concretely\n"
-    "  - an episode from its history: a war, a fire, a closure, a rescue, a record\n"
+    "  - a wartime or crisis episode: what was hidden, saved, or destroyed\n"
     "\n"
-    "Every item needs a NAMED person or a DATE, and preferably both, plus what came of it. "
-    "Reject your own output if it would be equally true of any expensive restaurant.\n"
+    "Every item needs a NAMED person and preferably a DATE, plus what came of it. Conflict and "
+    "consequence are what make it worth hearing: 'won three Michelin stars' is a fact, 'was given "
+    "four years to win three stars or lose the job, and did it in thirty-three months' is a story.\n"
     "\n"
     "FORBIDDEN: 'renowned for its exquisite cuisine', 'a favourite among discerning diners', "
-    "'an unforgettable experience'. Atmosphere words are not stories.\n"
+    "'an unforgettable experience', 'a testament to'. Atmosphere words are not stories. Reject "
+    "your own output if it would be equally true of any expensive restaurant.\n"
     "\n"
-    "Do not invent a guest, a date or an anecdote. Three real episodes beat eight with two made "
-    "up - a fabricated famous diner is the worst possible outcome here. Mark an item \"high\" "
-    "only if you are confident it happened at THIS restaurant.\n"
+    "ACCURACY IS THE HARD CONSTRAINT. Do not invent a guest, a date, an incident or a quote. "
+    "Where discretion means the specifics are not public, say so rather than inventing colour - "
+    "'the house does not discuss its guests' is honest and usable. Three real episodes beat eight "
+    "with two made up. Mark an item \"high\" only if you are confident it happened at THIS "
+    "restaurant.\n"
     "\n"
     'Return ONLY JSON: {"facts": [{"fact": "<one sentence: who, when, what came of it>", '
     '"confidence": "high|low"}]}'
@@ -291,7 +323,7 @@ def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45,
 
     parsed, provider = None, ''
     if prefer_gemini and os.environ.get('GEMINI_API_KEY'):
-        parsed, provider = _gemini_facts(work, venue, timeout)
+        parsed, provider = _gemini_facts(work, venue, timeout, focus=focus)
         if parsed is None:
             out['reason'] = f'gemini: {provider}; '
             parsed = None
@@ -345,3 +377,37 @@ def facts_as_snippets(result, work):
             'confidence': f.get('confidence', 'low'),
         })
     return snippets
+
+
+def story_prompt_block(facts, stop_name=''):
+    """[D548] Put the retrieved episodes in the prompt as a REQUIREMENT.
+
+    Michael, 2026-08-29: "The major thing to fix is to add stories about people;
+    without them we can not go to release ... Gemini have no problems to come up
+    with the stories, and yet, the system does not add them. Why??"
+
+    Two reasons, and this fixes the second. The first was that Gemini was being
+    asked about a museum object (see `_gemini_facts`). The second is that even
+    when good episodes were retrieved, they were injected as SEARCH SNIPPETS —
+    where `rank_and_cap_snippets` can score them `usable=0` and drop them, and
+    where the prompt only ever said "reference material", never "tell this".
+
+    The practicals had the same problem and only became reliable when they were
+    stated as a requirement rather than offered as context. Same treatment here.
+    """
+    hi = [f['fact'] for f in (facts or []) if f.get('confidence') == 'high']
+    lo = [f['fact'] for f in (facts or []) if f.get('confidence') != 'high']
+    if not hi and not lo:
+        return ""
+    lines = "\n".join(f"  - {f}" for f in (hi + lo)[:8])
+    return (
+        "\nVERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.\n"
+        + lines + "\n"
+        "YOU MUST TELL AT LEAST ONE OF THESE AS A STORY, with the person named, the date if given, "
+        "and what came of it. This is the reason the listener is standing here rather than at any "
+        "other restaurant — a stop that lists hours and prices and tells no story has failed.\n"
+        "Tell it properly: who, when, what they did, what happened because of it. Do not compress "
+        "it into an adjective ('the storied Elsa') — that is the failure this replaces.\n"
+        "Use ONLY what is listed above. Do not add a guest, a date or an incident that is not "
+        "here, and do not embellish one that is.\n"
+    )
