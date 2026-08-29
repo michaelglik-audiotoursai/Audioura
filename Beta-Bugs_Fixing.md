@@ -130,7 +130,15 @@ briefing. Work top to bottom.
 > `./deploy_tour_modernized.sh --rollback`; `v33` is intact.
 > **Deploying is a hard stop — ask Michael first.** Runbook `wdvrdaxn9f`.
 >
-> **`main` and production are in sync.** Nothing is committed-but-undeployed.
+> **⚠️ `main` is AHEAD of production again** as of 2026-08-29. Two commits are
+> committed, pushed and **not deployed**:
+>
+> | commit | what | task |
+> |---|---|---|
+> | `8395f59` | failure attribution — ten generator failure paths now carry a code and an upstream/content kind, and `/status` returns `error_type` | `wdvrdaxvvg` |
+> | `3f8c998` | `city_from_address()` returned the country for most of the world; anchors are now cities | `wdvrdaxvvt` |
+>
+> Neither warrants a deploy of its own. **Ask Michael** — deploying is a hard stop.
 >
 > ### Git
 >
