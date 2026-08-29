@@ -166,9 +166,52 @@ def _parse_stop(stop_text):
     return name, address, coords
 
 
-_COUNTRIES = {'australia', 'canada', 'usa', 'us', 'united states', 'united states of america',
-              'france', 'japan', 'uk', 'united kingdom', 'scotland', 'england', 'ireland',
-              'germany', 'italy', 'spain', 'netherlands'}
+# Countries, so a trailing country is never mistaken for the city.
+#
+# This was a 16-name set, which meant every country outside it -- most of the
+# world -- survived the filter and was returned AS THE CITY: 'Madagascar',
+# 'Brazil', 'Turkey', 'India', 'Kenya', 'Argentina'. Wrong on 8 of 12 real
+# address shapes; every one it got right happened to be one of the 16.
+#
+# A POSITIONAL RULE WAS TRIED FIRST AND REJECTED. "Drop the last component when
+# there are 3+" looks elegant and needs no data, but it beheads an address that
+# legitimately ends with a city: "Boston Common, 139 Tremont St, Boston" -> the
+# rule returns 'Boston Common'. Position cannot tell 'Boston' from 'Madagascar';
+# only knowledge can. The list is the honest tool. Country names are stable, so
+# the maintenance burden this was meant to avoid is close to zero.
+_COUNTRIES = {
+    'afghanistan', 'albania', 'algeria', 'andorra', 'angola', 'argentina', 'armenia',
+    'australia', 'austria', 'azerbaijan', 'bahamas', 'bahrain', 'bangladesh', 'barbados',
+    'belarus', 'belgium', 'belize', 'benin', 'bhutan', 'bolivia', 'bosnia',
+    'bosnia and herzegovina', 'botswana', 'brazil', 'brunei', 'bulgaria', 'burkina faso',
+    'burundi', 'cambodia', 'cameroon', 'canada', 'cape verde', 'chad', 'chile', 'china',
+    'colombia', 'congo', 'costa rica', 'croatia', 'cuba', 'cyprus', 'czechia',
+    'czech republic', 'denmark', 'djibouti', 'dominican republic', 'ecuador', 'egypt',
+    'el salvador', 'england', 'estonia', 'eswatini', 'ethiopia', 'fiji', 'finland',
+    'france', 'gabon', 'gambia', 'georgia', 'germany', 'ghana', 'gibraltar', 'greece',
+    'greenland', 'guatemala', 'guinea', 'guyana', 'haiti', 'honduras', 'hong kong',
+    'hungary', 'iceland', 'india', 'indonesia', 'iran', 'iraq', 'ireland', 'israel',
+    'italy', 'ivory coast', 'jamaica', 'japan', 'jordan', 'kazakhstan', 'kenya',
+    'kosovo', 'kuwait', 'kyrgyzstan', 'laos', 'latvia', 'lebanon', 'lesotho', 'liberia',
+    'libya', 'liechtenstein', 'lithuania', 'luxembourg', 'macau', 'madagascar', 'malawi',
+    'malaysia', 'maldives', 'mali', 'malta', 'mauritania', 'mauritius', 'mexico',
+    'moldova', 'monaco', 'mongolia', 'montenegro', 'morocco', 'mozambique', 'myanmar',
+    'namibia', 'nepal', 'netherlands', 'new zealand', 'nicaragua', 'niger', 'nigeria',
+    'north korea', 'north macedonia', 'northern ireland', 'norway', 'oman', 'pakistan',
+    'palestine', 'panama', 'papua new guinea', 'paraguay', 'peru', 'philippines',
+    'poland', 'portugal', 'puerto rico', 'qatar', 'romania', 'russia',
+    'russian federation', 'rwanda', 'saudi arabia', 'scotland', 'senegal', 'serbia',
+    'seychelles', 'sierra leone', 'singapore', 'slovakia', 'slovenia', 'somalia',
+    'south africa', 'south korea', 'south sudan', 'spain', 'sri lanka', 'sudan',
+    'suriname', 'sweden', 'switzerland', 'syria', 'taiwan', 'tajikistan', 'tanzania',
+    'thailand', 'togo', 'trinidad and tobago', 'tunisia', 'turkey', 'turkiye',
+    'turkmenistan', 'uganda', 'ukraine', 'united arab emirates', 'united kingdom',
+    'united states', 'united states of america', 'uruguay', 'uzbekistan', 'vatican city',
+    'venezuela', 'vietnam', 'wales', 'yemen', 'zambia', 'zimbabwe',
+    # common abbreviations and informal forms the model actually writes
+    'uae', 'uk', 'us', 'usa', 'u.s.', 'u.s.a.', 'u.k.', 'great britain', 'britain',
+    'holland', 'south korea (rok)', 'the netherlands', 'the bahamas', 'the gambia',
+}
 
 _STREET_WORD = re.compile(
     r'\b(st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|way|lane|ln|rue|place|terrace|'
@@ -178,11 +221,31 @@ _STREET_WORD = re.compile(
 def _clean_component(part):
     """Strip postcodes and state codes from one comma-separated address component."""
     p = part.strip()
+    # NL postcodes lead with digits AND two letters: "1071 DJ Amsterdam". This has
+    # to run before the generic leading-digits strip below, which would leave
+    # "DJ Amsterdam" -- and _is_junk_component then matches that as a state+code
+    # pair (case-insensitively) and discards the city entirely.
+    p = re.sub(r'^\d{4}\s*[A-Z]{2}\s+', '', p)                    # "1071 DJ Amsterdam" (NL)
     p = re.sub(r'^\d{3,5}(?:-\d{4})?\s+', '', p)                  # "75005 Paris" (FR/JP)
-    p = re.sub(r'\s+[A-Z]{2}\s+[A-Z\d][A-Z\d\s-]{2,}$', '', p)    # "Sydney NSW 2000"
+    # {2,3} not {2}: three-letter state codes are the common case in Australia
+    # (NSW, QLD, VIC, TAS, ACT). With {2} the docstring's own worked example --
+    # "Sydney NSW 2000" -- fell straight through and was returned verbatim.
+    p = re.sub(r'\s+[A-Z]{2,3}\s+[A-Z\d][A-Z\d\s-]{2,}$', '', p)  # "Sydney NSW 2000"
     p = re.sub(r'\s+[A-Z]\d[A-Z]\s*\d[A-Z]\d$', '', p)            # "Toronto M4P 2A8"
-    p = re.sub(r'\s+\d{5}(?:-\d{4})?$', '', p)                    # "Boston 02133"
+    # UK outward+inward code. The state-code rule above cannot catch it because
+    # the outward half contains a digit ("EH1"), so [A-Z]{2,3} never matches.
+    p = re.sub(r'\s+[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$', '', p)    # "Edinburgh EH1 2NG"
+    p = re.sub(r'\s+[A-Z]\d{4}$', '', p)                          # "Buenos Aires C1087" (AR)
+    # Trailing numeric postcode of any common length, optionally hyphenated:
+    # "Boston 02133", "Antananarivo 101", "Mumbai 400050",
+    # "Rio de Janeiro 22070-002". Anchored to the end and requires preceding
+    # whitespace, so a house number at the START is untouched (that is handled
+    # above) and "Route 66" as a whole component is left alone by the street-word
+    # filter downstream rather than here.
+    p = re.sub(r'\s+\d{3,6}(?:-\d{3,4})?$', '', p)                # "Boston 02133"
     return p.strip(' ,')
+
+
 
 
 def _is_junk_component(p):
@@ -204,18 +267,33 @@ def _is_junk_component(p):
 def city_from_address(address):
     """Pull the city out of a model-written address.
 
-    The city is the useful part; the postcode and country are actively harmful.
-    Measured on the real Bennelong Point case:
+    The city is the useful part; the postcode and country are noise. The city is
+    also what anchors the reversed-coordinate check in fix_reversed_coordinates(),
+    so returning a country there makes the anchor a country CENTROID rather than a
+    city -- coarser than intended, and silently so.
 
-        "Bennelong Point, Sydney NSW 2000, Australia" -> Bennelong BRIDGE, 12.75 km off
-        "Bennelong Point, Sydney"                     -> Bennelong Point,  0.08 km
+    Measured 2026-08-29 against the deployed image, on 12 real address shapes:
+    8 were wrong before this was fixed, and every one that was RIGHT happened to
+    be in the old 16-country allowlist. Two independent bugs:
 
-    Nominatim has no entry for that address, so rather than returning nothing it
-    fuzzy-matched "Bennelong" to a cycleway in another suburb. Removing the
-    postcode and country turns a 12.75 km failure into an 80 m success.
+      1. Countries were filtered against a 16-name set, so 'Madagascar',
+         'Brazil', 'Turkey', 'India', 'Kenya' and 'Argentina' were returned as
+         cities. _COUNTRIES is now comprehensive -- see the note there on why a
+         positional "drop the last component" rule was tried and rejected.
+      2. _clean_component matched state codes with [A-Z]{2}, so three-letter
+         Australian states did not match and 'Sydney NSW 2000' was returned
+         verbatim -- the function's own worked example.
 
-    Correct on 27 of 28 real generated addresses; the 28th returned "North York"
-    for a Toronto tour, which is a valid qualifier.
+    A NOTE ON A CLAIM THAT DOES NOT REPRODUCE. This docstring used to assert that
+    "Bennelong Point, Sydney NSW 2000" resolves 12.75 km off while
+    "Bennelong Point, Sydney" resolves to 80 m. Re-measured 2026-08-29 against
+    live Nominatim: the two forms return the IDENTICAL coordinate, 0.00 km apart,
+    as do 'Copacabana, Brazil' vs 'Copacabana, Rio de Janeiro' and
+    'Sultanahmet, Turkey' vs 'Sultanahmet, Istanbul'. Either Nominatim improved or
+    the original measurement was of something else. Do not repeat the 12.75 km
+    figure as fact, and do not justify work on this function by claiming it costs
+    lookup accuracy -- the measured cost is zero. The reason to keep it correct is
+    the anchor, and that the next reader should be able to trust what it says.
     """
     if not address:
         return ""
