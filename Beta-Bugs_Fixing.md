@@ -3,13 +3,29 @@
 Michael starts Claude and says **"read Beta-Bugs_Fixing.md"**. This file is the whole
 briefing. Work top to bottom.
 
-> ## 🔔 FIRST ACTION — check whether Yury has replied
+> ## ✅ FIRST ACTION — nothing is waiting on Yury any more (2026-08-28)
 >
-> **Before anything else, read the comments on these two tasks.** Michael gets
-> ClickUp's email alerts; this session gets nothing. The only way you learn that
-> Yury answered is by looking.
+> **All three tasks below are CLOSED.** Michael verified them on a device on
+> 2026-08-28 and instructed (`wdvrdaxvvc`): *"close the issues as verified in GCloud
+> manually by me."* Yury never replied — last message 2026-08-16.
 >
-> **Three** tasks are waiting on him, all assigned to him, all `in progress`.
+> | task | outcome |
+> |---|---|
+> | [`wdvrdaxmq2`](https://app.clickup.com/t/wdvrdaxmq2) concurrent audio | **complete** |
+> | [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3) map numbering | **complete** — `WORKS AS DESIGNED — confusing` |
+> | [`wdvrdaxqjn`](https://app.clickup.com/t/wdvrdaxqjn) wrong coordinates | **complete** |
+>
+> **Still worth checking the DM channel `2ky4d0u8-919` at session start.** Michael gets
+> ClickUp's email alerts; this session gets nothing, and the only way to learn Yury has
+> said anything is to look. If he now reports one of these as still broken, **check when
+> his tour was generated before treating it as a regression** — every fix is in the
+> generator, so a tour downloaded earlier keeps the old HTML and coordinates.
+>
+> Two follow-ups stay open by design: `wdvrdaxnc5` (merge overlapping pins) and
+> `wdvrdaxqtf` (real place database + confirmed-vs-estimated markers), both Storied.
+>
+> <details>
+> <summary>Original triage table — kept for the reasoning, no longer actionable</summary>
 >
 > | task | what we asked him | if he answered |
 > |---|---|---|
@@ -17,9 +33,11 @@ briefing. Work top to bottom.
 > | [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3) BETA-2, map numbering | zoom in far, confirm pin #1 appears beside #2 | **confirmed** → close as `WORKS AS DESIGNED — confusing`; real fix is [`wdvrdaxnc5`](https://app.clickup.com/t/wdvrdaxnc5) in Storied. **genuine mismatch** → new defect; check whether the stop's `audio_N.txt` has a `Coordinates:` line, since stops without one are dropped from the map while survivors keep their numbers. |
 > | [`wdvrdaxqjn`](https://app.clickup.com/t/wdvrdaxqjn) BETA-4, wrong coordinates | generate a **new** tour, check each pin is where that place actually is | **works** → set **Complete**, cite `audioura:v33`, and record it in `SUBMISSION_BETA_BUGS.md`. **a pin is wrong** → run the stop's name and address through `geocode_stops.resolve_stop()` and read the confidence: a *low*-confidence miss is known behaviour, a *high*-confidence miss is a real regression. **pins in the wrong ocean** → that is [`wdvrdaxqte`](https://app.clickup.com/t/wdvrdaxqte), reversed lat/lng, not this. |
 >
-> **Handle it yourself.** Michael's instruction, 2026-08-17: close it or continue
-> the work here on the Windows laptop; only come to him if you actually need a
-> decision. **Do not route these tasks back to him.**
+> </details>
+>
+> **Handle things yourself.** Michael's standing instruction, 2026-08-17: close it or
+> continue the work here on the Windows laptop; only come to him if you actually need a
+> decision. **Do not route tasks back to him** that you could resolve.
 >
 > **One exception: ask Michael before any GCloud deploy.** Use
 > `deploy_tour_modernized.sh`; runbook is [`wdvrdaxn9f`](https://app.clickup.com/t/wdvrdaxn9f).
@@ -62,15 +80,16 @@ briefing. Work top to bottom.
 > | [`wdvrdaxvvc`](https://app.clickup.com/t/wdvrdaxvvc) | three rulings: Dockerfile repair, the `#0` label, how to handle Yury's silence |
 > | [`wdvrdaxvvg`](https://app.clickup.com/t/wdvrdaxvvg) | nothing from Michael — it is Claude work, see below |
 >
-> ### ⚠️ Only one thing genuinely needs Michael now
+> ### ⚠️ One thing needs Michael, and it is the only gate left
 >
-> **Yury has not replied in 11 days.** Three tasks are assigned to him and waiting:
-> `wdvrdaxmq2`, `wdvrdaxmq3`, `wdvrdaxqjn`. His last message was 2026-08-16; the DM
-> asking him to verify went out 2026-08-20. `wdvrdaxqjn` can be closed on Michael's
-> own device check; `wdvrdaxmq3` needs Yury's tour and cannot be closed without him.
+> **The first Kiro dispatch needs his explicit go-ahead.** Forked headless sessions are
+> unattended spend, which is on the hard-stop list and in `wdvrdaxqnz`'s own PROCESS.
+> Everything else is ready: preflight passes all six checks and
+> `.continuous_dev/PAUSE` is in place, so nothing can fire by accident. Delete that
+> file to arm dispatch. The Kiro session task is `wdvrdaxqtg`.
 >
-> The Kiro session (`wdvrdaxqtg`) is **overdue since 2026-08-21** and blocked on
-> Michael installing the CLI and generating `KIRO_API_KEY`.
+> Yury's silence is **no longer a blocker** — all three of his tasks were closed on
+> 2026-08-28 on Michael's own device verification.
 >
 > ### What deploying does NOT affect
 >
@@ -96,9 +115,9 @@ briefing. Work top to bottom.
 >
 > | # | report | state |
 > |---|---|---|
-> | 1 | two audios play at once | **fixed, deployed, live.** Awaiting his check — `wdvrdaxmq2` |
-> | 2 | audio/map numbering | **not a numbering bug** — pin 1 hidden under pin 2. Fix scheduled Storied `wdvrdaxnc5`. Awaiting his check — `wdvrdaxmq3` |
-> | 3 | stop #6 over Central Islands | **fixed, deployed, live.** Awaiting his check — `wdvrdaxqjn` |
+> | 1 | two audios play at once | **CLOSED** — fixed, deployed, device-verified by Michael 2026-08-28 — `wdvrdaxmq2` |
+> | 2 | audio/map numbering | **CLOSED** as `WORKS AS DESIGNED — confusing`. Not a numbering bug — pin 1 hidden under pin 2. Real fix scheduled Storied `wdvrdaxnc5` — `wdvrdaxmq3` |
+> | 3 | stop #6 over Central Islands | **CLOSED** — fixed, deployed, device-verified — `wdvrdaxqjn` |
 > | 4 | all pins offset | same fix as #3 |
 > | 5 | parking / driving directions | feature filed for Storied — `wdvrdaxqjp` |
 > | 6 | tour mislabelled "Museum Tour" | cosmetic, already fixed on `storied` — `wdvrdaxmub` |
@@ -188,7 +207,10 @@ briefing. Work top to bottom.
 >   `git worktree add` on the Mac Mini would settle `core.longpaths`.
 >   ⚠️ **No `.continuous_dev/PAUSE` file exists, so dispatch is armed:** any
 >   `new_kiro_session_is_required_*.md` at the repo root forks a real session.
-> - **Unruled by Michael:** whether the current-location dot should be labelled `#0`.
+> - ~~**Unruled by Michael:** whether the current-location dot should be labelled `#0`.~~
+>   **Ruled 2026-08-28 (`wdvrdaxvvc`): declined, keep as is.** The unnumbered dot is
+>   intentional — numbering it would invite reading it as a stop on the tour. Settled;
+>   do not reopen.
 >
 > ### Hard-won gotchas — all cost real time
 >

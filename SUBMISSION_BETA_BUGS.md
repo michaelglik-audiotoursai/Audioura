@@ -1,9 +1,36 @@
 # SUBMISSION — Yury's Beta bugs
 
-Branch: `fix/yuri-audio-and-map` (cut from `main` = Beta)
-Session: `Beta_Bugs`, 2026-08-17
+Branch: `main` (Beta). Originally written on `fix/yuri-audio-and-map`, which is now
+**fully merged into `main` and strictly behind it** — do not check it out.
+Session: `Beta_Bugs`, 2026-08-17, current to 2026-08-29
 Reporter: Yury Makedonov (`101707192`), ClickUp DM channel `2ky4d0u8-919`, 2026-08-15
 Yury's tour: **"Toronto Ravines And Other Green Spaces"** (not present on this machine)
+
+## ✅ ALL CLOSED — 2026-08-28
+
+Every one of Yury's six reports is resolved. Production runs **`audioura:v34`**,
+revision `tour-modernized-00010-84r`.
+
+| # | report | task | outcome |
+|---|---|---|---|
+| 1 | two audios play at once | `wdvrdaxmq2` | **complete** — fixed, deployed, device-verified |
+| 2 | audio/map numbering | `wdvrdaxmq3` | **complete** — `WORKS AS DESIGNED — confusing`; real fix `wdvrdaxnc5` (Storied) |
+| 3 | stop #6 over Central Islands | `wdvrdaxqjn` | **complete** — fixed, deployed, device-verified |
+| 4 | all pins offset | `wdvrdaxqjn` | same fix as #3 |
+| 5 | parking / driving directions | `wdvrdaxqjp` | feature, filed for Storied |
+| 6 | tour mislabelled "Museum Tour" | `wdvrdaxmub` | cosmetic, fixed on `storied` |
+
+**Verified by Michael on a device on 2026-08-28**, not by Yury — Yury has not replied
+since 2026-08-16 (13 days). Michael's instruction on `wdvrdaxvvc`: *"close the issues as
+verified in GCloud manually by me."*
+
+⚠️ **If any of these is reported again, check when the tour was generated first.** All
+three fixes are in the generator, so a tour downloaded before the relevant deploy keeps
+the old HTML and coordinates and will look exactly like a failure.
+
+Two follow-ups remain open by design and are **not** closed by the above:
+`wdvrdaxnc5` (merge overlapping pins) and `wdvrdaxqtf` (pick stops from a real place
+database; mark confirmed vs estimated).
 
 ---
 
@@ -244,10 +271,17 @@ For a healthy tour the three systems agree, verified on the Boston walking tour:
 `_loadPois()` walks `audio_1.txt`, `audio_2.txt`, … and sets each POI's `index` to the
 **file number** (`tour_map_screen.dart:63-88`).
 
-### Open question for Michael — not assumed, not implemented
+### ✅ Settled by Michael, 2026-08-28 — declined
 
-Yury's *"I expect my current location on a map has a number e.g. #0"* is a **suggestion**,
-not a defect. Per §8 it was left alone and is Michael's call.
+Yury's *"I expect my current location on a map has a number e.g. #0"* was a **suggestion**,
+not a defect. Per §8 it was left alone pending Michael's call. His ruling on
+`wdvrdaxvvc`:
+
+> **decline — Keep this as is.**
+
+The unnumbered dot is intentional. A blue dot is the near-universal convention for
+"you are here"; numbering it invites reading it as a stop on the tour. **This is no
+longer an open question — do not reopen it.**
 
 ---
 
