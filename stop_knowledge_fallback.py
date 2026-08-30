@@ -479,7 +479,7 @@ def facts_as_snippets(result, work):
     return snippets
 
 
-def story_prompt_block(facts, stop_name=''):
+def story_prompt_block(facts, stop_name='', kind='restaurant'):
     """[D548] Put the retrieved episodes in the prompt as a REQUIREMENT.
 
     Michael, 2026-08-29: "The major thing to fix is to add stories about people;
@@ -494,12 +494,29 @@ def story_prompt_block(facts, stop_name=''):
 
     The practicals had the same problem and only became reliable when they were
     stated as a requirement rather than offered as context. Same treatment here.
+
+    [D559] `kind` exists because the closing line named restaurants outright, and
+    this block now runs on walking and place stops too. Telling the writer of a
+    Roman ruin that "a stop which lists hours and prices has failed" is advice
+    about a document it is not writing.
     """
     hi = [f['fact'] for f in (facts or []) if f.get('confidence') == 'high']
     lo = [f['fact'] for f in (facts or []) if f.get('confidence') != 'high']
     if not hi and not lo:
         return ""
     lines = "\n".join(f"  - {f}" for f in (hi + lo)[:8])
+    if kind == 'restaurant':
+        _closing = ("This is the reason the listener is standing here rather than at any "
+                    "other restaurant. A stop that lists hours and prices and gestures at "
+                    "a story has failed.\n")
+    else:
+        # The generality test from Michael's ClickUp task wdvrdaxa7h, applied to
+        # the story rather than to the prose: if the paragraph would read the same
+        # with another place's name in it, it is not about this place.
+        _closing = ("This is the reason the listener is standing HERE rather than at any "
+                    "other place on this tour. If what you write would still make sense "
+                    "with a different stop's name substituted in, it is not about this "
+                    "stop and it has failed.\n")
     return (
         "\nVERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.\n"
         + lines + "\n"
@@ -517,8 +534,7 @@ def story_prompt_block(facts, stop_name=''):
         "  - say what came of it: the name that stuck, the record, the consequence\n"
         "  - if the fact explains WHY something is called what it is, deliver that explanation\n"
         "\n"
-        "This is the reason the listener is standing here rather than at any other restaurant. "
-        "A stop that lists hours and prices and gestures at a story has failed.\n"
+        + _closing +
         "\n"
         "Use ONLY what is listed above. Do not add a guest, a date or an incident that is not "
         "here, and do not embellish one that is. If a listed fact is thin, tell a different one "

@@ -332,33 +332,41 @@ def _candidates(name, address, tour_location):
     return out
 
 
-def resolve_stop(stop_text, tour_location, tour_anchor=None):
-    """Pick a coordinate using agreement between independent sources.
+def resolve_point(name, address, model_pt, tour_location, tour_anchor=None):
+    """[D559] The coordinate decision itself, with no assumption about the caller.
 
-    Returns (new_text, record). record["confidence"] is "high" when two sources
-    corroborate each other, "low" when none do.
+    Michael, 2026-08-30: *"it would be nice if there is a procedure and you can
+    utilize it in every place where this functionality is needed."*
+
+    This was the body of `resolve_stop`, which parses the `Address:`/`Coordinates:`
+    lines of rendered stop text. That shape suits the Beta path
+    (`tour_generation_modernized.py`), which has text and nothing else, and suits
+    nothing else — the Storied generator holds POI dicts thousands of lines before
+    any text exists, so it could not call the one procedure that already solved
+    this. Lifting the decision out is what makes it reusable; `resolve_stop` is now
+    a text wrapper over it and its behaviour is unchanged, which matters because it
+    is deployed in Beta production (audioura:v33).
+
+    Returns (chosen_pt_or_None, record). `chosen_pt` is None when the model's own
+    coordinate stands — the caller changes nothing in that case.
 
     The rule, and why:
       * two candidates within AGREEMENT_M  -> trust the geocoded one. When the
         sources agree they are usually both right, and the geocoder is the more
         precise of the two.
       * nothing corroborates               -> keep the MODEL's coordinate. It is
-        the single most reliable source: in every large disagreement measured,
-        the model was right and the address lookup was wrong.
-
-    So a lookup can improve a coordinate, but only when something independent
-    backs it up. Left alone otherwise.
+        the single most reliable source: in every large disagreement measured
+        (Bethesda Terrace 26 km, Sydney Opera House 12.7 km), the model was right
+        and the ADDRESS lookup was wrong.
     """
-    name, address, model_pt = _parse_stop(stop_text)
     rec = {"stop": name, "address": address, "llm": model_pt,
            "confidence": "low", "action": "kept", "reason": "", "spread_m": None}
-
     if model_pt is None:
-        rec.update(action="skipped", reason="stop has no Coordinates line")
-        return stop_text, rec
+        rec.update(action="skipped", reason="no coordinate to check")
+        return None, rec
     if not GEOCODE_ENABLED:
         rec.update(reason="geocoding disabled")
-        return stop_text, rec
+        return None, rec
 
     cands = _candidates(name, address, tour_location)
 
@@ -388,24 +396,81 @@ def resolve_stop(stop_text, tour_location, tour_anchor=None):
 
     if best_gap is not None and best_gap <= AGREEMENT_M:
         rec["confidence"] = "high"
-        # Prefer a geocoded member of the agreeing pair over the model's value.
         pick = next((k for k in best_pair if k != "model"), None)
         if pick is None:
-            rec.update(reason=f"only the model available; nothing to corroborate")
-            return stop_text, rec
+            rec.update(reason="only the model available; nothing to corroborate")
+            return None, rec
         chosen = everything[pick]
+        rec.update(reason=f"{' + '.join(best_pair)} agree within {best_gap:.0f} m")
         if haversine_m(chosen, model_pt) <= 1.0:
-            rec.update(reason=f"{' + '.join(best_pair)} agree within {best_gap:.0f} m")
-            return stop_text, rec
-        new_text = _COORD_RE.sub(
-            lambda m: f"{m.group(1)}{chosen[0]:.6f}, {chosen[1]:.6f}", stop_text, count=1)
-        rec.update(action="replaced", chosen=pick,
-                   reason=f"{' + '.join(best_pair)} agree within {best_gap:.0f} m")
-        return new_text, rec
+            return None, rec        # already there; nothing to change
+        rec.update(action="replaced", chosen=pick)
+        return chosen, rec
 
     rec.update(reason=("sources disagree" if best_gap is not None else "no lookup succeeded")
                       + " — keeping the model's coordinate")
-    return stop_text, rec
+    return None, rec
+
+
+def resolve_poi(poi, tour_location, tour_anchor=None):
+    """[D559] `resolve_point` for a POI dict, the shape the Storied generator holds.
+
+    Reads `name`, `address` and the `coordinates` string; on a high-confidence
+    correction it writes the new coordinate back. Always records
+    `_geo_confidence` and `_geo_record` so later stages — route ordering, the
+    scope check, and eventually the map's confidence markers (ClickUp
+    wdvrdaxqtf) — can tell an established coordinate from a guess.
+
+    Returns the record. Mutates `poi`.
+    """
+    model_pt = _parse_coords_pair(poi.get('coordinates', ''))
+    chosen, rec = resolve_point(poi.get('name', ''), (poi.get('address') or '').strip(),
+                                model_pt, tour_location, tour_anchor)
+    if chosen:
+        poi['coordinates'] = f"{chosen[0]:.6f}, {chosen[1]:.6f}"
+    poi['_geo_confidence'] = rec.get('confidence', 'low')
+    poi['_geo_record'] = rec
+    return rec
+
+
+def _parse_coords_pair(text):
+    """'43.71, 7.27' -> (43.71, 7.27); anything unusable -> None."""
+    if not text:
+        return None
+    m = re.search(r'(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)', str(text))
+    if not m:
+        return None
+    try:
+        lat, lng = float(m.group(1)), float(m.group(2))
+    except ValueError:
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    if lat == 0.0 and lng == 0.0:
+        return None
+    return (lat, lng)
+
+
+def resolve_stop(stop_text, tour_location, tour_anchor=None):
+    """Pick a coordinate using agreement between independent sources.
+
+    Returns (new_text, record). record["confidence"] is "high" when two sources
+    corroborate each other, "low" when none do.
+
+    [D559] Now a thin wrapper over `resolve_point`, which holds the rule. Behaviour
+    is unchanged — this is deployed in Beta production (audioura:v33) and the point
+    of the extraction was to let the Storied generator reuse the decision, not to
+    alter it.
+    """
+    name, address, model_pt = _parse_stop(stop_text)
+    chosen, rec = resolve_point(name, address, model_pt, tour_location, tour_anchor)
+    if rec.get("action") == "skipped" and model_pt is None:
+        rec["reason"] = "stop has no Coordinates line"
+    if chosen is None:
+        return stop_text, rec
+    new_text = _COORD_RE.sub(
+        lambda m: f"{m.group(1)}{chosen[0]:.6f}, {chosen[1]:.6f}", stop_text, count=1)
+    return new_text, rec
 
 
 def correct_stop(stop_text, tour_location, tour_anchor=None):

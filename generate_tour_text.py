@@ -720,52 +720,66 @@ def _compute_route_order(poi_list):
         print(f"  [ROUTE-ORDER] Only {len(with_coords)} stops with coordinates — skipping algorithmic routing")
         return poi_list
     
-    # --- Nearest-neighbor ---
     n = len(with_coords)
-    # Start from the stop closest to the centroid (reasonable starting point)
-    centroid_lat = sum(c[0] for _, c in with_coords) / n
-    centroid_lng = sum(c[1] for _, c in with_coords) / n
-    centroid = (centroid_lat, centroid_lng)
-    
-    # Find starting stop: closest to centroid
-    start_idx = min(range(n), key=lambda i: _haversine_km(with_coords[i][1], centroid))
-    
-    visited = [False] * n
-    order = [start_idx]
-    visited[start_idx] = True
-    
-    for _ in range(n - 1):
-        current = order[-1]
-        current_coord = with_coords[current][1]
-        best_next = None
-        best_dist = float('inf')
-        for j in range(n):
-            if not visited[j]:
-                d = _haversine_km(current_coord, with_coords[j][1])
-                if d < best_dist:
-                    best_dist = d
-                    best_next = j
-        if best_next is not None:
-            order.append(best_next)
-            visited[best_next] = True
-    
-    # --- 2-opt improvement ---
+
     def _route_distance(route):
         total = 0.0
         for i in range(len(route) - 1):
             total += _haversine_km(with_coords[route[i]][1], with_coords[route[i+1]][1])
         return total
-    
-    improved = True
-    while improved:
-        improved = False
-        for i in range(1, n - 1):
-            for j in range(i + 1, n):
-                new_order = order[:i] + order[i:j+1][::-1] + order[j+1:]
-                if _route_distance(new_order) < _route_distance(order):
-                    order = new_order
-                    improved = True
-    
+
+    def _nearest_neighbour(start_idx):
+        visited = [False] * n
+        route = [start_idx]
+        visited[start_idx] = True
+        for _ in range(n - 1):
+            current_coord = with_coords[route[-1]][1]
+            best_next, best_dist = None, float('inf')
+            for j in range(n):
+                if not visited[j]:
+                    d = _haversine_km(current_coord, with_coords[j][1])
+                    if d < best_dist:
+                        best_dist, best_next = d, j
+            if best_next is not None:
+                route.append(best_next)
+                visited[best_next] = True
+        return route
+
+    def _two_opt(route):
+        # i starts at 1: the FIRST stop is never moved by a 2-opt reversal on an
+        # open path. That is the whole reason every start has to be tried below.
+        improved = True
+        while improved:
+            improved = False
+            for i in range(1, n - 1):
+                for j in range(i + 1, n):
+                    cand = route[:i] + route[i:j + 1][::-1] + route[j + 1:]
+                    if _route_distance(cand) < _route_distance(route):
+                        route, improved = cand, True
+        return route
+
+    # [D559] TRY EVERY START. Michael, 2026-08-30: "Please solve zigzag problem."
+    #
+    # This used to start from the stop nearest the CENTROID and never reconsider.
+    # On an open path 2-opt cannot move the first element, so a bad start is
+    # permanent — and the centroid is systematically a bad start on the shape
+    # tours actually take. Four stops along one road came back B -> C -> D -> A:
+    # up the hill, then all the way back down past everything, 1.64 km against
+    # 1.10 km for the obvious A -> B -> C -> D. That is exactly the zigzag a
+    # listener walks.
+    #
+    # n is the number of stops in one tour — 3 to 12. Running nearest-neighbour
+    # plus 2-opt from every start is n times a cheap computation on a dozen
+    # points, and it is deterministic. Ties break on the lower starting index so
+    # the same input always yields the same itinerary.
+    best_order, best_len = None, None
+    for _start in range(n):
+        _cand = _two_opt(_nearest_neighbour(_start))
+        _len = _route_distance(_cand)
+        if best_len is None or _len < best_len - 1e-9:
+            best_order, best_len = _cand, _len
+    order = best_order
+
     # Map back to original poi_list indices
     ordered_indices = [with_coords[o][0] for o in order]
     
@@ -1270,14 +1284,37 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
             return poi, False, "high", f"[scope-memory] {why}"
 
         # [LOCAL-359] Include address in the judge prompt when available.
-        # The address is authoritative — it was returned by Phase 3A alongside the name.
+        # [D559] BUT ONLY WHEN SOMETHING CORROBORATES IT. Michael, 2026-08-30:
+        # "stop letting an unverified address outrank the judge."
+        #
+        # The old text called the address "a verified fact" and told the judge to
+        # "answer true regardless of what you recall about the name". Nothing had
+        # verified it — PHASE 3B asks the model to write one. So a model that
+        # correctly knew Villa Leopolda is in Villefranche-sur-Mer was instructed to
+        # discard that and trust "Avenue de la Villa Leopolda, 06000 Nice", which the
+        # same model had just invented. That is the leading explanation for
+        # `PHASE 5.6: 6/6 within scope` on a tour with two stops outside Cimiez.
+        #
+        # An address is only authoritative once `geocode_stops.resolve_poi` has found
+        # an independent source agreeing with it. Otherwise it is one more model
+        # guess, and it is shown to the judge as exactly that.
         address_line = ""
         if address:
-            address_line = (
-                f"Address (authoritative): {address}\n"
-                f"NOTE: The address is a verified fact. If the address is clearly within "
-                f"'{scope_name}', answer true regardless of what you recall about the name.\n"
-            )
+            if poi.get('_geo_confidence') == 'high':
+                address_line = (
+                    f"Address (corroborated by an independent geocoder): {address}\n"
+                    f"NOTE: This address has been confirmed against OpenStreetMap. If it is "
+                    f"clearly within '{scope_name}', answer true regardless of what you recall "
+                    f"about the name.\n"
+                )
+            else:
+                address_line = (
+                    f"Address (UNVERIFIED — written by a language model, not looked up): "
+                    f"{address}\n"
+                    f"NOTE: This address has NOT been confirmed and may have been invented to "
+                    f"look plausible for '{scope_name}'. If what you know about this place "
+                    f"contradicts the address, trust what you know.\n"
+                )
 
         prompt = (
             f"You are a geography fact-checker for location tours.\n"
@@ -9592,6 +9629,47 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"  [D558] coordinate fallback unavailable — routing will "
                               f"keep {len(_gp_nocoord)} stop(s) in place")
 
+                # [D559] RESOLVE COORDINATES BEFORE ORDERING THEM.
+                #
+                # Ordering invented coordinates produces a tidy route through
+                # imaginary places. PHASE 3B asks the model for
+                # `"address": "<complete street address with ZIP>"` and
+                # `"coordinates": "<lat, lng>"` outright — there is no geocoding step
+                # anywhere on this path — which is how Villa Leopolda shipped as
+                # "Avenue de la Villa Leopolda, 06000 Nice" and the Musée National du
+                # Sport as "Boulevard des Jardins de Cimiez", a mangle of the real
+                # Boulevard des Jardiniers 7 km away.
+                #
+                # `geocode_stops` already solves this and has since 2026-08-20, but
+                # only `tour_generation_modernized.py` (Beta) called it. Michael,
+                # 2026-08-30: "it would be nice if there is a procedure and you can
+                # utilize it in every place where this functionality is needed."
+                # Beta measured 87 m -> 46 m typical error, 1,616 m -> 558 m worst,
+                # over 40 stops in 8 cities.
+                try:
+                    from geocode_stops import resolve_poi, geocode, location_hint
+                    _gp_anchor = None
+                    try:
+                        _gp_anchor = geocode(location_hint(location) or location)
+                    except Exception:
+                        pass
+                    _gp_hi = 0
+                    for _p in poi_list:
+                        _rec = resolve_poi(_p, location, _gp_anchor)
+                        if _rec.get('confidence') == 'high':
+                            _gp_hi += 1
+                        if _rec.get('action') == 'replaced':
+                            print(f"  [D559] coord CORRECTED '{_p['name'][:36]}' -> "
+                                  f"{_p['coordinates']} ({_rec.get('reason','')[:60]})")
+                    print(f"  [D559] Coordinates established for {_gp_hi}/{len(poi_list)} "
+                          f"stop(s); the rest keep the model's value and are marked low "
+                          f"confidence")
+                except ImportError as _gc_err:
+                    _import_logger.error(f"[D559] MISSING: geocode_stops — stops will be "
+                                         f"ordered on unverified coordinates: {_gc_err}")
+                except Exception as _gc_err:
+                    print(f"  [D559] Geocoding error (non-fatal): {_gc_err}")
+
                 _gp_prev_before = {p.get('name', ''): (poi_list[i - 1].get('name', '') if i else '')
                                    for i, p in enumerate(poi_list)}
                 poi_list = _compute_route_order(poi_list)
@@ -11443,6 +11521,45 @@ NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
                     "been compressed into a headline, which is the failure this stop exists to "
                     "avoid. Do NOT pad with atmosphere to reach it — if the material genuinely "
                     "supports only one episode, write that one fully and stop.\n")
+            elif tour_category != 'museum':
+                # [D559] Michael, 2026-08-30: "I want D551 fixed if possible."
+                #
+                # D551 is the Crêpe Suzette complaint — his words: "we started but
+                # then abruptly stopped without explaining who Suzette was." The
+                # retrieval was never the problem; Gemini had already named Henri
+                # Charpentier and Suzanne Reichenberg, and the narration kept the
+                # headline and dropped both. The block below is what fixed it.
+                #
+                # It was gated to restaurants (D551 §3) out of caution about a
+                # walking tour Michael had accepted — NOT because of museums, which
+                # are on a separate path (`focus='object'`) and never saw it. The
+                # cost of that caution is measurable: on the Cimiez walking tour,
+                # Musée Marc Chagall and Musée National du Sport failed the story
+                # gate on 7 and 8 retrieved high-confidence facts each. The du Sport
+                # stop promised "the mysterious medical emergency of Brazilian star
+                # Ronaldo" in its orientation and never named him in the body —
+                # Crêpe Suzette again, one tour type over.
+                #
+                # Museums stay excluded, deliberately and by his instruction:
+                # "we did a good job with museums and I do not want to damage it."
+                try:
+                    from stop_knowledge_fallback import story_prompt_block
+                    _practicals_block = story_prompt_block(poi.get('_lore'), poi_name,
+                                                           kind='place')
+                except Exception:
+                    _practicals_block = ""
+                if _practicals_block:
+                    # [D553] applies for the same reason it applied to restaurants:
+                    # a model handed several hundred words of constraints and no
+                    # target writes to the constraints and stops. Café de Paris fell
+                    # 253 -> 187 -> 164 words as those rules were added. Lower bound
+                    # than the restaurant block, which also carries practicals.
+                    _practicals_block += (
+                        "\n\nLENGTH: write 280-380 words for this stop. Two episodes told "
+                        "properly needs that room; 150 words means an episode has been "
+                        "compressed into a headline, which is the failure this stop exists "
+                        "to avoid. Do NOT pad with atmosphere to reach it — if the material "
+                        "genuinely supports only one episode, write that one fully and stop.\n")
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
 {_visited_line}{_claims_line}{_practicals_block}
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.

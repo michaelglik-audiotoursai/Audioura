@@ -242,28 +242,42 @@ class TestRouteOrderingIsAvailableAfterReplenishment(unittest.TestCase):
         self.assertLess(self._path_km(out, by_name), self._path_km(scrambled, by_name),
                         f"reordering did not shorten the walk: {scrambled} -> {out}")
 
-    def test_route_ordering_is_not_optimal(self):
-        """[D558] On record, not a passing grade.
+    def test_no_endpoint_is_stranded(self):
+        """[D559] The zigzag itself.
 
-        Four stops strung along one road, and the route is A-last: B->C->D->A, which
-        climbs the hill and then walks all the way back down. `_compute_route_order`
-        starts from the stop nearest the CENTROID and runs nearest-neighbour; 2-opt
-        cannot repair a bad start on an open path, so a collinear route reliably
-        strands one endpoint.
-
-        This is LOCAL-7 behaviour, older than D558 and not introduced by it, but it
-        is squarely on what Michael asked for ("so zigzags would not happen"). When
-        it is fixed, this test fails and should be deleted.
+        Four stops along one road. This returned B->C->D->A — up the hill and all
+        the way back down, 1.64 km against 1.10 km — because the route started at
+        the stop nearest the CENTROID and 2-opt cannot move the first element of an
+        open path. Every start is tried now.
         """
         by_name = {'A': (43.7109, 7.2784), 'B': (43.7152, 7.2797),
                    'C': (43.7190, 7.2813), 'D': (43.7200, 7.2823)}
-        pois = [{'name': n, 'coordinates': f'{by_name[n][0]}, {by_name[n][1]}'}
-                for n in ['D', 'A', 'C', 'B']]
-        out = [p['name'] for p in gtt._compute_route_order(pois)]
         optimal = self._path_km(['A', 'B', 'C', 'D'], by_name)
-        self.assertGreater(self._path_km(out, by_name), optimal * 1.2,
-                           "route ordering got better than its documented behaviour "
-                           "— good news; delete this test and update D558")
+        for scrambled in (['D', 'A', 'C', 'B'], ['C', 'A', 'D', 'B'],
+                          ['B', 'D', 'A', 'C'], ['A', 'C', 'B', 'D']):
+            pois = [{'name': n, 'coordinates': f'{by_name[n][0]}, {by_name[n][1]}'}
+                    for n in scrambled]
+            out = [p['name'] for p in gtt._compute_route_order(pois)]
+            self.assertIn(out, (['A', 'B', 'C', 'D'], ['D', 'C', 'B', 'A']),
+                          f"{scrambled} -> {out}: an endpoint is still stranded")
+            self.assertLessEqual(self._path_km(out, by_name), optimal + 1e-6)
+
+    def test_ordering_is_deterministic(self):
+        """Same stops, any input order, same itinerary — a tour must not change
+        shape because replenishment appended in a different sequence."""
+        by_name = {'A': (43.7109, 7.2784), 'B': (43.7152, 7.2797),
+                   'C': (43.7190, 7.2813), 'D': (43.7200, 7.2823)}
+        # Compared as an itinerary up to direction, not as a float: summing the same
+        # legs in reverse differs in the last bits (5 mm here), which says nothing
+        # about whether the route is stable.
+        routes = set()
+        for scrambled in (['A', 'B', 'C', 'D'], ['D', 'C', 'B', 'A'],
+                          ['B', 'D', 'A', 'C'], ['C', 'A', 'D', 'B']):
+            pois = [{'name': n, 'coordinates': f'{by_name[n][0]}, {by_name[n][1]}'}
+                    for n in scrambled]
+            out = [p['name'] for p in gtt._compute_route_order(pois)]
+            routes.add(tuple(min(out, out[::-1])))
+        self.assertEqual(len(routes), 1, f"itinerary varied by input order: {routes}")
 
     def test_stops_without_coordinates_do_not_crash_it(self):
         pois = [

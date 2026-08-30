@@ -22636,3 +22636,96 @@ try every endpoint as a start, or run 2-opt with a free start — cheap at these
   invented Cimiez address instructs the judge to discard the correct answer it holds. That is the
   leading explanation for `PHASE 5.6: 6/6 within scope` on a tour with two stops outside Cimiez.
   **Next.**
+
+## D559 — Zigzag, invented addresses, and D551 extended past restaurants
+
+**2026-08-30. Michael's three asks**, all in one change because they turned out to be one
+problem: *the pipeline was ordering, judging and narrating places it had made up.*
+
+### 1. D551 now runs on walking and place stops
+
+**His ask:** *"I want D551 fixed if possible."*
+
+D551 is the Crêpe Suzette complaint — *"we started but then abruptly stopped without explaining
+who Suzette was."* **It was never about removing the story; it was about telling it.** The block
+that fixed it (`story_prompt_block`: name every person, say what went wrong, say what came of it)
+was gated to `tour_category == 'restaurant'` out of caution about a walking tour he had accepted —
+**not** because of museums, which are on `focus='object'` and never saw it.
+
+The cost was measurable: on the Cimiez walking tour, Musée Marc Chagall and Musée National du Sport
+failed the story gate on **7 and 8 high-confidence facts each**. The du Sport orientation promised
+*"the mysterious medical emergency of Brazilian star Ronaldo"* and the body never named him. Crêpe
+Suzette, one tour type over.
+
+Now injected for every non-restaurant, non-museum stop, with `kind='place'` — the closing line
+named restaurants outright and is now the generality test from his ClickUp task `wdvrdaxa7h`:
+*if the paragraph would read the same with another stop's name in it, it is not about this stop.*
+**Museums stay excluded by his instruction.**
+
+### 2. The zigzag is fixed, and the cause was two separate things
+
+**(a) The algorithm stranded an endpoint.** `_compute_route_order` started from the stop nearest the
+CENTROID, and 2-opt cannot move the first element of an open path — so a bad start was permanent.
+Four stops along one road came back **B→C→D→A**: up the hill, then all the way back down.
+
+Every start is tried now (n is 3–12; this is nothing). Same four stops: **1.64 km → 1.07 km**, and
+the route is monotonic from any input order. Deterministic — ties break on the lower index.
+
+**(b) It was ordering coordinates the model invented.** A tidy route through imaginary places is
+still wrong. Which leads to:
+
+### 3. "Stop letting an unverified address outrank the judge" — and he was right that the work existed
+
+There is **no geocoding step anywhere on the Storied path**. PHASE 3B asks the model for
+`"address": "<complete street address with ZIP>"` and `"coordinates": "<lat, lng>"` outright.
+
+**`geocode_stops` already solved this on 2026-08-20** (BETA-4, `wdvrdaxqjn`, Yury Makedonov's
+report), and **only `tour_generation_modernized.py` called it.** Michael: *"it would be nice if
+there is a procedure and you can utilize it in every place where this functionality is needed."*
+
+- `resolve_point()` extracted from `resolve_stop()` — the decision, with no assumption about the
+  caller. `resolve_stop` is now a thin text wrapper and **its behaviour is unchanged**, which
+  matters because it is in Beta production (`audioura:v33`).
+- `resolve_poi()` — the same rule for the POI dicts Storied holds thousands of lines before any
+  text exists. Records `_geo_confidence` per stop.
+- Called before route ordering, so the route is computed on established coordinates.
+- **The scope judge no longer takes an invented address as fact.** The old prompt called it
+  *"a verified fact"* and said *"answer true regardless of what you recall about the name"* —
+  instructing a model that correctly knew Villa Leopolda is in Villefranche to discard that in
+  favour of an address the same model had just invented. Now: corroborated addresses keep that
+  standing; uncorroborated ones are labelled **UNVERIFIED — written by a language model, not looked
+  up**, with *"if what you know contradicts the address, trust what you know."*
+
+**Measured live against OpenStreetMap, the two stops that caused this:**
+
+| stop | OSM `by_name` | model said | spread |
+|---|---|---|---|
+| Villa Leopolda | 43.7094, 7.3209 — Villefranche-sur-Mer | 43.7109, 7.2784 — Cimiez | **3,419 m** |
+| Musée National du Sport | 43.7063, 7.1924 — Allianz Riviera | 43.7134, 7.2822 — Cimiez | **7,263 m** |
+| Musée Matisse | both lookups agree exactly | 43.7187, 7.2768 | 0 m → **corrected** |
+
+The 7 km reading confirms by independent source what was inferred from the mangled street name
+("Boulevard des **Jardins de Cimiez**" for the real Boulevard des Jardiniers).
+
+**Stated honestly — the pins are not fixed.** On a large disagreement the module keeps the model's
+coordinate, because Beta measured the model right and the *address* wrong in every such case. So
+Villa Leopolda still carries a Cimiez coordinate; what it now carries as well is `low` confidence,
+which is what the scope judge and the D557 corpus act on. **Correct pins need
+`wdvrdaxqtf` — select stops from a place database instead of naming them from memory.** That task
+is open and is the real cure.
+
+### Evidence
+
+- `tests/test_d559_geocode_shared.py` — **15/15**, new. `geocode_stops` had **no tests at all**
+  and is deployed in Beta production; refactoring untested production code is how behaviour changes
+  by accident, so the rule was pinned first.
+- `test_d558` 18/18, `test_d557` 16/16, closure suite, `test_sq4_merge`, `test_palais_fix` green.
+- **Break-the-code, four ways:** one start only → 2 red; agreement threshold removed → 3 red;
+  confidence forced high → 2 red; the address gate forced open → the unverified branch is
+  unreachable in the container.
+- **Two test bugs of my own, caught by the tests failing for the right reason:** the geocode stub
+  substring-matched, so the *address* lookup also matched the *name* key and manufactured the
+  agreement the test existed to rule out; and the fixture prefixed `Stop 1:` when production splits
+  on that marker and passes what follows.
+- Container `audioura-tour-generator-1` rebuilt, md5 of `generate_tour_text.py` identical to repo,
+  all four changes exercised inside it.
