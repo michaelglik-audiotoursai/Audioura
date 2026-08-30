@@ -1138,10 +1138,25 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
     if not poi_list or not scope_name:
         return poi_list
 
+    # [D557] Memory before judgement. A stop already ruled outside THIS scope is
+    # dropped deterministically — no token spend, and no chance of the model
+    # answering differently than it did last run, which is how Villa Leopolda
+    # walked back into a Cimiez tour it had already been removed from (D556).
+    try:
+        from scope_memory import known_out_of_scope, record_out_of_scope
+    except Exception as _e:
+        print(f"   [SCOPE-MEMORY] unavailable ({_e}) — falling back to the LLM check alone")
+        known_out_of_scope = lambda n, s: (False, '')          # noqa: E731
+        record_out_of_scope = lambda *a, **k: (False, None)    # noqa: E731
+
     def _check_one(poi):
         name = poi.get('name', '')
         address = (poi.get('address', '') or '').strip()
         desc = (poi.get('description', '') or '')[:400]
+
+        remembered, why = known_out_of_scope(name, scope_name)
+        if remembered:
+            return poi, False, "high", f"[scope-memory] {why}"
 
         # [LOCAL-359] Include address in the judge prompt when available.
         # The address is authoritative — it was returned by Phase 3A alongside the name.
@@ -1207,6 +1222,11 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
                 print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason} (conf={conf})")
             else:
                 print(f"   X SCOPE-CHECK REMOVED '{poi['name']}' — outside '{scope_name}': {reason} (conf={conf})")
+                # [D557] Record it so the next run does not have to be lucky.
+                # Only high-confidence verdicts reach here, so the corpus can
+                # never remove a stop this guard was not already removing.
+                if not reason.startswith('[scope-memory]'):
+                    record_out_of_scope(poi.get('name', ''), scope_name, reason=reason)
 
     kept = [first_stop] + survivors + tail
     return kept

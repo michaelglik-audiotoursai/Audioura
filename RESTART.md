@@ -1,19 +1,19 @@
-# RESTART briefing — generated 2026-08-26 10:37 EDT
+# RESTART briefing — generated 2026-08-30 09:50 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     b15290d Handoff for the /clear: the container is stale, and that outranks more measurement
+HEAD     91177e7 Correct handoff: container names, code_sha is expectedly unknown, md5 verified
 unpushed 0 commits
 dirty    1 files
 ```
 
 ## Production safety
 ```
-audio_tours real rows: 31
+audio_tours real rows: 34
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      628
+cost_ledger rows:      675
 ```
 ALERTS.md: 40 alert line(s) in the last 40 — read it if non-zero.
 
@@ -64,14 +64,15 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  5:- [ ] **2026-08-26 — NEXT SESSION: the container is STALE, and that outranks more measurement.**
-  106:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
-  163:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
-  199:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
-  222:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
-  226:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
-  233:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  317:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  5:- [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
+  83:- [ ] **2026-08-26 — the container was stale. FIXED 10:4x, see D531. The rest of this item stands.**
+  184:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
+  241:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
+  277:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+  300:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  304:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  311:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  395:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules

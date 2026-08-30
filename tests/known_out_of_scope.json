@@ -1,0 +1,27 @@
+{
+  "_purpose": "Stops that were PROPOSED FOR A TOUR and turned out to be outside the requested area. Which town a building stands in is a fact about geography, not an opinion — but PHASE 5.6 asks an LLM about it once per run, so a correctly-removed stop can return on the next run. D556 caught exactly that: Villa Leopolda removed at conf=high on one Cimiez run, kept on the next. This corpus makes the verdict deterministic.",
+  "_rule": "An entry is keyed on the (name, scope) PAIR, never on the name alone — a venue outside Cimiez is perfectly in scope for a tour of the Riviera. `expect: \"outside\"` drops the stop. `expect: \"verify\"` is a suspicion on the record and must NEVER remove anything. Entries are appended automatically by scope_memory.record_out_of_scope() when PHASE 5.6 rejects at high confidence, which means the corpus can only make an existing removal consistent — it can never remove something the guard was not already willing to remove. Delete an entry if it is wrong; that is the correction path.",
+  "_consumed_by": "scope_memory.known_out_of_scope(), called from _validate_stops_within_scope() in generate_tour_text.py before the LLM check. Regression suite: tests/test_d557_scope_memory.py",
+  "venues": [
+    {
+      "name": "Villa Leopolda",
+      "aliases": ["La Leopolda", "Villa La Leopolda"],
+      "scope": "Cimiez",
+      "expect": "outside",
+      "actual_location": "Villefranche-sur-Mer, Alpes-Maritimes",
+      "ground_truth": "Villa Leopolda stands on the Villefranche-sur-Mer hillside, roughly 6 km east of the Cimiez district of Nice and in a different commune. It is also a private residence, not visitable.",
+      "source": "D556 — removed at conf=high on one Cimiez run, kept on the next",
+      "recorded": "2026-08-30"
+    },
+    {
+      "name": "Chapelle du Rosaire",
+      "aliases": ["Matisse Chapel", "Chapelle du Rosaire de Vence", "Chapelle Matisse", "Rosary Chapel"],
+      "scope": "Cimiez",
+      "expect": "outside",
+      "actual_location": "Vence, Alpes-Maritimes",
+      "ground_truth": "Matisse's Chapelle du Rosaire is in Vence, about 22 km from Nice. The Cimiez connection is Matisse himself — he lived and is buried in Cimiez — which is why the chapel keeps being proposed for Cimiez tours.",
+      "source": "D556 — removed by SCOPE-CHECK on the Cimiez walking tour",
+      "recorded": "2026-08-30"
+    }
+  ]
+}

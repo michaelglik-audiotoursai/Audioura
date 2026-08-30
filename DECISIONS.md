@@ -22479,3 +22479,65 @@ that finally made the closure checks reliable.
    National du Sport failed the story gate despite 7 and 8 retrieved facts each. Material arrived;
    narration did not build an arc.
 3. `closure_scan` — three false positives, zero unique true positives. Demote to advisory.
+
+## D557 — Scope rejections now stick: geography is a fact, so stop asking twice
+
+**2026-08-30, the first of D556's three open items.**
+
+D556's defect: `PHASE 5.6` removed Villa Leopolda from a Cimiez tour at `conf=high` because
+it stands in Villefranche-sur-Mer, and the very next run for the same district kept it. The
+containment guard is a per-stop LLM judgement with **no memory between runs**, so a
+correctly-deleted stop can walk back in on the next roll.
+
+**Which town a building stands in does not change between two API calls.** The remedy is the
+one that finally made the closure checks reliable — a deterministic corpus consulted in
+production, not a model answering the same question twice (D542).
+
+### Shipped
+
+- **`tests/known_out_of_scope.json`** — seeded with the two real D556 misses: Villa Leopolda
+  (Villefranche-sur-Mer) and the Chapelle du Rosaire (Vence). Same `expect: outside` /
+  `expect: verify` split as `known_closed_venues.json`; only `outside` drops a stop.
+- **`scope_memory.py`** — `known_out_of_scope(name, scope)` and `record_out_of_scope(...)`.
+  Extracted to module scope deliberately (D421): the guard it serves is inline in
+  `generate_tour_text()` and needs a key, a DB and a network, which is why suites grep instead
+  of calling. These two functions need none of that, so the suite can actually run them.
+- **Wired into `_validate_stops_within_scope`** — the lookup runs **before** the HTTP call, so
+  a hit costs nothing and cannot come back different.
+- **High-confidence LLM rejections are recorded.** Only `conf=high` reaches that branch, so
+  the corpus **can never remove a stop the guard was not already removing** — it only makes an
+  existing removal consistent. That is the whole safety argument for auto-append.
+- **`Dockerfile.generator`** copies the corpus (the D-lesson: a data file that never entered
+  the image).
+
+### Two design points worth keeping
+
+- **The key is the (name, scope) PAIR, never the name.** Villa Leopolda is out of scope for
+  Cimiez and perfectly in scope for a tour of the corniches. A name-only entry would delete it
+  from its own town.
+- **Name matching requires 6+ folded chars for a substring hit.** `known_bad_venue` accepts any
+  substring, which would let a stop called "Villa" collide with "Villa Leopolda". Not copied.
+
+### Durability, stated honestly
+
+The write lands in the repo checkout on a host run, and in the container's own filesystem
+otherwise — lost at the next rebuild, but it covers **the case that actually bit us**: two runs
+minutes apart against one running container. Every write also prints
+`[SCOPE-MEMORY] NEW ENTRY <json>` so LEAD can commit it permanently.
+
+### Evidence
+
+- `tests/test_d557_scope_memory.py` — **16/16 green.**
+- **Standing check 1 satisfied, twice.** Deleting the three-line lookup from `_check_one` turns
+  `test_a_remembered_stop_is_removed_without_an_api_call` RED (`'Villa Leopolda' unexpectedly
+  found in [...]`). Removing the corpus file turns 7 tests RED. Both restored.
+- **Proven in the container it ships to**, not on the host: `audioura-tour-generator-1` rebuilt
+  (`build_time 2026-08-30T13:56Z`, `manifest_ok: true`), then run with
+  `Authorization: Bearer INVALID-ON-PURPOSE` — both venues removed, `KEPT: ['Monastere de
+  Cimiez']`. An invalid key is the point: the LLM path cannot have produced that result.
+
+### Still open from D556
+
+2. Extend "tell two episodes properly" beyond restaurants (Chagall, Musée National du Sport
+   failed the story gate on 7 and 8 retrieved facts).
+3. Demote `closure_scan` to advisory — three false positives, zero unique true positives.

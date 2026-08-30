@@ -14,6 +14,10 @@ COPY tests/db_connection.py tests/stop_anchor_detector_v2.py /app/
 # [D542] Read at runtime by known_bad_venue() — a venue a human confirmed dead
 # must not depend on a model answering the same way twice.
 COPY tests/known_closed_venues.json /app/tests/
+# [D557] Read at runtime by scope_memory.known_out_of_scope(). Which town a
+# building stands in does not change between two API calls; without this file in
+# the image the guard is back to asking an LLM once per run.
+COPY tests/known_out_of_scope.json /app/tests/
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown
