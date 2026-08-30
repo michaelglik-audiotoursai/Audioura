@@ -9329,6 +9329,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
 
 
+
+    def _with_lore_context(per_work: dict, pois: list) -> dict:
+        """[D555] Retrieved lore counts as context for fact-sheet generation.
+
+        After D554 put replenishment ahead of fact sheets, Le Grill went 249 -> 382
+        words. Rampoldi stayed at 154, and the log said why:
+
+            [LOCAL-183] stop_corpus: 2/3 stops have per-stop passages
+            No RAG context for Rampoldi — cannot generate fact sheet
+
+        It had **five high-confidence Gemini episodes** and still could not get a
+        fact sheet, because `generate_fact_sheet` requires venue corpus or
+        artist/period context and lore was not offered as either. The material was
+        in hand and structurally invisible — the same shape as the episodes that
+        were retrieved and never told (D548).
+
+        Lore is per-stop sourced prose about that exact stop, which is what
+        per_work_contexts holds. Merged, never overwriting real corpus.
+        """
+        merged = dict(per_work or {})
+        for _p in (pois or []):
+            _facts = _p.get('_lore') or []
+            if not _facts:
+                continue
+            _name = _p.get('name', '')
+            _texts = [f.get('fact', '') for f in _facts if f.get('fact')]
+            if _name and _texts:
+                merged[_name] = list(merged.get(_name, [])) + _texts
+        return merged
+
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
     _phase_timer.start('fact_sheets')
     _storied_spine = None
@@ -9775,9 +9805,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 venue_corpus=_d1_venue_corpus if _d1_venue_corpus else "",
                 # [LOCAL-183] Merge stop_corpus passages into per_work_contexts so
                 # fact extraction benefits from per-stop sourced material.
-                per_work_contexts=_merge_stop_corpus_into_per_work(
-                    _story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
-                    _stop_corpus_data,
+                per_work_contexts=_with_lore_context(
+                    _merge_stop_corpus_into_per_work(
+                        _story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
+                        _stop_corpus_data,
+                    ),
+                    poi_list,
                 ),
             )
             if _storied_fact_sheets:
