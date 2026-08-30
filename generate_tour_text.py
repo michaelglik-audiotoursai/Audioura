@@ -11074,6 +11074,23 @@ NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
                                          + _practicals_block)
                 except Exception:
                     pass
+                # [D553] STATE THE LENGTH. LOCAL-72 removed the word target on the
+                # reasoning that "the baseline produced 300-500 words per stop;
+                # constraining that thins content" — true when the prompt was short.
+                # It is no longer short: the practicals block and the story block add
+                # several hundred words of constraints, and Café de Paris fell 253 ->
+                # 187 -> 164 across three runs as they were added, with the
+                # orientation collapsing from 48 words to 12.
+                #
+                # A model given many rules and no target writes to the rules and
+                # stops. Restaurant stops only — the museum and walking paths keep
+                # LOCAL-72's behaviour, which Michael has accepted on both.
+                _practicals_block += (
+                    "\n\nLENGTH: write 300-400 words for this stop. Two episodes told properly "
+                    "plus the practical facts needs that room; 150 words means an episode has "
+                    "been compressed into a headline, which is the failure this stop exists to "
+                    "avoid. Do NOT pad with atmosphere to reach it — if the material genuinely "
+                    "supports only one episode, write that one fully and stop.\n")
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
 {_visited_line}{_claims_line}{_practicals_block}
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
