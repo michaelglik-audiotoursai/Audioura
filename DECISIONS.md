@@ -22303,3 +22303,59 @@ the span. Guarded so an initial is not read as a numeral ("Henri C. Charpentier"
    Louis XV 495 → 250. Run-to-run variance, not the regnal fix.
 3. **`closure_scan`: three false positives this week, zero true positives the corpus had not
    already caught. Demote to advisory.**
+
+---
+
+## D553 — The prompt grew and nobody stated a length; and why one stop stays short
+
+**2026-08-29. Michael: "the stop description seems even shorter than the last time. How many words
+is it?"** 159 this run, 164 the run before. He was right, and the trend was LEAD's doing:
+
+```
+run   Café de Paris   orientation   body
+v2         253             48        201
+v3         187             29        154
+v4         164             12        148
+```
+
+Each round added instruction blocks to that prompt — practicals, the story block, "tell two
+episodes properly". **Several hundred words of constraints accumulated and nothing ever stated a
+target length.** LOCAL-72 had removed it deliberately: *"the baseline produced 300-500 words per
+stop; constraining that thins content."* True when the prompt was short, false once it was long.
+**A model given many rules and no target writes to the rules and stops.**
+
+Restaurant stops now carry a 300-400 word target with an anti-padding clause. Museum and walking
+paths keep LOCAL-72's behaviour — both accepted work, neither touched.
+
+### Result: it fixed the stop that had material, and correctly refused to inflate the one that did not
+
+**Le Louis XV 250 -> 465.** Le Grill steady. **Café de Paris unchanged at ~159, and that is
+correct:**
+
+```
+[D545]   ADDED 'Café de Paris Monte-Carlo'   <- a REPLENISHMENT stop
+[D545] +3 story fact(s)                      <- 3 facts, 4 snippets
+```
+
+**Replenished stops never go through corpus mining or fact-sheet generation** — they are named
+after Phase 3A finishes, so they arrive with practicals and lore only. Le Louis XV, an
+originally-selected stop with the full pipeline behind it, reached 465 words on the same
+instruction. Three facts support ~110 words; reaching 300 would require the padding the instruction
+forbids. **The stop is short because its input is thin and the system declined to inflate it.**
+
+### The real fix, deliberately deferred
+
+Give replenished stops the same retrieval as originally-selected ones. It also fixes the thin
+biking stops (Le Grill 144w, Elsa 119w). **It is not a prompt tweak** — it means running a
+late-arriving stop back through phases that assume they run once, in order. This session has shown
+what happens when LEAD reaches further than a defect requires: a pipeline reorder attempted and
+reverted, an edit that deleted a function, an import that never applied. **Deferred to a fresh
+session.**
+
+### Standing state
+
+3 of 3 stops · **story gate 3/3 for a second consecutive run** · no dead venues · no corrupted
+regnal names · four practical facts present · 873 words.
+
+**Open:** replenished-stop retrieval (highest value); no "contested fact" signal (Édouard vs André
+Michelin); `closure_scan` demote to advisory.
