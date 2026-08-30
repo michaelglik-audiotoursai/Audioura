@@ -971,7 +971,49 @@ def _insert_gloss(sentence: str, entity: str, gloss: str) -> str:
     return _insert_composed_gloss(sentence, entity, gloss)
 
 
+# [D552] REGNAL NUMERALS BELONG TO THE NAME.
+#
+# The 2026-08-29 Monaco tour shipped two corrupted sentences, both from this
+# gate matching a royal name without its numeral:
+#
+#   gloss spliced INSIDE the name:
+#     "the future King Edward, the first British monarch of his house, VII,
+#      then Prince of Wales"          <- "King Edward" matched, VII stranded
+#
+#   name dropped, numeral orphaned:
+#     "with journalists and diplomats gathering III and Princess Grace
+#      navigated international tensions"   <- "Prince Rainier" dropped, III left
+#
+# The gate is old and correct for ordinary names; a tour full of Rainier III,
+# Edward VII and Albert II is what exposed it. Extending the matched span to
+# swallow a trailing Roman numeral fixes both symptoms at once, because both
+# insertion and degradation work from the same span.
+# The negative lookahead keeps an INITIAL from being read as a numeral:
+# 'Henri C. Charpentier' must not become 'Henri C'. A regnal numeral is
+# never followed by a period or another word character.
+_REGNAL_RE = re.compile(r'\s+(?:[IVXLC]+)(?![.\w])')
+
+
+def _with_regnal(sentence: str, entity: str) -> str:
+    """Return `entity` extended to include a regnal numeral that follows it.
+
+    "Prince Rainier" in "Prince Rainier III and Princess Grace" -> "Prince Rainier III".
+    Returns `entity` unchanged when no numeral follows, or when the entity
+    already ends in one.
+    """
+    if not sentence or not entity:
+        return entity
+    if _REGNAL_RE.fullmatch(' ' + entity.split()[-1]) if entity.split() else False:
+        return entity
+    idx = sentence.find(entity)
+    if idx < 0:
+        return entity
+    m = _REGNAL_RE.match(sentence[idx + len(entity):])
+    return entity + m.group(0) if m else entity
+
+
 def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
+    entity = _with_regnal(sentence, entity)   # [D552]
     """Insert a composed gloss after the entity name as an appositive.
 
     The gloss is already a lowercase clause without period. We insert it as:
@@ -1047,6 +1089,7 @@ def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
 
 
 def _degrade_reference_in_text(text: str, entity: str, sentence: str) -> str:
+    entity = _with_regnal(sentence, entity)   # [D552]
     """Remove the governed construction around an entity from its sentence.
 
     LOCAL-289: Degrading must remove the WHOLE construction the name governed,
