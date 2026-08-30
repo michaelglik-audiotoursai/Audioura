@@ -207,7 +207,17 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
     except Exception as e:
         return None, f"gemini unavailable: {e}"
     try:
-        if focus in ('restaurant', 'place'):
+        if focus == 'restaurant':
+            # [D551] RESTAURANTS ONLY. Michael, 2026-08-29: "Just make sure that this
+            # question is about restaurants only as it would not make sense for museums
+            # or museum stops. We did a good job with museums and I do not want to damage
+            # it by this development."
+            #
+            # Museums were never at risk — they call this with focus='object'. But D550
+            # also routed focus='place' (walking and biking stops) through the juicy
+            # question, and the biking tour is work he has already accepted. Narrowed to
+            # the one category that asked for it.
+            #
             # [D550] His question, verbatim. Prose in, structure after.
             _q = _JUICY_QUESTION.format(name=work, city=venue)
             res = gemini_with_sources(_q)
@@ -483,11 +493,24 @@ def story_prompt_block(facts, stop_name=''):
     return (
         "\nVERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.\n"
         + lines + "\n"
-        "YOU MUST TELL AT LEAST ONE OF THESE AS A STORY, with the person named, the date if given, "
-        "and what came of it. This is the reason the listener is standing here rather than at any "
-        "other restaurant — a stop that lists hours and prices and tells no story has failed.\n"
-        "Tell it properly: who, when, what they did, what happened because of it. Do not compress "
-        "it into an adjective ('the storied Elsa') — that is the failure this replaces.\n"
+        "TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.\n"
+        "\n"
+        "[D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that "
+        "said only 'a dessert accident involving the Prince of Wales led to the creation of the "
+        "famous Crepe Suzette': \"we started but then abruptly stopped without explaining who "
+        "Suzette was.\" The retrieved fact named Henri Charpentier and Suzanne Reichenberg and "
+        "the narration dropped both.\n"
+        "\n"
+        "For each episode you tell:\n"
+        "  - name EVERY person the fact names — a dropped name is the story's point removed\n"
+        "  - say what actually happened, including what went wrong\n"
+        "  - say what came of it: the name that stuck, the record, the consequence\n"
+        "  - if the fact explains WHY something is called what it is, deliver that explanation\n"
+        "\n"
+        "This is the reason the listener is standing here rather than at any other restaurant. "
+        "A stop that lists hours and prices and gestures at a story has failed.\n"
+        "\n"
         "Use ONLY what is listed above. Do not add a guest, a date or an incident that is not "
-        "here, and do not embellish one that is.\n"
+        "here, and do not embellish one that is. If a listed fact is thin, tell a different one "
+        "rather than inventing detail to fill it out.\n"
     )
