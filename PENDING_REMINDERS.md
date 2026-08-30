@@ -44,11 +44,11 @@ Durable across sessions. Delete a line once delivered.
       where it fired.**
 
       **(5) NEXT THREE, in order:**
-      - **Make scope rejections stick.** Villa Leopolda (Villefranche-sur-Mer) was removed at
-        `conf=high` on one Cimiez run and kept on the next. A per-stop LLM judgement with no
-        memory. **Outside-the-area is a fact about geography, not an opinion** — it belongs in a
-        corpus like `tests/known_closed_venues.json`, which is the remedy that finally made the
-        closure checks reliable.
+      - ~~**Make scope rejections stick.**~~ **DONE 2026-08-30, D557.**
+        `tests/known_out_of_scope.json` + `scope_memory.py`, consulted before the LLM call and
+        appended to on every high-confidence rejection. Keyed on the (name, scope) PAIR.
+        Proven in `audioura-tour-generator-1` with an invalid API key. 16/16 green, and the
+        suite goes red both ways when the code is broken.
       - **Extend "tell two episodes properly" past restaurants.** Musée Marc Chagall and Musée
         National du Sport failed the story gate with 7 and 8 retrieved facts each — material
         arrived, narration built no arc. That instruction is what took the restaurant tour from
