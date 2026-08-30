@@ -47,6 +47,23 @@ Durable across sessions. Delete a line once delivered.
         not already caught. **The known-closed corpus is the only reliable part of that
         machinery.**
 
+      **(7) DISK IS AT 96% — 9.3 GB free of 228 GB. Michael must decide, LEAD must not.**
+      Docker cache was reclaimed (1.5 GB, regenerable). The rest is his environment, not ours:
+      `~/Library/Developer` **17 GB** (Xcode DerivedData + simulators), `~/Library/Application
+      Support` 17 GB, `~/audioura-worktrees` **11 GB across 42 worktrees**. `git worktree prune`
+      found nothing stale — all 42 are live directories and **some hold unreviewed submissions**,
+      so they are not free to delete. **Postgres and generated MP3s need headroom during mobile
+      testing; if a tour fails oddly, check disk first.**
+
+      **(8) A TEST TOUR REACHED THE USER-FACING LIST AND HAS BEEN HIDDEN.** Tour **338**
+      ("Restaurant tour in Nice") was LEAD's end-to-end audio proof. Because it went through the
+      real `/generate-complete-tour` API, **`is_test` is false** and `tours-near` served it to
+      Michael's app. Coords nulled, originals in `.continuous_dev/hidden_tour_coords.csv`, row
+      count unchanged at 162. **The lesson: proving the pipeline end-to-end necessarily creates a
+      real tour. Any future e2e proof must set `is_test` or null its coords in the same step.**
+      `check_user_visible.sh` baseline now includes **339** — Michael's own Cimiez tour, which
+      belongs in the list.
+
       **(6) DO NOT re-derive these.** Practicals are restaurant-only by design (hours and a
       price band are meaningless for a Roman ruin). Museums are excluded from the story question
       on purpose — Michael: *"we did a good job with museums and I do not want to damage it."*

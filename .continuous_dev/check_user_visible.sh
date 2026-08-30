@@ -27,7 +27,7 @@ LOG="$HOME/audioura-backups/backup.log"
 # Chikanobu print: "has nothing to do with Nice museum and should be excluded
 # entirely as false." Coordinates nulled, not deleted; backup at
 # ~/audioura-backups/coords_asian_arts_20260805T003824.json
-EXPECTED="1,12,14,17,24,29,152"
+EXPECTED="1,12,14,17,24,29,152,339"   # 339 = Michael's own Cimiez tour from the phone, 2026-08-30
 
 ACTUAL=$(curl -s -m 20 "http://localhost:5005/tours-near/43.7009358/7.2683912?radius=50" 2>/dev/null \
   | /usr/bin/python3 -c "
