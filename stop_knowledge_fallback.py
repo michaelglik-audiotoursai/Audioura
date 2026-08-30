@@ -115,6 +115,73 @@ def _openai_facts(work, venue, api_key, model=None, timeout=45, evidence=None,
         return None, f"openai error: {e}"
 
 
+# [D550] ASK THE QUESTION MICHAEL ASKS. Measured, 2026-08-29, same restaurant:
+#
+#   LEAD's prompt (instruction block + "Return ONLY JSON"):
+#     "Chef Dominique Lory crafts a refined menu ... Ducasse began at Pavillon
+#      Landais in 1972."
+#
+#   Michael's phrasing, verbatim:
+#     "The sliding roof retracts in under three minutes. When it debuted on
+#      31 May 1959, Prince Rainier III and Princess Grace cut the ribbon ...
+#      Aristotle Onassis, majority shareholder of the SBM and often at odds with
+#      Rainier over control of Monaco, pushed to build the most extravagant
+#      rooftop in the Mediterranean to woo Maria Callas."
+#
+# Same model, same restaurant, same day. **The engineered prompt was suppressing
+# the material.** A wall of rules plus a JSON schema makes the model cautious and
+# list-shaped; a short natural question with an accuracy caveat lets it tell what
+# it knows.
+#
+# So: ask in his words, get prose, and structure it afterwards. The extraction
+# step is forbidden to add anything the prose does not contain, so the accuracy
+# caveat survives the round trip.
+_JUICY_QUESTION = (
+    "Can you tell me some stories about people or incidents in {name} in {city}, something juicy "
+    "for people to know. Just make sure these are actual events and not fabrications."
+)
+
+_PROSE_TO_FACTS = (
+    "Convert the passage below into JSON facts for an audio tour. Work ONLY from the passage.\n"
+    "\n"
+    "- One item per distinct episode. Keep the who, the when, and what came of it.\n"
+    "- Keep names, dates, places and numbers EXACTLY as written. Do not round, soften or generalise.\n"
+    "- Drop anything with no person, no date and no event — atmosphere is not a fact.\n"
+    "- If the passage says the specifics are not public, or hedges with 'reportedly' or 'legend "
+    "has it', keep that hedge in the sentence rather than dropping it.\n"
+    "- ADD NOTHING. If it is not in the passage it does not go in the JSON.\n"
+    "- confidence: \"high\" when the passage states it plainly, \"low\" when the passage itself "
+    "hedges.\n"
+    "\n"
+    'Return ONLY JSON: {"facts": [{"fact": "<one sentence>", "confidence": "high|low"}]}'
+)
+
+
+def _prose_to_facts(prose, api_key, model=None, timeout=45):
+    """Structure a natural-language answer without editorialising it."""
+    if not prose or not api_key:
+        return None
+    import requests
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            data=json.dumps({
+                "model": model or os.environ.get("TOUR_FALLBACK_MODEL", "gpt-4o"),
+                "messages": [{"role": "system", "content": _PROSE_TO_FACTS},
+                             {"role": "user", "content": prose[:12000]}],
+                "temperature": 0.0, "seed": 7, "max_tokens": 1200,
+                "response_format": {"type": "json_object"},
+            }),
+            timeout=timeout,
+        )
+        if resp.status_code != 200:
+            return None
+        return json.loads(resp.json()["choices"][0]["message"]["content"])
+    except Exception:
+        return None
+
+
 def _gemini_facts(work, venue, timeout=45, focus='object'):
     """Grounded variant — returns citations, so its facts carry sources.
 
@@ -140,6 +207,19 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
     except Exception as e:
         return None, f"gemini unavailable: {e}"
     try:
+        if focus in ('restaurant', 'place'):
+            # [D550] His question, verbatim. Prose in, structure after.
+            _q = _JUICY_QUESTION.format(name=work, city=venue)
+            res = gemini_with_sources(_q)
+            _text = res.get('text', '') if isinstance(res, dict) else str(res)
+            if not _text.strip():
+                return None, 'gemini returned nothing'
+            parsed = _prose_to_facts(_text, os.environ.get('OPENAI_API_KEY'), timeout=timeout)
+            if not parsed:
+                return None, 'prose could not be structured'
+            if isinstance(res, dict) and res.get('sources'):
+                parsed['_sources'] = res['sources']
+            return parsed, 'gemini'
         _sys = {'restaurant': _SYSTEM_RESTAURANT,
                 'place': _SYSTEM_PLACE}.get(focus, _SYSTEM)
         _noun = {'restaurant': 'Restaurant', 'place': 'Place'}.get(focus, 'Object')
