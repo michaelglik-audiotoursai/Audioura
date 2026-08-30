@@ -37,11 +37,22 @@ from typing import Dict, List
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-for _l in open(os.path.join(HERE, '.env')):
-    _l = _l.strip()
-    if _l and not _l.startswith('#') and '=' in _l:
-        _k, _v = _l.split('=', 1)
-        os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+# [D549] A convenience, not a requirement. This unconditional open() raised
+# FileNotFoundError at IMPORT TIME inside the container, where `.env` is
+# correctly excluded by .dockerignore because secrets do not belong in an image.
+# Every caller wrapping `from story_leads import ...` in a try/except therefore
+# lost Gemini silently and fell back to OpenAI — which is why Gemini worked in
+# every host test and had NEVER ONCE run in production. The container already
+# receives its keys through the compose environment; the file is only needed
+# when running from a shell that has not exported them.
+_envfile = os.path.join(HERE, '.env')
+if os.path.exists(_envfile):
+    with open(_envfile) as _fh:
+        for _l in _fh:
+            _l = _l.strip()
+            if _l and not _l.startswith('#') and '=' in _l:
+                _k, _v = _l.split('=', 1)
+                os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
 from story_opportunity_scan import _fold, _STAKES, _AGENCY_VERB   # noqa: E402
 
