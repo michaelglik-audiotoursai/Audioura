@@ -22127,3 +22127,56 @@ opening**. **Elsa carries all four facts plus a named-people story** — the des
 4. **Booking dropped on 2 of 3 stops** despite being acquired.
 
 **NOT ready for mobile testing until (1) is fixed** — it rejects real restaurants.
+
+---
+
+## D548/D549 — Why the stories never arrived: Gemini had never run in the container
+
+**2026-08-29. Michael, blocking release:** *"The major thing to fix is to add stories about people
+... Gemini have no problems to come up with the stories, and yet, the system does not add them.
+Why??"*
+
+**Three reasons. The third invalidated all of LEAD's testing.**
+
+1. **We were asking Gemini about a MUSEUM OBJECT.** `_gemini_facts()` hardcoded the museum system
+   prompt and the `Object:/Museum:` framing for every stop — for Elsa it sent *"ONE museum object …
+   maker, materials, dimensions, provenance"*. Gemini answered honestly and uselessly and the
+   result was discarded as thin. Now focus-aware.
+2. **Episodes were offered as context, never required.** They entered as search snippets where
+   `rank_and_cap_snippets` can score them `usable=0`. The practicals had the same problem and only
+   became reliable once stated as a requirement. `story_prompt_block()` now demands one be told,
+   with the person named and the date given, and forbids adding anything unlisted.
+3. **`story_leads.py` opened `.env` unconditionally at MODULE IMPORT.** `.env` is in
+   `.dockerignore` — correctly — so `from story_leads import gemini_with_sources` raised
+   `FileNotFoundError: '/app/.env'` inside the container. Every caller wraps that import in
+   try/except, so it was swallowed and the code fell back to OpenAI+web.
+
+   **Gemini worked in every host test and had NEVER ONCE executed in production.** LEAD was
+   verifying on the host, where `.env` exists, and shipping to a container where the path did not
+   exist. Now loaded if present, skipped if not.
+
+### Result
+
+3 of 3 stops. **All four practical facts on all three stops**, up from 1 of 3. A named person and
+a date in every stop. Robuchon dropped before the spine was written, so the tour never mentions it.
+
+Stop 1 carries Michael's own anecdote, retrieved independently:
+*"in 1987 Prince Rainier III posed a challenge to the young chef Alain Ducasse: three Michelin
+stars within four years or face the consequences … By 1990, a mere thirty-three months later …"*
+
+### Open
+
+- Story gate still 1/3 — the other two have a person and a date but not a full arc.
+- **`closure_scan` is the weakest component: three false positives this week, zero true positives
+  the corpus did not already catch. Demote to advisory.**
+- Replenished stops are thin (La Montgolfière 200w) — they arrive without corpus material.
+
+### The pattern, ten instances this week
+
+**Correct code running nowhere that mattered:** museum-gated blocks, a data file that never entered
+the image, a city compared by equality, an import that never applied, an edit that deleted a
+function, a module that died on import in the container while passing every host test.
+
+**Every one was hidden by a try/except that turned a hard failure into a silent downgrade, and
+every one was found by reading tour output rather than by a green suite.** The practice that
+catches them: **run it in the container it ships to, and show the log line where the code fired.**
