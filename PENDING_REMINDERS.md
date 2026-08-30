@@ -2,6 +2,56 @@
 
 Durable across sessions. Delete a line once delivered.
 
+- [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
+
+      **STATE: Michael accepted the restaurant tour and is testing from the phone.**
+      Storied is pushed (`origin/storied`), container current, `/health` reports `code_sha`.
+
+      **(1) SERVICES ARE READY AND PROVEN END-TO-END.** A real tour was generated through
+      `POST /generate-complete-tour` on `192.168.0.136:5002` — the exact call the app makes —
+      and produced tour id 338 with **3 MP3s, 2.7 MB of audio**. That was the FIRST audio all
+      week; every other tour was text-only via a direct function call. 9/9 services healthy.
+      **`map-delivery` shows "unhealthy" — ignore it**, its healthcheck runs `curl` in a
+      container with no `curl`.
+
+      **(2) THE MAC MINI IS `192.168.0.136`** (moved en0 -> en1; the address is unchanged).
+      The app default in `config.dart` was updated. CLAUDE.md's `.137` is stale.
+
+      **(3) THE CACHE IS KEYED ON THE RAW REQUEST STRING, TYPOS INCLUDED.** Michael's phone
+      sent `"walk ng tour around Cimez District"` (the app mangled "walking"), which cached a
+      4-stop tour under that key. Deleted. **When he reports a bad tour, check `tour_cache`
+      before assuming the pipeline produced it.**
+
+      **(4) THE PATTERN THAT COST MOST OF THIS WEEK — eleven instances:** correct code running
+      nowhere that mattered. Museum-gated blocks (x5), a data file that never entered the image,
+      a city compared by equality, an import that never applied, an edit that deleted a
+      function, a module that died on import in the container while passing every host test,
+      and a prompt so over-specified it suppressed the answer. **Every one was hidden by a
+      try/except that turned a hard failure into a silent downgrade, and every one was found by
+      reading tour output — never by a green suite.**
+      **Before calling a guard done: run it in the container it ships to and show the log line
+      where it fired.**
+
+      **(5) NEXT THREE, in order:**
+      - **Make scope rejections stick.** Villa Leopolda (Villefranche-sur-Mer) was removed at
+        `conf=high` on one Cimiez run and kept on the next. A per-stop LLM judgement with no
+        memory. **Outside-the-area is a fact about geography, not an opinion** — it belongs in a
+        corpus like `tests/known_closed_venues.json`, which is the remedy that finally made the
+        closure checks reliable.
+      - **Extend "tell two episodes properly" past restaurants.** Musée Marc Chagall and Musée
+        National du Sport failed the story gate with 7 and 8 retrieved facts each — material
+        arrived, narration built no arc. That instruction is what took the restaurant tour from
+        headlines to stories.
+      - **Demote `closure_scan` to advisory.** Three false positives this week (La Salière on a
+        Naples, Florida snippet; Café de Paris once) against zero true positives the corpus had
+        not already caught. **The known-closed corpus is the only reliable part of that
+        machinery.**
+
+      **(6) DO NOT re-derive these.** Practicals are restaurant-only by design (hours and a
+      price band are meaningless for a Roman ruin). Museums are excluded from the story question
+      on purpose — Michael: *"we did a good job with museums and I do not want to damage it."*
+      They use `focus='object'`; restaurants and places use the juicy question.
+
 - [ ] **2026-08-26 — the container was stale. FIXED 10:4x, see D531. The rest of this item stands.**
 
       **Read first:** `DECISIONS.md` D526–D531, then `STOPLIST_CHAIN.md`. That is the whole picture.
