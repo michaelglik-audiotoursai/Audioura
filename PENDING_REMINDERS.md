@@ -5,7 +5,18 @@ Durable across sessions. Delete a line once delivered.
 - [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
 
       **STATE: Michael accepted the restaurant tour and is testing from the phone.**
-      Storied is pushed (`origin/storied`), container current, `/health` reports `code_sha`.
+      Storied is pushed (`origin/storied`). **Container verified current by md5: 532 shipped
+      `.py` files, 0 differing** (the 116 "missing" are `test_*.py` and utilities, correctly kept
+      out of the image).
+
+      **`/health` reports `code_sha: "unknown"` — that is EXPECTED, not staleness.** `.git` is not
+      in the image. The real freshness signals are **`manifest_ok: true`** and `build_time`.
+      Do not chase the sha.
+
+      **CONTAINER NAMES ARE `audioura-*`, NOT `development-*`.** The tour generator is
+      **`audioura-tour-generator-1`**. Only Postgres kept the old prefix:
+      **`development-postgres-2-1`**. CLAUDE.md and older notes say `development-tour-generator-1`,
+      which no longer exists — commands copied from them fail with "No such container".
 
       **(1) SERVICES ARE READY AND PROVEN END-TO-END.** A real tour was generated through
       `POST /generate-complete-tour` on `192.168.0.136:5002` — the exact call the app makes —
