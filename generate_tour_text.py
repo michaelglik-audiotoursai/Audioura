@@ -9148,6 +9148,187 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 merged[stop_name] = existing + new_sentences
         return merged
 
+    # [D554] MOVED AHEAD OF SPINE AND FACT SHEETS.
+    #
+    # Michael: "so the problem is still Café de Paris: too short. Why?"
+    # The log answered it exactly:
+    #
+    #   [D547] Pre-spine drop 'Joel Robuchon'   <- 3 candidates
+    #   [D547] Pre-spine drop 'Le Vistamar'     <- down to 1
+    #   [Storied] Fact sheets: 1/1 generated    <- built for ONE stop
+    #   [D545]   ADDED 'Café de Paris'          <- arrives AFTER
+    #   [D545]   ADDED 'Le Grill'               <- arrives AFTER
+    #
+    # Two dead venues were dropped, fact sheets were generated for the single
+    # survivor, and replenishment then added two stops that had missed fact
+    # sheets, corpus mining and the story search entirely. Le Louis XV entered
+    # Phase 5 with a fact sheet and ranked corpus snippets and wrote 465 words;
+    # Café de Paris entered with 4 snippets and wrote 159. That is not a prompt
+    # problem or a length problem — it is arriving too late to be fed.
+    #
+    # The stop list must be VETTED AND COMPLETE before anything gathers material
+    # for it. Running here means a replenished stop is indistinguishable from an
+    # originally-selected one by the time the spine, the fact sheets and the
+    # story search run.
+
+    # [D538] MOVED OUT of the museum-gated block above (line ~9792,
+    # `if _storied_mode and tour_category == 'museum'`). Placed inside it, the
+    # restaurant practicals could never run on a restaurant tour — the Monaco
+    # re-run printed not one [D538] line. Fifth instance of a check wired to the
+    # museum path and named as if it were general.
+    # -------- [D538] Restaurant practicals: acquire, then gate --------
+    # Michael, 2026-08-27: "for the restaurants the tour stop can not be a stop
+    # if the restaurant is closed or the menu is overpriced. If the information
+    # does not come from the first request to OpenAI.API, we should be querying
+    # this from Gemini and SERP."
+    #
+    # The Monaco tour printed "PRACTICAL FACTS GATE: PASSED (0 verified)" over
+    # three restaurants with no hours, no prices and no booking requirement.
+    # LOCAL-36 is SUBTRACTIVE — it drops claims it cannot trace — so it is
+    # silent when the narration made no claims at all. This is the acquisition
+    # half, and it runs for restaurant tours only, where the practicals ARE the
+    # content rather than a convenience.
+    if tour_category == 'restaurant':
+        try:
+            from restaurant_practicals import (fetch_practicals,
+                                               propose_replacements)
+            _rp_city = location
+            _rp_keep, _rp_dropped = [], []
+            for _rp_poi in poi_list:
+                _rp = fetch_practicals(_rp_poi.get('name', ''), _rp_city, api_key)
+                _rp_poi['_practicals'] = _rp
+                _rp_bits = [f"{k}={_rp[k][:40]}" for k in
+                            ('hours', 'closed_days', 'reservation', 'price_band')
+                            if _rp.get(k)]
+                print(f"  [D538] '{_rp_poi.get('name','')[:44]}' via {_rp['provider']}: "
+                      f"{', '.join(_rp_bits) if _rp_bits else 'nothing actionable'}")
+                if not _rp['deliverable']:
+                    # The one hard rule. "unknown" is NOT closed — absence of
+                    # evidence never removes a stop, only positive evidence does.
+                    _rp_dropped.append(_rp_poi.get('name', ''))
+                    print(f"  [D538] ⚠️  DROPPED '{_rp_poi.get('name','')[:44]}' — {_rp['reason']}")
+                    continue
+                _rp_keep.append(_rp_poi)
+            # [D541] A CHECK MAY NOT EMPTY THE TOUR.
+            #
+            # On 2026-08-28 this dropped all three Monaco restaurants and the run
+            # died with `max_workers must be greater than 0`. When a verifier
+            # rejects EVERY candidate, the likelier explanation is a broken
+            # verifier than a city with no open restaurants — and a flagged tour
+            # serves the listener better than a crash. Delivery is the last thing
+            # a guard gets to take away.
+            if _rp_dropped and not _rp_keep:
+                print(f"  [D541] ⚠️  ALL {len(_rp_dropped)} restaurant(s) were rejected as "
+                      f"closed. Refusing to empty the tour — a check that rejects everything "
+                      f"is more likely broken than the city is. Keeping all stops, flagged:")
+                for _rd in _rp_dropped:
+                    print(f"        UNVERIFIED: {_rd}")
+                _rp_dropped = []
+            if _rp_dropped:
+                poi_list = _rp_keep
+                print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
+                      f"{len(poi_list)} remain")
+
+            # -------- [D545] REPLENISH. A dead restaurant is not a lost stop. --------
+            # Michael, 2026-08-28: "why would you recommend shipping while the wrong
+            # number of stops at the place where the stops can be plentiful is a
+            # terrible bug! The system can not find 3 restaurants in Monaco,
+            # really???" He is right. Dropping is correct; delivering 2 of 3 because
+            # of it is not, and the D536 shortfall notice does not discharge it —
+            # announcing a failure is not the same as not failing.
+            #
+            # ADDITIVE and BOUNDED: only ever appends, max 2 rounds, and every
+            # candidate goes through the same corpus + closure checks that removed
+            # the original, so this cannot smuggle a dead venue back in.
+            _rp_want = _requested_stop_count_original or len(poi_list)
+            _rp_round = 0
+            _rp_seen = {(_p.get('name') or '').lower() for _p in poi_list}
+            _rp_seen |= {d.lower() for d in _rp_dropped}
+            while len(poi_list) < _rp_want and _rp_round < 2:
+                _rp_round += 1
+                _need = _rp_want - len(poi_list)
+                _cands = propose_replacements(location, list(_rp_seen), _need, api_key)
+                print(f"  [D545] Replenish round {_rp_round}: need {_need}, "
+                      f"proposed {len(_cands)}")
+                for _c in _cands:
+                    if len(poi_list) >= _rp_want:
+                        break
+                    _cn = _c['name']
+                    if _cn.lower() in _rp_seen:
+                        continue
+                    _rp_seen.add(_cn.lower())
+                    _cp = fetch_practicals(_cn, _rp_city, api_key)
+                    if not _cp['deliverable']:
+                        print(f"  [D545]   rejected '{_cn[:40]}' — {_cp['reason'][:80]}")
+                        continue
+                    _new = _new_poi(_cn)
+                    _new['_practicals'] = _cp
+                    # [D546] Carry the reason this stop was proposed into its material.
+                    # 'Le Grill — retractable roof' was the whole point of choosing it
+                    # and the phrase appeared NOWHERE in the delivered tour. The system
+                    # knew what made the stop interesting and threw it away.
+                    if _c.get('why'):
+                        _new['_replenish_why'] = _c['why']
+                        _DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
+                            'snippet': f"{_cn}: {_c['why']}", 'title': _cn,
+                            'link': '', 'source': 'replenishment_rationale'})
+                    poi_list.append(_new)
+                    # [D546] Log what was acquired. Last run these stops' practicals were
+                    # invisible in the log, so "why did stop 2 omit the hours" could not be
+                    # answered without re-deriving it.
+                    _cb = [f"{k}={_cp[k][:34]}" for k in
+                           ('hours', 'closed_days', 'reservation', 'price_band', 'cuisine')
+                           if _cp.get(k)]
+                    print(f"  [D545]   ADDED '{_cn[:44]}' — {_c.get('why','')[:60]}")
+                    print(f"  [D546]     practicals: {', '.join(_cb) if _cb else 'none'}")
+                if not _cands:
+                    break
+            if len(poi_list) < _rp_want:
+                print(f"  [D545] ⚠️  Still short: {len(poi_list)}/{_rp_want} after "
+                      f"{_rp_round} round(s)")
+
+            # -------- [D545] LORE. For a restaurant, people ARE the story. --------
+            # Michael: "for restaurants it is very important to talk about people
+            # and people's experience." His Gemini answer for Le Louis XV is the
+            # specification — Prince Rainier III's 1986 dare, three stars in 33
+            # months, Prince Albert's 2011 wedding gala, the chefs who trained
+            # there, the cellar walled up in WWII, the clock stopped at 12:00.
+            # None of that is hours or a price, and none of it was reaching the
+            # tour: the practicals chain asks what it COSTS, never who was HERE.
+            try:
+                from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
+                for _lp in poi_list:
+                    _ln = _lp.get('name', '')
+                    _lr = fetch_stop_knowledge(_ln, _rp_city, api_key, focus='restaurant')
+                    if not _lr.get('ok'):
+                        print(f"  [D545] no lore for '{_ln[:40]}': {_lr.get('reason','')[:60]}")
+                        continue
+                    _hi = sum(1 for f in _lr['facts'] if f.get('confidence') == 'high')
+                    _DIRECT_SNIPPETS_PER_STOP.setdefault(_ln, []).extend(
+                        facts_as_snippets(_lr, _ln))
+                    # [D548] Also keep them ON THE POI, so Phase 5 can require one
+                    # be told. As snippets alone they compete with search results
+                    # and the ranker can score them usable=0 — which is why good
+                    # episodes were being retrieved and never spoken.
+                    _lp['_lore'] = _lr['facts']
+                    print(f"  [D545] +{len(_lr['facts'])} story fact(s) for "
+                          f"'{_ln[:40]}' via {_lr['provider']} ({_hi} high)")
+                    for _f in _lr['facts'][:3]:
+                        print(f"        [{_f['confidence']}] {_f['fact'][:110]}")
+            except ImportError as _lo_err:
+                _import_logger.error(f"[D545] MISSING: stop_knowledge_fallback — restaurant "
+                                     f"stops will have no people stories: {_lo_err}")
+            except Exception as _lo_err:
+                print(f"  [D545] Lore fetch error (non-fatal): {_lo_err}")
+            _rp_usable = sum(1 for p in poi_list if (p.get('_practicals') or {}).get('usable'))
+            print(f"  [D538] Practicals acquired for {_rp_usable}/{len(poi_list)} stop(s)")
+        except ImportError as _rp_err:
+            _import_logger.error(f"[D538] MISSING: restaurant_practicals — a restaurant "
+                                 f"tour will ship with no hours or prices: {_rp_err}")
+        except Exception as _rp_err:
+            print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
+
+
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
     _phase_timer.start('fact_sheets')
     _storied_spine = None
@@ -10463,163 +10644,6 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
             import traceback
             traceback.print_exc()
-
-    # [D538] MOVED OUT of the museum-gated block above (line ~9792,
-    # `if _storied_mode and tour_category == 'museum'`). Placed inside it, the
-    # restaurant practicals could never run on a restaurant tour — the Monaco
-    # re-run printed not one [D538] line. Fifth instance of a check wired to the
-    # museum path and named as if it were general.
-    # -------- [D538] Restaurant practicals: acquire, then gate --------
-    # Michael, 2026-08-27: "for the restaurants the tour stop can not be a stop
-    # if the restaurant is closed or the menu is overpriced. If the information
-    # does not come from the first request to OpenAI.API, we should be querying
-    # this from Gemini and SERP."
-    #
-    # The Monaco tour printed "PRACTICAL FACTS GATE: PASSED (0 verified)" over
-    # three restaurants with no hours, no prices and no booking requirement.
-    # LOCAL-36 is SUBTRACTIVE — it drops claims it cannot trace — so it is
-    # silent when the narration made no claims at all. This is the acquisition
-    # half, and it runs for restaurant tours only, where the practicals ARE the
-    # content rather than a convenience.
-    if tour_category == 'restaurant':
-        try:
-            from restaurant_practicals import (fetch_practicals,
-                                               propose_replacements)
-            _rp_city = location
-            _rp_keep, _rp_dropped = [], []
-            for _rp_poi in poi_list:
-                _rp = fetch_practicals(_rp_poi.get('name', ''), _rp_city, api_key)
-                _rp_poi['_practicals'] = _rp
-                _rp_bits = [f"{k}={_rp[k][:40]}" for k in
-                            ('hours', 'closed_days', 'reservation', 'price_band')
-                            if _rp.get(k)]
-                print(f"  [D538] '{_rp_poi.get('name','')[:44]}' via {_rp['provider']}: "
-                      f"{', '.join(_rp_bits) if _rp_bits else 'nothing actionable'}")
-                if not _rp['deliverable']:
-                    # The one hard rule. "unknown" is NOT closed — absence of
-                    # evidence never removes a stop, only positive evidence does.
-                    _rp_dropped.append(_rp_poi.get('name', ''))
-                    print(f"  [D538] ⚠️  DROPPED '{_rp_poi.get('name','')[:44]}' — {_rp['reason']}")
-                    continue
-                _rp_keep.append(_rp_poi)
-            # [D541] A CHECK MAY NOT EMPTY THE TOUR.
-            #
-            # On 2026-08-28 this dropped all three Monaco restaurants and the run
-            # died with `max_workers must be greater than 0`. When a verifier
-            # rejects EVERY candidate, the likelier explanation is a broken
-            # verifier than a city with no open restaurants — and a flagged tour
-            # serves the listener better than a crash. Delivery is the last thing
-            # a guard gets to take away.
-            if _rp_dropped and not _rp_keep:
-                print(f"  [D541] ⚠️  ALL {len(_rp_dropped)} restaurant(s) were rejected as "
-                      f"closed. Refusing to empty the tour — a check that rejects everything "
-                      f"is more likely broken than the city is. Keeping all stops, flagged:")
-                for _rd in _rp_dropped:
-                    print(f"        UNVERIFIED: {_rd}")
-                _rp_dropped = []
-            if _rp_dropped:
-                poi_list = _rp_keep
-                print(f"  [D538] {len(_rp_dropped)} restaurant(s) dropped as closed; "
-                      f"{len(poi_list)} remain")
-
-            # -------- [D545] REPLENISH. A dead restaurant is not a lost stop. --------
-            # Michael, 2026-08-28: "why would you recommend shipping while the wrong
-            # number of stops at the place where the stops can be plentiful is a
-            # terrible bug! The system can not find 3 restaurants in Monaco,
-            # really???" He is right. Dropping is correct; delivering 2 of 3 because
-            # of it is not, and the D536 shortfall notice does not discharge it —
-            # announcing a failure is not the same as not failing.
-            #
-            # ADDITIVE and BOUNDED: only ever appends, max 2 rounds, and every
-            # candidate goes through the same corpus + closure checks that removed
-            # the original, so this cannot smuggle a dead venue back in.
-            _rp_want = _requested_stop_count_original or len(poi_list)
-            _rp_round = 0
-            _rp_seen = {(_p.get('name') or '').lower() for _p in poi_list}
-            _rp_seen |= {d.lower() for d in _rp_dropped}
-            while len(poi_list) < _rp_want and _rp_round < 2:
-                _rp_round += 1
-                _need = _rp_want - len(poi_list)
-                _cands = propose_replacements(location, list(_rp_seen), _need, api_key)
-                print(f"  [D545] Replenish round {_rp_round}: need {_need}, "
-                      f"proposed {len(_cands)}")
-                for _c in _cands:
-                    if len(poi_list) >= _rp_want:
-                        break
-                    _cn = _c['name']
-                    if _cn.lower() in _rp_seen:
-                        continue
-                    _rp_seen.add(_cn.lower())
-                    _cp = fetch_practicals(_cn, _rp_city, api_key)
-                    if not _cp['deliverable']:
-                        print(f"  [D545]   rejected '{_cn[:40]}' — {_cp['reason'][:80]}")
-                        continue
-                    _new = _new_poi(_cn)
-                    _new['_practicals'] = _cp
-                    # [D546] Carry the reason this stop was proposed into its material.
-                    # 'Le Grill — retractable roof' was the whole point of choosing it
-                    # and the phrase appeared NOWHERE in the delivered tour. The system
-                    # knew what made the stop interesting and threw it away.
-                    if _c.get('why'):
-                        _new['_replenish_why'] = _c['why']
-                        _DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
-                            'snippet': f"{_cn}: {_c['why']}", 'title': _cn,
-                            'link': '', 'source': 'replenishment_rationale'})
-                    poi_list.append(_new)
-                    # [D546] Log what was acquired. Last run these stops' practicals were
-                    # invisible in the log, so "why did stop 2 omit the hours" could not be
-                    # answered without re-deriving it.
-                    _cb = [f"{k}={_cp[k][:34]}" for k in
-                           ('hours', 'closed_days', 'reservation', 'price_band', 'cuisine')
-                           if _cp.get(k)]
-                    print(f"  [D545]   ADDED '{_cn[:44]}' — {_c.get('why','')[:60]}")
-                    print(f"  [D546]     practicals: {', '.join(_cb) if _cb else 'none'}")
-                if not _cands:
-                    break
-            if len(poi_list) < _rp_want:
-                print(f"  [D545] ⚠️  Still short: {len(poi_list)}/{_rp_want} after "
-                      f"{_rp_round} round(s)")
-
-            # -------- [D545] LORE. For a restaurant, people ARE the story. --------
-            # Michael: "for restaurants it is very important to talk about people
-            # and people's experience." His Gemini answer for Le Louis XV is the
-            # specification — Prince Rainier III's 1986 dare, three stars in 33
-            # months, Prince Albert's 2011 wedding gala, the chefs who trained
-            # there, the cellar walled up in WWII, the clock stopped at 12:00.
-            # None of that is hours or a price, and none of it was reaching the
-            # tour: the practicals chain asks what it COSTS, never who was HERE.
-            try:
-                from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
-                for _lp in poi_list:
-                    _ln = _lp.get('name', '')
-                    _lr = fetch_stop_knowledge(_ln, _rp_city, api_key, focus='restaurant')
-                    if not _lr.get('ok'):
-                        print(f"  [D545] no lore for '{_ln[:40]}': {_lr.get('reason','')[:60]}")
-                        continue
-                    _hi = sum(1 for f in _lr['facts'] if f.get('confidence') == 'high')
-                    _DIRECT_SNIPPETS_PER_STOP.setdefault(_ln, []).extend(
-                        facts_as_snippets(_lr, _ln))
-                    # [D548] Also keep them ON THE POI, so Phase 5 can require one
-                    # be told. As snippets alone they compete with search results
-                    # and the ranker can score them usable=0 — which is why good
-                    # episodes were being retrieved and never spoken.
-                    _lp['_lore'] = _lr['facts']
-                    print(f"  [D545] +{len(_lr['facts'])} story fact(s) for "
-                          f"'{_ln[:40]}' via {_lr['provider']} ({_hi} high)")
-                    for _f in _lr['facts'][:3]:
-                        print(f"        [{_f['confidence']}] {_f['fact'][:110]}")
-            except ImportError as _lo_err:
-                _import_logger.error(f"[D545] MISSING: stop_knowledge_fallback — restaurant "
-                                     f"stops will have no people stories: {_lo_err}")
-            except Exception as _lo_err:
-                print(f"  [D545] Lore fetch error (non-fatal): {_lo_err}")
-            _rp_usable = sum(1 for p in poi_list if (p.get('_practicals') or {}).get('usable'))
-            print(f"  [D538] Practicals acquired for {_rp_usable}/{len(poi_list)} stop(s)")
-        except ImportError as _rp_err:
-            _import_logger.error(f"[D538] MISSING: restaurant_practicals — a restaurant "
-                                 f"tour will ship with no hours or prices: {_rp_err}")
-        except Exception as _rp_err:
-            print(f"  [D538] Restaurant practicals error (non-fatal): {_rp_err}")
 
     # -------- [LOCAL-440/445] Story-first pipeline: seek + verify + size-adapt --------
     _phase_timer.start('story_first')
