@@ -22418,3 +22418,64 @@ regnal names.** Longest and most even tour produced on this path.
 signal (Édouard vs André Michelin) · confidence-driven story instability · off-topic length filler.
 
 **READY FOR MOBILE TESTING.**
+
+---
+
+## D556 — Replenishment and lore are general; and a scope rejection that did not stick
+
+**2026-08-30. Michael, testing from the phone:** *"Asked for 'Walking tour around Cimez District,
+Nice, France' with 6 stops but got back only 4. why?"* and *"I do not hear good stories for each
+stop."*
+
+**Both had the same cause: a `tour_category == 'restaurant'` guard.**
+
+SCOPE-CHECK correctly removed Villa Leopolda (Villefranche-sur-Mer) and the Matisse Chapel (Vence)
+— genuinely outside the district — and **nothing replaced them**, because replenishment was
+restaurant-only. The same guard meant **not one story-retrieval line ran**: the tour scored 2/6 on
+the story gate while Gemini held the 1543 siege of the monastery, Saint Pontius in the Cemenelum
+arena, and Fray Marcos de Niza.
+
+**Michael's judgement was exactly right on both counts** — "no good stories" AND, minutes later,
+"actually stop 3 is excellent". The gate said 2 of 6; both statements fit that number.
+
+### Why the guard was there — a misread instruction worth recording
+
+D551 narrowed the story question to restaurants because he wrote *"restaurants only"*. **His stated
+REASON was museums** — *"we did a good job with museums and I do not want to damage it"*. LEAD
+implemented the literal words and removed walking tours along with museums. **Museums are excluded
+on a separate path (`focus='object'`) and were never at risk.**
+
+### Shipped
+
+- `propose_replacements(kind=...)` — names places as well as restaurants, and the prompt now warns
+  that a famous place in the next town is the commonest mistake, which is precisely what deleted
+  Villa Leopolda. Verified on Cimiez: Arènes de Cimiez, Jardin des Arènes, Musée Archéologique.
+- A **separate** block runs replenishment + lore for every non-restaurant, non-museum tour, before
+  fact sheets. Separate rather than widening the guard: that path wraps practicals, closure checks,
+  replenishment and lore in one try/except and splitting it cleanly failed twice. **Duplication is
+  cheaper than destabilising an accepted path.**
+- `focus='place'` routes to the juicy question again.
+- Practicals stay restaurant-only — hours and a price band are meaningless for a Roman ruin.
+
+### Result
+
+**6 of 6 stops · 6/6 within scope · 46 Gemini facts across 6 stops (45 high) · story gate 2/6 ->
+4/6 · 1,918 words, every stop over 250.**
+
+### NEW DEFECT — a scope rejection that does not stick
+
+`PHASE 5.6: 6/6 within scope` — but **Villa Leopolda is in Villefranche-sur-Mer**. The previous run
+removed it at `conf=high`; this run kept it. **The scope check is a per-stop LLM judgement with no
+memory between runs, so a correctly-deleted stop can return.**
+
+**A stop rejected for being outside the requested area is a fact about geography, not an opinion.**
+It belongs in a corpus like `known_closed_venues.json` so the rejection persists — the same remedy
+that finally made the closure checks reliable.
+
+### Open
+
+1. **Make scope rejections stick** (above).
+2. **Extend "tell two episodes properly" beyond restaurants** — Musée Marc Chagall and Musée
+   National du Sport failed the story gate despite 7 and 8 retrieved facts each. Material arrived;
+   narration did not build an arc.
+3. `closure_scan` — three false positives, zero unique true positives. Demote to advisory.
