@@ -9647,7 +9647,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # Beta measured 87 m -> 46 m typical error, 1,616 m -> 558 m worst,
                 # over 40 stops in 8 cities.
                 try:
-                    from geocode_stops import resolve_poi, geocode, location_hint
+                    from geocode_stops import (resolve_poi, geocode, location_hint,
+                                               fix_reversed_poi_list)
+                    # [LOCAL-470 / BETA-5] Repair a wholly reversed tour FIRST.
+                    #
+                    # The generator sometimes emits every coordinate longitude-first
+                    # (a Madagascar tour placed the Rova of Antananarivo at
+                    # "47.5224, -18.9110" — 9,899 km out, in the ocean off Somalia;
+                    # swapped it is 3.9 km). resolve_poi's plausibility guard anchors
+                    # on the tour's own stops, so if they are all mirrored it reasons
+                    # from poisoned input and would reject the correct answers. The
+                    # whole-tour check therefore has to run before per-POI resolution.
+                    try:
+                        _rev = fix_reversed_poi_list(poi_list)
+                        if _rev.get('action') == 'swapped':
+                            print(f"  [LOCAL-470] REVERSED COORDINATES corrected for the "
+                                  f"whole tour: {_rev.get('reason', '')}")
+                    except Exception as _rev_err:
+                        print(f"  [LOCAL-470] reversal check error (non-fatal): {_rev_err}")
                     _gp_anchor = None
                     try:
                         _gp_anchor = geocode(location_hint(location) or location)
