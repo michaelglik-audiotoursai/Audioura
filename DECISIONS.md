@@ -22249,3 +22249,57 @@ reading tour output rather than by a green suite.
 1. **Run it in the container it ships to, and show the log line where the code fired.**
 2. **When a human gets a better answer than the system, compare the two prompts before assuming the
    system needs more logic.**
+
+---
+
+## D551/D552 — Story gate 3 of 3, and a gloss spliced inside a regnal name
+
+**2026-08-29. Michael's three points, all answered.**
+
+**1. Minimum size, asked and answered:** `_RETRY_FLOOR=120` (hard, "hollowed") and
+`_THIN_FLOOR=300` (the target that triggers "add another story"). Café de Paris lands 164-253 on
+every run — the trigger fires every time. **What it was not doing was telling the stories
+properly:** one headline instead of two full episodes.
+
+**2. The truncated story.** He read *"a dessert accident involving the Prince of Wales led to the
+creation of the famous Crêpe Suzette"* and said we *"abruptly stopped without explaining who
+Suzette was."* **The retrieval was never the problem** — Gemini had already returned Henri
+Charpentier and Suzanne Reichenberg by name, La Belle Otero and Liane de Pougy, the 1929 Grand Prix
+triage post, and the SBM's undercover spotters. **The narration was compressing rich facts into
+headlines.** The block now requires TWO episodes, each with every person the fact names, what went
+wrong, what came of it, and — where the fact explains why something is called what it is — that
+explanation delivered. Result, in the tour: Charpentier, the igniting pan, and Suzette named.
+
+**3. Restaurants only.** Museums use `focus='object'` and were never at risk. But D550 had also
+routed `focus='place'` (walking/biking) through the juicy question, and that tour is work he has
+accepted. Narrowed to `focus == 'restaurant'`.
+
+### Story gate 3 of 3 — a first for this project
+
+Every previous tour on every path topped out at 1 or 2 verified story-units. All three stops now
+carry one.
+
+### D552 — the gate that corrupted royal names
+
+```
+"the future King Edward, the first British monarch of his house, VII, then Prince of Wales"
+"with journalists and diplomats gathering III and Princess Grace navigated international tensions"
+```
+
+`LOCAL-269` matches a royal name WITHOUT its numeral: it spliced a gloss inside "Edward VII" and
+dropped "Prince Rainier" leaving "III" stranded. **Old, correct for ordinary names, and exposed by
+a tour full of Rainier III, Edward VII and Albert II.** Fixed by extending the matched span over a
+trailing Roman numeral — one change repairs both symptoms because insertion and degradation share
+the span. Guarded so an initial is not read as a numeral ("Henri C. Charpentier").
+
+### Open
+
+1. **A CONTESTED NAME IS ASSERTED AS FACT.** Michael's source says **Édouard** Michelin; the tour
+   says **André**. Gemini asked directly: *"Historical accounts are uncertain and conflict … most
+   detailed racing records and local Monaco historical archives specifically name Édouard."*
+   The tour took the less-supported name and stated it flatly. **A "contested fact" signal is real
+   missing work.**
+2. **Stop length is not under control** — 694 words this run against 978 and 995 before it; Le
+   Louis XV 495 → 250. Run-to-run variance, not the regnal fix.
+3. **`closure_scan`: three false positives this week, zero true positives the corpus had not
+   already caught. Demote to advisory.**
