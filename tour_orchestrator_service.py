@@ -351,7 +351,7 @@ def log_job_update(job_id, status, progress):
     else:
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, low_confidence_stops=None):
     """Store the audio tour in the database with original tour content.
 
     Returns:
@@ -498,6 +498,24 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             cur.execute("ALTER TABLE audio_tours ADD COLUMN track VARCHAR(16) NOT NULL DEFAULT 'beta'")
             conn.commit()
             print("Added track column")
+
+        # [LOCAL-471] Self-healing add, same pattern as track/stops_count above.
+        # Additive nullable column — no approval needed, no backfill required, and
+        # any Postgres (Cloud SQL, Mac Mini local dev, a fresh checkout) gains it
+        # on first write. Holds the tour-level count of stops whose coordinate is
+        # NOT corroborated (Coordinate-Confidence != high). NULL means "not
+        # measured for this row" (e.g. legacy tours); 0 means "measured, all high".
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'low_confidence_stops'
+        """)
+        has_low_confidence = cur.fetchone() is not None
+        if not has_low_confidence:
+            print(f"Adding low_confidence_stops column...")
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN low_confidence_stops INTEGER")
+            conn.commit()
+            print("Added low_confidence_stops column")
         
         # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
         # lower(tour_name) WHERE original_tour_id IS NULL.
@@ -558,11 +576,13 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             cur.execute(
                 """
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track,
+                    low_confidence_stops)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track)
+                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track,
+                 low_confidence_stops)
             )
         elif has_audio_tour and has_lat and has_number_requested:
             cur.execute(
@@ -913,6 +933,30 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         print(f"STOP COUNT VERIFICATION: expected={expected_stops}, actual={actual_stops}, files={sorted(audio_files_in_zip)}")
         ACTIVE_JOBS[job_id]["expected_stops"] = expected_stops
         ACTIVE_JOBS[job_id]["actual_stops"] = actual_stops
+
+        # [LOCAL-471] Aggregate the per-stop Coordinate-Confidence signal so it
+        # survives the DB boundary. The per-stop truth lives in each audio_N.txt
+        # (and rides in the stored zip); this tour-level count of low-confidence
+        # stops is the queryable summary — the same treatment stops_count gets.
+        # A stop with no Coordinate-Confidence line counts as low, matching the
+        # emitter's honest default. Fail-soft: any read problem leaves it None.
+        low_confidence_stops = None
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                _txt_names = sorted(
+                    n for n in zip_ref.namelist() if re.fullmatch(r'audio_\d+\.txt', n))
+                if _txt_names:
+                    _low = 0
+                    for _n in _txt_names:
+                        _body = zip_ref.read(_n).decode('utf-8', 'replace')
+                        _m = re.search(r'(?im)^\s*Coordinate-Confidence\s*:\s*(\w+)', _body)
+                        if not _m or _m.group(1).strip().lower() != 'high':
+                            _low += 1
+                    low_confidence_stops = _low
+        except Exception as _conf_err:
+            print(f"WARNING: Could not count low-confidence stops: {_conf_err}")
+        print(f"CONFIDENCE VERIFICATION: low_confidence_stops={low_confidence_stops}")
+        ACTIVE_JOBS[job_id]["low_confidence_stops"] = low_confidence_stops
         
         if actual_stops == 0 or actual_stops is None:
             error_msg = (
@@ -1083,7 +1127,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[USER_INDEX] Non-fatal error: {idx_err}")
 
         # Store in database with tour content
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, low_confidence_stops=ACTIVE_JOBS[job_id].get("low_confidence_stops"))
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}

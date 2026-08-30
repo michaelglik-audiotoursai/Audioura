@@ -37,7 +37,7 @@ class TranslationService:
     
     # Only these two labels must stay in English — mobile app parses them by exact string match.
     # All other labels (Type/Specialty, Orientation, etc.) should be translated normally.
-    _METADATA_LABELS = ['Coordinates', 'Address']
+    _METADATA_LABELS = ['Coordinates', 'Address', 'Coordinate-Confidence']
 
     # Compiled pattern for stripping translated metadata label lines from .txt body.
     # Matches any line whose first word(s) correspond to a _METADATA_LABELS key followed
@@ -220,7 +220,7 @@ class TranslationService:
             
             # Get original tour with tour_content
             cursor.execute(
-                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri, stops_count FROM audio_tours WHERE id = %s", 
+                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri, stops_count, low_confidence_stops FROM audio_tours WHERE id = %s", 
                 (original_tour_id,)
             )
             original_tour = cursor.fetchone()
@@ -344,6 +344,11 @@ class TranslationService:
             
             # Create new tour record
             _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
+            # [LOCAL-471] Inherit the coordinate-confidence aggregate from the
+            # original: the translated zip carries the same Coordinate-Confidence
+            # lines (restored in English by _restore_metadata_labels), so the count
+            # of low-confidence stops is identical. Same treatment as stops_count.
+            _original_low_confidence = original_tour[11] if len(original_tour) > 11 else None
             # Track B: this deployment's own track (each of Beta/Storied is a
             # separate service instance, so a translation always belongs to
             # whichever track produced it — see tour_orchestrator_service.py).
@@ -352,12 +357,13 @@ class TranslationService:
                 _track = 'beta'
             cursor.execute("""
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                       lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                                       lat, lng, content_language, original_tour_id, tour_content, stops_count, track,
+                                       low_confidence_stops)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
                 translated_name, translated_request, translated_zip_data, original_tour[4],
                 original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content,
-                _original_stops_count, _track
+                _original_stops_count, _track, _original_low_confidence
             ))
             
             new_tour_id = cursor.fetchone()[0]
@@ -454,7 +460,15 @@ class TranslationService:
                             continue
                         
                         try:
-                            translated_text = self.translate_text(source_text, target_language)
+                            # [LOCAL-471] Keep the Coordinate-Confidence line out of
+                            # translation: its value ('low'/'high') would translate
+                            # unpredictably and _restore_metadata_labels re-inserts the
+                            # English line verbatim, so translating it only risks a
+                            # duplicate garbled line in the body. Values are read back
+                            # from the untouched source_text below.
+                            _translate_input = re.sub(
+                                r'(?im)^\s*Coordinate-Confidence\s*:.*$\n?', '', source_text)
+                            translated_text = self.translate_text(_translate_input, target_language)
                             # Restore English Coordinates/Address lines so mobile app can parse map pins
                             translated_text_with_meta = self._restore_metadata_labels(source_text, translated_text, target_language)
                             # For TTS audio: strip nav/metadata fields (don't read coordinates aloud)
@@ -1216,7 +1230,7 @@ Say 'What are my options' to hear this help again"""
         return html
     # Fields that should not be spoken aloud — same set as Fix A in tour_generation_modernized.py
     _NAV_FIELD_PREFIXES = [
-        'Address:', 'Coordinates:', 'Type/Specialty:', 'Specific Examples:',
+        'Address:', 'Coordinates:', 'Coordinate-Confidence:', 'Type/Specialty:', 'Specific Examples:',
         'Operational Details:'
     ]
 

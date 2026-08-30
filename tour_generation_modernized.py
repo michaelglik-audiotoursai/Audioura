@@ -19,7 +19,7 @@ import threading
 # Labels stripped from TTS audio (kept in .txt files for mobile app parsing)
 # Matches all 5 structured metadata fields — same set as translation_service._NAV_FIELD_PREFIXES
 _NAV_LABEL_RE = re.compile(
-    r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
+    r'^\s*(Address|Coordinates|Coordinate-Confidence|Type/Specialty|Specific Examples|Operational Details)\s*:',
     re.IGNORECASE | re.MULTILINE
 )
 
@@ -348,6 +348,7 @@ def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchest
         # (which the map reads) and the map buttons in the HTML get the corrected
         # values. Fail-soft: any geocoder problem leaves the original untouched.
         ACTIVE_JOBS.update(job_id, progress="Validating stop coordinates...")
+        geo_records = []
         try:
             import geocode_stops
             hint = geocode_stops.location_hint(modernized_data.get("tour_name", ""))
@@ -359,6 +360,26 @@ def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchest
                 print(f"[GEOCODE] corrected {corrected} of {len(geo_records)} stop coordinates")
         except Exception as e:
             print(f"[GEOCODE] validation skipped ({e}); keeping model coordinates")
+
+        # [LOCAL-471] Carry the confidence signal into audio_N.txt so the map can
+        # tell an established coordinate from a guess. correct_stops already
+        # decided this per stop (record["confidence"] == 'high' when two sources
+        # agree within 200 m, else 'low'); we only write it down. geo_records is
+        # [] on any geocoder failure above and shorter than the stop list under
+        # GEOCODE_STOPS=0 — annotate_text_content marks every un-covered stop
+        # 'low', which is the honest default, so this never crashes or omits the
+        # field. The mobile rendering half is 🟩 Mobile — Kiro's work; the field
+        # to read is `Coordinate-Confidence`.
+        try:
+            from geo_confidence_emit import annotate_text_content
+            modernized_data["text_content"] = annotate_text_content(
+                modernized_data["text_content"], geo_records)
+            _low = sum(1 for r in geo_records if r.get("confidence") != "high")
+            _low += max(0, len(modernized_data["text_content"]) - len(geo_records))
+            print(f"[LOCAL-471] Coordinate-Confidence emitted for "
+                  f"{len(modernized_data['text_content'])} stop(s); {_low} marked low")
+        except Exception as e:
+            print(f"[LOCAL-471] confidence emit skipped ({e})")
 
         # Generate audio using TTS service
         ACTIVE_JOBS.update(job_id, progress="Generating audio files...")
