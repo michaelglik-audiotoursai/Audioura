@@ -1120,7 +1120,118 @@ def scope_is_a_waypoint(scope_name, request_text):
     return False
 
 
-def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
+def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
+                       seen=None, max_rounds=3, on_add=None):
+    """[D558] Propose -> validate -> substitute -> repeat, until the count is met.
+
+    Michael, 2026-08-30: "make sure that the stops we obtain by replenishment are
+    validated the same way as the original and then substituted if invalid — seems
+    like a loop to me."
+
+    MODULE SCOPE ON PURPOSE. The first version of this lived inline in
+    `generate_tour_text()`, and its suite could only reach the primitives it called
+    — so reverting `protect_first` at the call site left every test green. That is
+    D418/D421 exactly: a suite that cannot fail is not evidence. The remedy there was
+    the remedy here — lift the logic to module scope and test the real thing. The
+    two arguments that need a network (`propose`) or the enclosing closure
+    (`make_poi`) are injected; validation is NOT injected, because validating the
+    same way as the original is the whole point and a test must exercise it.
+
+    Args:
+      poi_list:  the current stops. MUTATED IN PLACE by append, as callers expect.
+      want:      how many stops the listener asked for.
+      scope:     containment scope from `_resolve_scope_for_check`; '' skips vetting.
+      propose:   fn(need, seen_names) -> [{'name': str, 'why': str}]
+      make_poi:  fn(name) -> poi dict
+      on_add:    optional fn(poi) called for each accepted stop.
+
+    Returns (added, rejected, rounds).
+    """
+    seen = seen if seen is not None else {(p.get('name') or '').lower() for p in poi_list}
+    added, rejected, rounds = 0, 0, 0
+
+    while len(poi_list) < want and rounds < max_rounds:
+        rounds += 1
+        need = want - len(poi_list)
+        cands = propose(need, sorted(seen))
+        print(f"  [D556] Replenish round {rounds}: need {need}, proposed {len(cands)}")
+
+        fresh = []
+        for c in cands:
+            if len(fresh) >= need:
+                break
+            name = (c.get('name') or '').strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())          # never re-propose it, valid or not
+            poi = make_poi(name)
+            if c.get('why'):
+                poi['_replenish_why'] = c['why']
+            fresh.append(poi)
+
+        # Validate candidates the same way the originals are. protect_first=False:
+        # every one of these IS a candidate, and the keep-stop-0 rule exists to stop
+        # a WHOLE tour emptying, not to wave through whichever name the proposer
+        # happened to return first.
+        if fresh and scope:
+            n_in = len(fresh)
+            fresh = _validate_stops_within_scope(fresh, scope, headers, protect_first=False)
+            rejected += n_in - len(fresh)
+            print(f"  [D558] Replenishment scope check: {len(fresh)}/{n_in} "
+                  f"candidate(s) inside '{scope}'")
+
+        for poi in fresh:
+            if len(poi_list) >= want:
+                break
+            poi_list.append(poi)
+            added += 1
+            if on_add:
+                on_add(poi)
+            print(f"  [D556]   ADDED '{poi['name'][:44]}' — "
+                  f"{(poi.get('_replenish_why') or '')[:60]}")
+
+        if not cands:
+            break
+
+    if len(poi_list) < want:
+        print(f"  [D556] ⚠️  Still short: {len(poi_list)}/{want} after {rounds} "
+              f"round(s), {rejected} candidate(s) rejected for scope")
+    return added, rejected, rounds
+
+
+def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name, quiet=False):
+    """[D558] The one place that decides what a tour's containment scope IS.
+
+    Michael, 2026-08-30: "make sure that the stops we obtain by replenishment are
+    validated the same way as the original". "The same way" has to mean the same
+    code, not a second copy that drifts — so PHASE 5.6 and the replenishment loop
+    both call this.
+
+    Returns '' when no stop-by-stop containment check applies (a museum tour with
+    its own guard, a scope too wide to be meaningful, or a scope that is really
+    just a waypoint on the route).
+    """
+    if tour_category == 'museum' and museum_venue_name:
+        return ''
+    scope = ''
+    if intent and intent.get('geographic_scope') and \
+            intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT', 'CORRIDOR'):
+        scope = intent['geographic_scope']
+    # [D536] Refuse a scope that is only a named stop on the route.
+    if scope and scope_is_a_waypoint(scope, location):
+        _wider = (intent.get('location') or '').strip() if intent else ''
+        if not quiet:
+            print(f"\n  [D536] SCOPE REFUSED: '{scope}' is named in the request as a "
+                  f"STOP, not as the tour's extent — it cannot contain the tour that visits it.")
+            if _wider and _norm_place(_wider) != _norm_place(scope):
+                print(f"  [D536] Falling back to the tour's stated area: '{_wider}' "
+                      f"(too wide for a stop-by-stop containment check — skipping PHASE 5.6)")
+        scope = ''
+    return scope
+
+
+def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
+                                 protect_first=True):
     """
     PHASE 5.6 — Geographic-scope containment guard.
 
@@ -1200,9 +1311,19 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
         except Exception as e:
             return poi, True, "low", f"check error: {e}"
 
-    first_stop = poi_list[0]
-    candidates = poi_list[1:1 + max_check]
-    tail = poi_list[1 + max_check:]
+    # [D558] `protect_first` is the graceful-degradation rule for a WHOLE tour:
+    # never leave the listener with nothing. It must be off when the caller is
+    # vetting a batch of replenishment candidates, where the first element is
+    # just another candidate and keeping it unconditionally would re-admit the
+    # out-of-area stop the loop is there to reject.
+    if protect_first:
+        first_stop = [poi_list[0]]
+        candidates = poi_list[1:1 + max_check]
+        tail = poi_list[1 + max_check:]
+    else:
+        first_stop = []
+        candidates = poi_list[:max_check]
+        tail = poi_list[max_check:]
 
     survivors = []
     if candidates:
@@ -1228,7 +1349,7 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
                 if not reason.startswith('[scope-memory]'):
                     record_out_of_scope(poi.get('name', ''), scope_name, reason=reason)
 
-    kept = [first_stop] + survivors + tail
+    kept = first_stop + survivors + tail
     return kept
 
 
@@ -9378,34 +9499,39 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _gp_city = location
             _gp_want = _requested_stop_count_original or len(poi_list)
             _gp_seen = {(_p.get('name') or '').lower() for _p in poi_list}
+            _gp_initial = [_p.get('name', '') for _p in poi_list]
             _gp_round = 0
-            while len(poi_list) < _gp_want and _gp_round < 2:
-                _gp_round += 1
-                _need = _gp_want - len(poi_list)
-                _cands = propose_replacements(_gp_city, list(_gp_seen), _need, api_key,
-                                              kind='places to visit')
-                print(f"  [D556] Replenish round {_gp_round}: need {_need}, "
-                      f"proposed {len(_cands)}")
-                for _c in _cands:
-                    if len(poi_list) >= _gp_want:
-                        break
-                    _cn = _c['name']
-                    if _cn.lower() in _gp_seen:
-                        continue
-                    _gp_seen.add(_cn.lower())
-                    _np = _new_poi(_cn)
-                    if _c.get('why'):
-                        _np['_replenish_why'] = _c['why']
-                        _DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
-                            'snippet': f"{_cn}: {_c['why']}", 'title': _cn,
-                            'link': '', 'source': 'replenishment_rationale'})
-                    poi_list.append(_np)
-                    print(f"  [D556]   ADDED '{_cn[:44]}' — {_c.get('why','')[:60]}")
-                if not _cands:
-                    break
-            if len(poi_list) < _gp_want:
-                print(f"  [D556] ⚠️  Still short: {len(poi_list)}/{_gp_want} after "
-                      f"{_gp_round} round(s)")
+            # [D558] Michael, 2026-08-30: "make sure that the stops we obtain by
+            # replenishment are validated the same way as the original and then
+            # substituted if invalid — seems like a loop to me."
+            #
+            # It was not a loop. D556 proposed once, appended, and let PHASE 5.6
+            # judge the result several thousand lines later — by which point a
+            # rejected stop could not be replaced, because descriptions were
+            # already written. So a replacement that was itself out of area put
+            # the tour right back to short, which is the 6-asked-4-delivered bug
+            # reappearing one layer down.
+            #
+            # Now: propose -> validate against the SAME scope by the SAME function
+            # -> keep the survivors -> go round again for whatever is still
+            # missing. PHASE 5.6 stays where it is as the final backstop.
+            _gp_scope = _resolve_scope_for_check(intent, location, tour_category,
+                                                 _museum_venue_name, quiet=True)
+            def _gp_propose(_need, _seen):
+                return propose_replacements(_gp_city, list(_seen), _need, api_key,
+                                            kind='places to visit')
+
+            def _gp_on_add(_poi):
+                if _poi.get('_replenish_why'):
+                    _DIRECT_SNIPPETS_PER_STOP.setdefault(_poi['name'], []).append({
+                        'snippet': f"{_poi['name']}: {_poi['_replenish_why']}",
+                        'title': _poi['name'], 'link': '',
+                        'source': 'replenishment_rationale'})
+
+            _gp_added, _gp_rejected, _gp_round = replenish_to_count(
+                poi_list, _gp_want, _gp_scope, headers,
+                propose=_gp_propose, make_poi=_new_poi,
+                seen=_gp_seen, on_add=_gp_on_add)
 
             # Lore for every stop, not only replenished ones — the Cimiez tour had
             # no story retrieval at all.
@@ -9423,6 +9549,75 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _hi = sum(1 for f in _gr['facts'] if f.get('confidence') == 'high')
                 print(f"  [D556] +{len(_gr['facts'])} story fact(s) for '{_gn[:40]}' "
                       f"via {_gr['provider']} ({_hi} high)")
+
+            # ---- [D558] PATH CORRECTION, after the set is final ----
+            # Michael, 2026-08-30: "After we got all the stories we managed to
+            # obtain, then we need to make sure that the path from stop to stop
+            # makes sense... if some stops needed to be substituted, then we get
+            # new set that needs to be path-corrected if needed."
+            #
+            # The route was ordered in PHASE 3B (_compute_route_order, lines ~8511
+            # and ~8992) — both BEFORE this block existed. Replenished stops were
+            # appended to the end of the list and never re-ordered, so a stop
+            # added here could sit last on the itinerary while standing first on
+            # the ground. That is the zigzag.
+            _gp_names_now = [p.get('name', '') for p in poi_list]
+            if _gp_names_now != _gp_initial and len(poi_list) >= 3:
+                # Routing needs coordinates, and a replenished stop has none yet.
+                # Without this the new stops are exactly the ones _compute_route_order
+                # cannot place, and it would keep them where they were appended —
+                # a no-op precisely where the correction is needed.
+                _gp_nocoord = [p for p in poi_list if not p.get('coordinates')]
+                if _gp_nocoord:
+                    try:
+                        _gp_coord_fn = _fetch_coords
+                    except NameError:
+                        _gp_coord_fn = None   # PHASE 3A/3B raised before defining it
+                    if _gp_coord_fn:
+                        print(f"  [D558] Fetching coordinates for {len(_gp_nocoord)} "
+                              f"replenished stop(s) so the route can place them...")
+                        with ThreadPoolExecutor(max_workers=min(len(_gp_nocoord), 5)) as _gp_ex:
+                            _gp_futs = {_gp_ex.submit(_gp_coord_fn, _p): _p for _p in _gp_nocoord}
+                            for _fut in as_completed(_gp_futs):
+                                _pr, _cr, _tok = _fut.result()
+                                if _cr:
+                                    _pr['coordinates'] = _cr
+                                    total_tokens += _tok
+                                    total_cost += _tour_llm_cost(_tok)
+                                    print(f"  [D558]   coords OK '{_pr['name'][:40]}': {_cr}")
+                                else:
+                                    print(f"  [D558]   coords FAILED '{_pr['name'][:40]}' — "
+                                          f"this stop keeps its current position")
+                    else:
+                        print(f"  [D558] coordinate fallback unavailable — routing will "
+                              f"keep {len(_gp_nocoord)} stop(s) in place")
+
+                _gp_prev_before = {p.get('name', ''): (poi_list[i - 1].get('name', '') if i else '')
+                                   for i, p in enumerate(poi_list)}
+                poi_list = _compute_route_order(poi_list)
+                _gp_order_after = [p.get('name', '') for p in poi_list]
+                if _gp_order_after != _gp_names_now:
+                    print(f"  [D558] Route re-ordered after replenishment: "
+                          f"{' -> '.join(n[:18] for n in _gp_order_after)}")
+                else:
+                    print(f"  [D558] Route order already correct after replenishment")
+
+                # Directions written by PHASE 3B describe travel from the PREVIOUS
+                # stop. Any stop whose predecessor changed now carries directions
+                # to the wrong place. In storied mode they are regenerated from
+                # the final adjacency at output time; clearing them is what keeps
+                # the non-storied path from shipping a wrong turn.
+                _gp_stale = 0
+                for _i, _p in enumerate(poi_list):
+                    _prev_now = poi_list[_i - 1].get('name', '') if _i else ''
+                    if _gp_prev_before.get(_p.get('name', ''), '') != _prev_now and _p.get('directions'):
+                        _p['directions'] = ''
+                        _gp_stale += 1
+                if _gp_stale:
+                    print(f"  [D558] Cleared {_gp_stale} stale direction(s) — their "
+                          f"preceding stop changed")
+                for _i, _p in enumerate(poi_list):
+                    _p['stop_number'] = _i + 1
         except ImportError as _gp_err:
             _import_logger.error(f"[D556] MISSING module — replenishment and lore "
                                  f"DISABLED for {tour_category}: {_gp_err}")
@@ -14930,19 +15125,10 @@ REWRITE RULES (all mandatory):
 
     # PHASE 5.6: Geographic-scope containment — only when the museum guard did NOT run
     if not (tour_category == 'museum' and _museum_venue_name):
-        # Use geographic_scope if precision is tight enough (BUILDING or DISTRICT)
-        _scope_for_check = ''
-        if intent and intent.get('geographic_scope') and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT', 'CORRIDOR'):
-            _scope_for_check = intent['geographic_scope']
-        # [D536] Refuse a scope that is only a named stop on the route.
-        if _scope_for_check and scope_is_a_waypoint(_scope_for_check, location):
-            _wider = (intent.get('location') or '').strip() if intent else ''
-            print(f"\n  [D536] SCOPE REFUSED: '{_scope_for_check}' is named in the request as a "
-                  f"STOP, not as the tour's extent — it cannot contain the tour that visits it.")
-            if _wider and _norm_place(_wider) != _norm_place(_scope_for_check):
-                print(f"  [D536] Falling back to the tour's stated area: '{_wider}' "
-                      f"(too wide for a stop-by-stop containment check — skipping PHASE 5.6)")
-            _scope_for_check = ''
+        # [D558] Same resolver the replenishment loop uses — "validated the same
+        # way as the original" has to mean the same code, not a second copy.
+        _scope_for_check = _resolve_scope_for_check(intent, location, tour_category,
+                                                    _museum_venue_name)
         if _scope_for_check:
             _before = len(poi_list)
             print(f"\nPHASE 5.6: Validating stops are within '{_scope_for_check}'...")

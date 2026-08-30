@@ -31,6 +31,7 @@ with the exact JSON, so LEAD can commit it permanently.
 import json
 import os
 import re
+import threading
 import unicodedata
 from datetime import datetime, timezone
 
@@ -38,6 +39,7 @@ _CORPUS_BASENAME = os.path.join('tests', 'known_out_of_scope.json')
 
 _CACHE = None
 _CACHE_PATH = None
+_LOAD_LOCK = threading.Lock()
 
 
 def _fold(s):
@@ -57,19 +59,33 @@ def _candidate_paths():
 
 
 def _load():
-    """Load the corpus once, remembering which path it came from so writes go back there."""
+    """Load the corpus once, remembering which path it came from so writes go back there.
+
+    [D558] Publish the list only when it is fully built. The first version assigned
+    `_CACHE = []` and *then* filled it, so a second thread arriving in between saw a
+    non-None empty cache and reported "not on record". `_validate_stops_within_scope`
+    checks stops on a ThreadPoolExecutor, so this was not theoretical: with Villa
+    Leopolda and the Chapelle du Rosaire vetted in the same batch, one hit the corpus
+    and the other fell through to the LLM. Caught by
+    test_a_candidate_batch_can_be_rejected_entirely.
+    """
     global _CACHE, _CACHE_PATH
     if _CACHE is not None:
         return _CACHE
-    _CACHE = []
-    for cand in _candidate_paths():
-        try:
-            with open(cand, encoding='utf-8') as fh:
-                _CACHE = json.load(fh).get('venues', [])
-            _CACHE_PATH = cand
-            break
-        except Exception:
-            continue
+    with _LOAD_LOCK:
+        if _CACHE is not None:          # another thread finished while we waited
+            return _CACHE
+        loaded, path = [], None
+        for cand in _candidate_paths():
+            try:
+                with open(cand, encoding='utf-8') as fh:
+                    loaded = json.load(fh).get('venues', [])
+                path = cand
+                break
+            except Exception:
+                continue
+        _CACHE_PATH = path
+        _CACHE = loaded                 # single assignment, fully populated
     return _CACHE
 
 

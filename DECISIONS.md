@@ -22541,3 +22541,98 @@ minutes apart against one running container. Every write also prints
 2. Extend "tell two episodes properly" beyond restaurants (Chagall, Musée National du Sport
    failed the story gate on 7 and 8 retrieved facts).
 3. Demote `closure_scan` to advisory — three false positives, zero unique true positives.
+
+## D558 — Replenishment is a loop now, and the path is corrected after it
+
+**2026-08-30. Michael:** *"Please make sure that the stops we obtain by replenishment are
+validated the same way as the original and then substituted if invalid — seems like a loop to me.
+After we got all the stories we managed to obtain, then we need to make sure that the path from
+stop to stop makes sense... if some stops needed to be substituted, then we get new set that needs
+to be path-corrected if needed."*
+
+**He was right that it was not a loop.** D556 proposed once, appended the results to the END of
+`poi_list`, and left PHASE 5.6 to judge them ~5,500 lines later — by which point descriptions were
+written and a rejected stop could not be replaced. **A replacement that was itself out of area put
+the tour straight back to short: the 6-asked-4-delivered bug, one layer down.** And nothing
+re-ordered the route, so a replenished stop sat last on the itinerary while standing first on the
+ground.
+
+### Shipped
+
+- **`replenish_to_count()` — module scope**, not inline. Propose → validate → keep survivors → go
+  round again for whatever is still missing, max 3 rounds. Rejected names go into `seen` so a round
+  is never spent re-offering them.
+- **`_resolve_scope_for_check()`** — one function deciding what a tour's containment scope is.
+  PHASE 5.6 and the replenishment loop both call it. *"The same way as the original"* has to mean
+  the same code; a second copy is how two checks drift apart.
+- **`protect_first=False`** on the candidate-vetting call. The keep-stop-0 rule is graceful
+  degradation for a WHOLE tour — never leave the listener with nothing. Applied to a candidate
+  batch it waves through whichever name the proposer returned first, which is precisely the stop
+  the loop exists to reject.
+- **Path correction after the set is final**: fetch coordinates for replenished stops (without
+  them `_compute_route_order` cannot place the new stops and no-ops exactly where correction is
+  needed), re-run the route order, then **clear directions whose preceding stop changed** —
+  PHASE 3B wrote those against the old adjacency.
+
+### Two defects found by the tests, not by review
+
+**1. A race in D557's corpus loader.** `_load()` assigned `_CACHE = []` and *then* filled it, so a
+second thread arriving in between saw a non-None empty cache and reported "not on record".
+`_validate_stops_within_scope` vets on a ThreadPoolExecutor, so this was live: with Villa Leopolda
+and the Chapelle du Rosaire in one batch, **one hit the corpus and the other fell through to the
+LLM.** Fixed with a lock and a single assignment of the fully-built list.
+
+**2. The first D558 suite could not fail — written the same day as a decision about that.**
+Reverting `protect_first` at the call site left all 10 tests green, because they exercised
+`_validate_stops_within_scope` directly and never the loop. **This is D418/D421 exactly.** The
+remedy was D421's: lift the logic to module scope and test the real function. `propose` and
+`make_poi` are injected because they need a network and the enclosing closure; **validation is
+deliberately NOT injected** — validating the same way as the original is the point, so the test
+must exercise it.
+
+### Evidence
+
+- `tests/test_d558_replenish_loop.py` — **17/17 green**, `test_d557` 16/16, closure suite,
+  `test_sq4_merge`, `test_palais_fix_lead_fixture` all still green.
+- **Break-the-code, both ways:** reverting `protect_first` turns 4 red; reducing the loop to one
+  shot (D556's behaviour) turns 3 red.
+- **In the container**, `audioura-tour-generator-1` rebuilt (`manifest_ok: true`, build
+  `2026-08-30T16:07Z`), invalid API key on purpose:
+  ```
+  [D556] Replenish round 1: need 1, proposed 1
+   X SCOPE-CHECK REMOVED 'Villa Leopolda' — [scope-memory] ...
+  [D558] Replenishment scope check: 0/1 candidate(s) inside 'Cimiez District, Nice'
+  [D556] Replenish round 2: need 1, proposed 1
+  [D556]   ADDED 'Arenes de Cimiez' — roman arena
+  RESULT stops= ['Matisse Museum', 'Cimiez Monastery', 'Arenes de Cimiez']  added 1 rejected 1 rounds 2
+  ```
+
+### NEW DEFECT, on the record — route ordering strands an endpoint
+
+Four stops along one road, handed in scrambled: `_compute_route_order` returns **B → C → D → A** —
+up the hill and all the way back down. 1.64 km against 1.1 km for A→B→C→D. It starts from the stop
+nearest the **centroid** and runs nearest-neighbour; 2-opt cannot repair a bad start on an open
+path, so a collinear route reliably strands one endpoint.
+
+**This is LOCAL-7 behaviour, older than D558 and not introduced by it** — but it is squarely on what
+Michael asked for ("so zigzags would not happen"). Reordering still shortens the walk, which is
+what `test_a_scrambled_route_comes_back_shorter` asserts; the suboptimality is pinned by
+`test_route_ordering_is_not_optimal`, which is written to FAIL when someone fixes it. The fix is to
+try every endpoint as a start, or run 2-opt with a free start — cheap at these stop counts.
+
+### Also answered this session
+
+- **The "Crêpe Suzette complaint" was about DEPTH, never about removing the story.** Michael, D551:
+  *"we started but then abruptly stopped without explaining who Suzette was."* The episode's later
+  disappearance is a **separate** issue — D555: it came back `[low]` confidence one run and lost to
+  two `high` ones. Story selection is confidence-ranked and unstable; a story he values will come
+  and go. Still open.
+- **Addresses are model-generated, with no geocoding step at all.** PHASE 3B's schema asks GPT for
+  `"address": "<complete street address with ZIP>"` outright. Coordinates have a Wikidata P625 path
+  for *verified* stops only. That is why Villa Leopolda shipped as "Avenue de la Villa Leopolda,
+  06000 Nice" and the Musée National du Sport as "Boulevard des Jardins de Cimiez" — a mangle of
+  the real Boulevard des Jardiniers, 7 km away. **And the scope-check prompt tells the judge the
+  address is "a verified fact… answer true regardless of what you recall about the name"** — so an
+  invented Cimiez address instructs the judge to discard the correct answer it holds. That is the
+  leading explanation for `PHASE 5.6: 6/6 within scope` on a tour with two stops outside Cimiez.
+  **Next.**
