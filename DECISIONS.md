@@ -22359,3 +22359,62 @@ regnal names · four practical facts present · 873 words.
 
 **Open:** replenished-stop retrieval (highest value); no "contested fact" signal (Édouard vs André
 Michelin); `closure_scan` demote to advisory.
+
+---
+
+## D554/D555 — The short stop was arriving too late to be fed
+
+**2026-08-29. Michael: "so the problem is still Café de Paris: too short. Why?"**
+
+The log answered it exactly:
+
+```
+[D547] Pre-spine drop 'Joel Robuchon'   <- 3 candidates
+[D547] Pre-spine drop 'Le Vistamar'     <- down to 1
+[Storied] Fact sheets: 1/1 generated    <- built for ONE stop
+[D545]   ADDED 'Café de Paris'          <- arrives AFTER
+```
+
+Two dead venues dropped, fact sheets built for the lone survivor, replenishment then added stops
+that had missed fact sheets, corpus mining and the story search. **Le Louis XV entered Phase 5 with
+a fact sheet and ranked corpus and wrote 465 words; Café de Paris entered with 4 snippets and wrote
+159.** Every length fix before this was treating a symptom — the stop list was being VETTED AFTER
+the material was gathered for it.
+
+**D554:** the whole vetting block — corpus drops, closure checks, practicals, replenishment, lore —
+now runs BEFORE the spine and fact sheets. Le Grill went **249 -> 382** immediately. Dependencies
+checked before moving (only `poi_list`, `location`, `api_key`, `tour_category`, `_new_poi`), order
+asserted in source afterwards.
+
+**D555:** Rampoldi still failed — `No RAG context ... cannot generate fact sheet` — while holding
+FIVE high-confidence Gemini episodes, because `generate_fact_sheet()` wants venue corpus or
+artist/period context and lore was neither. **Material in hand and structurally invisible**, the
+same shape as D548. Lore is per-stop sourced prose, which is what `per_work_contexts` holds.
+
+### Result
+
+| | fact sheets | Louis XV | Le Grill | Café de Paris | total |
+|---|---|---|---|---|---|
+| before | 1/1 | 465 | 249 | **159** | 873 |
+| after | **3/3** | 367 | 285 | **383** | **1,035** |
+
+**Story gate 3/3 · all four practical facts on all three stops · no dead venues · no corrupted
+regnal names.** Longest and most even tour produced on this path.
+
+### Two honest observations
+
+1. **Story selection is confidence-dependent and unstable.** The Crêpe Suzette episode came back
+   `[low]` this run (it was `[high]` last run) and was passed over for two `high` ones — the 1883
+   woman who threatened to shoot herself on the terrace after losing 100,000 francs, and the 2,000
+   francs the casino paid to avoid the scene. Correct behaviour, but a story Michael valued will
+   come and go.
+2. **Length can be met with off-topic corpus material** — the stop drifts into SBM ownership detail
+   about the casino. The anti-padding clause bars invented atmosphere, not real-but-irrelevant
+   material.
+
+### Open
+
+`closure_scan` demote to advisory (3 false positives, 0 unique true positives) · no contested-fact
+signal (Édouard vs André Michelin) · confidence-driven story instability · off-topic length filler.
+
+**READY FOR MOBILE TESTING.**
