@@ -9330,6 +9330,86 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
 
 
+    # -------- [D556] REPLENISH + LORE for every OTHER tour type --------
+    # Michael, 2026-08-30: "fix all tour type as a replenishment is a general
+    # process for any tour."
+    #
+    # A walking tour of Cimiez asked for 6 stops and delivered 4. SCOPE-CHECK
+    # correctly removed Villa Leopolda (Villefranche-sur-Mer) and the Matisse
+    # Chapel (Vence) — both genuinely outside the district — and nothing replaced
+    # them, because replenishment was written restaurant-only.
+    #
+    # The same guard hid the stories: not one [D545] story-fact line appeared, so
+    # the tour scored 2/6 on the story gate while Gemini had the 1543 siege of the
+    # monastery and Saint Pontius in the Cemenelum arena waiting to be asked.
+    #
+    # Deliberately a SEPARATE block rather than widening the restaurant guard: the
+    # restaurant path wraps practicals, closure checks, replenishment and lore in
+    # one try/except, and splitting it cleanly failed twice. Duplication here is
+    # cheaper than destabilising a path Michael has accepted.
+    #
+    # PRACTICALS are not repeated — opening hours and a price band are meaningless
+    # for a Roman ruin. MUSEUMS ARE EXCLUDED: they keep the object-focused
+    # retrieval Michael asked to protect.
+    if tour_category not in ('restaurant', 'museum'):
+        try:
+            from restaurant_practicals import propose_replacements
+            from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
+            _gp_city = location
+            _gp_want = _requested_stop_count_original or len(poi_list)
+            _gp_seen = {(_p.get('name') or '').lower() for _p in poi_list}
+            _gp_round = 0
+            while len(poi_list) < _gp_want and _gp_round < 2:
+                _gp_round += 1
+                _need = _gp_want - len(poi_list)
+                _cands = propose_replacements(_gp_city, list(_gp_seen), _need, api_key,
+                                              kind='places to visit')
+                print(f"  [D556] Replenish round {_gp_round}: need {_need}, "
+                      f"proposed {len(_cands)}")
+                for _c in _cands:
+                    if len(poi_list) >= _gp_want:
+                        break
+                    _cn = _c['name']
+                    if _cn.lower() in _gp_seen:
+                        continue
+                    _gp_seen.add(_cn.lower())
+                    _np = _new_poi(_cn)
+                    if _c.get('why'):
+                        _np['_replenish_why'] = _c['why']
+                        _DIRECT_SNIPPETS_PER_STOP.setdefault(_cn, []).append({
+                            'snippet': f"{_cn}: {_c['why']}", 'title': _cn,
+                            'link': '', 'source': 'replenishment_rationale'})
+                    poi_list.append(_np)
+                    print(f"  [D556]   ADDED '{_cn[:44]}' — {_c.get('why','')[:60]}")
+                if not _cands:
+                    break
+            if len(poi_list) < _gp_want:
+                print(f"  [D556] ⚠️  Still short: {len(poi_list)}/{_gp_want} after "
+                      f"{_gp_round} round(s)")
+
+            # Lore for every stop, not only replenished ones — the Cimiez tour had
+            # no story retrieval at all.
+            for _gp in poi_list:
+                _gn = _gp.get('name', '')
+                if not _gn or _gp.get('_lore'):
+                    continue
+                _gr = fetch_stop_knowledge(_gn, _gp_city, api_key, focus='place')
+                if not _gr.get('ok'):
+                    print(f"  [D556] no lore for '{_gn[:40]}': {_gr.get('reason','')[:50]}")
+                    continue
+                _gp['_lore'] = _gr['facts']
+                _DIRECT_SNIPPETS_PER_STOP.setdefault(_gn, []).extend(
+                    facts_as_snippets(_gr, _gn))
+                _hi = sum(1 for f in _gr['facts'] if f.get('confidence') == 'high')
+                print(f"  [D556] +{len(_gr['facts'])} story fact(s) for '{_gn[:40]}' "
+                      f"via {_gr['provider']} ({_hi} high)")
+        except ImportError as _gp_err:
+            _import_logger.error(f"[D556] MISSING module — replenishment and lore "
+                                 f"DISABLED for {tour_category}: {_gp_err}")
+        except Exception as _gp_err:
+            print(f"  [D556] Replenish/lore error (non-fatal): {_gp_err}")
+
+
     def _with_lore_context(per_work: dict, pois: list) -> dict:
         """[D555] Retrieved lore counts as context for fact-sheet generation.
 

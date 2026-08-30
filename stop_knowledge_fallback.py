@@ -207,8 +207,18 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
     except Exception as e:
         return None, f"gemini unavailable: {e}"
     try:
-        if focus == 'restaurant':
-            # [D551] RESTAURANTS ONLY. Michael, 2026-08-29: "Just make sure that this
+        if focus in ('restaurant', 'place'):
+            # [D556] Restaurants AND places. Michael's D551 instruction was
+            # "restaurants only", and his stated REASON was museums: "it would
+            # not make sense for museums or museum stops. We did a good job with
+            # museums and I do not want to damage it." I narrowed it past his
+            # intent and took walking tours out with them — so the Cimiez tour got
+            # no story retrieval at all and scored 2/6.
+            #
+            # MUSEUMS REMAIN EXCLUDED: they call with focus='object' and never
+            # reach this branch. That is the protection he asked for, intact.
+            #
+            # [D551] originally RESTAURANTS ONLY. Michael, 2026-08-29: "Just make sure that this
             # question is about restaurants only as it would not make sense for museums
             # or museum stops. We did a good job with museums and I do not want to damage
             # it by this development."

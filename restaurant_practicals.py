@@ -557,25 +557,37 @@ def practicals_prompt_block(p):
 # ---------------------------------------------------------------------------
 
 _REPLACE_SYSTEM = (
-    "You name real restaurants for an audio walking tour. Return ONLY establishments that are "
-    "CURRENTLY OPEN and that a visitor could walk into this month.\n"
+    "You name real {kind} for an audio walking tour. Return ONLY places that CURRENTLY EXIST and "
+    "that a visitor could reach this month.\n"
     "\n"
     "Rules:\n"
-    "- Real, specific, named restaurants. No categories, no invented names.\n"
-    "- Do NOT return any name on the exclusion list, or a rebranded version of one.\n"
-    "- Prefer places with a STORY: a founding dare, a famous regular, a chef who trained there, "
-    "a wartime episode, a ritual the room is known for. A tour needs something to say.\n"
-    "- If you are not confident a place is still open under that name, leave it out.\n"
+    "- Real, specific, named places. No categories, no invented names.\n"
+    "- Do NOT return any name on the exclusion list, or a renamed version of one.\n"
+    "- They must be INSIDE the area named below. A famous place in the next town is the single "
+    "most common mistake here and it gets the stop deleted later.\n"
+    "- Prefer places with a STORY: a founding, a siege, a famous resident, a scandal, a disaster, "
+    "a first. A tour needs something to say.\n"
+    "- If you are not confident a place still exists under that name, leave it out.\n"
     "\n"
-    'Return ONLY JSON: {"restaurants": [{"name": "", "why": "<the story in one clause>"}]}'
+    'Return ONLY JSON: {{"places": [{{"name": "", "why": "<the story in one clause>"}}]}}'
 )
 
 
-def propose_replacements(city, exclude, n, api_key, model=None, timeout=45):
-    """Name `n` more real, open restaurants in `city`, excluding `exclude`.
+def propose_replacements(city, exclude, n, api_key, model=None, timeout=45,
+                         kind='restaurants'):
+    """Name `n` more real, currently-existing places in `city`, excluding `exclude`.
 
-    Returns a list of {'name','why'}. Never raises; an empty list simply means the
-    tour stays short and the D536 shortfall notice reports it honestly.
+    [D556] Michael, 2026-08-30: "fix all tour type as a replenishment is a general
+    process for any tour." A walking tour of Cimiez asked for 6 stops and got 4 —
+    the scope check correctly removed Villa Leopolda (Villefranche-sur-Mer) and the
+    Matisse Chapel (Vence), and nothing replaced them, because this was written
+    restaurant-only.
+
+    `kind` is the noun the model is asked for: "restaurants", "places to visit",
+    "landmarks". Everything else is identical.
+
+    Returns a list of {'name','why'}. Never raises; an empty list means the tour
+    stays short and the D536 shortfall notice reports it honestly.
     """
     if not city or n <= 0 or not api_key:
         return []
@@ -588,9 +600,9 @@ def propose_replacements(city, exclude, n, api_key, model=None, timeout=45):
             data=json.dumps({
                 "model": model or os.environ.get("TOUR_PRACTICALS_MODEL", "gpt-4o"),
                 "messages": [
-                    {"role": "system", "content": _REPLACE_SYSTEM},
+                    {"role": "system", "content": _REPLACE_SYSTEM.format(kind=kind)},
                     {"role": "user", "content":
-                        f"City: {city}\nExclude: {_ex}\n\nName {n + 2} restaurants."},
+                        f"Area: {city}\nExclude: {_ex}\n\nName {n + 2} {kind} INSIDE that area."},
                 ],
                 "temperature": 0.3, "seed": 7, "max_tokens": 600,
                 "response_format": {"type": "json_object"},
@@ -599,9 +611,9 @@ def propose_replacements(city, exclude, n, api_key, model=None, timeout=45):
         )
         if resp.status_code != 200:
             return []
+        _d = json.loads(resp.json()["choices"][0]["message"]["content"])
         out = []
-        for r in (json.loads(resp.json()["choices"][0]["message"]["content"])
-                  .get('restaurants') or []):
+        for r in (_d.get('places') or _d.get('restaurants') or []):
             nm = (r.get('name') or '').strip() if isinstance(r, dict) else str(r).strip()
             if nm:
                 out.append({'name': nm,
