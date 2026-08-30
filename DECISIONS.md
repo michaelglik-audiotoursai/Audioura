@@ -22180,3 +22180,72 @@ function, a module that died on import in the container while passing every host
 **Every one was hidden by a try/except that turned a hard failure into a silent downgrade, and
 every one was found by reading tour output rather than by a green suite.** The practice that
 catches them: **run it in the container it ships to, and show the log line where the code fired.**
+
+---
+
+## D550 — The engineered prompt was suppressing the stories
+
+**2026-08-29. Michael: "Did you ask the question to Gemini as I did last time?"** No. LEAD sent an
+instruction block ending in `Return ONLY JSON`. Measured, same model, same restaurant, same day:
+
+```
+LEAD's prompt : "Chef Dominique Lory crafts a refined menu ... Ducasse began at
+                 Pavillon Landais in 1972."
+
+Michael's     : "The sliding roof retracts in under three minutes. When it debuted
+                 on 31 May 1959, Prince Rainier III and Princess Grace cut the
+                 ribbon ... Aristotle Onassis, majority shareholder of the SBM and
+                 often at odds with Rainier over control of Monaco, pushed to build
+                 the most extravagant rooftop in the Mediterranean to woo Maria
+                 Callas."
+```
+
+**A wall of rules plus a JSON schema makes the model cautious and list-shaped. A short natural
+question with an honesty caveat lets it tell what it knows.** LEAD had assumed more instruction
+meant better output; the measurement says the opposite, and that assumption cost several
+iterations.
+
+**Fix:** ask his question verbatim, take prose, structure it in a second pass **forbidden to add
+anything the prose does not contain** — hedges preserved, not promoted to fact.
+
+### The four causes, each hiding the next
+
+Michael asked "why are there no stories" four times before it was answered:
+
+1. `_gemini_facts()` asked about a MUSEUM OBJECT for every stop (D548).
+2. Episodes were offered as context, never required — they entered as snippets the ranker could
+   score `usable=0` (D548).
+3. **`story_leads.py` opened `.env` at module import; `.env` is in `.dockerignore`, so the import
+   raised inside the container and every caller's try/except swallowed it. Gemini had NEVER run in
+   production while passing every host test** (D549).
+4. The prompt itself (this decision).
+
+### Result
+
+3 of 3 stops. **All four practical facts on all three.** A named person and a date in all three.
+**Story gate 2/3 — the best on any path in this project.** All lore via `gemini`.
+
+> *"Opened on May 31, 1959 ... inaugurated by none other than Prince Rainier III and Princess
+> Grace, accompanied by the illustrious Aristotle Onassis and Tina Livanos."*
+> *"In 1896, a dessert accident here involving the Prince of Wales led to the creation of the
+> famous Crêpe Suzette ... Sergei Diaghilev and the Ballets Russes, including Vaslav Nijinsky and
+> Tamara Karsavina, gathered here."*
+
+**READY FOR MOBILE TESTING.**
+
+### Open, none blocking
+
+- Story gate 2/3 — Le Grill has the episode but not a full arc.
+- **`closure_scan`: three false positives this week, zero true positives the corpus had not already
+  caught. DEMOTE TO ADVISORY.**
+- Replenished stops arrive thinner — practicals and lore but no corpus material.
+
+### Two practices for Subscribed
+
+**Eleven failures this week, one shape: correct code running nowhere that mattered**, every one
+hidden by a try/except that turned a hard failure into a silent downgrade, every one found by
+reading tour output rather than by a green suite.
+
+1. **Run it in the container it ships to, and show the log line where the code fired.**
+2. **When a human gets a better answer than the system, compare the two prompts before assuming the
+   system needs more logic.**
