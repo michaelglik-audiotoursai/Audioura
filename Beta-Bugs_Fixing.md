@@ -15,11 +15,36 @@ briefing. Work top to bottom.
 > | [`wdvrdaxmq3`](https://app.clickup.com/t/wdvrdaxmq3) map numbering | **complete** — `WORKS AS DESIGNED — confusing` |
 > | [`wdvrdaxqjn`](https://app.clickup.com/t/wdvrdaxqjn) wrong coordinates | **complete** |
 >
-> **Still worth checking the DM channel `2ky4d0u8-919` at session start.** Michael gets
-> ClickUp's email alerts; this session gets nothing, and the only way to learn Yury has
-> said anything is to look. If he now reports one of these as still broken, **check when
-> his tour was generated before treating it as a regression** — every fix is in the
-> generator, so a tour downloaded earlier keeps the old HTML and coordinates.
+> ### 🔔 STILL DO THIS AT SESSION START — check ALL tester channels, not just Yury's
+>
+> Michael gets ClickUp's email alerts; this session gets **nothing**. The only way to
+> learn a tester said anything is to look.
+>
+> **There are three testers, not one.** Until 2026-08-30 this check covered only Yury,
+> and a channel Greg created on 2026-08-24 had gone unread for six days. It happened to
+> be empty — but that was luck, not process.
+>
+> | tester | id | DM channel | as of 2026-08-31 |
+> |---|---|---|---|
+> | Yury Makedonov | `101707192` | `2ky4d0u8-919` | last message **2026-08-16** |
+> | Gregory Lepsky | `101714111` | `2ky4d0u8-999` | **0 messages, ever** |
+> | igor linkov | `101715779` | **none exists** | never contacted |
+>
+> **Do not hardcode the channel list.** Enumerate it, so a new tester cannot be missed:
+>
+> ```
+> clickup_get_workspace_members          -> tester ids
+> clickup_get_chat_channels              -> find DMs whose creator is a tester id
+> clickup_get_chat_channel_messages      -> read each
+> ```
+>
+> Greg and Igor have **no tasks assigned and have never been asked to test anything** —
+> see [`wdvrdaxxrd`](https://app.clickup.com/t/wdvrdaxxrd), which holds ready-to-send
+> onboarding drafts for both. Their silence is not a signal.
+>
+> If a tester reports one of the closed bugs as still broken, **check when their tour
+> was generated before treating it as a regression** — every fix is in the generator, so
+> a tour downloaded earlier keeps the old HTML and coordinates.
 >
 > Two follow-ups stay open by design: `wdvrdaxnc5` (merge overlapping pins) and
 > `wdvrdaxqtf` (real place database + confirmed-vs-estimated markers), both Storied.
