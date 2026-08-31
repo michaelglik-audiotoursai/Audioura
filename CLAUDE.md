@@ -165,6 +165,32 @@ needs to tell them apart at a glance.
 A restarted session inherits its name from this table by the directory and work it
 picks up. If a new track is added, name it here first.
 
+## HOW THE SESSIONS ACTUALLY TALK TO EACH OTHER (2026-08-30)
+
+Michael asked how a warning from one session reaches another. **Three channels, and
+only three. Nothing said in one session's chat is visible to any other.**
+
+| channel | carries | rule |
+|---|---|---|
+| **ClickUp task descriptions** | the assignment, the reasoning, the acceptance criteria | Every task starts with `**Agent:** <ID>`. A session works its own list. |
+| **GitHub** | the code | **A branch that is not pushed does not exist to the other machine.** |
+| **The repo's own markdown** | durable rulings — `DECISIONS.md`, this file, `TRACK_B_STORIED_VS_BETA.md` | Reachable only after a `git pull`. |
+
+**The failure this rule exists to prevent, 2026-08-30:** LEAD wrote into the GCloud
+deploy task that `LOCAL-470` carries the reversed-coordinate fix and must not be
+missed — while `LOCAL-470` existed **only as a local worktree branch on the Mac
+Mini**. The Windows session could have read the warning, gone looking, and found
+nothing. A cross-machine reference to a branch is worthless until `git push`.
+
+**So: push the branch FIRST, then write the ClickUp note that names it.** In that
+order, and name the exact branch and commit, never "the recent work".
+
+**Machine constraints that cannot be worked around:**
+- **iOS/Xcode builds require macOS.** The Mac Mini is the only machine that can
+  produce an IPA. Never assign an iOS build to the Windows laptop.
+- Docker images are architecture-specific and are never shared between machines;
+  each machine builds its own.
+
 **The prefix is not optional and not cosmetic.** Michael runs several of these at once and
 sorts them by that first token. A session that omits it is unidentifiable in a screenshot
 or a pasted log — which is exactly how "Claude-Beta" and "Beta_Bugs" ended up being the
