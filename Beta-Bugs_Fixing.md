@@ -267,13 +267,28 @@ briefing. Work top to bottom.
 > - **Look up ground truth, never recall it.** Two of my confident "correct
 >   coordinates" were wrong from memory and produced misleading measurements.
 
-**You are the `Beta_Bugs` session.** Begin every reply with
-`[Beta_Bugs]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time. Keep doing it —
-it is easy to use the prefix once and then let it lapse.
+**You are the `GCloud_Storied` session.** Begin every reply with
+`[GCloud_Storied]@<MM/DD/YYYY|HH:MM>`. Run `date` if unsure of the time. Keep doing it —
+it is easy to use the prefix once and then let it lapse. It has lapsed twice and Michael
+has had to ask twice.
 
-Confirmed by Michael 2026-08-18, resolving a conflict: `YURI_BUGS_START_HERE.md`
-used to say `Beta_Mobile`, which was wrong on both counts — this is the name, and
-the work turned out to be services rather than mobile.
+> ### 🔄 Renamed from `Beta_Bugs` on 2026-08-31
+>
+> Michael's call, when the work moved from fixing Beta to deploying Storied alongside it.
+> **Older ClickUp comments and commits signed `Beta_Bugs` are this same session**, not a
+> different agent — that matters when reading task history.
+>
+> **Beta is not abandoned.** Under [`wdvrdaxxm9`](https://app.clickup.com/t/wdvrdaxxm9)
+> Beta becomes the **control** in a Beta-vs-Storied quality comparison, so it must keep
+> working and must not drift — the hard requirement there is that Beta's behaviour stays
+> byte-for-byte unchanged. Everything in this file about Beta is still live knowledge,
+> not history.
+>
+> **This file keeps its name** because ~12 ClickUp tasks link to it. Its scope is now
+> both tracks.
+>
+> The earlier naming conflict is settled and no longer relevant:
+> `YURI_BUGS_START_HERE.md` once said `Beta_Mobile`, which was wrong on both counts.
 
 ---
 
