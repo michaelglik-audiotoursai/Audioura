@@ -79,16 +79,24 @@ backup — re-run this check if the secrets are ever rotated.
 
 ## How bad is losing it
 
-**Check first: Play Console → Test and release → App integrity → App signing.**
-(It is *not* under a "Setup" menu; the console was reorganised.)
+**ANSWERED 2026-08-31: Play App Signing IS ENABLED.**
+
+Confirmed in Play Console → **Protected with Play → Play Store protection →
+Protect app signing key**, which reads **"Releases signed by Play"**. It is *not*
+under a "Setup" menu and not under App integrity — the console was reorganised.
+
+**So this `.jks` is only the UPLOAD key, not the app's identity.** Google holds the
+real signing key. Losing the upload key is recoverable: request an upload key reset
+in Play Console. That is the lower-severity row below, and it is the one we are in.
 
 | Play App Signing | consequence of losing the key | recovery |
 |---|---|---|
 | **enabled** | Google holds the real signing key; this `.jks` is only the *upload* key | request an upload key reset through Play Console — annoying, recoverable |
 | **not enabled** | this `.jks` **is** the app's identity | **unrecoverable.** New package name, new listing, all installs and reviews orphaned |
 
-**This is worth confirming and recording here**, because it decides how much ceremony the
-backup deserves. As of 2026-08-31 it has not been confirmed either way.
+The backup still matters — an upload key reset costs days of back-and-forth with Google
+and blocks releases meanwhile. But it is not existential, which is the answer to "how much
+ceremony does this deserve".
 
 ## Second custodian — still to do
 
