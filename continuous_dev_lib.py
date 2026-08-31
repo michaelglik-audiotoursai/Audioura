@@ -69,10 +69,10 @@ def check_and_record_reboot():
     """
     ensure_control_dir()
     current = get_boot_time()
-    previous = BOOT_FILE.read_text().strip() if BOOT_FILE.exists() else None
+    previous = BOOT_FILE.read_text(encoding="utf-8").strip() if BOOT_FILE.exists() else None
     rebooted = previous is not None and current is not None and current != previous
     if current is not None:
-        BOOT_FILE.write_text(current)
+        BOOT_FILE.write_text(current, encoding="utf-8")
     return rebooted
 
 

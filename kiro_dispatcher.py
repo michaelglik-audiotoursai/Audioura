@@ -78,7 +78,7 @@ def locked_append(text):
                     "dispatcher may be running -- appends are lock-protected, "
                     "manual edits are not.\n\n"
                 )
-            with open(LOG_FILE, "a") as fh:
+            with open(LOG_FILE, "a", encoding="utf-8") as fh:
                 fh.write(text if text.endswith("\n") else text + "\n")
         finally:
             portable_lock.unlock(lock_fh)
@@ -89,7 +89,7 @@ def last_status_for(task_filename):
     if not LOG_FILE.exists():
         return None, None
     last = (None, None)
-    for line in LOG_FILE.read_text().splitlines():
+    for line in LOG_FILE.read_text(encoding="utf-8").splitlines():
         m = STATUS_LINE_RE.match(line)
         if m and m.group(2) == task_filename:
             last = (m.group(1), line)
@@ -201,7 +201,7 @@ def worker_process_alive(task_filename):
     try:
         result = subprocess.run(
             ["pgrep", "-f", task_id],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
         )
         return bool(result.stdout.strip())
     except Exception:
@@ -230,7 +230,7 @@ def render_status(candidates, launched, paused, reboot_recovered, liveness_aband
         )
     block = "\n".join(lines)
 
-    existing = cdl.STATUS_FILE.read_text() if cdl.STATUS_FILE.exists() else (
+    existing = cdl.STATUS_FILE.read_text(encoding="utf-8") if cdl.STATUS_FILE.exists() else (
         "# Continuous Development Status\n\n"
         "<!-- DISPATCH STATUS START -->\n<!-- DISPATCH STATUS END -->\n\n"
         "<!-- REVIEW STATUS START -->\n(no review activity recorded yet)\n<!-- REVIEW STATUS END -->\n"
@@ -242,7 +242,7 @@ def render_status(candidates, launched, paused, reboot_recovered, liveness_aband
         existing,
         flags=re.DOTALL,
     )
-    cdl.STATUS_FILE.write_text(updated)
+    cdl.STATUS_FILE.write_text(updated, encoding="utf-8")
 
 
 def dispatch():
@@ -273,7 +273,7 @@ def dispatch():
 
         # Parse the base branch from the task file for the STARTED record.
         try:
-            prompt_text = task_path.read_text()
+            prompt_text = task_path.read_text(encoding="utf-8")
         except OSError:
             continue
         base = base_branch_for(prompt_text)
@@ -317,7 +317,7 @@ def find_session_id(prompt_title_prefix, cwd):
             ["kiro-cli", "chat", "--list-sessions", "--format", "json"],
             cwd=str(cwd),
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=30,
         ).stdout
         data = json.loads(out)
@@ -365,7 +365,7 @@ def validate_base_branch(base, cwd):
     """
     result = subprocess.run(
         ["git", "rev-parse", "--verify", base],
-        cwd=str(cwd), capture_output=True, text=True,
+        cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     if result.returncode != 0:
         return False, (
@@ -373,7 +373,7 @@ def validate_base_branch(base, cwd):
             f"Available local branches: "
             + subprocess.run(
                 ["git", "branch", "--format=%(refname:short)"],
-                cwd=str(cwd), capture_output=True, text=True,
+                cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
             ).stdout.strip().replace("\n", ", ")
         )
     return True, None
@@ -383,7 +383,7 @@ def resolve_base_sha(base, cwd):
     """Return the sha the base branch points at right now, or '' if unknown."""
     r = subprocess.run(
         ["git", "rev-parse", "--short", base],
-        cwd=str(cwd), capture_output=True, text=True,
+        cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     return r.stdout.strip() if r.returncode == 0 else ""
 
@@ -455,7 +455,7 @@ def setup_worktree(task_id, branch, base):
         cmd = ["git"] + GIT_LONGPATHS + ["worktree", "add", str(path), branch]
     else:
         cmd = ["git"] + GIT_LONGPATHS + ["worktree", "add", "-b", branch, str(path), base]
-    subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, check=True)
+    subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, encoding="utf-8", errors="replace", check=True)
 
     # [LOCAL-412 review] Link .env into the worktree.
     # .env is gitignored, so `git worktree add` never brings it across and every
@@ -500,7 +500,7 @@ def export_dotenv_into_environ():
     if not env_file.exists():
         return
     try:
-        for raw in env_file.read_text().splitlines():
+        for raw in env_file.read_text(encoding="utf-8").splitlines():
             line = raw.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
@@ -524,7 +524,7 @@ def worker(task_path_str):
         locked_append(f"- FAILED    | task={task_filename} | reason=file_missing_at_worker_start")
         return
 
-    prompt = task_path.read_text()
+    prompt = task_path.read_text(encoding="utf-8")
     if not prompt.strip():
         locked_append(f"- FAILED    | task={task_filename} | reason=empty_task_file")
         return
@@ -568,7 +568,7 @@ def worker(task_path_str):
                 cmd,
                 cwd=str(worktree_path),
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8", errors="replace",
                 timeout=MAX_RUNTIME_SECONDS,
             )
             exit_code = result.returncode
@@ -581,7 +581,7 @@ def worker(task_path_str):
     finally:
         sem.release()
 
-    session_log_path.write_text(strip_ansi(raw_output))
+    session_log_path.write_text(strip_ansi(raw_output), encoding="utf-8", errors="replace")
     duration_s = int(time.monotonic() - start_time)
 
     session_id = None
@@ -594,18 +594,18 @@ def worker(task_path_str):
     # own branch -- so record what the worktree really has.
     real_branch = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        cwd=str(worktree_path), capture_output=True, text=True,
+        cwd=str(worktree_path), capture_output=True, text=True, encoding="utf-8", errors="replace",
     ).stdout.strip() or branch
     stale = ""
     if base_sha:
         on_base = subprocess.run(
             ["git", "merge-base", "--is-ancestor", base_sha, "HEAD"],
-            cwd=str(worktree_path), capture_output=True, text=True,
+            cwd=str(worktree_path), capture_output=True, text=True, encoding="utf-8", errors="replace",
         ).returncode
         if on_base != 0:
             behind = subprocess.run(
                 ["git", "rev-list", "--count", f"HEAD..{base}"],
-                cwd=str(worktree_path), capture_output=True, text=True,
+                cwd=str(worktree_path), capture_output=True, text=True, encoding="utf-8", errors="replace",
             ).stdout.strip() or "?"
             stale = f" | *** STALE BASE: work is {behind} commits behind {base} ***"
 
@@ -634,7 +634,7 @@ def kiro_login_state():
     if not exe:
         return False, "kiro-cli is not on PATH"
     try:
-        r = subprocess.run([exe, "whoami"], capture_output=True, text=True, timeout=30)
+        r = subprocess.run([exe, "whoami"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     except Exception as e:
         return False, f"could not run `kiro-cli whoami`: {e}"
     out = ((r.stdout or "") + (r.stderr or "")).strip()
@@ -743,7 +743,7 @@ def _selftest_worktree_base():
     try:
         WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
         probe = WORKTREE_BASE / ".preflight_probe"
-        probe.write_text("x")
+        probe.write_text("x", encoding="utf-8")
         probe.unlink()
         return True
     except Exception:
