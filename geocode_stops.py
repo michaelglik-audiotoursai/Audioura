@@ -166,9 +166,56 @@ def _parse_stop(stop_text):
     return name, address, coords
 
 
-_COUNTRIES = {'australia', 'canada', 'usa', 'us', 'united states', 'united states of america',
-              'france', 'japan', 'uk', 'united kingdom', 'scotland', 'england', 'ireland',
-              'germany', 'italy', 'spain', 'netherlands'}
+# Countries, so a trailing country is never mistaken for the city.
+#
+# [LOCAL-470] Ported from Beta (origin/main). This was a 16-name set, which meant
+# every country outside it -- most of the world -- survived the filter and was
+# returned AS THE CITY: 'Madagascar', 'Brazil', 'Turkey', 'India', 'Kenya',
+# 'Argentina'. Wrong on 8 of 12 real address shapes; every one it got right
+# happened to be one of the 16. This is load-bearing for the reversed-coordinate
+# check below: fix_reversed_poi_list anchors on the city geocoded from the stops'
+# addresses, so if 'Madagascar' is returned instead of 'Antananarivo' the anchor
+# is a country centroid (or fails entirely) and the reversal is missed.
+#
+# A POSITIONAL RULE WAS TRIED FIRST AND REJECTED. "Drop the last component when
+# there are 3+" looks elegant and needs no data, but it beheads an address that
+# legitimately ends with a city: "Boston Common, 139 Tremont St, Boston" -> the
+# rule returns 'Boston Common'. Position cannot tell 'Boston' from 'Madagascar';
+# only knowledge can. The list is the honest tool. Country names are stable, so
+# the maintenance burden this was meant to avoid is close to zero.
+_COUNTRIES = {
+    'afghanistan', 'albania', 'algeria', 'andorra', 'angola', 'argentina', 'armenia',
+    'australia', 'austria', 'azerbaijan', 'bahamas', 'bahrain', 'bangladesh', 'barbados',
+    'belarus', 'belgium', 'belize', 'benin', 'bhutan', 'bolivia', 'bosnia',
+    'bosnia and herzegovina', 'botswana', 'brazil', 'brunei', 'bulgaria', 'burkina faso',
+    'burundi', 'cambodia', 'cameroon', 'canada', 'cape verde', 'chad', 'chile', 'china',
+    'colombia', 'congo', 'costa rica', 'croatia', 'cuba', 'cyprus', 'czechia',
+    'czech republic', 'denmark', 'djibouti', 'dominican republic', 'ecuador', 'egypt',
+    'el salvador', 'england', 'estonia', 'eswatini', 'ethiopia', 'fiji', 'finland',
+    'france', 'gabon', 'gambia', 'georgia', 'germany', 'ghana', 'gibraltar', 'greece',
+    'greenland', 'guatemala', 'guinea', 'guyana', 'haiti', 'honduras', 'hong kong',
+    'hungary', 'iceland', 'india', 'indonesia', 'iran', 'iraq', 'ireland', 'israel',
+    'italy', 'ivory coast', 'jamaica', 'japan', 'jordan', 'kazakhstan', 'kenya',
+    'kosovo', 'kuwait', 'kyrgyzstan', 'laos', 'latvia', 'lebanon', 'lesotho', 'liberia',
+    'libya', 'liechtenstein', 'lithuania', 'luxembourg', 'macau', 'madagascar', 'malawi',
+    'malaysia', 'maldives', 'mali', 'malta', 'mauritania', 'mauritius', 'mexico',
+    'moldova', 'monaco', 'mongolia', 'montenegro', 'morocco', 'mozambique', 'myanmar',
+    'namibia', 'nepal', 'netherlands', 'new zealand', 'nicaragua', 'niger', 'nigeria',
+    'north korea', 'north macedonia', 'northern ireland', 'norway', 'oman', 'pakistan',
+    'palestine', 'panama', 'papua new guinea', 'paraguay', 'peru', 'philippines',
+    'poland', 'portugal', 'puerto rico', 'qatar', 'romania', 'russia',
+    'russian federation', 'rwanda', 'saudi arabia', 'scotland', 'senegal', 'serbia',
+    'seychelles', 'sierra leone', 'singapore', 'slovakia', 'slovenia', 'somalia',
+    'south africa', 'south korea', 'south sudan', 'spain', 'sri lanka', 'sudan',
+    'suriname', 'sweden', 'switzerland', 'syria', 'taiwan', 'tajikistan', 'tanzania',
+    'thailand', 'togo', 'trinidad and tobago', 'tunisia', 'turkey', 'turkiye',
+    'turkmenistan', 'uganda', 'ukraine', 'united arab emirates', 'united kingdom',
+    'united states', 'united states of america', 'uruguay', 'uzbekistan', 'vatican city',
+    'venezuela', 'vietnam', 'wales', 'yemen', 'zambia', 'zimbabwe',
+    # common abbreviations and informal forms the model actually writes
+    'uae', 'uk', 'us', 'usa', 'u.s.', 'u.s.a.', 'u.k.', 'great britain', 'britain',
+    'holland', 'south korea (rok)', 'the netherlands', 'the bahamas', 'the gambia',
+}
 
 _STREET_WORD = re.compile(
     r'\b(st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|way|lane|ln|rue|place|terrace|'
@@ -176,12 +223,36 @@ _STREET_WORD = re.compile(
 
 
 def _clean_component(part):
-    """Strip postcodes and state codes from one comma-separated address component."""
+    """Strip postcodes and state codes from one comma-separated address component.
+
+    [LOCAL-470] Ported from Beta (origin/main). Storied's copy matched state codes
+    with [A-Z]{2}, so three-letter Australian states (NSW, QLD, VIC) did not match
+    and 'Sydney NSW 2000' was returned verbatim -- which then failed to geocode as a
+    city and broke the reversal anchor. Also adds NL, AR and UK postcode shapes.
+    """
     p = part.strip()
+    # NL postcodes lead with digits AND two letters: "1071 DJ Amsterdam". This has
+    # to run before the generic leading-digits strip below, which would leave
+    # "DJ Amsterdam" -- and _is_junk_component then matches that as a state+code
+    # pair (case-insensitively) and discards the city entirely.
+    p = re.sub(r'^\d{4}\s*[A-Z]{2}\s+', '', p)                    # "1071 DJ Amsterdam" (NL)
     p = re.sub(r'^\d{3,5}(?:-\d{4})?\s+', '', p)                  # "75005 Paris" (FR/JP)
-    p = re.sub(r'\s+[A-Z]{2}\s+[A-Z\d][A-Z\d\s-]{2,}$', '', p)    # "Sydney NSW 2000"
+    # {2,3} not {2}: three-letter state codes are the common case in Australia
+    # (NSW, QLD, VIC, TAS, ACT). With {2} the docstring's own worked example --
+    # "Sydney NSW 2000" -- fell straight through and was returned verbatim.
+    p = re.sub(r'\s+[A-Z]{2,3}\s+[A-Z\d][A-Z\d\s-]{2,}$', '', p)  # "Sydney NSW 2000"
     p = re.sub(r'\s+[A-Z]\d[A-Z]\s*\d[A-Z]\d$', '', p)            # "Toronto M4P 2A8"
-    p = re.sub(r'\s+\d{5}(?:-\d{4})?$', '', p)                    # "Boston 02133"
+    # UK outward+inward code. The state-code rule above cannot catch it because
+    # the outward half contains a digit ("EH1"), so [A-Z]{2,3} never matches.
+    p = re.sub(r'\s+[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$', '', p)    # "Edinburgh EH1 2NG"
+    p = re.sub(r'\s+[A-Z]\d{4}$', '', p)                          # "Buenos Aires C1087" (AR)
+    # Trailing numeric postcode of any common length, optionally hyphenated:
+    # "Boston 02133", "Antananarivo 101", "Mumbai 400050",
+    # "Rio de Janeiro 22070-002". Anchored to the end and requires preceding
+    # whitespace, so a house number at the START is untouched (that is handled
+    # above) and "Route 66" as a whole component is left alone by the street-word
+    # filter downstream rather than here.
+    p = re.sub(r'\s+\d{3,6}(?:-\d{3,4})?$', '', p)                # "Boston 02133"
     return p.strip(' ,')
 
 
@@ -204,18 +275,22 @@ def _is_junk_component(p):
 def city_from_address(address):
     """Pull the city out of a model-written address.
 
-    The city is the useful part; the postcode and country are actively harmful.
-    Measured on the real Bennelong Point case:
+    The city is the useful part; the postcode and country are noise. The city is
+    also what anchors the reversed-coordinate check in fix_reversed_poi_list()
+    (LOCAL-470), so returning a country there makes the anchor a country CENTROID
+    rather than a city -- coarser than intended, and silently so.
 
-        "Bennelong Point, Sydney NSW 2000, Australia" -> Bennelong BRIDGE, 12.75 km off
-        "Bennelong Point, Sydney"                     -> Bennelong Point,  0.08 km
+    [LOCAL-470] The body is unchanged from Storied; the fixes ported from Beta are
+    in _COUNTRIES (now comprehensive) and _clean_component (three-letter state
+    codes, NL/AR/UK postcodes). Measured on 12 real address shapes, 8 were wrong
+    before those fixes and every one that was RIGHT happened to be in the old
+    16-country allowlist.
 
-    Nominatim has no entry for that address, so rather than returning nothing it
-    fuzzy-matched "Bennelong" to a cycleway in another suburb. Removing the
-    postcode and country turns a 12.75 km failure into an 80 m success.
-
-    Correct on 27 of 28 real generated addresses; the 28th returned "North York"
-    for a Toronto tour, which is a valid qualifier.
+    A NOTE ON A CLAIM THAT DOES NOT REPRODUCE. This docstring used to assert that
+    "Bennelong Point, Sydney NSW 2000" resolves 12.75 km off while
+    "Bennelong Point, Sydney" resolves to 80 m. Re-measured 2026-08-29 against
+    live Nominatim: the two forms return the IDENTICAL coordinate. Do not repeat
+    the 12.75 km figure as fact. The reason to keep this correct is the anchor.
     """
     if not address:
         return ""
@@ -602,3 +677,196 @@ def correct_stops(text_content, tour_location, tour_anchor=None):
             logging.info("[GEOCODE]   %s: %s -> %s (%s)",
                          r.get("stop"), r.get("llm"), r.get("geocoded"), r["reason"])
     return new_content, records
+
+
+# --- whole-tour coordinate reversal (BETA-5, wdvrdaxqte) ---------------------
+#
+# Ported from Beta (origin/main) 2026-08-30. The generator sometimes emits the
+# coordinate pair longitude-first for an ENTIRE tour. Every stop then plots on
+# the far side of the world and the tour is not merely inaccurate but unusable.
+# Observed in a Madagascar tour:
+#
+#     Rova of Antananarivo   Coordinates: 47.5224, -18.9110
+#         as written  9,899 km from Antananarivo (Indian Ocean off Somalia)
+#         swapped         3.9 km
+#
+# Found in 2 of 16 scanned tours. Storied had no protection against this at all.
+#
+# The plausibility guard in resolve_point/correct_stop derives its anchor from
+# the tour's OWN stops (the geocoded city, or the median of the model's points).
+# When every coordinate is mirrored the anchor lands in the wrong ocean too, so
+# the guard reasons correctly from poisoned input and rejects the CORRECT
+# geocoder answers. The reversal check therefore has to run BEFORE per-stop
+# resolution, on the whole tour at once.
+
+# A swapped pair must be at least this many times closer to the tour city than
+# the pair as written before we believe the tour was reversed. The margin in the
+# Madagascar case was not subtle (~9,900 km vs ~4 km); requiring a large factor
+# across a majority of stops makes a false positive implausible. A correctly
+# written tour cannot be 10x better mirrored unless it sits almost exactly on
+# both the equator AND the prime meridian.
+REVERSAL_FACTOR = float(os.getenv("GEOCODE_REVERSAL_FACTOR", "10"))
+
+
+def _swap_coord_line(stop_text):
+    """Return stop_text with its Coordinates pair reversed."""
+    return _COORD_RE.sub(lambda m: f"{m.group(1)}{m.group(3)}, {m.group(2)}", stop_text, count=1)
+
+
+def _tour_city_ref(addresses):
+    """Geocode the tour's own city from the first address that yields one.
+
+    Returns (city, ref_point) or ("", None)/(city, None). Shared by both the
+    text and POI-list reversal checks so they anchor identically.
+    """
+    city = ""
+    for address in addresses:
+        city = city_from_address(address)
+        if city:
+            break
+    if not city:
+        return "", None
+    return city, geocode(city)
+
+
+def _is_reversed(coords, ref):
+    """True when this point is REVERSAL_FACTOR times closer to ref when swapped."""
+    as_is = haversine_m(coords, ref)
+    flipped = haversine_m((coords[1], coords[0]), ref)
+    return flipped * REVERSAL_FACTOR < as_is
+
+
+def fix_reversed_coordinates(text_content):
+    """Repair tours whose stops were written longitude-first. Returns (text, record).
+
+    Two checks, cheapest first:
+
+    1. Latitude outside +/-90 is impossible. No reference data needed, and it is
+       always wrong. (It would NOT have caught the Madagascar case, where 47.52
+       is a perfectly valid latitude -- hence the second check.)
+
+    2. Compare the whole tour against its own city, taken from the stops'
+       addresses. If a majority of stops are dramatically closer when swapped,
+       the pair is reversed. See REVERSAL_FACTOR for why a false positive is
+       implausible.
+
+    Beta's `correct_stops` calls this first; on the Storied path
+    `fix_reversed_poi_list` is the equivalent and both reuse `_is_reversed`.
+    """
+    rec = {"checked": len(text_content), "action": "none", "reason": ""}
+    parsed = []
+    for t in text_content:
+        name, address, coords = _parse_stop(t)
+        if coords:
+            parsed.append((t, name, address, coords))
+    if not parsed:
+        return text_content, rec
+
+    impossible = [p for p in parsed if abs(p[3][0]) > 90]
+    if impossible:
+        logging.warning("[GEOCODE] %d stop(s) have an impossible latitude (>90)", len(impossible))
+        rec["impossible_latitude"] = len(impossible)
+
+    city, ref = _tour_city_ref([p[2] for p in parsed])
+    if not city:
+        if impossible:
+            fixed = [_swap_coord_line(t) if abs(c[0]) > 90 else t for t, _, _, c in parsed]
+            rec.update(action="swapped", reason="latitude outside +/-90 and no city to check against")
+            return fixed, rec
+        rec.update(reason="no city available to test against")
+        return text_content, rec
+    if not ref:
+        rec.update(reason=f"could not geocode the tour city {city!r}")
+        return text_content, rec
+
+    better = sum(1 for _, _, _, coords in parsed if _is_reversed(coords, ref))
+
+    rec.update(city=city, stops_better_swapped=better)
+    if better > len(parsed) / 2:
+        logging.warning(
+            "[GEOCODE] REVERSED COORDINATES: %d of %d stops are >%.0fx closer to %s when "
+            "swapped — correcting the whole tour", better, len(parsed), REVERSAL_FACTOR, city)
+        rec.update(action="swapped",
+                   reason=f"{better}/{len(parsed)} stops are {REVERSAL_FACTOR:.0f}x closer "
+                          f"to {city} when reversed")
+        return [_swap_coord_line(t) for t in text_content], rec
+
+    rec.update(reason="coordinate order looks correct")
+    return text_content, rec
+
+
+def fix_reversed_poi_list(poi_list):
+    """[LOCAL-470] `fix_reversed_coordinates` for the POI-dict shape the Storied
+    generator holds. Mutates poi_list in place; returns the record.
+
+    Storied does not call `correct_stops` — `generate_tour_text.py` resolves each
+    POI through `resolve_poi`. The whole-tour reversal check has to run BEFORE
+    that per-stop resolution, because the plausibility guard inside `resolve_point`
+    derives its anchor from the tour's own stops and would reason correctly from
+    poisoned input when every coordinate is reversed. This is the same rule as
+    `fix_reversed_coordinates`, reused via `_swap_coord_line`/`_is_reversed`, not a
+    second copy.
+    """
+    rec = {"checked": len(poi_list), "action": "none", "reason": ""}
+
+    def _raw_pair(poi):
+        """(lat, lng) parsed loosely — NO plausibility filter. `_parse_coords_pair`
+        rejects |lat| > 90, which would hide the very reversal we need to catch when
+        a longitude-first pair has |lat| > 90. This keeps that pair visible."""
+        m = re.search(r'(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)', str(poi.get('coordinates', '')))
+        if not m:
+            return None
+        try:
+            return (float(m.group(1)), float(m.group(2)))
+        except ValueError:
+            return None
+
+    def _swap(poi):
+        c = _raw_pair(poi)
+        if c:
+            poi['coordinates'] = f"{c[1]:.6f}, {c[0]:.6f}"
+
+    parsed = []          # (poi, raw_coords)
+    for poi in poi_list:
+        coords = _raw_pair(poi)
+        if coords:
+            parsed.append((poi, coords))
+    if not parsed:
+        return rec
+
+    raw_impossible = [poi for poi, c in parsed if abs(c[0]) > 90]
+    if raw_impossible:
+        logging.warning("[GEOCODE] %d POI(s) have an impossible latitude (>90)",
+                        len(raw_impossible))
+        rec["impossible_latitude"] = len(raw_impossible)
+
+    city, ref = _tour_city_ref([(p.get('address') or '') for p, _ in parsed])
+    if not city:
+        if raw_impossible:
+            for poi in raw_impossible:
+                _swap(poi)
+            rec.update(action="swapped",
+                       reason="latitude outside +/-90 and no city to check against")
+            return rec
+        rec.update(reason="no city available to test against")
+        return rec
+    if not ref:
+        rec.update(reason=f"could not geocode the tour city {city!r}")
+        return rec
+
+    better = sum(1 for _, coords in parsed if _is_reversed(coords, ref))
+
+    rec.update(city=city, stops_better_swapped=better)
+    if better > len(parsed) / 2:
+        logging.warning(
+            "[GEOCODE] REVERSED COORDINATES: %d of %d stops are >%.0fx closer to %s when "
+            "swapped — correcting the whole tour", better, len(parsed), REVERSAL_FACTOR, city)
+        rec.update(action="swapped",
+                   reason=f"{better}/{len(parsed)} stops are {REVERSAL_FACTOR:.0f}x closer "
+                          f"to {city} when reversed")
+        for poi, _ in parsed:
+            _swap(poi)
+        return rec
+
+    rec.update(reason="coordinate order looks correct")
+    return rec
