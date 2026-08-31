@@ -28,8 +28,21 @@ AI-powered audio tour generator with mobile app for Android and iOS.
 
 ### Server (Backend - 10 Microservices)
 ```bash
-docker-compose up -d
+docker-compose -f docker-compose-beta-local.yml up -d
 ```
+
+> ⚠️ **Do not run a bare `docker-compose up -d`.** Two reasons, both real:
+>
+> 1. **`docker-compose.yml` cannot build anything.** It declares `build: .` for 14
+>    services, and there is no root `Dockerfile` — it was removed and the compose file
+>    was never updated. Verified 2026-08-31.
+> 2. **It can destroy unrelated containers.** Several long-running containers on the
+>    development machines share names with services here. A bare `up` collides on those
+>    names and offers `--remove-orphans`; accepting it deletes them.
+>
+> Use `docker-compose-beta-local.yml`, which builds from each service's own repaired
+> Dockerfile and brings up 21 healthy services. Requires `OPENAI_API_KEY` in `.env`.
+> Full recipe: ClickUp [`wdvrdaxn8x`](https://app.clickup.com/t/wdvrdaxn8x).
 
 **Services:**
 - **tour-orchestrator** (5002) - Main orchestration

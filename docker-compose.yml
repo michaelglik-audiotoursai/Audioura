@@ -1,3 +1,20 @@
+# ⚠️ THIS FILE CANNOT BUILD ANYTHING. Use docker-compose-beta-local.yml instead.
+#
+#     docker-compose -f docker-compose-beta-local.yml up -d
+#
+# Every service below declares `build: .`, which needs a Dockerfile at the repo
+# root. There is no root Dockerfile — it was removed and this file was never
+# updated. Verified again 2026-08-31 on both `main` and `storied`.
+#
+# It is kept rather than deleted because ~10 documents still reference it by name
+# and it records the original port map, which is still accurate. But running it is
+# never the right move, and a bare `docker-compose up -d` is actively dangerous:
+# several long-running containers on the dev machines share names with services
+# here, so the collision prompt offers `--remove-orphans`, and accepting that
+# deletes them.
+#
+# docker-compose-beta-local.yml builds from each service's own repaired Dockerfile
+# and brings up 21 healthy services. Full recipe: ClickUp wdvrdaxn8x.
 version: '3.8'
 
 services:
