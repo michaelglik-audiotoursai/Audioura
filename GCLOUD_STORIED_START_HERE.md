@@ -112,8 +112,8 @@ docker-compose -f docker-compose-beta-local.yml up -d
 | 0. Prep | ✅ done |
 | 1. Schema | ✅ **no migration needed** — `track` and `low_confidence_stops` both self-heal via idempotent `information_schema`-guarded `ALTER`s in `store_audio_tour()` |
 | 2. Deploy Storied | **staged**, dry-run verified — ⛔ needs Michael |
-| 3. Routing / URL | ⛔ needs Michael's decision |
-| 4. Mobile selector | Mobile Kiro, blocked on the same URL |
+| 3. Routing / URL | ✅ **DONE** — `storied-api.audioura.com` live, TLS correct both hops |
+| 4. Mobile selector | Mobile Kiro — **unblocked**, building now |
 | 5. Verify | baseline ready |
 
 ### Findings that changed the plan — do not re-derive
@@ -130,18 +130,36 @@ docker-compose -f docker-compose-beta-local.yml up -d
 3. Staged script: `deploy_storied_service.sh` (branch `kiro/storied-4`). `--dry-run`
    verified correct.
 
-### URL scheme — recommended, awaiting Michael
+### URL / TLS — DONE 2026-09-01, do not redo
 
-**Subdomain `storied-api.audioura.com`**, not a path prefix: the mobile selector must
-change only the host, or path parity breaks.
+**`https://storied-api.audioura.com`** is live and verified end to end.
 
-Routing today is `Cloudflare (proxied) → GCP LB 34.36.147.30 → api-gateway-backend →
-api-gateway`. `audioura-url-map` has **no host rules**.
+```
+Cloudflare (proxied) -> GCP LB 34.36.147.30 -> api-gateway-storied-backend
+                                            -> api-gateway-storied -> tour-orchestrator-storied
+```
 
-⚠️ **The GCP managed cert has never worked**: `audioura-cert` reads
-`api.audioura.com: FAILED_NOT_VISIBLE`, because the name resolves to Cloudflare, not the
-LB. Cloudflare terminates TLS. **Do not add the subdomain to that cert** — it would fail
-identically. Mirror the existing `api` DNS record instead.
+Beta is unchanged: `api.audioura.com` still falls through to the default backend.
+
+Built: NEG `api-gateway-storied-neg`, backend `api-gateway-storied-backend` (**scheme
+`EXTERNAL`** — the classic LB rejects `EXTERNAL_MANAGED`), and a host rule on
+`audioura-url-map`. Cloudflare `A` record `storied-api` -> `34.36.147.30`, proxied.
+
+**TLS was rebuilt and this matters.** The Google managed cert `audioura-cert` was
+*expiring 2026-09-04 and could not renew* — `FAILED_NOT_VISIBLE`, because the name
+resolves to Cloudflare rather than the LB, so Google could not validate it. Replaced with
+a **Cloudflare Origin CA certificate valid to 2041**, covering `*.audioura.com`, attached
+to `audioura-https-proxy`. Cloudflare is on **Full (strict)** with Always Use HTTPS.
+
+`openssl` reports `Verify return code: 21` against the origin — **expected and correct**.
+Origin CA certs are trusted only by Cloudflare, which is what makes them immune to the
+renewal problem.
+
+**Origin port 80 is closed** (`audioura-http-rule` deleted 2026-09-01). Safe because
+`endpoints.dart:56` hardcodes `https://api.audioura.com`; the only `http://` in the app is
+local mode pointing at a LAN IP. Cert and key live OUTSIDE the repo at
+`AudioTours\cloudflare_v1.pem` and `AudioTours\claudflare_v1.key` (the typo is only on the
+key) — **the private key cannot be re-downloaded from Cloudflare**.
 
 ---
 
