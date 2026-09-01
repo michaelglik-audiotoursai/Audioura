@@ -37,6 +37,11 @@
 
 set -euo pipefail
 
+# Release tagging: every deploy is pinned to a pushed git tag so the deployed
+# source can be reconstituted exactly. See release_tag.sh for why a commit count
+# could not do this.
+. "$(dirname "$0")/release_tag.sh"
+
 PROJECT="audiotours-migration"
 REGION="us-central1"
 REPO="us-central1-docker.pkg.dev/${PROJECT}/services"
@@ -134,8 +139,20 @@ gcloud artifacts docker images describe "$FULL_IMAGE" >/dev/null 2>&1 \
   && fail "${FULL_IMAGE} already exists — tags are immutable, pass a different --tag"
 
 # ------------------------------------------------------------- build/push ---
+# --- release tag -------------------------------------------------------------
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+RELEASE_LINE=$(release_line_for_branch "$BRANCH")
+if [ -z "$RELEASE_LINE" ]; then
+  fail "no release line mapped for branch '$BRANCH'. Deploys must come from
+       main (1), storied (2) or subscribed (3) — see release_tag.sh."
+fi
+assert_image_content_clean || exit 1
+RELEASE_TAG=$(next_release_tag "$RELEASE_LINE")
+DEPLOY_COMMIT=$(git rev-parse HEAD)
+echo "  release tag: ${RELEASE_TAG}  (line ${RELEASE_LINE}, branch ${BRANCH}, commit ${DEPLOY_COMMIT:0:8})"
+
 say "Building ${FULL_IMAGE}"
-run "docker build -f '$DOCKERFILE' -t '$FULL_IMAGE' ."
+run "docker build -f '$DOCKERFILE' -t '$FULL_IMAGE' --build-arg RELEASE_TAG='$RELEASE_TAG' --build-arg GIT_SHA='$DEPLOY_COMMIT' ."
 say "Pushing"
 run "gcloud auth configure-docker us-central1-docker.pkg.dev --quiet"
 run "docker push '$FULL_IMAGE'"
@@ -165,6 +182,14 @@ printf '%s' "$HEALTH" | grep -q 'healthy' \
 
 REV=$(gcloud run services describe "$SERVICE" --region "$REGION" \
   --format="value(status.traffic[0].revisionName)")
+# Tag only AFTER a verified deploy. Tagging first would leave a tag pointing at
+# something that never shipped.
+if create_and_push_release_tag "$RELEASE_TAG" "$DEPLOY_COMMIT" "$SERVICE" "$FULL_IMAGE"; then
+  echo "  tagged and pushed: $RELEASE_TAG -> ${DEPLOY_COMMIT:0:8}"
+else
+  echo "  WARNING: deploy succeeded but tagging did not — reconstitution is not guaranteed" >&2
+fi
+
 say "Done"
 cat <<EOF
   service  : ${SERVICE}

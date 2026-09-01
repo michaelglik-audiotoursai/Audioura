@@ -3,6 +3,19 @@
 # Build once, deploy many (different CMD per Cloud Run service).
 FROM python:3.11-slim
 
+# Release identity, baked in at build time by the deploy scripts.
+# WITHOUT these ARG lines the --build-arg values are SILENTLY DISCARDED and the
+# image carries no version at all -- the failure mode is a no-op that looks fine.
+# RELEASE_TAG is v<line>t<seq>, e.g. v2t357: line 1=beta 2=storied 3=subscribed,
+# permanent per release line so a promoted build keeps the number it shipped with.
+# The tag is pushed to origin, so `git checkout $RELEASE_TAG` reconstitutes exactly
+# what is running. See release_tag.sh.
+ARG RELEASE_TAG="unset"
+ARG GIT_SHA="unset"
+ENV RELEASE_TAG=${RELEASE_TAG} \
+    GIT_SHA=${GIT_SHA}
+
+
 WORKDIR /app
 
 # System dependencies
