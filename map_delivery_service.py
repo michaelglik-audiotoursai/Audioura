@@ -139,8 +139,13 @@ def get_tours_near_location(lat, lng):
         cur = conn.cursor()
         
         # Get original tours (exclude test tours and translations)
+        # COALESCE so rows written before audio_tours.track existed read 'beta'
+        # rather than NULL. The app must never have to guess which engine made a
+        # tour -- guessing only works within one session and breaks for anything
+        # generated before the Stable/Preview selector shipped (ClickUp wdvrdaxywb).
         cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested
+            SELECT id, tour_name, request_string, lat, lng, number_requested,
+                   COALESCE(track, 'beta') AS track
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
               AND (is_test IS NOT TRUE)
@@ -151,7 +156,7 @@ def get_tours_near_location(lat, lng):
         nearby_tours = []
         
         for tour in tours:
-            tour_id, tour_name, request_string, tour_lat, tour_lng, requests = tour
+            tour_id, tour_name, request_string, tour_lat, tour_lng, requests, track = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -166,7 +171,9 @@ def get_tours_near_location(lat, lng):
                         'distance_km': round(distance, 2),
                         'popularity': requests,
                         'type': 'walking_tour',
-                        'is_custom': False
+                        'is_custom': False,
+                        # 'beta' | 'storied'. Additive: older app builds ignore it.
+                        'track': track or 'beta'
                     })
         
         # Get custom tours
