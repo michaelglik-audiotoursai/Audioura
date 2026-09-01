@@ -145,6 +145,49 @@ identically. Mirror the existing `api` DNS record instead.
 
 ---
 
+## 🔥 Picked up mid-flight — read before doing anything else (2026-09-01 16:05)
+
+1. **Docker Desktop is STOPPED.** The local stack is down. Nothing local works until it
+   is started, and that is why item 2 is unverified.
+
+2. **`/tours-near` returns `track` but has NEVER been called.** Commit `a10b457` on
+   branch `feat/track-in-api` (pushed; **not** on `storied`). Static checks only: query
+   and unpack balance at 7 columns, field reaches the response dict, module compiles.
+   **Owed: one `curl` against a running `map-delivery`.** ClickUp `wdvrdaxywb`.
+
+   Two traps found making that change — both would have shipped silently:
+   - the live service is **`map_delivery_service.py`**, not `app.py`; both define
+     `GET /tours-near` and only the former is what Cloud Run runs
+   - the unpack line `tour_id, ... requests = tour` appears **twice** (`:159`, `:395`,
+     different endpoints); only `:159` follows the modified query
+
+3. **`wdvrdaxxmb` is unblocked except the version suffix.** Mobile Kiro can build the
+   selector, the URL fix, `track` storage and the labels now. Still owed by services:
+   `/status`, the manifest payload, and a per-tour `build_number`.
+
+### The version-number rules Michael set (2026-09-01) — these constrain the design
+
+Stable's number **< ** Preview's; a bug fix raises a track's number but Stable must stay
+below Preview; **the same build always shows the same number.**
+
+Scheme: `git rev-list --count <commit>` of the branch the image was built from —
+`main` = 75, `storied` = 2126. Deterministic, monotonic, and ordered because `storied`
+is a superset of `main`'s history plus ~2,051 commits.
+
+⚠️ **The invariant depends on a practice:** always forward-merge `main` into `storied`
+after a Beta fix. Stop doing that and rule 2 degrades silently.
+
+**Store it per tour, never read it from `/health` at display time** — that would show
+today's build for a week-old tour and break "same build ⇒ same number". `null` is a
+permanent valid state for tours predating the field; render the bare track name then.
+
+### Outstanding decision for Michael
+
+Ship `2.2.1+2` (compliance rebuild) **first**, then `2.3.1+1` with the selector — or fold
+them into one upload? Recommendation: ship compliance first; Google's extension buys a
+month but the rebuild is already built and only needs a device test, and the task itself
+says not to couple them. His call.
+
 ## Hard stops — ask Michael even in queue mode
 
 - **Any GCloud deploy.** Runbook `wdvrdaxn9f`.
