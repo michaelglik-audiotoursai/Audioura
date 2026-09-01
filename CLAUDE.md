@@ -581,7 +581,23 @@ concurrent claiming across machines). **All work is explicitly dispatched by
 Michael or Claude.**
 
 **Agent IDs:** `Mac Mini Kiro` (this machine) · `Services Kiro` (Windows laptop)
-· `Mobile Kiro` (Windows laptop) · `Claude` (reviewer/dispatcher).
+· `Mobile Kiro` (Windows laptop) · `Claude` (reviewer/dispatcher)
+· **`GCloud_Storied`** (Claude on the **Windows laptop**; renamed from `Beta_Bugs`
+2026-08-31 — comments and commits signed `Beta_Bugs` are the same session).
+
+> **`GCloud_Storied` reads `GCLOUD_STORIED_START_HERE.md`, not this file.** That is its
+> whole briefing: branch, worktrees, dispatcher, current deploy state, hard stops.
+> Added by that session at Michael's request 2026-08-31; the rest of CLAUDE.md remains
+> `Storied_Tours`'s to maintain.
+>
+> ⚠️ **Cross-machine hazard, for whoever reads this next.** The Windows laptop now sits
+> on the `storied` branch, where the Mac Mini's `new_kiro_session_is_required_*.md` task
+> files are tracked. Its dispatcher globs the working tree, so a plain dispatch there
+> picks up **this machine's queue**. On 2026-08-31 that started `LOCAL-382/383/424` in
+> error; they were killed within a minute and produced nothing, and `FAILED` records
+> were written so they cannot re-dispatch. **If a `LOCAL-*` task looks like it ran
+> somewhere unexpected, that is why.** A dispatcher-side fix (allowlist, or only
+> claiming files it created) is still outstanding.
 
 **Lists per space** (current space: Storied; Development folder):
 🔵 Claude — Review (`1000410000000732`) · 🟦 Services — Kiro (`1000410000000733`)
