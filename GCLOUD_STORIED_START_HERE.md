@@ -163,21 +163,42 @@ key) — **the private key cannot be re-downloaded from Cloudflare**.
 
 ---
 
-## 🔥 Picked up mid-flight — read before doing anything else (2026-09-01 16:05)
+## 🔥 Picked up mid-flight — read before doing anything else (2026-09-01 17:10)
 
-1. **Docker Desktop is STOPPED.** The local stack is down. Nothing local works until it
-   is started, and that is why item 2 is unverified.
+1. **Docker Desktop is RUNNING again** (started 2026-09-01 16:55). 22 containers up from
+   the previous session's images. `tour-editing-1` sits `Exited (255)` — it is the orphan
+   the briefing warns about, and it was already failing; **do not "fix" it with
+   `--remove-orphans`**, that destroys it.
 
-2. **`/tours-near` returns `track` but has NEVER been called.** Commit `a10b457` on
-   branch `feat/track-in-api` (pushed; **not** on `storied`). Static checks only: query
-   and unpack balance at 7 columns, field reaches the response dict, module compiles.
-   **Owed: one `curl` against a running `map-delivery`.** ClickUp `wdvrdaxywb`.
+2. **`/tours-near` returns `track` — VERIFIED against a running service, 2026-09-01.**
+   Commit `a10b457`, on local `storied` (unpushed) and on pushed `feat/track-in-api`.
+   Evidence and the full test table are in ClickUp `wdvrdaxywb`. Three results: default
+   reads `beta`; a row set to `storied` reads `storied` (**the red test** — without it a
+   hardcoded `'beta'` passes everything else); `NULL` reads `beta` via COALESCE. Local dev
+   Postgres only, `audio_tours` 291 rows before and after, production only ever read.
 
-   Two traps found making that change — both would have shipped silently:
-   - the live service is **`map_delivery_service.py`**, not `app.py`; both define
-     `GET /tours-near` and only the former is what Cloud Run runs
-   - the unpack line `tour_id, ... requests = tour` appears **twice** (`:159`, `:395`,
-     different endpoints); only `:159` follows the modified query
+   **Which file is live is now proved, not assumed.** The live response carries
+   `is_custom`, which only `map_delivery_service.py` emits — `app.py` emits neither
+   `is_custom` nor `language`, `map_delivery/app.py` emits `language`/`original_tour_id`
+   and no `is_custom`. So **production runs `map_delivery_service.py`**, which is the file
+   that was changed. (The ClickUp task description points at `app.py:154` — wrong file.)
+
+   ⚠️ **The local Docker stack CANNOT test this endpoint.**
+   `docker-compose-beta-local.yml` builds `map-delivery` with `build: ./map_delivery`, so
+   the container runs `map_delivery/app.py` — a different, older implementation of the
+   same route. A green local stack proves nothing here. The verification above was done by
+   `docker cp`-ing `map_delivery_service.py` into `development-map-delivery-1` and running
+   it on port 5099 (needs `pip install requests`; that image lacks it).
+
+   The other trap still stands: the unpack line `tour_id, ... requests = tour` appears
+   **twice** (`:159`, `:395`, different endpoints); only `:159` follows the modified query.
+
+   **Local dev Postgres was behind production schema** — it had neither `track` nor
+   `is_test`. Both added additively (`ADD COLUMN IF NOT EXISTS`). Expect the same gap
+   again on any fresh local DB.
+
+   Still owed on `wdvrdaxywb`: `/status/<job_id>` (AC2) and the download/manifest payload,
+   neither started; AC3 (a real Storied tour reading `'storied'`) needs the Phase 2 deploy.
 
 3. **`wdvrdaxxmb` is unblocked except the version suffix.** Mobile Kiro can build the
    selector, the URL fix, `track` storage and the labels now. Still owed by services:
@@ -207,10 +228,16 @@ deploy, and refuse if image content (`*.py`, `Dockerfile*`, `requirements*.txt`)
 uncommitted. The guard is narrow on purpose — this tree is shared with Kiro and always
 has dirty docs.
 
-⚠️ **Unverified:** that the `ARG` lands in a built image. Docker is down. One
-`docker build` + `printenv RELEASE_TAG` is owed. `Dockerfile.cloudrun` had **no `ARG`**
-at all until this commit — without it `--build-arg` is silently discarded and the whole
-scheme is a no-op that looks fine.
+✅ **VERIFIED 2026-09-01** that the `ARG` lands in a built image.
+`docker build -f Dockerfile.cloudrun --build-arg RELEASE_TAG=v2t999 --build-arg
+GIT_SHA=deadbeef` then `printenv` inside it returns `v2t999` / `deadbeef`. **Red test:**
+the same build with no `--build-arg` returns `unset` / `unset`, the declared defaults —
+so the value genuinely comes from the build argument and is not baked in. Both
+`deploy_cloudrun_service.sh:155` and `deploy_tour_modernized.sh:148` pass both args, and
+both scripts use `Dockerfile.cloudrun`, the only Dockerfile carrying the `ARG` lines.
+`Dockerfile.modernized` has none — do not deploy an image through it expecting a version.
+(`Dockerfile.cloudrun` had **no `ARG`** at all until commit `bc1bc49`; without it
+`--build-arg` is silently discarded and the whole scheme is a no-op that looks fine.)
 
 The per-tour field is **`release_tag`** (string), optional, `null` for older tours.
 
