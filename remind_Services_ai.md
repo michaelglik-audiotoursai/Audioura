@@ -4,6 +4,35 @@
 
 **UPDATED**: 2026-06-07 (PRODUCTION LIVE: `https://api.audioura.com` — GCP LB + Cloudflare proxy + Python auth-proxy gateway. K1-K9 complete. All backends IAM-locked. Cost-bearing endpoints require X-API-Key header. Tour downloads from R2 verified. CPU throttling fix applied: `--no-cpu-throttling --min-instances=1` on orchestrator, `--no-cpu-throttling` on modernized. Graceful shutdown handler added. See `claude_review_cpu_throttling_graceful_shutdown_2026_06_07.md` for details.)
 
+> NOTE: Identity is now **SERVICES KIRO** (not Amazon-Q — that header below is stale). Always prefix replies with "🔧 SERVICES KIRO -".
+
+---
+
+## 🗒️ SESSION LOG — 2026-08-31 (Services Kiro, Windows laptop)
+
+> ⚠️ **This reminder file differs per git branch.** This `main` copy and the `storied` copy are separate. This same session log was written to BOTH branch copies (Michael's directive, option 3). If facts here conflict with the older production header above, THIS log is newer.
+
+**Branch reality:**
+- `main` is STRICTLY AHEAD of `fix/yuri-audio-and-map` (that branch is STALE — 0 commits not in main) and matches GCloud/production.
+- `storied` = the next release, being deployed to GCloud ALONGSIDE Beta (not replacing it).
+
+**What was done this session:**
+1. **Docker Decision B (task `wdvrdaxvvc`) — DONE + committed to `main` (`1fe0d20`, pushed).** All 5 previously-broken per-service Dockerfiles now `COPY *.py` (orchestrator, news-orchestrator, news-generator, newsletter-processor, tour-worker). `docker-compose-beta-local.yml` repointed off the `Dockerfile.cloudrun` workaround. Verified: real Boston Common tour generated, no 503 quota_check_failed. Local Beta stack (`docker-compose-beta-local.yml`, 23 services) healthy. NOTE: postgres host port **5433**, tour-worker host port **5045** (5040 held by Windows svchost).
+2. **Google Play developer verification (Sep 30)** — auto-completed, no action. Task `wdvrdaxnug` closed.
+3. **Target API level bump (Aug 31)** — Flutter `targetSdkVersion`; task `wdvrdaxw54` → Storied → 🔵 Claude — Review. Mobile/Flutter, not Services.
+4. **Beta testers (Google Play closed testing):** Yury Makedonov, Gregory Lepsky (glepsky@gmail.com), Igor Linkov (ilinkov@yahoo.com, Ph.D., iPhone). Igor invite+follow-up in task `wdvrdaxwxk`. Yury's 3 tasks reactivated + "🧪 Yury — Beta Testing" index list `1000410000005404`. Igor list `1000410000005407` parked (email/DM only, not a ClickUp member).
+5. **Igor product signal (Subscribed space):** wants "bring-your-own ordered stop list → one audio tour" (built an MFA itinerary). Rules-of-engagement task `wdvrdaxy14` + feedback task `wdvrdaxy15`. Solution = single generation pass over ordered stop list, NOT stitching per-stop ZIPs.
+
+**ACTIVE: Deploy Storied to GCloud alongside Beta (task `wdvrdaxxm9`, Storied → 🟦 Services — Kiro):**
+- Deploy plan posted as ClickUp comment "Proposed by Services Kiro" on `wdvrdaxxm9` (comment `1000410000017249`).
+- Model: keep Beta byte-for-byte unchanged (comparison control); deploy Storied as a SECOND independent Cloud Run service writing `track='storied'` to the SAME Postgres; additive `audio_tours.track` column (`NOT NULL DEFAULT 'beta'`, no backfill); mobile Beta/Storied selector.
+- Spec: `TRACK_B_STORIED_VS_BETA.md` (on `storied` branch root).
+- **BLOCKER:** merge `LOCAL-470-port-beta-geocode` (reversed-coordinate fix) into `storied` before cutting a deploy tag — task `wdvrdaxy4r` (Storied → 🔵 Claude — Review), owned by Mac Mini Claude (`Storied_Tours`). Also decide LOCAL-469/471. `storied` HEAD was `2eb39f4`.
+- **GCP facts (verified via gcloud, authed as michael.glik@gmail.com):** project `audiotours-migration`, region `us-central1`, artifact repo `us-central1-docker.pkg.dev/audiotours-migration/services`. Beta service = Cloud Run `tour-modernized` (image `audioura`, `Dockerfile.cloudrun`, `--no-cpu-throttling --max-instances=1`).
+- **Cloud SQL:** instance `audioura-db`, POSTGRES_15, tier **`db-f1-micro`** (smallest), 10GB SSD, ZONAL, connection `audiotours-migration:us-central1:audioura-db`. Fine for one-at-a-time tester load; bump to `db-custom-1-3840` if concurrent Beta+Storied generation becomes common. No purchase needed now.
+- **NEXT ACTIONS:** (a) Michael relays LOCAL-470 merge to Mac Mini Claude; (b) Michael decides URL scheme (subdomain `storied-api.audioura.com` recommended vs path); (c) Michael approves GCloud deploy (runbook `wdvrdaxn9f`); then Services Kiro does additive schema change + deploys Storied as 2nd service + verifies by generating a real tour per track.
+- **NO purchases needed** from Google or Cloudflare (Cloud Run scales to zero; subdomain on existing domain is free).
+
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
 3. You communicate with Mobile App Amazon-Q via: `c:\Users\micha\eclipse-workspace\amazon-q-communications\audiotours\requirements\`
