@@ -59,10 +59,13 @@ class Endpoints {
   /// testers can opt into to compare tour quality against Beta. Same request/
   /// response contract as Beta; only the base URL differs. See
   /// TRACK_B_STORIED_VS_BETA.md and DECISIONS.md D347+.
-  /// This is the live Cloud Run URL for api-gateway-storied — a custom domain
-  /// (api-storied.audioura.com) is the intended long-term address but DNS for
-  /// it has not been set up yet; swap this constant once it is.
-  static const _storiedCloudBaseUrl = 'https://api-gateway-storied-60899077572.us-central1.run.app';
+  /// Custom domain, live and verified (Michael 2026-09-01): it takes the SAME
+  /// network path as Beta — client → Cloudflare → GCP LB → gateway — differing
+  /// only in hostname. Do NOT revert to the bare Cloud Run URL: that returns
+  /// 200 but bypasses Cloudflare (no WAF/DDoS, invisible in monitoring, wrong
+  /// TLS chain), which breaks the like-for-like comparison this feature exists
+  /// for. Note the order: storied-api, not api-storied.
+  static const _storiedCloudBaseUrl = 'https://storied-api.audioura.com';
 
   /// Gateway API key — injected at build time via --dart-define=GATEWAY_API_KEY=...
   /// NEVER hardcode the actual key in source.
@@ -99,6 +102,22 @@ class Endpoints {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cloud_track', track);
   }
+
+  /// Human-facing label for a stored tour's track. Michael 2026-09-01:
+  /// testers see Stable/Preview, never the internal branch names beta/storied.
+  /// A missing or unknown track ⇒ Stable (that is what every older app made).
+  /// When [buildNumber] is present it is appended as "(vNNN)" so a tour listed
+  /// a week later still identifies the exact build that produced it; when
+  /// absent (older tours, or before services populated it) the bare name shows.
+  /// Never compute the number in the app — it is read from the tour record.
+  static String trackLabel(String? track, {int? buildNumber}) {
+    final name = track == 'storied' ? 'Preview' : 'Stable';
+    return buildNumber != null ? '$name (v$buildNumber)' : name;
+  }
+
+  /// Whether a stored track should render as the Preview (Storied) track.
+  /// Missing/unknown ⇒ false (Stable), matching backward-compat behaviour.
+  static bool isPreviewTrack(String? track) => track == 'storied';
 
   /// Convenience: returns a fully-formed [Uri] for [s] + [path].
   static Future<Uri> url(Service s, String path) async =>

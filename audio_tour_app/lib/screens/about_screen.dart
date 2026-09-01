@@ -247,16 +247,18 @@ class _AboutScreenState extends State<AboutScreen> {
                     ],
                   ),
                   // Cloud mode — no fields needed (values baked in via --dart-define)
+                  // Labels are Stable/Preview (Michael 2026-09-01); the pref
+                  // value stays 'beta'/'storied' (DB/API contract, backward compat).
                   if (_serverMode == 'cloud') Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       _cloudTrack == 'storied'
-                          ? '✅ Cloud mode active — connected to Storied'
-                          : '✅ Cloud mode active — connected to Beta (api.audioura.com)',
+                          ? '✅ Cloud mode active — connected to Preview'
+                          : '✅ Cloud mode active — connected to Stable',
                       style: TextStyle(fontSize: 12, color: _cloudTrack == 'storied' ? Colors.purple : Colors.green),
                     ),
                   ),
-                  // Storied vs Beta comparison track — cloud mode only.
+                  // Stable vs Preview comparison track — cloud mode only.
                   if (_serverMode == 'cloud') Padding(
                     padding: const EdgeInsets.only(top: 10),
                     child: Row(
@@ -264,14 +266,14 @@ class _AboutScreenState extends State<AboutScreen> {
                         const Text('Track:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                         const SizedBox(width: 10),
                         ChoiceChip(
-                          label: const Text('Beta'),
+                          label: const Text('Stable'),
                           selected: _cloudTrack == 'beta',
                           selectedColor: Colors.green.shade100,
                           onSelected: (_) => _setCloudTrack('beta'),
                         ),
                         const SizedBox(width: 8),
                         ChoiceChip(
-                          label: const Text('Storied'),
+                          label: const Text('Preview'),
                           selected: _cloudTrack == 'storied',
                           selectedColor: Colors.purple.shade100,
                           onSelected: (_) => _setCloudTrack('storied'),
@@ -585,7 +587,7 @@ class _AboutScreenState extends State<AboutScreen> {
     await DebugLogHelper.addDebugLog('ABOUT: Cloud track set to: $track');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Comparing against ${track == 'storied' ? 'Storied' : 'Beta'}'),
+        content: Text('Comparing against ${track == 'storied' ? 'Preview' : 'Stable'}'),
         backgroundColor: track == 'storied' ? Colors.purple : Colors.green,
       ),
     );

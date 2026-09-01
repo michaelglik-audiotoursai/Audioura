@@ -564,6 +564,12 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
     if (stops == 0) stops = 10;
 
+    // A translation is produced by the same track the tester is on (the
+    // translation request went to that gateway), so tag it with the current
+    // cloud_track. In local mode this is 'beta' by default, which is correct
+    // for provenance display. See wdvrdaxxmb.
+    final translationTrack = await Endpoints.cloudTrack();
+
     final savedTours = prefs.getStringList('saved_tours') ?? [];
     savedTours.add(jsonEncode({
       'title': tourName,
@@ -575,6 +581,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       'editable': false,
       'is_translation': true,
       'parent_tour_id': null,
+      'track': translationTrack,
     }));
     await prefs.setStringList('saved_tours', savedTours);
     await DebugLogHelper.addDebugLog('TOUR: Saved translated tour $tourId ($lang) as: $tourName');
@@ -768,6 +775,13 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Get coordinates from status endpoint
       double? lat;
       double? lng;
+      // Track provenance: read from the server response, never recompute.
+      // 'track' is 'beta'|'storied' (missing/unknown ⇒ 'beta', which is also
+      // what every older app produces). 'build_number' identifies which build
+      // made the tour so a tour listed a week later still says so; it is
+      // optional — older tours genuinely have none. See wdvrdaxxmb.
+      String tourTrack = 'beta';
+      int? buildNumber;
       try {
         final statusResponse = await http.get(
           await Endpoints.url(Service.orchestrator, '/status/$jobId'),
@@ -782,6 +796,17 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             lng = statusData['coordinates'][1]?.toDouble();
             await DebugLogHelper.addDebugLog('SAVE_TOUR: Found coordinates: $lat, $lng');
           }
+          final rawTrack = statusData['track'];
+          if (rawTrack == 'storied' || rawTrack == 'beta') {
+            tourTrack = rawTrack as String;
+          }
+          final rawBuild = statusData['build_number'];
+          if (rawBuild is int) {
+            buildNumber = rawBuild;
+          } else if (rawBuild is String) {
+            buildNumber = int.tryParse(rawBuild);
+          }
+          await DebugLogHelper.addDebugLog('SAVE_TOUR: track=$tourTrack build_number=$buildNumber');
         }
       } catch (e) {
         await DebugLogHelper.addDebugLog('SAVE_TOUR: Error getting coordinates: $e');
@@ -802,6 +827,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         'is_translation': false,
         'lat': lat,
         'lng': lng,
+        'track': tourTrack,
+        if (buildNumber != null) 'build_number': buildNumber,
       };
       
       await DebugLogHelper.addDebugLog('SAVE_TOUR: Saving tour info: $tourInfo');

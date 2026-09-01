@@ -1362,6 +1362,13 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        // Per-tour track provenance (Stable/Preview). Driven by
+                        // the stored track on THIS tour, not the current setting,
+                        // so a mixed list shows which build made each tour.
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: _trackChip(tour),
+                        ),
                       ],
                     ),
                     trailing: Row(
@@ -1418,6 +1425,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
                           builder: (context) => TourPlayerScreen(
                             tourPath: tour['path'],
                             tourTitle: tour['title'],
+                            track: tour['track'] as String?,
+                            buildNumber: tour['build_number'] is int
+                                ? tour['build_number'] as int
+                                : (tour['build_number'] is String
+                                    ? int.tryParse(tour['build_number'])
+                                    : null),
                           ),
                         ),
                       );
@@ -1446,6 +1459,32 @@ class _MyToursScreenState extends State<MyToursScreen> {
     return title;
   }
   
+  /// Small provenance chip showing which track (Stable/Preview) produced a
+  /// tour, with the build number when the record carries one. Driven by the
+  /// stored per-tour 'track', not the current setting. See wdvrdaxxmb.
+  Widget _trackChip(Map<String, dynamic> tour) {
+    final track = tour['track'] as String?;
+    final rawBuild = tour['build_number'];
+    final buildNumber = rawBuild is int
+        ? rawBuild
+        : (rawBuild is String ? int.tryParse(rawBuild) : null);
+    final isPreview = Endpoints.isPreviewTrack(track);
+    final label = Endpoints.trackLabel(track, buildNumber: buildNumber);
+    final color = isPreview ? Colors.purple : Colors.green;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
   Color _getTypeColor(String type) {
     switch (type) {
       case 'News and Politics':
