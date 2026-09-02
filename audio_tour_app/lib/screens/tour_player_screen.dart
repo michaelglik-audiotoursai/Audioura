@@ -49,26 +49,6 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   void _initializeWebView() {
     // InAppWebView will be initialized in the build method
   }
-
-  /// AppBar provenance badge (Stable/Preview, with build number when known).
-  /// Driven by the track stored on this tour, not the current setting.
-  Widget _buildTrackBadge() {
-    final isPreview = Endpoints.isPreviewTrack(widget.track);
-    final label = Endpoints.trackLabel(widget.track, buildNumber: widget.buildNumber);
-    final color = isPreview ? Colors.purple.shade200 : Colors.green.shade200;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
   
   Future<String> _getIndexUrl() async {
     // Mobile platform only: use file URL.
@@ -101,10 +81,10 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
         backgroundColor: const Color(0xFF2c3e50),
         foregroundColor: Colors.white,
         actions: [
-          // Track provenance, always visible while listening (AC4): a tester
-          // must never be unsure which track produced the tour they hear.
-          Center(child: _buildTrackBadge()),
-          const SizedBox(width: 4),
+          // Track/release provenance is intentionally NOT shown here — a
+          // visible "Stable"/"Preview" mark confuses testers. Provenance is
+          // available on demand via the "Version" item in the ⋮ menu on the
+          // tour list. See wdvrdaxxmb.
           IconButton(
             icon: Icon(Icons.help_outline),
             onPressed: _showTourHelpDialog,

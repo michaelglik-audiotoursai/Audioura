@@ -1362,13 +1362,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        // Per-tour track provenance (Stable/Preview). Driven by
-                        // the stored track on THIS tour, not the current setting,
-                        // so a mixed list shows which build made each tour.
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: _trackChip(tour),
-                        ),
+                        // Track/release provenance is intentionally NOT shown as
+                        // a chip here — a visible "Stable"/"Preview" label on the
+                        // list confuses testers. It's available on demand via the
+                        // "Version" item in the ⋮ menu instead. See wdvrdaxxmb.
                       ],
                     ),
                     trailing: Row(
@@ -1398,6 +1395,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               case 'edit': _editTour(tour); break;
                               case 'delete': _deleteTour(index); break;
                               case 'report': _reportTour(tour); break;
+                              case 'version': _showVersionDialog(tour); break;
                             }
                           },
                           itemBuilder: (context) => [
@@ -1406,6 +1404,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
                             const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'), dense: true)),
                             const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.flag_outlined, color: Colors.grey), title: Text('Report'), dense: true)),
+                            const PopupMenuItem(value: 'version', child: ListTile(leading: Icon(Icons.info_outline, color: Colors.blueGrey), title: Text('Version'), dense: true)),
                           ],
                         ),
                         const Icon(Icons.play_arrow, color: Color(0xFF3498db)),
@@ -1459,29 +1458,72 @@ class _MyToursScreenState extends State<MyToursScreen> {
     return title;
   }
   
-  /// Small provenance chip showing which track (Stable/Preview) produced a
-  /// tour, with the build number when the record carries one. Driven by the
-  /// stored per-tour 'track', not the current setting. See wdvrdaxxmb.
-  Widget _trackChip(Map<String, dynamic> tour) {
+  /// Version/provenance details for a tour, shown on demand from the ⋮ menu
+  /// (NOT as a chip on the list — a visible Stable/Preview label confuses
+  /// testers). Shows generation date, release (track + build number when
+  /// present), and services version once the tour record carries it. See
+  /// wdvrdaxxmb.
+  void _showVersionDialog(Map<String, dynamic> tour) {
+    // Generation date
+    String generated = 'Unknown';
+    final created = tour['created'];
+    if (created is String && created.isNotEmpty) {
+      try {
+        generated = DateTime.parse(created).toLocal().toString().split('.').first;
+      } catch (_) {
+        generated = created;
+      }
+    }
+
+    // Release = track label (+ build number when the record has one).
     final track = tour['track'] as String?;
     final rawBuild = tour['build_number'];
     final buildNumber = rawBuild is int
         ? rawBuild
         : (rawBuild is String ? int.tryParse(rawBuild) : null);
-    final isPreview = Endpoints.isPreviewTrack(track);
-    final label = Endpoints.trackLabel(track, buildNumber: buildNumber);
-    final color = isPreview ? Colors.purple : Colors.green;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+    final release = Endpoints.trackLabel(track, buildNumber: buildNumber);
+
+    // Services version — only present once the services side stores it on the
+    // tour record. Absent for now; show a placeholder until then.
+    final rawSvc = tour['services_version'];
+    final servicesVersion =
+        (rawSvc != null && rawSvc.toString().isNotEmpty) ? rawSvc.toString() : 'Not available yet';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Version'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _versionRow('Generated', generated),
+            const SizedBox(height: 8),
+            _versionRow('Release', release),
+            const SizedBox(height: 8),
+            _versionRow('Services version', servicesVersion),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
-      ),
+    );
+  }
+
+  Widget _versionRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
+        Expanded(child: Text(value)),
+      ],
     );
   }
 
