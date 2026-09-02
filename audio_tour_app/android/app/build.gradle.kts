@@ -19,8 +19,6 @@ android {
             keyPassword = "android"
             storeFile = file("debug.keystore")
             storePassword = "android"
-            enableV1Signing = true
-            enableV2Signing = true
         }
         create("release") {
             val keystorePropertiesFile = rootProject.file("key.properties")
@@ -38,12 +36,20 @@ android {
                 storeFile = file("debug.keystore")
                 storePassword = "android"
             }
-            // Explicitly enable v1 (JAR) AND v2 signing. minSdk is 24, and
-            // API 24–27 devices REQUIRE a v1 signature — the newer AGP shipped
-            // with Flutter 3.41.6 otherwise defaults to v2-only, producing an
-            // APK that fails to install with "App not installed" on 7.0–8.1.
-            enableV1Signing = true
+            // Signature schemes. The AGP shipped with Flutter 3.41.6 defaulted
+            // this release config to v2-ONLY, which tap-installs on a Pixel 4
+            // (Android 13) failed with the generic "App wasn't installed" — even
+            // on a clean device, even though Play Protect logged ALLOW and the
+            // integrity check passed. A one-variable test (same bytes, same key,
+            // re-signed with v3+v4) tap-installed successfully, isolating the
+            // missing v3/v4 signatures as the cause. v4 produces the .idsig used
+            // by the streaming/incremental installer path that Files-by-Google
+            // uses. Enable v2+v3+v4; v1 is intentionally left off (AGP omits it
+            // for minSdk>=24 and it is not needed on API 24+).
+            enableV1Signing = false
             enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
         }
     }
 
