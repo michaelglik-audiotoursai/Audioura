@@ -43,6 +43,13 @@ bash build_flutter_clean.sh
 - Script outputs: `audioura-dev.apk` (release APK) + `audioura-release.aab` (signed AAB) copied back to `/media/sf_audiotours` (Windows shared folder).
 - Script needs `build_secrets.env` in `/media/sf_audiotours` with `GATEWAY_API_KEY=...` (gitignored; fail-fast if missing).
 
+### 📲 Installing an APK on the phone (Files-by-Google is BROKEN — use Chrome or adb)
+Proven 2026-09-02 on Pixel 4 / Android 13: **tapping an APK in Files by Google fails with "The app wasn't installed"** — even byte-identical, valid, signed APKs. Root cause: Play Protect queues a background upload/scan (`Adding apk for upload`, `upload_consent=1`) and the Files `PackageInstaller` session times out (`Session ID is no longer active`). NOT a build/signing/versionCode/tour-data issue — ruled all out. Same bytes install fine via adb and via Chrome. (See ClickUp `wdvrday4x3` how-to + `wdvrdaxxmb` investigation.)
+- **adb (phone via USB):** `adb install -r <apk>` — reliable, preserves data. adb is at `C:\Users\micha\AppData\Local\Android\Sdk\platform-tools\adb.exe`.
+- **Chrome sideload (no USB):** `adb reverse tcp:8765 tcp:8765`, copy apk into a serve dir, `python -m http.server 8765` there; on phone Chrome → `localhost:8765/audioura.apk` → download → tap in Chrome's download bar → Install. Chrome is a different session owner, unaffected by the Play Protect upload path.
+- **Testers (Yury/Igor):** Play Store internal-testing track — no sideload, updates auto-deliver. This is the real distribution path.
+- Do NOT change phone Play Protect settings to work around this (Michael's standing instruction).
+
 ## 📋 WORKFLOW (ClickUp-driven)
 - Work is tracked in **ClickUp** via the MCP server. Mobile queue list: **🟩 Mobile — Kiro** (`1000410000000734`). Services list: **🟦 Services — Kiro** (`1000410000000733`). Michael's list: **👤 Michael** (`1000410000000735`).
 - Loop: read task → implement fully → commit to `storied` → push to GitHub → tell Michael "Ready to build on Ubuntu" → comment results on the task → move to review/appropriate status.
