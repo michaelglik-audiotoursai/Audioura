@@ -36,20 +36,21 @@ android {
                 storeFile = file("debug.keystore")
                 storePassword = "android"
             }
-            // Signature schemes. The AGP shipped with Flutter 3.41.6 defaulted
-            // this release config to v2-ONLY, which tap-installs on a Pixel 4
-            // (Android 13) failed with the generic "App wasn't installed" — even
-            // on a clean device, even though Play Protect logged ALLOW and the
-            // integrity check passed. A one-variable test (same bytes, same key,
-            // re-signed with v3+v4) tap-installed successfully, isolating the
-            // missing v3/v4 signatures as the cause. v4 produces the .idsig used
-            // by the streaming/incremental installer path that Files-by-Google
-            // uses. Enable v2+v3+v4; v1 is intentionally left off (AGP omits it
-            // for minSdk>=24 and it is not needed on API 24+).
-            enableV1Signing = false
+            // Signature schemes: v2 + v3 (v1/JAR is not needed for minSdk>=24;
+            // AGP omits it by default). Play Store re-signs on delivery, so
+            // testers are unaffected regardless.
+            //
+            // NOTE on the "App wasn't installed" saga: signing was investigated
+            // and RULED OUT as the cause. The real cause is device-side — on a
+            // Pixel 4 / Android 13, Play Protect runs a ~6s Just-in-Time scan on
+            // sideloaded APKs (PlayProtectDialogsActivity) that races and
+            // outlives the PackageInstaller session ("Session ID is no longer
+            // active"), so tap-install intermittently fails even though the
+            // verdict is ALLOW. It is non-deterministic and not a build defect:
+            // the same APK installs reliably via `adb install -r` and via the
+            // Play Store. See ClickUp wdvrdaxxmb for the full logcat evidence.
             enableV2Signing = true
             enableV3Signing = true
-            enableV4Signing = true
         }
     }
 
