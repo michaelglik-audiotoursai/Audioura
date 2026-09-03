@@ -2,7 +2,9 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-RUN pip install flask psycopg2-binary requests beautifulsoup4
+# cryptography: /submit_credentials decryption imports it lazily, so omitting it gives
+# a container that starts cleanly and fails only at request time (ClickUp wdvrday52p).
+RUN pip install flask psycopg2-binary requests beautifulsoup4 'cryptography>=41.0.0'
 
 # newsletter_processor_service.py imports seven sibling modules (apple_podcasts_processor,
 # spotify_processor, subscription_detector, dh_service_simple, user_consolidation_service,
