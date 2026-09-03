@@ -14692,6 +14692,67 @@ REWRITE RULES (all mandatory):
                   f"{_r10_total_paras_emptied} paragraphs emptied, "
                   f"{_r10_stops_affected} stops affected")
 
+    # -------- [LOCAL-472] PHASE 5.152: Stop-specificity gate --------
+    # Michael (wdvrdaxa7h): "make sure that any paragraph is stop specific. If it
+    # is not, the choice should be either remove it or make it the stop specific."
+    # Two checks, one module (stop_specificity_gate.py):
+    #   1. The substitution test, made mechanical — but [LOCAL-473] we no longer
+    #      swap in a NAMED sibling from this tour (that made the verdict depend on
+    #      which stops happen to be present). We classify the stop's KIND and swap
+    #      in a GENERIC same-kind referent ("another art museum", "another coastal
+    #      viewpoint"), then ask whether any concrete claim now breaks. No break =>
+    #      the paragraph was never about this stop => transferable. Same paragraph
+    #      => same verdict, regardless of siblings.
+    #   2. A named person/book/film must carry a STATED relationship to THIS stop,
+    #      not merely be well-known (the axis the unglossed gate at 5.157 already
+    #      covers) or grounded in a checklist (the museum-only gate at 5.158).
+    # Removal is conservative (LOCAL-359): only confidence=='high' transferable
+    # verdicts delete, and the last paragraph of a stop is never removed.
+    # Behind DISABLE_STOP_SPECIFICITY_GATE=1, like every other gate in the chain.
+    # LOCAL-472 supersedes LOCAL-469: the entity detector no longer truncates
+    # accented names (NFC normalization, D243), and the dead duplicate detector
+    # has been removed. See stop_specificity_gate.py header.
+    _ssg_disabled = os.environ.get('DISABLE_STOP_SPECIFICITY_GATE', '').strip() == '1'
+    if _ssg_disabled:
+        print(f"\n  [LOCAL-472] Stop-specificity gate DISABLED by DISABLE_STOP_SPECIFICITY_GATE=1 env var")
+    else:
+        print(f"\n  [LOCAL-472] PHASE 5.152: Stop-specificity gate...")
+        try:
+            from stop_specificity_gate import apply_stop_specificity_gate as _ssg_apply
+        except ImportError as _ssg_err:
+            _ssg_apply = None
+            print(f"  [LOCAL-472] ERROR: stop_specificity_gate not importable — gate skipped "
+                  f"({_ssg_err}). The module sits beside this file; this is a defect. "
+                  f"sys.path[0]={sys.path[0]}")
+
+        if _ssg_apply:
+            _ssg_api_key = api_key
+            _ssg_model = os.environ.get('STOP_SPECIFICITY_MODEL', 'gpt-4o-mini')
+            try:
+                _ssg_stats = _ssg_apply(
+                    poi_list,
+                    api_key=_ssg_api_key,
+                    model=_ssg_model,
+                )
+                print(f"  [LOCAL-472] Stop-specificity gate summary:")
+                print(f"    Stops checked: {_ssg_stats['stops_checked']}")
+                print(f"    Paragraphs checked: {_ssg_stats['paragraphs_checked']}")
+                print(f"    Transferable (high, removed): {_ssg_stats['paragraphs_removed']}")
+                print(f"    Transferable (low conf, kept): {_ssg_stats['transferable_low_conf_kept']}")
+                print(f"    Last-paragraph protected: {_ssg_stats['last_paragraph_protected']}")
+                print(f"    Ungrounded named entities: {_ssg_stats['ungrounded_entities']}")
+                print(f"    Stops affected: {_ssg_stats['stops_affected']}")
+                for _rl in _ssg_stats['removal_log']:
+                    print(f"    [LOCAL-472] REMOVED transferable paragraph "
+                          f"stop='{_rl['stop']}' conf={_rl['confidence']} "
+                          f"reason='{_rl['reason']}': \"{_rl['paragraph']}\"")
+                for _el in _ssg_stats['entity_log']:
+                    print(f"    [LOCAL-472] UNGROUNDED entity stop='{_el['stop']}' "
+                          f"entity='{_el['entity']}' reason='{_el['reason']}' "
+                          f"in: \"{_el['paragraph']}\"")
+            except Exception as _ssg_err:
+                print(f"  [LOCAL-472] ERROR: stop-specificity gate failed (non-fatal): {_ssg_err}")
+
     # -------- [LOCAL-263] PHASE 5.156: Unsupported-claim gate --------
     # D166: a claim survives only if something adjacent substantiates it.
     # Four claim types (PROMISE, SENSORY, FEELING, QUALITY), one shared test.
