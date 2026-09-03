@@ -34,6 +34,8 @@
 	<string>Main</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app needs speech recognition for voice commands</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Audioura lets you choose an audio file from your device to attach to a tour stop. Access is requested only when you pick a file, and only the file you select is read.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for voice commands</string>
 	<key>NSLocalNetworkUsageDescription</key>
