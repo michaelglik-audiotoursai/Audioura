@@ -2,6 +2,40 @@
 
 Durable across sessions. Delete a line once delivered.
 
+- [ ] **2026-09-03 — iOS IS LIVE ON TESTFLIGHT. First iOS build this project has shipped.**
+
+      **Audioura 2.3.2 (21) is installed on Michael's iPhone via TestFlight**, App Apple ID
+      **6807925770**, bundle `com.audioura.audiotours`, Apple Distribution: Audioura LLC
+      (`4HGRU6TKGQ`). Built from `cc636d4`. TestFlight builds **expire 90 days** from 09-03.
+
+      **Android is 2.3.2 (20), iOS is (21)** — Apple consumes a build number even on a rejected
+      upload, and build 20 was rejected (`ITMS-90683`, missing `NSPhotoLibraryUsageDescription`;
+      triggered by `file_picker`, which links the Photos framework for the audio-attach feature in
+      `edit_stop_screen.dart`). Same code, same version string. Android realigns on its next build.
+
+      **Export compliance is answered**: standard algorithms (AES/SHA-256 via PointyCastle, not
+      Apple's system crypto), **not** distributed in France. Revisit if France distribution or a
+      French external tester is ever added. Adding `ITSAppUsesNonExemptEncryption` to `Info.plist`
+      would stop the dialog recurring — not done yet, deliberately, until the answer is settled.
+
+      **Internal testers must be App Store Connect TEAM MEMBERS first** — two invitations, not one.
+      That is why adding `sophiaglik@gmail.com` straight into the tester group failed with a blank
+      "We can't process your request" page. She has a team invite pending acceptance.
+      **External testers need none of this** — email or link only, but Apple reviews the first
+      build (~1 day). That is the right route for Yury and anyone beyond the household.
+
+      **STILL OPEN, none blocking the build:**
+      - `wdvrday52p` — `/submit_credentials` returns 400, `No module named 'cryptography'`. Source
+        fixed on **both** branches (`81dd1cc` main, `1caa646` storied) but **the Cloud Run image has
+        not been rebuilt or redeployed on either**. A health check will not catch it: the import is
+        inside the function, so the container boots clean and fails only on a real submission.
+      - `wdvrday53a` — 78 bare `print()` in `lib/`, 37 in the credential file. All safe today; the
+        redactor only covers `addDebugLog`.
+      - `wdvrday5ad` — MinimumOSVersion 13.0 -> 15.0, required Spring 2027. Do it AFTER the test
+        round, not during.
+      - **The app-specific password is in the session transcript. Revoke it** at appleid.apple.com.
+      - Flutter's **default white launch screen** still ships.
+
 - [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
 
       **STATE: Michael accepted the restaurant tour and is testing from the phone.**
