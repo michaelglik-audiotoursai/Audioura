@@ -23,6 +23,19 @@ void main() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('cached_articles');
     print('🗑️ Cleared old article cache to fix 404 errors');
+
+    // SECURITY (wdvrday4pk): one-time purge of the persisted debug log.
+    // Builds before 2.3.2 wrote plaintext credentials and the AES key into
+    // SharedPreferences 'debug_logs'. Any device that ran an affected build
+    // still has those secrets on disk. Clear them once on first launch of the
+    // fixed version. Keyed so it runs exactly once (and again if we ever bump
+    // the guard key for a future incident).
+    const purgeFlag = 'debug_logs_security_purged_v2';
+    if (!(prefs.getBool(purgeFlag) ?? false)) {
+      await prefs.remove('debug_logs');
+      await prefs.setBool(purgeFlag, true);
+      print('🔒 Purged legacy debug_logs (one-time security cleanup)');
+    }
   } catch (e) {
     print('Warning: Could not clear cache: $e');
   }

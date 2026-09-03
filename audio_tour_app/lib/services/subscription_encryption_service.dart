@@ -47,29 +47,23 @@ class SubscriptionEncryptionService {
       final digest = sha256.convert(sharedSecretBytes);
       final aesKey = base64.encode(digest.bytes.take(16).toList()); // AES-128
       
-      // Store keys securely
-      print('ENCRYPTION_DEBUG: About to store keys');
-      print('ENCRYPTION_DEBUG: Storage instance: $_storage');
-      print('ENCRYPTION_DEBUG: Storage key constant: $_keyStorageKey');
-      print('ENCRYPTION_DEBUG: AES key to store: $aesKey');
-      
+      // Store keys securely.
+      // SECURITY (wdvrday4pk): NEVER print the AES key or its material. A key
+      // in a log is a key that is gone. Log only non-sensitive progress.
+      print('ENCRYPTION_DEBUG: Storing derived keys');
+
       await _storage.write(key: _keyStorageKey, value: aesKey);
-      print('ENCRYPTION_DEBUG: AES key write completed');
-      
       await _storage.write(key: _privateKeyStorageKey, value: privateKey.toRadixString(16));
       await _storage.write(key: _publicKeyStorageKey, value: publicKey.toRadixString(16));
       print('ENCRYPTION_DEBUG: All keys write completed');
-      
-      // Immediately verify storage with same instance
+
+      // Immediately verify storage with same instance (existence only).
       final verifyKey = await _storage.read(key: _keyStorageKey);
       print('ENCRYPTION_DEBUG: Immediate verification - key exists: ${verifyKey != null}');
-      if (verifyKey != null) {
-        print('ENCRYPTION_DEBUG: Immediate verification - key matches: ${verifyKey == aesKey}');
-        print('ENCRYPTION_DEBUG: Immediate verification - key length: ${verifyKey.length}');
-      } else {
+      if (verifyKey == null) {
         print('ENCRYPTION_DEBUG: CRITICAL - Key not found immediately after storage!');
       }
-      
+
       // Test hasStoredKey() immediately
       final hasKeyResult = await hasStoredKey();
       print('ENCRYPTION_DEBUG: hasStoredKey() immediately after storage: $hasKeyResult');
@@ -98,15 +92,10 @@ class SubscriptionEncryptionService {
   /// Get stored encryption key (SECURE - only from Diffie-Hellman)
   static Future<String?> getStoredKey() async {
     try {
-      print('ENCRYPTION_DEBUG: Attempting to read key from storage with key: $_keyStorageKey');
       final key = await _storage.read(key: _keyStorageKey);
+      // SECURITY (wdvrday4pk): existence only — never print key material or a
+      // preview of it.
       print('ENCRYPTION_DEBUG: Retrieved key from storage: ${key != null ? "[KEY_EXISTS]" : "[NULL]"}');
-      
-      if (key != null) {
-        print('ENCRYPTION_DEBUG: Key length: ${key.length}');
-        print('ENCRYPTION_DEBUG: Key preview: ${key.length > 10 ? key.substring(0, 10) + "..." : key}');
-      }
-      
       return key;
     } catch (e) {
       print('ENCRYPTION_DEBUG: Error reading key from storage: $e');
@@ -145,7 +134,9 @@ class SubscriptionEncryptionService {
   static Future<Map<String, String>?> encryptCredentials(String username, String password, String domain) async {
     print('ENCRYPTION_METHOD_ENTRY: encryptCredentials called');
     try {
-      print('CREDENTIAL_DEBUG: Starting encryption - Username: "$username" (${username.length}), Password: "$password" (${password.length})');
+      // SECURITY (wdvrday4pk): never print credential values or the AES key.
+      // Lengths only, for diagnosing empty/oversized inputs.
+      print('CREDENTIAL_DEBUG: Starting encryption - username ${username.length} chars, password ${password.length} chars');
       
       print('CREDENTIAL_DEBUG: About to call getStoredKey()');
       final keyBase64 = await getStoredKey();
@@ -153,22 +144,17 @@ class SubscriptionEncryptionService {
       
       if (keyBase64 == null) {
         print('CREDENTIAL_DEBUG: ERROR - No encryption key found');
-        print('CREDENTIAL_DEBUG: Checking if key was stored during key exchange...');
         
-        // Check if key exists with direct storage access
+        // Check if key exists with direct storage access (existence only).
         final directCheck = await _storage.read(key: _keyStorageKey);
         print('CREDENTIAL_DEBUG: Direct storage check: ${directCheck != null ? "[KEY_EXISTS]" : "[NULL]"}');
         
         return null; // Return null instead of throwing exception
       }
       
-      print('CREDENTIAL_DEBUG: Retrieved key from storage: $keyBase64');
-      
+      // NEVER log the key (base64 or hex) — it decrypts everything it protects.
       final key = base64.decode(keyBase64);
-      print('CREDENTIAL_DEBUG: AES key: ${key.map((b) => b.toRadixString(16).padLeft(2, '0')).join('')}');
-      print('SERVICES_DEBUG: ENCRYPTING WITH AES KEY: ${key.map((b) => b.toRadixString(16).padLeft(2, '0')).join('')}');
-      print('SERVICES_DEBUG: USERNAME TO ENCRYPT: "$username"');
-      print('SERVICES_DEBUG: PASSWORD TO ENCRYPT: "$password"');
+      print('CREDENTIAL_DEBUG: Key loaded (${key.length} bytes); encrypting credentials');
       
       print('CREDENTIAL_DEBUG: About to encrypt username');
       final encryptedUsername = _encryptAES(username, key);

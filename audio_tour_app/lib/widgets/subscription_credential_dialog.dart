@@ -184,11 +184,10 @@ class _SubscriptionCredentialDialogState extends State<SubscriptionCredentialDia
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
 
-    // DEBUG: Log actual input values
-    await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: Username input: "$username" (length: ${username.length})');
-    await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: Password input: "$password" (length: ${password.length})');
-    await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: Username isEmpty: ${username.isEmpty}');
-    await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: Password isEmpty: ${password.isEmpty}');
+    // DEBUG: log non-sensitive facts only. SECURITY (wdvrday4pk): never log
+    // the username or password value — lengths / emptiness are enough to
+    // diagnose empty-field errors.
+    await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: username ${username.length} chars (empty: ${username.isEmpty}), password ${password.length} chars (empty: ${password.isEmpty})');
 
     if (username.isEmpty || password.isEmpty) {
       await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: ERROR - Empty credentials detected');
@@ -207,7 +206,8 @@ class _SubscriptionCredentialDialogState extends State<SubscriptionCredentialDia
 
     try {
       await DebugLogHelper.addDebugLog('SUBSCRIPTION_DIALOG: Submitting credentials for article: ${widget.articleId}');
-      await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: About to encrypt - Username: "$username", Password: "$password"');
+      // SECURITY (wdvrday4pk): do not log credential values.
+      await DebugLogHelper.addDebugLog('CREDENTIAL_DEBUG: About to encrypt credentials (username ${username.length} chars, password ${password.length} chars)');
       
       final deviceId = await DeviceService.getUserId();
       
