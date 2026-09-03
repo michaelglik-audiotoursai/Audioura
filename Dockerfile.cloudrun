@@ -24,6 +24,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python dependencies (superset covering all services)
+# cryptography is NOT optional: dh_service_simple.decrypt_credentials_with_mobile_key
+# imports it INSIDE the function, so a container without it boots, passes health
+# checks, and then returns 400 "Decryption failed: No module named 'cryptography'"
+# on every /submit_credentials call. requirements.txt has declared it all along, but
+# this Dockerfile installs a hand-maintained list and never reads that file, so the
+# declaration bought nothing. Ported from origin/main 81dd1cc. ClickUp wdvrday52p.
 RUN pip install --no-cache-dir \
     flask==2.3.3 \
     flask-cors==4.0.0 \
@@ -34,7 +40,8 @@ RUN pip install --no-cache-dir \
     beautifulsoup4==4.12.2 \
     pydub==0.25.1 \
     python-dotenv \
-    lxml==4.9.3
+    lxml==4.9.3 \
+    cryptography>=41.0.0
 
 # Copy all service files
 COPY *.py /app/
