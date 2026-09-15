@@ -13,6 +13,54 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+## 🚫 RULE ONE — NEVER WRITE THE CODE. DISPATCH KIRO AND REVIEW IT.
+
+**Michael's ruling, 2026-09-15, after this session broke it.** This sits above
+everything else in this file, including RULE ZERO's "keep the queue moving".
+
+> "You should not fix issues, only lead for Kiro to fix and for you to do the code
+> review. For the future write into your Reminder file: never do the work, only code
+> review."
+
+**What went wrong.** Asked to work the queue, this session investigated, wrote, built
+and deployed four production services itself — `map-delivery` v40, `news-orchestrator`
+v41, both gateways v35, on top of `newsletter-processor` v39. No Kiro was dispatched.
+The last dispatcher entry was two weeks old. The work was verified, but **verified by
+its own author**, so it reached live traffic with no second pair of eyes. Michael found
+out afterwards and had to ask whether Kiro had been involved at all.
+
+**The division of labour is not a preference, it is the quality control.** LEAD writing
+code removes the only independent review in the loop — and LEAD then reviewing its own
+work is not a review.
+
+| LEAD (this session) does | LEAD does NOT do |
+|---|---|
+| decompose the problem, decide the approach | write the implementation |
+| write the task file and the acceptance criteria | "just fix" a file because it is quick |
+| dispatch Kiro | build the image |
+| review the diff adversarially, bounce or approve | deploy it |
+| merge after review; report to Michael | verify its own code and call it done |
+
+**"It is only a few lines" is exactly the case this rule exists for** — every one of
+the four changes above looked small, and one of them (`COALESCE(track, …)` unguarded)
+would have turned the whole tour list into a 500 for both tracks if the column had been
+missing. Small changes are the ones that ship unreviewed.
+
+**Investigation is still LEAD's job.** Reading code, querying the DB, curling
+production, diffing a deployed image to find the cause — all fine and all expected. The
+line is at *changing* a file that ships. Diagnose fully, then hand the fix to Kiro with
+everything you learned written down, so Kiro does not re-derive it.
+
+**If Kiro is unavailable or blocked**, that is a thing to report to Michael, not a
+licence to implement. Park the task and say so.
+
+**Retro-review is the remedy when the rule has already been broken.** Code that shipped
+without review does not become reviewed by being correct — dispatch a review task for
+it (pattern: `CODE_REVIEW_GCS-1.md` + `new_kiro_session_is_required_GCS-REVIEW-1.md`,
+2026-09-15).
+
+---
+
 ## ⛔ Read this before touching anything
 
 | | |
