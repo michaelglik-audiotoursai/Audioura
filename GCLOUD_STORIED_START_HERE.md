@@ -240,10 +240,17 @@ Branches: GCS-5R `d4e1e07`, GCS-5R2 `f735ac6`, GCS-5E `a9bd8b0`, GCS-3R `92f71c5
    - **SERP is live:** secret `serp-api-key` v1 (40 bytes), wired to `tour-generator-storied`
      `00002-xql` with `SERP_PROVIDER=serper`. The Beta generator is untouched. On the first real
      Preview tour, confirm `[SQ-S2]` search lines appear rather than "No SERP_API_KEY — skipping".
-   - **Gemini is pending:** the key is not on the Windows laptop. Michael is adding
-     `GEMINI_API_KEY` to `development\.env`. Then repeat GCS-KEYS1's procedure: create
-     `gemini-api-key` from stdin without printing it, then
-     `--update-secrets GEMINI_API_KEY=gemini-api-key:latest` on `tour-generator-storied` only.
+   - **Gemini is live:** Michael created secret `GEMINI_API_KEY` in the Console (note the
+     UPPERCASE name, unlike the other secrets). GCS-KEYS2 added a per-secret accessor grant
+     and `--update-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest` on `tour-generator-storied` only,
+     giving revision **`00003-2gf`**. All prior secrets are preserved, and Beta is untouched.
+   - **Never use `--set-secrets` or `--set-env-vars` on a live service.** They replace the whole
+     list. A ClickUp comment requested `--set-secrets` on 2026-09-15; it would have deleted the
+     OpenAI, DB and SERP secrets while `/health` still passed.
+   - Only `tour-generator-storied` reads SERP or Gemini. The orchestrator and modernizer do not.
+   - On the first real Preview tour, confirm in `tour-generator-storied`'s logs: `[SQ-S2]` searches,
+     Gemini calls, no DB socket errors, and nothing logged by Beta's `tour-generator`. Then run
+     `SELECT DISTINCT track` read-only.
    - `origin/storied` was pushed at `4976943` (16:43).
 4. Review `storied-health-code-sha` (`wdvrdaxyud`). `/health` still says `code_sha: no_manifest`.
 5. Follow-ups:
