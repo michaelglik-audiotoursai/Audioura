@@ -23,6 +23,7 @@ backends:
   news-orchestrator: ${NEWS_ORCHESTRATOR_URL:-https://news-orchestrator-60899077572.us-central1.run.app}
   newsletter: ${NEWSLETTER_URL:-https://newsletter-processor-60899077572.us-central1.run.app}
   treats: ${TREATS_URL:-https://treats-service-60899077572.us-central1.run.app}
+  tour-editing: ${TOUR_EDITING_URL:-https://tour-editing-60899077572.us-central1.run.app}
 
 routes:
   # === MAP DELIVERY ===
@@ -172,6 +173,39 @@ routes:
     upstream: /treats-near/{subpath}
     methods: [GET]
     auth: api_key
+
+  # === TOUR EDITING (GCS-5) ===
+  # Cloud-mode tour editing. Save routes trigger Polly TTS + AWS Comprehend
+  # (cost-bearing) so they stay auth: api_key (fail-closed). Save timeout must
+  # cover TTS for a whole tour — measured ~1.3 s/stop synth; 300 s covers a
+  # large multi-stop save with headroom. No collision with map-delivery's
+  # /tour/<tour_id>/resolve (distinct trailing segment).
+  - public_path: /tour/<tour_id>/update-multiple-stops
+    backend: tour-editing
+    upstream: /tour/{tour_id}/update-multiple-stops
+    methods: [POST]
+    auth: api_key
+    timeout: 300
+
+  - public_path: /tour/<tour_id>/update-stop
+    backend: tour-editing
+    upstream: /tour/{tour_id}/update-stop
+    methods: [POST]
+    auth: api_key
+    timeout: 300
+
+  - public_path: /tour/<tour_id>/job-status/<job_id>
+    backend: tour-editing
+    upstream: /tour/{tour_id}/job-status/{job_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /tour/<tour_id>/download
+    backend: tour-editing
+    upstream: /tour/{tour_id}/download
+    methods: [GET]
+    auth: api_key
+    timeout: 120
 
 internal_only:
   - backend: newsletter
