@@ -89,6 +89,27 @@ def get_db_connection():
         port=os.getenv('DB_PORT', '5432')
     )
 
+_TRACK_COLUMN = None
+
+
+def _has_track_column(cur):
+    """True if audio_tours.track exists. Looked up once, then cached.
+
+    Kept as a real catalog read rather than an assumption: this service is shared
+    by Beta and Storied, so a wrong guess here is an outage for both.
+    """
+    global _TRACK_COLUMN
+    if _TRACK_COLUMN is None:
+        cur.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'track'
+        """)
+        _TRACK_COLUMN = cur.fetchone() is not None
+        print(f"audio_tours.track column present: {_TRACK_COLUMN}")
+        sys.stdout.flush()
+    return _TRACK_COLUMN
+
+
 def calculate_distance(lat1, lng1, lat2, lng2):
     """Calculate distance between two points in kilometers"""
     R = 6371
@@ -144,13 +165,23 @@ def get_tours_near_location(lat, lng):
         # tour -- guessing only works within one session and breaks for anything
         # generated before the Stable/Preview selector shipped (ClickUp wdvrdaxywb).
         cur.execute("""
+            -- The track column is selected only when it EXISTS. audio_tours.track
+            -- is created by the Storied orchestrator's self-healing ALTER, so on a
+            -- database that has never run it the column is absent -- and an
+            -- unguarded reference would turn the whole tour list into a 500 for
+            -- every user on both tracks. Degrading to 'beta' is correct anyway:
+            -- no track column means nothing but Beta has ever written here.
+            --
+            -- The is_test / original_tour_id filters are STORIED-ONLY and are kept
+            -- deliberately: main has never had them, and dropping them here would
+            -- make Storied start listing translations and test tours.
             SELECT id, tour_name, request_string, lat, lng, number_requested,
-                   COALESCE(track, 'beta') AS track
+                   %s AS track
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
               AND (is_test IS NOT TRUE)
               AND original_tour_id IS NULL
-        """)
+        """ % ("COALESCE(track, 'beta')" if _has_track_column(cur) else "'beta'"))
         
         tours = cur.fetchall()
         nearby_tours = []
