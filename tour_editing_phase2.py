@@ -71,6 +71,118 @@ EDIT_BLOB_PREFIX = "tours/edits"
 def _edit_blob_key(source_tour_id, new_tour_id):
     return f"{EDIT_BLOB_PREFIX}/{source_tour_id}/{new_tour_id}.zip"
 
+
+# ---------------------------------------------------------------------------
+# Service-to-service auth (GCS-5E) — private Cloud Run calls need an identity token
+# ---------------------------------------------------------------------------
+# polly-tts is a PRIVATE Cloud Run service: its IAM grants roles/run.invoker only
+# to the compute SA that tour-editing also runs as. An unauthenticated
+# POST /synthesize therefore returns 403 and the edited stop silently gets no
+# MP3 (LEAD verification, GCS-5E). Every outbound call from this service to a
+# private https:// Cloud Run service must carry a Google-signed identity token
+# whose audience is the target service's base URL.
+#
+# This mirrors the orchestrator's proven pattern
+# (tour_orchestrator_service.py _get_auth_headers / _authenticated_request):
+# fetch the token from the GCE metadata server, audience = scheme://netloc. On
+# local dev there is no metadata server, so no token is sent and behaviour is
+# unchanged (local Polly stubs do not require auth).
+#
+# _identity_token_fn is an injection seam for tests: a test can set it to a
+# callable(audience)->token to exercise the token path without a real metadata
+# server. Production leaves it None and uses the metadata server.
+_identity_token_fn = None
+METADATA_IDENTITY_URL = (
+    "http://metadata.google.internal/computeMetadata/v1/"
+    "instance/service-accounts/default/identity"
+)
+
+
+def _get_identity_token(audience):
+    """Return a Google-signed identity token for `audience`, or None locally.
+
+    Order:
+      1. An injected token function (tests) — always consulted first.
+      2. The GCE/Cloud Run metadata server.
+    Any failure (no metadata server on local dev, network error) returns None,
+    so the caller sends no Authorization header and local behaviour is unchanged.
+    """
+    if _identity_token_fn is not None:
+        try:
+            return _identity_token_fn(audience)
+        except Exception as e:
+            print(f"[AUTH] injected token function failed for {audience}: {e}")
+            return None
+    # Test-only seam: a local end-to-end harness can set LOCAL_IDENTITY_TOKEN to
+    # exercise the token path without a metadata server. Production NEVER sets
+    # this, so default behaviour is unchanged. (The metadata server below is the
+    # real production source.)
+    local_tok = os.getenv('LOCAL_IDENTITY_TOKEN')
+    if local_tok:
+        return local_tok
+    try:
+        resp = requests.get(
+            METADATA_IDENTITY_URL,
+            params={"audience": audience},
+            headers={"Metadata-Flavor": "Google"},
+            timeout=5,
+        )
+        if resp.status_code == 200 and resp.text:
+            return resp.text
+        print(f"[AUTH] metadata identity endpoint returned {resp.status_code} for {audience}")
+    except Exception as e:
+        # Expected on local dev (no metadata server) — send no token, no auth.
+        print(f"[AUTH] no identity token for {audience} (local dev?): {e}")
+    return None
+
+
+def _auth_headers_for(url):
+    """Authorization header dict for a Cloud Run service-to-service call.
+
+    Only https:// targets are treated as (potentially private) Cloud Run
+    services. For non-https (local Docker/dev) we never attempt auth — UNLESS
+    the test-only LOCAL_IDENTITY_TOKEN seam is set, which lets a local E2E
+    harness point POLLY_TTS_URL at an http auth-requiring stub and still attach
+    the token. Production never sets LOCAL_IDENTITY_TOKEN, so its non-https
+    calls remain unauthenticated exactly as before.
+    """
+    from urllib.parse import urlparse
+    if not url.startswith("https://") and not os.getenv("LOCAL_IDENTITY_TOKEN"):
+        return {}
+    parsed = urlparse(url)
+    audience = f"{parsed.scheme}://{parsed.netloc}"
+    token = _get_identity_token(audience)
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
+def _authenticated_request(method, url, **kwargs):
+    """requests.request wrapper that adds an identity token for private Cloud Run."""
+    headers = dict(kwargs.get("headers") or {})
+    headers.update(_auth_headers_for(url))
+    kwargs["headers"] = headers
+    return requests.request(method, url, **kwargs)
+
+
+class AudioGenerationError(Exception):
+    """Raised when a stop that NEEDED text-to-speech audio failed to get it.
+
+    The save must not report success and must not persist an R2 object or a
+    tour_edit_blobs row for such a save (GCS-5E). Carries the stop number and the
+    upstream Polly status so the endpoint can build an AUDIO_GENERATION_FAILED
+    error response and log the failure.
+    """
+    def __init__(self, stop_number, status=None, body_snippet=""):
+        self.stop_number = stop_number
+        self.status = status
+        self.body_snippet = body_snippet
+        msg = f"TTS audio generation failed for stop {stop_number}"
+        if status is not None:
+            msg += f" (upstream status {status})"
+        super().__init__(msg)
+
+
 # Language -> AWS Polly voice. Identical to translation_service.py VOICE_MAP.
 VOICE_MAP = {
     'en': 'Joanna', 'es': 'Lucia', 'fr': 'Celine',
@@ -974,22 +1086,40 @@ def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, 
     
     # Generate new TTS audio (flag=true or no existing audio)
     try:
-        tts_response = requests.post(f"{POLLY_TTS_URL}/synthesize", json={
-            "text": text_content,
-            "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
-            "format": "mp3"
-        }, timeout=30)
-        
+        tts_response = _authenticated_request(
+            "POST",
+            f"{POLLY_TTS_URL}/synthesize",
+            json={
+                "text": text_content,
+                "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
+                "format": "mp3",
+            },
+            timeout=30,
+        )
+
         if tts_response.status_code == 200:
             audio_file = tour_path / f"audio_{stop_number}.mp3"
             with open(audio_file, 'wb') as f:
                 f.write(tts_response.content)
             print(f"Generated TTS audio for stop {stop_number}")
             return "tts_generated", []
-        return "error", []
+        # Non-200: this stop NEEDED audio and did not get it. Log the upstream
+        # status + a body snippet, then fail loudly so the save cannot report
+        # success with a missing MP3 (GCS-5E).
+        body_snippet = ""
+        try:
+            body_snippet = (tts_response.text or "")[:200]
+        except Exception:
+            body_snippet = "<unreadable response body>"
+        print(f"[TTS] Polly /synthesize failed for stop {stop_number}: "
+              f"status={tts_response.status_code} body={body_snippet!r}")
+        raise AudioGenerationError(stop_number, status=tts_response.status_code,
+                                   body_snippet=body_snippet)
+    except AudioGenerationError:
+        raise
     except Exception as e:
         print(f"Audio generation failed for stop {stop_number}: {e}")
-        return "error", []
+        raise AudioGenerationError(stop_number, status=None, body_snippet=str(e)[:200])
 
 def create_clean_html(tour_path, final_stops):
     """Create clean HTML focused on audio controls"""
@@ -1635,6 +1765,26 @@ def _bulk_save_core(tour_id, data):
         print(f"PRESERVE: Creating new tour with {len(final_stops_data)} total stops")
         try:
             new_tour_info = create_complete_tour_with_preservation(tour_path, final_stops_data, tour_id, original_stops_dict, content_language=content_language)
+        except AudioGenerationError as audio_e:
+            # GCS-5E: a stop that needed TTS did not get audio. Fail the save —
+            # we are still BEFORE the R2 upload / tour_edit_blobs insert, so no
+            # object and no mapping row are created. Report the stop and the
+            # upstream Polly status so the client (and logs) know why.
+            print(f"[AUDIO_GENERATION_FAILED] stop={audio_e.stop_number} "
+                  f"upstream_status={audio_e.status} body={audio_e.body_snippet!r} "
+                  f"-> failing save, no R2 object or mapping row created")
+            status_code = 502 if audio_e.status in (403, 401, 500, 502, 503, 504) else 500
+            return jsonify({
+                "status": "error",
+                "message": (f"Audio could not be generated for stop {audio_e.stop_number}. "
+                            f"The text-to-speech service returned "
+                            f"{audio_e.status if audio_e.status is not None else 'an error'}."),
+                "error_code": "AUDIO_GENERATION_FAILED",
+                "stop_number": audio_e.stop_number,
+                "upstream_status": audio_e.status,
+                "recoverable": True,
+                "suggested_action": "Please try again in a few moments"
+            }), status_code
         except Exception as tour_e:
             error_str = str(tour_e)
             # Check if it's a JSON error from audio conversion
