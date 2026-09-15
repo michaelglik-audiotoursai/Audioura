@@ -166,6 +166,23 @@ routes:
     methods: [DELETE]
     auth: api_key
 
+  # === USER REGISTRATION ===
+  # Backed by news-orchestrator because it already has the Cloud SQL attachment
+  # and owns the article_requests FK that made the missing row fatal. The gateway
+  # itself has no database, which is why the old in-gateway stub could only ever
+  # fabricate a success. ClickUp wdvrdaycef.
+  - public_path: /user
+    backend: news-orchestrator
+    upstream: /user
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /user/<secret_id>
+    backend: news-orchestrator
+    upstream: /user/{secret_id}
+    methods: [GET]
+    auth: api_key
+
   # === TREATS ===
   - public_path: /treats-near/<path:subpath>
     backend: treats
