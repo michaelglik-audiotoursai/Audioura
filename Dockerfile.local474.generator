@@ -1,0 +1,13 @@
+# [LOCAL-474] Overlay image for tour-generator.
+#
+# Built AS AN OVERLAY on the exact image Beta runs (audioura:v36), NOT a rebuild
+# of main. The two COPYs replace only generate_tour_text.py and
+# generate_tour_text_service.py; every other file under /app is inherited
+# byte-for-byte from v36, so the Beta control cannot drift. Proven by the /app
+# SHA256 manifest diff in SUBMISSION_GCS-7.md.
+#
+# The copied files' ONLY behaviour change: an empty/missing tour_type is
+# normalised to '' and classified from the request text, instead of being
+# rejected with HTTP 400 (service gate) or crashing on None.lower() (generator).
+FROM us-central1-docker.pkg.dev/audiotours-migration/services/audioura:v36
+COPY generate_tour_text.py generate_tour_text_service.py /app/

@@ -1,0 +1,17 @@
+﻿LOCAL-474 /app SHA256 no-drift manifest diff (generated 2026-09-15T16:00:05.8965234-04:00)
+
+=== ORCHESTRATOR: audioura:v22-local474 (overlay) vs audioura:v22 (base) ===
+Files in base: 241   Files in overlay: 241
+Differences (=> overlay, <= base):
+=> e4abb4d788f03b8f2cff1bf32bb5d28d71419bd897f8b5422b30e204e157251f  ./tour_orchestrator_service.py
+<= 594761a894c49327c7bb1a1db9fce1386c92644fe98dc1f7dc97d70799826dbc  ./tour_orchestrator_service.py
+
+=== GENERATOR: audioura:v36-local474 (overlay) vs audioura:v36 (base) ===
+Files in base: 204   Files in overlay: 204
+Differences (=> overlay, <= base):
+=> c45f41b1c94f95555086fa7d29591b751062ca7d7b8d05f9da036bed84c27132  ./generate_tour_text.py
+=> e891600dac5e3f15a4c91d3f7f101626f95a70a72de5a570039581d5f170c099  ./generate_tour_text_service.py
+<= f4a3abdd20a217185293e45b50e8101a67a1df66ceab345b50bfcce7a64e5715  ./generate_tour_text.py
+<= f20e4361eb165cb541b8badf00232d632840f31e278c16e5c5fbdd5d5147530c  ./generate_tour_text_service.py
+
+CONCLUSION: only the intended LOCAL-474 files differ; no files added or removed.

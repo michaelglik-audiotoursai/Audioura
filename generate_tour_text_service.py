@@ -155,7 +155,7 @@ def generate_tour():
     
     # Get parameters
     location = data.get('location')
-    tour_type = data.get('tour_type')
+    tour_type = data.get('tour_type') or ''  # [LOCAL-474] None → '' so the classifier can run
     total_stops = data.get('total_stops', 10)
     
     api_call_logger.log("GENERATOR_SERVICE_RECEIVED_REQUEST", {
@@ -166,8 +166,14 @@ def generate_tour():
         "total_stops_resolved": total_stops,
     })
     
-    if not location or not tour_type:
-        return jsonify({"error": "location and tour_type are required"}), 400
+    # [LOCAL-474] location is required; tour_type is NOT. Empty/missing tour_type
+    # means "classify it" — generate_tour_text() infers the category from the
+    # request text. This mirrors the orchestrator's relaxed gate; both had to
+    # change, otherwise the orchestrator would forward '' and be rejected here.
+    if not location:
+        return jsonify({"error": "location is required"}), 400
+    if not tour_type:
+        print(f"[LOCAL-474] Empty tour_type — deferring category to classifier in generate_tour_text()")
     
     try:
         total_stops = int(total_stops)

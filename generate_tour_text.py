@@ -601,6 +601,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
     """
     _clear_failure()   # so a stale reason from an earlier job on this thread cannot leak
     import api_call_logger
+
+    # [LOCAL-474] Defensive normalization: an absent tour_type arrives here as None.
+    # Downstream code calls tour_type.lower() (in _classify_tour_category and when
+    # building the request string/title/conclusion) and f"{tour_type} {location}",
+    # both of which break on None. Coerce to '' so "no type" flows into the
+    # classifier as an empty signal — which is exactly what "classify it" means.
+    # _classify_tour_category already handles an empty tour_type and always yields a
+    # concrete category (defaulting to 'walking'), so no clean-fail guard is needed
+    # on main (unlike storied, whose extra evidence machinery is not present here).
+    if tour_type is None:
+        tour_type = ''
+
     api_call_logger.log("GENERATE_TOUR_TEXT_FUNCTION_ENTRY", {
         "location": location,
         "tour_type": tour_type,

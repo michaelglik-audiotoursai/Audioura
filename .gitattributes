@@ -1,0 +1,4 @@
+# [LOCAL-474] Keep the deploy script and evidence LF so the bash script runs
+# correctly under Git Bash regardless of core.autocrlf on the checkout.
+deploy_beta_local474.sh text eol=lf
+local474_evidence/*.py text eol=lf

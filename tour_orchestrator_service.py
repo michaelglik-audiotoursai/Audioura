@@ -1107,8 +1107,17 @@ def generate_complete_tour():
     if language not in supported_languages:
         return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
     
-    if not location or not tour_type:
-        return jsonify({"error": "location and tour_type are required"}), 400
+    # [LOCAL-474] location is required; tour_type is NOT.
+    # An absent/empty tour_type means "classify it" — the downstream category
+    # classifier in generate_tour_text.py infers the category from the request
+    # text (exactly as it does for a wrong-but-nonempty type). The app sends
+    # tour_type='' whenever it recognises no category keyword (e.g. restaurant
+    # tours, which have no parser branch), and that request must be honoured,
+    # not rejected. See tour_request_parser.dart:111 and D538–D556.
+    if not location:
+        return jsonify({"error": "location is required"}), 400
+    if not tour_type:
+        print(f"[LOCAL-474] Empty tour_type — deferring category to downstream classifier")
     
     # Reject new requests during graceful shutdown
     if _SHUTTING_DOWN:

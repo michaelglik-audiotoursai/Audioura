@@ -1,0 +1,11 @@
+# [LOCAL-474] Overlay image for tour-orchestrator.
+#
+# Built AS AN OVERLAY on the exact image Beta runs (audioura:v22), NOT a rebuild
+# of main. The single COPY replaces only tour_orchestrator_service.py; every other
+# file under /app is inherited byte-for-byte from v22, so the Beta control cannot
+# drift. Proven by the /app SHA256 manifest diff in SUBMISSION_GCS-7.md.
+#
+# The copied file's ONLY behaviour change: an empty/missing tour_type is passed
+# downstream to be classified instead of being rejected with HTTP 400.
+FROM us-central1-docker.pkg.dev/audiotours-migration/services/audioura:v22
+COPY tour_orchestrator_service.py /app/
