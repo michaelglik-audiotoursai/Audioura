@@ -1880,7 +1880,10 @@ class _EditStopScreenState extends State<EditStopScreen> {
         ),
       );
       
-      Navigator.pop(context, true);
+      // LOCAL-475: return the mutated stop map (not a bool) so the caller in
+      // edit_tour_screen._editStop can assign it back into _stops and
+      // _hasAnyChanges() can read modified/action off a real Map.
+      Navigator.pop(context, widget.stopData);
     } catch (e) {
       await DebugLogHelper.addDebugLog('EDIT: Error marking stop: $e');
     }
@@ -2201,7 +2204,9 @@ class _EditStopScreenState extends State<EditStopScreen> {
         ),
       );
       
-      Navigator.pop(context, true);
+      // LOCAL-475: return the stop map (action='delete') so the caller assigns a
+      // Map into _stops and _hasAnyChanges() detects the deletion.
+      Navigator.pop(context, widget.stopData);
     }
   }
   

@@ -22729,3 +22729,102 @@ is open and is the real cure.
   on that marker and passes what follows.
 - Container `audioura-tour-generator-1` rebuilt, md5 of `generate_tour_text.py` identical to repo,
   all four changes exercised inside it.
+
+## D560 — Three attempts at one gate, and why the first two rejections were worth their cost
+
+**2026-08-31 → 09-02.** Michael's ClickUp `wdvrdaxa7h`: a paragraph must be about THIS stop. His
+Cap d'Antibes example passes `apply_r1..r4` **byte-for-byte untouched**, so nothing in the pipeline
+tested it.
+
+**LOCAL-469 — REJECTED.** Entity detector truncated names; `_detect_named_entities` was defined
+**twice**, the first copy with a half-written body, silently shadowed by the second. 13 tests passed
+over a file containing dead code.
+
+**LOCAL-472 — REJECTED**, and this is the one worth remembering. It fixed everything named above and
+shipped **18 green tests**. The tests stub the model (`llm_fn=cimiez_specificity_stub()`), so they
+prove the plumbing and **cannot prove the judgement**. Run against the real model:
+
+```
+Cap d'Antibes, siblings=[Villa Leopolda, Musee Matisse] -> transferable=False/high  KEPT   <-- wrong
+   reason: "Musee Matisse does not offer panoramic views of nature."
+Cap d'Antibes, siblings=[Cap Ferrat, Pointe des Douaniers] -> transferable=True/high  REMOVED
+```
+
+**Same paragraph, opposite verdicts, decided by which other stops the tour happened to contain.**
+Substituting a *dissimilar* sibling makes almost anything look specific — and real tours are mostly
+dissimilar stops, so the failure mode was the common case, not the edge.
+
+**LOCAL-473 — MERGED (`795f75f`).** Substitutes a **generic same-kind referent**, not a named
+sibling. Michael's own wording was the clue: *"say the same thing about another **location**"* — not
+another stop on this tour. Verified by LEAD against the real model: Cap d'Antibes `True/high` and
+Cimiez Monastery `False/high`, both stable across three different sibling sets. Ships a **live-model
+suite** alongside the stubs — the gap that let 472 through.
+
+### The rulings
+
+1. **A stub cannot prove a judgement.** Stubbed tests are right for CI determinism and they are not
+   evidence about what a model decides. Any gate whose verdict comes from an LLM needs at least one
+   live call in its suite, pasted into the submission.
+2. **A rejection that produces a diagnosis is not a wasted round.** LEAD had said it would discard
+   the work if the second attempt failed. It failed — and by then the failure was *understood*, with
+   a cheap fix. Discarding then would have thrown away the two rounds that bought the insight. The
+   rule that matters is "stop when you are flailing", not "stop after N".
+3. **LEAD's own harness is a suspect.** LEAD twice nearly bounced correct work on bad measurement:
+   once slicing a tour file at 900 chars so the cut landed mid-word, then reporting the gate had
+   truncated `"Musée Mati"` — the *input* was truncated. Standing check 3 exists for this and LEAD
+   violated it by feeding a case whose answer it had corrupted.
+
+---
+
+## D561 — The iOS release chain, and four blockers that were each mistaken for another
+
+**2026-08-31 → 09-03. First iOS build this project has produced.** Shipped:
+`com.audioura.audiotours` **2.3.2 (20)**, Apple Distribution: Audioura LLC, `UIBackgroundModes:
+[audio]`, built from `c0049a8` — the same commit Android shipped.
+
+**Every blocker was misdiagnosed at least once. The pattern is worth keeping.**
+
+| symptom | LEAD's first call | what it actually was |
+|---|---|---|
+| Xcode: "Failed to retrieve development teams" | two Apple teams, membership lapsed | one team (`4HGRU6TKGQ` **is** Audioura LLC); a stale token, cleared by quitting Xcode |
+| `flutter build ipa` hung 31 min, then 10 more | App ID not registered | an **unanswered keychain dialog** — `codesign` blocked on permission for a key created hours earlier |
+| Version looked wrong (`2.2.1+1` vs D1's `2.3.0+20`) | policy violation needing archaeology | **LEAD's checkout was 20 commits stale.** `origin/storied` already said `2.3.1+5`. |
+| iOS build failed mid-compile | — | **disk full**; 17 GB of stale iOS DeviceSupport |
+
+**The version one is the instructive failure.** LEAD reconstructed D1, traced four version-bump
+commits and wrote a long analysis of a regression — when `git pull` answered it. **Michael asked
+"why 2.2 instead of 2.3?" and was simply right.** Reasoning from history is not a substitute for
+reading current state.
+
+### Standing consequences
+
+- **`git pull` before building anything, every time.** LEAD pushed to `storied` on 08-30 and did not
+  pull again until 09-02. Two IPAs were built from a stale tree and thrown away.
+- **An App Store-signed IPA cannot be sideloaded** (`ProvisionedDevices: 0`). Installing on a device
+  needs a separate development-signed build, which **expires in 7 days**. LEAD twice promised to
+  "install the IPA on your iPhone" before checking this.
+- **PlistBuddy reorders `Info.plist` alphabetically**, and a Python text-mode write converts its
+  **CRLF** to LF. Either turns a 4-line change into a 122-line diff that conflicts with the other
+  machine. Write it in binary mode, preserving the file's own newline.
+- **Background audio worked with nothing declaring the right to it** — no `UIBackgroundModes`, no
+  `AVAudioSession` playback category (the only `setCategory` is `.record`). It worked incidentally.
+  Now declared, because incidental behaviour breaks in the field, on a walk, not on a desk.
+
+### On the security fix, `wdvrday4pk`
+
+Found by LEAD reading code for the App Privacy declaration, not by a tester: plaintext passwords
+**and the AES key** written to a `SharedPreferences`-persisted log with an in-app viewer. Fixed by
+Mobile Kiro in `c0049a8` and **verified by LEAD rather than taken on report** — leak sites clean,
+redactor wired at `debug_log_viewer_screen.dart:152`, legacy purge real, and forcing `redact()` to a
+pass-through turns the suite `+1 -4`. They also found a site LEAD's ticket had missed
+(`subscription_credential_dialog.dart`).
+
+**Residual, filed as `wdvrday53a`:** the guard covers `addDebugLog` only. **78 bare `print()` calls
+remain in `lib/`, 37 of them in the credential file.** All are safe today — lengths and
+`[KEY_EXISTS]` — so safety now rests on every future edit remembering the convention, in the one
+file that handles passwords. That is precisely why `wdvrday4pk` existed.
+
+**Unrelated services bug surfaced by their device test:** `/submit_credentials` returns
+`400 {"message": "Decryption failed: No module named 'cryptography'"}`. **The newsletter service
+image is missing that package, so the credential feature is broken end-to-end on Beta as well.**
+Services', not Mobile's.

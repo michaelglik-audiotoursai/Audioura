@@ -2368,6 +2368,45 @@ def _classify_tour_category(location, tour_type):
     return 'walking'
 
 
+# [LOCAL-474] Testable seams for the empty-tour_type path.
+#
+# An absent/empty tour_type means "classify it" (see tour_orchestrator_service.py
+# and generate_tour_text_service.py, both relaxed to require location only). These
+# two helpers are pulled out of generate_tour_text() so the inferred-category log
+# and the genuinely-unclassifiable clean-fail can be unit-tested directly, without
+# driving the whole generation pipeline (which needs OpenAI + live services).
+
+def _infer_category_log_line(tour_type, tour_category):
+    """Return the audit line proving what the classifier decided for a request.
+
+    When tour_type arrived empty, source='inferred'; when the caller supplied a
+    concrete type, source='explicit'. This is printed at the point request
+    parameters are finalized, so a wrong inference is visible in the tour log
+    rather than silent.
+    """
+    _type_source = "explicit" if (tour_type or '').strip() else "inferred"
+    return f"[LOCAL-474] tour_type='{tour_type or ''}' → category='{tour_category}' (source={_type_source})"
+
+
+def _build_unclassifiable_evidence(location, tour_type):
+    """Structured clean-fail evidence for a request no category could be inferred for.
+
+    A genuinely unclassifiable request must fail cleanly with a useful message —
+    NOT a generic 400 (the request was well-formed) and NOT a tour about nothing.
+    The service layer surfaces error_type/user_message to the client.
+    """
+    return {
+        "error_type": "unclassifiable_request",
+        "user_message": (
+            f"We couldn't tell what kind of tour \"{location}\" should be. "
+            f"Try naming a place, neighborhood, or a tour type "
+            f"(e.g. \"restaurant\", \"walking\", \"museum\")."
+        ),
+        "location": location,
+        "tour_type": tour_type,
+    }
+
+
 
 def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
@@ -5388,6 +5427,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     """
     import api_call_logger
 
+    # [LOCAL-474] Defensive normalization: an absent tour_type arrives here as None.
+    # Downstream code calls tour_type.lower() and f"{tour_type} {location}", both of
+    # which break on None. Coerce to '' so "no type" flows into the classifier as an
+    # empty signal — which is exactly what "classify it" means.
+    if tour_type is None:
+        tour_type = ''
+
     # [LOCAL-230] Reset per-run network failure counter
     try:
         from venue_resolver import reset_network_failure_count
@@ -5477,6 +5523,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     
     # [LOCAL-60] Declare global for cost exposure
     global _LAST_GENERATION_COST
+    global _LAST_CLEAN_FAIL_EVIDENCE  # [LOCAL-474] clean-fail evidence set from multiple points
     global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
     global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
 
@@ -5700,6 +5747,34 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _phase_timer.start('poi_selection')
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
     # (that was the bug: it overwrote the venue_name-based 'museum' decision with 'walking').
+    #
+    # [LOCAL-474] CLEAN-FAIL GUARD for a genuinely unclassifiable request.
+    # An absent/empty tour_type means "classify it", and _classify_tour_category
+    # normally always yields a concrete category (defaulting to 'walking'). But if
+    # classification ever collapses to empty/None — a request we cannot reason about
+    # at all — we must fail cleanly with a useful message rather than push an empty
+    # category through the pipeline and deliver "a tour about nothing" (a 400 is also
+    # not acceptable; the request was well-formed). Signal via the same None-return +
+    # _LAST_CLEAN_FAIL_EVIDENCE mechanism the service layer already surfaces.
+    if not tour_category:
+        print(f"\n  [LOCAL-474] ⚠️  UNCLASSIFIABLE REQUEST — no tour category could be inferred")
+        print(f"    location='{location}' tour_type='{tour_type}'")
+        # _LAST_CLEAN_FAIL_EVIDENCE / _LAST_GENERATION_COST declared global at function top
+        _LAST_CLEAN_FAIL_EVIDENCE = _build_unclassifiable_evidence(location, tour_type)
+        _LAST_GENERATION_COST = {
+            "total_cost": 0.0,
+            "total_tokens": 0,
+            "cache_hit": False,
+            "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+        }
+        return None, None, (None, None)
+
+    # [LOCAL-474] Inferred-category log. When tour_type arrived empty, this line is
+    # the audit trail proving what the classifier decided — so a wrong inference is
+    # visible in the tour log rather than silent. Printed alongside the request
+    # parameters that were logged at function entry (GENERATE_TOUR_TEXT_FUNCTION_ENTRY).
+    print(_infer_category_log_line(tour_type, tour_category))
+
     # [LOCAL-46 Bug B] Display the transport mode as the detected category when applicable.
     # The logical tour_category stays 'walking' (same verification/template path) but the
     # reported category reflects what the user actually asked for.
@@ -6386,7 +6461,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"    Exhibition: {_exhibition_checklist_result.exhibition_title}")
                     print(f"    Closed: {_exhibition_checklist_result.closing_date}")
                     print(f"    Reason: {_exhibition_checklist_result.reason}")
-                    global _LAST_CLEAN_FAIL_EVIDENCE
+                    # [LOCAL-474] _LAST_CLEAN_FAIL_EVIDENCE declared global at function top
                     _LAST_CLEAN_FAIL_EVIDENCE = {
                         "error_type": "exhibition_closed",
                         "exhibition_title": _exhibition_checklist_result.exhibition_title,

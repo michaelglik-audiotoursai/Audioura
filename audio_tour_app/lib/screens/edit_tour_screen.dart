@@ -8,6 +8,49 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_editing_service.dart';
 import 'edit_stop_screen.dart';
 
+/// LOCAL-475 — the edit screen and its caller must agree on the return type.
+///
+/// [EditStopScreen] returns the updated stop as a `Map<String, dynamic>` on
+/// every save/delete path (with `modified: true` and an `action`), and returns
+/// `null` when the user cancels without changes.
+///
+/// This function is the single place that merges that navigator result back
+/// into [stops]. It enforces the invariant that **[stops] only ever contains
+/// maps**: a non-map result (the old, broken `pop(context, true)` behaviour)
+/// is rejected instead of corrupting the list.
+///
+/// Returns `true` when [stops] was mutated (caller should rebuild).
+///
+/// Kept as a top-level pure function so the return contract is unit-testable
+/// without standing up the full [EditStopScreen] widget (AC #6, #7).
+bool applyEditStopResult(
+  List<Map<String, dynamic>> stops,
+  Map<String, dynamic> editedStop,
+  Object? result,
+) {
+  // Cancel / no-change path: nothing to merge, Save All stays as it was.
+  if (result == null) return false;
+
+  // Contract guard: only a Map<String, dynamic> may enter `stops`. A bool or
+  // anything else is a broken return contract — reject it so a later
+  // `stop['modified']` read never operates on a non-map.
+  if (result is! Map<String, dynamic>) {
+    assert(
+      false,
+      'EditStopScreen must return a Map<String, dynamic> stop, got '
+      '${result.runtimeType}. See LOCAL-475.',
+    );
+    return false;
+  }
+
+  final index =
+      stops.indexWhere((s) => s['stop_number'] == editedStop['stop_number']);
+  if (index == -1) return false;
+
+  stops[index] = result;
+  return true;
+}
+
 class EditScreenLogger {
   static Future<void> logFromService(String message) async {
     await DebugLogHelper.addDebugLog('SERVICE_LOG: $message');
@@ -193,13 +236,18 @@ class _EditTourScreenState extends State<EditTourScreen> {
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        final index = _stops.indexWhere((s) => s['stop_number'] == stop['stop_number']);
-        if (index != -1) {
-          _stops[index] = result;
-        }
-      });
+    // LOCAL-475: EditStopScreen must hand back the updated stop as a
+    // Map<String, dynamic>. Older code popped `true`/`false`, which put a
+    // bool into _stops and silently broke _hasAnyChanges(). The merge + guard
+    // is delegated to applyEditStopResult so the contract is unit-testable.
+    if (result != null && result is! Map<String, dynamic>) {
+      await DebugLogHelper.addDebugLog(
+        'EDIT_CONTRACT_VIOLATION: EditStopScreen returned ${result.runtimeType}, expected Map<String, dynamic>. See LOCAL-475.',
+      );
+    }
+    final merged = applyEditStopResult(_stops, stop, result);
+    if (merged) {
+      setState(() {});
     }
   }
 

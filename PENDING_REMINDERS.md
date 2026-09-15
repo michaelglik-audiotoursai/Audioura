@@ -2,6 +2,80 @@
 
 Durable across sessions. Delete a line once delivered.
 
+- [ ] **2026-09-15 — MAC MINI FIRMWARE/OS UPDATE IS PENDING. Read this BEFORE and AFTER the reboot.**
+
+      Michael is upgrading this machine's firmware. A reboot breaks four things here, every one of
+      which has already bitten us once. **After the machine comes back, do these in order:**
+
+      **1. START DOCKER DESKTOP — it does NOT auto-start, and nothing local works without it.**
+      ```
+      open -a Docker
+      until docker info >/dev/null 2>&1; do sleep 10; done
+      docker ps --format '{{.Names}}'        # expect ~21 containers, self-restarting
+      ```
+      **If it launches and quietly quits, check disk first** — Docker cannot allocate its VM below
+      ~5 GB free. That is exactly what happened 2026-09-02 → 09-14.
+
+      **2. CHECK THE ALERT LOOP IS TICKING.** launchd reloads the job, but a stale run can wedge it:
+      ```
+      launchctl list | grep audioura            # a PID means running
+      ls -l .continuous_dev/autonomy.log        # mtime must be within ~5 minutes
+      ```
+      **A PID that never changes and a log that never grows means it is HUNG, not working.** That is
+      how monitoring died silently for 12 days. `guard()` now time-boxes every step, so a hung step
+      raises `*** TICK STEP TIMED OUT ***` instead of killing the loop — but verify.
+
+      **3. DETACHED KIRO WORKERS DIE WITH THE REBOOT.** Any task with a `STARTED` record and no
+      terminal record in `kiro_sessions_ran.md` is abandoned. Mark it `ABANDONED (reboot detected)`
+      and let the dispatcher re-claim it. **Park the task file first** or it re-dispatches into the
+      same wall (D420).
+
+      **4. THE REVIEW LOOP IS SESSION-SCOPED AND DOES NOT COME BACK.** Say "restart continuous dev".
+
+      **Before the reboot, if there is time:** let in-flight Kiro tasks finish, and note that
+      `~/audioura-worktrees` holds 11 worktrees with **uncommitted** work that exists nowhere else —
+      a reboot does not touch them, but do not let anyone "clean up" during the upgrade.
+
+      **State as of 2026-09-15 00:20 EDT, so a fresh session can tell what changed:**
+      - `origin/storied` = `95957d5`; local clean; disk ~9 GB free
+      - iOS **2.3.2 (22)** accepted by Apple and live on TestFlight, built from `2c85717`
+      - Android **2.3.2+22** built on Windows but **NOT uploaded** — held deliberately, see below
+      - Production healthy on both tracks; `track` field live (`beta` 30 / `storied` 9)
+
+- [ ] **2026-09-03 — iOS IS LIVE ON TESTFLIGHT. First iOS build this project has shipped.**
+
+      **Audioura 2.3.2 (21) is installed on Michael's iPhone via TestFlight**, App Apple ID
+      **6807925770**, bundle `com.audioura.audiotours`, Apple Distribution: Audioura LLC
+      (`4HGRU6TKGQ`). Built from `cc636d4`. TestFlight builds **expire 90 days** from 09-03.
+
+      **Android is 2.3.2 (20), iOS is (21)** — Apple consumes a build number even on a rejected
+      upload, and build 20 was rejected (`ITMS-90683`, missing `NSPhotoLibraryUsageDescription`;
+      triggered by `file_picker`, which links the Photos framework for the audio-attach feature in
+      `edit_stop_screen.dart`). Same code, same version string. Android realigns on its next build.
+
+      **Export compliance is answered**: standard algorithms (AES/SHA-256 via PointyCastle, not
+      Apple's system crypto), **not** distributed in France. Revisit if France distribution or a
+      French external tester is ever added. Adding `ITSAppUsesNonExemptEncryption` to `Info.plist`
+      would stop the dialog recurring — not done yet, deliberately, until the answer is settled.
+
+      **Internal testers must be App Store Connect TEAM MEMBERS first** — two invitations, not one.
+      That is why adding `sophiaglik@gmail.com` straight into the tester group failed with a blank
+      "We can't process your request" page. She has a team invite pending acceptance.
+      **External testers need none of this** — email or link only, but Apple reviews the first
+      build (~1 day). That is the right route for Yury and anyone beyond the household.
+
+      **STILL OPEN, none blocking the build:**
+      - `wdvrday52p` — `/submit_credentials` returns 400, `No module named 'cryptography'`. Source
+        fixed on **both** branches (`81dd1cc` main, `1caa646` storied) but **the Cloud Run image has
+        not been rebuilt or redeployed on either**. A health check will not catch it: the import is
+        inside the function, so the container boots clean and fails only on a real submission.
+      - `wdvrday53a` — 78 bare `print()` in `lib/`, 37 in the credential file. All safe today; the
+        redactor only covers `addDebugLog`.
+      - `wdvrday5ad` — MinimumOSVersion 13.0 -> 15.0, required Spring 2027. Do it AFTER the test
+        round, not during.
+      - **The app-specific password is in the session transcript. Revoke it** at appleid.apple.com.
+      - Flutter's **default white launch screen** still ships.
+
 - [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
 
       **STATE: Michael accepted the restaurant tour and is testing from the phone.**
