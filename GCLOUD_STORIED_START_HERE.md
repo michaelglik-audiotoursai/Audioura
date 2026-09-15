@@ -211,6 +211,52 @@ key) — **the private key cannot be re-downloaded from Cloudflare**.
 
 ---
 
+## ✅ STATE 2026-09-15 16:40 — deploy day. This section supersedes "STATE AT SHUTDOWN" below.
+
+Every change below was written by Kiro, reviewed by LEAD (including LEAD's own real dry-run), deployed by
+a Kiro execute-only task, and verified by LEAD by effect. Michael approved in chat: the Preview
+tour-editing deploy (~14:22), and the whole `wdvrdaxxm9` deploy request (15:42).
+
+| service | image | revision | what / verified |
+|---|---|---|---|
+| `tour-editing` (**new**, private) | `tour-editing:v2` | `00002-wc7` | cloud editing: R2 read and persist, Polly authenticated. LEAD: Russian edit of tour 421 saved and downloaded, **edited stop has audio**. Rollback: revision `00001-924` |
+| `api-gateway-storied` | `api-gateway:v36` | `00003-5zp` | = v35 `main.py` (SHA-proven) + 4 editing routes. **Stable `api-gateway` still v35 `00022-t88`**, so no editing on Stable |
+| `tour-orchestrator` (Beta) | `audioura:v22-local474` | `00025-cvz` | overlay: v22 + LOCAL-474 gate only. Env/annotations identical. Rollback `:v22` |
+| `tour-generator` (Beta) | `audioura:v36-local474` | `00023-nrv` | overlay: v36 + LOCAL-474 only. Rollback `:v36` |
+| `tour-generator-storied` (**new**, private) | `audioura-storied:v1` | `00001-6kn` | real Storied engine, `STORIED_MODE=true`, Cloud SQL |
+| `tour-modernized-storied` (**new**, private) | `audioura-storied:v1` | `00001-b2c` | mirrors Beta `tour-modernized` |
+| `tour-orchestrator-storied` | `audioura-storied:v1` | `00002-rwh` | URLs now point at the `-storied` services, so **Preview finally runs Storied code** |
+
+Branches: GCS-5R `d4e1e07`, GCS-5R2 `f735ac6`, GCS-5E `a9bd8b0`, GCS-3R `92f71c5`, and GCS-7 `1e7c2cb`
+(on `main`'s line, not merged). The first four are merged into local `storied` (`384a273`).
+**Local `storied` is ahead of origin; pushing needs Michael.**
+
+**Open, in order:**
+1. **Michael's device test** of editing on Android 2.3.2+23, Preview track, tour 421. The steps are in
+   the chat and in ClickUp `wdvrdaycwj`. Stable editing waits on it: `deploy_gcs5_tour_editing.sh --stable`.
+2. **First real Preview tour:** check the `tour-generator-storied` logs for DB errors (the socket
+   `DATABASE_URL` was never exercised), and confirm Beta's `tour-generator` did **not** log it.
+3. **Michael's call:** no `SERP_API_KEY` or `GEMINI_API_KEY` in Secret Manager, so Preview understates story quality.
+4. Review `storied-health-code-sha` (`wdvrdaxyud`). `/health` still says `code_sha: no_manifest`.
+5. Follow-ups:
+   - `deploy_storied_generator.sh` deploys by default, and its `TOUR_TRACK` read-back doesn't strip quotes.
+   - Custom (recorded) audio in `tour_editing_phase2.py` still writes to local disk, which is not cloud-safe.
+   - Move `tests/db_connection.py` and `tests/stop_anchor_detector_v2.py` to the repo root.
+6. `PARKED_kiro_task_GCS-6.md`: its APK part is superseded (Michael builds on Ubuntu). The test-script part is done in chat.
+
+**Lessons from today, do not repeat:**
+- A local test against a stub that doesn't require auth hid a production 403 (Polly).
+  Stubs must mirror production auth.
+- A route diff that compares only YAML missed a code drift in the same image.
+  Compare the code inside the running image by SHA.
+- A task file named a flag (`--apply`) that the script doesn't have.
+  Read the script's argument parser before writing the command.
+- Git Bash mangles raw Cyrillic in curl bodies. Send `\u`-escaped JSON files.
+- No tour generation for verification on production: `is_test` is ignored unless
+  `TOUR_TEST_MODE_ALLOW_REQUEST` is set.
+
+---
+
 ## 🔥 STATE AT SHUTDOWN — 2026-09-15 00:13, before Michael ran a system update
 
 **Nothing is in flight. Nothing is armed. `.continuous_dev/PAUSE` exists — remove it to
