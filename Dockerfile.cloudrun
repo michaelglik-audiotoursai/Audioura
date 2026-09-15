@@ -46,6 +46,19 @@ RUN pip install --no-cache-dir \
 # Copy all service files
 COPY *.py /app/
 
+# [GCS-3R B4b] `COPY *.py` above copies ONLY repo-root .py files. The Storied
+# generator imports two modules that live under tests/ (not at root) via
+# style_validator_detector.py — db_connection and stop_anchor_detector_v2 — and
+# reads two non-.py data assets at generation time. Without these, a Storied tour
+# BOOTS and passes /health but ERRORS mid-generation ("No module named
+# 'db_connection'" / "...'stop_anchor_detector_v2'" / missing spine_restaurant.txt
+# / story_type_taxonomy.json). Proven by a local end-to-end run (SUBMISSION_GCS-3R.md).
+# Copy them to /app so they are importable/readable as top-level modules/assets.
+COPY tests/db_connection.py /app/db_connection.py
+COPY tests/stop_anchor_detector_v2.py /app/stop_anchor_detector_v2.py
+COPY story_type_taxonomy.json /app/story_type_taxonomy.json
+COPY templates/ /app/templates/
+
 # Create tours directory (for volume mode compatibility)
 RUN mkdir -p /app/tours
 
