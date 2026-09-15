@@ -236,7 +236,15 @@ Branches: GCS-5R `d4e1e07`, GCS-5R2 `f735ac6`, GCS-5E `a9bd8b0`, GCS-3R `92f71c5
    the chat and in ClickUp `wdvrdaycwj`. Stable editing waits on it: `deploy_gcs5_tour_editing.sh --stable`.
 2. **First real Preview tour:** check the `tour-generator-storied` logs for DB errors (the socket
    `DATABASE_URL` was never exercised), and confirm Beta's `tour-generator` did **not** log it.
-3. **Michael's call:** no `SERP_API_KEY` or `GEMINI_API_KEY` in Secret Manager, so Preview understates story quality.
+3. **Keys (Michael approved 16:43):**
+   - **SERP is live:** secret `serp-api-key` v1 (40 bytes), wired to `tour-generator-storied`
+     `00002-xql` with `SERP_PROVIDER=serper`. The Beta generator is untouched. On the first real
+     Preview tour, confirm `[SQ-S2]` search lines appear rather than "No SERP_API_KEY — skipping".
+   - **Gemini is pending:** the key is not on the Windows laptop. Michael is adding
+     `GEMINI_API_KEY` to `development\.env`. Then repeat GCS-KEYS1's procedure: create
+     `gemini-api-key` from stdin without printing it, then
+     `--update-secrets GEMINI_API_KEY=gemini-api-key:latest` on `tour-generator-storied` only.
+   - `origin/storied` was pushed at `4976943` (16:43).
 4. Review `storied-health-code-sha` (`wdvrdaxyud`). `/health` still says `code_sha: no_manifest`.
 5. Follow-ups:
    - `deploy_storied_generator.sh` deploys by default, and its `TOUR_TRACK` read-back doesn't strip quotes.
