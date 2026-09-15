@@ -155,25 +155,65 @@ else
 fi
 
 # ------------------------------------- 3. new gateway image (route-baked) ----
-# Prove the manifest delta against the currently deployed v35 image BEFORE
-# building: pull v35, extract its baked gateway_routes.yaml, diff against the
-# repo manifest. The only difference must be the 4 editing routes + backend.
-say "Establish deployed gateway image + prove route delta"
+# GCS-5R2 core fix. The deployed api-gateway:v35 runs a SPECIFIC main.py. The
+# storied tree's api-gateway/main.py has DIVERGED from it (LEAD: 54 insertions,
+# 29 deletions — attestation rewrite that imports attestation_verifier, a
+# sys.path hack, ATTESTATION_MODE/PLAY_INTEGRITY_API_KEY/APP_* env, extra
+# /health fields). Building the gateway image from the storied tree (the old
+# `docker build ... api-gateway`) would therefore change attestation handling on
+# every cost-bearing route — on Preview now and Stable later. That is NOT "v35 +
+# 4 routes". GCS-5R's proof only diffed the YAML, so it missed this.
+#
+# Correct image = v35's EXACT main.py + v35's EXACT Dockerfile + this branch's
+# gateway_routes.yaml (which is v35's YAML + exactly the 4 editing routes). LEAD
+# verified origin/main:api-gateway/main.py and :Dockerfile are identical to the
+# v35 image's (only a line-1 BOM their export added), so we stage from
+# origin/main and PROVE byte-identity against the image before building.
+#
+# The read-only proof (pull v35, extract /app/main.py + /app/gateway_routes.yaml,
+# SHA256 + route_diff) runs in BOTH --dry-run and --apply: pulling is allowed,
+# only build/push are gated. --apply ABORTS if either check fails.
+say "Stage gateway build context from origin/main (v35 code) + this branch's routes"
 V35_IMAGE="${REPO}/${GATEWAY_IMAGE_NAME}:v35"
-if [ "$DRY_RUN" = "1" ]; then
-  echo "  [dry-run] would: docker pull ${V35_IMAGE}; extract /app/gateway_routes.yaml;"
-  echo "            python api-gateway/route_diff.py <v35.yaml> api-gateway/gateway_routes.yaml"
-  echo "            (must PASS: only +4 editing routes +tour-editing backend)"
-else
-  run "docker pull '${V35_IMAGE}'"
-  run "cid=\$(docker create '${V35_IMAGE}') && docker cp \"\$cid:/app/gateway_routes.yaml\" /tmp/gw_v35.yaml && docker rm \"\$cid\""
-  run "python api-gateway/route_diff.py /tmp/gw_v35.yaml api-gateway/gateway_routes.yaml || { echo 'route delta is not exactly the 4 editing routes'; exit 1; }"
-fi
+STAGE_DIR="$(mktemp -d)"
+trap 'rm -rf "$STAGE_DIR"' EXIT
+# v35's code and Dockerfile come from origin/main (NOT the storied working tree).
+git show origin/main:api-gateway/main.py    > "${STAGE_DIR}/main.py"    || fail "cannot read origin/main:api-gateway/main.py"
+git show origin/main:api-gateway/Dockerfile > "${STAGE_DIR}/Dockerfile" || fail "cannot read origin/main:api-gateway/Dockerfile"
+# The routes are the ONLY intended change: v35 YAML + the 4 editing routes.
+cp api-gateway/gateway_routes.yaml "${STAGE_DIR}/gateway_routes.yaml"    || fail "cannot stage gateway_routes.yaml"
+echo "  Staged context: ${STAGE_DIR}"
+echo "    main.py            <- git origin/main:api-gateway/main.py"
+echo "    Dockerfile         <- git origin/main:api-gateway/Dockerfile"
+echo "    gateway_routes.yaml<- api-gateway/gateway_routes.yaml (this branch)"
+
+say "PROVE the staged main.py is byte-identical to the running v35 image (read-only)"
+# These run in dry-run too — a read-only pull + extract, no mutation.
+docker pull "${V35_IMAGE}" || fail "docker pull ${V35_IMAGE} failed (read-only)"
+V35CID="$(docker create "${V35_IMAGE}")" || fail "docker create ${V35_IMAGE} failed"
+docker cp "${V35CID}:/app/main.py"            "${STAGE_DIR}/v35_main.py" || fail "extract /app/main.py from v35 failed"
+docker cp "${V35CID}:/app/gateway_routes.yaml" "${STAGE_DIR}/v35_routes.yaml" || fail "extract /app/gateway_routes.yaml from v35 failed"
+docker rm "${V35CID}" >/dev/null || true
+python api-gateway/main_sha_check.py "${STAGE_DIR}/main.py" "${STAGE_DIR}/v35_main.py" \
+  || fail "staged main.py is NOT byte-identical to the v35 image main.py — refusing to build"
+
+say "PROVE the route delta is exactly +4 editing routes +1 backend (read-only)"
+python api-gateway/route_diff.py "${STAGE_DIR}/v35_routes.yaml" "${STAGE_DIR}/gateway_routes.yaml" \
+  || fail "route delta is not exactly the 4 editing routes + tour-editing backend"
+
+say "PROVE the editing-route test passes against the STAGED main.py (v35 code), not storied's"
+# test_editing_routes.py imports 'main' and reads gateway_routes.yaml from its
+# OWN directory, so copy it into the staged context and run it there: this
+# exercises v35's main.py + this branch's routes, exactly what ships.
+cp api-gateway/test_editing_routes.py "${STAGE_DIR}/test_editing_routes.py" || fail "cannot stage test_editing_routes.py"
+( cd "${STAGE_DIR}" && python test_editing_routes.py ) \
+  || fail "test_editing_routes.py failed against the staged (v35) context"
 
 GWTAG=$(next_tag "$GATEWAY_IMAGE_NAME" "$GW_TAG" "v36")   # v35 + 1
 GATEWAY_IMAGE="${REPO}/${GATEWAY_IMAGE_NAME}:${GWTAG}"
-say "Build + push NEW gateway image ${GATEWAY_IMAGE} (bakes the 4 new routes)"
-run "docker build -f '${GATEWAY_DOCKERFILE}' -t '${GATEWAY_IMAGE}' api-gateway"
+say "Build + push NEW gateway image ${GATEWAY_IMAGE} (v35 code + Dockerfile + the 4 routes)"
+# Build from the STAGED context (v35's main.py/Dockerfile), NOT the storied tree.
+run "docker build -f '${STAGE_DIR}/Dockerfile' -t '${GATEWAY_IMAGE}' '${STAGE_DIR}'"
 run "docker push '${GATEWAY_IMAGE}'"
 
 # ---------------------------------------- 4/5. deploy + wire target gateways -

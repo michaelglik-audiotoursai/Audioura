@@ -2159,6 +2159,17 @@ def update_single_stop(tour_id):
             "error_code": "VALIDATION_FAILED", "recoverable": True,
             "suggested_action": "Provide a stop_number and try again"
         }), 400
+    # GCS-5R2 item 2: GCS-5R dropped the old `if not new_text` guard, so an empty
+    # or whitespace-only new_text now folds into a synthesised stop and can yield
+    # a zero-length audio file (Michael saw "0 length" audio in the editor).
+    # Reject it before we build a bulk-save payload. `new_text` may not be a str
+    # if the caller sends a non-string, so coerce defensively.
+    if not isinstance(new_text, str) or not new_text.strip():
+        return jsonify({
+            "status": "error", "message": "new_text is required and cannot be empty",
+            "error_code": "VALIDATION_FAILED", "recoverable": True,
+            "suggested_action": "Provide non-empty new_text and try again"
+        }), 400
 
     # Fold into the bulk-save request shape (single modified stop). bulk_save
     # merges/preserves all other existing stops from the source tour.
