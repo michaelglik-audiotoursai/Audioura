@@ -149,10 +149,15 @@ fi
 assert_image_content_clean || exit 1
 RELEASE_TAG=$(next_release_tag "$RELEASE_LINE")
 DEPLOY_COMMIT=$(git rev-parse HEAD)
-echo "  release tag: ${RELEASE_TAG}  (line ${RELEASE_LINE}, branch ${BRANCH}, commit ${DEPLOY_COMMIT:0:8})"
+# BUILD_NUMBER is the DISPLAY number the app shows (vNNN). git rev-list --count
+# HEAD computed HERE on the host — the .git dir is not in the build context, so
+# it cannot be read inside the container. Display number only; RELEASE_TAG
+# (v<line>t<seq>) remains the reconstitution identity (see release_tag.sh).
+BUILD_NUMBER=$(git rev-list --count HEAD)
+echo "  release tag: ${RELEASE_TAG}  (line ${RELEASE_LINE}, branch ${BRANCH}, commit ${DEPLOY_COMMIT:0:8}, build ${BUILD_NUMBER})"
 
 say "Building ${FULL_IMAGE}"
-run "docker build -f '$DOCKERFILE' -t '$FULL_IMAGE' --build-arg RELEASE_TAG='$RELEASE_TAG' --build-arg GIT_SHA='$DEPLOY_COMMIT' ."
+run "docker build -f '$DOCKERFILE' -t '$FULL_IMAGE' --build-arg RELEASE_TAG='$RELEASE_TAG' --build-arg GIT_SHA='$DEPLOY_COMMIT' --build-arg BUILD_NUMBER='$BUILD_NUMBER' --build-arg GIT_BRANCH='$BRANCH' ."
 say "Pushing"
 run "gcloud auth configure-docker us-central1-docker.pkg.dev --quiet"
 run "docker push '$FULL_IMAGE'"

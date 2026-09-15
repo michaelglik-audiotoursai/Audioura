@@ -473,6 +473,8 @@ def health_check():
     except ImportError:
         _manifest_info = {
             "code_sha": "manifest_check_unavailable",
+            "build_number": "unknown",
+            "git_branch": "unknown",
             "build_time": "unknown",
             "manifest_ok": False,
             "drift_files": ["manifest_check.py not found in image"],
@@ -492,6 +494,8 @@ def health_check():
         "version": SERVICE_VERSION,
         "mode": os.getenv("STORIED_MODE", "false"),
         "code_sha": _manifest_info.get("code_sha", "unknown"),
+        "build_number": _manifest_info.get("build_number", "unknown"),
+        "git_branch": _manifest_info.get("git_branch", "unknown"),
         "build_time": _manifest_info.get("build_time", "unknown"),
         "manifest_ok": _manifest_info.get("manifest_ok", False),
         **({

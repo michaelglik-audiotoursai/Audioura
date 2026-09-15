@@ -12,8 +12,18 @@ FROM python:3.11-slim
 # what is running. See release_tag.sh.
 ARG RELEASE_TAG="unset"
 ARG GIT_SHA="unset"
+# BUILD_NUMBER is the DISPLAY number the app shows next to Stable/Preview
+# (git rev-list --count HEAD). GIT_BRANCH records which line the image came from.
+# All three are baked in at build time by the deploy scripts. WITHOUT these ARG
+# lines the --build-arg values are SILENTLY DISCARDED. A build made without them
+# degrades to the declared defaults below -- a CLEAR sentinel, never a stale or
+# wrong number (a wrong build_number mislabels which engine produced a tour).
+ARG BUILD_NUMBER="unknown"
+ARG GIT_BRANCH="unknown"
 ENV RELEASE_TAG=${RELEASE_TAG} \
-    GIT_SHA=${GIT_SHA}
+    GIT_SHA=${GIT_SHA} \
+    BUILD_NUMBER=${BUILD_NUMBER} \
+    GIT_BRANCH=${GIT_BRANCH}
 
 
 WORKDIR /app
@@ -45,6 +55,18 @@ RUN pip install --no-cache-dir \
 
 # Copy all service files
 COPY *.py /app/
+
+# Build-time manifest: record checksums of all Python sources + git identity.
+# The .git directory is NOT in this build context (COPY *.py only), so
+# `git rev-parse` inside the container cannot work -- the values MUST arrive as
+# build args. We write them to files that build_manifest.py reads, then generate
+# /app/.build_manifest.json which manifest_check.py serves on /health.
+# Omitting the build args leaves the ARG defaults ("unknown"), so a mis-built
+# image reports a clear sentinel instead of a stale/wrong number.
+RUN echo "${GIT_SHA}" > /app/.git_sha \
+    && echo "${BUILD_NUMBER}" > /app/.build_number \
+    && echo "${GIT_BRANCH}" > /app/.git_branch \
+    && python build_manifest.py /app /app/.build_manifest.json
 
 # Create tours directory (for volume mode compatibility)
 RUN mkdir -p /app/tours

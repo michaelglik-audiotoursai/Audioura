@@ -110,6 +110,8 @@ def get_health_info():
 
     {
         "code_sha": "abc123...",
+        "build_number": "2150",       # the vNNN the app shows
+        "git_branch": "storied",
         "build_time": "2026-07-31T...",
         "manifest_ok": true/false,
         "drift_files": [...]   # only present when manifest_ok is false
@@ -117,6 +119,8 @@ def get_health_info():
     """
     info = {
         "code_sha": _manifest_data.get("git_sha", "unknown") if _manifest_data else "no_manifest",
+        "build_number": _manifest_data.get("build_number", "unknown") if _manifest_data else "no_manifest",
+        "git_branch": _manifest_data.get("git_branch", "unknown") if _manifest_data else "no_manifest",
         "build_time": _manifest_data.get("build_time", "unknown") if _manifest_data else "no_manifest",
         "manifest_ok": _manifest_ok,
     }

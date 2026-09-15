@@ -1424,9 +1424,40 @@ def get_coordinates_direct(location):
         return (0, 0)  # Return 0,0 as fallback
 
 
+def _get_build_identity():
+    """Return the image's build identity for /status and /health.
+
+    Reads from the build manifest (baked in at build time via Dockerfile.cloudrun
+    build args). Returns clear sentinels ("no_manifest"/"unknown") when the image
+    was built without the plumbing, never a stale or wrong number.
+    """
+    try:
+        import manifest_check
+        info = manifest_check.get_health_info()
+        return {
+            "code_sha": info.get("code_sha", "unknown"),
+            "build_number": info.get("build_number", "unknown"),
+        }
+    except ImportError:
+        return {"code_sha": "manifest_check_unavailable", "build_number": "unknown"}
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint with cost ceiling stats."""
+    """Health check endpoint with cost ceiling stats and build identity."""
+    try:
+        import manifest_check
+        _manifest_info = manifest_check.get_health_info()
+    except ImportError:
+        _manifest_info = {
+            "code_sha": "manifest_check_unavailable",
+            "build_number": "unknown",
+            "git_branch": "unknown",
+            "build_time": "unknown",
+            "manifest_ok": False,
+            "drift_files": ["manifest_check.py not found in image"],
+        }
+
     try:
         from cost_ceiling_monitor import get_ceiling_stats
         _ceiling_stats = get_ceiling_stats()
@@ -1436,6 +1467,18 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "tour_orchestrator",
+        # Build identity so the app's Stable/Preview selector can show WHICH build
+        # produced a tour. Baked in at build time (see Dockerfile.cloudrun); an
+        # image built without the build args reports a clear sentinel, not a
+        # stale/wrong number.
+        "code_sha": _manifest_info.get("code_sha", "unknown"),
+        "build_number": _manifest_info.get("build_number", "unknown"),
+        "git_branch": _manifest_info.get("git_branch", "unknown"),
+        "build_time": _manifest_info.get("build_time", "unknown"),
+        "manifest_ok": _manifest_info.get("manifest_ok", False),
+        **({
+            "drift_files": _manifest_info["drift_files"]
+        } if not _manifest_info.get("manifest_ok", False) else {}),
         "cost_ceiling": _ceiling_stats,
     })
 
@@ -1639,7 +1682,12 @@ def get_job_status(job_id):
     """Get job status. Reads from in-memory dict (thread mode) or database (cloud_tasks mode)."""
     print(f"\n==== STATUS REQUEST: {datetime.now().isoformat()} ====")
     print(f"Job ID: {job_id}")
-    
+
+    # Build identity: which engine produced this tour. Surfaced here (alongside
+    # 'track') so the app needs no second call to /health. Baked in at build time;
+    # a mis-built image reports a clear sentinel, never a stale/wrong number.
+    _build_info = _get_build_identity()
+
     # Try in-memory first (covers thread mode and recently-created cloud_tasks jobs)
     if job_id in ACTIVE_JOBS:
         job = ACTIVE_JOBS[job_id]
@@ -1650,7 +1698,10 @@ def get_job_status(job_id):
             "location": job.get("location", ""),
             "tour_type": job.get("tour_type", ""),
             "total_stops": job.get("total_stops", 0),
-            "created_at": job.get("created_at", "")
+            "created_at": job.get("created_at", ""),
+            "track": os.getenv('TOUR_TRACK', 'beta').lower(),
+            "code_sha": _build_info["code_sha"],
+            "build_number": _build_info["build_number"],
         }
         
         if job["status"] == "completed":
@@ -1696,7 +1747,10 @@ def get_job_status(job_id):
                 "location": db_job.get("location", ""),
                 "tour_type": db_job.get("tour_type", ""),
                 "total_stops": db_job.get("total_stops", 0),
-                "created_at": db_job.get("created_at", "")
+                "created_at": db_job.get("created_at", ""),
+                "track": os.getenv('TOUR_TRACK', 'beta').lower(),
+                "code_sha": _build_info["code_sha"],
+                "build_number": _build_info["build_number"],
             }
             if db_job["status"] == "completed":
                 response["netlify_ready"] = True
