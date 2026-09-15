@@ -30,7 +30,9 @@ top of +21 on either system."*
 | 20 | Android | 2.3.2 | `c0049a8` | **shipped to Play closed testing** | 2026-09-03 |
 | 20 | iOS | 2.3.2 | `c0049a8` | **REJECTED by Apple** — `ITMS-90683`, missing `NSPhotoLibraryUsageDescription`. Number consumed anyway. | 2026-09-03 |
 | 21 | iOS | 2.3.2 | `cc636d4` | **LIVE on TestFlight**, App Apple ID 6807925770 | 2026-09-03 |
-| 22 | — | 2.3.2 | — | **NEXT — claimed in `pubspec.yaml`, not yet built** | — |
+| 22 | iOS | 2.3.2 | `2c85717` | **uploaded to TestFlight** — carries the tour-editing fix (LOCAL-475) and the empty-`tour_type` fix (LOCAL-474/476) | 2026-09-14 |
+| 22 | Android | 2.3.2 | `2c85717` | **owed** — must be the SAME commit and number, so a tester on either platform is testing one thing | — |
+| 23 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
