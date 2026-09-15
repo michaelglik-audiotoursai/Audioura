@@ -61,6 +61,110 @@ def get_db_connection():
         port=os.getenv('DB_PORT', '5433')
     )
 
+def ensure_user(cursor, secret_id):
+    """Make sure `secret_id` exists in `users`, and report whether it did.
+
+    article_requests.secret_id carries a real foreign key to users.secret_id. The
+    app mints its id ON THE DEVICE (DeviceService.getUserId -> "USER-<hash>") and
+    nothing ever registered it server-side, so every news request from a new
+    device died on article_requests_secret_id_fkey. Tour generation survived only
+    because it has no such constraint.
+
+    A device-minted id is always potentially new, so the server cannot require a
+    registration step it never performs. Creating the row here is idempotent and
+    is the only thing standing between a fresh install and working news.
+    ClickUp wdvrdaycef.
+    """
+    cursor.execute("SELECT 1 FROM users WHERE secret_id = %s", (secret_id,))
+    existed = cursor.fetchone() is not None
+    if not existed:
+        cursor.execute(
+            "INSERT INTO users (secret_id, app_version) VALUES (%s, %s) "
+            "ON CONFLICT (secret_id) DO NOTHING",
+            (secret_id, 'auto-registered'))
+        logging.info(f"[USER] auto-registered previously unknown secret_id={secret_id}")
+    return existed
+
+
+@app.route('/user', methods=['POST'])
+def upsert_user():
+    """Register/refresh a device user. Reports what actually happened.
+
+    The gateway used to answer this itself with a hardcoded
+    {"status":"success","rows_affected":1} and never called any backend, so the
+    app's About-screen sync reported success while writing nothing -- and a GET
+    for an id that had never existed reported a row too. A sync that claims
+    success while the row is missing is worse than a failure: it took a field
+    test in Nice to notice. ClickUp wdvrdaycef.
+    """
+    data = request.get_json(silent=True) or {}
+    secret_id = data.get('secret_id')
+    if not secret_id:
+        return jsonify({"status": "error", "message": "secret_id is required"}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO users (secret_id, app_version) VALUES (%s, %s) "
+            "ON CONFLICT (secret_id) DO UPDATE SET app_version = EXCLUDED.app_version",
+            (secret_id, data.get('app_version', 'unknown')))
+
+        coords = data.get('coordinates') or {}
+        if coords.get('lat') is not None and coords.get('lng') is not None:
+            cursor.execute(
+                "INSERT INTO coordinates (secret_id, lat, lng) VALUES (%s, %s, %s)",
+                (secret_id, coords.get('lat'), coords.get('lng')))
+
+        # Confirm the row is really there before claiming success. This read is
+        # the whole point of the endpoint -- without it we are back to asserting.
+        cursor.execute("SELECT 1 FROM users WHERE secret_id = %s", (secret_id,))
+        present = cursor.fetchone() is not None
+        conn.commit()
+        cursor.close()
+
+        if not present:
+            return jsonify({"status": "error", "secret_id": secret_id,
+                            "message": "user row not present after write"}), 500
+        return jsonify({"status": "success", "secret_id": secret_id, "registered": True})
+    except Exception as e:
+        logging.error(f"[USER] upsert failed for {secret_id}: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/user/<secret_id>', methods=['GET'])
+def get_user(secret_id):
+    """Look a user up. Returns 404 when absent -- never a fabricated success."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT secret_id, app_version, created_at FROM users WHERE secret_id = %s",
+            (secret_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return jsonify({"status": "error", "message": "user not found",
+                            "secret_id": secret_id}), 404
+        return jsonify({
+            "status": "success",
+            "secret_id": row[0],
+            "app_version": row[1],
+            "created_at": row[2].isoformat() if row[2] else None,
+        })
+    except Exception as e:
+        logging.error(f"[USER] lookup failed for {secret_id}: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy", "service": "news_orchestrator_1"})
@@ -142,6 +246,10 @@ def generate_news():
         utf8_bytes = article_text.encode('utf-8')
         logging.info(f"🔍 UTF-8 encoded length: {len(utf8_bytes)} bytes")
         
+        # article_requests.secret_id is FK-constrained to users. Create the row
+        # first or a fresh device can never generate news (ClickUp wdvrdaycef).
+        ensure_user(cursor, secret_id)
+
         # Create article request
         cursor.execute("""
             INSERT INTO article_requests 
