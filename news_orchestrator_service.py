@@ -79,7 +79,8 @@ def ensure_user(cursor, secret_id):
     existed = cursor.fetchone() is not None
     if not existed:
         cursor.execute(
-            "INSERT INTO users (secret_id, app_version) VALUES (%s, %s) "
+            "INSERT INTO users (secret_id, app_version, updated_at) "
+            "VALUES (%s, %s, NOW()) "
             "ON CONFLICT (secret_id) DO NOTHING",
             (secret_id, 'auto-registered'))
         logging.info(f"[USER] auto-registered previously unknown secret_id={secret_id}")
@@ -107,8 +108,10 @@ def upsert_user():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO users (secret_id, app_version) VALUES (%s, %s) "
-            "ON CONFLICT (secret_id) DO UPDATE SET app_version = EXCLUDED.app_version",
+            "INSERT INTO users (secret_id, app_version, updated_at) "
+            "VALUES (%s, %s, NOW()) "
+            "ON CONFLICT (secret_id) DO UPDATE SET "
+            "app_version = EXCLUDED.app_version, updated_at = NOW()",
             (secret_id, data.get('app_version', 'unknown')))
 
         coords = data.get('coordinates') or {}
@@ -144,7 +147,7 @@ def get_user(secret_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT secret_id, app_version, created_at FROM users WHERE secret_id = %s",
+            "SELECT secret_id, app_version, created_at, updated_at FROM users WHERE secret_id = %s",
             (secret_id,))
         row = cursor.fetchone()
         cursor.close()
@@ -156,6 +159,8 @@ def get_user(secret_id):
             "secret_id": row[0],
             "app_version": row[1],
             "created_at": row[2].isoformat() if row[2] else None,
+            # Additive field: older clients simply ignore it (GCS-4 defect 3).
+            "updated_at": row[3].isoformat() if row[3] else None,
         })
     except Exception as e:
         logging.error(f"[USER] lookup failed for {secret_id}: {e}")
@@ -196,6 +201,26 @@ def generate_news():
         if is_trusted_internal:
             # Trusted internal caller (newsletter-processor) — skip per-article quota.
             # The newsletter-processor does one batch-level quota check + debit upfront.
+            #
+            # Trust here means "skip the quota gate", NOT "skip identifying the
+            # user". secret_id still becomes the FK on article_requests (via
+            # ensure_user below) and drives attribution, so a missing/anonymous
+            # id must be refused on this path too. Without this check the default
+            # 'anonymous' would reach ensure_user() and auto-create a users row
+            # that every such article FK-attaches to, making quota and
+            # attribution for those articles meaningless (GCS-4 defect 2).
+            #
+            # We REJECT rather than substitute a service principal: a batch news
+            # article always originates from a real subscriber's newsletter, so
+            # the internal caller already holds that user's id and simply has to
+            # send it. A synthetic principal would collapse per-user attribution
+            # — the very thing this endpoint exists to preserve.
+            if not secret_id or secret_id == 'anonymous':
+                logging.warning("[QUOTA] Internal call with missing/anonymous secret_id — refusing (fail-closed)")
+                return jsonify({
+                    "allowed": False, "error": "secret_id_required",
+                    "message": "Internal callers must supply the end user's secret_id."
+                }), 400
             logging.info(f"[QUOTA] Internal service call verified — skipping per-article quota (user={secret_id})")
             from entitlements import get_user_plan, words_budget_for_minutes
             try:

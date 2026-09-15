@@ -174,17 +174,44 @@ def get_tours_near_location(lat, lng):
                         'track': track or 'beta'
                     })
         
-        # Get custom tours
-        cur.execute("""
-            SELECT custom_tour_id, tour_name, request_string, lat, lng, number_requested, original_tour_id
-            FROM custom_tours 
-            WHERE lat IS NOT NULL AND lng IS NOT NULL
-        """)
+        # Get custom tours.
+        #
+        # A custom tour has no engine record of its own: custom_tours has no
+        # `track` column, only original_tour_id (FK -> audio_tours.id). A custom
+        # tour is DERIVED from an original, so its track is the original's track --
+        # a tour edited from a Storied original is a Storied tour. We inherit it
+        # via a LEFT JOIN to audio_tours.track rather than inventing a value, so
+        # the label is authoritative (read from the source row) and not a guess.
+        #
+        # Guarded exactly like the original-tours query: audio_tours.track is
+        # created by the Storied self-healing ALTER, so on a database that never
+        # ran it the column is absent and an unguarded reference is a 500 for
+        # everyone on both tracks. When absent, every custom tour COALESCEs to
+        # 'beta' -- correct, because nothing but Beta has ever written there.
+        # LEFT JOIN (not JOIN) so a custom tour whose original was deleted still
+        # lists, degrading to 'beta'.
+        if _has_track_column(cur):
+            cur.execute("""
+                SELECT c.custom_tour_id, c.tour_name, c.request_string,
+                       c.lat, c.lng, c.number_requested, c.original_tour_id,
+                       COALESCE(o.track, 'beta') AS track
+                FROM custom_tours c
+                LEFT JOIN audio_tours o ON o.id = c.original_tour_id
+                WHERE c.lat IS NOT NULL AND c.lng IS NOT NULL
+            """)
+        else:
+            cur.execute("""
+                SELECT custom_tour_id, tour_name, request_string,
+                       lat, lng, number_requested, original_tour_id,
+                       'beta' AS track
+                FROM custom_tours
+                WHERE lat IS NOT NULL AND lng IS NOT NULL
+            """)
         
         custom_tours = cur.fetchall()
         
         for tour in custom_tours:
-            custom_id, tour_name, request_string, tour_lat, tour_lng, requests, original_id = tour
+            custom_id, tour_name, request_string, tour_lat, tour_lng, requests, original_id, track = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
@@ -200,7 +227,10 @@ def get_tours_near_location(lat, lng):
                         'popularity': requests,
                         'type': 'walking_tour',
                         'is_custom': True,
-                        'original_tour_id': original_id
+                        'original_tour_id': original_id,
+                        # Inherited from the original tour. 'beta' | 'storied'.
+                        # Additive: older builds ignore it.
+                        'track': track or 'beta'
                     })
         
         nearby_tours.sort(key=lambda x: x['distance_km'])
