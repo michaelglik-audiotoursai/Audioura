@@ -211,90 +211,88 @@ key) — **the private key cannot be re-downloaded from Cloudflare**.
 
 ---
 
-## 🔥 Picked up mid-flight — read before doing anything else (2026-09-01 17:10)
+## 🔥 STATE AT SHUTDOWN — 2026-09-15 00:13, before Michael ran a system update
 
-1. **Docker Desktop is RUNNING again** (started 2026-09-01 16:55). 22 containers up from
-   the previous session's images. `tour-editing-1` sits `Exited (255)` — it is the orphan
-   the briefing warns about, and it was already failing; **do not "fix" it with
-   `--remove-orphans`**, that destroys it.
+**Nothing is in flight. Nothing is armed. `.continuous_dev/PAUSE` exists — remove it to
+resume dispatching.** No Kiro processes were running and no task file was unclaimed, so a
+reboot loses nothing. Every branch below is **pushed**; the only things that live solely
+on this disk are the two build artifacts named at the end.
 
-2. **`/tours-near` returns `track` — VERIFIED against a running service, 2026-09-01.**
-   Commit `a10b457`, on local `storied` (unpushed) and on pushed `feat/track-in-api`.
-   Evidence and the full test table are in ClickUp `wdvrdaxywb`. Three results: default
-   reads `beta`; a row set to `storied` reads `storied` (**the red test** — without it a
-   hardcoded `'beta'` passes everything else); `NULL` reads `beta` via COALESCE. Local dev
-   Postgres only, `audio_tours` 291 rows before and after, production only ever read.
+**Michael should `/clear` before resuming.** Resuming a long conversation after the cache
+TTL costs real money for zero work; this section rebuilds the picture cheaply.
 
-   **Which file is live is now proved, not assumed.** The live response carries
-   `is_custom`, which only `map_delivery_service.py` emits — `app.py` emits neither
-   `is_custom` nor `language`, `map_delivery/app.py` emits `language`/`original_tour_id`
-   and no `is_custom`. So **production runs `map_delivery_service.py`**, which is the file
-   that was changed. (The ClickUp task description points at `app.py:154` — wrong file.)
+### Production right now
 
-   ⚠️ **The local Docker stack CANNOT test this endpoint.**
-   `docker-compose-beta-local.yml` builds `map-delivery` with `build: ./map_delivery`, so
-   the container runs `map_delivery/app.py` — a different, older implementation of the
-   same route. A green local stack proves nothing here. The verification above was done by
-   `docker cp`-ing `map_delivery_service.py` into `development-map-delivery-1` and running
-   it on port 5099 (needs `pip install requests`; that image lacks it).
+| service | image | note |
+|---|---|---|
+| `map-delivery` | `audioura:v40` | **from main** — `/tours-near` now returns `track` |
+| `news-orchestrator` | `audioura:v41` | **from main** — real `/user`, `ensure_user` |
+| `api-gateway` / `api-gateway-storied` | `api-gateway:v35` | **from main** — `/user` stub removed |
+| `newsletter-processor` | `audioura:v39` | `cryptography` present, `/submit_credentials` works |
+| `tour-orchestrator-storied` | `audioura:storied` | **stale — built from `a57dc507`, 2026-08-11** |
+| `tour-generator`, `tour-modernized` | `v36`, `v37` | Beta, untouched |
 
-   The other trap still stands: the unpack line `tour_id, ... requests = tour` appears
-   **twice** (`:159`, `:395`, different endpoints); only `:159` follows the modified query.
+`origin/storied` = **`95957d5`** — the services fixes are now on storied as well as main.
 
-   **Local dev Postgres was behind production schema** — it had neither `track` nor
-   `is_test`. Both added additively (`ADD COLUMN IF NOT EXISTS`). Expect the same gap
-   again on any fresh local DB.
+### ⚠️ THE BIG ONE: Preview has never run Storied code
 
-   Still owed on `wdvrdaxywb`: `/status/<job_id>` (AC2) and the download/manifest payload,
-   neither started; AC3 (a real Storied tour reading `'storied'`) needs the Phase 2 deploy.
+Full evidence in **`PREVIEW_IS_RUNNING_BETA_CODE.md`**. Summary: the storied orchestrator
+does not generate — it POSTs to `TOUR_GENERATOR_URL`, which points at **Beta's**
+`tour-generator` (`audioura:v36`, `generate_tour_text.py` identical to `main`). Proved by
+generating tour **422** on Preview: it records `track='storied'` while Beta's generator
+logged the text at 03:31:11. **`MODERNIZED_URL` has the same defect** — found by GCS-3.
 
-3. **`wdvrdaxxmb` is unblocked except the version suffix.** Mobile Kiro can build the
-   selector, the URL fix, `track` storage and the labels now. Still owed by services:
-   `/status`, the manifest payload, and a per-tour `build_number`.
+So Preview ≡ Stable today and the `wdvrdaxxm9` comparison is impossible until the
+generator deploy lands. **`track` alone is never evidence** — tour 422 proves a
+Beta-generated tour can read `storied`.
 
-### Version scheme — SETTLED 2026-09-01: release tags, not commit counts
+### Four Kiro branches awaiting LEAD review — none deployed, none merged
+
+| branch | what | state |
+|---|---|---|
+| `kiro/gcs-review-1` @ `093e653` | adversarial review of the 2026-09-15 deploy | **read it** — found a real defect and corrected a too-strong "no drift" claim |
+| `gcs-4-services-fixes` @ `19ccdd7` | fixes all four review findings | needs LEAD review |
+| `kiro/gcs-3-storied-generator-deploy` @ `b9662fe` | **stages the Storied generator deploy**, dry-run verified | needs LEAD review, then **Michael's approval to deploy** |
+| `storied-health-code-sha` @ `94aa3b8` | `wdvrdaxyud` — `code_sha`/`build_number` on `/health` and `/status` | needs LEAD review |
+
+`kiro_sessions_ran.md` records GCS-2, GCS-3, GCS-4 and GCS-REVIEW-1 all `COMPLETED`.
+
+### Android 2.3.2+22 — built, NOT uploaded
 
 ```
-v<line>t<seq>        e.g.  v2t357        display: "Stable v2t357"
+audioura-2.3.2+22.aab   31.2 MB   <- Play Console upload
+audioura-2.3.2+22.apk   60.3 MB   <- sideload/test
 ```
+At the repo root, **gitignored, local only — these do not survive a wipe.** versionCode
+22, from **`2c85717`**, signed `CN=Mikhail Glik` (`b3abe5fb…ed3a64`). Matches the
+`BUILD_NUMBERS.md` row that says Android 22 is owed, same commit as the iOS 22 already on
+TestFlight.
 
-**`<line>` is a permanent release-line identity** — `beta=1`, `storied=2`,
-`subscribed=3`. **Not** the Stable/Preview slot. A promoted build keeps its number, so
-`v2t357` reads the same whether it is Preview or Stable — that is how you see where a
-build came from. It also makes ordering arithmetic: `v3t…` Preview is always above any
-`v2t…` Stable.
+**Upload is manual** — no service-account tooling exists; `PLAY_BUILD_AND_UPLOAD_RUNBOOK.md`
+is Play Console by hand. Add the ledger row when uploaded; iOS then takes 23.
 
-**Commit counts were tried and rejected.** They could order builds but not reconstitute
-one, and they lied: `main` (75) contained the reversed-coordinate fix while `storied`
-(2126) did not, because `LOCAL-470` **ported** the fix instead of merging it. A tag pins
-an exact commit, so `git checkout v2t357` gives precisely what shipped.
+⚠️ **Caveat Michael has not yet ruled on:** this was built on Windows with Flutter 3.29.3
+directly, because `build_flutter_clean.sh` only runs on the Ubuntu VM. That skips the
+ImageMagick icon step, and the committed icons are **five identical 1024×1024 files** that
+were never resized — so this build ships a 1024×1024 launcher icon in every density
+bucket. It works, but it is heavier than and not comparable to prior releases. Rebuilding
+on Ubuntu with Mobile Kiro, same commit and number, is the safe option.
 
-**Generated by the deploy scripts, never by hand** — `release_tag.sh`, wired into
-`deploy_cloudrun_service.sh` and `deploy_tour_modernized.sh` (commit `bc1bc49`, branch
-`feat/release-tagging`). They compute, create and **push** the tag after a verified
-deploy, and refuse if image content (`*.py`, `Dockerfile*`, `requirements*.txt`) is
-uncommitted. The guard is narrow on purpose — this tree is shared with Kiro and always
-has dirty docs.
+### Worktrees on this machine (all survive a reboot)
 
-✅ **VERIFIED 2026-09-01** that the `ARG` lands in a built image.
-`docker build -f Dockerfile.cloudrun --build-arg RELEASE_TAG=v2t999 --build-arg
-GIT_SHA=deadbeef` then `printenv` inside it returns `v2t999` / `deadbeef`. **Red test:**
-the same build with no `--build-arg` returns `unset` / `unset`, the declared defaults —
-so the value genuinely comes from the build argument and is not baked in. Both
-`deploy_cloudrun_service.sh:155` and `deploy_tour_modernized.sh:148` pass both args, and
-both scripts use `Dockerfile.cloudrun`, the only Dockerfile carrying the `ARG` lines.
-`Dockerfile.modernized` has none — do not deploy an image through it expecting a version.
-(`Dockerfile.cloudrun` had **no `ARG`** at all until commit `bc1bc49`; without it
-`--build-arg` is silently discarded and the whole scheme is a no-op that looks fine.)
+`C:\adev-wt\` — `kirotool` (dispatcher), `GCS-2/3/4`, `GCS-REVIEW-1`, `CRYPTOFIX` (main
+baseline), `PORT-STORIED`, `BUILD-22` (the 2c85717 build tree, has the signing material
+copied in), `STORIED-1..4`, `APK-2312`.
 
-The per-tour field is **`release_tag`** (string), optional, `null` for older tours.
+### Loose ends worth a ticket
 
-### Outstanding decision for Michael
-
-Ship `2.2.1+2` (compliance rebuild) **first**, then `2.3.1+1` with the selector — or fold
-them into one upload? Recommendation: ship compliance first; Google's extension buys a
-month but the rebuild is already built and only needs a device test, and the task itself
-says not to couple them. His call.
+- `POST /sync` in the gateway is still a hardcoded `{"status":"success"}` — same class of
+  lie as the `/user` stub was.
+- `Dockerfile.cloudrun` installs a **hand-maintained pip list and never reads
+  `requirements.txt`** — that is the only reason `cryptography` was missing for months.
+- The shared `audioura:vN` image is a standing hazard for the Beta control: `COPY *.py`
+  bakes in the whole repo, so "I diffed one file" never proves no drift. GCS-4 wrote a
+  reusable check (`tools/beta_image_drift_check.py`) — review it.
 
 ## Hard stops — ask Michael even in queue mode
 
