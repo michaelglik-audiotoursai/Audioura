@@ -296,6 +296,29 @@ copied in), `STORIED-1..4`, `APK-2312`.
 
 ## Hard stops — ask Michael even in queue mode
 
+### 🧪 MICHAEL TESTS ON-DEVICE BEFORE ANYTHING IS DISTRIBUTED
+
+**Michael's ruling, 2026-09-15**, after tour editing shipped in 2.3.2 (22) to TestFlight
+and failed on the first Save: *"I would like to test it before distribution otherwise we
+will be here again: distributing with obvious errors."*
+
+A green Kiro submission, a LEAD review and a passing curl are **not** the gate. The gate is
+Michael exercising the feature on a real device, through the real cloud path
+(app → Cloudflare → gateway → service), on a **non-distributed test build**. Order:
+
+1. Kiro implements → LEAD reviews.
+2. Deploy to the **Preview/storied path first** (Michael approves the deploy). Beta stays
+   untouched until the device test passes.
+3. LEAD verifies by effect with curl against `storied-api.audioura.com`.
+4. A **sideload/internal test build** goes to Michael only, with a written step-by-step
+   test script and the expected result of each step, plus known-unfixed issues listed so he
+   does not spend time on them.
+5. **Only after Michael reports pass:** Beta gateway, store/TestFlight build for testers.
+
+Why the old flow failed: 2.3.2 (22) fixed the Save All button (LOCAL-475) and was
+distributed without anyone pressing Save in cloud mode — the backend had never been
+deployed at all. Every check before distribution was local or source-level.
+
 - **Any GCloud deploy.** Runbook `wdvrdaxn9f`.
 - **Pushing `origin/storied`.**
 - **Anything irreversible:** force-push, history rewrite, deleting a pushed branch,
