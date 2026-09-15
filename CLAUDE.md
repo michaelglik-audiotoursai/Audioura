@@ -638,6 +638,38 @@ in `remind_Services_ai.md`.
 mcp-remote → https://mcp.clickup.com/mcp, browser OAuth as
 michael.glik@gmail.com). Node.js installed via brew.
 
+## ACCOUNTS — which login owns what (recorded 2026-09-15, Michael's answer)
+
+Michael has four addresses and they are not interchangeable. Guessing costs twenty
+minutes every few weeks, so:
+
+| service | account |
+|---|---|
+| **Google Cloud Console / `audiotours-migration`** | **`michael.glik@gmail.com`** |
+| GitHub, ClickUp | `michael.glik@gmail.com` |
+| Apple ID / App Store Connect / TestFlight | `glikfamily@gmail.com` |
+| Serper and other paid service logins | `michael.glik@audioura.com` |
+| product/brand address | `audiotoursai@gmail.com` |
+
+**GCloud project:** `audiotours-migration`, **project number `60899077572`** — the
+number that appears in every Cloud Run URL
+(`tour-orchestrator-60899077572.us-central1.run.app`), which is how to confirm you
+are in the right project without asking anyone.
+
+**Secrets live in Secret Manager**, not in `.env` and not in a Cloud Run env var.
+A `.env` file is read by `docker-compose` locally and is invisible to Cloud Run.
+First one created: `projects/60899077572/secrets/GEMINI_API_KEY` (2026-09-15).
+**Reference secrets by name in the deploy** — `--set-secrets NAME=NAME:latest` plus
+`roles/secretmanager.secretAccessor` on the runtime SA — so nobody handles a value.
+
+**Passwords are never written here.** They live in Google Password Manager
+(passwords.google.com). The one credential that leaked into a session transcript
+this month was an Apple app-specific password, pasted because LEAD suggested a
+method that echoes the command. **For a secret value, use Terminal directly or the
+USB drive — never the chat.**
+
+---
+
 ## ENVIRONMENT NOTES
 
 - Mac Mini, **Apple M4 (arm64)**. Images build arm64 locally. If a build fails
