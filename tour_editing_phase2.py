@@ -192,6 +192,11 @@ def _ensure_edit_map_table(cur):
             created_at      TIMESTAMPTZ DEFAULT now()
         )
     """)
+    # Commit the DDL now. get_db_connection() connections are not autocommit,
+    # so without this the CREATE is rolled back when the (read-only) caller
+    # closes its connection, and a later INSERT on a different connection fails
+    # with "relation tour_edit_blobs does not exist".
+    cur.connection.commit()
     _edit_map_table_ready = True
 
 
