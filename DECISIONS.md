@@ -22828,3 +22828,90 @@ file that handles passwords. That is precisely why `wdvrday4pk` existed.
 `400 {"message": "Decryption failed: No module named 'cryptography'"}`. **The newsletter service
 image is missing that package, so the credential feature is broken end-to-end on Beta as well.**
 Services', not Mobile's.
+
+## D562 — What Michael learned in France: we answer "what is here", people ask "what do I need to know"
+
+**2026-09-08..14, field research in Boston Logan and Nice. The most consequential finding of the
+project so far, and it is a product finding, not a bug.**
+
+### The evidence, pulled from production and read
+
+**Tour 402, "walking tour in Logan International Airport including Terminal E".** Michael asked for
+4 stops expecting the four terminals. He got **Harpoon Taproom, Dunkin' Donuts, Hudson News** — in
+museum register:
+
+> *"Position yourself near the entrance of Dunkin' Donuts to fully appreciate this **exhibit**…
+> **This exhibit celebrates** the ubiquitous coffee and donut chain… **The artist behind this
+> installation**, renowned for their hyper-realistic style…"*
+> *"…a contemporary art piece… **Created by a local Boston artist known as Mia**…"*
+> *"…a vibrant mural… **created by renowned local artist Sarah Parker**…"*
+
+**Sarah Parker and Mia do not exist, and neither do the murals.** This is the failure stacking that
+matters: once the system decided this was a museum, a stop *needs* an artist — so it invented one.
+**The framing error manufactures the fabrication.** The request said `tour_type: walking`, so the
+round-11 museum-register gate is NOT holding.
+
+**Tour 387, Musée National Marc Chagall, stop 1 "The Christ in Glory":** provenance, a date, three
+adjectives — *"unique blend of religious symbolism and vibrant colors"*, *"exuding a sense of divine
+majesty"*. **It says the painting is about the Bible and never tells the story.** No characters, no
+scene, no what-is-happening. (The "1968, for the Metropolitan Opera House" attribution also wants
+checking; Chagall's Met murals were 1966.)
+
+### Michael's diagnosis, which is correct
+
+**Dunkin' is the right answer to the wrong question.** It genuinely is the most-frequented place in
+Terminal E. Nobody needs a tour of it. The system asks *"what is at this location?"*; the person
+standing there is asking *"what do I need to understand here?"* — and the answer is governed by a
+property of the venue we never model:
+
+| venue | its governing property | what the listener wants |
+|---|---|---|
+| airport terminal | you are transiting under time pressure | lost & found, airline counters, kids, dietary |
+| Chagall | the paintings are **narratives** | the Bible story each one tells |
+| Matisse | the paintings are **formal** | why colour and shape make it *Conversation* |
+| Orthodox cathedral | a political and religious artefact | why built, who paid, what the icons mean |
+| restaurant | you are deciding whether to enter | hours, price, the story worth the detour |
+
+**His Google-suggest analogy is the load-bearing part:** these wants are patterned and predictable
+per venue type, not infinitely variable. That is what makes them modelable.
+
+### Three distinct capabilities, which must not be conflated
+
+Michael's examples look like one thing and are three:
+
+1. **Interpretive depth** — Chagall's Bible story, Matisse's colour. Needs a different *question
+   asked of the material we already retrieve*. Cheapest, closest to shipping.
+2. **Constraint-aware selection** — bathrooms on the route, step-free paths for elderly visitors,
+   somewhere to eat plain rice after food poisoning. Needs different *stop selection*, not better
+   prose.
+3. **Follow-up dialogue** — the Gemini pattern he watched people use in the Chagall museum: point,
+   get what/where/when, **then ask why**. Needs interaction; a tour today is a broadcast artefact.
+
+### Sequencing — Michael's, 2026-09-15
+
+> *"Before we can charge people money — Subscribed — we have to provide value: what people are
+> interested in — Storied."*
+
+**Storied first. Subscribed last.** And a proposed third release between them, tentatively
+**Conversational**: let a person describe what they actually want, and ask follow-ups. His tester
+Igor wanted to set up MFA Boston exhibits and could not — *"we think it is us who knows better."*
+
+### The supply-side discovery
+
+The guide at **Saint-Nicolas Cathedral in Nice** gave the tour Michael wanted — why it was built,
+who paid, what the icons mean for Russians and for the French, the angels as guards of the imperial
+family — and **would happily publish it in Audioura**, for the translation, the simultaneous
+multilingual delivery, and the ability to charge.
+
+**A human guide IS the intent layer.** That is why Subscribed does not depend on solving the
+generation problem — but Michael's ordering still puts value before payment, and that is right.
+
+### Standing consequence for current work
+
+**Nothing built so far is wasted.** Retrieval, verification, scope containment, geocoding, the story
+gate — all enablers, correctly built, **aimed at the wrong target**. The gap is an intent layer
+above them, not a replacement for them.
+
+**Open and unanswered:** whether intent is inferred from the venue, or asked of the listener. His
+airport case argues for asking — a parent with a bored child and a passenger who lost a bag want
+completely different tours of the same terminal.
