@@ -113,6 +113,13 @@ def _get_identity_token(audience):
         except Exception as e:
             print(f"[AUTH] injected token function failed for {audience}: {e}")
             return None
+    # Test-only seam: a local end-to-end harness can set LOCAL_IDENTITY_TOKEN to
+    # exercise the token path without a metadata server. Production NEVER sets
+    # this, so default behaviour is unchanged. (The metadata server below is the
+    # real production source.)
+    local_tok = os.getenv('LOCAL_IDENTITY_TOKEN')
+    if local_tok:
+        return local_tok
     try:
         resp = requests.get(
             METADATA_IDENTITY_URL,
@@ -133,11 +140,15 @@ def _auth_headers_for(url):
     """Authorization header dict for a Cloud Run service-to-service call.
 
     Only https:// targets are treated as (potentially private) Cloud Run
-    services. For non-https (local Docker/dev) we never attempt auth.
+    services. For non-https (local Docker/dev) we never attempt auth — UNLESS
+    the test-only LOCAL_IDENTITY_TOKEN seam is set, which lets a local E2E
+    harness point POLLY_TTS_URL at an http auth-requiring stub and still attach
+    the token. Production never sets LOCAL_IDENTITY_TOKEN, so its non-https
+    calls remain unauthenticated exactly as before.
     """
-    if not url.startswith("https://"):
-        return {}
     from urllib.parse import urlparse
+    if not url.startswith("https://") and not os.getenv("LOCAL_IDENTITY_TOKEN"):
+        return {}
     parsed = urlparse(url)
     audience = f"{parsed.scheme}://{parsed.netloc}"
     token = _get_identity_token(audience)
