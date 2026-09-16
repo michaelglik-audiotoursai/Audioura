@@ -49,6 +49,24 @@ WHITELIST_PATTERNS = [
     re.compile(r"EXAMPLE", re.IGNORECASE),                # anything with EXAMPLE
     re.compile(r"DUMMY", re.IGNORECASE),                  # anything with DUMMY
     re.compile(r"TEST(?:ING|_)", re.IGNORECASE),          # TEST_ or TESTING prefix
+
+    # A Secret Manager REFERENCE is a name, never a value. Cloud Run deploys
+    # pass `--set-secrets ENV_NAME=secret-name:latest`, which is exactly the
+    # pattern CLAUDE.md mandates so that nobody handles a value. The scanner
+    # flagged 15 of these on 2026-09-15 and then re-fired every ~6 minutes,
+    # which is how a real finding gets buried. Matches one or more
+    # comma-separated `NAME=secret-name:version` pairs, optionally built up
+    # from a ${VAR} prefix.
+    re.compile(r"^\$\{\w+\},?", re.IGNORECASE),        # ${SECRETS},... accumulator
+    re.compile(r"^(?:\$\{\w+\},)?"
+               r"[A-Z0-9_]+=[a-z0-9-]+:(?:latest|\d+)"
+               r"(?:,[A-Z0-9_]+=[a-z0-9-]+:(?:latest|\d+))*$"),
+
+    # A pure lowercase snake_case identifier is a NAME, not a value — no mixed
+    # case, no digits-as-entropy, no symbols. `_keyStorageKey =
+    # 'subscription_encryption_key'` is a storage slot name. If the entropy
+    # detector fires on one of these its entropy estimate is wrong, not the code.
+    re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$"),
 ]
 
 # Files that contain intentional test fixtures (not real secrets).
@@ -56,6 +74,11 @@ WHITELIST_PATTERNS = [
 ALLOWLISTED_FILES = {
     "tests/test_secret_scan.py",
     "secret_scan.py",  # contains pattern literals (e.g. PEM header in return value)
+    # Literal placeholder tokens in auth tests — the values ARE the fixture.
+    # Added 2026-09-16 after the alert re-fired every ~6 minutes on them.
+    "tests/gcs5e_verify_ru_auth.py",
+    "tests/test_gcs5e_polly_auth_and_fail.py",
+    "audio_tour_app/test/log_redactor_test.dart",
 }
 
 # Files/paths to always skip (binary, generated, or known-safe).
