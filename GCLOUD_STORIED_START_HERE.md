@@ -219,7 +219,7 @@ tour-editing deploy (~14:22), and the whole `wdvrdaxxm9` deploy request (15:42).
 
 | service | image | revision | what / verified |
 |---|---|---|---|
-| `tour-editing` (**new**, private) | `tour-editing:v2` | `00002-wc7` | cloud editing: R2 read and persist, Polly authenticated. LEAD: Russian edit of tour 421 saved and downloaded, **edited stop has audio**. Rollback: revision `00001-924` |
+| `tour-editing` (**new**, private) | `tour-editing:v3` | `00003-vpt` | cloud editing: R2 read/persist, Polly authenticated (v2), **narration no longer filename-sanitised and the nav header is stripped from TTS only** (v3, GCS-SAN1). LEAD verified on tour 421: colons, newlines and accents survive; every stop has audio. Rollback: `tour-editing-00002-wc7` |
 | `api-gateway-storied` | `api-gateway:v36` | `00003-5zp` | = v35 `main.py` (SHA-proven) + 4 editing routes. **Stable `api-gateway` still v35 `00022-t88`**, so no editing on Stable |
 | `tour-orchestrator` (Beta) | `audioura:v22-local474` | `00025-cvz` | overlay: v22 + LOCAL-474 gate only. Env/annotations identical. Rollback `:v22` |
 | `tour-generator` (Beta) | `audioura:v36-local474` | `00023-nrv` | overlay: v36 + LOCAL-474 only. Rollback `:v36` |
