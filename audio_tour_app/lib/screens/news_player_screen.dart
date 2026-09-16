@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import '../services/voice_control_service_news.dart';
+import '../services/webview_console_logger.dart';
 import 'debug_log_viewer_screen.dart';
 
 class NewsPlayerScreen extends StatefulWidget {
@@ -25,6 +26,9 @@ class NewsPlayerScreen extends StatefulWidget {
 class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
   final VoiceControlServiceNews voiceService = VoiceControlServiceNews();
   InAppWebViewController? webController;
+  // LOCAL-483: forward the news player WebView's JS console into the debug log.
+  final WebViewConsoleLogger _consoleLogger =
+      WebViewConsoleLogger(source: 'news-player');
   bool _isListening = false;
   String _displayTitle = '';
   late final Future<String> _indexUrlFuture;
@@ -269,6 +273,9 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
               allowsInlineMediaPlayback: true,
               allowsAirPlayForMediaPlayback: true,
             ),
+            onConsoleMessage: (controller, consoleMessage) {
+              _consoleLogger.onConsoleMessage(consoleMessage);
+            },
             onWebViewCreated: (controller) async {
               webController = controller;
               await DebugLogHelper.addDebugLog('NEWS: InAppWebView created');
@@ -463,6 +470,7 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
   @override
   void dispose() {
     voiceService.dispose();
+    _consoleLogger.flush();
     super.dispose();
   }
 }
