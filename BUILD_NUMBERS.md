@@ -31,8 +31,10 @@ top of +21 on either system."*
 | 20 | iOS | 2.3.2 | `c0049a8` | **REJECTED by Apple** — `ITMS-90683`, missing `NSPhotoLibraryUsageDescription`. Number consumed anyway. | 2026-09-03 |
 | 21 | iOS | 2.3.2 | `cc636d4` | **LIVE on TestFlight**, App Apple ID 6807925770 | 2026-09-03 |
 | 22 | iOS | 2.3.2 | `2c85717` | **uploaded to TestFlight** — carries the tour-editing fix (LOCAL-475) and the empty-`tour_type` fix (LOCAL-474/476) | 2026-09-14 |
-| 22 | Android | 2.3.2 | `2c85717` | **owed** — must be the SAME commit and number, so a tester on either platform is testing one thing | — |
-| 23 | — | — | — | **NEXT** | — |
+| 22 | Android | 2.3.2 | `2c85717` | built on Windows with **Flutter 3.29.3** — never shipped; superseded by 23 | 2026-09-14 |
+| 23 | iOS | 2.3.2 | `5e53c56` | **uploaded to TestFlight** — removes the client-side cloud-mode block on tour editing | 2026-09-15 |
+| 23 | Android | 2.3.2 | `5e53c56` | built on Ubuntu by `GCloud_Storied`; **not uploaded to Play** pending Michael's device test | 2026-09-15 |
+| 24 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
