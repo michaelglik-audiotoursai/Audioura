@@ -34,7 +34,7 @@ top of +21 on either system."*
 | 22 | Android | 2.3.2 | `2c85717` | built on Windows with **Flutter 3.29.3** — never shipped; superseded by 23 | 2026-09-14 |
 | 23 | iOS | 2.3.2 | `5e53c56` | **uploaded to TestFlight** — removes the client-side cloud-mode block on tour editing | 2026-09-15 |
 | 23 | Android | 2.3.2 | `5e53c56` | built on Ubuntu by `GCloud_Storied`; **not uploaded to Play** pending Michael's device test | 2026-09-15 |
-| 24 | iOS | 2.3.2 | `PENDING` | building — carries **LOCAL-477** (Add Stop no longer pops to Listen) and **LOCAL-478** (original audio loads; stale iOS container paths heal after a TestFlight update) | 2026-09-15 |
+| 24 | iOS | 2.3.2 | `92dac9e` | **IPA built, awaiting upload** — carries **LOCAL-477** (Add Stop no longer pops to Listen) and **LOCAL-478** (original audio loads; stale iOS container paths heal after a TestFlight update) | 2026-09-15 |
 | 25 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
