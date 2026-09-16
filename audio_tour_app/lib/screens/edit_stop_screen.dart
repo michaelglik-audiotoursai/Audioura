@@ -251,6 +251,10 @@ class _EditStopScreenState extends State<EditStopScreen> {
   void dispose() {
     _textController.dispose();
     _htmlRecorder.dispose();
+    // LOCAL-482: delete the scratch player HTML written beside the audio so it
+    // never ends up in a re-zip, download, or sync (AC #5). dispose() can't be
+    // async; fire-and-forget the deletion (same pattern as _htmlRecorder).
+    _htmlAudioPlayer.dispose();
     super.dispose();
   }
 
