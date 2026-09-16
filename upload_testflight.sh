@@ -7,6 +7,11 @@
 # secrets, and live in .appstoreconnect.env (gitignored anyway, for tidiness).
 #
 # Usage:  bash upload_testflight.sh [path-to-ipa]
+#
+# Fallback if the API key is unavailable: Apple's Transporter app. It is NOT in
+# Homebrew (checked 2026-09-16 — `brew install --cask transporter` fails, there
+# is no such cask). It ships only through the Mac App Store:
+#   https://apps.apple.com/us/app/transporter/id1450874784
 set -euo pipefail
 
 CFG="$HOME/.appstoreconnect/config.env"
