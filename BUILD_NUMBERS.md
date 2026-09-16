@@ -35,7 +35,8 @@ top of +21 on either system."*
 | 23 | iOS | 2.3.2 | `5e53c56` | **uploaded to TestFlight** — removes the client-side cloud-mode block on tour editing | 2026-09-15 |
 | 23 | Android | 2.3.2 | `5e53c56` | built on Ubuntu by `GCloud_Storied`; **not uploaded to Play** pending Michael's device test | 2026-09-15 |
 | 24 | iOS | 2.3.2 | `92dac9e` | **uploaded to TestFlight** (first upload via the App Store Connect API key, delivery `bde945f9`) — carries **LOCAL-477** (Add Stop no longer pops to Listen) and **LOCAL-478** (original audio loads; stale iOS container paths heal after a TestFlight update) | 2026-09-15 |
-| 25 | — | — | — | **NEXT** | — |
+| 25 | iOS | 2.3.2 | `1673643` | **uploaded to TestFlight** — build 24 shipped without `--dart-define=GATEWAY_API_KEY`, so `X-API-Key` was empty and every gateway call 401'd ("couldn't connect securely"). 25 is the first iOS build made with `build_ios_release.sh`; key verified present in the compiled binary. Delivery `1dca7f30` | 2026-09-16 |
+| 26 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
@@ -52,11 +53,18 @@ a clear error, and **Apple silently consumes it**, which is the expensive direct
 If this file is ever wrong, the stores are the truth: Play Console → App bundle explorer, and
 App Store Connect → TestFlight → Build Uploads.
 
-## Uploading (from 2026-09-16)
+## Building and uploading (from 2026-09-16)
 
 ```bash
+cd ~/Audioura && bash build_ios_release.sh   # REQUIRED — never `flutter build ipa` bare
 cd ~/Audioura && bash upload_testflight.sh
 ```
+
+**Never run `flutter build ipa --release` by hand.** `Endpoints._builtInApiKey` is a
+`String.fromEnvironment('GATEWAY_API_KEY')` compile-time constant: with no `--dart-define` it bakes
+in as empty, the app sends no `X-API-Key`, and every gateway endpoint returns 401 — which the app
+shows the user as "Audioura couldn't connect securely." That is what happened to build 24.
+`build_ios_release.sh` reads `build_secrets.env` and refuses to build without the key.
 
 Credentials are an **App Store Connect API key**, not an app-specific password. The private `.p8`
 lives at `~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8` (mode 600) and is never passed on a
