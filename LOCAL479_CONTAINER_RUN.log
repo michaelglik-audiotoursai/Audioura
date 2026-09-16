@@ -1,0 +1,14 @@
+========================================================================
+LOCAL-479 container run — unglossed_reference_gate on stop: Boston Logan Airport History Walk
+========================================================================
+  [LOCAL-479] stop='Boston Logan Airport History Walk' cut orphaned dependant of a removed introduction — subject 'plane': "The plane made an emergency landing at Logan, preventing disaster."
+  [LOCAL-479] stop='Boston Logan Airport History Walk' cut orphaned dependant of a removed introduction — subject 'attempt/failed': "The failed attempt serves as a stark reminder of vigilance."
+  [LOCAL-479] stop='Boston Logan Airport History Walk' cut orphaned dependant of a removed introduction — subject 'incident': "The incident spurred safety reviews and runway technology."
+
+--- stats ---
+references_detected      : 2
+sentences_dropped_by_guard: 1
+references_dependants_cut : 3
+
+--- final description ---
+'In September 1968, the Maverick Street Mothers, a group of local mothers, blocked dump trucks. Their protest led to changes in airport policies.'
