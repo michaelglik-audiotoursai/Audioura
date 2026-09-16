@@ -72,3 +72,4 @@ newEnv*
 # [D495] Persistent domain-tier cache — machine-local resolution results,
 # rebuilt on demand. Never shared: the two machines resolve independently.
 .domain_tier_cache.json
+.appstoreconnect.env
