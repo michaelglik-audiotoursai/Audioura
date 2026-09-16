@@ -34,7 +34,7 @@ top of +21 on either system."*
 | 22 | Android | 2.3.2 | `2c85717` | built on Windows with **Flutter 3.29.3** — never shipped; superseded by 23 | 2026-09-14 |
 | 23 | iOS | 2.3.2 | `5e53c56` | **uploaded to TestFlight** — removes the client-side cloud-mode block on tour editing | 2026-09-15 |
 | 23 | Android | 2.3.2 | `5e53c56` | built on Ubuntu by `GCloud_Storied`; **not uploaded to Play** pending Michael's device test | 2026-09-15 |
-| 24 | iOS | 2.3.2 | `92dac9e` | **IPA built, awaiting upload** — carries **LOCAL-477** (Add Stop no longer pops to Listen) and **LOCAL-478** (original audio loads; stale iOS container paths heal after a TestFlight update) | 2026-09-15 |
+| 24 | iOS | 2.3.2 | `92dac9e` | **uploaded to TestFlight** (first upload via the App Store Connect API key, delivery `bde945f9`) — carries **LOCAL-477** (Add Stop no longer pops to Listen) and **LOCAL-478** (original audio loads; stale iOS container paths heal after a TestFlight update) | 2026-09-15 |
 | 25 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
@@ -51,3 +51,18 @@ a clear error, and **Apple silently consumes it**, which is the expensive direct
 
 If this file is ever wrong, the stores are the truth: Play Console → App bundle explorer, and
 App Store Connect → TestFlight → Build Uploads.
+
+## Uploading (from 2026-09-16)
+
+```bash
+cd ~/Audioura && bash upload_testflight.sh
+```
+
+Credentials are an **App Store Connect API key**, not an app-specific password. The private `.p8`
+lives at `~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8` (mode 600) and is never passed on a
+command line; `~/.appstoreconnect/config.env` holds only the Key ID and Issuer ID, which are
+identifiers. Revoke a key at App Store Connect → Users and Access → Integrations.
+
+**Standing warning from Apple, first seen on build 24 (90068):** `MinimumOSVersion` is **13.0**.
+**From Spring 2027 Apple rejects any upload below 15.0.** Raising it drops iPhone 6s/7 and the
+first-gen SE. Not urgent, but it is a hard deadline, not a suggestion.
