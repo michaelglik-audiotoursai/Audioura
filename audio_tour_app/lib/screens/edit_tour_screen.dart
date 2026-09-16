@@ -72,9 +72,17 @@ class SaveContextLogger {
 class EditTourScreen extends StatefulWidget {
   final Map<String, dynamic> tourData;
 
+  /// Test-only seam (LOCAL-477). When provided, the screen renders these stops
+  /// synchronously and skips the async `_loadTourStops` disk/plugin path,
+  /// which cannot be driven deterministically under `flutter test`
+  /// (initState-time awaits are bound to the fake-async test zone). Production
+  /// call sites never pass this, so behaviour on device is unchanged.
+  final List<Map<String, dynamic>>? debugInitialStops;
+
   const EditTourScreen({
     super.key,
     required this.tourData,
+    this.debugInitialStops,
   });
 
   @override
@@ -90,6 +98,18 @@ class _EditTourScreenState extends State<EditTourScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.debugInitialStops != null) {
+      // Test seam: seed stops synchronously so the loaded list renders
+      // without the async disk/plugin load. See [EditTourScreen.debugInitialStops].
+      _stops = widget.debugInitialStops!
+          .map((s) => Map<String, dynamic>.from(s))
+          .toList();
+      _originalStops = widget.debugInitialStops!
+          .map((s) => Map<String, dynamic>.from(s))
+          .toList();
+      _isLoading = false;
+      return;
+    }
     _loadTourStops();
   }
 
@@ -564,14 +584,16 @@ class _EditTourScreenState extends State<EditTourScreen> {
       'action': 'add',
     };
 
-    _stops.add(newStop);
-    _stops.sort((a, b) => a['stop_number'].compareTo(b['stop_number']));
+    // Mutate _stops and refresh the list. Do NOT pop the screen — the user
+    // stays on the edit screen so the new row appears and Save All enables,
+    // exactly as after editing a stop's text. (LOCAL-477)
+    setState(() {
+      _stops.add(newStop);
+      _stops.sort((a, b) => a['stop_number'].compareTo(b['stop_number']));
+      _newStopContent = '';
+    });
 
-    Navigator.pop(context);
     unawaited(DebugLogHelper.addDebugLog('CRITICAL_ADD: Added new stop $newStopNumber with action=add, modified=true')); // sync callback
-
-    _newStopContent = '';
-    setState(() {});
   }
 
   void _reorderStops(int oldIndex, int newIndex) {
