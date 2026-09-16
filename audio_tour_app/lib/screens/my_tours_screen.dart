@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
+import '../utils/tour_path_healer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'tour_player_screen.dart';
@@ -658,9 +659,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
       try {
         final tour = Map<String, dynamic>.from(json.decode(raw) as Map);
         final oldPath = tour['path'] as String? ?? '';
-        final idx = oldPath.indexOf('/tours/');
-        if (idx != -1 && !oldPath.startsWith(docsDir)) {
-          tour['path'] = docsDir + oldPath.substring(idx);
+        // LOCAL-478: shared rule — same healing the stop editor now uses.
+        final newPath = healTourPath(oldPath, docsDir);
+        if (newPath != oldPath) {
+          tour['path'] = newPath;
           healedRaw.add(json.encode(tour));
           anyHealed = true;
         } else {
