@@ -22915,3 +22915,52 @@ above them, not a replacement for them.
 **Open and unanswered:** whether intent is inferred from the venue, or asked of the listener. His
 airport case argues for asking — a parent with a bored child and a passenger who lost a bag want
 completely different tours of the same terminal.
+
+## D563 — The intent layer's first concrete form: a `facility` tour category
+### 2026-09-15. Answers the question D562 left open.
+
+D562 ended: *"whether intent is inferred from the venue, or asked of the listener."* Tour 423 and
+Michael's reaction to it answer it — **inferred from the venue, for this class of venue.**
+
+**His verdict, verbatim:** *"the stories are really good! I was listening to the stories with a
+great interest. Unfortunately… most people would want something related to airport itself:
+airlines, counters, terminals, lost and found, children playgrounds, app such as Lyft and Uber
+pickup locations, parkings, museum exhibits, WiFi, electric outlets, etc. But stories are good,
+funny."*
+
+**The ruling: the prose is finished work and is not to be touched. The defect is stop selection.**
+Four rounds of gate work went into fabrication and it is now solved — tour 423's named entities
+(Kuraly, Miller, Reid, the Maverick Street Mothers, Wood Island Park) all check out where 402's
+Sarah Parker and Mia did not. What remains is that a good storyteller is describing places
+nobody walks to, including "Boston Logan Airport Virtual Tour", which is not a place at all.
+
+**Why inference beats asking here.** A venue people pass *through* with an errand — airport,
+station, ferry terminal, hospital, convention centre, campus — has a traveller need-sequence that
+is nearly the same for everyone: orient, terminal and gate, security, food and water, rest, kids,
+art, lost and found, baggage, ground transport. That is knowable from the venue class alone. The
+per-listener question D562 imagined (bored child vs. lost bag) is a *reordering* of that spine,
+not a different spine, so it can come later as personalisation. Asking first would put a dialogue
+in front of every tour to recover something we can already derive.
+
+**Evidence the spine is buildable now, measured 2026-09-15** — two Overpass queries against Logan
+returned **331 coordinate-bearing mapped objects, free, no API key**: 113 gates by number, 46
+parking areas including `Central Parking` (Logan's rideshare pickup) and the `Rental Car Center`,
+68 food and drink, 49 toilets, 22 drinking water, 4 named terminals, 10 terminal shuttle stops,
+Blue Line `Airport Station` and `Wood Island`, 2 ferry terminals, 7 car rental brands, 4 artworks.
+Missing: lost and found, children's play, outlets, WiFi, airline counters — **four of Michael's
+fourteen categories**, which come from the venue's own website (the Tier-1 source LOCAL-23
+established as co-equal with Wikipedia).
+
+**The corollary that makes this cheap:** every facility stop is a mapped physical object with a
+real coordinate, so D559 / LOCAL-470 / LOCAL-471's confidence and route work pays off here in a
+way it never could for narrative stops. **A facility tour is the easiest kind of tour to ground,**
+not the hardest. And a `low`-confidence facility stop is *dropped*, never downgraded — for a story
+a failed check costs a sentence, for a facility it costs a traveller their flight.
+
+**The stories move rather than die.** The material the engine already produced maps onto the real
+mapped places almost one-for-one: the 1968 Maverick Street Mothers belong at Central Parking, Wood
+Island Park belongs at Wood Island station one stop up the Blue Line, Reid belongs at security,
+Kuraly stays at the Bruins bar. Nothing new is needed in the prose pipeline.
+
+Dispatched as **LOCAL-480**. Michael's approved Cimiez tour is the regression control — a change
+to its stop list is a bounce.
