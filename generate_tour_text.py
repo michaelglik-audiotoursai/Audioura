@@ -2327,16 +2327,94 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
     return fallback
 
 
+# [LOCAL-480] Facility venue-class detection.
+#
+# A "facility" is a venue people pass THROUGH with an errand — an airport, a
+# train or ferry terminal, a large hospital, a convention centre, a stadium, a
+# university campus. The design (D563) infers the class from the venue, and it
+# must also be requestable in words. This helper is the word/IATA signal; the
+# geocoded-anchor signal (aeroway=aerodrome / public_transport=station on the
+# resolved point) is applied in generate_tour_text() where the anchor is known.
+#
+# Kept deliberately NARROW. It fires on unambiguous facility nouns and on an
+# IATA-code-shaped request ("BOS airport", "tour of LHR"). It does NOT fire on
+# generic walking words like "district", "downtown", or "park", so the Cimiez
+# walking tour (D556, Michael-approved) is untouched.
+
+# Strong, unambiguous multi-word facility venue-class phrases. A single one is
+# enough. Multi-word so they cannot fire on an ordinary walking request.
+_FACILITY_CLASS_WORDS = (
+    'airport', 'aerodrome', 'air terminal',
+    'train station', 'railway station', 'rail station', 'bus station',
+    'bus terminal', 'ferry terminal', 'transit center', 'transit centre',
+    'transit hub', 'transit station', 'metro station', 'subway station',
+    'convention center', 'convention centre', 'conference center',
+    'conference centre', 'exhibition centre', 'exhibition center',
+    'university campus', 'college campus', 'medical center',
+    'medical centre', 'cruise terminal', 'cruise port',
+)
+
+import re as _facility_re
+
+# Single-word facility nouns matched on a WORD BOUNDARY so punctuation does not
+# hide them ("South Station terminal," -> matches 'terminal'; "Terminal E" ->
+# matches). Kept to nouns that are unambiguously a pass-through facility.
+_FACILITY_WORD_RE = _facility_re.compile(
+    r'\b(terminal|hospital|stadium|arena|fairgrounds)\b', _facility_re.IGNORECASE)
+
+
+def _detect_facility_class(location, tour_type=""):
+    """True when the request names a facility venue class (airport, terminal,
+    station, campus, hospital, convention centre, stadium, ...) or an IATA-shaped
+    airport request. NARROW by design — see _FACILITY_CLASS_WORDS.
+
+    Returns False for ordinary walking/museum/restaurant requests, including
+    'Walking tour around Cimiez District, Nice, France'.
+    """
+    text = f"{location or ''} {tour_type or ''}".lower()
+
+    # Word signal: any strong facility phrase.
+    for word in _FACILITY_CLASS_WORDS:
+        if word in text:
+            return True
+
+    # Single-word facility nouns, matched on a word boundary.
+    if _FACILITY_WORD_RE.search(text):
+        return True
+
+    # IATA signal: a 3-letter uppercase code alongside an airport/flight word.
+    # e.g. "BOS airport tour", "tour of LHR terminal".
+    if _facility_re.search(r'\b(airport|airfield|flight|departures|arrivals)\b',
+                           (location or '').lower()):
+        return True
+
+    return False
+
+
 def _classify_tour_category(location, tour_type):
     """
     Detect the appropriate tour template based on location and tour_type.
     
-    Returns: 'restaurant', 'walking', 'museum', or 'specialized'
+    Returns: 'facility', 'restaurant', 'walking', 'museum', or 'specialized'
     """
     location_lower = location.lower()
     tour_type_lower = tour_type.lower()
-    
-    # EXPLICIT WALKING TOUR detection (highest priority — overrides everything)
+
+    # [LOCAL-480] FACILITY TOUR detection — HIGHEST priority, above explicit
+    # "walking tour", because the defect on tour 423 was exactly a facility that
+    # arrived phrased as "Walking tour around Logan Airport". A person in a
+    # terminal has an errand, not a sightseeing afternoon: the stop list must be
+    # a need-spine, not an interest ranking (Michael, 2026-09-15).
+    #
+    # This fires ONLY on a strong venue-class signal (airport/terminal/station/
+    # hospital/convention centre/stadium/campus) or an IATA-code-shaped request —
+    # NOT on generic walking words. "Walking tour around Cimiez District, Nice"
+    # has no facility word and stays 'walking' (D556 — Michael approved it, a
+    # regression there is a bounce).
+    if _detect_facility_class(location, tour_type):
+        return 'facility'
+
+    # EXPLICIT WALKING TOUR detection (high priority — overrides museum stops)
     # If the user explicitly says "walking tour" in the location, honor that
     # even if a museum name appears as one of the stops
     explicit_walking_phrases = ['walking tour', 'walk tour', 'walking in', 'walk in']
@@ -5615,7 +5693,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     #
     # Area resolution keeps the stripped string; intent gets the sentence the
     # listener actually typed.
-    if _pre_category in ('restaurant', 'walking', 'specialized'):
+    if _pre_category in ('restaurant', 'walking', 'specialized', 'facility'):
         # Location string already encodes the real intent — don't prepend tour_type
         user_request = location
         print(f"  [Bug2Fix/D536] tour_type='{tour_type}' not prepended (pre_category="
@@ -5714,7 +5792,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 else:
                     print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains explicit non-museum phrase")
             # Touchpoint 1: suppress tour_type when pre_category or transport_mode gives a strong signal
-            _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized') or transport_mode != 'on_foot') else tour_type
+            _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized', 'facility') or transport_mode != 'on_foot') else tour_type
             tour_category = _classify_tour_category(location, _effective_tour_type)
             if tour_category == 'specialized':
                 tour_category = 'book'
@@ -5722,7 +5800,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print("⚠️ Intent analysis failed, using fallback detection")
         intent = None
         # Touchpoint 1: suppress tour_type when pre_category or transport_mode gives a strong signal
-        _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized') or transport_mode != 'on_foot') else tour_type
+        _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized', 'facility') or transport_mode != 'on_foot') else tour_type
         tour_category = _classify_tour_category(location, _effective_tour_type)
         if tour_category == 'specialized':
             tour_category = 'book'
@@ -5742,6 +5820,21 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _matched_word = (_loc_words & _VENUE_WORDS_FOR_CLASSIFY).pop()
             print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
             tour_category = 'museum'
+
+    # [LOCAL-480] FACILITY GUARD — runs AFTER convergence, overrides any museum
+    # flip. Tour 423 arrived as "Walking tour around Logan Airport" and S15/
+    # CLASSIFY-FIX could pull a venue_name like "Logan Airport" into 'museum'.
+    # A facility is a venue people pass THROUGH with an errand; its stop list is
+    # a need-spine, not an interest ranking (D563). The word/IATA signal is
+    # authoritative here — if the request names a facility class, it is a
+    # facility tour regardless of what venue_name inference decided.
+    #
+    # This does NOT touch the Cimiez walking tour: _detect_facility_class returns
+    # False for 'Walking tour around Cimiez District, Nice, France'.
+    if _detect_facility_class(location, tour_type) and tour_category != 'facility':
+        print(f"  [LOCAL-480] FACILITY GUARD: overriding '{tour_category}' → facility "
+              f"(request names a facility venue class)")
+        tour_category = 'facility'
     
     # PHASE 2: Detect tour type and get appropriate template
     _phase_timer.start('poi_selection')
@@ -5903,7 +5996,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         user_request = location
     else:
         # BUG 2 FIX: if location alone encodes the category, don't prepend tour_type
-        if _pre_category in ('restaurant', 'walking', 'specialized'):
+        if _pre_category in ('restaurant', 'walking', 'specialized', 'facility'):
             user_request = location
         else:
             user_request = f"{tour_type} {location}"
@@ -6214,6 +6307,90 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
             import traceback
             traceback.print_exc()
+
+    # ──── [LOCAL-480] FACILITY NEED-SPINE FILL ────────────────────────────────
+    # A facility tour's stop list is a need-spine, not an interest ranking. Fill
+    # poi_list from the ordered traveller-need checklist (facility_spine), each
+    # slot from the nearest mapped OSM object, IN NEED ORDER. This mirrors the
+    # LOCAL-30 deterministic-fill pattern: on success we set a skip flag so the
+    # Phase 3A GPT sightseeing call is bypassed.
+    #
+    # BREAK-THE-SPINE FALLBACK (AC6): when facility_spine.spine_filling_enabled()
+    # is False, fill_need_spine() returns [], _facility_fill_used stays False, and
+    # execution FALLS THROUGH to the ordinary walking Phase-3A GPT list — the old
+    # sightseeing behaviour. A test flips the flag and asserts the fallback fires.
+    #
+    # Every stop here is a mapped object with a real coordinate; the LOCAL-471
+    # low-confidence DROP happens at coordinate-resolution time (D559 block).
+    _facility_fill_used = False
+    _facility_dropped_low_conf = []   # names dropped for low geo confidence (AC5 log)
+    if tour_category == 'facility' and not _forced_stops_active:
+        try:
+            import facility_spine
+            from geocode_stops import geocode as _fac_geocode, location_hint as _fac_hint
+            # Anchor the facility from its own name/location (venue-class signal).
+            _fac_anchor = None
+            try:
+                _fac_anchor = _fac_geocode(_fac_hint(location) or location)
+            except Exception as _fac_geo_err:
+                print(f"  [LOCAL-480] facility anchor geocode failed (non-fatal): {_fac_geo_err}")
+            if _fac_anchor:
+                print(f"  [LOCAL-480] facility anchor: {_fac_anchor[0]:.4f}, {_fac_anchor[1]:.4f} "
+                      f"for '{location}'")
+                _fac_stops = facility_spine.fill_need_spine(
+                    _fac_anchor[0], _fac_anchor[1], total_stops)
+                if _fac_stops:
+                    poi_list = []
+                    for _fs in _fac_stops:
+                        _p = _new_poi(_fs.name, _fs.address)
+                        _p['coordinates'] = _fs.coordinates
+                        _p['type_specialty'] = _fs.need_label
+                        _p['_facility_need'] = _fs.need_key
+                        _p['_facility_source'] = _fs.source
+                        _p['_facility_source_line'] = _fs.source_line()
+                        poi_list.append(_p)
+                    _facility_fill_used = True
+                    print(f"  [LOCAL-480] FACILITY NEED-SPINE FILL: {len(poi_list)} "
+                          f"need(s) filled → Phase 3A GPT SKIPPED")
+                    for _p in poi_list:
+                        print(f"     {_p['_facility_source_line']}")
+                    _selection_reasons = {}
+
+                    # [LOCAL-480 / LOCAL-471] FINDABLE OR CUT. For a story, failing
+                    # verification costs a sentence; for a facility it costs the
+                    # STOP (Yury: "you may lose a couple of hours if you follow
+                    # these directions"). Confirm each facility coordinate against
+                    # the LOCAL-471 _geo_confidence signal and DROP — not downgrade
+                    # — any stop that comes back 'low'. Every drop is logged.
+                    try:
+                        from geocode_stops import resolve_poi as _fac_resolve_poi
+                        _fac_kept = []
+                        for _p in poi_list:
+                            _rec = _fac_resolve_poi(_p, location, _fac_anchor)
+                            if _p.get('_geo_confidence') == 'low':
+                                _facility_dropped_low_conf.append(_p['name'])
+                                print(f"  [LOCAL-480] DROPPED facility stop '{_p['name']}' "
+                                      f"(need={_p.get('_facility_need','?')}) — geocode "
+                                      f"confidence LOW; a traveller must not be sent to an "
+                                      f"unverified place. reason={_rec.get('reason','')[:60]}")
+                            else:
+                                _fac_kept.append(_p)
+                        poi_list = _fac_kept
+                        print(f"  [LOCAL-480] facility stops after confidence drop: "
+                              f"{len(poi_list)} kept, {len(_facility_dropped_low_conf)} dropped")
+                    except ImportError as _fac_gc_err:
+                        _import_logger.error(f"[LOCAL-480] MISSING: geocode_stops — cannot "
+                                             f"apply confidence drop: {_fac_gc_err}")
+                else:
+                    print(f"  [LOCAL-480] need-spine returned no stops (filling disabled or "
+                          f"nothing mapped) — FALLING BACK to the sightseeing list")
+            else:
+                print(f"  [LOCAL-480] no facility anchor — falling back to the sightseeing list")
+        except ImportError as _fac_imp:
+            _import_logger.error(f"[LOCAL-480] MISSING: facility_spine — facility fill "
+                                 f"DISABLED, falling back to sightseeing: {_fac_imp}")
+        except Exception as _fac_err:
+            print(f"  [LOCAL-480] facility fill error (non-fatal), falling back: {_fac_err}")
 
     # ──── [LOCAL-357] FORCED STOPS HARNESS ────────────────────────────────────
     # When forced_stops is provided, bypass ALL candidate generation (Phase 3A,
@@ -6928,10 +7105,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"   - {p['name']}")
         # [LOCAL-329] No selection reasons when deterministic fill is used
         _selection_reasons = {}
+    elif _facility_fill_used:
+        # [LOCAL-480] Facility need-spine already filled poi_list — skip Phase 3A GPT.
+        print(f"\nPHASE 3A: SKIPPED (facility need-spine fill from {len(poi_list)} need slot(s))")
+        print(f"OK PHASE 3A parsed {len(poi_list)} candidate facility POI(s):")
+        for p in poi_list:
+            print(f"   - {p['name']} [{p.get('_facility_need','?')}]")
+        _selection_reasons = {}
     else:
         pass  # Fall through to normal Phase 3A GPT call below
 
-    if not _deterministic_fill_used:
+    if not _deterministic_fill_used and not _facility_fill_used:
         # [LOCAL-425] Exhibition-aware Phase 3A: when an exhibition is named but
         # the checklist/creator-filter couldn't supply works, override the
         # museum constraint to ask for EXHIBITION works specifically, not the
@@ -6999,7 +7183,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         })
 
     try:
-        if not _deterministic_fill_used:
+        if not _deterministic_fill_used and not _facility_fill_used:
             info_response = requests.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers=headers,
@@ -9604,7 +9788,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # PRACTICALS are not repeated — opening hours and a price band are meaningless
     # for a Roman ruin. MUSEUMS ARE EXCLUDED: they keep the object-focused
     # retrieval Michael asked to protect.
-    if tour_category not in ('restaurant', 'museum'):
+    #
+    # [LOCAL-480] FACILITY IS EXCLUDED TOO. Its stop list is a need-spine of
+    # mapped, coordinate-bearing objects; a facility stop that cannot be located
+    # is CUT, not replaced by a generic knowledge stop. Running the sightseeing
+    # replenisher here would re-introduce exactly the "stops nobody walks to"
+    # that tour 423 was bounced for.
+    if tour_category not in ('restaurant', 'museum', 'facility'):
         try:
             from restaurant_practicals import propose_replacements
             from stop_knowledge_fallback import fetch_stop_knowledge, facts_as_snippets
