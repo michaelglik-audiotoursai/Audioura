@@ -38,6 +38,33 @@ MAX_AUDIO_SIZE = MAX_AUDIO_SIZE_MB * 1024 * 1024  # Convert to bytes
 # ephemeral /tmp, tours live in Postgres BYTEA and/or Cloudflare R2).
 STORAGE_MODE = os.getenv('TOUR_STORAGE_MODE', 'volume')
 
+# ---------------------------------------------------------------------------
+# TTS nav-field stripping (GCS-SAN1 Fault 2)
+# ---------------------------------------------------------------------------
+# An edited stop must be SPOKEN like a generated one: the metadata header
+# (Address/Coordinates/etc.) belongs in the .txt for the mobile app to parse,
+# but must NOT be read aloud by Polly. The generation pipeline already does
+# this before calling /synthesize; the editing service did not, so Polly spoke
+# the header. We duplicate the regex + helper here (rather than importing
+# tour_generation_modernized, which builds a Flask app and a job store at
+# import time). KEEP THIS IN SYNC WITH:
+#   - tour_generation_modernized.py  (_NAV_LABEL_RE / _strip_nav_fields_for_tts)
+#   - translation-service/translation_service.py (mirrors the same convention)
+# Only the TTS input is stripped; the .txt files keep every line unchanged.
+_NAV_LABEL_RE = re.compile(
+    r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
+    re.IGNORECASE | re.MULTILINE
+)
+
+
+def _strip_nav_fields_for_tts(text):
+    """Remove structured metadata lines before sending to Polly.
+    Keeps: stop name, Orientation, and all narrative paragraphs.
+    Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details.
+    The .txt files are written from the original text and remain unchanged."""
+    lines = text.split('\n')
+    return '\n'.join(l for l in lines if not _NAV_LABEL_RE.match(l))
+
 
 # ---------------------------------------------------------------------------
 # Blob storage (Cloudflare R2) — GCS-5 gaps 3 & 4
@@ -1132,11 +1159,15 @@ def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, 
     
     # Generate new TTS audio (flag=true or no existing audio)
     try:
+        # GCS-SAN1 Fault 2: strip the nav/metadata header from the TTS input so
+        # Polly speaks the stop like a generated one. The .txt on disk keeps
+        # every line; only this synthesise payload has the nav lines removed.
+        tts_text = _strip_nav_fields_for_tts(text_content)
         tts_response = _authenticated_request(
             "POST",
             f"{POLLY_TTS_URL}/synthesize",
             json={
-                "text": text_content,
+                "text": tts_text,
                 "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
                 "format": "mp3",
             },
