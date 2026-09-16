@@ -38,6 +38,7 @@ MAX_AUDIO_SIZE = MAX_AUDIO_SIZE_MB * 1024 * 1024  # Convert to bytes
 # ephemeral /tmp, tours live in Postgres BYTEA and/or Cloudflare R2).
 STORAGE_MODE = os.getenv('TOUR_STORAGE_MODE', 'volume')
 
+
 # ---------------------------------------------------------------------------
 # Blob storage (Cloudflare R2) — GCS-5 gaps 3 & 4
 # ---------------------------------------------------------------------------
@@ -262,6 +263,51 @@ def sanitize_user_input(text):
     # Clean up extra whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     
+    return text
+
+def sanitize_narration_text(text):
+    r"""Sanitize saved stop *narration* (prose) — NOT a filename.
+
+    GCS-SAN1: the old path ran sanitize_user_input() over every saved stop,
+    which mangled prose: it replaced ':' '/' etc. with '_' (turning
+    'Coordinates:' into 'Coordinates_'), collapsed all newlines into a single
+    line, deleted apostrophes/quotes and stripped SQL keywords. None of that
+    protects anything here — every DB call in this service is parameterised
+    (%s), so string-stripping is not what prevents injection — and all of it
+    destroys the text the user typed and the voice reads.
+
+    LEAD decision: keep ONLY what is genuinely needed for narration —
+      - control-character removal (but PRESERVE newlines/tabs so structure and
+        the nav header survive for the .txt),
+      - markdown cleanup for TTS,
+      - XSS stripping (<script>, javascript:, on*=),
+      - the 10,000-char DoS cap.
+    Dropped for the narration path: the SQL block, the filename regex
+    [<>:"/\\|?*] -> '_', and the r'\s+' -> ' ' whitespace collapse.
+
+    If a filesystem-safe string is ever needed for a *filename*, derive it
+    separately at the point of use (e.g. via sanitize_user_input); do not
+    reshape the narration text.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+
+    # Remove control characters EXCEPT tab (\x09), newline (\x0A) and carriage
+    # return (\x0D) so line breaks (and the nav header) are preserved.
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+
+    # Clean markdown formatting for better TTS and display
+    text = clean_markdown_formatting(text)
+
+    # Remove script tags and javascript (XSS) — the ONLY injection stripping
+    # that is meaningful for text later rendered/spoken.
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'on\w+\s*=', '', text, flags=re.IGNORECASE)
+
+    # Limit length to prevent DoS
+    text = text[:10000]
+
     return text
 
 def get_db_connection():
@@ -1606,7 +1652,10 @@ def _bulk_save_core(tour_id, data):
         # Process each stop with flag coordination
         for stop_data in stops:
             stop_number = stop_data.get('stop_number')
-            text = sanitize_user_input(stop_data.get('text', ''))
+            # GCS-SAN1: narration prose must NOT be filename-sanitised. Use the
+            # narration-safe cleaner so colons, apostrophes and newlines survive
+            # (sanitize_user_input remains for genuine path-safe token needs).
+            text = sanitize_narration_text(stop_data.get('text', ''))
             action = str(stop_data.get('action', '')).lower()
             generate_flag = stop_data.get('generate_audio_from_text', True)  # Default true
             
