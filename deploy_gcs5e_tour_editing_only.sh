@@ -22,20 +22,22 @@
 #
 # What it stages, in order:
 #   1. Build + push the tour-editing backend image tour-editing:<tag> (default
-#      v2). GIT_SHA / RELEASE_TAG baked in as build-args, exactly like v1.
+#      v3 for GCS-SAN1). GIT_SHA / RELEASE_TAG baked in as build-args, exactly
+#      like v1/v2.
 #   2. `gcloud run deploy tour-editing` onto the new image with the SAME env,
-#      secrets and flags as v1 (port 5022, --no-allow-unauthenticated, Cloud SQL,
-#      R2 + AWS + Polly). A deploy of an existing service creates a new revision
-#      and keeps the service's identity/IAM; no gateway is touched.
-#   3. Print the EXACT rollback to tour-editing:v1 (tour-editing-00001-924).
+#      secrets and flags as v1/v2 (port 5022, --no-allow-unauthenticated, Cloud
+#      SQL, R2 + AWS + Polly). A deploy of an existing service creates a new
+#      revision and keeps the service's identity/IAM; no gateway is touched.
+#   3. Print the EXACT rollback to the previous known-good image tour-editing:v2
+#      (GCS-5E). v2's revision name must be confirmed against the live service.
 #
 # It NEVER references api-gateway / api-gateway-storied and has no gateway image
-# code. It does not modify IAM (v1's invoker bindings already exist).
+# code. It does not modify IAM (v1/v2's invoker bindings already exist).
 #
 # Usage:
 #   ./deploy_gcs5e_tour_editing_only.sh --dry-run            # default; prints only
-#   ./deploy_gcs5e_tour_editing_only.sh --apply              # deploy v2 (LEAD)
-#   ./deploy_gcs5e_tour_editing_only.sh --dry-run --editing-tag v2
+#   ./deploy_gcs5e_tour_editing_only.sh --apply              # deploy v3 (LEAD)
+#   ./deploy_gcs5e_tour_editing_only.sh --dry-run --editing-tag v3
 # =============================================================================
 set -euo pipefail
 
@@ -53,9 +55,16 @@ POLLY_TTS_URL="https://polly-tts-60899077572.us-central1.run.app"
 # value v1 uses — a wrong endpoint must not be shippable.
 R2_ENDPOINT="https://4b4aa47cda0cc65f20b20fac0b363ac7.r2.cloudflarestorage.com"
 
-# The known-good previous revision to roll back to (LEAD: tour-editing:v1).
-ROLLBACK_TAG="v1"
-ROLLBACK_REVISION="tour-editing-00001-924"
+# The known-good previous revision to roll back to.
+# GCS-SAN1 ships tour-editing:v3; the live known-good image is now GCS-5E's
+# tour-editing:v2. Roll back to v2 by tag (Option B redeploys the image and does
+# not need the revision suffix). The exact v2 revision name must be confirmed
+# against the live service before --apply (it is not hard-coded here to avoid a
+# fabricated/stale revision ID):
+#   gcloud run revisions list --service tour-editing --region us-central1 \
+#     --format='value(metadata.name)' | head
+ROLLBACK_TAG="v2"
+ROLLBACK_REVISION="<CONFIRM_LIVE_V2_REVISION>"   # e.g. tour-editing-00002-xxx
 
 DRY_RUN=1
 EDITING_TAG=""
@@ -94,11 +103,11 @@ run "command -v docker >/dev/null || { echo 'docker not on PATH'; exit 1; }"
 run "gcloud auth print-access-token >/dev/null 2>&1 || { echo 'not authenticated'; exit 1; }"
 [ -f "$EDITING_DOCKERFILE" ] || fail "$EDITING_DOCKERFILE not found — run from repo root"
 GIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-RELEASE_TAG="${RELEASE_TAG:-v2t-gcs5e}"   # line 2 = storied; override via env if desired
+RELEASE_TAG="${RELEASE_TAG:-v3t-gcs-san1}"   # line 2 = storied; override via env if desired
 echo "  GIT_SHA=${GIT_SHA}  RELEASE_TAG=${RELEASE_TAG}"
 
 # --------------------------------------------- 1. build + push v2 image ------
-ETAG=$(next_tag "$EDITING_IMAGE_NAME" "$EDITING_TAG" "v2")
+ETAG=$(next_tag "$EDITING_IMAGE_NAME" "$EDITING_TAG" "v3")
 EDITING_IMAGE="${REPO}/${EDITING_IMAGE_NAME}:${ETAG}"
 say "Build + push tour-editing image ${EDITING_IMAGE} (own image, not shared audioura)"
 run "docker build -f '${EDITING_DOCKERFILE}' \
@@ -134,15 +143,15 @@ run "gcloud run deploy '${EDITING_SERVICE}' \
   --cpu 1 --memory 1Gi --timeout 600 --concurrency 20 --max-instances 4 --quiet"
 
 # ------------------------------------------------------------- rollback ------
-say "ROLLBACK (if v2 misbehaves) — route 100% of traffic back to ${ROLLBACK_TAG}"
+say "ROLLBACK (if v3 misbehaves) — route 100% of traffic back to ${ROLLBACK_TAG}"
 cat <<EOF
 
-  # Option A: pin traffic to the known-good v1 revision (fastest, no rebuild):
+  # Option A: pin traffic to the known-good v2 revision (fastest, no rebuild):
   gcloud run services update-traffic ${EDITING_SERVICE} \\
     --project ${PROJECT} --region ${REGION} \\
     --to-revisions ${ROLLBACK_REVISION}=100 --quiet
 
-  # Option B: redeploy the v1 image (if the revision was pruned):
+  # Option B: redeploy the v2 image (if the revision was pruned):
   gcloud run deploy ${EDITING_SERVICE} \\
     --project ${PROJECT} --region ${REGION} \\
     --image ${REPO}/${EDITING_IMAGE_NAME}:${ROLLBACK_TAG} \\
