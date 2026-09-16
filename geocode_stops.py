@@ -870,3 +870,190 @@ def fix_reversed_poi_list(poi_list):
 
     rec.update(reason="coordinate order looks correct")
     return rec
+
+
+# --- centroid collapse (LOCAL-481, tour 423) ---------------------------------
+#
+# Tour 423, Logan Airport, 2026-09-15:
+#
+#     Boston Bruins Bar                 42.3656, -71.0188
+#     Art Exhibits at Logan Airport     42.3656, -71.0173
+#     Boston Logan Airport Virtual Tour 42.3656, -71.0096
+#     Boston Logan Airport History Walk 42.3656, -71.0189
+#
+# All four share latitude 42.3656 EXACTLY. That is not four independently located
+# places — it is the venue centroid with the longitude jittered. The tour then
+# claimed to "span 2 kilometres" across points a few hundred metres apart on one
+# line. When the model does not know where a stop is, it reuses a coordinate it
+# already emitted and nudges the other half. A collision to 4 decimal places
+# (~11 m) is the fingerprint: two genuinely distinct destinations do not land on
+# the same parallel or meridian to 11 m by chance.
+#
+# This is deterministic and needs no network — it reads coordinates the generator
+# already holds. It does NOT decide anything on its own; it identifies the
+# colliding stops so the caller can send them back through `resolve_poi`, which
+# is the one procedure that already knows how to find a real coordinate. If
+# re-resolution moves a stop off the shared line, the collision is cured; if it
+# cannot, the stop is still flagged for the caller to drop and replenish.
+#
+# SCOPE. Genuinely co-located stops are legitimate for a `museum` tour — two
+# artworks in one room share a coordinate and should. So the collision rule runs
+# only for categories whose stops are DISTINCT PHYSICAL DESTINATIONS you walk or
+# drive between: walking, driving, biking/cycling, restaurant, specialized, and
+# the facility case behind 423. Museum (and any tour with a single venue) is
+# exempt.
+
+# Categories where every stop is a separate place with its own coordinate. A
+# collision within one of these tours is a defect. Anything NOT in this set —
+# `museum` above all — is left alone, because co-location there is expected.
+COLLISION_CATEGORIES = {
+    'walking', 'driving', 'biking', 'cycling', 'restaurant', 'specialized',
+    'facility', 'bus', 'boat', 'road_trip', 'roadtrip',
+}
+
+# 4 decimal places ≈ 11 m at the equator. Two distinct destinations do not share
+# a parallel or a meridian to this precision by accident; the model reusing a
+# coordinate it already wrote does exactly this.
+_COLLISION_DP = 4
+
+
+def _round_dp(x, dp=_COLLISION_DP):
+    return round(float(x), dp)
+
+
+def find_centroid_collapse(poi_list, category=None):
+    """[LOCAL-481] Identify stops that were not independently located.
+
+    A collision is two or more stops sharing latitude OR longitude to
+    `_COLLISION_DP` decimal places. Returns a record::
+
+        {
+          "action": "none" | "collision",
+          "reason": str,
+          "colliding_indices": [i, ...],   # indices into poi_list, sorted
+          "groups": [{"axis": "lat"|"lng", "value": float, "indices": [...]}],
+          "checked": int,
+        }
+
+    Deterministic, no network, no mutation. `category` scopes the check: a
+    category outside COLLISION_CATEGORIES (notably `museum`) returns action
+    "none" with the reason, so two artworks in one room are never flagged.
+    """
+    rec = {"action": "none", "reason": "", "colliding_indices": [],
+           "groups": [], "checked": 0}
+
+    if category is not None and category not in COLLISION_CATEGORIES:
+        rec["reason"] = (f"category {category!r} allows co-located stops "
+                         f"— collision check skipped")
+        return rec
+
+    pts = []          # (index, lat, lng)
+    for i, poi in enumerate(poi_list):
+        c = _parse_coords_pair(poi.get('coordinates', '') if isinstance(poi, dict) else '')
+        if c:
+            pts.append((i, c[0], c[1]))
+    rec["checked"] = len(pts)
+    if len(pts) < 2:
+        rec["reason"] = "fewer than two stops carry a coordinate"
+        return rec
+
+    colliding = set()
+    for axis, comp in (("lat", 1), ("lng", 2)):
+        buckets = {}
+        for row in pts:
+            key = _round_dp(row[comp])
+            buckets.setdefault(key, []).append(row[0])
+        for value, idxs in buckets.items():
+            if len(idxs) >= 2:
+                rec["groups"].append({"axis": axis, "value": value,
+                                      "indices": sorted(idxs)})
+                colliding.update(idxs)
+
+    if colliding:
+        rec["action"] = "collision"
+        rec["colliding_indices"] = sorted(colliding)
+        parts = []
+        for grp in rec["groups"]:
+            parts.append(f"{len(grp['indices'])} stops share {grp['axis']}="
+                         f"{grp['value']:.4f}")
+        rec["reason"] = "; ".join(parts)
+        logging.warning("[GEOCODE] CENTROID COLLAPSE: %s (%d stop(s) affected)",
+                        rec["reason"], len(colliding))
+    else:
+        rec["reason"] = "every stop has an independent coordinate"
+    return rec
+
+
+def repair_centroid_collapse(poi_list, tour_location, category=None,
+                             tour_anchor=None, resolver=None):
+    """[LOCAL-481] Detect a centroid collapse and re-resolve the colliding stops.
+
+    This is the wiring the task asks for: flag the tour, log every colliding
+    stop, and send those stops back through `resolve_poi` (the resolver), which
+    is the one procedure that already knows how to find a real coordinate.
+    Mutates the colliding POIs in place via the resolver. Returns a record::
+
+        {
+          ...everything from find_centroid_collapse...,
+          "reresolved": [ {name, before, after, moved, confidence} ],
+          "cured_indices": [...],        # collided before, independent after
+          "still_colliding": [...],      # still on a shared line after re-resolve
+        }
+
+    `resolver` defaults to `resolve_poi`; it is injectable so a test can drive it
+    without a network. A stop that re-resolves off the shared line is cured; one
+    that cannot move is left flagged in `still_colliding` for the caller to drop
+    and let the replenishment loop (D558) refill — repair before deletion, exactly
+    as the task requires.
+    """
+    if resolver is None:
+        resolver = resolve_poi
+
+    rec = find_centroid_collapse(poi_list, category=category)
+    rec["reresolved"] = []
+    rec["cured_indices"] = []
+    rec["still_colliding"] = []
+    if rec["action"] != "collision":
+        return rec
+
+    for i in rec["colliding_indices"]:
+        poi = poi_list[i]
+        before = poi.get('coordinates', '')
+        try:
+            sub = resolver(poi, tour_location, tour_anchor)
+        except Exception as e:                       # pragma: no cover - defensive
+            logging.warning("[GEOCODE] re-resolution errored for %r: %s",
+                            poi.get('name', ''), e)
+            sub = {}
+        after = poi.get('coordinates', '')
+        rec["reresolved"].append({
+            "name": poi.get('name', ''),
+            "before": before,
+            "after": after,
+            "moved": before != after,
+            "confidence": (sub or {}).get('confidence', 'low'),
+        })
+        logging.info("[GEOCODE]   re-resolve %r: %s -> %s (%s)",
+                     poi.get('name', ''), before, after,
+                     (sub or {}).get('confidence', 'low'))
+
+    # Did re-resolution actually break the collision? Re-run the detector on the
+    # (now mutated) list and see which of the originally-colliding stops are no
+    # longer part of any shared line.
+    after_rec = find_centroid_collapse(poi_list, category=category)
+    still = set(after_rec["colliding_indices"])
+    for i in rec["colliding_indices"]:
+        if i in still:
+            rec["still_colliding"].append(i)
+        else:
+            rec["cured_indices"].append(i)
+
+    if rec["cured_indices"]:
+        logging.info("[GEOCODE] centroid collapse: %d/%d colliding stop(s) cured "
+                     "by re-resolution", len(rec["cured_indices"]),
+                     len(rec["colliding_indices"]))
+    if rec["still_colliding"]:
+        logging.warning("[GEOCODE] centroid collapse: %d stop(s) still share a line "
+                        "after re-resolution — caller should drop and replenish",
+                        len(rec["still_colliding"]))
+    return rec
