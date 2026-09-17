@@ -23701,3 +23701,68 @@ descriptor for them, not because they were badly geocoded. An indoor stop's loca
 any finer claim we make is ungrounded — the same condition as the directions D575 found ungated and
 the facts D567 found misattributed. **This is one gap, not three, and it is the next thing worth
 building.**
+
+## D577 — Ship it with honest confidence. No answer is worse than an imperfect one.
+### 2026-09-17. Michael's product philosophy, and it REVERSES D563's "findable or cut".
+
+> *"Providing no guidance when asked is worse than providing a false guidance IMHO. Providing an
+> uninteresting stop is better than providing no stop, providing unverified story is better than
+> providing no story. All we have to do is to be clear and transparent how confident we are about
+> what we are saying."*
+
+> *"we should assume that the listener is capable to ask an attendant in case if our directions are
+> flawed. And it is their problem if they miss a flight… We, as everyone else, are doing our best
+> job but can be wrong and our listener ought to understand that."*
+
+**What this overturns.** D563 ruled: *"a `low`-confidence facility stop is dropped, never downgraded
+— for a story a failed check costs a sentence, for a facility it costs a traveller their flight."*
+**That is now reversed.** The listener is an adult with a phone, a map and staff to ask.
+
+**Immediate consequence: today's Logan behaviour is wrong under the new rule.** The run delivered
+nothing (`LOCAL-292: ALL stops failed generation — cannot deliver tour`). Under D577 a thin tour
+with honest confidence beats no tour. The empty-stop gate needs revisiting, not celebrating.
+
+**And Michael's field experience reorders the priorities:**
+
+> *"our directions were not a big problem because I always asked how to get to the next stop and had
+> time to look at Google-Map or ask a person on the street. The value of our tours were the
+> suggestions what to visit and stories about these stops."*
+
+**The product is what to visit, and the stories. Directions are a convenience.** The locatability
+work (D576) therefore matters most for *choosing and showing* stops, and least for turn-by-turn
+quality.
+
+### The one distinction that must survive: unverified is not the same as refuted
+
+Michael's principle is right about **unverified** claims. Today's church tour did not ship an
+unverified story — it shipped a **confidently false** one: a Newton parish credited to the
+**Archbishop of Los Angeles**, and Father Cuenin moved to the wrong parish (D567). The pipeline
+reported `2/2 stops verified (100%)`. Nothing was hedged, because nothing knew.
+
+**Transparency about confidence only works if the confidence is calibrated.** A "high confidence"
+label on the Los Angeles sentence does not inform the listener — it launders the error. **The
+grounding work is what produces the signal Michael wants to display**; the label is worthless
+without it.
+
+**So the floor is not "verified". The floor is "not refuted."**
+
+| claim | status | ship? |
+|---|---|---|
+| a story we could not corroborate | unverified | **yes**, hedged |
+| a stop we are unsure is interesting | unverified | **yes** |
+| a Newton parish erected by the Archbishop of **Los Angeles** | **refuted** — wrong jurisdiction | **no** |
+| the **Sistine Chapel** as a stop in Newton MA | **refuted** — 6,700 km away | **no** |
+
+**Ship what we cannot verify. Never ship what we can refute.** Both of the real failures this month
+were refutable by simple geography, not by deep verification — which makes the floor cheap to
+enforce and is why it does not reintroduce the gate-heaviness D577 is rejecting.
+
+### Never tell the listener to ask an attendant
+
+> *"I do find it annoying if the tour says, ask an attendant how to get here and there, we should
+> wire it in the app and assume people know it."*
+
+**Supersedes D575's third property and D576's point 3.** "Ask a gallery attendant" is a *design
+assumption* about the listener's real-world options — it is not narration. A tour that tells an
+adult to ask someone for directions is talking down to them. **The fallback stays in the design and
+comes out of the script.**
