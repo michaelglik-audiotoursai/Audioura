@@ -23572,3 +23572,83 @@ test → cost → Stable/Preview swap). Adding it is a roadmap decision, not an 
 **LEAD's recommendation:** take consequences 1–3 now — they delete code and remove a failure mode —
 and advertise guidance through `_build_closing_offer` (D573's surviving half) only once it works
 outdoors.
+
+## D575 — Guidance is landmark waypoints, not turn-by-turn. LEAD's feasibility objection was wrong.
+### 2026-09-17. Michael's correction of D574's second caveat.
+
+**LEAD objected** that guidance needs indoor positioning, which Logan does not publish, so it is a
+research problem and a separate product line. **That objection assumed turn-by-turn navigation.
+Michael is not proposing navigation.**
+
+> *"The goal is to provide our listeners guidance not step-by-step directions without forcing them
+> to look at the screen… we can roughly identify where the person is without asking for the exact
+> location. The path might be the same or similar, and we can guide the person the same way we guide
+> between stops."*
+
+**The listener is the sensor.** Each leg ends at a landmark the listener can recognise, and they
+advance manually — *"Once found, listen to the next stop."* His Logan example is three legs:
+
+1. *Find the Terminal E→C connector — look for the indoor pedestrian signs toward Terminal C or the
+   Central Parking Garage.* → listener confirms
+2. *Head to the lower level — take the nearest escalator or elevator down to Arrivals.* → confirms
+3. *Walk the lower-level hallway toward Terminal C; the Massport office is in that connecting
+   hallway, next to the Security Badge Office.*
+
+**No positioning of any kind is required.** The phone never needs to know where you are, because you
+do. LEAD's objection dissolves entirely.
+
+### It is a tour feature, because it is literally the existing data structure
+
+Ordered stops plus transitions between them, advanced by the listener. **The machinery already
+exists and already emits landmark confirmations.** From today's live church tour:
+
+> *"As you exit Mary Immaculate of Lourdes Parish, head east on Washington Street… **You'll know
+> you're there when you see the beautiful red brick facade of the church.**"*
+
+That is the same pattern as Michael's MFA leg — *"you will immediately know you are in the right
+place because this massive tapestried hall is designed to look like a European palace."* Guidance is
+a tour whose stops are waypoints and whose payload is arrival confirmation.
+
+### Michael's two points that LEAD had backwards
+
+**1. The problem is already ours, indoors, today.** A museum tour names artworks whose location we
+cannot explain and which the museum moves. His MFA example: Chagall's *Village Street* *"is not
+always out on display… check the MFA Artwork Status Page or ask a gallery attendant."* **We already
+ship museum tours whose stops the listener may not be able to find.** This is not a new problem
+being taken on; it is an existing one being named.
+
+**2. Indoors there are people to ask, and outdoors there are not.** *"In a museum, there is a guard
+almost in every room, and there are many working people in an airport."* So the human fallback is
+*more* available exactly where the technology is weakest. **The design should use that explicitly** —
+"ask any gallery attendant for Gallery 250" is a robust instruction, not a failure. This inverts
+LEAD's assumption that indoors is the hard case.
+
+### The design rule LEAD adds
+
+**Every leg must end at a self-verifiable landmark — never at a distance, a turn count, or a
+timing.** A wrong landmark is self-correcting: the listener looks for a tapestried hall, does not
+see one, and stops. A wrong turn instruction is not self-correcting — it is followed, and the
+listener ends up somewhere else with no signal that anything went wrong. **Self-verifiability is
+what makes landmark guidance safe without positioning**, and it must be a hard requirement on every
+generated leg, not a stylistic preference.
+
+### The risk moves — it does not go away
+
+The objection is no longer positioning. It is **the truthfulness of navigational claims**, and the
+bar is higher than for prose. D563 already said it: *"for a story a failed check costs a sentence,
+for a facility it costs a traveller their flight."*
+
+**And we have live evidence that our directions are ungated.** Today's church tour emitted, with no
+verification anywhere:
+
+> *"head east on Washington Street. Continue walking until you reach Centre Street, then turn left."*
+
+Those are specific street-level claims about a **5 km** walk, produced the same way the prose is
+produced — and this is the same day we found a Newton parish credited to the Archbishop of Los
+Angeles (D567). **There is no gate on directions at all.** Before guidance ships, navigational
+claims need the grounding the facts still do not have.
+
+**Sequencing recommendation, unchanged in shape but not in reasoning:** prove landmark guidance
+where a wrong leg is cheap — a museum with a gallery attendant to ask, or an outdoor district —
+before a terminal where the cost of a wrong leg is a missed flight. The reason is no longer
+"positioning is hard"; it is "we cannot yet verify a direction."
