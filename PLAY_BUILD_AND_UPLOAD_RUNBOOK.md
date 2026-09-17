@@ -1,5 +1,10 @@
 # Audioura — Build & Play Upload Runbook
 
+> **Automation available:** the Play upload steps below can now be run in one
+> command — `bash upload_play.sh --notes "…" --apply` (dry run by default). See
+> **`PLAY_UPLOAD.md`**. This manual runbook remains the source of truth and the
+> fallback.
+
 How to produce a signed Android App Bundle (`.aab`) and upload it to Google Play. Keep this for every future release.
 
 App: **Audioura** · Package: **com.audioura.audiotours** · Build machine: **Ubuntu (VirtualBox)** · Shared folder: **/media/sf_audiotours** (= Windows `…\AudioTours\development`)
