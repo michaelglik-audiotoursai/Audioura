@@ -211,6 +211,26 @@ key) — **the private key cannot be re-downloaded from Cloudflare**.
 
 ---
 
+## ⏳ STATE 2026-09-17 11:10 — two fixes reviewed and staged, awaiting Michael's deploy approval
+
+| task | branch | staged image | verified | rollback |
+|---|---|---|---|---|
+| `wdvrdaydr1` translations 404 (GCS-TR1) | `kiro/gcs-tr1` @ `522d25c` (**`main` line**, unmerged) | `translation-service:v35-tr1` = v35 + `translation_service.py` only | LEAD: 6/6 AC tests, red proof on v35, `/app` manifest diff | image `:v35` |
+| `wdvrdayd40` language gate (GCS-LANG1) | `kiro/gcs-lang1` @ `d6dacc8`, merged into local `storied` `2109754` | `tour-editing:v4` | LEAD: 7 suites green, independent probe | revision `tour-editing-00003-vpt` |
+
+- **Root cause of translations 404:** the R2 source fetch only ran for tours *without* `tour_content`, so
+  R2-migrated tours built a ZIP from `None`. The error was swallowed and an artifact-less row was inserted.
+  The cache check then returned that broken row forever.
+- **Already done in prod (reversible):** 424, 425 and 426 hidden (`lat`/`lng` NULL; backups in
+  `SUBMISSION_GCS-TR1.md` §7). Verified gone from `tours-near` on both hosts.
+- **Also orphaned, still visible:** 368 (de) and 378 (zh), from June. Hide them with the deploy.
+- **Track decision (LEAD, reversible):** a translation inherits its *source* tour's `track`. Storied_Tours
+  asked for track-by-host; argued on `wdvrdaydr1`.
+- **Follow-ups:** in TR1, check the cache before the R2 fetch. The app-side "not available for this older
+  tour" message is `wdvrdaye0j` (Mac Mini).
+- **Local `storied` is 2 ahead of origin** (the LANG1 merge). Push needs Michael.
+- **Test hygiene:** never loop-run every file under `tests/`. `gcslang1_lang_stub.py` is a server and hangs.
+
 ## ✅ STATE 2026-09-15 16:40 — deploy day. This section supersedes "STATE AT SHUTDOWN" below.
 
 Every change below was written by Kiro, reviewed by LEAD (including LEAD's own real dry-run), deployed by
