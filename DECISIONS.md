@@ -23326,3 +23326,79 @@ Same request, merged and pre-merged trees: **$0.2444 / $0.2126 / $0.2741** — m
 ±13%, 268–361s, 36–38k tokens. **A single measurement cannot show a cost regression smaller than
 about a quarter of the total.** Any future "we made it cheaper" claim needs at least three runs on
 each side.
+
+## D571 — A named building is a building tour, and its stops come from what that kind of building IS
+### 2026-09-17. Michael's ruling, answering D567. This supersedes D564's routing of worship venues to the walking path.
+
+**The request string has a grammar, and it decides the tour.** Michael's words:
+
+> *"'Our Lady Help of Christians, Newton MA' can be broken down into 'Target+location' and the
+> target is a building. So it should be a building tour. Even if the string would say 'walking tour
+> of Our Lady Help of Christians, Newton MA' it is broken down into Tour type + constriction +
+> location so it would become a walking tour inside of the building, and immediately becomes a
+> building tour."*
+
+Two parse shapes, one outcome:
+
+| request | parses as | tour |
+|---|---|---|
+| `Our Lady Help of Christians, Newton MA` | **Target** + Location | building tour |
+| `walking tour of Our Lady Help of Christians, Newton MA` | TourType + **Constriction** + Location | walking tour *inside* the building → **still a building tour** |
+
+**A named building as the Target wins over any tour-type word in front of it.** "Walking" then
+describes how you move *within* the venue, not a neighbourhood stroll past it.
+
+### Where the stops come from: ask what the venue class consists of
+
+**Not "what artworks are here"** — that question produced the Sistine Chapel in Newton (D564).
+The question is *what does a church consist of, for a tour?* Michael's worked answer: narthex,
+baptismal font, nave and its vaulting, stained glass, pulpit and lectern, Stations of the Cross,
+rood screen or iconostasis, chancel and choir stalls, altar and altarpiece, tabernacle, transepts,
+side chapels, sacristy, crypt.
+
+And for an airport, by the same method: check-in and ticketing, the baggage sorter beneath the
+floor, the security checkpoint, concourse and gates, the jetbridge, ramp operations seen from the
+window, the ATC tower, the fire and rescue station, the operations control centre, ground support
+equipment, terminal architecture and art, sustainability systems.
+
+**The method generalises: venue class → parts list → which parts this instance has.**
+
+**Why this is safe where the museum path was not.** The class parts list is knowledge *about the
+class* — "a church has a nave" cannot be a falsehood about Newton. Only the second step is
+venue-specific, and it is a verifiable yes/no about a named part, not an open invitation to name
+objects. That two-step is the whole safety property. Michael: *"we will need to ask AI, and maybe
+more than once to get things right here."*
+
+### Two consequences that bind on code already merged
+
+**1. A building tour's stops share a coordinate, and LOCAL-481 currently calls that a defect.**
+`geocode_stops.COLLISION_CATEGORIES` includes `facility`, and the collapse threshold is 4 decimal
+places ≈ **11 metres**. The narthex, the font, the nave and the altar are all within 11 m of each
+other — an entire correct building tour would be flagged as centroid collapse and its stops
+re-resolved or dropped. `museum` is already exempt for precisely this reason ("two artworks in one
+room legitimately share a coordinate"). **A building/interior tour is the same case and must be
+exempt the same way.** This is the tour-423 detector doing the right thing to the wrong category.
+
+**2. OSM cannot supply interior parts.** Overpass has `Terminal C` and `Dunkin'`; it does not have
+the baptismal font, the rood screen, or the operations control centre. **The interior parts list
+does not come from Overpass at all** — it comes from the class knowledge plus the venue's own site
+(the Tier-1 source LOCAL-23 established). This substantially reduces, and may remove, the facility
+feature's dependence on the endpoint that D569 identifies as a single point of failure.
+
+### The open tension, stated rather than resolved
+
+**There are two different airport tours, and Michael has now described both.**
+
+- **The errand tour** — his 2026-09-15 verdict on tour 423: *"airlines, counters, terminals, lost
+  and found, children playgrounds, Lyft and Uber pickup locations, parkings, WiFi, electric
+  outlets."* This is D563's need-spine: a traveller with a flight to catch. Stops are mapped
+  objects with real coordinates.
+- **The interior tour** — the list above: ATC tower, baggage sorter, jetbridge, ARFF. This is an
+  enthusiast's or a school group's tour. Most of its stops are not publicly reachable and have no
+  mapped coordinate.
+
+**Both are legitimate and they are not the same product.** A passenger in Terminal E wants the
+first; someone who came *to see the airport* wants the second. This needs a decision before the
+facility work resumes — LEAD's recommendation is that the **errand tour stays the default for a
+facility**, because it matches the original complaint and the stops are groundable, with the
+interior tour as a separate mode. Not decided here.
