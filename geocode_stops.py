@@ -914,7 +914,8 @@ COLLISION_CATEGORIES = {
 # 4 decimal places ≈ 11 m at the equator. Two distinct destinations do not share
 # a parallel or a meridian to this precision by accident; the model reusing a
 # coordinate it already wrote does exactly this.
-_COLLISION_DP = 4
+_COLLISION_DP = 4          # retained: used by callers/tests for rounding display
+_COLLAPSE_MIN_STOPS = 3   # [D572] two stops sharing an axis is innocent; three is the artifact
 
 
 def _round_dp(x, dp=_COLLISION_DP):
@@ -922,65 +923,80 @@ def _round_dp(x, dp=_COLLISION_DP):
 
 
 def find_centroid_collapse(poi_list, category=None):
-    """[LOCAL-481] Identify stops that were not independently located.
+    """[LOCAL-481, reshaped by D572] Identify stops that were never independently located.
 
-    A collision is two or more stops sharing latitude OR longitude to
-    `_COLLISION_DP` decimal places. Returns a record::
+    **This detects an artifact, not closeness.** Michael, 2026-09-17: *"different
+    buildings have different dimensions… We can not generalize the distance between
+    objects no matter the tour target."* A palace tour's stops may be 300 m apart and
+    a single-room tour's 2 m apart; both are correct. So no distance constant, and no
+    per-category exemption list.
 
-        {
-          "action": "none" | "collision",
-          "reason": str,
-          "colliding_indices": [i, ...],   # indices into poi_list, sorted
-          "groups": [{"axis": "lat"|"lng", "value": float, "indices": [...]}],
-          "checked": int,
-        }
+    The artifact is what tour 423 looked like::
 
-    Deterministic, no network, no mutation. `category` scopes the check: a
-    category outside COLLISION_CATEGORIES (notably `museum`) returns action
-    "none" with the reason, so two artworks in one room are never flagged.
+        Boston Bruins Bar                 42.3656, -71.0188
+        Art Exhibits at Logan Airport     42.3656, -71.0173
+        Boston Logan Airport Virtual Tour 42.3656, -71.0096
+        Boston Logan Airport History Walk 42.3656, -71.0189
+
+    One latitude repeated EXACTLY while longitude varies — a centroid with single-axis
+    jitter, which has no innocent explanation. Therefore a collapse requires ALL of:
+
+      * **three or more** stops (two sharing an axis is commonplace and innocent),
+      * sharing one axis at **exact** value (not rounded into a bucket),
+      * while the **other axis varies** among them.
+
+    Stops identical on BOTH axes are co-located, not collapsed — two artworks in one
+    room, two chapels given the building's coordinate. That is why `museum` no longer
+    needs an exemption: the rule itself never fired on it. `category` is accepted for
+    call-site compatibility and is no longer used to gate the check (D572).
+
+    Returns the same record shape as before::
+
+        {"action": "none"|"collision", "reason": str,
+         "colliding_indices": [...], "groups": [...], "checked": int}
+
+    Deterministic, no network, no mutation.
     """
     rec = {"action": "none", "reason": "", "colliding_indices": [],
            "groups": [], "checked": 0}
-
-    if category is not None and category not in COLLISION_CATEGORIES:
-        rec["reason"] = (f"category {category!r} allows co-located stops "
-                         f"— collision check skipped")
-        return rec
 
     pts = []          # (index, lat, lng)
     for i, poi in enumerate(poi_list):
         c = _parse_coords_pair(poi.get('coordinates', '') if isinstance(poi, dict) else '')
         if c:
-            pts.append((i, c[0], c[1]))
+            pts.append((i, float(c[0]), float(c[1])))
     rec["checked"] = len(pts)
-    if len(pts) < 2:
-        rec["reason"] = "fewer than two stops carry a coordinate"
+    if len(pts) < _COLLAPSE_MIN_STOPS:
+        rec["reason"] = (f"fewer than {_COLLAPSE_MIN_STOPS} stops carry a coordinate "
+                         f"— the collapse artifact needs at least that many")
         return rec
 
     colliding = set()
-    for axis, comp in (("lat", 1), ("lng", 2)):
+    for axis, comp, other in (("lat", 1, 2), ("lng", 2, 1)):
         buckets = {}
         for row in pts:
-            key = _round_dp(row[comp])
-            buckets.setdefault(key, []).append(row[0])
-        for value, idxs in buckets.items():
-            if len(idxs) >= 2:
-                rec["groups"].append({"axis": axis, "value": value,
-                                      "indices": sorted(idxs)})
-                colliding.update(idxs)
+            buckets.setdefault(row[comp], []).append(row)
+        for value, rows in buckets.items():
+            if len(rows) < _COLLAPSE_MIN_STOPS:
+                continue
+            # The other axis must VARY. If it is constant too, these stops are
+            # co-located (same room, same building) — innocent, never a collapse.
+            if len({r[other] for r in rows}) < 2:
+                continue
+            idxs = sorted(r[0] for r in rows)
+            rec["groups"].append({"axis": axis, "value": value, "indices": idxs})
+            colliding.update(idxs)
 
     if colliding:
         rec["action"] = "collision"
         rec["colliding_indices"] = sorted(colliding)
-        parts = []
-        for grp in rec["groups"]:
-            parts.append(f"{len(grp['indices'])} stops share {grp['axis']}="
-                         f"{grp['value']:.4f}")
+        parts = [f"{len(g['indices'])} stops share {g['axis']}={g['value']!r} exactly "
+                 f"while the other axis varies" for g in rec["groups"]]
         rec["reason"] = "; ".join(parts)
         logging.warning("[GEOCODE] CENTROID COLLAPSE: %s (%d stop(s) affected)",
                         rec["reason"], len(colliding))
     else:
-        rec["reason"] = "every stop has an independent coordinate"
+        rec["reason"] = "no centroid-plus-jitter artifact found"
     return rec
 
 
@@ -1011,6 +1027,8 @@ def repair_centroid_collapse(poi_list, tour_location, category=None,
 
     rec = find_centroid_collapse(poi_list, category=category)
     rec["reresolved"] = []
+    _before_coords = {i: (poi_list[i].get("coordinates", "") if isinstance(poi_list[i], dict) else "")
+                      for i in rec["colliding_indices"]}
     rec["cured_indices"] = []
     rec["still_colliding"] = []
     if rec["action"] != "collision":
@@ -1037,16 +1055,31 @@ def repair_centroid_collapse(poi_list, tour_location, category=None,
                      poi.get('name', ''), before, after,
                      (sub or {}).get('confidence', 'low'))
 
-    # Did re-resolution actually break the collision? Re-run the detector on the
-    # (now mutated) list and see which of the originally-colliding stops are no
-    # longer part of any shared line.
-    after_rec = find_centroid_collapse(poi_list, category=category)
-    still = set(after_rec["colliding_indices"])
+    # [D572] "Cured" is a fact about the STOP, not about the group. The previous
+    # version re-ran the detector and treated "no longer in the colliding set" as
+    # cured — which silently passes a stop that never moved, because curing ONE
+    # member of a three-stop group drops the group below the detection threshold
+    # and the two untouched bogus stops get reported as cured. A stop is cured only
+    # if its own coordinate actually moved off the line it shared.
+    _shared_values = {(g["axis"], g["value"]) for g in rec["groups"]}
+
+    def _still_on_a_shared_line(poi):
+        c = _parse_coords_pair(poi.get('coordinates', '') if isinstance(poi, dict) else '')
+        if not c:
+            return True          # no coordinate at all is not a cure
+        lat, lng = float(c[0]), float(c[1])
+        for axis, value in _shared_values:
+            if (axis == "lat" and lat == value) or (axis == "lng" and lng == value):
+                return True
+        return False
+
     for i in rec["colliding_indices"]:
-        if i in still:
-            rec["still_colliding"].append(i)
-        else:
+        poi = poi_list[i]
+        moved = (poi.get('coordinates', '') if isinstance(poi, dict) else '') != _before_coords.get(i)
+        if moved and not _still_on_a_shared_line(poi):
             rec["cured_indices"].append(i)
+        else:
+            rec["still_colliding"].append(i)
 
     if rec["cured_indices"]:
         logging.info("[GEOCODE] centroid collapse: %d/%d colliding stop(s) cured "

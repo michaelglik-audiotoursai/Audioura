@@ -65,22 +65,37 @@ class TestFind(unittest.TestCase):
         self.assertEqual(rec["action"], "none", rec)
         self.assertEqual(rec["colliding_indices"], [], rec)
 
-    def test_co_located_artworks_WOULD_collide_without_the_scope(self):
-        """The scope is doing real work: the same two points collide when the
-        category is one where stops are distinct destinations."""
-        rec = g.find_centroid_collapse(MUSEUM_ROOM, category="walking")
-        self.assertEqual(rec["action"], "collision", rec)
+    def test_co_located_stops_are_innocent_in_EVERY_category(self):
+        """[D572] Co-location is innocent by the rule itself, not by a category
+        exemption. Stops identical on BOTH axes were not centroid-jittered — they
+        are two artworks in one room, or two chapels given the building's point.
+        Michael, 2026-09-17: scale is a property of the venue, not the category."""
+        for category in ("walking", "museum", "facility", None):
+            rec = g.find_centroid_collapse(MUSEUM_ROOM, category=category)
+            self.assertEqual(rec["action"], "none",
+                             f"co-located stops must be innocent for {category!r}: {rec}")
 
     def test_distinct_stops_are_clean(self):
         rec = g.find_centroid_collapse(DISTINCT, category="walking")
         self.assertEqual(rec["action"], "none", rec)
 
     def test_longitude_collision_is_caught_too(self):
+        """[D572] The artifact on the longitude axis: THREE stops share a longitude
+        exactly while latitude varies. Three, not two — see the test below."""
         rows = pois([("A", 43.7109, 7.2800), ("B", 43.7152, 7.2800),
-                     ("C", 43.7190, 7.2813)])
+                     ("C", 43.7190, 7.2800), ("D", 43.7201, 7.2813)])
         rec = g.find_centroid_collapse(rows, category="walking")
         self.assertEqual(rec["action"], "collision", rec)
-        self.assertEqual(rec["colliding_indices"], [0, 1], rec)
+        self.assertEqual(rec["colliding_indices"], [0, 1, 2], rec)
+
+    def test_two_stops_sharing_an_axis_is_NOT_a_collapse(self):
+        """[D572] Two stops on the same east-west street share a latitude. That is
+        commonplace and innocent at any distance apart — the old rule fired on it.
+        The artifact needs a third stop to be centroid-plus-jitter."""
+        rows = pois([("A", 43.7109, 7.2800), ("B", 43.7109, 7.2913),
+                     ("C", 43.7190, 7.2854)])
+        rec = g.find_centroid_collapse(rows, category="walking")
+        self.assertEqual(rec["action"], "none", rec)
 
 
 class TestRepair(unittest.TestCase):
@@ -156,10 +171,11 @@ class TestDetectorCanFail(unittest.TestCase):
         g.COLLISION_CATEGORIES = self._cats
 
     def test_disabled_detector_lets_423_through_unflagged(self):
-        # Disable by removing 'facility' from the scoped set — the detector then
-        # treats 423 like a museum and never looks. This is the real disable path
-        # a regression would take (mis-scoping the check).
-        g.COLLISION_CATEGORIES = set()
+        # [D572] The scoped-set disable path is gone with COLLISION_CATEGORIES.
+        # Raise the minimum-stop threshold instead: that is the knob a regression
+        # would now turn to stop the detector looking at 423.
+        _saved_min = g._COLLAPSE_MIN_STOPS
+        g._COLLAPSE_MIN_STOPS = 99        # [D572] the real disable path now
         disabled = g.find_centroid_collapse(TOUR_423, category="facility")
         self.assertEqual(disabled["action"], "none",
                          "with the detector disabled the 423 collapse must pass "
@@ -167,7 +183,7 @@ class TestDetectorCanFail(unittest.TestCase):
 
         # Re-enable: the very same fixture is now flagged. If this ever fails to
         # flip, the test can no longer distinguish fixed from broken.
-        g.COLLISION_CATEGORIES = self._cats
+        g._COLLAPSE_MIN_STOPS = _saved_min
         enabled = g.find_centroid_collapse(TOUR_423, category="facility")
         self.assertEqual(enabled["action"], "collision", enabled)
         self.assertEqual(enabled["colliding_indices"], [0, 1, 2, 3], enabled)
