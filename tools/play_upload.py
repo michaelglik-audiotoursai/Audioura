@@ -164,7 +164,15 @@ def check_signer(aab_path: str, keytool: str) -> str:
 # ---------------------------------------------------------------------------
 
 def build_numbers_has_android_upload(build_numbers_path: str, version_code: int) -> bool:
-    """True if BUILD_NUMBERS.md already records this Android build as uploaded."""
+    """True if BUILD_NUMBERS.md already records this Android build as uploaded.
+
+    Rule (case-insensitive, ``**`` markdown stripped): a row counts as uploaded
+    only when its outcome says it actually reached Play — it contains
+    ``"uploaded to play"`` or ``"shipped to play"`` — AND it does NOT contain a
+    negation, ``"not uploaded"`` or ``"never shipped"``. A row that merely
+    contains the substring ``"upload"`` (e.g. "not uploaded to Play") is NOT a
+    duplicate: the number was never consumed on Play.
+    """
     try:
         with open(build_numbers_path, "r", encoding="utf-8") as fh:
             text = fh.read()
@@ -176,8 +184,17 @@ def build_numbers_has_android_upload(build_numbers_path: str, version_code: int)
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) < 5:
             continue
-        build, platform, outcome = cells[0], cells[1].lower(), cells[4].lower()
-        if build == str(version_code) and platform == "android" and "upload" in outcome:
+        build = cells[0]
+        platform = cells[1].lower()
+        # Ignore markdown emphasis markers so "**uploaded to Play**" matches.
+        outcome = cells[4].lower().replace("*", "")
+        if build != str(version_code) or platform != "android":
+            continue
+        reached_play = ("uploaded to play" in outcome
+                        or "shipped to play" in outcome)
+        negated = ("not uploaded" in outcome
+                   or "never shipped" in outcome)
+        if reached_play and not negated:
             return True
     return False
 
@@ -424,13 +441,80 @@ def _safe_delete(service, edit_id: str, plan: UploadPlan) -> None:
 def append_build_numbers_row(build_numbers_path: str, version_code: int,
                              version_name: str, commit_short: str,
                              edit_id: str, date_str: str) -> str:
-    """Append the Android ledger row. Only called after a real commit."""
+    """Insert the Android ledger row INSIDE the ``## Ledger`` table.
+
+    The row is placed:
+      * directly BEFORE the ``NEXT`` placeholder row if that section has one, or
+      * after the last table row of the ``## Ledger`` section otherwise.
+
+    Existing rows (including the ``NEXT`` placeholder) are never modified;
+    bumping ``NEXT`` is the operator's choice. The file's existing line endings
+    are preserved and it is written back as UTF-8. Raises ``UploadError`` if the
+    ``## Ledger`` table cannot be located — we never append blindly.
+    """
+    with open(build_numbers_path, "r", encoding="utf-8", newline="") as fh:
+        raw = fh.read()
+
+    # Preserve the file's dominant line ending.
+    newline = "\r\n" if "\r\n" in raw else "\n"
+    # Split on any newline flavour but keep the content; we re-join with `newline`.
+    lines = raw.splitlines()
+    trailing_newline = raw.endswith(("\n", "\r"))
+
     row = (
         f"| {version_code} | Android | {version_name} | `{commit_short}` | "
         f"**uploaded to Play closed testing** (edit `{edit_id}`) | {date_str} |"
     )
-    with open(build_numbers_path, "a", encoding="utf-8") as fh:
-        fh.write("\n" + row + "\n")
+
+    def is_table_row(s: str) -> bool:
+        return s.strip().startswith("|")
+
+    # Find the `## Ledger` heading.
+    ledger_idx = None
+    for i, ln in enumerate(lines):
+        if ln.strip().lower().startswith("## ledger"):
+            ledger_idx = i
+            break
+    if ledger_idx is None:
+        raise UploadError(
+            f"Could not find a '## Ledger' section in {build_numbers_path} — "
+            "refusing to append the ledger row blindly."
+        )
+
+    # The section ends at the next '## ' heading (or end of file).
+    section_end = len(lines)
+    for i in range(ledger_idx + 1, len(lines)):
+        if lines[i].strip().startswith("## "):
+            section_end = i
+            break
+
+    # Collect the table-row line indices within this section.
+    table_rows = [i for i in range(ledger_idx + 1, section_end)
+                  if is_table_row(lines[i])]
+    if not table_rows:
+        raise UploadError(
+            f"The '## Ledger' section in {build_numbers_path} has no table — "
+            "refusing to append the ledger row blindly."
+        )
+
+    # Locate the NEXT placeholder row (a table row whose outcome cell, with
+    # markdown emphasis stripped, is exactly "NEXT").
+    insert_at = None
+    for i in table_rows:
+        cells = [c.strip() for c in lines[i].strip().strip("|").split("|")]
+        if len(cells) >= 5 and cells[4].replace("*", "").strip().upper() == "NEXT":
+            insert_at = i  # insert BEFORE the NEXT placeholder
+            break
+    if insert_at is None:
+        insert_at = table_rows[-1] + 1  # after the last table row of the section
+
+    lines.insert(insert_at, row)
+
+    out = newline.join(lines)
+    if trailing_newline:
+        out += newline
+    with open(build_numbers_path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(out)
     return row
 
 

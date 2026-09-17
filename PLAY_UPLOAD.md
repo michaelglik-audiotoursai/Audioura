@@ -23,8 +23,11 @@ if more than one closed track exists.
 
 The script fails fast if: the AAB is missing, its version ≠ `pubspec.yaml`, it is
 not signed with `CN=Mikhail Glik, O=Audioura LLC`, or the versionCode is already
-used on Play (or already recorded as uploaded in `BUILD_NUMBERS.md`). On a real
-`--apply` commit it appends the Android row to `BUILD_NUMBERS.md` and prints the
+used on Play (or already recorded in `BUILD_NUMBERS.md` as having reached Play —
+a row that says e.g. "not uploaded to Play" or "never shipped" does NOT count).
+On a real `--apply` commit it inserts the Android row **inside the `## Ledger`
+table** (directly before the `NEXT` placeholder row, else after the last table
+row), leaving every existing row — including `NEXT` — untouched, and prints the
 exact `git commit` command — it never commits git itself.
 
 ## Auth — no key file

@@ -368,11 +368,90 @@ def test_apply_refuses_versioncode_mismatch_from_upload(tmp_path):
 # ledger append
 # ---------------------------------------------------------------------------
 
+FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "BUILD_NUMBERS.fixture.md")
+
+
+def _read_bytes(path):
+    with open(path, "rb") as fh:
+        return fh.read()
+
+
 def test_append_build_numbers_row(tmp_path):
     bn = os.path.join(str(tmp_path), "BUILD_NUMBERS.md")
     with open(bn, "w", encoding="utf-8") as fh:
+        fh.write("## Ledger\n\n")
         fh.write("| build | platform | version | commit | outcome | date |\n")
+        fh.write("|---|---|---|---|---|---|\n")
+        fh.write("| 25 | iOS | 2.3.2 | `abc` | uploaded to TestFlight | 2026-09-16 |\n")
     row = pu.append_build_numbers_row(bn, 26, "2.3.2", "abc1234", "edit-123", "2026-09-17")
     assert "| 26 | Android | 2.3.2 |" in row
     with open(bn, "r", encoding="utf-8") as fh:
         assert "uploaded to Play closed testing" in fh.read()
+
+
+def test_append_inserts_before_next_placeholder_on_real_ledger(tmp_path):
+    """Acceptance #1: on a verbatim copy of the real BUILD_NUMBERS.md the 26
+    Android row lands immediately before the `27 NEXT` row, and every other
+    line is byte-identical."""
+    bn = os.path.join(str(tmp_path), "BUILD_NUMBERS.md")
+    original = _read_bytes(FIXTURE)
+    with open(bn, "wb") as fh:
+        fh.write(original)
+
+    pu.append_build_numbers_row(bn, 26, "2.3.2", "5e53c56", "edit-123", "2026-09-17")
+
+    before_lines = original.decode("utf-8").splitlines(keepends=True)
+    after_lines = _read_bytes(bn).decode("utf-8").splitlines(keepends=True)
+
+    # Exactly one line added.
+    assert len(after_lines) == len(before_lines) + 1
+
+    # Find the inserted row and the NEXT row in the new file.
+    new_idx = next(i for i, l in enumerate(after_lines)
+                   if l.strip().startswith("| 26 | Android | 2.3.2 |"))
+    next_idx = next(i for i, l in enumerate(after_lines) if "**NEXT**" in l)
+    assert new_idx + 1 == next_idx, "26 Android row must sit right before the NEXT row"
+
+    # Every other line is byte-identical: removing the inserted line reproduces
+    # the original file exactly (bytes and line endings).
+    rebuilt = "".join(after_lines[:new_idx] + after_lines[new_idx + 1:])
+    assert rebuilt.encode("utf-8") == original
+
+    # Preserved CRLF endings on the inserted line too.
+    assert after_lines[new_idx].endswith("\r\n")
+
+
+def test_append_no_ledger_table_errors_and_leaves_file_unchanged(tmp_path):
+    """Acceptance #1: no `## Ledger` table -> clear error, file unchanged."""
+    bn = os.path.join(str(tmp_path), "BUILD_NUMBERS.md")
+    content = b"# Something else\r\n\r\nNo ledger here.\r\n"
+    with open(bn, "wb") as fh:
+        fh.write(content)
+    with pytest.raises(pu.UploadError) as e:
+        pu.append_build_numbers_row(bn, 26, "2.3.2", "abc", "edit", "2026-09-17")
+    assert "ledger" in str(e.value).lower()
+    assert _read_bytes(bn) == content, "file must be unchanged when the table is absent"
+
+
+def test_duplicate_guard_on_real_ledger(tmp_path):
+    """Acceptance #2: the fixed duplicate guard on the verbatim fixture."""
+    # 20 Android -> "shipped to Play closed testing" -> uploaded.
+    assert pu.build_numbers_has_android_upload(FIXTURE, 20) is True
+    # 22 Android -> "never shipped" -> not uploaded.
+    assert pu.build_numbers_has_android_upload(FIXTURE, 22) is False
+    # 23 Android -> "not uploaded to Play" -> not uploaded.
+    assert pu.build_numbers_has_android_upload(FIXTURE, 23) is False
+    # 26 Android -> absent -> not uploaded.
+    assert pu.build_numbers_has_android_upload(FIXTURE, 26) is False
+
+
+def test_duplicate_guard_true_after_fixed_append(tmp_path):
+    """Acceptance #2: after the fixed append writes the 26 Android row, the
+    guard reports 26 as uploaded."""
+    bn = os.path.join(str(tmp_path), "BUILD_NUMBERS.md")
+    with open(bn, "wb") as fh:
+        fh.write(_read_bytes(FIXTURE))
+    assert pu.build_numbers_has_android_upload(bn, 26) is False
+    pu.append_build_numbers_row(bn, 26, "2.3.2", "5e53c56", "edit-123", "2026-09-17")
+    assert pu.build_numbers_has_android_upload(bn, 26) is True
