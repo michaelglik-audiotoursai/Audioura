@@ -211,6 +211,20 @@ key) — **the private key cannot be re-downloaded from Cloudflare**.
 
 ---
 
+## ✅ STATE 2026-09-17 11:25 — both deployed with Michael's approval, both verified by effect
+
+| service | image | revision | verified | rollback |
+|---|---|---|---|---|
+| `translation-service` | `v35-tr1` | `00019-fw8` | Russian on tour 107 created **427**; `/download-tour/427` 200, 2.6 MB, Russian text, audio, `track=beta` | image `:v35` |
+| `tour-editing` | `v4` | `00004-zp7` | realistic mixed-script ru edit: v3 input cv 0.57 (false reject), v4 input ru 0.54 (accepted), live 200; English still 400 | revision `00003-vpt` |
+
+- Orphans 424/425/426 are hidden. **368/378 hide re-dispatched as GCS-HIDE2**: GCS-TR1D stopped correctly because LEAD's
+  task file said `tour-editing` must be unchanged while LEAD was deploying it in parallel. Never list a service as
+  must-not-change while another task is deploying it.
+- **Verification lesson:** Kiro's language tests used a stub detector, and the 09-15 "false rejection" was caused mostly
+  by LEAD's own Latin test marker (`LEADTEXT…`). Verify language behaviour against **live Comprehend**, with a marker
+  in the tour's own script.
+
 ## ⏳ STATE 2026-09-17 11:10 — two fixes reviewed and staged, awaiting Michael's deploy approval
 
 | task | branch | staged image | verified | rollback |
