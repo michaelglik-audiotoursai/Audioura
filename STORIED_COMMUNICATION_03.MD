@@ -1588,3 +1588,29 @@ de-repetition guard broke coherence, the fallback flag produced a false disclosu
 exhibit, the waypoint was rescued from being a boundary then dropped from the tour, the bike
 reachability check deleted three reachable stops while keeping an island. **All were caught by
 running the thing and reading the output; the suites were green every time.**
+
+---
+
+## 2026-09-17 — SIDE: which cheap unlocked Pixel for Android field testing?
+
+**Michael:** *"It seems I need an android phone for testing. Can you look at [Amazon, unlocked Pixel, high-price=70] and decide which one would serve us the best?"*
+
+**LEAD:** Amazon returned 503 to the fetcher, so the filtered listings could not be read —
+answered from the app's own build config plus market prices.
+
+The deciding spec is **maximum Android version**, not speed or camera. `minSdk = 24` means
+almost any Pixel installs the app, so installability is not the constraint. What matters is
+that `AndroidManifest.xml` declares `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `RECORD_AUDIO`
+and `ACCESS_FINE_LOCATION`, and the app builds on Flutter 3.41.6 / `compileSdk 36` — so it
+**targets Android 16**, and each of those permissions changed behaviour in a different release.
+
+Under $70 the ceiling is **Android 13** (Pixel 4 and Pixel 4a both end there; 3a/3/2 end at 12).
+Android 13 does cover the notification-permission prompt — the one that does not exist at all
+below 13 — but not `foregroundServiceType` enforcement (14+) or edge-to-edge layout (15+,
+which `targetSdk` 35+ forces and which visibly changes the app's layout).
+
+**Recommendation: Pixel 6a, ~$119 unlocked (Swappa).** Cheapest Pixel that runs Android 16 —
+the OS the app targets. If $70 is firm: **Pixel 4a**, never a 3a, and pair it with an
+Android 16 emulator on the Mac Mini, which covers the API-level behaviour the 4a cannot while
+the 4a covers real GPS and audio in the field. Caveat on the 4a: Google's January 2025 update
+deliberately reduced battery capacity on affected units — the worst trait for a walking tour.
