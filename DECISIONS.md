@@ -23281,3 +23281,48 @@ that breaks it.
 **Still unverified, and honestly so: no facility tour has yet been generated end to end.** The
 crash (D568) is fixed and the pipeline now runs its full length, but the spine has never been fed
 real data in a complete run. That verification is blocked until the Overpass block lifts.
+
+## D570 — Cimiez cannot be the regression control the way D563/D564 define it. Stop selection is stochastic.
+### 2026-09-17. Three runs of the identical request settle it.
+
+D563 and D564 both end with: *"Cimiez remains the regression control. A change to its stop list is
+a bounce."* The post-merge run changed the stop list, which by that rule is a bounce. **It is not,
+and the rule is what is wrong.**
+
+Identical request — `Walking tour around Cimiez District, Nice, France`, walking, 4 stops:
+
+| run | tree | stops | cost | chars |
+|---|---|---|---|---|
+| 1 | pre-merge `a3d4e9d` | Matisse · Monastery · **Cimiez Cemetery** · Chagall | $0.2444 | 9,466 |
+| 2 | merged | Matisse · Monastery · **Roman Ruins of Cemenelum** | $0.2126 | 7,551 |
+| 3 | merged | Matisse · Monastery · **Roman Ruins of Cemenelum** · Chagall | $0.2741 | 10,487 |
+
+**Run 3 restores the requested 4-stop count and Chagall on the merged tree.** Stops 1 and 2 are
+stable everywhere. The variation is in the Phase 3A candidate list, which is LLM-generated, and in
+which candidates survive corpus loading.
+
+**Direct evidence no merged code caused it:** the post-merge runs log **no LOCAL-481 activity at
+all** — no centroid-collapse, no `place_shape` rejection. The stops that changed were never touched
+by the new code. And `Cemenelum` was already in the pre-merge candidate pool, dropped there as
+`EMPTY`; post-merge it resolved `tier=rich, facts=8`. That is corpus variance, and arguably an
+improvement, not a regression.
+
+**The methodological ruling: a stochastic pipeline cannot be regression-tested by string-comparing
+its output.** "The stop list changed" carries no signal when the same tree produces three different
+lists. Two usable replacements, both cheap:
+
+1. **Pin the input.** `LOCAL-357`'s `forced_stops` harness already bypasses candidate generation
+   entirely and runs everything downstream unchanged. A control tour with a fixed stop list makes
+   every gate, corpus and prose change observable, and is the tool for exactly this.
+2. **Compare stable properties, not the list** — stop count vs requested, every stop inside the
+   requested area, no non-place names, no fact assigned to the wrong venue (D567), cost in band.
+
+**Supersedes the "a change to its stop list is a bounce" clause of D563 and D564.** The rest of
+both rulings stands.
+
+### Cost baseline for D565, now n=3 instead of n=1
+
+Same request, merged and pre-merged trees: **$0.2444 / $0.2126 / $0.2741** — mean **$0.244**, range
+±13%, 268–361s, 36–38k tokens. **A single measurement cannot show a cost regression smaller than
+about a quarter of the total.** Any future "we made it cheaper" claim needs at least three runs on
+each side.
