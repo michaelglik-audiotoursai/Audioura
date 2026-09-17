@@ -17,6 +17,29 @@ import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
 import 'tour_map_screen.dart';
 
+/// LOCAL-484 — build the subtitle line shown under each tour on the Listen
+/// (My Tours) list.
+///
+/// The count segment ("N stops • ") is only emitted when the tour actually
+/// stored a stop count. Previously the widget used `tour['stops'] ?? '10'`,
+/// which asserted a fabricated "10 stops" for any tour that never stored a
+/// count. An absent number is honest; a wrong one is not — so when the count
+/// is unknown we show only the created date.
+///
+/// Kept as a top-level pure function so the "no count → no '10 stops'"
+/// behaviour is unit-testable without the widget (AC #3).
+String tourSubtitleLine(Map<String, dynamic> tour) {
+  final created =
+      DateTime.parse(tour['created']).toLocal().toString().split(' ')[0];
+
+  final rawStops = tour['stops'];
+  final stops = rawStops?.toString().trim() ?? '';
+  if (stops.isEmpty) {
+    return 'Created: $created';
+  }
+  return '$stops stops • Created: $created';
+}
+
 class MyToursScreen extends StatefulWidget {
   const MyToursScreen({super.key});
 
@@ -1356,7 +1379,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${tour['stops'] ?? '10'} stops • Created: ${DateTime.parse(tour['created']).toLocal().toString().split(' ')[0]}'),
+                        Text(tourSubtitleLine(tour)),
                         if (tour['original_request'] != null && tour['original_request'] != tour['title'])
                           Text(
                             'Original: ${tour['original_request']}',
