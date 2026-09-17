@@ -204,7 +204,19 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                             f'for example a walking tour of the surrounding neighbourhood.'
                         )
                     else:
-                        _error_msg = "This venue could not be verified with enough works to generate a quality tour."
+                        # [LOCAL-485 / D564] The catch-all must describe the CATCH-ALL case.
+                        # It previously borrowed the museum "not enough works" wording, so
+                        # every unclassified failure told the listener it lacked artworks —
+                        # whether or not artworks were ever relevant. Michael spent a day on
+                        # that message believing a quota had blocked him. Name the venue, and
+                        # say only what is actually known: we could not build the tour.
+                        _venue_name = (_LAST_CLEAN_FAIL_EVIDENCE.get("venue")
+                                       or location or "this venue")
+                        _error_msg = (
+                            f'We could not find enough verified material about '
+                            f'"{_venue_name}" to build a tour. Try a broader request — '
+                            f'for example a walking tour of the surrounding neighbourhood.'
+                        )
                     import generate_tour_text as _gtt
                     _gtt._LAST_CLEAN_FAIL_EVIDENCE = {}  # Reset for next request
             except ImportError as _cfe_err:
