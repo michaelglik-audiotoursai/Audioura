@@ -22964,3 +22964,50 @@ Kuraly stays at the Bruins bar. Nothing new is needed in the prose pipeline.
 
 Dispatched as **LOCAL-480**. Michael's approved Cimiez tour is the regression control — a change
 to its stop list is a bounce.
+
+## D564 — The venue class decides what a stop IS. Three failures, one defect.
+### 2026-09-17. Supersedes the framing of D563 by widening it.
+
+D563 introduced a `facility` category for the Logan airport tour. Two days of Michael's field
+testing show that was the narrow reading of a general defect.
+
+**Three requests, three outcomes, one cause:**
+
+| requested | routed as | what a stop should have been | result |
+|---|---|---|---|
+| Logan Airport, walking | sightseeing stroll | facility needs — gates, transit, food, lost and found | 4 generic stops, one of them "Virtual Tour", a non-place |
+| Our Lady Help of Christians, Newton MA | **museum** | places with history — building, tower, memorial, hall | **hard failure**, `tier: unresolvable` |
+| Cimiez District, walking | sightseeing stroll | sights | **excellent** — correct by luck of category |
+
+**The church case is the proof, and it is worth stating exactly.** Routed to the museum path, the
+generator asked an LLM for *artworks* at a parish church. It answered with the **Sistine Chapel
+Ceiling (Vatican City)** and **The Last Supper (Milan)** — 6,700 km and 6,300 km from Newton — plus
+two plausible-but-uncatalogued items. The museum verification gate then refused the whole tour
+(`entity_resolved: False, sparql_works: 0, tier: unresolvable`) and clean-failed.
+
+**The gate was right. The routing was wrong.** That gate is the only reason the Sistine Chapel did
+not reach a listener standing in a Newton parish, and it must not be weakened to make churches work.
+
+**The decisive evidence that this is routing and not data:** Michael's approved Cimiez tour contains
+**Cimiez Monastery — a church — as a stop, and it works.** Same kind of building; different path
+through the code; opposite outcome. The material exists. The museum path cannot see it because it
+looks only for catalogued objects.
+
+**The rule:** `generate_tour_text.py` already encodes the fork —
+`_kf_focus = 'object' if tour_category == 'museum' else 'place'`. A museum's unit is a **catalogued
+object** verifiable against Wikidata. Everything else's unit is a **place with history**, verifiable
+the way a walking tour's stops already are. A third unit now joins them: a facility's unit is a
+**traveller need met at a mapped location**.
+
+**One detector, not three.** LOCAL-480 (facility) and LOCAL-485 (church/civic) must share a single
+venue-class mechanism. A fourth venue type must extend it, never add a parallel copy.
+
+**Second, smaller ruling — error messages may not lie by default.**
+`generate_tour_text_service.py:193` makes "could not be verified with enough works" the `else`
+branch: `exhibition_closed` and `exhibition_not_found` get true messages, and **every other
+failure** is told it lacks artworks whether artworks were ever relevant. Michael spent a day
+believing a quota had blocked him. **A catch-all message must describe the catch-all case
+("we could not find enough verified material about <venue>"), never borrow the wording of a
+specific one**, and it must name the venue.
+
+Dispatched as LOCAL-485. Cimiez remains the regression control for both tasks.
