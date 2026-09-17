@@ -23050,3 +23050,138 @@ not as a step at the end of another one.
 It is not yet submitted for Beta App Review; Elie and Sophie are not yet added. Michael's decision:
 control testers by invitation, not a public link, and raise `tours_per_day_override` per tester
 rather than the `free` plan default — which stays at 1.
+
+## D566 — The tour-purpose work is merged. What the live runs proved, and what only they could.
+### 2026-09-17. LOCAL-479/480/481/483/484/485 reviewed, merged, and verified by LEAD while Michael was away.
+
+Six submissions sat finished and unreviewed at the start of this session. All six are now in
+`storied`. Full review in `REVIEW_LOCAL-479_to_485.md`; this is the durable part.
+
+### D564's "one detector, not three" survived independent dispatch
+
+480 and 485 were dispatched from different bases — `git merge-base --is-ancestor` proves 485's
+base does not contain 480 — so two parallel facility detectors was the likely outcome. It did not
+happen: **485 wrote the shared `_detect_venue_class` primitive and made 480's
+`_detect_facility_class` a thin wrapper over it**, keeping the exact name 480's wiring calls.
+
+LEAD verified rather than believed: 485's `_FACILITY_CLASS_WORDS` is **byte-identical** to 480's.
+The merge conflicted in four hunks, resolved by keeping 485's shared block and **deleting 480's
+duplicate detector**; the classifier and both post-convergence guards take both branches, facility
+first. The tree now holds exactly one facility detector.
+
+**The lesson worth keeping: a later task can be told to write the seam the earlier one will merge
+into.** That is cheaper than merging two finished copies, and it is what made this merge routine.
+
+### The live-artifact gate earned its keep twice
+
+Both 480 and 485 reported honestly that they had verified **offline only** — Overpass mocked,
+nothing deployed. Neither claimed COMPLETE. Both were right to hand it over, because:
+
+**1. LOCAL-480's need-spine collapses against the real Overpass.** It issues **one query per need
+slot — ten, sequentially, two retries each**. Three live runs at Logan returned 5, 6, and 2 stops
+in 131–148s, with different slots lost each time to 429/504/ConnectionError. All 20 of its tests
+pass against a mock and none of them could see this.
+
+The mechanism is right — `Terminal C` (OSM way/29518154) and `Dunkin'` (node/5380463925) came back
+real, distinctly located, correctly sourced. **The defect is that "findable or cut" cannot
+distinguish "not mapped" from "Overpass was busy,"** so a transient 504 silently deletes a stop
+that exists. D563 counted 68 food-and-drink objects at Logan by hand; one run shipped none.
+
+**Fix direction: one combined query instead of ten** (D563 got all 331 objects in two), and
+**separate an empty result from a failed request** so an errored slot is retried, never cut.
+
+**2. D564's second ruling was only half-applied.** 485 gave `thin_evidence` its own honest,
+venue-named message but left the `else` catch-all still reading *"could not be verified with
+enough works"* — the museum wording, unnamed venue, for every unclassified failure. That is the
+precise defect the ruling names: **485 fixed the instance and not the rule.** LEAD fixed the
+catch-all (`0c7eb0c`).
+
+**The general lesson: when a ruling states a rule and cites an instance, a task that fixes only
+the instance has not satisfied the ruling.** Check the `else` branch.
+
+### A regression claim needs two trees, and this one got them
+
+The full Python run shows 20 failures and 37 collection errors. **None is ours.** Collection
+errors are missing host deps (`bs4` ×18, `selenium` ×12, `Crypto` ×4) plus three py3.9 f-string
+syntax errors in old scripts. The exhibition-extraction failures matter because 485 touches
+`generate_tour_text.py`, so they were run on a worktree at the pre-merge commit `a3d4e9d`:
+**9 failed / 88 passed on both trees, identical.** They also pass individually — pre-existing
+test-order pollution.
+
+### Two pieces of housekeeping worth recording
+
+- **`widget_test.dart` deleted.** The stock Flutter counter template, importing a package name
+  that has not existed since the rename, pumping a `MyApp` this app never had. Red since "First
+  commit", which made `Some tests failed.` the suite's normal output and would have hidden a real
+  failure. Flutter is now **132/132 green**.
+- **The worktree prune is not an incident.** `.continuous_dev/prune_worktrees.sh` removed the six
+  task worktrees minutes after they became merged-and-idle-6h, freeing ~2.5 GB and clearing the
+  DISK LOW alert. Branches and commits all survive in `.git`, exactly as that script promises.
+  Recording it because an unexplained directory disappearance on this machine reads like the
+  tour-29 event until you find the script.
+
+## D567 — The church tour no longer fails. It now ships confident, wrong facts instead.
+### 2026-09-17. Found by the first live church run after D564's routing fix. Not caused by it.
+
+**D564's defect is fixed.** `Our Lady Help of Christians Catholic Church, Newton MA` — the request
+that clean-failed `tier: unresolvable` on build 26 after being offered the Sistine Chapel —
+now produces a complete tour: 3 stops, 7,372 chars, 247s, **$0.1965**. No stop is outside Newton.
+No catalogued-artwork fabrication. The stop about the requested church is properly place-grounded
+("the very stones you see", "the spacious nave", Gothic Revival, Nonantum, 1881) and its history
+checks out.
+
+**But stop 2 is wrong in two independent ways, and nothing in the pipeline noticed.**
+
+Stop 2 is `Sacred Heart Parish`, a real church at a real Newton address (1321 Centre St). Its
+narration says:
+
+> *"The parish was canonically recognized in 1966 by Cardinal James Francis McIntyre, **Archbishop
+> of Los Angeles**."*
+
+McIntyre was Archbishop of Los Angeles. A Newton, Massachusetts parish in 1966 was under the
+Archbishop of **Boston**. That sentence belongs to a different Sacred Heart Parish, ~4,000 km away.
+
+> *"In 2002, Father Walter Cuenin became a figure of controversy… This bold stance led to a ban on
+> archdiocesan meetings **at Our Lady Help of Christians**… marking **Sacred Heart Parish** as a
+> site of defiance."*
+
+Cuenin was pastor of **Our Lady Help of Christians** — which is stop 3. The sentence names the
+correct parish and credits the wrong one **in the same breath**. The whole Cuenin story is told
+twice: correctly at stop 3, transplanted onto stop 2, and the closing recap keeps the wrong
+version — *"Sacred Heart Parish, where Father Walter Cuenin criticized Cardinal Bernard Law."*
+
+### Why nothing caught it
+
+```
+[EXISTENCE-GATE] LOG_ONLY — 2/2 stops verified (100%), 0 would be dropped
+  [VERIFIED] 'Sacred Heart Parish' — venue_corpus canonical_title(geo):
+             'Newton College of the Sacred Heart'
+```
+
+**The gate matched a parish to a defunct women's college.** `Newton College of the Sacred Heart`
+closed in 1975; it is not a parish and never was. The gate asks whether a *string* resembles a
+known title near the location. It does not ask whether the entity is the same entity, and nothing
+anywhere asks whether an attached *fact* belongs to the venue it is attached to.
+
+**This is D563/D564's failure one level down.** Those were stops in the wrong place. This is the
+right stop carrying another place's facts — and it is harder to see, because every name in the
+sentence is locally plausible.
+
+### The rule this establishes
+
+**A stop-existence check is not a fact-ownership check, and passing the first must stop implying
+the second.** Two concrete consequences, neither dispatched (Michael was away; an unattended
+dispatcher task spends money unwatched):
+
+1. **Entity-type agreement.** A stop named `... Parish` must not verify against a *college*. The
+   gate has the canonical title in hand; compare the kind, not just the string.
+2. **One story, one owner.** When the same named person or event appears at two stops, that is a
+   duplicate to resolve, not two facts. The correct owner is the venue the source ties them to —
+   here, the text itself named it.
+
+**The prose is not the problem and must not be touched** (D563 still binds). The retrieval-to-stop
+binding is.
+
+**Honest scope note:** this behaviour is not new and was not introduced by the six merges. It is
+the same "stories are real but not tied to the object" pattern recorded for the MFA tour on
+2026-08-12. What is new is that we can now see it, because the church tour runs at all.
