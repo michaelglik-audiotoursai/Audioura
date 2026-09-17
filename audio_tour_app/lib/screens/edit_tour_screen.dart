@@ -51,6 +51,99 @@ bool applyEditStopResult(
   return true;
 }
 
+/// LOCAL-484 — the Listen page's stop count must follow the edit.
+///
+/// The `saved_tours` SharedPreferences list holds one JSON entry per tour.
+/// `my_tours_screen` renders `'${tour['stops']} stops • …'` straight from that
+/// entry. Before this change, `'stops'` was written once at download time and
+/// never updated, so adding or deleting a stop left the Listen count stale.
+///
+/// This is the single walk that rewrites a tour's entry after a Save All that
+/// produced a new tour id. It matches on [tourPath] (the entry keeps its
+/// original path even after the in-memory `widget.tourData['path']` is
+/// repointed) and writes:
+///   * `new_tour_id` — the id returned by the save (unchanged behaviour), and
+///   * `stops`       — the fresh stop count, when [stopCount] is known.
+///
+/// Keeping both writes in one walk avoids a second, divergent copy of the
+/// list-rewriting logic (the task's explicit constraint).
+///
+/// [stopCount] is nullable on purpose: if the true count could not be
+/// determined we leave `'stops'` untouched rather than writing a guess — an
+/// absent/old number is corrected only when we actually know the new one.
+///
+/// Returns a NEW list with the matched entry rewritten. Entries that don't
+/// match [tourPath], and malformed JSON entries, are copied through untouched.
+/// Kept as a top-level pure function so it is unit-testable without standing
+/// up the widget (AC #1–#6).
+List<String> applyTourEditToSavedTours(
+  List<String> savedTours,
+  String tourPath, {
+  String? newTourId,
+  int? stopCount,
+}) {
+  final result = List<String>.from(savedTours);
+
+  for (int i = 0; i < result.length; i++) {
+    final entryJson = result[i];
+    if (entryJson.isEmpty) continue;
+
+    Map<String, dynamic> entry;
+    try {
+      final decoded = jsonDecode(entryJson);
+      if (decoded is! Map<String, dynamic>) continue;
+      entry = decoded;
+    } catch (_) {
+      // Malformed entry — pass it through untouched rather than dropping it.
+      continue;
+    }
+
+    if (entry['path'] == tourPath) {
+      if (newTourId != null) {
+        entry['new_tour_id'] = newTourId;
+      }
+      if (stopCount != null) {
+        // Stored as a String to match the value written at download time
+        // (tour_generator_screen.dart: `'stops': stops.toString()`), so the
+        // Listen page reads a single consistent type.
+        entry['stops'] = stopCount.toString();
+      }
+      result[i] = jsonEncode(entry);
+      break;
+    }
+  }
+
+  return result;
+}
+
+/// LOCAL-484 — count the stops actually written to disk for a tour.
+///
+/// WHY DISK AND NOT THE SERVER RESPONSE: the orchestrator persists
+/// `stops_count` server-side, but the Save All response the app receives
+/// (`/tour/<id>/update-multiple-stops`) does NOT carry it — it returns only
+/// `status`, `message`, `stops` (the processed subset, not the merged total),
+/// `new_tour_id` and `download_url`. So there is no authoritative count in the
+/// response to prefer. The download, however, writes the complete edited tour
+/// to [tourDirPath], one `audio_<n>.mp3` per stop. Counting those files is the
+/// authoritative local number and is what the Listen page should show.
+///
+/// Returns the number of `audio_*.mp3` files directly in [tourDirPath], or
+/// `null` if the directory is missing or contains none (unknown — caller must
+/// not invent a count).
+int? countStopsOnDisk(String tourDirPath) {
+  final dir = Directory(tourDirPath);
+  if (!dir.existsSync()) return null;
+
+  final mp3Pattern = RegExp(r'audio_\d+\.mp3$');
+  int count = 0;
+  for (final entity in dir.listSync()) {
+    if (entity is File && mp3Pattern.hasMatch(entity.uri.pathSegments.last)) {
+      count++;
+    }
+  }
+  return count > 0 ? count : null;
+}
+
 class EditScreenLogger {
   static Future<void> logFromService(String message) async {
     await DebugLogHelper.addDebugLog('SERVICE_LOG: $message');
@@ -431,7 +524,12 @@ class _EditTourScreenState extends State<EditTourScreen> {
       );
 
       if (downloadSuccess) {
-        await _updateLocalTourId(newTourId);
+        // The download extracted the complete edited tour into `tourPath`
+        // (the old path — the saved_tours entry still keys on it). Count the
+        // audio_*.mp3 files there: that is the authoritative new stop count,
+        // because the Save All response carries no stops_count (LOCAL-484).
+        final diskStopCount = countStopsOnDisk(tourPath);
+        await _updateLocalTourId(newTourId, stopCount: diskStopCount);
 
         final oldTourPath = widget.tourData['path'] as String;
         final newTourPath = oldTourPath.replaceAll(RegExp(r'[0-9a-f-]{36}'), newTourId);
@@ -503,32 +601,25 @@ class _EditTourScreenState extends State<EditTourScreen> {
 
   // ── part3 methods ──────────────────────────────────────────────────────────
 
-  Future<void> _updateLocalTourId(String newTourId) async {
+  Future<void> _updateLocalTourId(String newTourId, {int? stopCount}) async {
     try {
-      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: $newTourId');
+      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: $newTourId, stopCount: $stopCount');
 
       final tourPath = widget.tourData['path'] as String;
       final prefs = await SharedPreferences.getInstance();
       final savedTours = prefs.getStringList('saved_tours') ?? [];
 
-      for (int i = 0; i < savedTours.length; i++) {
-        final tourDataJson = savedTours[i];
-        if (tourDataJson.isNotEmpty) {
-          try {
-            final tourData = jsonDecode(tourDataJson) as Map<String, dynamic>;
-            if (tourData['path'] == tourPath) {
-              tourData['new_tour_id'] = newTourId;
-              savedTours[i] = jsonEncode(tourData);
-              break;
-            }
-          } catch (jsonError) {
-            continue;
-          }
-        }
-      }
+      // Single walk that rewrites both new_tour_id and the stop count. See
+      // applyTourEditToSavedTours — no divergent copy of this logic (LOCAL-484).
+      final updated = applyTourEditToSavedTours(
+        savedTours,
+        tourPath,
+        newTourId: newTourId,
+        stopCount: stopCount,
+      );
 
-      await prefs.setStringList('saved_tours', savedTours);
-      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Local tour updated with new ID reference');
+      await prefs.setStringList('saved_tours', updated);
+      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Local tour updated with new ID reference and stop count $stopCount');
     } catch (e) {
       await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: ERROR in _updateLocalTourId: $e');
     }
