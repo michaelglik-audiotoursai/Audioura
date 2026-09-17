@@ -23185,3 +23185,49 @@ binding is.
 **Honest scope note:** this behaviour is not new and was not introduced by the six merges. It is
 the same "stories are real but not tied to the object" pattern recorded for the MFA tour on
 2026-08-12. What is new is that we can now see it, because the church tour runs at all.
+
+## D568 — LOCAL-480 crashed on every facility tour, and 20 green tests could not see it
+### 2026-09-17. Found by the first end-to-end facility run. The most important finding of the batch.
+
+`Walking tour around Logan Airport, Boston` routes correctly — `Detected tour category: FACILITY`,
+the exact phrasing that produced tour 423's sightseeing list. Then it **crashes**:
+
+```
+File "generate_tour_text.py", line 6444, in generate_tour_text
+    if tour_category == 'facility' and not _forced_stops_active:
+UnboundLocalError: local variable '_forced_stops_active' referenced before assignment
+```
+
+`_forced_stops_active` is assigned in the LOCAL-357 forced-stops harness **~70 lines below** the
+facility block that reads it. Every facility tour died before Phase 3A.
+
+**This is LOCAL-480's own defect, not a merge artifact.** Verified against the untouched branch
+commit: on `c85f61e` the read is at line 6327 and the first assignment at 6401. The merge
+preserved the ordering exactly.
+
+### Why twenty passing tests missed a hard crash on the only path the task existed to build
+
+LOCAL-480's suite has 20 tests. They fall into two groups, and **neither can execute the facility
+branch of `generate_tour_text()`**:
+
+- the `fill_need_spine` tests call the new module directly, with a mocked Overpass;
+- the `TestWiring` tests assert on `inspect.getsource(generate_tour_text)` — they check the
+  integration code is *textually present*.
+
+A source assertion proves the wiring exists. **It cannot prove the wiring runs.** LOCAL-465
+introduced that pattern to catch a reverted integration, and it is good at exactly that — but it
+reads like end-to-end coverage while providing none.
+
+**This extends D242.** That rule says green tests over an orphaned module prove nothing; the
+module here was *not* orphaned — `grep` found the production importer, which was the check D242
+prescribes, and the check passed. **A production caller existing is not the same as the production
+caller working.** The only instrument that could see this was running the thing.
+
+**The rule: a task that adds a new branch to `generate_tour_text()` must run `generate_tour_text()`
+down that branch at least once.** Mocking the network is fine; skipping the entry point is not.
+Where cost forbids a full run, the task must say so and hand the run to LEAD — as both 480 and 485
+correctly did for their other claims.
+
+**Fixed** by deriving `_forced_stops_active = bool(forced_stops)` before the facility block; it
+depends only on the `forced_stops` parameter, so early derivation is value-identical, and the
+LOCAL-357 block that re-derives it is untouched.

@@ -6441,6 +6441,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # low-confidence DROP happens at coordinate-resolution time (D559 block).
     _facility_fill_used = False
     _facility_dropped_low_conf = []   # names dropped for low geo confidence (AC5 log)
+    # [LEAD 2026-09-17] _forced_stops_active is not assigned until the LOCAL-357
+    # harness block ~70 lines below, so reading it here raised UnboundLocalError and
+    # crashed EVERY facility tour before Phase 3A. It derives only from the
+    # forced_stops parameter, so deriving it early is value-identical; the LOCAL-357
+    # block re-derives the same value and is left untouched. See D568.
+    _forced_stops_active = bool(forced_stops)
     if tour_category == 'facility' and not _forced_stops_active:
         try:
             import facility_spine
