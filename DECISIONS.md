@@ -23652,3 +23652,52 @@ claims need the grounding the facts still do not have.
 where a wrong leg is cheap — a museum with a gallery attendant to ask, or an outdoor district —
 before a terminal where the cost of a wrong leg is a missed flight. The reason is no longer
 "positioning is hard"; it is "we cannot yet verify a direction."
+
+## D576 — Two peer tour types, one shared primitive: can we locate the thing we named?
+### 2026-09-17. Michael's synthesis, closing the D571–D575 thread.
+
+> *"So tour can be go to see that painting and then go to see that painting and hopefully we know
+> where they are and can show on the map. But we should be able to anticipate the user's question
+> 'how can I get to…' That is a different tour and we can provide guidance."*
+
+**Two tour types, peers in the same data structure:**
+
+| type | stops are | chosen for | arrival is |
+|---|---|---|---|
+| **discovery** | things worth seeing | interest | a means |
+| **guidance** | waypoints to one named destination | recognisability (D575) | the point |
+
+**Anticipate the question; never ask it up front.** D573's surviving half: a discovery tour ends by
+offering the other — *"if you want to go back and find the Chagall, ask and I'll walk you there."*
+`_build_closing_offer` (`generate_tour_text.py:1933`) is where that lives, and it already does this
+for news.
+
+### The shared primitive, and the reason "hopefully" is the right word
+
+Both types stand or fall on the same question: **given a name, can we say where the thing is, well
+enough to direct someone to it?** Discovery needs it to put a stop on the map; guidance needs it to
+choose the destination. One mechanism serves both, and we do not have it.
+
+**The stop model cannot express an indoor location.** `_new_poi` carries `name, address, artist,
+year, directions, coordinates, type_specialty, specific_examples, operational_details, description`
+— and nothing else. There is **no gallery, level, wing, or room field**. So "where is Chagall's
+*Village Street*?" can be answered only as a street address and a building centroid: *at the MFA*.
+That is useless for both showing it on a map and walking someone to it.
+
+**This is the same root as D572.** Indoor stops share a coordinate because a coordinate is the wrong
+descriptor for them, not because they were badly geocoded. An indoor stop's location is
+`Level 2 · Evans Wing · Gallery 250`, which is a *path through a building*, not a point on a globe.
+
+**Three properties an indoor location descriptor must have:**
+1. **Hierarchical** — building → level → wing → gallery/room, so it degrades gracefully when the
+   finest level is unknown ("Art of Europe, Level 2" is useful; a wrong gallery number is not).
+2. **Freshness-stamped** — museums rotate collections and airports relocate offices. A location
+   without a date is a claim we cannot age out. The MFA publishes an artwork status page; that is
+   the Tier-1 venue source LOCAL-23 established, and it is the right source here.
+3. **Degradable to a human** — D575: *"ask any gallery attendant for Gallery 250."* Indoors there
+   are staff, and handing off is a designed outcome, not a failure.
+
+**Until that descriptor exists, both tour types are limited to venue-level precision indoors**, and
+any finer claim we make is ungrounded — the same condition as the directions D575 found ungated and
+the facts D567 found misattributed. **This is one gap, not three, and it is the next thing worth
+building.**
