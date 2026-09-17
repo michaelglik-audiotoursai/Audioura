@@ -189,6 +189,20 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "exhibition_not_found":
                         _error_msg = _LAST_CLEAN_FAIL_EVIDENCE.get("user_message", "Exhibition not found.")
                         _error_extra["suggestions"] = _LAST_CLEAN_FAIL_EVIDENCE.get("suggestions", [])
+                    # [LOCAL-485] thin_evidence gets its OWN honest message, naming the
+                    # venue. Previously this fell through to the museum "not enough works"
+                    # catch-all below — a lie whenever artworks were never the point
+                    # (e.g. a parish church routed down the museum path). Name the venue
+                    # so the listener knows WHICH request failed, and point them at a
+                    # request shape that can succeed.
+                    elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "thin_evidence":
+                        _venue_name = (_LAST_CLEAN_FAIL_EVIDENCE.get("venue")
+                                       or location or "this venue")
+                        _error_msg = (
+                            f'We could not find enough verified material about '
+                            f'"{_venue_name}" to build a tour. Try a broader request — '
+                            f'for example a walking tour of the surrounding neighbourhood.'
+                        )
                     else:
                         _error_msg = "This venue could not be verified with enough works to generate a quality tour."
                     import generate_tour_text as _gtt

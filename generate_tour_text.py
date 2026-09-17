@@ -2327,6 +2327,116 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
     return fallback
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-485] SHARED VENUE-CLASS DETECTOR
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# D563's principle: intent is inferred from the venue CLASS. A museum's unit is a
+# catalogued object, verifiable against Wikidata; a facility's unit is a
+# traveller-need spine (LOCAL-480); a worship/civic building's unit is a PLACE
+# with history — the nave, the bell tower, the war memorial, the parish hall, the
+# cemetery — verifiable the way a walking tour's stops are.
+#
+# This is ONE detector, not two. LOCAL-480 added `facility` as a narrow venue
+# class; LOCAL-485 adds `worship_civic`. Both flow through `_detect_venue_class`
+# so the mechanism is shared: `_detect_facility_class` is a thin wrapper that asks
+# this detector whether the class is 'facility', and `_classify_tour_category`
+# consults the single detector for both classes. When the two branches merge, they
+# converge on this one function rather than two parallel copies.
+#
+# Kept deliberately NARROW. It fires on unambiguous venue-class nouns naming the
+# REQUESTED venue — not on a stop that happens to be a church inside a walking
+# tour. It does NOT fire on generic walking words ("district", "downtown",
+# "park"), so Michael's approved Cimiez walking tour ("Walking tour around Cimiez
+# District, Nice, France") is untouched — its request names no worship/civic venue
+# class and carries an explicit "walking tour" phrase.
+
+import re as _venue_class_re
+
+# --- facility class (LOCAL-480 / D563) — venues people pass THROUGH with an errand.
+# Multi-word phrases so they cannot fire on an ordinary walking request.
+_FACILITY_CLASS_WORDS = (
+    'airport', 'aerodrome', 'air terminal',
+    'train station', 'railway station', 'rail station', 'bus station',
+    'bus terminal', 'ferry terminal', 'transit center', 'transit centre',
+    'transit hub', 'transit station', 'metro station', 'subway station',
+    'convention center', 'convention centre', 'conference center',
+    'conference centre', 'exhibition centre', 'exhibition center',
+    'university campus', 'college campus', 'medical center',
+    'medical centre', 'cruise terminal', 'cruise port',
+)
+# Single-word facility nouns, matched on a WORD BOUNDARY.
+_FACILITY_WORD_RE = _venue_class_re.compile(
+    r'\b(terminal|hospital|stadium|arena|fairgrounds)\b', _venue_class_re.IGNORECASE)
+
+# --- worship / civic place class (LOCAL-485) — a building whose stops are PLACES,
+# not catalogued works: a church, cathedral, basilica, chapel, abbey, minster,
+# priory, monastery, convent, synagogue, mosque, temple, shrine, meetinghouse,
+# courthouse, town/city hall. Word-boundary anchored so punctuation cannot hide a
+# noun and so we never match inside a larger word.
+_WORSHIP_CIVIC_WORD_RE = _venue_class_re.compile(
+    r'\b('
+    r'church|cathedral|basilica|chapel|abbey|minster|priory|monastery|convent'
+    r'|friary|parish|shrine|meetinghouse|meeting\s+house'
+    r'|synagogue|mosque|masjid|temple|gurdwara|pagoda'
+    r'|courthouse|court\s+house|town\s+hall|city\s+hall|guildhall'
+    r')\b',
+    _venue_class_re.IGNORECASE,
+)
+
+
+def _detect_venue_class(location, tour_type=""):
+    """Return the venue CLASS named by the request, or None.
+
+    One shared detector for the venue-class-routes-intent principle (D563):
+      - 'facility'      — airport/terminal/station/hospital/stadium/campus/…
+                          (LOCAL-480): its stops are a traveller-need spine.
+      - 'worship_civic' — church/cathedral/synagogue/temple/courthouse/town hall/…
+                          (LOCAL-485): its stops are PLACES at/around the building,
+                          NOT catalogued artworks, so it must NOT enter the museum
+                          artwork pipeline (which requires Wikidata-verified works a
+                          parish church has no catalogued inventory of).
+      - None            — ordinary walking/museum/restaurant/specialized request.
+
+    NARROW by design. Returns None for a plain walking request, including
+    'Walking tour around Cimiez District, Nice, France' — that names no venue
+    class. `facility` takes priority over `worship_civic` (an airport chapel is a
+    facility errand, not a worship-tour venue).
+    """
+    text = f"{location or ''} {tour_type or ''}".lower()
+
+    # --- facility signals (LOCAL-480) — checked first.
+    for word in _FACILITY_CLASS_WORDS:
+        if word in text:
+            return 'facility'
+    if _FACILITY_WORD_RE.search(text):
+        return 'facility'
+    if _venue_class_re.search(r'\b(airport|airfield|flight|departures|arrivals)\b',
+                              (location or '').lower()):
+        return 'facility'
+
+    # --- worship / civic place signals (LOCAL-485).
+    if _WORSHIP_CIVIC_WORD_RE.search(text):
+        return 'worship_civic'
+
+    return None
+
+
+def _detect_facility_class(location, tour_type=""):
+    """True when the request names a facility venue class (LOCAL-480).
+
+    Thin wrapper over the shared `_detect_venue_class` so there is ONE detector,
+    not two. Kept as a named seam because LOCAL-480's classifier, FACILITY GUARD,
+    and tests reference it by this name.
+    """
+    return _detect_venue_class(location, tour_type) == 'facility'
+
+
+def _detect_worship_civic_class(location, tour_type=""):
+    """True when the request names a worship/civic PLACE venue class (LOCAL-485)."""
+    return _detect_venue_class(location, tour_type) == 'worship_civic'
+
+
 def _classify_tour_category(location, tour_type):
     """
     Detect the appropriate tour template based on location and tour_type.
@@ -2335,7 +2445,24 @@ def _classify_tour_category(location, tour_type):
     """
     location_lower = location.lower()
     tour_type_lower = tour_type.lower()
-    
+
+    # [LOCAL-485] WORSHIP/CIVIC PLACE detection — HIGH priority, above the museum
+    # keyword scan. A church's stops are PLACES (nave, bell tower, war memorial,
+    # parish hall, cemetery), verifiable the way a walking tour's stops are — NOT
+    # catalogued artworks. Routing it 'walking' (the place-based path) lets it use
+    # the same corpus Michael's approved Cimiez tour used successfully; routing it
+    # 'museum' sends it into the artwork pipeline, which demands Wikidata-verified
+    # works a parish church has no catalogued inventory of, so the run clean-fails
+    # `unresolvable` before scope/route machinery can catch the fabricated stops
+    # (LOCAL-485: the Sistine Chapel and The Last Supper appearing in Newton MA).
+    #
+    # NARROW: fires only when the request NAMES a worship/civic venue class, not on
+    # a walking request that merely passes a church. It sits below the explicit
+    # "walking tour" phrase (handled next), so Cimiez stays 'walking' either way.
+    if (not _detect_facility_class(location, tour_type)
+            and _detect_worship_civic_class(location, tour_type)):
+        return 'walking'
+
     # EXPLICIT WALKING TOUR detection (highest priority — overrides everything)
     # If the user explicitly says "walking tour" in the location, honor that
     # even if a museum name appears as one of the stops
@@ -5704,11 +5831,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Safety net (_EXPLICIT_NON_MUSEUM_TOUR_RE) prevents GPT-hallucinated venue_names
         # on "walking tour starting at X" / "restaurant tour near X" requests from
         # silently flipping the category. See S15 Claude review §3.
-        if intent.get('venue_name') and transport_mode == 'on_foot' and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location) and not _MULTI_BUILDING_INSTITUTION_RE.search(location):
+        # [LOCAL-485] A worship/civic venue class (church, cathedral, synagogue,
+        # courthouse, town hall, …) is NOT a museum: its stops are places, not
+        # catalogued works. Do not let S15 flip it to the artwork pipeline.
+        if (intent.get('venue_name') and transport_mode == 'on_foot'
+                and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location)
+                and not _MULTI_BUILDING_INSTITUTION_RE.search(location)
+                and not _detect_worship_civic_class(location, tour_type)):
             tour_category = 'museum'
             print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
         else:
-            if intent.get('venue_name'):
+            if intent.get('venue_name') and _detect_worship_civic_class(location, tour_type):
+                print(f"  [S15/LOCAL-485] venue_name='{intent['venue_name']}' NOT forced to museum "
+                      f"— request names a worship/civic place class (stops are places, not works)")
+            elif intent.get('venue_name'):
                 if _MULTI_BUILDING_INSTITUTION_RE.search(location):
                     print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains multi-building institution keyword")
                 else:
@@ -5732,16 +5868,38 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # (palais, museum, gallery, etc.), override to 'museum'. This catches BOTH failure modes:
     # (1) intent extraction returned None entirely (second branch above)
     # (2) intent succeeded but venue_name=null, S15 didn't fire (first branch, else clause)
+    #
+    # [LOCAL-485] Worship/civic venue-class words (church, cathedral, basilica,
+    # abbey, temple, synagogue, mosque, courthouse, town hall) were REMOVED from
+    # this set. They named the exact defect: a parish church flipped to 'museum'
+    # here, entered the artwork pipeline, and clean-failed 'unresolvable' — after
+    # the model had already invented the Sistine Chapel and The Last Supper as its
+    # "works". A worship/civic building's stops are places, so it belongs on the
+    # place-based (walking) path, handled by _classify_tour_category above.
     _VENUE_WORDS_FOR_CLASSIFY = {'museum', 'musée', 'musee', 'gallery', 'galleria', 'palais',
                                  'palazzo', 'palace', 'castle', 'château', 'house', 'mansion',
-                                 'cathedral', 'basilica', 'library', 'institute', 'villa',
-                                 'temple', 'church', 'abbey'}
+                                 'library', 'institute', 'villa'}
     if tour_category == 'walking':
         _loc_words = set(location.lower().split())
         if _loc_words & _VENUE_WORDS_FOR_CLASSIFY:
             _matched_word = (_loc_words & _VENUE_WORDS_FOR_CLASSIFY).pop()
             print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
             tour_category = 'museum'
+
+    # [LOCAL-485] VENUE-CLASS GUARD — runs AFTER convergence, overrides any museum
+    # flip that S15 or CLASSIFY-FIX may have applied to a worship/civic venue. A
+    # facility takes priority (LOCAL-480), so this only claims a venue that is
+    # worship/civic and NOT a facility. This is the hard stop that keeps a church
+    # out of the artwork pipeline no matter which upstream branch fired — and the
+    # seam a break-the-routing test flips to prove the fix (LOCAL-485 AC6).
+    # It does NOT touch Cimiez: _detect_worship_civic_class returns None for
+    # "Walking tour around Cimiez District, Nice, France" (no venue-class noun).
+    if (tour_category == 'museum'
+            and not _detect_facility_class(location, tour_type)
+            and _detect_worship_civic_class(location, tour_type)):
+        print(f"  [LOCAL-485] VENUE-CLASS GUARD: overriding 'museum' → walking "
+              f"(request names a worship/civic place class — its stops are places, not works)")
+        tour_category = 'walking'
     
     # PHASE 2: Detect tour type and get appropriate template
     _phase_timer.start('poi_selection')
@@ -7264,6 +7422,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             "site_reachable": _d1v2_result.site_reachable,
                             "wikipedia_available": _d1v2_result.wiki_available,
                             "tier": "unresolvable",
+                            # [LOCAL-485] Name the venue so the service layer can say
+                            # WHICH venue lacked material, instead of a catch-all.
+                            "venue": _museum_venue_name or location,
                         }
                         return None, None, (None, None)
                     # Extract fields from VerificationResult
@@ -7320,6 +7481,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         "site_reachable": False,
                         "wikipedia_available": False,
                         "tier": "unresolvable",
+                        # [LOCAL-485] Name the venue so the service layer can say which.
+                        "venue": _museum_venue_name or location,
                     })
                     return None, None, (None, None)
 
