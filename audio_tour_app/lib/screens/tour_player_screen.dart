@@ -7,6 +7,7 @@ import 'voice_methods.dart';
 import 'debug_log_viewer_screen.dart';
 import 'tour_map_screen.dart';
 import '../config/endpoints.dart';
+import '../services/webview_console_logger.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -33,6 +34,10 @@ class TourPlayerScreen extends StatefulWidget {
 class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   InAppWebViewController? _controller;
 
+  // LOCAL-483: forward the tour player WebView's JS console into the debug log.
+  final WebViewConsoleLogger _consoleLogger =
+      WebViewConsoleLogger(source: 'tour-player');
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +48,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   @override
   void dispose() {
     disposeVoice();
+    _consoleLogger.flush();
     super.dispose();
   }
 
@@ -113,6 +119,9 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                 allowsInlineMediaPlayback: true,
                 allowsAirPlayForMediaPlayback: true,
               ),
+              onConsoleMessage: (controller, consoleMessage) {
+                _consoleLogger.onConsoleMessage(consoleMessage);
+              },
               onWebViewCreated: (InAppWebViewController controller) async {
                 _controller = controller;
                 webController = controller;

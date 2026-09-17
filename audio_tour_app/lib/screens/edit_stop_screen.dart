@@ -9,6 +9,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_editing_service.dart';
 import '../services/html_audio_player_service.dart';
 import '../services/html_audio_recorder_service.dart';
+import '../services/webview_console_logger.dart';
 import '../utils/tour_path_healer.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -66,6 +67,14 @@ class _EditStopScreenState extends State<EditStopScreen> {
   final HtmlAudioRecorderService _htmlRecorder = HtmlAudioRecorderService();
   InAppWebViewController? _audioWebViewController;
   InAppWebViewController? _recorderWebViewController;
+  // LOCAL-483: forward each WebView's JS console (errors/warnings always,
+  // verbose only in debug) into DebugLogHelper so a failure inside the WebView
+  // — like the audio retry-loop error that read as success in Michael's log —
+  // shows up in the device log instead of dying in the WebView.
+  final WebViewConsoleLogger _audioConsoleLogger =
+      WebViewConsoleLogger(source: 'editor-audio');
+  final WebViewConsoleLogger _recorderConsoleLogger =
+      WebViewConsoleLogger(source: 'editor-recorder');
   // LOCAL-478: set when _loadSelectedAudio ran before the audio WebView was
   // ready. onWebViewCreated replays the load once the controller exists so the
   // request is retried rather than silently dropped.
@@ -255,6 +264,11 @@ class _EditStopScreenState extends State<EditStopScreen> {
     // never ends up in a re-zip, download, or sync (AC #5). dispose() can't be
     // async; fire-and-forget the deletion (same pattern as _htmlRecorder).
     _htmlAudioPlayer.dispose();
+    // LOCAL-483: flush any held (de-duplicated) console run so the last line of
+    // a burst is not lost when the WebViews go away. dispose() can't be async;
+    // fire-and-forget like the deletions above.
+    _audioConsoleLogger.flush();
+    _recorderConsoleLogger.flush();
     super.dispose();
   }
 
@@ -2617,6 +2631,9 @@ class _EditStopScreenState extends State<EditStopScreen> {
                                             allowsInlineMediaPlayback: true,
                                             javaScriptEnabled: true,
                                           ),
+                                          onConsoleMessage: (controller, consoleMessage) {
+                                            _audioConsoleLogger.onConsoleMessage(consoleMessage);
+                                          },
                                           onWebViewCreated: (controller) async {
                                             _audioWebViewController = controller;
                                             // LOCAL-478: the controller now
@@ -2704,6 +2721,9 @@ class _EditStopScreenState extends State<EditStopScreen> {
                                   allowsInlineMediaPlayback: true,
                                   javaScriptEnabled: true,
                                 ),
+                                onConsoleMessage: (controller, consoleMessage) {
+                                  _recorderConsoleLogger.onConsoleMessage(consoleMessage);
+                                },
                                 onWebViewCreated: (controller) async {
                                   _recorderWebViewController = controller;
                                   await _htmlRecorder.initialize(controller);
