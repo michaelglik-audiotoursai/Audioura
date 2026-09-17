@@ -219,13 +219,32 @@ VOICE_MAP = {
 
 comprehend_client = boto3.client('comprehend', region_name='us-east-1')
 
+
+def _detect_dominant_language_raw(text):
+    """Call the dominant-language detector and return its raw response.
+
+    Normally this is AWS Comprehend. A local end-to-end harness may set
+    LOCAL_LANGUAGE_STUB_URL to a plain HTTP endpoint that accepts
+    {"text": ...} and returns Comprehend's {"Languages": [...]} shape, so the
+    container can be verified deterministically without AWS (same idea as the
+    POLLY_TTS_URL / LOCAL_IDENTITY_TOKEN test seams). Production NEVER sets it,
+    so the Comprehend path is unchanged.
+    """
+    stub_url = os.getenv('LOCAL_LANGUAGE_STUB_URL')
+    if stub_url:
+        resp = requests.post(stub_url, json={'text': text}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    return comprehend_client.detect_dominant_language(Text=text)
+
+
 def _detect_text_language(text):
     """Return dominant ISO language code of text, or None if too short / undetectable."""
     cleaned = (text or '').strip()
     if len(cleaned) < 25:
         return None
     try:
-        resp = comprehend_client.detect_dominant_language(Text=cleaned[:4900])
+        resp = _detect_dominant_language_raw(cleaned[:4900])
         langs = resp.get('Languages', [])
         if not langs:
             return None
@@ -233,6 +252,46 @@ def _detect_text_language(text):
     except Exception as e:
         print(f"[LANG] detection failed: {e}")
         return None  # fail open — do not block the save on a detector error
+
+
+def _narration_for_language_detection(text):
+    """Return just the narration body to feed the language gate (GCS-LANG1).
+
+    A saved stop blob is a mixed-script document: a stop-name line, a Latin
+    metadata header (Coordinates:/Address:/Type/Specialty:/Specific Examples:/
+    Operational Details:), an Orientation: line and then the narrative
+    paragraphs. Running Comprehend over the whole blob lets the Latin header and
+    Latin place names (e.g. 'Avenue Auguste Vérola') drag detection to a
+    neighbouring language (a ru narration was reported as 'cv', Chuvash), which
+    falsely trips LANGUAGE_MISMATCH.
+
+    We judge the narrative, not the scaffolding, by removing:
+      - the structured nav header, via the existing GCS-SAN1
+        _strip_nav_fields_for_tts helper; and
+      - a single leading stop-name line — the first non-blank line, when it is
+        NOT itself an Orientation:/nav line. Stop names are frequently Latin
+        place names even inside a ru/zh/… tour, so this line is exactly the kind
+        of cross-script noise that misleads the detector.
+
+    The Orientation: line and every narrative paragraph are kept. This function
+    does NOT change the saved .txt or the TTS input; it only produces the string
+    handed to _detect_text_language.
+    """
+    stripped = _strip_nav_fields_for_tts(text or '')
+    lines = stripped.split('\n')
+    # Drop a single leading stop-name line: the first non-blank line, provided
+    # it is not an Orientation: line (or a nav line that survived stripping).
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+        if line.strip().lower().startswith('orientation:'):
+            break  # first content line is Orientation: — nothing to drop
+        if _NAV_LABEL_RE.match(line):
+            break  # defensive: leave nav lines to the strip step
+        del lines[i]
+        break
+    return '\n'.join(lines).strip()
+
 
 def clean_markdown_formatting(text):
     """Remove markdown formatting characters that interfere with TTS"""
@@ -1826,7 +1885,15 @@ def _bulk_save_core(tour_id, data):
                     and not stop_data.get('custom_audio_data')
                     and not stop_data.get('audio_parts')
                     and not stop_data.get('has_custom_audio')):
-                detected = _detect_text_language(stop_data['text_content'])
+                # GCS-LANG1: judge the narration, not the whole stop blob. The
+                # blob carries a Latin nav header and often Latin place names,
+                # which drag Comprehend to a neighbouring language and falsely
+                # trip LANGUAGE_MISMATCH. Detect on the stripped narration body
+                # (nav header + leading stop-name line removed). If that body is
+                # empty or too short to classify, _detect_text_language returns
+                # None and we do NOT reject — same as before.
+                narration = _narration_for_language_detection(stop_data['text_content'])
+                detected = _detect_text_language(narration)
                 if detected is not None and detected != content_language:
                     sn = stop_data['stop_number']
                     print(f"[LANG_VALIDATE] LANGUAGE_MISMATCH stop={sn} expected={content_language} detected={detected}")
