@@ -23011,3 +23011,42 @@ believing a quota had blocked him. **A catch-all message must describe the catch
 specific one**, and it must name the venue.
 
 Dispatched as LOCAL-485. Cimiez remains the regression control for both tasks.
+
+## D565 — The agreed sequence after build 26, and the one thing to do before optimizing
+### 2026-09-17. Michael's plan, with LEAD's single amendment. Recorded so a cleared session inherits it.
+
+Michael's words: *"Our next task will be fixing the tour-purpose work. Testing Storied. Then looking
+at the prices per tour and article generation decide if we need to work on making the generation be
+cheaper in Storied. After that, we will need to make Storied Stable and Subscribe the preview."*
+
+**Agreed, in that order.** One amendment, which he has not yet responded to:
+
+**Measure cost per tour BEFORE the purpose work lands, not after.** Not to optimize — to have a
+baseline. LOCAL-480 and LOCAL-485 change which corpus calls fire and add OSM queries (free). Without
+a number taken beforehand, a later measurement cannot be read as improvement or regression. The
+decision about *whether* to optimize still waits until after testing; only the measurement moves.
+
+**The track swap is the end state, and it is the riskiest step in the list.** Storied becomes
+Stable, Subscribed becomes Preview. `track` is a live DB discriminator with rows already carrying
+`beta`/`storied`, the app renders it as Stable/Preview (D-wdvrdaxxmb), and `api.audioura.com` vs
+`storied-api.audioura.com` are separate Cloud Run stacks. Plan it as its own task with a rollback,
+not as a step at the end of another one.
+
+### Queue at the moment of this writing — all on disk, nothing in context
+
+| task | state |
+|---|---|
+| LOCAL-479 one-word names (Walter, Suzette) | COMPLETED, awaiting LEAD review |
+| LOCAL-480 `facility` venue class (D563) | COMPLETED, awaiting LEAD review |
+| LOCAL-481 a stop must be a real place | COMPLETED, awaiting LEAD review |
+| LOCAL-483 WebView console → debug log | filed, not dispatched |
+| LOCAL-484 stale stop count on Listen | filed, not dispatched |
+| LOCAL-485 church/civic routing (D564) | filed, not dispatched |
+
+**LOCAL-479/480/481/485 together ARE the tour-purpose work.** Review 480 and 485 as one mechanism
+(D564: one venue-class detector, never two).
+
+**Build 26 is on Michael's phone and passes everything he has tested** except the stale stop count.
+It is not yet submitted for Beta App Review; Elie and Sophie are not yet added. Michael's decision:
+control testers by invitation, not a public link, and raise `tours_per_day_override` per tester
+rather than the `free` plan default — which stays at 1.
