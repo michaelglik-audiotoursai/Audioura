@@ -23402,3 +23402,104 @@ first; someone who came *to see the airport* wants the second. This needs a deci
 facility work resumes — LEAD's recommendation is that the **errand tour stays the default for a
 facility**, because it matches the original complaint and the stops are groundable, with the
 interior tour as a separate mode. Not decided here.
+
+## D572 — There is no universal inter-stop distance. The collapse detector must key on the artifact, not on proximity.
+### 2026-09-17. Michael's correction of D571's second consequence. LEAD had it wrong.
+
+**LEAD wrote:** *"A building tour's stops are all within ~11 metres of each other,"* and proposed
+exempting the building class the way `museum` is exempted.
+
+**Michael:** *"different buildings have different dimensions… There are huge palaces and for them
+the distance can be way bigger. On the other hand our listener may ask to give him a tour in a
+museum room, then the distance between objects can be way smaller. We can not generalize the
+distance between objects no matter the tour target."*
+
+**He is right, and the error was bigger than a wrong number.** Both halves of the design are the
+wrong shape: a fixed threshold, and a per-category exemption list. A palace tour's stops may be
+300 m apart; a single-room tour's stops may be 2 m apart. Both are correct tours. **Scale is a
+property of the venue and of the requested granularity, not of the category.**
+
+### And the detector does not measure distance at all
+
+Reading `find_centroid_collapse` rather than its description: a collision is *"two or more stops
+sharing latitude **OR** longitude to `_COLLISION_DP` decimal places."* That is **axis coincidence**,
+not proximity. Two stops on the same east–west street, or two rooms along one corridor, share a
+latitude while being any distance apart in longitude — and are flagged as "not independently
+located" when they are nothing of the sort. **The false-positive rate does not fall as the building
+gets bigger; it depends on the building's orientation.**
+
+### What tour 423 actually looked like
+
+```
+Boston Bruins Bar                 42.3656, -71.0188
+Art Exhibits at Logan Airport     42.3656, -71.0173
+Boston Logan Airport Virtual Tour 42.3656, -71.0096
+Boston Logan Airport History Walk 42.3656, -71.0189
+```
+
+**Four stops, one latitude repeated exactly, longitude jittered.** That is a centroid with
+single-axis noise — the signature of coordinates that were never looked up. It is far more specific
+than "two stops round to the same 4dp latitude."
+
+### The rule
+
+**Detect the artifact, not the closeness.** A collapse is: *three or more* stops sharing an axis
+value at full precision **while the other axis varies** — a fingerprint of centroid-plus-jitter that
+has no innocent explanation. Two stops sharing a rounded axis value has many innocent explanations
+and must not fire.
+
+**Where a distance sanity check is still wanted, derive the scale from the venue,** not from a
+constant: the venue's own footprint (OSM way/relation bounding box, Wikidata area, the building's
+published dimensions — Michael: *"we can acquire that knowledge from multiple sources"*) and the
+requested granularity. A stop outside the venue's extent is suspicious; two stops close together
+inside it are not.
+
+**Consequence:** `COLLISION_CATEGORIES` and the `museum` exemption are both superseded. `museum`
+was not a principle — it was this defect being papered over for the one category where it was
+noticed. Every category needs the artifact test, and none needs a distance constant.
+
+## D573 — Both airport tours ship, and the listener is never made to choose up front
+### 2026-09-17. Michael's ruling, resolving the tension D571 left open.
+
+**The errand tour is the default for a facility; the enthusiast/interior tour is a second mode.**
+Agreed on both sides.
+
+**How to derive the errand stops — ask for the pain points, not for the places.** Michael's
+question, via Gemini:
+
+> *"What are the most common passenger pain points and customer service inquiries handled inside an
+> airport?"*
+
+This is the same two-step safety property as D571: the question is about the **class** (what do
+travellers struggle with in airports), which cannot be a falsehood about Logan; only the second
+step — *does Logan have one, and where* — is venue-specific and verifiable. Contrast with asking
+"what are the interesting places at Logan," which is what produced `Boston Logan Airport Virtual
+Tour`.
+
+The resulting categories: airline and flight logistics (terminal/gate verification, inter-terminal
+transit landside vs airside, oversized and special baggage drop); lost and found, split between the
+airline's baggage office for items left on the aircraft and the airport authority for items left in
+the terminal; document and printing services; dietary-specific dining (gluten-free, vegan, halal,
+kosher — by concourse) and water refill stations past security; ground transport (rideshare zones,
+which are often on a specific parking-garage level rather than the arrivals curb, plus rental-car
+centre and hotel shuttle pillars).
+
+### The interaction rule, which is the durable part
+
+**Michael:** *"we need a flag or an option or an ability for people to specify — IF THEY WANT — if
+they want is important: we should not force them to provide specifications; we should derive them
+from the experience or provide a bit of both and then in the end suggest a sentence what else they
+can learn if they specify… like we do for news and restaurant tours at the end of each tour."*
+
+**Never put a dialogue in front of a tour.** Default to a derived blend, then offer the alternative
+in the closing sentence.
+
+**The machinery already exists and is already doing this.** `_build_closing_offer`
+(`generate_tour_text.py:1933`, called at `:18415`) is what produced, in today's live church tour:
+
+> *"We can also generate news articles for you to listen to on the way back."*
+
+A facility tour's closing offer becomes the place to say *"ask for the behind-the-scenes tour and
+we'll cover the control tower, the baggage system and the fire station."* **This is an extension of
+a working pattern, not a new mechanism** — which is the cheapest kind of feature to add and the
+kind least likely to break something.
