@@ -20,6 +20,18 @@ from bs4 import BeautifulSoup, NavigableString
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
+class TranslationArtifactError(Exception):
+    """Raised when a translation cannot produce a valid downloadable artifact.
+
+    The caller MUST treat this as a hard failure: no translation row is inserted,
+    and the HTTP endpoint returns a non-200 response with error code
+    TRANSLATION_ARTIFACT_FAILED. This prevents the historic bug (GCS-TR1) where an
+    artifact-less row was inserted and then 404'd from map-delivery/download-tour.
+    """
+    error_code = "TRANSLATION_ARTIFACT_FAILED"
+
+
 class TranslationService:
     def __init__(self):
         self.translate_client = boto3.client('translate', region_name='us-east-1')
@@ -181,24 +193,35 @@ class TranslationService:
             tour_content = original_tour[7]  # tour_content column
             original_zip_data = original_tour[3]  # audio_tour column
             tour_blob_uri = original_tour[9] if len(original_tour) > 9 else None  # R2 blob key
-            
+
+            # GCS-TR1 fix: fetch the source ZIP from R2 whenever audio_tour is NULL and
+            # tour_blob_uri is set — REGARDLESS of tour_content. The R2 migration set the
+            # audio_tour BYTEA column to NULL for migrated tours, so R2-migrated tours that
+            # still have tour_content (e.g. 107/120/284) previously skipped this fetch and
+            # crashed later in _create_mobile_compatible_zip with original_zip_data == None.
+            if not original_zip_data and tour_blob_uri:
+                logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching source ZIP from R2 blob: {tour_blob_uri}")
+                try:
+                    from blobstorage import R2BlobStorage
+                    original_zip_data = R2BlobStorage().download(tour_blob_uri)
+                    logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
+                except Exception as r2_err:
+                    # Do not proceed to INSERT an artifact-less row. Signal a hard failure so
+                    # the endpoint returns non-200 and the caller can retry/report.
+                    logging.error(f"Failed to download source ZIP for tour {original_tour_id} from R2 ({tour_blob_uri}): {r2_err}")
+                    raise TranslationArtifactError(
+                        f"source ZIP unobtainable for tour {original_tour_id} (blob {tour_blob_uri}): {r2_err}"
+                    )
+
             if not tour_content:
                 logging.warning(f"No tour content found for tour {original_tour_id}, falling back to ZIP extraction")
-                
-                # If audio_tour is NULL but tour_blob_uri exists, download from R2
-                if not original_zip_data and tour_blob_uri:
-                    logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching from R2 blob: {tour_blob_uri}")
-                    try:
-                        from blobstorage import R2BlobStorage
-                        original_zip_data = R2BlobStorage().download(tour_blob_uri)
-                        logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
-                    except Exception as r2_err:
-                        logging.error(f"Failed to download tour {original_tour_id} from R2: {r2_err}")
-                
-                # Verify ZIP has actual audio before attempting fallback
+
+                # Source ZIP is required for the fallback path.
                 if not original_zip_data:
                     logging.error(f"Tour {original_tour_id} has no tour_content AND no ZIP data — cannot translate")
-                    return None
+                    raise TranslationArtifactError(
+                        f"tour {original_tour_id} has no tour_content and no source ZIP"
+                    )
                 try:
                     import io as _io
                     zip_bytes = original_zip_data.tobytes() if hasattr(original_zip_data, 'tobytes') else bytes(original_zip_data)
@@ -206,16 +229,45 @@ class TranslationService:
                         audio_files_in_zip = [n for n in _z.namelist() if n.startswith('audio_') and n.endswith('.mp3')]
                     if not audio_files_in_zip:
                         logging.error(f"Tour {original_tour_id} ZIP has no audio files and no tour_content — cannot translate")
-                        return None
-                except Exception:
+                        raise TranslationArtifactError(
+                            f"tour {original_tour_id} ZIP has no audio files and no tour_content"
+                        )
+                except zipfile.BadZipFile:
                     pass
                 return self._translate_tour_from_zip(original_tour, target_language, zip_data_override=original_zip_data)
-            
+
             logging.info(f"Using stored tour content: {len(tour_content)} characters")
-            
-            # Check if translation already exists
+
+            # The main (tour_content) path requires the source ZIP so the translated ZIP can
+            # be assembled from the original HTML structure. If it is still missing here, fail
+            # hard rather than crash inside _create_mobile_compatible_zip and insert a NULL row.
+            if not original_zip_data:
+                logging.error(f"Tour {original_tour_id} has tour_content but no source ZIP (audio_tour NULL, tour_blob_uri {tour_blob_uri!r}) — cannot build artifact")
+                raise TranslationArtifactError(
+                    f"tour {original_tour_id} has tour_content but no source ZIP artifact"
+                )
+
+            # Does the audio_tours table have a 'track' column? Guarded like the orchestrator
+            # so the INSERT still works on a DB without the column.
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            has_track = cursor.fetchone() is not None
+            source_track = None
+            if has_track:
+                cursor.execute("SELECT track FROM audio_tours WHERE id = %s", (original_tour_id,))
+                _row = cursor.fetchone()
+                source_track = _row[0] if _row else None
+                logging.info(f"Source tour {original_tour_id} track = {source_track!r}; translation will inherit it")
+
+            # Check if a USABLE translation already exists. GCS-TR1: a row is only a valid
+            # cache hit if it actually has a downloadable artifact. Artifact-less rows (the
+            # historic bug) are ignored here and regenerated below.
             cursor.execute(
-                "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s",
+                "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s "
+                "AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)",
                 (original_tour_id, target_language)
             )
             existing = cursor.fetchone()
@@ -267,28 +319,53 @@ class TranslationService:
             translated_zip_data = self._create_mobile_compatible_zip(
                 original_zip_data, translated_name, translated_audio_files, target_language, translated_stops
             )
-            
+
+            # GCS-TR1: never insert a translation row without a real artifact. If the ZIP
+            # builder failed (returns None) or produced empty bytes, fail hard — do NOT INSERT.
+            if not translated_zip_data or len(translated_zip_data) == 0:
+                logging.error(f"Tour {original_tour_id}: translated ZIP is empty/None — refusing to insert artifact-less row")
+                raise TranslationArtifactError(
+                    f"translated artifact build failed for tour {original_tour_id} ({target_language})"
+                )
+
             # Store translated tour content for future reference
             translated_tour_content = "\n\n".join([
                 f"Stop {i+1}: {stop}" for i, stop in enumerate(translated_stops)
             ])
             
-            # Create new tour record
-            cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
-                                       lat, lng, content_language, original_tour_id, tour_content)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (
-                translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content
-            ))
+            # Create new tour record. A translation inherits its source tour's track
+            # (the service is shared by both tracks, so an env var cannot know the caller).
+            if has_track:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
+                                           lat, lng, content_language, original_tour_id, tour_content, track)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour_id,
+                    translated_tour_content, source_track
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
+                                           lat, lng, content_language, original_tour_id, tour_content)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content
+                ))
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
             
-            logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops")
+            logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops (track={source_track!r})")
             return new_tour_id
             
+        except TranslationArtifactError:
+            # Hard failure: roll back so no partial/artifact-less row is committed, then
+            # propagate so the endpoint can return a non-200 TRANSLATION_ARTIFACT_FAILED.
+            conn.rollback()
+            raise
         except Exception as e:
             logging.error(f"Tour translation with audio error: {e}")
             conn.rollback()
@@ -1417,7 +1494,11 @@ Say 'What are my options' to hear this help again"""
             logging.error(f"Error creating mobile-compatible ZIP: {e}")
             import traceback
             logging.error(f"Traceback: {traceback.format_exc()}")
-            return original_zip_data  # Return original on error
+            # GCS-TR1: signal failure instead of passing the original (or None) through.
+            # The historic bug returned original_zip_data here (None for R2-migrated tours),
+            # and the caller then INSERTed an artifact-less row that 404'd. Returning None
+            # makes the caller raise TranslationArtifactError and skip the INSERT.
+            return None
     
     def _generate_translated_html(self, tour_name, translated_stops, audio_files, target_language):
         """Generate HTML with embedded translated audio data.
@@ -1551,11 +1632,6 @@ Say 'What are my options' to hear this help again"""
             
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
-                    audioElements.forEach((otherAudio, otherIndex) => {
-                        if (otherIndex !== index && !otherAudio.paused) {
-                            otherAudio.pause();
-                        }
-                    });
                     currentStopIndex = index;
                 });
             });
@@ -1586,26 +1662,61 @@ Say 'What are my options' to hear this help again"""
             original_zip_data = bytes(original_zip_data)
         
         translated_zip_data = self.translate_zip_audio(original_zip_data, target_language)
-        
+
+        # GCS-TR1: never insert a translation row without a real artifact.
+        if not translated_zip_data or len(translated_zip_data) == 0:
+            logging.error(f"Tour {original_tour[0]}: ZIP fallback produced empty/None artifact — refusing to insert")
+            raise TranslationArtifactError(
+                f"ZIP-fallback artifact build failed for tour {original_tour[0]} ({target_language})"
+            )
+
         # Create new tour record
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
+
+            # Inherit the source tour's track, guarded so the INSERT still works on a DB
+            # without the column (same information_schema check the orchestrator uses).
             cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
-                                       lat, lng, content_language, original_tour_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (
-                translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour[0]
-            ))
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            has_track = cursor.fetchone() is not None
+            source_track = None
+            if has_track:
+                cursor.execute("SELECT track FROM audio_tours WHERE id = %s", (original_tour[0],))
+                _row = cursor.fetchone()
+                source_track = _row[0] if _row else None
+
+            if has_track:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
+                                           lat, lng, content_language, original_tour_id, track)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour[0], source_track
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
+                                           lat, lng, content_language, original_tour_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour[0]
+                ))
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
             
-            logging.info(f"Created translated tour {new_tour_id} in {target_language} using ZIP fallback")
+            logging.info(f"Created translated tour {new_tour_id} in {target_language} using ZIP fallback (track={source_track!r})")
             return new_tour_id
             
+        except TranslationArtifactError:
+            conn.rollback()
+            raise
         except Exception as e:
             logging.error(f"Fallback tour translation error: {e}")
             conn.rollback()
@@ -1643,17 +1754,32 @@ def translate_content_with_audio():
     languages = data.get('languages', ['en'])
     
     results = {}
+    had_artifact_failure = False
     for lang in languages:
         if lang == 'en':
             results[lang] = {'status': 'original', 'id': content_id}
             continue
             
-        if content_type == 'tour':
-            translated_id = translation_service.translate_tour_with_audio(content_id, lang)
-        elif content_type == 'article':
-            translated_id = translation_service.translate_article(content_id, lang)
-        else:
-            translated_id = None
+        try:
+            if content_type == 'tour':
+                translated_id = translation_service.translate_tour_with_audio(content_id, lang)
+            elif content_type == 'article':
+                translated_id = translation_service.translate_article(content_id, lang)
+            else:
+                translated_id = None
+        except TranslationArtifactError as e:
+            # GCS-TR1: a translation could not produce a downloadable artifact and NO row
+            # was inserted. Surface this to the caller as a hard failure (non-200) rather
+            # than a silent 200 that hides an artifact-less/404-ing row.
+            logging.error(f"Artifact failure translating {content_type} {content_id} to {lang}: {e}")
+            had_artifact_failure = True
+            results[lang] = {
+                'status': 'failed',
+                'id': None,
+                'error_code': TranslationArtifactError.error_code,
+                'error': str(e),
+            }
+            continue
         
         if translated_id:
             # Include translated tour_name so the mobile app can display the correct title
@@ -1679,10 +1805,12 @@ def translate_content_with_audio():
         else:
             results[lang] = {'status': 'failed', 'id': None}
     
+    status_code = 502 if had_artifact_failure else 200
     return jsonify({
-        'status': 'completed',
+        'status': 'completed' if not had_artifact_failure else 'error',
+        'error_code': TranslationArtifactError.error_code if had_artifact_failure else None,
         'translations': results
-    })
+    }), status_code
 @app.route('/translate', methods=['POST', 'OPTIONS'])
 def translate_content():
     if request.method == 'OPTIONS':

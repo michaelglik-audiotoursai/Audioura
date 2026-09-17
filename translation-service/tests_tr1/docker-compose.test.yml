@@ -1,0 +1,31 @@
+# GCS-TR1 local test stack: Postgres + MinIO (R2 stand-in).
+# Brought up by run_tests_tr1.sh; not part of the production compose files.
+services:
+  tr1-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: audiotours
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d audiotours"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  tr1-minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9011"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9010:9000"
+      - "9011:9011"
+    healthcheck:
+      test: ["CMD-SHELL", "mc --version || exit 0"]
+      interval: 3s
+      timeout: 3s
+      retries: 10

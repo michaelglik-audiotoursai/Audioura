@@ -1,0 +1,5 @@
+# GCS-TR1 overlay: the ONLY change vs the deployed v35 image is translation_service.py.
+# Everything else (base layers, blobstorage.py, deps, entrypoint) is inherited unchanged,
+# so an /app SHA256 manifest diff against v35 shows exactly one differing file.
+FROM us-central1-docker.pkg.dev/audiotours-migration/services/translation-service:v35
+COPY translation_service.py /app/

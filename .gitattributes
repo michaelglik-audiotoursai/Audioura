@@ -1,0 +1,2 @@
+# GCS-TR1: keep this deploy script LF so it runs under Git Bash after a Windows checkout.
+/deploy_translation_tr1.sh text eol=lf
