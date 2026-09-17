@@ -23231,3 +23231,53 @@ correctly did for their other claims.
 **Fixed** by deriving `_forced_stops_active = bool(forced_stops)` before the facility block; it
 depends only on the `forced_stops` parameter, so early derivation is value-identical, and the
 LOCAL-357 block that re-derives it is untouched.
+
+## D569 — The facility tour's Overpass dependency is a single point of failure, and LEAD proved it by tripping it
+### 2026-09-17, correcting and sharpening the Overpass finding in D566.
+
+**What happened.** After D568's crash fix, the Logan facility tour ran the whole pipeline and still
+delivered nothing: `RESULT: FAILED chars=0, 197s`. All **ten** need-spine slots failed with
+`ConnectionError`, the spine filled zero stops, and the one stop that reached composition
+(`Piers Park`) failed narration and was removed:
+
+```
+[LOCAL-292] EMPTY STOP REMOVAL GATE: 1 stop(s) removed for failed/empty description
+            SUMMARY: requested=1 / generated=0 / failed=1 / delivered=0
+[LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour
+```
+
+**LOCAL-292/420 behaved correctly** — it refused to ship an empty shell. That guard is working.
+
+**The cause was LEAD, and it is the finding.** A direct probe afterwards:
+
+| host | result |
+|---|---|
+| `overpass-api.de` | **Connection refused in 0.2s** |
+| `overpass.kumi.systems` | read timeout |
+| `api.openai.com` | HTTP 401 — reached fine, egress is healthy |
+
+Connection refused in 0.2s is not a rate limit, it is a **block**. Three full ten-query sweeps plus
+two tour runs in under an hour got this machine banned from the public Overpass endpoint.
+
+**Which is exactly the production risk.** `osm_venue_facts.py:41` hardcodes
+`_OVERPASS_URL = "https://overpass-api.de/api/interpreter"` — **one endpoint, no mirror, no
+fallback** — and a facility tour spends **ten sequential queries** against it. A handful of users
+generating airport tours would do to the production server what LEAD did to this one. The failure
+is not graceful: a banned endpoint means **every facility tour returns nothing at all.**
+
+**Correcting D566's framing.** D566 described this as the spine degrading (5/6/2 stops across three
+runs) and could not tell "unmapped" from "Overpass busy." True, and now sharper: the degradation is
+continuous down to **zero**, the endpoint is a single point of failure, and *we* are the traffic
+that breaks it.
+
+**Three things the fix must do, in priority order:**
+1. **Collapse ten queries into one.** D563 pulled all 331 Logan objects in two hand-written
+   queries. Ten-per-tour is what earns the ban.
+2. **Distinguish a failed request from an empty result.** A `ConnectionError` is not evidence that
+   an airport has no food.
+3. **Fall back** — a second endpoint, and a cache of the previous successful answer for a venue.
+   A facility's mapped objects change on the order of months; re-querying them per tour is waste.
+
+**Still unverified, and honestly so: no facility tour has yet been generated end to end.** The
+crash (D568) is fixed and the pipeline now runs its full length, but the spine has never been fed
+real data in a complete run. That verification is blocked until the Overpass block lifts.
