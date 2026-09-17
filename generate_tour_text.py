@@ -1274,10 +1274,30 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
         known_out_of_scope = lambda n, s: (False, '')          # noqa: E731
         record_out_of_scope = lambda *a, **k: (False, None)    # noqa: E731
 
+    # [LOCAL-481] A stop that is not a PLACE cannot be inside any scope. This is
+    # deterministic — a fact about the name's shape, not an opinion — so it runs
+    # here beside the scope-memory lookup, before the LLM, in the same spirit as
+    # D557: no token spend and no chance of a different answer next run. Tour 423
+    # shipped "Art Exhibits at Logan Airport" (a category) and "…Virtual Tour" (a
+    # format) as stops; neither is somewhere a listener can stand. Rejecting them
+    # here means the replenishment loop (D558), which already calls this function
+    # to vet candidates, refills the count with real places — repair over deletion.
+    try:
+        from place_shape import classify_stop_name as _classify_stop_name
+    except Exception as _ps_e:
+        print(f"   [LOCAL-481] place_shape unavailable ({_ps_e}) — non-place names "
+              f"will not be rejected")
+        _classify_stop_name = lambda n: {"is_place": True, "shape": "place", "reason": ""}  # noqa: E731
+
     def _check_one(poi):
         name = poi.get('name', '')
         address = (poi.get('address', '') or '').strip()
         desc = (poi.get('description', '') or '')[:400]
+
+        # [LOCAL-481] Not a place -> not inside scope. Deterministic, high conf.
+        _shape = _classify_stop_name(name)
+        if not _shape.get('is_place', True):
+            return poi, False, "high", f"[not-a-place] {_shape.get('reason', '')}"
 
         remembered, why = known_out_of_scope(name, scope_name)
         if remembered:
@@ -1383,7 +1403,10 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                 # [D557] Record it so the next run does not have to be lucky.
                 # Only high-confidence verdicts reach here, so the corpus can
                 # never remove a stop this guard was not already removing.
-                if not reason.startswith('[scope-memory]'):
+                # [LOCAL-481] A [not-a-place] rejection is NOT scope-specific — the
+                # name is bad for every scope — so it must not be written into the
+                # (name, scope) out-of-scope corpus.
+                if not reason.startswith('[scope-memory]') and not reason.startswith('[not-a-place]'):
                     record_out_of_scope(poi.get('name', ''), scope_name, reason=reason)
 
     kept = first_stop + survivors + tail
@@ -9963,7 +9986,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # added here could sit last on the itinerary while standing first on
             # the ground. That is the zigzag.
             _gp_names_now = [p.get('name', '') for p in poi_list]
-            if _gp_names_now != _gp_initial and len(poi_list) >= 3:
+            # [LOCAL-481] The centroid-collapse case (tour 423) happens on the
+            # ORIGINAL set, with no replenishment: the model emits the venue
+            # centroid for every stop with the longitude jittered. So the geocode
+            # + re-resolution pass below must also run when no stop was added but
+            # the tour's coordinates collapsed onto a shared line. This extends the
+            # existing D559 resolution rather than adding a separate gate.
+            try:
+                from geocode_stops import find_centroid_collapse as _find_collapse
+                _gp_collapse = _find_collapse(poi_list, category=tour_category)
+                _gp_has_collapse = _gp_collapse.get('action') == 'collision'
+            except Exception:
+                _gp_has_collapse = False
+            if (_gp_names_now != _gp_initial or _gp_has_collapse) and len(poi_list) >= 3:
                 # Routing needs coordinates, and a replenished stop has none yet.
                 # Without this the new stops are exactly the ones _compute_route_order
                 # cannot place, and it would keep them where they were appended —
@@ -10045,6 +10080,85 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [D559] Coordinates established for {_gp_hi}/{len(poi_list)} "
                           f"stop(s); the rest keep the model's value and are marked low "
                           f"confidence")
+
+                    # [LOCAL-481] CENTROID COLLAPSE (tour 423). If two or more stops
+                    # share a latitude OR longitude to 4 dp they were not
+                    # independently located — the model reused the venue centroid
+                    # and jittered one axis. Send exactly those stops back through
+                    # resolve_poi (the same procedure just used above), then see
+                    # which came off the shared line. A stop that re-resolves is
+                    # cured; one that cannot AND is not a real place is dropped so
+                    # the replenishment loop below refills the count — repair over
+                    # deletion. Scoped to distinct-destination categories inside
+                    # repair_centroid_collapse (museum is exempt: two artworks in
+                    # one room share a coordinate and should).
+                    try:
+                        from geocode_stops import repair_centroid_collapse
+                        from place_shape import is_a_place as _is_a_place
+                        _cc = repair_centroid_collapse(
+                            poi_list, location, category=tour_category,
+                            tour_anchor=_gp_anchor)
+                        if _cc.get('action') == 'collision':
+                            print(f"  [LOCAL-481] CENTROID COLLAPSE: {_cc.get('reason','')} "
+                                  f"— {len(_cc.get('colliding_indices', []))} stop(s) sent "
+                                  f"back through resolve_poi")
+                            for _r in _cc.get('reresolved', []):
+                                print(f"  [LOCAL-481]   re-resolve '{_r['name'][:36]}': "
+                                      f"{_r['before']} -> {_r['after']} "
+                                      f"({'moved' if _r['moved'] else 'unchanged'}, "
+                                      f"{_r['confidence']})")
+                            # Drop stops that STILL share a line and are not a real
+                            # place — those are the 423 non-places. A still-colliding
+                            # stop that IS a real place is kept (its coordinate is the
+                            # best we have); deletion is reserved for names that were
+                            # never a destination.
+                            _cc_drop = [poi_list[i] for i in _cc.get('still_colliding', [])
+                                        if not _is_a_place(poi_list[i].get('name', ''))]
+                            if _cc_drop:
+                                _drop_names = {id(p) for p in _cc_drop}
+                                for _d in _cc_drop:
+                                    print(f"  [LOCAL-481]   DROP '{_d.get('name','')[:44]}' "
+                                          f"— still collapsed and not a place; "
+                                          f"replenishment will refill")
+                                poi_list[:] = [p for p in poi_list if id(p) not in _drop_names]
+                                # Refill to the requested count with real places,
+                                # validated the same way as the originals (D558).
+                                try:
+                                    _cc_want = _requested_stop_count_original or (len(poi_list) + len(_cc_drop))
+                                    _cc_seen = {(p.get('name') or '').lower() for p in poi_list}
+                                    _cc_seen.update((d.get('name') or '').lower() for d in _cc_drop)
+                                    replenish_to_count(
+                                        poi_list, _cc_want, _gp_scope, headers,
+                                        propose=_gp_propose, make_poi=_new_poi,
+                                        seen=_cc_seen, on_add=_gp_on_add)
+                                    # Newly added stops carry no coordinate yet.
+                                    # Fetch and resolve them so routing can place
+                                    # them, exactly as the D558 path does above.
+                                    _cc_new = [p for p in poi_list if not p.get('coordinates')]
+                                    try:
+                                        _cc_coord_fn = _fetch_coords
+                                    except NameError:
+                                        _cc_coord_fn = None
+                                    if _cc_new and _cc_coord_fn:
+                                        with ThreadPoolExecutor(max_workers=min(len(_cc_new), 5)) as _cc_ex:
+                                            _cc_futs = {_cc_ex.submit(_cc_coord_fn, _p): _p for _p in _cc_new}
+                                            for _cf in as_completed(_cc_futs):
+                                                _cp, _ccoord, _ctok = _cf.result()
+                                                if _ccoord:
+                                                    _cp['coordinates'] = _ccoord
+                                                    total_tokens += _ctok
+                                                    total_cost += _tour_llm_cost(_ctok)
+                                    for _np in poi_list:
+                                        if _np.get('coordinates') and not _np.get('_geo_record'):
+                                            resolve_poi(_np, location, _gp_anchor)
+                                except Exception as _cc_ref_err:
+                                    print(f"  [LOCAL-481] refill after collapse error "
+                                          f"(non-fatal): {_cc_ref_err}")
+                    except ImportError:
+                        pass
+                    except Exception as _cc_err:
+                        print(f"  [LOCAL-481] centroid-collapse repair error "
+                              f"(non-fatal): {_cc_err}")
                 except ImportError as _gc_err:
                     _import_logger.error(f"[D559] MISSING: geocode_stops — stops will be "
                                          f"ordered on unverified coordinates: {_gc_err}")
