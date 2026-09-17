@@ -23503,3 +23503,72 @@ A facility tour's closing offer becomes the place to say *"ask for the behind-th
 we'll cover the control tower, the baggage system and the fire station."* **This is an extension of
 a working pattern, not a new mechanism** — which is the cheapest kind of feature to add and the
 kind least likely to break something.
+
+## D574 — A list of errands is not a tour. Guidance is a separate product.
+### 2026-09-17. Michael reversing his own D573 ruling within the hour, and he is right to.
+
+**His argument, verbatim:** *"if I want to know how to get to counter for Delta airline, why would I
+care about British Air airline? If I am interested to get to Lost and Found, why would I want a nice
+restaurant on the way there? How are we better than just ask Google? We are better because we do not
+ask you to read the screen and we know your GPS coordinates to guide you… So for a tour we indeed
+want exciting spots to see, visit, learn, to know."*
+
+**The incoherence this names.** D563's need-spine assembled ten traveller needs and called the
+result a tour. But a listener wants **exactly one** of those needs at a time, and the other nine are
+noise. A sequence of unrelated errands has no through-line — it is a directory read aloud. The
+thing that makes a tour a tour, the reason to listen to the next stop, is absent by construction.
+
+**And the Logan evidence was there all along.** Michael on tour 423, 2026-09-15: *"the stories are
+really good! I was listening to the stories with a great interest."* He is now explicit that those
+stories — the history, the individual restaurants — were the tour. D563 read his complaint as "the
+stop list is wrong" and built a need-spine. The stop list *was* wrong, but the fix is **better
+interesting stops**, not a different kind of list.
+
+### Three consequences, in order of how much they simplify
+
+**1. The facility tour is just a tour.** It needs no need-spine, no ten-slot checklist, no "findable
+or cut". `facility_spine.py` (348 lines) and the FACILITY NEED-SPINE FILL block exist to build a
+product we are no longer building. **They should be parked, not extended.**
+
+**2. D569 largely dissolves.** The ten sequential Overpass queries per tour — the single point of
+failure that got this machine blocked — existed to fill the need-spine. Without it, the Overpass
+dependency shrinks to ordinary venue lookups. *The Q2 answer LEAD was about to implement is
+substantially moot.*
+
+**3. D573 is superseded.** There are not two airport tours (errand vs enthusiast). There is **one**
+tour — interesting spots, whichever they are, the ATC tower and the notable restaurant alike — plus
+a separate guidance feature. D571's ruling stands untouched: a named building is a building tour,
+and its stops come from what that kind of building consists of.
+
+### The new product: guidance
+
+*"If I want to get to Lost and Found office, I should be able to ask for that directly and we should
+be able to figure out that this is a special type of tour: guiding tour and then the stops (turns,
+escalators, etc.) are not important. So we should offer this to our listeners: specify a destination
+and we will guide you there."*
+
+**The request grammar extends cleanly** (D571's frame): `Lost and Found at Logan Airport` parses as
+**Destination + Location** → guidance; `Logan Airport` parses as **Target + Location** → tour. The
+discriminator is whether the named thing is *somewhere you need to be* or *somewhere you want to
+experience*.
+
+**The differentiator is real.** Google's indoor wayfinding makes you look at a screen. Eyes-free,
+hands-free voice guidance while dragging luggage is a genuinely different product.
+
+### Two things that must be said before anyone builds it
+
+**1. Indoor positioning is the hard part, and it is hardest at exactly the venue that motivated
+this.** GPS degrades badly inside a terminal. The app today uses `Geolocator.getCurrentPosition`
+(×6), one `getPositionStream` and one `distanceBetween` — that is **proximity, not turn-by-turn**.
+Guiding someone to a lost-and-found office two levels up needs an indoor map (floor plans, level
+connections, which escalator goes where) and indoor positioning (beacons or WiFi fingerprinting)
+that Logan does not publish. **Guidance works outdoors — a campus, a park, a district — and is a
+research problem indoors.** Prove it outdoors first; do not let the airport be the pilot.
+
+**2. Guidance is a new product line, not a tour feature.** It competes with Google Maps and the
+airline apps rather than with audio tours, and it is not on D565's agreed sequence (purpose work →
+test → cost → Stable/Preview swap). Adding it is a roadmap decision, not an implementation detail.
+
+**LEAD's recommendation:** take consequences 1–3 now — they delete code and remove a failure mode —
+and advertise guidance through `_build_closing_offer` (D573's surviving half) only once it works
+outdoors.
