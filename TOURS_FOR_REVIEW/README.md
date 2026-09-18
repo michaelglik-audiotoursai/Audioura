@@ -71,3 +71,54 @@ plugged in yet.
    Logan spans 2,384 acres"* — a number was cut and two sentences ran together.
 3. **`LOCAL-472` correctly flagged a generic paragraph** ("applicable to any historic church") and
    *deleted* the stop. Under D577 the right response is to hedge and keep.
+
+---
+
+# UPDATE — your causal chain, tested (2026-09-18)
+
+You objected that ranking parts by "which is most interesting" was either venue-specific or
+directionless, and proposed instead:
+
+> *Building tour → what was the reason/cause for this building to exist → who created it →
+> who paid for it → who visited it*
+
+**Nothing was hardcoded for St Nicholas** — the old ranking was one generic prompt with the venue
+name interpolated. But your deeper objection was right: one opaque judgement call is not a *path*.
+Your ordering is causal, so each link can be inspected and each can be seen to succeed or fail.
+
+## Your chain works. Measured on Logan, where parts-first found nothing.
+
+Five grounded questions, 8–29 sources each:
+
+| material | parts-first (3 tours) | your causal chain |
+|---|---|---|
+| **Wood Island Park**, the Olmsted park demolished for Runway 15R/33L | absent | **found** |
+| **Neptune Road** residents displaced by Massport | absent | **found** |
+| **Edward Lawrence Logan**, who the airport is named for | absent | **7 mentions** |
+| East Boston / Reid / protests | absent | 13 / 4 / 4 |
+| **named people in the delivered tour** | **0, 0, 0** | — |
+
+That is the tour-423 material you liked, and parts-ranking could never reach it: asking what is
+interesting about a control tower returns machinery; asking why the airport exists returns the
+neighbourhood it destroyed.
+
+## But the delivered tour barely improved, and I found exactly why
+
+`LOGAN_storyfirst_1.txt` — dates 5 vs 4, one mention of Edward Lawrence Logan, one of East Boston.
+**Wood Island Park and Neptune Road never reached the text.**
+
+```
+poi_list = [_new_poi(_n) for _n in _vp_stops]      # generate_tour_text.py:6476
+```
+
+**Only the stop NAMES are handed on.** The chain computes ~25,000 characters of sourced story
+material, uses it to choose and order the stops, and then **throws it away**. The prose stage then
+re-researches each stop from its name alone — and "Control Tower", researched by name, gives
+2,384 acres and six runways.
+
+**So the chain is proven and the handoff is missing.** This is the same shape as the earlier gap
+where the story questions existed but were never called: the material is found, then dropped on the
+floor between selection and writing.
+
+**The next step is one specific thing:** feed the chain's text into each stop's corpus instead of
+discarding it, so the writer starts from Wood Island Park rather than from the word "Control Tower".
