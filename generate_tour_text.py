@@ -1423,7 +1423,8 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
     return kept
 
 
-def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
+def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None,
+                         distance_meaningful=True):
     """[LOCAL-280] Build a closing recap sentence from delivered tour content.
 
     The recap replaces any thank-you sentence. It states scale (stop count +
@@ -1699,8 +1700,13 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
 
     # --- Build the recap sentence ---
     # Scale part: "That's N stops and X kilometres"
+    # [Michael 2026-09-18] Distance is omitted for a building tour, not corrected.
+    # "That's 4 stops and 2 kilometres" for four stops inside one church made the
+    # whole tour suspect. His reasoning: for a walking, biking, restaurant or book
+    # tour the distance lets a listener judge stamina and time before starting; for
+    # a building tour it tells them nothing and can only be wrong.
     _stop_word = "stop" if n_delivered == 1 else "stops"
-    if total_km >= 1:
+    if total_km >= 1 and distance_meaningful:
         scale_part = f"That's {n_delivered} {_stop_word} and {total_km:.0f} kilometres"
     else:
         scale_part = f"That's {n_delivered} {_stop_word}"
@@ -16548,6 +16554,30 @@ REWRITE RULES (all mandatory):
         # and 4 shipped their repeats — stop 2's only story was stop 1's Mother Teresa
         # visit. Regeneration costs a call and is rightly capped; DELETION costs
         # nothing and is safe, because the content is still told at the earlier stop.
+        # [Michael 2026-09-18] A named violent death must carry its circumstances.
+        # CHURCH_1 reported three real, named people murdered and then said only that
+        # the narthex hosted a Mass of Peace — a gate had removed the explanation and
+        # left the naming, so the listener is invited to supply a motive. We cannot
+        # invent a cause, so when the cause is gone the naming goes with it.
+        try:
+            from tragedy_context_gate import strip_uncontextualised_deaths as _strip_tragedy
+            _tg_removed = 0
+            for _tpoi in poi_list:
+                _tdesc = _tpoi.get('description') or ''
+                if not _tdesc:
+                    continue
+                _tclean, _tcut = _strip_tragedy(_tdesc)
+                if _tcut:
+                    _tpoi['description'] = _tclean
+                    _tg_removed += len(_tcut)
+                    for _tc in _tcut[:2]:
+                        print(f"      [TRAGEDY-CONTEXT] stop='{_tpoi.get('name','')[:28]}' "
+                              f"cut (death named without circumstances): {_tc[:90]}")
+            if _tg_removed:
+                print(f"  [TRAGEDY-CONTEXT] removed {_tg_removed} sentence(s)")
+        except Exception as _tg_err:
+            print(f"  [TRAGEDY-CONTEXT] skipped ({_tg_err})")
+
         try:
             from derepetition_guard import strip_cross_stop_repeats as _strip_repeats
             _stripped = _strip_repeats(poi_list, banned_by_stop=_d534_repeats_by_stop)
@@ -17043,7 +17073,8 @@ REWRITE RULES (all mandatory):
 
             # [LOCAL-286] Distance floor: if under 50 meters, the distance is
             # meaningless (single-building / co-located stops). Omit it entirely.
-            _prolog_distance_meaningful = (_prolog_total_km * 1000) >= 50
+            _prolog_distance_meaningful = ((_prolog_total_km * 1000) >= 50
+                                           and not _venue_parts_used)
 
             # [LOCAL-286] Detect museum tours for prolog specialization
             _is_museum_prolog = (tour_category == 'museum')
@@ -18522,7 +18553,7 @@ RULES:
                 # States scale + names real content, using the LOCAL-276 intrigue
                 # ranking (same ranking, same verification as Part 4).
                 # No thank-you, no "we hope you enjoyed" — show substance instead.
-                _recap = _build_closing_recap(poi_list, _recap_ranked_facts, api_key=api_key)
+                _recap = _build_closing_recap(poi_list, _recap_ranked_facts, api_key=api_key, distance_meaningful=not _venue_parts_used)
                 if _recap:
                     epilog += _recap + " "
                     _offer_budget = 2  # recap took sentence 1

@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-18T09:43:22.981878
+Generated: 2026-09-18T15:33:41.611126
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -12,7 +12,7 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 --- USER MESSAGE ---
 STYLE: Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.
 
-Create a detailed description for the stop "Nave" on a walking tour of Our Lady Help of Christians Catholic Church, Newton MA.
+Create a detailed description for the stop "Narthex" on a walking tour of Our Lady Help of Christians Catholic Church, Newton MA.
 
 NAME THE STORY OR DROP THE GESTURE. Never write that a place has a 'storied past', hosted 'luminaries', 'notable figures' or 'countless chapters of history', witnessed 'clandestine meetings', 'intrigue', 'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives ONE of them concretely: who, when, what they did, what came of it.
 - BAD:  'a storied past of hosting luminaries'
@@ -24,10 +24,10 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In December 2002, Father Walter Cuenin delivered a homily condemning Cardinal Bernard Law at Our Lady Help of Christians, leading to standing ovations and Cardinal Law's resignation days later.
-  - On June 15, 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, drawing hundreds of local residents and parishioners to the nave.
-  - On June 25, 2023, Gilda and Bruno D’Amore were found murdered on the day they were to celebrate their 50th wedding anniversary at Our Lady Help of Christians, leading to a 'Mass of Peace' attended by mourning parishioners and media.
-  - In the early 20th century, cultural friction occurred at Our Lady Help of Christians due to pew rentals and the influx of Italian immigrants, leading to tensions over sanctuary ownership.
+  - In late 2002, during the height of the Archdiocese of Boston sexual abuse crisis, Father Walter H. Cuenin announced plans to hold a forum for dissident priests at Our Lady Help of Christians, leading Cardinal Bernard Law to ban all diocesan-related events at the parish.
+  - In late 2002, over 850 parishioners packed Our Lady Help of Christians to support Father Walter H. Cuenin, turning the entrance and outer steps into a protest rally and press scrum.
+  - In 2005, the archdiocese forced Father Walter H. Cuenin to resign after an audit cited financial irregularities, leading parishioners to hold vigils and demonstrations at Our Lady Help of Christians.
+  - In June 1995, Mother Teresa of Calcutta paid a surprise visit to Our Lady Help of Christians, drawing massive crowds to the church entrance.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -100,19 +100,18 @@ NO CONDESCENSION:
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 
 VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
-This stop is "Nave" located in/near Newton on this tour of Our Lady Help of Christians Catholic Church, Newton MA.
+This stop is "Narthex" located in/near Newton on this tour of Our Lady Help of Christians Catholic Church, Newton MA.
 If multiple places share this name (e.g., museums in different cities), you are describing
 ONLY the one in Newton. Do NOT use facts about a same-named institution in another
 city. If you are uncertain which facts apply to THIS specific location, omit them rather
 than risk conflation.
 
 RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
-  - The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy.
-  - The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
-  - Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
-  - == History ==
-John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in order to coordinate all activities related to the Salesians in the Valdocco suburb.
-  - According to legend, a vision of the Blessed Virgin Mary appeared in a dream to Bosco in 1844 or 1845 and revealed the site of the martyrdom of the Turinese saints Solutor, Adventor and Octavius.
+  - Shrine of Our Lady of Guadalupe is a Catholic shrine located in La Crosse, Wisconsin.
+  - It is dedicated to the Blessed Virgin Mary under the title of Our Lady of Guadalupe.
+  - The 100-acre (0.40 km2) grounds include a visitors' center and outdoor devotional areas such as a rosary walk, Stations of the Cross, and a votive candle chapel.
+  - The construction of the shrine church began on May 13, 2004, with a dedication on July 31, 2008.
+  - The shrine was founded and later dedicated by Archbishop Raymond Leo Burke.
 
 SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
 must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
@@ -126,12 +125,8 @@ apply to a same-named entity in a different city. If the passages do not mention
 year, collection size, or building name, do NOT supply one from memory.
 
 HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
-The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy. The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
-Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
-
-
-== History ==
-John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in or
+Shrine of Our Lady of Guadalupe is a Catholic shrine located in La Crosse, Wisconsin. It is dedicated to the Blessed Virgin Mary under the title of Our Lady of Guadalupe. The 100-acre (0.40 km2) grounds include a visitors' center and outdoor devotional areas such as a rosary walk, Stations of the Cross, and a votive candle chapel. Mass and the sacrament of Penance are celebrated daily by Norbertine canons of St. Michael's Abbey.
+The construction of the shrine church began on May 13, 2004, with a
 
 OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
@@ -172,22 +167,22 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
 DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: awe and reverence
-- Unique angle to emphasize: Stand in the nave and notice the high vaulted ceilings, a design reminiscent of European cathedrals, reflecting the immigrant roots of Newton's Catholic community.
-- End with a forward-looking hook: As you gaze towards the colorful patterns of light, move towards the Stained Glass Windows just ahead...
+- Emotional beat for this stop: curiosity
+- Unique angle to emphasize: The narthex's stained glass windows, which depict scenes of local events, invite visitors to ponder the fusion of faith and community history.
+- End with a forward-looking hook: As you step through the doors into the nave, what other stories might these walls reveal?
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-Father Walter Cuenin delivered a homily condemning Cardinal Bernard Law at Our Lady Help of Christians in December 2002.; Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts on June 15, 1995.; Gilda and Bruno D’Amore were found murdered on the day they were to celebrate their 50th wedding anniversary at Our Lady Help of Christians on June 25, 2023.
+The narthex is an architectural element in Christian churches reached after opening the church doors.; The narthex in early Christian and Byzantine basilicas and churches was located at the west end of the nave, opposite the church's main altar.; In early Christian churches, the narthex was often divided into an esonarthex (inner narthex) and an exonarthex (outer narthex).
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Nave
-      In December 2002, Father Walter Cuenin delivered a homily condemning Cardinal Bernard Law at Our Lady Help of Christians, leading to standing ovations and Cardinal Law's resignation days later.
-  [2] Nave
-      On June 15, 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, drawing hundreds of local residents and parishioners to the nave.
-  [3] Nave
-      On June 25, 2023, Gilda and Bruno D’Amore were found murdered on the day they were to celebrate their 50th wedding anniversary at Our Lady Help of Christians, leading to a 'Mass of Peace' attended by mourning parishioners and media.
-  [4] Nave
-      In the early 20th century, cultural friction occurred at Our Lady Help of Christians due to pew rentals and the influx of Italian immigrants, leading to tensions over sanctuary ownership.
+  [1] Narthex
+      In 2005, the archdiocese forced Father Walter H. Cuenin to resign after an audit cited financial irregularities, leading parishioners to hold vigils and demonstrations at Our Lady Help of Christians.
+  [2] Narthex
+      In late 2002, over 850 parishioners packed Our Lady Help of Christians to support Father Walter H. Cuenin, turning the entrance and outer steps into a protest rally and press scrum.
+  [3] Narthex
+      In late 2002, during the height of the Archdiocese of Boston sexual abuse crisis, Father Walter H. Cuenin announced plans to hold a forum for dissident priests at Our Lady Help of Christians, leading Cardinal Bernard Law to ban all diocesan-related e
+  [4] Narthex
+      In June 1995, Mother Teresa of Calcutta paid a surprise visit to Our Lady Help of Christians, drawing massive crowds to the church entrance.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -270,26 +265,31 @@ DO NOT include directions to the next stop - these will be added separately.
 LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
 
-THIS STOP IS TOO SHORT AT 210 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+THIS STOP IS TOO SHORT AT 150 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "In December 2002, this very nave became a focal point of significant change."
-- "Father Walter Cuenin stood before the congregation and delivered a homily that condemned the actions of Cardinal Bernard Law, who had been embroiled in the sexual abuse scandal within the Archdiocese of Boston."
-- "Just days later, Cardinal Law resigned, marking a pivotal moment in the Church's reckoning with accountability and transparency."
-- "The nave is also a place of deep communal gathering and has witnessed moments of profound connection and sorrow."
-- "On June 15, 1995, Mother Teresa visited Our Lady Help of Christians, drawing hundreds of local residents and parishioners to this very space."
-- "Yet, this nave has also been a backdrop to tragedy."
-- "The 'Mass of Peace' that followed brought together mourners and media, highlighting the nave as a space for public grief and collective healing."
-- "The history of this church is deeply intertwined with the lives of its parishioners, both in moments of joy and sorrow."
-- "The immigrant roots of Newton's Catholic community are reflected in the church's European-influenced design and its role as a sanctuary for many seeking solace and solidarity in a new land."
-- "As you stand here, let your eyes follow the colorful patterns of light streaming through the windows, leading you naturally to the next focal point, the Stained Glass Windows, where more stories await."
+- "The narthex of Our Lady Help of Christians serves not just as an entryway to the spiritual sanctuary beyond but as a witness to pivotal moments in the church’s and community's life."
+- "In June 1995, a surprise visit by Mother Teresa of Calcutta transformed this space into a bustling center of excitement."
+- "Her presence drew massive crowds to the church entrance, each person eager to catch a glimpse of the revered figure known for her relentless service to the world's least privileged.Fast forward to late 2002, and this same narthex became the focal point of a different kind of gathering."
+- "Amidst the Archdiocese of Boston's sexual abuse crisis, Father Walter H."
+- "Cuenin planned a forum for dissident priests at this very location."
+- "The announcement led Cardinal Bernard Law to ban all diocesan-related events here, but the narthex was already a crucible of support and protest."
+- "Over 850 parishioners packed into this space, spilling onto the outer steps, transforming it into a rallying point and a press scrum."
+- "This moment underscored the community’s resilience and commitment to holding their leaders accountable, turning the church entrance into a symbol of advocacy and solidarity."
+- "The narthex, with its vibrant stained glass, offers more than colorful depictions; it is a canvas that reflects the living pulse of a community, intertwining faith with local history."
+- "As you step through these doors into the nave, the stories these walls have witnessed beckon you to discover what other narratives lie within."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
 
+THIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.
+It may be accurate and well written; it is still a description. A story here means: ONE named person, across THREE OR MORE consecutive sentences, DOING something — deciding, refusing, persuading, travelling, failing — with something at stake for them. Not 'X was an artist who worked in Paris'. Something happened, to someone, and it mattered.
+Use only the source material supplied. If the material will not support such a story, write the shorter factual account rather than inventing one — an invented story is worse than none.
+
+
 ================================================================================
-Total user message length: 24061 chars
+Total user message length: 24503 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -297,4 +297,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Altar', 'Side Chapels']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Narthex', 'Nave', 'Pulpit', 'Altar']
