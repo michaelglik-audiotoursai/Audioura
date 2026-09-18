@@ -73,3 +73,4 @@ newEnv*
 # rebuilt on demand. Never shared: the two machines resolve independently.
 .domain_tier_cache.json
 .appstoreconnect.env
+.venue_parts_cache.json
