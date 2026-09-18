@@ -381,15 +381,31 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         pres = parts_present(venue_name, location, physical, ask_grounded)
         candidates = [p for p in physical if p in pres["present"]] + \
                      [p for p in physical if p in pres["unknown"]]
-        # SELECT BY STORY, ORDER BY WALK. Taking Q2's first N gives the porch and
-        # the narthex; ranking by story surfaces the iconostasis. Once chosen, the
-        # stops are put back into class (walking) order so the route still makes
-        # sense on foot.
-        by_story = rank_parts_by_story(venue_name, location, candidates, ask_grounded)
+
+        # [Michael, 2026-09-18] STORY FIRST, PARTS SECOND. Run the causal chain —
+        # why does this exist / who created it / who paid / who came / what is it
+        # the only one of — then place those stories in the parts of the building
+        # they happened in. Ranking parts by "which is most interesting" (the
+        # previous approach, kept below as the fallback) asks an airport what is
+        # interesting about a control tower and gets machinery; the causal chain
+        # asks why the airport exists and gets Wood Island Park, Neptune Road and
+        # the families Massport displaced.
+        chain = venue_story_chain(venue_name, location, ask_grounded)
+        placed = place_stories_in_building(venue_name, location, chain,
+                                           candidates, ask_grounded)
+        if placed:
+            by_story = [r["part"] for r in placed]
+            by_story += [p for p in candidates if p not in by_story]
+        else:
+            by_story = rank_parts_by_story(venue_name, location, candidates, ask_grounded)
         chosen = by_story[:want] if want else by_story
         ordered = [p for p in physical if p in chosen]
         return ordered, {"kind": kind, "class_parts": parts, "physical": physical,
                          "story_rank": by_story[:8],
+                         "story_chain": {k: {"chars": len(v.get("text") or ""),
+                                             "sources": len(v.get("sources") or [])}
+                                         for k, v in (chain or {}).items()},
+                         "placed": placed,
                          "present": pres["present"], "unknown": pres["unknown"],
                          "absent": pres["absent"], "sources": pres["sources"]}
     except Exception as e:
@@ -436,4 +452,111 @@ def rank_parts_by_story(venue_name, location, parts, ask_grounded):
             seen.add(canon.lower())
             out.append(canon)
     out += [p for p in parts if p.lower() not in seen]
+    return out
+
+
+# ── Michael's causal chain (2026-09-18) — STORY FIRST, PARTS SECOND ─────────
+# *"if you fix the selection for this particular cathedral -- it is useless… We need
+# to fix it so there is a path to the items humans consider interesting. Maybe an
+# algorithm such as --> Building tour --> What was the reason/cause for this building
+# to exist --> who created it --> Who paid for it -- who visited it, etc."*
+#
+# This replaces ranking parts by "which is most interesting", which was one opaque
+# judgement with no reasoning path. His ordering is a CAUSAL chain, and it is what
+# actually produces people:
+#
+#   why does it exist   -> the event or person that caused it (a Tsarevich's death;
+#                          an airport expansion that swallowed a neighbourhood)
+#   who created it      -> architect, builder, artists, by name
+#   who paid for it     -> donors and patrons, and what they wanted in return
+#   who came / happened -> visitors, protests, disasters, arguments
+#
+# Each link is a separate grounded question, so the chain is INSPECTABLE — you can
+# see which link produced a fact and which link came back empty. Parts are then
+# matched to the stories, not the other way round.
+
+STORY_CHAIN = (
+    ('cause',    'What event, person or decision caused "{venue}"{where} to be built at all? '
+                 'Name the event and the people, with dates. What existed on the site before, '
+                 'and what happened to it?'),
+    ('creators', 'Who created "{venue}"{where} — the architect, the builder, the artists and '
+                 'craftsmen — by name? What else are they known for, and what did they do '
+                 'differently here?'),
+    ('patrons',  'Who paid for "{venue}"{where}? Name the donors, patrons or public bodies, '
+                 'what it cost, and what they wanted in return or wanted remembered.'),
+    ('visitors', 'Who came to "{venue}"{where} and what happened here? Name visitors, '
+                 'congregants, workers, protesters, victims — real people and real events, '
+                 'with dates. What are people still arguing about?'),
+    ('singular', 'What is "{venue}"{where} the largest, first, only, oldest or last of? '
+                 'What does it hold or show that exists nowhere else?'),
+)
+
+
+def venue_story_chain(venue_name, location, ask_grounded, links=None):
+    """Run the causal chain. Returns {link: {"text":…, "sources":[…]}}.
+
+    Inspectable by design: every link is recorded separately, including the empty
+    ones, so it is visible WHICH question produced the material and which failed.
+    A failed link never aborts the chain (D577).
+    """
+    where = f' in {location}' if location else ''
+    out = {}
+    for key, template in (links or STORY_CHAIN):
+        prompt = template.format(venue=venue_name, where=where) + \
+                 '\nGive concrete, checkable facts with names and dates. Cite your sources. ' \
+                 'If you do not know, say so rather than guessing.'
+        try:
+            text, sources = ask_grounded(prompt)
+        except Exception as e:
+            out[key] = {"text": "", "sources": [], "error": str(e)}
+            continue
+        out[key] = {"text": text or "", "sources": list(sources or [])}
+    return out
+
+
+def place_stories_in_building(venue_name, location, chain, parts, ask_grounded):
+    """Match the stories the chain found to the parts of the building they happened in.
+
+    This is the join that makes a story-first tour into a walkable one: the sit-in
+    happened in the nave, the donor's name is on the window, the architect's signature
+    is on the porch. A story with no home is still worth telling — it is attached to
+    the most relevant part rather than dropped (D577).
+
+    Returns [{"part":…, "why":…}] ordered best-story-first.
+    """
+    material = "\n\n".join(f"[{k}] {v.get('text','')[:1200]}"
+                           for k, v in (chain or {}).items() if v.get('text'))
+    if not material or not parts:
+        return []
+    listing = "\n".join(f"- {p}" for p in parts)
+    where = f' in {location}' if location else ''
+    prompt = (
+        f'Here is what is known about "{venue_name}"{where}:\n\n{material}\n\n'
+        f'These are the parts of the building a visitor can stand in:\n{listing}\n\n'
+        'For each story above, say WHICH PART of the building it belongs to — where the '
+        'visitor should be standing to hear it. Then list the parts that carry the best '
+        'stories, best first.\n'
+        'Answer as a JSON array of objects: [{"part": "...", "why": "one line naming the '
+        'people or event"}]. Use only parts from the list. Omit parts with no story.'
+    )
+    try:
+        text, _ = ask_grounded(prompt)
+    except Exception:
+        return []
+    m = re.search(r'\[.*\]', str(text or ''), re.S)
+    if not m:
+        return []
+    try:
+        rows = json.loads(m.group(0))
+    except Exception:
+        return []
+    known = {p.lower(): p for p in parts}
+    out, seen = [], set()
+    for r in rows if isinstance(rows, list) else []:
+        if not isinstance(r, dict):
+            continue
+        canon = known.get(str(r.get('part', '')).strip().lower())
+        if canon and canon.lower() not in seen:
+            seen.add(canon.lower())
+            out.append({"part": canon, "why": str(r.get('why', ''))[:200]})
     return out
