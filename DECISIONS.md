@@ -23766,3 +23766,51 @@ enforce and is why it does not reintroduce the gate-heaviness D577 is rejecting.
 assumption* about the listener's real-world options — it is not narration. A tour that tells an
 adult to ask someone for directions is talking down to them. **The fallback stays in the design and
 comes out of the script.**
+
+## D578 — Building parts trip every gate built for places in an area
+### 2026-09-18. Found on the first live venue-parts tour. The stop model changed; the gates did not.
+
+The D571 chain works end to end: `Our Lady Help of Christians` now yields **Nave · Stained Glass
+Windows · Pulpit · Altar** — parts of the building — instead of a tour of two *other* Newton
+parishes. And a side effect worth noting: **D567's cross-venue fact bleed disappeared.** With every
+stop inside one building there is no sibling parish for Father Cuenin to be misattributed to, and
+he is now correctly placed at this church.
+
+**But the tour delivered 3 stops, not 4.** Three separate gates fired on the Pulpit:
+
+```
+[LOCAL-472] REMOVED transferable paragraph stop='Pulpit' — 'Generic description
+            applicable to any historic church.'
+[LOCAL-472] UNGROUNDED entity stop='Pulpit' entity='Cardinal Bernard Law'
+SCOPE-CHECK REMOVED 'Pulpit' — outside 'Our Lady Help of Christians Catholic Church':
+            "The stop 'Pulpit' is located at 573 Washington St, Newton, MA 02458,
+             which is outside the bounds of 'Our Lady Help of Christians'."
+```
+
+**That last one is nonsense, and it is structural.** 573 Washington St **is** the church's own
+address. The pulpit is not outside the church; it *is* the church. The scope machinery assumes a
+stop is a separate place inside an area and asks whether its address falls within the venue — but
+every building part carries the building's own address, so the question has no meaningful answer
+and the gate answers "outside" with `conf=high`. It then wrote that conclusion into SCOPE-MEMORY,
+so it will repeat.
+
+**This is the third gate in the same family**, and the pattern is now unmistakable:
+
+| gate | assumes | breaks on a building part because |
+|---|---|---|
+| centroid collapse (D572) | stops have distinct coordinates | every part shares the building's point |
+| scope check (here) | a stop's address sits inside the venue | every part has the venue's own address |
+| no indoor descriptor (D576) | a location is a lat/lng | a part's location is level · wing · room |
+
+**One root cause: a building part is not a place in an area, and the pipeline has no way to say so.**
+D576 called for a hierarchical indoor descriptor; this is the third piece of evidence that it is the
+missing primitive, not a nicety.
+
+**Interim rule until that exists: a stop created by the venue-parts chain is by construction inside
+its venue, and the scope check must not run on it.** The provenance is already there —
+`_venue_parts_used` — so the gate can be skipped rather than argued with.
+
+**LOCAL-472 firing was correct and is good news.** It caught a genuinely generic paragraph
+("applicable to any historic church") — exactly the glossary failure Michael predicted. Under D577
+the right response is to *hedge and keep* the stop rather than delete it, but the detector itself is
+working.

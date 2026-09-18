@@ -6439,15 +6439,56 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     #
     # Every stop here is a mapped object with a real coordinate; the LOCAL-471
     # low-confidence DROP happens at coordinate-resolution time (D559 block).
+    # [D568, re-hoisted] _forced_stops_active is not assigned until the LOCAL-357
+    # harness ~100 lines below, so every early reader raised UnboundLocalError. It
+    # derives only from the forced_stops parameter, so deriving it here is
+    # value-identical and the LOCAL-357 block that re-derives it is untouched.
+    # Hoisted a second time when the D571 venue-parts block became the FIRST reader
+    # — inserting code above a fix silently reintroduces the bug the fix removed.
+    _forced_stops_active = bool(forced_stops)
+
     _facility_fill_used = False
     _facility_dropped_low_conf = []   # names dropped for low geo confidence (AC5 log)
-    # [LEAD 2026-09-17] _forced_stops_active is not assigned until the LOCAL-357
-    # harness block ~70 lines below, so reading it here raised UnboundLocalError and
-    # crashed EVERY facility tour before Phase 3A. It derives only from the
-    # forced_stops parameter, so deriving it early is value-identical; the LOCAL-357
-    # block re-derives the same value and is left untouched. See D568.
-    _forced_stops_active = bool(forced_stops)
-    if tour_category == 'facility' and not _forced_stops_active:
+
+    # ──── [D571/D574] VENUE-PARTS FILL — a building's stops are its PARTS ────────
+    # Michael, 2026-09-17: a named building is a building tour, and its stops come
+    # from what that KIND of building consists of — not from what is famous nearby
+    # (which gave a Newton parish a tour of two OTHER parishes) and not from a
+    # traveller-errand checklist (D574: "a list of errands is not a tour").
+    #
+    # Three questions: what is this / what does that kind consist of / which parts
+    # does this one have. Then the parts are ranked by the story attached to each
+    # at THIS building, and the chosen stops are put back into walking order.
+    #
+    # Runs AHEAD of the LOCAL-480 need-spine, which D574 parks. Any failure returns
+    # an empty list and the old path continues untouched — D577: never turn a
+    # working tour into no tour.
+    _venue_parts_used = False
+    _venue_parts_evidence = {}
+    if (not _forced_stops_active
+            and _detect_venue_class(location, tour_type) in ('worship_civic', 'facility')):
+        try:
+            import venue_parts as _vp
+            _vp_venue = (intent.get('venue_name') if isinstance(intent, dict) else '') or location
+            _vp_stops, _venue_parts_evidence = _vp.build_tour_stops(
+                _vp_venue, location, total_stops)
+            if _vp_stops:
+                poi_list = [_new_poi(_n) for _n in _vp_stops]
+                _venue_parts_used = True
+                _facility_fill_used = True      # reuse the Phase-3A skip gate
+                _selection_reasons = {}
+                print(f"  [D571] VENUE-PARTS FILL: kind={_venue_parts_evidence.get('kind')!r} "
+                      f"→ {len(poi_list)} stop(s), Phase 3A GPT SKIPPED")
+                print(f"  [D571]   story rank: {_venue_parts_evidence.get('story_rank')}")
+                print(f"  [D571]   stops: {[p['name'] for p in poi_list]}")
+            elif _venue_parts_evidence.get('rejected'):
+                print(f"  [D571] VENUE-PARTS rejected the venue kind "
+                      f"({_venue_parts_evidence['rejected']}) — falling through")
+        except Exception as _vp_err:
+            print(f"  [D571] venue-parts unavailable ({_vp_err}) — falling through")
+
+    if (tour_category == 'facility' and not _forced_stops_active
+            and not _venue_parts_used):   # [D574] need-spine parked behind venue-parts
         try:
             import facility_spine
             from geocode_stops import geocode as _fac_geocode, location_hint as _fac_hint
