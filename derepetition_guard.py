@@ -8,6 +8,17 @@ import re
 from typing import List
 from cost_rates import llm_cost as _llm_cost
 
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
 # 25+ forbidden/overused phrases compiled as case-insensitive regexes.
 # Each pattern matches the phrase (or close variants) wherever it appears.
 FORBIDDEN_PHRASES: List[re.Pattern] = [
@@ -120,7 +131,7 @@ def _jaccard_similarity(words_a: set, words_b: set) -> float:
 def _split_into_sentences(text: str) -> List[str]:
     """Split text into sentences (simple regex, no external libs)."""
     import re
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = _ss_split(text.strip())
     return [s.strip() for s in sentences if len(s.strip()) > 20]
 
 
@@ -783,3 +794,102 @@ def repeated_assertions_by_stop(tour_text, api_key, threshold=0.82):
         if r['first_sentence'] not in by_stop[r['repeat_stop']]:
             by_stop[r['repeat_stop']].append(r['first_sentence'])
     return by_stop
+
+
+
+
+_PROPER = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b')
+_YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
+_TITLES = {'saint', 'st', 'mother', 'father', 'cardinal', 'sister', 'pope', 'the'}
+
+
+def _entity_year_key(sentence):
+    """(proper-noun cores, years) — the fingerprint of an EPISODE.
+
+    Word overlap cannot see that "Mother Teresa visited this very church" in 1995
+    and "Saint Mother Teresa of Calcutta held a Mass here in June 1995" are the
+    same event: they share only 4 content words out of 16, a Jaccard of ~0.25, far
+    below any threshold safe against false positives. What they DO share is a
+    person and a year, which is what an episode actually is. Titles are stripped so
+    "Mother Teresa" and "Saint Mother Teresa" match on "teresa".
+    """
+    names = set()
+    for m in _PROPER.finditer(sentence or ''):
+        parts = [p.lower() for p in m.group(1).split()
+                 if p.lower() not in _TITLES]
+        if parts:
+            names.add(parts[-1])          # surname / distinctive last token
+    return names, set(_YEAR.findall(sentence or ''))
+
+
+def _same_episode(key_a, key_b):
+    """Same person and same year -> the same story, however it is worded."""
+    names_a, years_a = key_a
+    names_b, years_b = key_b
+    return bool(names_a & names_b) and bool(years_a & years_b)
+
+
+def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int = 8,
+                             banned_by_stop: dict = None, banned_threshold: float = 0.42):
+    """[2026-09-18] Delete a sentence from a LATER stop when an earlier stop said it.
+
+    Michael, reading CHURCH_tour_3: stop 2's only story was stop 1's Mother Teresa
+    visit, and stop 4 repeated stop 3. *"I thought we had a filter that should have
+    removed the repeated close from the step description."*
+
+    There is one — `repeated_assertions_by_stop` (D534) — and it FIRED, reporting
+    "Stop 2 / 3 / 4 repeat … will regenerate with them banned". Then `LOCAL-487`
+    applied `cap=1` and retried only stop 3. Stops 2 and 4 were never regenerated,
+    so their repeats shipped and the log line was false for two of the three.
+
+    Regeneration costs a model call and is rightly capped. **Deletion costs nothing
+    and is safe here**: the content is not lost, it is still told at the earlier
+    stop. So after the capped retries, whatever still repeats is simply removed.
+
+    Mutates `description` in place. Returns [{stop, removed, matched_stop}].
+    """
+    removed_log = []
+    seen = []                      # [(stop_index, token_set, sentence)]
+    # `banned_by_stop` carries what D534's LLM detector ALREADY identified as
+    # repeated for each stop. Jaccard alone catches verbatim repeats; D534 catches
+    # paraphrases ("Mother Teresa visited" vs "Saint Mother Teresa of Calcutta held
+    # a Mass here"), which is the case Michael actually hit. Seeding the deletion
+    # with D534's findings reuses the detector we have instead of adding a second
+    # one, and a looser threshold is safe because the sentence is known to repeat.
+    _banned = {int(k): [_entity_year_key(x) for x in v]
+               for k, v in (banned_by_stop or {}).items()}
+    for idx, poi in enumerate(poi_list or []):
+        desc = (poi.get('description') or '') if isinstance(poi, dict) else ''
+        if not desc:
+            continue
+        kept, dropped = [], []
+        for sent in _split_into_sentences(desc):
+            toks = _tokenize(sent)
+            # Length guard counts RAW words, not post-stopword tokens: "Her presence
+            # drew hundreds of local residents to the doors." is 10 words but only 6
+            # content tokens, so a token-based guard skipped an exact duplicate.
+            if len(sent.split()) < min_words or not toks:
+                kept.append(sent)
+                continue
+            dup_of = None
+            _key = _entity_year_key(sent)
+            for bkey in _banned.get(idx + 1, []):
+                if _same_episode(_key, bkey):
+                    dup_of = 0      # flagged by D534; source stop not tracked
+                    break
+            if dup_of is None:
+              for prev_idx, prev_toks, _prev in seen:
+                if _jaccard_similarity(toks, prev_toks) >= threshold:
+                    dup_of = prev_idx
+                    break
+            if dup_of is not None:
+                dropped.append((sent, dup_of))
+            else:
+                kept.append(sent)
+                seen.append((idx, toks, sent))
+        if dropped:
+            poi['description'] = ' '.join(kept).strip()
+            for sent, src in dropped:
+                removed_log.append({'stop': idx + 1, 'removed': sent,
+                                    'matched_stop': src + 1})
+    return removed_log

@@ -38,9 +38,21 @@ from typing import Dict, List, Optional, Tuple
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
 
 from style_validator_detector import (
+
     _is_style_navigation_sentence,
     _split_sentences,
 )
+
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -743,7 +755,7 @@ def _search_corpus_for_fact(entity: str, corpus_passages: List[str]) -> Optional
         passage_lower = passage.lower()
         if entity_lower in passage_lower:
             # Found entity in corpus — extract the sentence containing it
-            sents = re.split(r'(?<=[.!?])\s+', passage)
+            sents = _ss_split(passage)
             for s in sents:
                 if entity_lower in s.lower():
                     # Check if this sentence has factual content beyond just naming

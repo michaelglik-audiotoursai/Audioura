@@ -5,7 +5,10 @@
   "venues": [
     {
       "name": "Villa Leopolda",
-      "aliases": ["La Leopolda", "Villa La Leopolda"],
+      "aliases": [
+        "La Leopolda",
+        "Villa La Leopolda"
+      ],
       "scope": "Cimiez",
       "expect": "outside",
       "actual_location": "Villefranche-sur-Mer, Alpes-Maritimes",
@@ -15,13 +18,128 @@
     },
     {
       "name": "Chapelle du Rosaire",
-      "aliases": ["Matisse Chapel", "Chapelle du Rosaire de Vence", "Chapelle Matisse", "Rosary Chapel"],
+      "aliases": [
+        "Matisse Chapel",
+        "Chapelle du Rosaire de Vence",
+        "Chapelle Matisse",
+        "Rosary Chapel"
+      ],
       "scope": "Cimiez",
       "expect": "outside",
       "actual_location": "Vence, Alpes-Maritimes",
       "ground_truth": "Matisse's Chapelle du Rosaire is in Vence, about 22 km from Nice. The Cimiez connection is Matisse himself — he lived and is buried in Cimiez — which is why the chapel keeps being proposed for Cimiez tours.",
       "source": "D556 — removed by SCOPE-CHECK on the Cimiez walking tour",
       "recorded": "2026-08-30"
+    },
+    {
+      "name": "Test Stop",
+      "aliases": [],
+      "scope": "Test District",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "test verdict",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Walden Pond",
+      "aliases": [],
+      "scope": "Robbins House grounds",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "Walden Pond is in Concord but 2 miles from Robbins House",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Newton Cemetery",
+      "aliases": [],
+      "scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The Newton Cemetery is located outside of Our Lady Help of Christians Catholic Church in Newton, MA.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Jackson Homestead and Museum",
+      "aliases": [],
+      "scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The Jackson Homestead and Museum is located outside of Our Lady Help of Christians Catholic Church, Newton, MA.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Newton City Hall",
+      "aliases": [],
+      "scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The stop is located outside of 'Our Lady Help of Christians Catholic Church, Newton, MA'.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Constitution Beach",
+      "aliases": [],
+      "scope": "Logan Airport",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "Constitution Beach is located outside of Logan Airport in Boston, MA.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "LoPresti Park",
+      "aliases": [],
+      "scope": "Logan Airport",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "LoPresti Park is located outside of Logan Airport in East Boston.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "East Boston Memorial Park",
+      "aliases": [],
+      "scope": "Logan Airport",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The East Boston Memorial Park is located outside of Logan Airport, in the town of East Boston.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "East Boston Greenway",
+      "aliases": [],
+      "scope": "Logan Airport",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The East Boston Greenway is located outside of Logan Airport, in the town of Boston.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Harborwalk",
+      "aliases": [],
+      "scope": "Logan Airport",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The Harborwalk stop is located in Boston, MA 02128, which is outside the bounds of Logan Airport.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-17"
+    },
+    {
+      "name": "Pulpit",
+      "aliases": [],
+      "scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+      "expect": "outside",
+      "actual_location": "",
+      "ground_truth": "The stop 'Pulpit' is located at 573 Washington St, Newton, MA 02458, which is outside the bounds of 'Our Lady Help of Christians Catholic Church, Newton, MA'.",
+      "source": "phase_5_6_high_conf",
+      "recorded": "2026-09-18"
     }
   ]
 }

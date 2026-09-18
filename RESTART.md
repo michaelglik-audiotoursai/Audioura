@@ -1,19 +1,19 @@
-# RESTART briefing — generated 2026-08-30 09:50 EDT
+# RESTART briefing — generated 2026-09-17 12:55 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     91177e7 Correct handoff: container names, code_sha is expectedly unknown, md5 verified
+HEAD     c61b8d3 D565: the agreed sequence after build 26, and measure cost before the purpose work lands
 unpushed 0 commits
-dirty    1 files
+dirty    8 files
 ```
 
 ## Production safety
 ```
-audio_tours real rows: 34
+audio_tours real rows: 36
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      675
+cost_ledger rows:      684
 ```
 ALERTS.md: 40 alert line(s) in the last 40 — read it if non-zero.
 
@@ -22,12 +22,12 @@ ALERTS.md: 40 alert line(s) in the last 40 — read it if non-zero.
 in flight:
 
 last 6 dispatcher events:
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-467.md | at=2026-08-24T19:27:55-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-466.md | id=TLOCAL-466 | branch=LOCAL-466-multi-story | base=sto
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-467.md | id=TLOCAL-467 | branch=LOCAL-467-gallery-attribution | 
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-465.md | id=TLOCAL-465 | branch=LOCAL-465-exhibition-not-found |
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-468.md | at=2026-08-25T01:11:14-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-468.md | id=TLOCAL-468 | branch=LOCAL-468-seed-diversity | base=
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-483.md | at=2026-09-16T18:11:40-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-483.md | id=TLOCAL-483 | branch=LOCAL-483-webview-console-to-log
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-484.md | at=2026-09-16T21:59:50-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-484.md | id=TLOCAL-484 | branch=LOCAL-484-listen-stop-count-stal
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-485.md | at=2026-09-16T22:17:24-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-485.md | id=TLOCAL-485 | branch=LOCAL-485-venue-class-routing | 
 ```
 
 ## Re-dispatchable (last status ABANDONED — a bounce awaiting pickup)
@@ -64,15 +64,17 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 
 ## Pending reminders for Michael
-  5:- [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
-  83:- [ ] **2026-08-26 — the container was stale. FIXED 10:4x, see D531. The rest of this item stands.**
-  184:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
-  241:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
-  277:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
-  300:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
-  304:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
-  311:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
-  395:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  5:- [ ] **2026-09-15 — MAC MINI FIRMWARE/OS UPDATE IS PENDING. Read this BEFORE and AFTER the reboot.**
+  45:- [ ] **2026-09-03 — iOS IS LIVE ON TESTFLIGHT. First iOS build this project has shipped.**
+  79:- [ ] **2026-08-30 — MOBILE TESTING IS LIVE. Read D538-D556 in DECISIONS.md, then this.**
+  157:- [ ] **2026-08-26 — the container was stale. FIXED 10:4x, see D531. The rest of this item stands.**
+  258:- [ ] **2026-08-24 — NEXT SESSION'S TASK LIST, Michael's instruction before /clear.**
+  315:- [ ] **2026-08-22 — NEXT SESSION'S FIRST TASK, Michael's instruction before /clear:**
+  351:- [ ] **2026-08-19 — Boston Globe credential: MICHAEL DEFERRED TO THE WEEK OF 08-24.**
+  374:- [ ] **2026-08-19 morning — READ THESE TWO FILES FIRST, they are open in VS Code:**
+  378:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
+  385:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
+  469:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules

@@ -2340,6 +2340,25 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         else:
             print(f"  [LOCAL-275] Part 2: news path not found at {_news_path} — news offer omitted")
 
+        # [Michael 2026-09-18] One short line naming what ELSE we could tour from
+        # here — "it should be little addition not a paragraph". Offered, never
+        # asked up front (D573): the listener specifies only if they want to.
+        # The suggestion is drawn from the venue class so it is never generic.
+        _more = {
+            'worship_civic': "If you'd like, I can take you round the other historic "
+                             "churches nearby, or find you somewhere to eat afterwards.",
+            'facility':      "If you'd like, I can point you to the best places to eat "
+                             "here, or guide you to somewhere you need to be.",
+            'museum':        "If you'd like, I can build you a tour of another wing, "
+                             "or find you somewhere to eat nearby.",
+            'restaurant':    "If you'd like, I can show you what else is worth seeing "
+                             "on this street.",
+        }.get(tour_category) or ("If you'd like, I can suggest somewhere to eat nearby, "
+                                 "or another tour close by.")
+        sentences.append(_more)
+        print(f"  [LOCAL-275] Part 2 (more): offered a related tour for "
+              f"category '{tour_category}'")
+
     except Exception as e:
         print(f"  [LOCAL-275] Part 2 error: {e}")
 
@@ -16514,6 +16533,25 @@ REWRITE RULES (all mandatory):
                 print(f"    [LOCAL-474] retry failed (non-fatal): {_rt_err}")
             finally:
                 _rpoi.pop('_local474_forbidden', None)
+
+        # [2026-09-18] The retries are capped, so what D534 flagged is not all fixed.
+        # On CHURCH_tour_3 it reported "Stop 2 / 3 / 4 repeat ... will regenerate with
+        # them banned", LOCAL-487 applied cap=1 and retried only stop 3, and stops 2
+        # and 4 shipped their repeats — stop 2's only story was stop 1's Mother Teresa
+        # visit. Regeneration costs a call and is rightly capped; DELETION costs
+        # nothing and is safe, because the content is still told at the earlier stop.
+        try:
+            from derepetition_guard import strip_cross_stop_repeats as _strip_repeats
+            _stripped = _strip_repeats(poi_list, banned_by_stop=_d534_repeats_by_stop)
+            if _stripped:
+                print(f"  [D534] removed {len(_stripped)} repeated sentence(s) the "
+                      f"capped retries could not reach:")
+                for _r in _stripped[:4]:
+                    print(f"      stop {_r['stop']}: {_r['removed'][:90]}")
+            else:
+                print(f"  [D534] no repeated sentences left after the retries")
+        except Exception as _strip_err:
+            print(f"  [D534] cross-stop repeat strip skipped ({_strip_err})")
 
         if _retry_stats['eligible']:
             print(f"\n  [LOCAL-474] retry summary: {_retry_stats['eligible']} eligible, "

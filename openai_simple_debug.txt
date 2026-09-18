@@ -1,29 +1,34 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
-You are a knowledgeable local guide for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
-List exactly 6 specific, real, well-known museum exhibits relevant to: museum Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
+You are a knowledgeable local guide for Walking tour around Cimiez District, Nice, France.
+List exactly 7 specific, real, well-known landmarks relevant to: Walking tour around Cimiez District, Nice, France.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
 - NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
 - Include a complete street address with ZIP code where applicable.
 
-CRITICAL CONSTRAINT — THIS IS A NAMED EXHIBITION TOUR:
-- The user is requesting a tour of the exhibition 'Picasso, Miro, Dali: Unbound' at 'Museum of Fine Arts'.
-- List the 3 most notable ARTWORKS that are part of THIS SPECIFIC EXHIBITION — not the museum's permanent collection highlights.
-- Each stop MUST be named after an ARTWORK in the exhibition.
-- Only include works you are confident are IN THIS EXHIBITION.
-- Do NOT list the museum's iconic permanent-collection works unless they are explicitly part of this exhibition.
-- Do NOT fabricate artwork names.
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Cimiez District.
+- Do NOT include well-known landmarks elsewhere in the city just because they are famous — if it is outside Cimiez District, it does not belong.
+
+WALKING-TOUR COMPACTNESS — this is a walking tour:
+- All stops must form ONE compact cluster, close enough to walk between comfortably.
+- No stop should be more than a 10–15 minute walk (roughly 1 km) from its nearest neighbour in the tour.
+- Prefer a tight set of stops in one walkable area over famous landmarks scattered across the city. A shorter, denser route is better than a long, spread-out one.
+- Prefer landmarks that are DOCUMENTED — places with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
 
 
 Return ONLY a JSON array, no other text, no markdown fences:
-[{"name": "...", "address": "..."}, ...]
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "Guernica", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
-{"name": "The Birth of the World", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"},
-{"name": "The Persistence of Memory", "address": "Museum of Fine Arts, 465 Huntington Ave, Boston, MA 02115"}]
+[{"name": "Cimiez Monastery", "address": "8 Rue Monastère, 06000 Nice, France", "reason": "Founded in the 9th century by Benedictine monks"},
+{"name": "Musée Matisse", "address": "164 Avenue des Arènes de Cimiez, 06000 Nice, France", "reason": "Dedicated to the works of French artist Henri Matisse"},
+{"name": "Roman Ruins of Cemenelum", "address": "30 Avenue des Arènes de Cimiez, 06000 Nice, France", "reason": "Ancient Roman archaeological site dating back to the 1st century AD"},
+{"name": "Musée Marc Chagall", "address": "36 Avenue Dr Ménard, 06000 Nice, France", "reason": "Houses the largest collection of works by Russian-French artist Marc Chagall"},
+{"name": "Cimiez Arena", "address": "163 Avenue des Arènes de Cimiez, 06000 Nice, France", "reason": "Ancient Roman amphitheater used for concerts and events"},
+{"name": "Franciscan Museum", "address": "18 Rue Papon, 06000 Nice, France", "reason": "Showcases the history of the Franciscan Order in the region"},
+{"name": "Villa Leopolda", "address": "Avenue de la Villa des Genêts, 06000 Nice, France", "reason": "Historic villa once owned by Belgian King Leopold II"}]
 
 === ANALYSIS ===
-Requested stops: 3
-See full chain log: /app/api_call_chain_20260826_084235.txt
+Requested stops: 4
+See full chain log: /app/api_call_chain_20260917_141446.txt
