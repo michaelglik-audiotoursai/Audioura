@@ -1395,7 +1395,17 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
             # in the general area. The Le Safari false-positive (medium confidence,
             # wrong answer) demonstrates that medium is not reliable enough for a
             # destructive action. Only high-confidence "outside" verdicts justify removal.
-            if inside or conf in ("low", "medium"):
+            # [D578] A venue-parts stop is inside its venue BY CONSTRUCTION — it is a
+            # part of that building. The check asks whether the stop's address falls
+            # within the venue, but every part carries the venue's OWN address, so the
+            # question is unanswerable and it answered "outside" with conf=high:
+            # "the Pulpit is located at 573 Washington St — outside the bounds of Our
+            # Lady Help of Christians." That is the church's own address.
+            if poi.get('_venue_part'):
+                survivors.append(poi)
+                print(f"   OK '{poi['name']}' — part of '{scope_name}' by construction "
+                      f"(D578: scope check does not apply to building parts)")
+            elif inside or conf in ("low", "medium"):
                 survivors.append(poi)
                 print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason} (conf={conf})")
             else:
@@ -6474,6 +6484,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _vp_venue, location, total_stops)
             if _vp_stops:
                 poi_list = [_new_poi(_n) for _n in _vp_stops]
+                # THE HANDOFF. Without this the chain's ~25k chars of sourced
+                # material was used to ORDER the stops and then thrown away, and
+                # the writer re-researched each stop from its name alone —
+                # "Control Tower" -> 2,384 acres and six runways, while the chain
+                # held Wood Island Park and the Neptune Road displacements.
+                # `_lore` is the writer's own input channel (story_prompt_block
+                # states these as a REQUIREMENT, D548) and seeding it also stops
+                # the generic per-stop fetch from overwriting them.
+                _vp_lore = (_venue_parts_evidence or {}).get('lore') or {}
+                _vp_seeded = 0
+                for _p in poi_list:
+                    _p['_venue_part'] = True     # [D578] inside its venue by construction
+                    _f = _vp_lore.get(_p['name']) or []
+                    if _f:
+                        _p['_lore'] = _f
+                        _vp_seeded += len(_f)
+                print(f"  [D571] seeded {_vp_seeded} story fact(s) from the causal "
+                      f"chain onto {len(poi_list)} stop(s)")
                 _venue_parts_used = True
                 _facility_fill_used = True      # reuse the Phase-3A skip gate
                 _selection_reasons = {}
@@ -8133,7 +8161,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # -------- PHASE 4: parallel type verification (skipped for walking + museum) --------
         # Museum tours: every stop is a room/exhibit inside a known venue — type verification
         # provides no signal and the wrong stops in the hallucination bug all passed it anyway.
-        if intent and intent.get('poi_type') and tour_category not in ('walking', 'museum'):
+        # [D578] A venue-parts stop is a PART of the venue — a check-in hall, a nave,
+        # a control tower — so asking whether it "matches the requested type" is the
+        # museum case exactly: it provides no signal and answers no. On the first
+        # Logan run it excluded all four stops ("Check-In Hall is a location within
+        # an airport, not the airport itself") and the tour delivered nothing.
+        if (intent and intent.get('poi_type')
+                and tour_category not in ('walking', 'museum')
+                and not _venue_parts_used):
             print(f"\nPHASE 4: Verifying POIs match requested type '{intent['poi_type']}' (parallel)...")
             poi_list, excluded_count = _verify_against_intent(poi_list)
             if excluded_count > 0:

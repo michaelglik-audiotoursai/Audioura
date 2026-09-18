@@ -406,6 +406,7 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
                                              "sources": len(v.get("sources") or [])}
                                          for k, v in (chain or {}).items()},
                          "placed": placed,
+                         "lore": distribute_lore(ordered, placed, chain),
                          "present": pres["present"], "unknown": pres["unknown"],
                          "absent": pres["absent"], "sources": pres["sources"]}
     except Exception as e:
@@ -560,3 +561,65 @@ def place_stories_in_building(venue_name, location, chain, parts, ask_grounded):
             seen.add(canon.lower())
             out.append({"part": canon, "why": str(r.get('why', ''))[:200]})
     return out
+
+
+# ── The handoff: chain material -> per-stop lore ────────────────────────────
+# The chain was computing ~25k characters of sourced story material, using it to
+# order the stops, and then discarding it: `poi_list = [_new_poi(_n) for _n in
+# _vp_stops]` kept only the NAMES. The writer then re-researched each stop from its
+# name alone, which is why "Control Tower" came back as 2,384 acres and six runways
+# while the chain had Wood Island Park and the Neptune Road displacements.
+#
+# `poi['_lore']` is the writer's own input channel (consumed by
+# `stop_knowledge_fallback.story_prompt_block`, which states the facts as a
+# REQUIREMENT rather than offering them as context — D548). Pre-seeding it also
+# suppresses the generic per-stop fetch, which skips any stop that already has lore.
+
+_SENT_SPLIT = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"“])')
+_FACTY = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b|\b[A-Z][a-z]+\s+[A-Z][a-z]+\b')
+
+
+def chain_to_facts(chain, per_link=6):
+    """Turn the causal chain's prose into fact lines the writer will be given.
+
+    Keeps only sentences that carry a date or a proper name — the ones that can
+    actually anchor a story. A link that returned sources marks its facts `high`.
+    """
+    out = []
+    for link, payload in (chain or {}).items():
+        text = (payload or {}).get('text') or ''
+        has_src = bool((payload or {}).get('sources'))
+        kept = 0
+        for raw in _SENT_SPLIT.split(re.sub(r'[*#`]+', '', text)):
+            s = ' '.join(raw.split()).strip(' -–—')
+            if not (40 <= len(s) <= 400) or not _FACTY.search(s):
+                continue
+            out.append({'fact': s, 'confidence': 'high' if has_src else 'low',
+                        'link': link})
+            kept += 1
+            if kept >= per_link:
+                break
+    return out
+
+
+def distribute_lore(stops, placed, chain, per_stop=6):
+    """Give every stop its own slice of the chain, so stops do not repeat each other.
+
+    Each stop gets: the one-line reason it was chosen (its `placed` entry, stated
+    first and high-confidence), then a non-overlapping share of the venue-level
+    facts dealt round-robin.
+    """
+    facts = chain_to_facts(chain)
+    why_by_part = {r['part']: r.get('why', '') for r in (placed or []) if r.get('part')}
+    lore = {s: [] for s in stops}
+    for s in stops:
+        why = why_by_part.get(s)
+        if why:
+            lore[s].append({'fact': why, 'confidence': 'high', 'link': 'placed'})
+    for i, f in enumerate(facts):
+        if not stops:
+            break
+        s = stops[i % len(stops)]
+        if len(lore[s]) < per_stop:
+            lore[s].append(f)
+    return lore

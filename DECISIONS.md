@@ -23814,3 +23814,66 @@ its venue, and the scope check must not run on it.** The provenance is already t
 ("applicable to any historic church") — exactly the glossary failure Michael predicted. Under D577
 the right response is to *hedge and keep* the stop rather than delete it, but the detector itself is
 working.
+
+## D579 — We find the stories, inject them, and a gate deletes them
+### 2026-09-18. The full chain traced end to end on Logan. Three blockers fixed; the fourth needs Michael.
+
+Michael asked whether the diagnosis had been *fixed*, not just written down. Three of four were.
+
+**Fixed 1 — the handoff.** `poi_list = [_new_poi(_n) for _n in _vp_stops]` kept only the stop NAMES;
+the chain's ~25k characters of sourced material was used to order the stops and discarded. The stops
+now carry it as `poi['_lore']`, the writer's own input channel (`story_prompt_block` states lore as
+a REQUIREMENT, D548), and seeding it also suppresses the generic per-stop fetch. **24 facts seeded
+across 4 stops.**
+
+**Fixed 2 — Phase 4 excluded every stop and the tour delivered nothing.**
+*"Excluded Check-In Hall — a location within an airport, not the airport itself"*, and the same for
+Concourse, Control Tower and Baggage Claim. Correct reasoning, wrong model: these are parts of the
+venue by construction. The skip already existed for `museum` with the reason written in the code —
+*"every stop is a room/exhibit inside a known venue — type verification provides no signal"* — so
+venue-parts stops now take the same exemption.
+
+**Fixed 3 — the scope check that deleted the Pulpit** (D578). Building parts are marked
+`_venue_part` and skip it, because every part carries the venue's own address and the question is
+unanswerable.
+
+### Not fixed — and it is the one that matters
+
+The material is good. The chain returns **Mayor James Michael Curley petitioning the state in March
+1922; Governor Cox signing Chapter 404 of the Acts of 1922; the Jeffries Point flats; the 1969–73
+control tower by Desmond & Lord with Minoru Yamasaki; Perini as builder.** None of it reaches the
+listener. `LOCAL-472` strips it:
+
+```
+UNGROUNDED entity stop='Check-In Hall'  entity='Federal Aviation Administration'
+UNGROUNDED entity stop='Control Tower'  entity='Boston Logan International Airport'
+       reason='No specific person or work is mentioned with a concrete link to the stop.'
+REMOVED transferable paragraph stop='Concourse'
+       reason='Generic scene-setting claims apply to any historic church.'
+```
+
+**The gate demands every named entity be concretely tied to the stop, and a building part cannot
+satisfy that** — Curley relates to the airport, not to the check-in hall; the tower's architect
+relates to the tower, but "Boston Logan International Airport" was itself stripped *at the Control
+Tower* for lacking a concrete link. **Fifth gate in the D578 family.**
+
+Note also that it called an airport concourse *"any historic church"* — the gate's prompt is
+church/museum-scoped and is being applied to venues it was never written for. That is a defect
+independent of the ruling below.
+
+### Why LEAD did not just fix it
+
+**LOCAL-472 is the anti-fabrication gate.** D564: *"The gate was right. The routing was wrong… it
+must not be weakened to make churches work."* It is part of why D567's Los Angeles archbishop was
+the exception rather than the rule. Relaxing it to let sourced chain facts through is a real
+loosening of the defence that stops the Sistine Chapel reaching a listener, and that is Michael's
+call, not LEAD's.
+
+**The narrow version LEAD would propose:** a fact that arrived from the causal chain carries
+**sources** (8–29 per link). The gate exists to catch material invented by the writer. So exempt
+only facts whose text the writer did not invent — those seeded into `_lore` with a source — and keep
+the gate at full strength on everything the writer adds. That is not "weaken the gate"; it is "stop
+the gate from auditing evidence we already grounded."
+
+**Measured state of the Logan tour after fixes 1–3:** it generates (was: delivered nothing), 6 dates
+vs 4, and still **zero of the named people** the chain found.
