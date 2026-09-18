@@ -2344,7 +2344,7 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         # here — "it should be little addition not a paragraph". Offered, never
         # asked up front (D573): the listener specifies only if they want to.
         # The suggestion is drawn from the venue class so it is never generic.
-        _more = {
+        _more_map = {
             'worship_civic': "If you'd like, I can take you round the other historic "
                              "churches nearby, or find you somewhere to eat afterwards.",
             'facility':      "If you'd like, I can point you to the best places to eat "
@@ -2353,8 +2353,16 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
                              "or find you somewhere to eat nearby.",
             'restaurant':    "If you'd like, I can show you what else is worth seeing "
                              "on this street.",
-        }.get(tour_category) or ("If you'd like, I can suggest somewhere to eat nearby, "
-                                 "or another tour close by.")
+        }
+        _more = _more_map
+        # Key on the VENUE CLASS first: 485 routes a worship/civic venue to
+        # tour_category 'walking' (D564), so keying on the category alone gave a
+        # church the generic fallback and the "other historic churches nearby" line
+        # could never fire.
+        _more_key = _detect_venue_class(location, tour_type) or tour_category
+        _more = _more.get(_more_key) or _more.get(tour_category) or (
+            "If you'd like, I can suggest somewhere to eat nearby, "
+            "or another tour close by.")
         sentences.append(_more)
         print(f"  [LOCAL-275] Part 2 (more): offered a related tour for "
               f"category '{tour_category}'")
