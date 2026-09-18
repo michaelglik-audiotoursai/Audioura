@@ -335,3 +335,105 @@ def part_story_prompt(part, venue_name, location=''):
         'Concrete people, dates and events — not a description of what a '
         f'{part} is in general. Cite your sources; say so if you do not know.'
     )
+
+
+# ── Production adapters ─────────────────────────────────────────────────────
+# The module keeps every model call injected so tests stay offline. These are the
+# two callables production passes in.
+
+def default_ask(prompt, timeout=60):
+    """Ungrounded asker for Q1/Q2 — class knowledge, no sources needed."""
+    try:
+        from story_leads import gemini_with_sources
+    except Exception:
+        return ''
+    out = gemini_with_sources(prompt, resolve=False, timeout=timeout) or {}
+    return out.get('text', '') or ''
+
+
+def default_ask_grounded(prompt, timeout=90):
+    """Grounded asker for Q3 and the story questions — returns (text, sources)."""
+    try:
+        from story_leads import gemini_with_sources
+    except Exception:
+        return '', []
+    out = gemini_with_sources(prompt, resolve=True, timeout=timeout) or {}
+    srcs = [s.get('url') or s.get('domain') for s in (out.get('sources') or [])]
+    return out.get('text', '') or '', [s for s in srcs if s]
+
+
+def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
+                     use_cache=True):
+    """The whole chain, production-shaped. Returns (stop_names, evidence).
+
+    Falls back to an empty list on any failure, so the caller keeps its existing
+    path — D577: never turn a working tour into no tour.
+    """
+    ask = ask or default_ask
+    ask_grounded = ask_grounded or default_ask_grounded
+    try:
+        kind = identify_venue_kind(venue_name, location, ask)
+        parts = parts_for_kind(kind, ask, use_cache=use_cache)
+        ok, physical, why = validate_kind_via_parts(parts)
+        if not ok:
+            # Q2's answer says Q1 was wrong. Do not build a tour on it.
+            return [], {"kind": kind, "rejected": why, "class_parts": parts}
+        pres = parts_present(venue_name, location, physical, ask_grounded)
+        candidates = [p for p in physical if p in pres["present"]] + \
+                     [p for p in physical if p in pres["unknown"]]
+        # SELECT BY STORY, ORDER BY WALK. Taking Q2's first N gives the porch and
+        # the narthex; ranking by story surfaces the iconostasis. Once chosen, the
+        # stops are put back into class (walking) order so the route still makes
+        # sense on foot.
+        by_story = rank_parts_by_story(venue_name, location, candidates, ask_grounded)
+        chosen = by_story[:want] if want else by_story
+        ordered = [p for p in physical if p in chosen]
+        return ordered, {"kind": kind, "class_parts": parts, "physical": physical,
+                         "story_rank": by_story[:8],
+                         "present": pres["present"], "unknown": pres["unknown"],
+                         "absent": pres["absent"], "sources": pres["sources"]}
+    except Exception as e:
+        return [], {"error": str(e)}
+
+
+def rank_parts_by_story(venue_name, location, parts, ask_grounded):
+    """Rank parts by how much REMARKABLE, venue-specific history attaches to each.
+
+    Michael, 2026-09-17: *"description of an altar may be boring, but who came to
+    this altar and what did they do and were hoping to achieve is not boring."*
+
+    Q2 returns parts in walking order — entrance inward — so taking the first N
+    gives Porch, Narthex, Nave: architecturally correct and dull. At St Nicholas in
+    Nice the interesting part is the **iconostasis**, whose icons invoke the patron
+    saints matching the Romanov family's baptismal names. Walking order buries it.
+
+    **So: select by story, then order by walk.** One grounded call, not one per part.
+    Returns the part names ordered best-story-first; parts the model does not rank
+    keep their class order at the end (D577 — unranked is not rejected).
+    """
+    if not parts:
+        return []
+    listing = "\n".join(f"- {p}" for p in parts)
+    where = f' in {location}' if location else ''
+    prompt = (
+        f'For "{venue_name}"{where}, which of these parts has the most remarkable, '
+        f'specific history attached to it — real people, events, donors, makers, '
+        f'disputes, or things found nowhere else?\n\n{listing}\n\n'
+        'Rank them most interesting first. Judge by what actually happened AT that '
+        'part of THIS building, not by how important the part is in general. '
+        'Answer as a JSON array of the names, best first. Cite your sources.'
+    )
+    try:
+        text, _sources = ask_grounded(prompt)
+    except Exception:
+        return list(parts)
+    ranked = _coerce_list(text)
+    known = {p.lower(): p for p in parts}
+    out, seen = [], set()
+    for r in ranked:
+        canon = known.get(r.lower())
+        if canon and canon.lower() not in seen:
+            seen.add(canon.lower())
+            out.append(canon)
+    out += [p for p in parts if p.lower() not in seen]
+    return out
