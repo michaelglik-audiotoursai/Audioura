@@ -106,3 +106,100 @@ def strip_uncontextualised_deaths(text):
         clean = ' '.join(survivors).strip()
         flagged = list(flagged) + cut_extra
     return clean, flagged
+
+
+# ── Search before you delete ────────────────────────────────────────────────
+# Michael, 2026-09-20: *"if we found out about 'a real person's violent death' at
+# least circumstances must be in the same article, unless this was an article
+# summary… omitting the fact should not be a substitution for us searching for a
+# cause or circumstances."*
+#
+# He is right. If a sentence reporting the murder exists at all, something we read
+# carried the circumstances and we failed to bring them through. Deleting is the
+# fallback, not the response.
+#
+# **The hazard that shapes the implementation.** For a recent crime involving
+# private individuals the sources are thin, and a model asked "why were they
+# killed" will produce a motive whether or not one is known. A wrong motive
+# attached to a real murder is far worse than omitting the passage — worse than any
+# other failure in this pipeline, because it defames identifiable people. So the
+# retrieval is GROUNDED and must come back with BOTH sources and explicit
+# circumstance language; anything less is treated as "not found" and the sentence
+# is removed as before.
+
+_NAME_IN = re.compile(r"\b[A-Z][\w’'\-]+(?:\s+(?:'[^']+'\s+)?[A-Z][\w’'\-]+)+\b")
+_YEAR_IN = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
+MAX_CIRCUMSTANCE_CHARS = 320
+
+
+def circumstances_query(sentence, venue_name='', location=''):
+    """A closed question about a specific death — never 'why do you think'."""
+    names = _NAME_IN.findall(sentence or '')
+    years = _YEAR_IN.findall(sentence or '')
+    who = ', '.join(dict.fromkeys(names[:4])) or 'the people named'
+    when = f' in {years[0]}' if years else ''
+    where = f' near {venue_name}' if venue_name else (f' in {location}' if location else '')
+    return (
+        f'What were the documented circumstances of the deaths of {who}{when}{where}?\n'
+        'State only what reporting confirms: where and how it happened, who was '
+        'charged or convicted, and the stated motive IF investigators or the courts '
+        'stated one.\n'
+        'If the circumstances are not documented, reply exactly: NOT DOCUMENTED. '
+        'Do not speculate about a motive under any condition. Cite your sources.'
+    )
+
+
+def resolve_uncontextualised_deaths(text, venue_name='', location='',
+                                    ask_grounded=None):
+    """Try to RECOVER the circumstances; delete only if that fails.
+
+    Returns (text, recovered, removed) where `recovered` is
+    [{sentence, circumstances, sources}].
+    """
+    flagged = find_uncontextualised_deaths(text)
+    if not flagged:
+        return text, [], []
+    if ask_grounded is None:
+        clean, removed = strip_uncontextualised_deaths(text)
+        return clean, [], removed
+
+    recovered, still_bare = [], []
+    for sent in flagged:
+        try:
+            answer, sources = ask_grounded(
+                circumstances_query(sent, venue_name, location))
+        except Exception:
+            answer, sources = '', []
+        answer = ' '.join((answer or '').split())
+        if (not sources or not answer or 'NOT DOCUMENTED' in answer.upper()
+                or not _CIRCUMSTANCE.search(answer)):
+            still_bare.append(sent)      # nothing solid came back — delete it
+            continue
+        recovered.append({'sentence': sent,
+                          'circumstances': answer[:MAX_CIRCUMSTANCE_CHARS],
+                          'sources': list(sources)})
+
+    out = text
+    # Splice the recovered circumstances in right after the sentence that named the
+    # death, so the listener hears what happened instead of being left to guess.
+    for rec in recovered:
+        sents = _split(out)
+        try:
+            i = sents.index(rec['sentence'])
+        except ValueError:
+            continue
+        circ = rec['circumstances'].strip()
+        if circ and not circ.endswith(('.', '!', '?')):
+            circ += '.'
+        sents.insert(i + 1, circ)
+        out = ' '.join(sents)
+    if still_bare:
+        keep = [s for s in _split(out) if s not in still_bare]
+        out = ' '.join(keep).strip()
+        try:
+            from unglossed_reference_gate import cut_orphaned_dependants
+            out, orphans = cut_orphaned_dependants(out, still_bare)
+            still_bare = list(still_bare) + list(orphans or [])
+        except Exception:
+            pass
+    return out, recovered, still_bare

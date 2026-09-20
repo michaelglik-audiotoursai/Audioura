@@ -16560,21 +16560,39 @@ REWRITE RULES (all mandatory):
         # left the naming, so the listener is invited to supply a motive. We cannot
         # invent a cause, so when the cause is gone the naming goes with it.
         try:
-            from tragedy_context_gate import strip_uncontextualised_deaths as _strip_tragedy
-            _tg_removed = 0
+            # [Michael 2026-09-20] SEARCH BEFORE YOU DELETE. If we learned that
+            # someone was murdered, the circumstances were in what we read and we
+            # failed to carry them through — so go back for them, and delete only
+            # when the search comes back with nothing. The retrieval is grounded and
+            # refuses to speculate: an invented motive attached to a real murder is
+            # worse than any other failure this pipeline can produce.
+            from tragedy_context_gate import resolve_uncontextualised_deaths as _resolve_tragedy
+            try:
+                import venue_parts as _vp_ask
+                _tg_grounded = _vp_ask.default_ask_grounded
+            except Exception:
+                _tg_grounded = None
+            _tg_removed = _tg_recovered = 0
             for _tpoi in poi_list:
                 _tdesc = _tpoi.get('description') or ''
                 if not _tdesc:
                     continue
-                _tclean, _tcut = _strip_tragedy(_tdesc)
-                if _tcut:
+                _tclean, _trec, _tcut = _resolve_tragedy(
+                    _tdesc, _tpoi.get('name', ''), location, _tg_grounded)
+                if _trec or _tcut:
                     _tpoi['description'] = _tclean
+                    _tg_recovered += len(_trec)
                     _tg_removed += len(_tcut)
+                    for _tr in _trec[:2]:
+                        print(f"      [TRAGEDY-CONTEXT] stop='{_tpoi.get('name','')[:28]}' "
+                              f"RECOVERED circumstances ({len(_tr['sources'])} source(s)): "
+                              f"{_tr['circumstances'][:90]}")
                     for _tc in _tcut[:2]:
                         print(f"      [TRAGEDY-CONTEXT] stop='{_tpoi.get('name','')[:28]}' "
-                              f"cut (death named without circumstances): {_tc[:90]}")
-            if _tg_removed:
-                print(f"  [TRAGEDY-CONTEXT] removed {_tg_removed} sentence(s)")
+                              f"cut (circumstances not documented): {_tc[:80]}")
+            if _tg_recovered or _tg_removed:
+                print(f"  [TRAGEDY-CONTEXT] recovered {_tg_recovered}, "
+                      f"removed {_tg_removed} sentence(s)")
         except Exception as _tg_err:
             print(f"  [TRAGEDY-CONTEXT] skipped ({_tg_err})")
 

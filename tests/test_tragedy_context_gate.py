@@ -67,3 +67,53 @@ class TestItCanFail(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestSearchBeforeDelete(unittest.TestCase):
+    """Michael, 2026-09-20: *"omitting the fact should not be a substitution for us
+    searching for a cause or circumstances."* Deletion is the fallback."""
+
+    S = ("In June 2023 tragedy struck with the murder of Bruno D'Amore and Lucia "
+         "Arpino. The narthex hosted a Mass of Peace.")
+
+    def test_documented_circumstances_are_recovered_and_spliced_in(self):
+        from tragedy_context_gate import resolve_uncontextualised_deaths as res
+        def grounded(_p):
+            return ("They were killed during a burglary at their home; a suspect "
+                    "was arrested and later convicted."), ["https://example.org/news"]
+        text, recovered, removed = res(self.S, "Narthex", "Newton MA", grounded)
+        self.assertEqual(len(recovered), 1)
+        self.assertEqual(removed, [])
+        self.assertIn("D'Amore", text, "the naming stays once it has circumstances")
+        self.assertIn("burglary", text, "the circumstances are spliced in after it")
+
+    def test_not_documented_falls_back_to_deletion(self):
+        from tragedy_context_gate import resolve_uncontextualised_deaths as res
+        text, recovered, removed = res(self.S, "", "", lambda p: ("NOT DOCUMENTED", ["x"]))
+        self.assertEqual(recovered, [])
+        self.assertTrue(removed)
+        self.assertNotIn("D'Amore", text)
+
+    def test_UNSOURCED_SPECULATION_IS_NEVER_PUBLISHED(self):
+        """The worst failure available to this pipeline: a motive invented for a
+        real murder. No sources means not found, whatever the model said."""
+        from tragedy_context_gate import resolve_uncontextualised_deaths as res
+        def speculating(_p):
+            return "They were likely targeted because of their background.", []
+        text, recovered, removed = res(self.S, "", "", speculating)
+        self.assertEqual(recovered, [], "an unsourced motive must never be recovered")
+        self.assertTrue(removed)
+        self.assertNotIn("targeted because", text)
+
+    def test_the_query_forbids_speculation_and_offers_an_out(self):
+        from tragedy_context_gate import circumstances_query
+        q = circumstances_query(self.S, "Narthex", "Newton MA")
+        self.assertIn("Do not speculate", q)
+        self.assertIn("NOT DOCUMENTED", q)
+        self.assertIn("Cite your sources", q)
+
+    def test_no_grounded_client_means_the_old_behaviour(self):
+        from tragedy_context_gate import resolve_uncontextualised_deaths as res
+        text, recovered, removed = res(self.S, "", "", None)
+        self.assertEqual(recovered, [])
+        self.assertTrue(removed)
