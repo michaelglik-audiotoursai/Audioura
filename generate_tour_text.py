@@ -12154,6 +12154,23 @@ NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
                 # "we did a good job with museums and I do not want to damage it."
                 try:
                     from stop_knowledge_fallback import story_prompt_block
+                    # [2026-09-20] RE-ATTACH the causal-chain lore at the point of
+                    # use. It is seeded onto the stops right after selection, but
+                    # poi_list is rebuilt at several later points (D1v2 verification,
+                    # scope filtering, replenishment) and each rebuild makes fresh
+                    # dicts, so `_lore` was gone by the time the writer ran —
+                    # measured: lore_facts=0 on every stop while 24 facts had been
+                    # seeded. Re-attaching here survives any rebuild, whichever one
+                    # it was. That is why Curley, Cox and Warnecke never reached the
+                    # page: not the gate (it was deleting filler, correctly), and not
+                    # the extraction (that was noisy but fixed) — the facts simply
+                    # were not in front of the writer.
+                    if not poi.get('_lore'):
+                        _reattach = (_venue_parts_evidence or {}).get('lore', {}).get(poi_name)
+                        if _reattach:
+                            poi['_lore'] = _reattach
+                            print(f"  [D571] re-attached {len(_reattach)} chain fact(s) "
+                                  f"to '{poi_name[:30]}' (lost in a poi_list rebuild)")
                     _practicals_block = story_prompt_block(poi.get('_lore'), poi_name,
                                                            kind='place')
                 except Exception:

@@ -575,26 +575,67 @@ def place_stories_in_building(venue_name, location, chain, parts, ask_grounded):
 # REQUIREMENT rather than offering them as context — D548). Pre-seeding it also
 # suppresses the generic per-stop fetch, which skips any stop that already has lore.
 
-_SENT_SPLIT = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"“])')
+try:  # the abbreviation-safe splitter — without it "the U.S." and "President
+    # John F." are cut mid-name, the same defect this module was built to avoid.
+    from sentence_split import split_sentences as _sent_split
+except Exception:  # pragma: no cover
+    _SENT_RE = re.compile(r'(?<=[.!?])\s+(?=[A-Z0-9"“])')
+    def _sent_split(t):
+        return _SENT_RE.split(t or '')
 _FACTY = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b|\b[A-Z][a-z]+\s+[A-Z][a-z]+\b')
 
 
 def chain_to_facts(chain, per_link=6):
-    """Turn the causal chain's prose into fact lines the writer will be given.
+    """Turn the causal chain's prose into clean fact lines for the writer.
 
-    Keeps only sentences that carry a date or a proper name — the ones that can
-    actually anchor a story. A link that returned sources marks its facts `high`.
+    The chain answers in MARKDOWN — `### The Origins: Events, People, and
+    Decisions`, `* **The Context:** Following World War I...`, `* **Mayor James
+    Michael Curley:** In March 1922...`. A naive sentence split over that produced
+    "facts" like *"The Event, People, and Decision Behind the Creation"*, which is a
+    heading, not a fact. Twenty-four of those were seeded onto the Logan stops and
+    the writer, reasonably, ignored all of them: Curley, Cox, Yamasaki and Perini
+    appear ZERO times in all three generation logs — never written, never deleted.
+    LEAD first blamed the anti-fabrication gate for that; the gate was innocent.
+
+    So: drop headings, unwrap bold labels, and keep only things that read as
+    statements — ending in terminal punctuation, containing a date or a name, and
+    not a label ending in a colon.
     """
     out = []
     for link, payload in (chain or {}).items():
         text = (payload or {}).get('text') or ''
         has_src = bool((payload or {}).get('sources'))
-        kept = 0
-        for raw in _SENT_SPLIT.split(re.sub(r'[*#`]+', '', text)):
-            s = ' '.join(raw.split()).strip(' -–—')
-            if not (40 <= len(s) <= 400) or not _FACTY.search(s):
+
+        # PASS 1 — clean line by line (headings and bullets are line-scoped).
+        cleaned = []
+        for line in text.splitlines():
+            ln = line.strip()
+            if not ln or ln.startswith('#'):
                 continue
-            out.append({'fact': s, 'confidence': 'high' if has_src else 'low',
+            ln = re.sub(r'^[\s*\-•]+', '', ln)
+            ln = re.sub(r'^\*\*([^*]{1,60}?):\*\*\s*', '', ln)
+            ln = ln.replace('**', '').replace('`', '').strip()
+            if not ln or ln.endswith(':'):
+                continue
+            ln = re.sub(r"^[A-Z][\w.'’\- ]{0,48}?:\s+(?=[A-Z0-9])", '', ln)
+            cleaned.append(ln)
+
+        # PASS 2 — join, THEN split. A sentence that spans two markdown lines was
+        # otherwise cut at the line break: "...the Massachusetts National Guard and
+        # the U.S." lost "Army Air Corps" to the next line.
+        blob = ' '.join(cleaned)
+        kept = 0
+        for raw in _sent_split(blob):
+            sent = ' '.join(raw.split()).strip(' -–—')
+            if not (45 <= len(sent) <= 400):
+                continue
+            if not sent.endswith(('.', '!', '?')):
+                continue
+            if not _FACTY.search(sent):
+                continue
+            if not re.search(r'\b[a-z]{3,}\b.*\b[a-z]{3,}\b', sent):
+                continue
+            out.append({'fact': sent, 'confidence': 'high' if has_src else 'low',
                         'link': link})
             kept += 1
             if kept >= per_link:

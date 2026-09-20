@@ -43,6 +43,10 @@ def _ends_on_abbreviation(chunk):
     # A single capital letter + dot is an initial: "J. F. Kennedy".
     if re.search(r'(?:^|\s)[A-Z]\.$', c):
         return True
+    # Dotted acronyms: U.S., U.K., D.C., N.Y. — the letter before the final dot is
+    # preceded by a dot, not whitespace, so the initial rule above cannot see them.
+    if re.search(r'(?:^|\s)(?:[A-Za-z]\.){2,}$', c):
+        return True
     m = _TRAILING_TOKEN.search(c)
     return bool(m) and m.group(1).lower() in _ABBREV
 
