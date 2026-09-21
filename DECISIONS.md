@@ -23877,3 +23877,74 @@ the gate from auditing evidence we already grounded."
 
 **Measured state of the Logan tour after fixes 1–3:** it generates (was: delivered nothing), 6 dates
 vs 4, and still **zero of the named people** the chain found.
+
+## D580 — The tour-quality loop runs itself. The instrument that made it possible, and the one judgement it hands back.
+### 2026-09-21. Michael's request, and a correction of LEAD's own behaviour.
+
+> *"at some point I will rely on your judgement and the described 3 steps can be done by you
+> automatically informing me but not continue without my permission unless I stop you. How can we
+> make this happen?"*
+
+The three steps he described: generate a batch → notice one is much better than the others →
+diagnose, fix, regenerate.
+
+**The first answer is that the rule already existed and LEAD was not following it.** RULE ZERO in
+`CLAUDE.md` says: do not stop and ask; ask only before something irreversible. Fixing a bug is
+`git revert`-able; generating tours inside an agreed ceiling is reversible. **LEAD asked permission
+for both, repeatedly.** No mechanism was missing — the discipline was.
+
+**The second answer is that one real piece WAS missing: an instrument.** The loop cannot run while
+Michael is the only judge. `tour_quality.py` now scores a tour on defects with an objective
+signature — every one of them something he found by reading and then had to explain:
+
+| defect | the reading that produced it |
+|---|---|
+| `no_story` | Logan, zero named people, three rounds running |
+| `thin` | the Pulpit deleted for being inside its own church (D578) |
+| `truncated` | *"Founded in 1868 by St."* |
+| `repeated` | Mother Teresa told at stops 1 and 2 |
+| `refuted` | the Archbishop of Los Angeles in Newton (D577) |
+| `bare_death` | three named people murdered, no circumstances |
+| `distance` | *"4 stops and 2 kilometres"* inside one church |
+
+It reproduced his manual read of round 3 exactly, unprompted, and then measured the round-4 fix:
+**2/3 clean and inconsistent → 3/3 clean and consistent, named people 0–2 → 1–3.**
+
+### The limit, demonstrated rather than claimed
+
+`LOGAN_3` scores **clean** with three named people, and its Security Checkpoint stop reads:
+
+> *"a point of convergence, where travelers, staff, and technology engage in a carefully
+> choreographed dance of safety and efficiency."*
+
+That is the glossary prose Michael has objected to since the beginning, and **the scorer passes
+it.** No counter can ask whether a listener would want to keep listening.
+
+**So the division is not a compromise, it is the shape of the problem:** the loop drives the
+counters to zero and consistent, then hands over tours that are *defect-free and possibly dull*.
+Michael: *"that would be perfect in my opinion."*
+
+### The second critic — Michael's idea, and the machinery was already here
+
+> *"all of you do a great job to critic the tours pointing its weaknesses sometime better than I
+> can… would it be beneficial if you create internal task for Amazon-Q to critic the tour."*
+
+`kiro-cli` **is** Amazon's agentic CLI, `kiro_dispatcher.py` already forks it headless per task
+file, and every `LOCAL-*` task this month ran through it. Nothing new is needed to run it. What is
+new is **pointing it at the gap**: the critic is asked *"would a listener want to keep listening,
+and what is missing that belongs here"* — never at defects, which are already counted.
+
+**Two constraints, both learned expensively:**
+1. **A critic's finding is a claim, not a fact.** D423: two instruments disagreed and LEAD nearly
+   published the wrong one. Reproduce before fixing.
+2. **The critic must not write the rule.** D579 is the cost of acting on an unverified premise —
+   LEAD blamed an innocent gate twice and burned two rounds of generation. The critic reports; a
+   reviewed change follows.
+
+### Controls
+
+- **Spend ceiling** — `--ceiling`, default $5. The loop halts and reports rather than continuing.
+- **Stop switch** — `.continuous_dev/PAUSE`. Michael can touch that file and the loop stops at the
+  next run without talking to anyone.
+- **Never without asking** — deploying, writing to the production DB, deleting anything he has not
+  agreed to lose, or spending past the ceiling.
