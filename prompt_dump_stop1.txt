@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-18T15:33:41.611126
+Generated: 2026-09-20T13:48:19.693565
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -24,10 +24,10 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In late 2002, during the height of the Archdiocese of Boston sexual abuse crisis, Father Walter H. Cuenin announced plans to hold a forum for dissident priests at Our Lady Help of Christians, leading Cardinal Bernard Law to ban all diocesan-related events at the parish.
-  - In late 2002, over 850 parishioners packed Our Lady Help of Christians to support Father Walter H. Cuenin, turning the entrance and outer steps into a protest rally and press scrum.
-  - In 2005, the archdiocese forced Father Walter H. Cuenin to resign after an audit cited financial irregularities, leading parishioners to hold vigils and demonstrations at Our Lady Help of Christians.
-  - In June 1995, Mother Teresa of Calcutta paid a surprise visit to Our Lady Help of Christians, drawing massive crowds to the church entrance.
+  - In 2002, Rev. Walter H. Cuenin, pastor of Our Lady Help of Christians, publicly clashed with church hierarchy over clerical accountability, the ordination of women, and LGBTQ+ inclusion, leading to Cardinal Bernard Law barring archdiocesan meetings at the church.
+  - In September 2005, Rev. Walter H. Cuenin resigned from Our Lady Help of Christians following an internal audit alleging financial irregularities, ending his tenure as pastor.
+  - In June 2023, three parishioners of Our Lady Help of Christians—Bruno D’Amore, his wife Jill, and Jill’s mother Lucia Arpino—were murdered in a home invasion, leading to widespread grief and media attention.
+  - In late 2023 and early 2024, Our Lady Help of Christians volunteered space to house migrant families, sparking local debate, online rumors, and protests, leading the parish to hire private security.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -167,22 +167,22 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
 DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: curiosity
-- Unique angle to emphasize: The narthex's stained glass windows, which depict scenes of local events, invite visitors to ponder the fusion of faith and community history.
-- End with a forward-looking hook: As you step through the doors into the nave, what other stories might these walls reveal?
+- Emotional beat for this stop: anticipation
+- Unique angle to emphasize: The narthex features a beautifully restored wooden door that once served as a simple entrance, now a symbol of the church's open arms to the community.
+- End with a forward-looking hook: As you step through this historic entrance, the grandeur of the nave awaits just ahead.
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The narthex is an architectural element in Christian churches reached after opening the church doors.; The narthex in early Christian and Byzantine basilicas and churches was located at the west end of the nave, opposite the church's main altar.; In early Christian churches, the narthex was often divided into an esonarthex (inner narthex) and an exonarthex (outer narthex).
+The narthex is an enclosed area just inside the entrance of a Christian church, historically designed for those not allowed in the main worship space.; The narthex is an architectural element in Christian churches consisting of the area reached after opening the church doors; one or three doors in the narthex then open into the nave of the church.; In early Christian churches, the narthex was often divided into two distinct parts: an esonarthex (inner narthex) and an external closed space, the exonarthex (outer narthex).
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Narthex
-      In 2005, the archdiocese forced Father Walter H. Cuenin to resign after an audit cited financial irregularities, leading parishioners to hold vigils and demonstrations at Our Lady Help of Christians.
+      In 2002, Rev. Walter H. Cuenin, pastor of Our Lady Help of Christians, publicly clashed with church hierarchy over clerical accountability, the ordination of women, and LGBTQ+ inclusion, leading to Cardinal Bernard Law barring archdiocesan meetings a
   [2] Narthex
-      In late 2002, over 850 parishioners packed Our Lady Help of Christians to support Father Walter H. Cuenin, turning the entrance and outer steps into a protest rally and press scrum.
+      In September 2005, Rev. Walter H. Cuenin resigned from Our Lady Help of Christians following an internal audit alleging financial irregularities, ending his tenure as pastor.
   [3] Narthex
-      In late 2002, during the height of the Archdiocese of Boston sexual abuse crisis, Father Walter H. Cuenin announced plans to hold a forum for dissident priests at Our Lady Help of Christians, leading Cardinal Bernard Law to ban all diocesan-related e
+      In June 2023, three parishioners of Our Lady Help of Christians—Bruno D’Amore, his wife Jill, and Jill’s mother Lucia Arpino—were murdered in a home invasion, leading to widespread grief and media attention.
   [4] Narthex
-      In June 1995, Mother Teresa of Calcutta paid a surprise visit to Our Lady Help of Christians, drawing massive crowds to the church entrance.
+      In late 2023 and early 2024, Our Lady Help of Christians volunteered space to house migrant families, sparking local debate, online rumors, and protests, leading the parish to hire private security.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -264,21 +264,40 @@ DO NOT include directions to the next stop - these will be added separately.
 
 LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
+PER-STOP SOURCE MATERIAL for "Narthex" (from verified sources — use this as your primary factual basis):
+  Passage 1: The narthex is an enclosed area just inside the entrance of a Christian church, historically designed for those not allowed in the main worship space. This ...
+  Passage 2: The chapel is connected to the larger church by a spacious narthex. In 2005, Monsignor Capik celebrated his 50th Anniversary of Ordination and retired from ...
+  Sources:
+  [Narthex — interpretive search] https://study.com/academy/lesson/video/narthex-definition-lesson-quiz.html (tier 3)
+  [Narthex — interpretive search] https://saintjamesbr.org/our-history (tier 3)
 
-THIS STOP IS TOO SHORT AT 150 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
+
+BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
+
+NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
+  - If a passage names WHERE someone came from and WHERE they went, state both.
+  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
+  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
+  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
+  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+
+
+THIS STOP IS TOO SHORT AT 108 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "The narthex of Our Lady Help of Christians serves not just as an entryway to the spiritual sanctuary beyond but as a witness to pivotal moments in the church’s and community's life."
-- "In June 1995, a surprise visit by Mother Teresa of Calcutta transformed this space into a bustling center of excitement."
-- "Her presence drew massive crowds to the church entrance, each person eager to catch a glimpse of the revered figure known for her relentless service to the world's least privileged.Fast forward to late 2002, and this same narthex became the focal point of a different kind of gathering."
-- "Amidst the Archdiocese of Boston's sexual abuse crisis, Father Walter H."
-- "Cuenin planned a forum for dissident priests at this very location."
-- "The announcement led Cardinal Bernard Law to ban all diocesan-related events here, but the narthex was already a crucible of support and protest."
-- "Over 850 parishioners packed into this space, spilling onto the outer steps, transforming it into a rallying point and a press scrum."
-- "This moment underscored the community’s resilience and commitment to holding their leaders accountable, turning the church entrance into a symbol of advocacy and solidarity."
-- "The narthex, with its vibrant stained glass, offers more than colorful depictions; it is a canvas that reflects the living pulse of a community, intertwining faith with local history."
-- "As you step through these doors into the nave, the stories these walls have witnessed beckon you to discover what other narratives lie within."
+- "The narthex of Our Lady Help of Christians has been a backdrop for the church's vibrant and sometimes turbulent history."
+- "In 2002, Rev."
+- "Cuenin, then pastor, found himself at odds with the church hierarchy."
+- "His vocal advocacy for clerical accountability, the ordination of women, and LGBTQ+ inclusion led to a significant clash with Cardinal Bernard Law."
+- "As a result, Cardinal Law barred archdiocesan meetings at the church, marking a bold stand for Rev."
+- "Cuenin and underscoring the narthex as a space of both welcome and dissent."
+- "This episode reflects the church's role not only as a place of worship but as a crucible for social change."
+- "In a more somber chapter, June 2023 brought tragedy as the community mourned the loss of three parishioners—Bruno D’Amore, his wife Jill, and Jill’s mother Lucia Arpino—who were murdered in a home invasion."
+- "This tragic event drew widespread media attention and became a poignant reminder of the church's integral role in the communal fabric of Newton."
+- "Yet, the narthex continues to symbolize hope and hospitality."
+- "This decision sparked local debate, leading to protests and the eventual need for private security.As you pass through this historic entrance, the grandeur of the nave awaits, promising further exploration of a space that has been both a witness and participant in the living pulse of its community."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
@@ -289,7 +308,7 @@ Use only the source material supplied. If the material will not support such a s
 
 
 ================================================================================
-Total user message length: 24503 chars
+Total user message length: 27804 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0

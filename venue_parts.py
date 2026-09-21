@@ -644,23 +644,70 @@ def chain_to_facts(chain, per_link=6):
 
 
 def distribute_lore(stops, placed, chain, per_stop=6):
-    """Give every stop its own slice of the chain, so stops do not repeat each other.
+    """Give each stop the facts that BELONG to it, with the reason they belong.
 
-    Each stop gets: the one-line reason it was chosen (its `placed` entry, stated
-    first and high-confidence), then a non-overlapping share of the venue-level
-    facts dealt round-robin.
+    The first version dealt facts round-robin — `stops[i % len(stops)]` — which is
+    why Logan was a coin flip. The chain's facts are about the VENUE (the airport's
+    1922 founding, Jeffries Point, Cox and Curley) and the writer has to bind them
+    to a PARTICULAR stop. Measured across three runs:
+
+      * bound well  -> "Within these walls, civic leaders ... envisioned"  — survives
+      * dealt blind -> Jeffries Point handed to the Baggage Claim, no connection,
+                       and LOCAL-472 removed it: "No specific link to Jeffries Point
+                       is provided." **The gate was right.**
+
+    So the writer was being asked to invent a connection for a fact chosen at
+    random, under a gate that deletes unconvincing connections. `place_stories_in_
+    building` already works out which part each story belongs to and why, and this
+    function was throwing that away.
+
+    Now: each fact goes to the stop its own words point at, the `placed` reason
+    leads, and anything unclaimed is spread over the stops that are still short.
     """
     facts = chain_to_facts(chain)
-    why_by_part = {r['part']: r.get('why', '') for r in (placed or []) if r.get('part')}
     lore = {s: [] for s in stops}
+    if not stops:
+        return lore
+
+    # 1. The reason this stop was chosen leads — it IS the binding.
+    why_by_part = {r['part']: r.get('why', '') for r in (placed or []) if r.get('part')}
     for s in stops:
-        why = why_by_part.get(s)
-        if why:
-            lore[s].append({'fact': why, 'confidence': 'high', 'link': 'placed'})
-    for i, f in enumerate(facts):
-        if not stops:
+        if why_by_part.get(s):
+            lore[s].append({'fact': why_by_part[s], 'confidence': 'high',
+                            'link': 'placed'})
+
+    # 2. Send each fact to the stop it actually names. A fact mentioning "control
+    #    tower" belongs at the Control Tower; one mentioning "check-in" at the
+    #    Check-In Hall. Matching is on the stop's distinctive words, so "Hall" or
+    #    "Claim" alone cannot capture a fact.
+    def _tokens(name):
+        stop_words = {'hall', 'area', 'the', 'and', 'of', 'room', 'point', 'claim'}
+        return [w for w in re.findall(r'[a-z]+', (name or '').lower())
+                if len(w) > 3 and w not in stop_words]
+
+    keys = {s: _tokens(s) for s in stops}
+    unclaimed = []
+    for f in facts:
+        text = f['fact'].lower()
+        owner = None
+        for s in stops:
+            if keys[s] and all(k in text for k in keys[s]):
+                owner = s
+                break
+        if owner and len(lore[owner]) < per_stop:
+            lore[owner].append(f)
+        else:
+            unclaimed.append(f)
+
+    # 3. Venue-level facts — the founding, the patrons — belong to no single part.
+    #    Spread them over the stops that are still short, fullest-last, so no stop
+    #    is left with nothing to tell.
+    for f in unclaimed:
+        short = [s for s in stops if len(lore[s]) < per_stop]
+        if not short:
             break
-        s = stops[i % len(stops)]
-        if len(lore[s]) < per_stop:
-            lore[s].append(f)
+        short.sort(key=lambda s: len(lore[s]))
+        lore[short[0]].append(f)
     return lore
+
+
