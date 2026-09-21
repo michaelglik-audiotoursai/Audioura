@@ -39,6 +39,17 @@ _BINDING_PATTERNS = (
     r'\bhoused\s+(?:in|at)\s+(?P<place>[A-Z][\w.\'-]*(?:\s+[A-Z][\w.\'-]*){0,3})',
     r'\bsituated\s+(?:in|at|within)\s+(?P<place>[A-Z][\w.\'-]*(?:\s+[A-Z][\w.\'-]*){0,3})',
     r'\bpart\s+of\s+the\s+(?P<place>[A-Z][\w.\'-]*(?:\s+[A-Z][\w.\'-]*){0,3})\s+(?:Archdiocese|Diocese)',
+    # [2026-09-21] A DEMONSTRATIVE binding another place to this stop:
+    #   "This Atlanta hub, named after former mayors William B. Hartsfield and
+    #    Maynard Jackson, has been the world's busiest airport since 1998"
+    # — shipped inside a BOSTON LOGAN tour. The writer had written a comparison,
+    # "reminiscent of Hartsfield-Jackson Atlanta International Airport", and a
+    # downstream edit stripped the comparison and kept the other airport's facts as
+    # if they were this venue's. Same family as LOCAL-479 (introduction removed,
+    # dependants kept) and the tragedy gate (explanation removed, naming kept):
+    # a gate drops the qualifier and leaves an unqualified claim.
+    r'\b[Tt]his\s+(?P<place>[A-Z][\w.\'-]*(?:\s+[A-Z][\w.\'-]*){0,2})\s+'
+    r'(?:hub|airport|terminal|museum|cathedral|church|station|park|city)\b',
 )
 _COMPILED = tuple(re.compile(p) for p in _BINDING_PATTERNS)
 

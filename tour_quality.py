@@ -16,6 +16,8 @@ every one of them something Michael found by reading and then had to explain:
   refuted         a bound place too far away (Archbishop of Los Angeles, D577)
   bare_death      a named violent death with no circumstances
   distance        a kilometre figure on a building tour
+  spliced         "...aviation sector.3 million passengers" — a cut sentence rejoined
+  foreign_venue   another airport's facts asserted as this one's (the Atlanta bug)
 
 **What it deliberately cannot judge: whether a tour is INTERESTING.** That is the
 thing Michael reads for, and no counter substitutes for it. The loop is therefore
@@ -36,6 +38,12 @@ _PERSON = re.compile(r'\b(?:Governor|Mayor|Father|Cardinal|Archbishop|Mother|Sis
 _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+\s+'
                     r'(?:you|As|The|It|This|Its|Their|He|She|We))')
 _MANGLED = re.compile(r'\b(?:engaged|which|that|and|of)\s+of\s+[A-Z]')
+# [2026-09-21, Michael on LOGAN_1] "...ensuring Boston's competitive edge in the
+# aviation sector.3 million passengers in 2025." A sentence was cut and the
+# remainder spliced on with no space, so the tour states ".3 million" — the leading
+# digits gone. Two signatures: a full stop immediately followed by a digit, and a
+# sentence that BEGINS with a decimal fragment.
+_SPLICE = re.compile(r'[a-z]\.\d|(?:^|\s)\.\d+\s+\w')
 _KM = re.compile(r'\b\d+(?:\.\d+)?\s*(?:km|kilometre|kilometer)s?\b', re.I)
 
 
@@ -62,7 +70,8 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
     if metrics['named_people'] == 0:
         defects['no_story'] = "no named people anywhere in the tour"
 
-    trunc = _TRUNC.findall(text) + _MANGLED.findall(text)
+    trunc = _TRUNC.findall(text) + _MANGLED.findall(text) + \
+        [m.group(0) for m in _SPLICE.finditer(text)]
     if trunc:
         defects['truncated'] = f"{len(trunc)} fragment(s), e.g. {trunc[0]!r}"
 

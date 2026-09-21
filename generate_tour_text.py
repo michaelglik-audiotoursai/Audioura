@@ -2340,7 +2340,12 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
                                    'news_orchestrator_service.py')
         if os.path.exists(_news_path):
             sentences.append(
-                "We can also generate news articles for you to listen to on the way back."
+                ("We can also generate news articles for you to listen to on the way back."
+                 if not _venue_parts_used else
+                 # [Michael 2026-09-21] "back where?" — a building tour has no return
+                 # journey to fill. Inside a church or a terminal the listener is not
+                 # travelling home; they are standing in a room.
+                 "We can also generate news articles for you to listen to while you are here.")
             )
             print("  [LOCAL-275] Part 2 (news): news_orchestrator_service.py confirmed")
         else:
