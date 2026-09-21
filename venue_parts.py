@@ -382,6 +382,15 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         candidates = [p for p in physical if p in pres["present"]] + \
                      [p for p in physical if p in pres["unknown"]]
 
+        # [2026-09-21] Resolve each part to ONE INSTANCE the listener can stand at.
+        # "Security Checkpoint" names none of Logan's seven; "Side Chapels" names
+        # none of the church's. Access is recorded for the precondition line and
+        # never used to drop a stop (Michael: we cannot enumerate what a listener
+        # has, so state the requirement rather than refuse the stop).
+        instances = resolve_part_instances(venue_name, location, candidates,
+                                           ask_grounded)
+        candidates, dropped_ambiguous, access = name_the_instances(candidates, instances)
+
         # [Michael, 2026-09-18] STORY FIRST, PARTS SECOND. Run the causal chain —
         # why does this exist / who created it / who paid / who came / what is it
         # the only one of — then place those stories in the parts of the building
@@ -406,6 +415,9 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
                                              "sources": len(v.get("sources") or [])}
                                          for k, v in (chain or {}).items()},
                          "placed": placed,
+                         "instances": instances,
+                         "access": access,
+                         "dropped_ambiguous": dropped_ambiguous,
                          "lore": distribute_lore(ordered, placed, chain),
                          "present": pres["present"], "unknown": pres["unknown"],
                          "absent": pres["absent"], "sources": pres["sources"]}
@@ -711,3 +723,110 @@ def distribute_lore(stops, placed, chain, per_stop=6):
     return lore
 
 
+
+
+# ── One instance, not a category ────────────────────────────────────────────
+# Michael, 2026-09-21, reading the Logan tours: *"there are more than one
+# Concourse; it is hard to identify what this particular one is."* Logan has 7 TSA
+# checkpoints across 4 terminals and a baggage claim per terminal. A stop called
+# "Security Checkpoint" names none of them.
+#
+# And his caveat, which is the important half: this is NOT an airport special case.
+# *"in the church tour something like Bell, Tower, Crossing or Transept, Crypt,
+# Pulpit... There you can not limit to a structure something like terminal but still
+# we will have to identify what we are talking about with absolute certainty."* Two
+# stops we shipped prove it — **"Side Chapels"** and **"Stained Glass Windows"** are
+# plural categories, exactly as unfindable as "Security Checkpoint".
+#
+# LOCAL-481 already ruled a stop must be a real, named, findable place. The parts
+# chain reintroduced that defect in a new costume, so the rule goes where the parts
+# are made:
+#
+#   exactly one at this venue      -> the bare part name is already unambiguous
+#   several, and they have names   -> use the NAMED instance, never the category
+#   several, none distinguished    -> pick one by name, or drop the part
+#
+# ACCESS is recorded but never used to filter. Michael, same message: *"if we have
+# a choice to create a path for everyone, we should do it, but if not, I would
+# assume that the listener needs to define the tour parameters more precise… in a
+# museum one needs a ticket, on a bike tour the listener needs a bike, in a church
+# tour our listener, especially if female, needs a proper dress. We cannot
+# encounter all possibilities of the listener identity and possessions."*
+# So an airside stop is not dropped — the tour STATES the precondition. Dropping it
+# would be the restrictive error; saying "this is past security, so you will need a
+# boarding pass" is the informative one.
+
+def resolve_part_instances(venue_name, location, parts, ask_grounded):
+    """How many of each part are there, what is each called, and what does it need?
+
+    Returns {part: {"count": int|None, "names": [...], "access": str}}.
+    `access` is one of 'open', 'ticketed', 'secure', 'restricted', '' — recorded for
+    the precondition line, never used to drop a stop.
+    """
+    out = {}
+    if not parts:
+        return out
+    listing = "\n".join(f"- {p}" for p in parts)
+    where = f' in {location}' if location else ''
+    prompt = (
+        f'For "{venue_name}"{where}, for each item below tell me:\n'
+        f'  - how many there are at this venue\n'
+        f'  - if more than one, what each individual one is CALLED (the name a '
+        f'visitor would see on a sign or a map)\n'
+        f'  - whether a member of the public can walk to it: "open", "ticketed" '
+        f'(needs admission), "secure" (past a security checkpoint), or '
+        f'"restricted" (staff only)\n\n{listing}\n\n'
+        'Answer as JSON: {"<item>": {"count": <number>, "names": [...], '
+        '"access": "open|ticketed|secure|restricted"}}. '
+        'If you do not know the count, use null. Do not invent names.'
+    )
+    try:
+        text, _ = ask_grounded(prompt)
+    except Exception:
+        return out
+    m = re.search(r'\{.*\}', str(text or ''), re.S)
+    if not m:
+        return out
+    try:
+        data = json.loads(m.group(0))
+    except Exception:
+        return out
+    if not isinstance(data, dict):
+        return out
+    known = {p.lower(): p for p in parts}
+    for k, v in data.items():
+        canon = known.get(str(k).strip().lower())
+        if not canon or not isinstance(v, dict):
+            continue
+        names = [str(n).strip() for n in (v.get('names') or []) if str(n).strip()]
+        cnt = v.get('count')
+        out[canon] = {'count': cnt if isinstance(cnt, int) else None,
+                      'names': names[:8],
+                      'access': str(v.get('access') or '').strip().lower()}
+    return out
+
+
+def name_the_instances(parts, instances):
+    """Turn category parts into findable stops. Returns (stops, dropped, access).
+
+    A part with one instance keeps its name. A part with several becomes its first
+    NAMED instance. A part with several and no names is dropped — shipping it would
+    be a stop the listener cannot stand at, which is the defect LOCAL-481 named.
+    """
+    stops, dropped, access = [], [], {}
+    for p in parts:
+        info = (instances or {}).get(p) or {}
+        cnt, names = info.get('count'), info.get('names') or []
+        if info.get('access'):
+            access[p] = info['access']
+        if cnt is not None and cnt > 1:
+            if names:
+                chosen = names[0]
+                stops.append(chosen)
+                if info.get('access'):
+                    access[chosen] = info['access']
+            else:
+                dropped.append((p, f'{cnt} of them and none is named'))
+            continue
+        stops.append(p)
+    return stops, dropped, access

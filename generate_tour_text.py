@@ -6547,6 +6547,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                       f"→ {len(poi_list)} stop(s), Phase 3A GPT SKIPPED")
                 print(f"  [D571]   story rank: {_venue_parts_evidence.get('story_rank')}")
                 print(f"  [D571]   stops: {[p['name'] for p in poi_list]}")
+                if _venue_parts_evidence.get('dropped_ambiguous'):
+                    for _dn, _dr in _venue_parts_evidence['dropped_ambiguous']:
+                        print(f"  [D571]   dropped '{_dn}' — {_dr}")
+                # [Michael 2026-09-21] STATE the precondition, never drop the stop.
+                # "if we have a choice to create a path for everyone, we should do
+                # it, but if not, I would assume that the listener needs to define
+                # the tour parameters more precise… in a museum one needs a ticket,
+                # on a bike tour a bike, in a church proper dress. We cannot
+                # encounter all possibilities of the listener identity."
+                # So an airside stop is announced, not refused.
+                _vp_access = _venue_parts_evidence.get('access') or {}
+                _needs = sorted({_vp_access.get(p['name'], '') for p in poi_list}
+                                - {'', 'open'})
+                if _needs:
+                    _words = {'secure': 'past the security checkpoint, so you will '
+                                        'need a boarding pass',
+                              'ticketed': 'inside the ticketed area, so you will need '
+                                          'admission',
+                              'restricted': 'not open to the public, so you will see '
+                                            'it from outside'}
+                    _pre = '; '.join(_words.get(n, n) for n in _needs)
+                    for _p in poi_list:
+                        if _vp_access.get(_p['name'], 'open') != 'open':
+                            _p['_access_note'] = _words.get(
+                                _vp_access[_p['name']], _vp_access[_p['name']])
+                    print(f"  [D571]   precondition: some stops are {_pre}")
             elif _venue_parts_evidence.get('rejected'):
                 print(f"  [D571] VENUE-PARTS rejected the venue kind "
                       f"({_venue_parts_evidence['rejected']}) — falling through")
