@@ -129,7 +129,42 @@ def strip_uncontextualised_deaths(text):
 
 _NAME_IN = re.compile(r"\b[A-Z][\w’'\-]+(?:\s+(?:'[^']+'\s+)?[A-Z][\w’'\-]+)+\b")
 _YEAR_IN = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
-MAX_CIRCUMSTANCE_CHARS = 320
+MAX_CIRCUMSTANCE_CHARS = 420
+
+
+def _as_narration(raw, names):
+    """Turn the grounded answer into a spoken sentence, not pasted markdown.
+
+    Michael, 2026-09-22, on CHURCH_1's Narthex: the recovered circumstances shipped
+    as **"Based on official reporting from law enforcement and court proceedings:
+    * **Where it happened:** Inside the victims' home at 49 Broadway Street ...
+    failed to arrive for their 50th wedding a."** — three defects in one passage:
+    the model's bullet markdown pasted verbatim into narration, a cut mid-word at
+    the character cap, and **the victims never named**, which is the whole point.
+    His verdict: *"If they were named, this would have been a wonderful story
+    connecting the crime to the Stop."*
+    """
+    txt = ' '.join((raw or '').split())
+    txt = re.sub(r'\*\*([^*]+)\*\*', r'\1', txt)        # bold
+    txt = re.sub(r'(?:^|\s)[*\-•]\s+', ' ', txt)          # bullets
+    txt = re.sub(r'\b(Where it happened|What happened|Who was charged|'
+                 r'Motive|Outcome|Circumstances)\s*:\s*', '', txt, flags=re.I)
+    txt = re.sub(r'^\s*Based on [^:]{0,80}:\s*', '', txt, flags=re.I)
+    txt = ' '.join(txt.split()).strip()
+    # Never cut mid-word: keep whole sentences up to the cap.
+    out = []
+    for sent in _split(txt):
+        if sum(len(x) + 1 for x in out) + len(sent) > MAX_CIRCUMSTANCE_CHARS:
+            break
+        out.append(sent)
+    txt = ' '.join(out).strip() or ''
+    if txt and not txt.endswith(('.', '!', '?')):
+        txt += '.'
+    # The names are the point. If the recovered prose dropped them, put them back.
+    missing = [n for n in (names or []) if n and n.split()[-1] not in txt]
+    if txt and missing:
+        txt = txt.rstrip('.') + '. The victims were ' + ', '.join(missing) + '.'
+    return txt
 
 
 def circumstances_query(sentence, venue_name='', location=''):
@@ -175,8 +210,12 @@ def resolve_uncontextualised_deaths(text, venue_name='', location='',
                 or not _CIRCUMSTANCE.search(answer)):
             still_bare.append(sent)      # nothing solid came back — delete it
             continue
-        recovered.append({'sentence': sent,
-                          'circumstances': answer[:MAX_CIRCUMSTANCE_CHARS],
+        _names = _NAME_IN.findall(sent or '')
+        _clean = _as_narration(answer, _names)
+        if not _clean:
+            still_bare.append(sent)
+            continue
+        recovered.append({'sentence': sent, 'circumstances': _clean,
                           'sources': list(sources)})
 
     out = text

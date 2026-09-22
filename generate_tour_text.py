@@ -2351,32 +2351,41 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location, sent
         else:
             print(f"  [LOCAL-275] Part 2: news path not found at {_news_path} — news offer omitted")
 
-        # [Michael 2026-09-18] One short line naming what ELSE we could tour from
-        # here — "it should be little addition not a paragraph". Offered, never
-        # asked up front (D573): the listener specifies only if they want to.
-        # The suggestion is drawn from the venue class so it is never generic.
-        _more_map = {
-            'worship_civic': "If you'd like, I can take you round the other historic "
-                             "churches nearby, or find you somewhere to eat afterwards.",
-            'facility':      "If you'd like, I can point you to the best places to eat "
-                             "here, or guide you to somewhere you need to be.",
-            'museum':        "If you'd like, I can build you a tour of another wing, "
-                             "or find you somewhere to eat nearby.",
-            'restaurant':    "If you'd like, I can show you what else is worth seeing "
-                             "on this street.",
-        }
-        _more = _more_map
-        # Key on the VENUE CLASS first: 485 routes a worship/civic venue to
-        # tour_category 'walking' (D564), so keying on the category alone gave a
-        # church the generic fallback and the "other historic churches nearby" line
-        # could never fire.
-        _more_key = _detect_venue_class(location, tour_type) or tour_category
-        _more = _more.get(_more_key) or _more.get(tour_category) or (
-            "If you'd like, I can suggest somewhere to eat nearby, "
-            "or another tour close by.")
-        sentences.append(_more)
-        print(f"  [LOCAL-275] Part 2 (more): offered a related tour for "
-              f"category '{tour_category}'")
+        # [Michael 2026-09-22] THE UPSELL, in his priority order. One short line,
+        # never a paragraph, and each option omitted entirely when it does not apply
+        # — "If there are no coupons in the area, that should be completely omitted."
+        #
+        #   1. a Treat nearby            -> point at the Treats tab
+        #   2. movement in the tour      -> news for the way back (walking/biking/etc)
+        #   3. a building tour, no treat -> a restaurant tour of the area, by diet
+        #   4. a category we can name    -> more tours of the same kind
+        #
+        # The old single line was generic and, worse, the news offer said "on the way
+        # back" inside a church, where there is no way back.
+        _more = ""
+        _venue_class = _detect_venue_class(location, tour_type)
+        if _treat_clause:
+            _more = ("Keep an eye on the Treats tab — there is something nearby you "
+                     "can claim at a discount.")
+        elif not _venue_parts_used:
+            _more = ("We can also generate news articles for you to listen to on the "
+                     "way back.")
+        else:
+            _more = ("If you would like a bite afterwards, ask for a tour of the "
+                     "restaurants around here and say what you do or do not eat.")
+        _category_offer = {
+            'worship_civic': "I can also take you round the other historic places of "
+                             "worship in this area.",
+            'facility':      "",
+            'museum':        "I can also build you a tour of another collection like "
+                             "this one.",
+        }.get(_venue_class or tour_category, "")
+        if _more:
+            sentences.append(_more)
+        if _category_offer:
+            sentences.append(_category_offer)
+        print(f"  [LOCAL-275] Part 2 (more): treat={bool(_treat_clause)} "
+              f"building={_venue_parts_used} class={_venue_class!r}")
 
     except Exception as e:
         print(f"  [LOCAL-275] Part 2 error: {e}")
