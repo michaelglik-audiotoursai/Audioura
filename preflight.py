@@ -22,10 +22,30 @@ GEMINI_MODEL = 'gemini-flash-latest'      # what story_leads actually calls
 TIMEOUT = 20
 
 
+def _quota_from_headers(headers):
+    """Surface whatever the service says about what is left.
+
+    Serper returns x-ratelimit-limit / -remaining / -reset on every call, so the
+    number is free — we were throwing it away and reporting a bare "OK". OpenAI
+    sends x-ratelimit-remaining-requests/-tokens. Neither is a CREDIT BALANCE;
+    those live only on the billing dashboards.
+    """
+    rem = (headers.get('x-ratelimit-remaining')
+           or headers.get('x-ratelimit-remaining-requests'))
+    lim = (headers.get('x-ratelimit-limit')
+           or headers.get('x-ratelimit-limit-requests'))
+    if rem and lim:
+        return f'{rem}/{lim} left in this window'
+    if rem:
+        return f'{rem} left in this window'
+    return ''
+
+
 def _probe(req):
     try:
         r = urllib.request.urlopen(req, timeout=TIMEOUT)
-        return True, f'HTTP {r.status}'
+        q = _quota_from_headers(r.headers)
+        return True, (f'HTTP {r.status}' + (f' — {q}' if q else ''))
     except urllib.error.HTTPError as e:
         body = ''
         try:

@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-22T12:31:12.387264
+Generated: 2026-09-22T18:09:23.220857
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -24,11 +24,11 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In late 2002, Father Walter Cuenin held an unauthorized meeting of dissenting priests at Our Lady Help of Christians in Newton, Massachusetts, leading Cardinal Bernard Law to ban official archdiocesan events from the church grounds.
-  - On December 8, 2002, Father Walter Cuenin openly criticized Cardinal Law during a Mass at Our Lady Help of Christians, receiving two standing ovations from over 850 attendees.
-  - In September 2005, Father Walter Cuenin was forced out of Our Lady Help of Christians following an archdiocesan audit accusing him of financial irregularities.
-  - On June 25, 2023, Jill and Bruno D'Amore and Lucia Arpino were found murdered after missing a Mass at Our Lady Help of Christians where they were to celebrate the D'Amores' 50th wedding anniversary.
-  - Every July, the Saint Mary of Carmen Society Festival takes place at Our Lady Help of Christians, featuring a life-size statue of Our Lady of Mount Carmel carried through the streets.
+  - On December 8, 2002, more than 850 parishioners at Our Lady Help of Christians in Newton, Massachusetts, openly rebelled against Cardinal Bernard Law during a Mass led by Father Walter H. Cuenin, resulting in multiple standing ovations.
+  - On June 15, 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, drawing massive crowds and halting traffic on Washington Street.
+  - On June 25, 2023, the customary pews of Lucia Arpino, Gilda (Jill) D’Amore, and Bruno D’Amore at Our Lady Help of Christians remained empty during a Mass meant to celebrate Jill and Bruno's 50th wedding anniversary, as they were discovered murdered in a home invasion earlier that morning.
+  - Between the 1870s and 1881, Irish immigrants in Newton, Massachusetts, funded and labored to construct the nave of Our Lady Help of Christians, despite hostility from the local Protestant establishment.
+  - During a restoration by John Canning & Co., hidden ecclesiastical paintwork by architect James Murphy, influenced by Patrick Keely, was discovered in the nave of Our Lady Help of Christians.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -174,23 +174,23 @@ DO NOT USE these phrases: built in the year, the facade features, architecturall
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: awe
-- Unique angle to emphasize: The vaulted ceilings, with their intricate stained glass, not only tell biblical tales but also capture the artistic aspirations of a once-thriving immigrant community.
-- End with a forward-looking hook: As you move towards the narthex, consider the stories each window might tell.
+- Unique angle to emphasize: The vaulted ceiling of the Nave, with its intricate woodwork, was designed to amplify the choir's voices, a testament to the church's focus on community gatherings.
+- End with a forward-looking hook: As you move towards the stained glass windows, consider the stories these walls have silently witnessed.
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The nave is the central part of a church, distinct from the area reserved for the choir and clergy.; In a church with side aisles, the nave includes the central aisle, side aisles, and transepts.
+Irish immigrants in Newton, Massachusetts, funded and labored to construct the nave of Our Lady Help of Christians between the 1870s and 1881.; During a restoration by John Canning & Co., hidden ecclesiastical paintwork by architect James Murphy, influenced by Patrick Keely, was discovered in the nave of Our Lady Help of Christians.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Nave
-      In September 2005, Father Walter Cuenin was forced out of Our Lady Help of Christians following an archdiocesan audit accusing him of financial irregularities.
+      On June 25, 2023, the customary pews of Lucia Arpino, Gilda (Jill) D’Amore, and Bruno D’Amore at Our Lady Help of Christians remained empty during a Mass meant to celebrate Jill and Bruno's 50th wedding anniversary, as they were discovered murdered i
   [2] Nave
-      In late 2002, Father Walter Cuenin held an unauthorized meeting of dissenting priests at Our Lady Help of Christians in Newton, Massachusetts, leading Cardinal Bernard Law to ban official archdiocesan events from the church grounds.
+      Between the 1870s and 1881, Irish immigrants in Newton, Massachusetts, funded and labored to construct the nave of Our Lady Help of Christians, despite hostility from the local Protestant establishment.
   [3] Nave
-      On December 8, 2002, Father Walter Cuenin openly criticized Cardinal Law during a Mass at Our Lady Help of Christians, receiving two standing ovations from over 850 attendees.
+      During a restoration by John Canning & Co., hidden ecclesiastical paintwork by architect James Murphy, influenced by Patrick Keely, was discovered in the nave of Our Lady Help of Christians.
   [4] Nave
-      On June 25, 2023, Jill and Bruno D'Amore and Lucia Arpino were found murdered after missing a Mass at Our Lady Help of Christians where they were to celebrate the D'Amores' 50th wedding anniversary.
+      On December 8, 2002, more than 850 parishioners at Our Lady Help of Christians in Newton, Massachusetts, openly rebelled against Cardinal Bernard Law during a Mass led by Father Walter H. Cuenin, resulting in multiple standing ovations.
   [5] Nave
-      Every July, the Saint Mary of Carmen Society Festival takes place at Our Lady Help of Christians, featuring a life-size statue of Our Lady of Mount Carmel carried through the streets.
+      On June 15, 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, drawing massive crowds and halting traffic on Washington Street.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -271,22 +271,8 @@ DO NOT include any section headers other than "Orientation:" - the description s
 DO NOT include directions to the next stop - these will be added separately.
 
 
-THIS STOP IS TOO SHORT AT 114 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
-
-
-CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "This act of defiance against the Catholic hierarchy led Cardinal Bernard Law to ban official archdiocesan events from these grounds."
-- "Father Cuenin's actions resonated with many, echoing the congregation's desire for change and transparency within the church."
-- "During a Mass attended by over 850 people, he openly criticized Cardinal Law, addressing the clergy abuse scandal that had shaken the church.The nave's stained glass windows tell stories of biblical tales and the aspirations of the immigrant community that built this church."
-- "They capture the spirit of those who gathered here, seeking solace and solidarity."
-- "As you look around, consider the vibrant history these walls have witnessed, from acts of courage to moments of profound communal reflection."
-- "This space connects past and present, embodying the living pulse of the community it serves."
-
-Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
-
-
 ================================================================================
-Total user message length: 23451 chars
+Total user message length: 21895 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -294,4 +280,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Narthex', 'Pulpit', 'Altar']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Altar', 'Narthex']
