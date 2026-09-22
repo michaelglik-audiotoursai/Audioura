@@ -156,6 +156,21 @@ def main():
         print('PAUSED — .continuous_dev/PAUSE exists; doing nothing.')
         return
 
+    # [2026-09-22] Check the account BEFORE spending a batch on it. A six-tour run
+    # lost five tours and ~20 minutes to an OpenAI balance of zero, discovered one
+    # failed stop at a time. Two seconds of probing says so up front.
+    sys.path.insert(0, REPO)
+    try:
+        from preflight import preflight
+        ok, rows = preflight()
+        for name, good, detail in rows:
+            print(f"  preflight {name:<8} {'OK ' if good else 'DOWN'}  {detail}")
+        if not ok:
+            print('ABORTING — a required service is unusable. No tours generated.')
+            return
+    except Exception as e:
+        print(f'  preflight unavailable ({e}) — continuing without it')
+
     os.makedirs(args.out, exist_ok=True)
     spent = 0.0
     for i in range(1, args.runs + 1):
