@@ -9462,7 +9462,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # -------- [LOCAL-355] Source operational details from OSM (non-dining tours) --------
         # For museum, walking, and park tours: query OSM for practical visitor facts
         # (opening_hours, fee/admission, timed entry). Same provenance model as LOCAL-353.
-        if tour_category in ('museum', 'walking') and poi_list:
+        # [2026-09-22] Never ask OSM about a building PART. OpenStreetMap maps
+        # places you can find on a map — it has no node for a pulpit, a narthex or
+        # a jetbridge. Measured on a church tour: 8 Overpass calls, ALL of them
+        # failed (5 read timeouts, 2 rate limits, 1 server error), and poi_selection
+        # took 298.7s against 52.1s for the same code on a Logan tour. That is ~200s
+        # of waiting on an API that could never answer. It is also the D569 traffic
+        # that got this machine blocked in the first place.
+        if (tour_category in ('museum', 'walking') and poi_list
+                and not _venue_parts_used):
             try:
                 from osm_venue_facts import fetch_osm_venue_facts, extract_city_from_venue_name as _extract_city
                 _osm_city = _extract_city(location)
@@ -13647,7 +13655,10 @@ Write the story FIRST, then add physical description if space allows.
         # [LOCAL-394] Track best valid description across retries. A stop is NEVER
         # dropped to satisfy a length or beat rule — if all retries fail, we return
         # the best description produced rather than GENERATION_FAILED.
-        _max_retries = 2
+        # [2026-09-22] 3 attempts was enough for a flaky 500 and not for a rate
+        # limit. With the 429-aware backoff below (5s/15s/45s) a stop now has time
+        # to get through instead of being deleted by the empty-stop gate.
+        _max_retries = 4
         _best_description = None  # (orientation, description, word_count, tokens_used, call_cost)
         _attempts_for_resolution = []  # [LOCAL-422] Accumulated for resolve_final_description
         for _attempt in range(_max_retries + 1):
@@ -14396,7 +14407,24 @@ Write the story FIRST, then add physical description if space allows.
                     # [LOCAL-292] Retry transient failures following _PROLOG_MAX_RETRIES pattern (LOCAL-119)
                     _DESC_TRANSIENT_CODES = {429, 500, 502, 503, 504}
                     if description_response.status_code in _DESC_TRANSIENT_CODES and _attempt < _max_retries:
-                        _backoff = min(2 ** (_attempt + 1), 8)  # cap at 8s
+                        # [2026-09-22] A 429 is not a 500. The old backoff capped at
+                        # 8s and gave up after three tries, which is far too quick
+                        # for a rate limit: parallelising the causal chain raised
+                        # throughput enough to start earning 429s, and a church tour
+                        # lost its 'Stained Glass Windows' stop entirely — the
+                        # empty-stop gate removed it after 2s and 4s of waiting.
+                        # Rate limits need to be waited out, not retried at speed;
+                        # honour Retry-After when the server sends one.
+                        if description_response.status_code == 429:
+                            _ra = description_response.headers.get('Retry-After')
+                            try:
+                                _backoff = max(float(_ra), 5.0) if _ra else 0
+                            except Exception:
+                                _backoff = 0
+                            if not _backoff:
+                                _backoff = min(5 * (3 ** _attempt), 60)  # 5s, 15s, 45s
+                        else:
+                            _backoff = min(2 ** (_attempt + 1), 8)  # cap at 8s
                         print(f"  [LOCAL-292] Stop {stop_num}: transient failure (HTTP {description_response.status_code}), "
                               f"retrying in {_backoff}s (attempt {_attempt + 2}/{_max_retries + 1})")
                         time.sleep(_backoff)

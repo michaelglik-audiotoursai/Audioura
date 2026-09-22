@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-21T22:26:16.580917
+Generated: 2026-09-22T12:31:12.387264
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -24,10 +24,11 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - On December 8, 2002, Rev. Walter H. Cuenin gave a homily criticizing Cardinal Bernard Law, leading to standing ovations from over 850 parishioners at Our Lady Help of Christians.
-  - In June 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, causing massive gridlock and filling the nave to capacity.
-  - In September 2005, Archbishop Seán O'Malley forced Rev. Walter H. Cuenin to resign after an audit found financial non-conformities, which parishioners viewed as political retribution.
-  - In the late 19th and early 20th century, Irish and Italian immigrants clashed over church representation at Our Lady Help of Christians, with Italians eventually reshaping the parish identity.
+  - In late 2002, Father Walter Cuenin held an unauthorized meeting of dissenting priests at Our Lady Help of Christians in Newton, Massachusetts, leading Cardinal Bernard Law to ban official archdiocesan events from the church grounds.
+  - On December 8, 2002, Father Walter Cuenin openly criticized Cardinal Law during a Mass at Our Lady Help of Christians, receiving two standing ovations from over 850 attendees.
+  - In September 2005, Father Walter Cuenin was forced out of Our Lady Help of Christians following an archdiocesan audit accusing him of financial irregularities.
+  - On June 25, 2023, Jill and Bruno D'Amore and Lucia Arpino were found murdered after missing a Mass at Our Lady Help of Christians where they were to celebrate the D'Amores' 50th wedding anniversary.
+  - Every July, the Saint Mary of Carmen Society Festival takes place at Our Lady Help of Christians, featuring a life-size statue of Our Lady of Mount Carmel carried through the streets.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -172,22 +173,24 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
 DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: awe and curiosity
-- Unique angle to emphasize: As you enter the Nave, notice the intricate stained glass windows depicting scenes not only of religious significance but also nods to local history.
-- End with a forward-looking hook: As you walk towards the Pulpit, consider what stories these walls might tell if they could speak...
+- Emotional beat for this stop: awe
+- Unique angle to emphasize: The vaulted ceilings, with their intricate stained glass, not only tell biblical tales but also capture the artistic aspirations of a once-thriving immigrant community.
+- End with a forward-looking hook: As you move towards the narthex, consider the stories each window might tell.
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-Rev. Walter H. Cuenin gave a homily criticizing Cardinal Bernard Law on December 8, 2002, at Our Lady Help of Christians.; Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, in June 1995.; Archbishop Seán O'Malley forced Rev. Walter H. Cuenin to resign in September 2005 due to financial non-conformities.
+The nave is the central part of a church, distinct from the area reserved for the choir and clergy.; In a church with side aisles, the nave includes the central aisle, side aisles, and transepts.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Nave
-      In September 2005, Archbishop Seán O'Malley forced Rev. Walter H. Cuenin to resign after an audit found financial non-conformities, which parishioners viewed as political retribution.
+      In September 2005, Father Walter Cuenin was forced out of Our Lady Help of Christians following an archdiocesan audit accusing him of financial irregularities.
   [2] Nave
-      On December 8, 2002, Rev. Walter H. Cuenin gave a homily criticizing Cardinal Bernard Law, leading to standing ovations from over 850 parishioners at Our Lady Help of Christians.
+      In late 2002, Father Walter Cuenin held an unauthorized meeting of dissenting priests at Our Lady Help of Christians in Newton, Massachusetts, leading Cardinal Bernard Law to ban official archdiocesan events from the church grounds.
   [3] Nave
-      In June 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, causing massive gridlock and filling the nave to capacity.
+      On December 8, 2002, Father Walter Cuenin openly criticized Cardinal Law during a Mass at Our Lady Help of Christians, receiving two standing ovations from over 850 attendees.
   [4] Nave
-      In the late 19th and early 20th century, Irish and Italian immigrants clashed over church representation at Our Lady Help of Christians, with Italians eventually reshaping the parish identity.
+      On June 25, 2023, Jill and Bruno D'Amore and Lucia Arpino were found murdered after missing a Mass at Our Lady Help of Christians where they were to celebrate the D'Amores' 50th wedding anniversary.
+  [5] Nave
+      Every July, the Saint Mary of Carmen Society Festival takes place at Our Lady Help of Christians, featuring a life-size statue of Our Lady of Mount Carmel carried through the streets.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -260,39 +263,30 @@ IS the story's starting point.
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
-LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
-
-THIS STOP IS TOO SHORT AT 171 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+THIS STOP IS TOO SHORT AT 114 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "As you stand here, you're enveloped by the echoes of history and the living pulse of a community that has long gathered within these walls."
-- "One memorable episode occurred in June 1995, when Mother Teresa visited this very nave."
-- "Her presence drew a massive crowd, filling the space to capacity and causing significant gridlock in the surrounding streets."
-- "The visit was not just a logistical challenge but a moment of immense spiritual significance for the parishioners, who felt the weight of her compassion and dedication to service resonate within these walls."
-- "Cuenin delivered a powerful homily that criticized Cardinal Bernard Law."
-- "This bold move came in the wake of the church's handling of abuse scandals, and Cuenin’s words struck a chord with his congregation."
-- "The nave of Our Lady Help of Christians has also been a battleground for identity and representation."
-- "These walls, with their silent witness to moments of celebration, conflict, and change, connect deeply to the everyday rhythms and traditions of the people who have passed through."
+- "This act of defiance against the Catholic hierarchy led Cardinal Bernard Law to ban official archdiocesan events from these grounds."
+- "Father Cuenin's actions resonated with many, echoing the congregation's desire for change and transparency within the church."
+- "During a Mass attended by over 850 people, he openly criticized Cardinal Law, addressing the clergy abuse scandal that had shaken the church.The nave's stained glass windows tell stories of biblical tales and the aspirations of the immigrant community that built this church."
+- "They capture the spirit of those who gathered here, seeking solace and solidarity."
+- "As you look around, consider the vibrant history these walls have witnessed, from acts of courage to moments of profound communal reflection."
+- "This space connects past and present, embodying the living pulse of the community it serves."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
 
-THIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.
-It may be accurate and well written; it is still a description. A story here means: ONE named person, across THREE OR MORE consecutive sentences, DOING something — deciding, refusing, persuading, travelling, failing — with something at stake for them. Not 'X was an artist who worked in Paris'. Something happened, to someone, and it mattered.
-Use only the source material supplied. If the material will not support such a story, write the shorter factual account rather than inventing one — an invented story is worse than none.
-
-
 ================================================================================
-Total user message length: 24108 chars
+Total user message length: 23451 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -300,4 +294,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Pulpit', 'Altar', 'Narthex']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Narthex', 'Pulpit', 'Altar']
