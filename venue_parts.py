@@ -389,7 +389,8 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         # has, so state the requirement rather than refuse the stop).
         instances = resolve_part_instances(venue_name, location, candidates,
                                            ask_grounded)
-        candidates, dropped_ambiguous, access = name_the_instances(candidates, instances)
+        candidates, dropped_ambiguous, access, ambiguous = \
+            name_the_instances(candidates, instances)
 
         # [Michael, 2026-09-18] STORY FIRST, PARTS SECOND. Run the causal chain —
         # why does this exist / who created it / who paid / who came / what is it
@@ -408,7 +409,13 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         else:
             by_story = rank_parts_by_story(venue_name, location, candidates, ask_grounded)
         chosen = by_story[:want] if want else by_story
-        ordered = [p for p in physical if p in chosen]
+        # Order by walk — but against `candidates`, which carries the RESOLVED
+        # instance names ("Terminal A Baggage Claim"), not `physical`, which still
+        # holds the generic part names. Intersecting with `physical` silently kept
+        # only the parts that happened not to be renamed: Logan asked for 4 stops
+        # and got 2, because 'Jetbridge' and 'Control Tower' were the only names
+        # unchanged by instance resolution. `candidates` is already in class order.
+        ordered = [c for c in candidates if c in chosen]
         return ordered, {"kind": kind, "class_parts": parts, "physical": physical,
                          "story_rank": by_story[:8],
                          "story_chain": {k: {"chars": len(v.get("text") or ""),
@@ -418,6 +425,7 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
                          "instances": instances,
                          "access": access,
                          "dropped_ambiguous": dropped_ambiguous,
+                         "ambiguous": ambiguous,
                          "lore": distribute_lore(ordered, placed, chain),
                          "present": pres["present"], "unknown": pres["unknown"],
                          "absent": pres["absent"], "sources": pres["sources"]}
@@ -807,18 +815,30 @@ def resolve_part_instances(venue_name, location, parts, ask_grounded):
 
 
 def name_the_instances(parts, instances):
-    """Turn category parts into findable stops. Returns (stops, dropped, access).
+    """Turn category parts into findable stops.
+
+    Returns (stops, dropped, access, ambiguous) — `ambiguous` maps a kept part to
+    how many of it the venue has, so the narration can name which one it means.
 
     A part with one instance keeps its name. A part with several becomes its first
-    NAMED instance. A part with several and no names is dropped — shipping it would
-    be a stop the listener cannot stand at, which is the defect LOCAL-481 named.
+    NAMED instance. A part with several and NO names is kept and flagged, never
+    dropped — dropping them left Logan with one stop out of four.
     """
-    stops, dropped, access = [], [], {}
+    stops, dropped, access, ambiguous = [], [], {}, {}
     for p in parts:
         info = (instances or {}).get(p) or {}
         cnt, names = info.get('count'), info.get('names') or []
         if info.get('access'):
             access[p] = info['access']
+        # count == 0 means the venue does not HAVE this part. Dropping it is not
+        # over-restriction — it is declining to invent a room. Found 2026-09-21:
+        # the Newton church reports 0 crypts and 0 side chapels, and earlier rounds
+        # shipped a **Crypt** stop for it. Q3 had put it in `unknown`, and D577 says
+        # unknown still ships — but "we could not confirm" and "there are none" are
+        # different answers, and only the first should ship.
+        if cnt == 0:
+            dropped.append((p, 'the venue has none of these'))
+            continue
         if cnt is not None and cnt > 1:
             if names:
                 chosen = names[0]
@@ -826,7 +846,16 @@ def name_the_instances(parts, instances):
                 if info.get('access'):
                     access[chosen] = info['access']
             else:
-                dropped.append((p, f'{cnt} of them and none is named'))
+                # [2026-09-21] DO NOT DROP. The first version dropped every part
+                # with several unnamed instances and Logan came back with ONE stop
+                # out of four — worse than the ambiguity it was fixing, and exactly
+                # the over-restriction Michael warned against. D577 governs: ship it,
+                # and be honest. The stop is kept and marked so the narration can say
+                # WHICH one and that there are others.
+                stops.append(p)
+                ambiguous[p] = cnt
+                if info.get('access'):
+                    access[p] = info['access']
             continue
         stops.append(p)
-    return stops, dropped, access
+    return stops, dropped, access, ambiguous
