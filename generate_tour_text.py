@@ -17395,6 +17395,26 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
                         _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
                         if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
                             _prolog_text = _prolog_text[1:-1].strip()
+                        # [2026-09-21] The tragedy gate runs over stop DESCRIPTIONS.
+                        # The prolog previews the stops separately and named three
+                        # real murder victims with no circumstances — "At the Main
+                        # Altar, Bruno and Gilda D'Amore met a tragic fate on their
+                        # wedding vow renewal day" — while the stop bodies had their
+                        # circumstances properly recovered from 6 sources. Same rule,
+                        # same text: a named death in the preview needs its
+                        # circumstances too, or it does not ship.
+                        try:
+                            from tragedy_context_gate import (
+                                resolve_uncontextualised_deaths as _rt_prolog)
+                            import venue_parts as _vp_pa
+                            _prolog_text, _rp_rec, _rp_cut = _rt_prolog(
+                                _prolog_text, location, location,
+                                _vp_pa.default_ask_grounded)
+                            if _rp_rec or _rp_cut:
+                                print(f"  [TRAGEDY-CONTEXT] prolog: recovered "
+                                      f"{len(_rp_rec)}, removed {len(_rp_cut)}")
+                        except Exception as _rp_err:
+                            print(f"  [TRAGEDY-CONTEXT] prolog skipped ({_rp_err})")
                         _saved_prolog = _prolog_text
                         _prolog_success = True
                         if _prolog_attempt > 0:
