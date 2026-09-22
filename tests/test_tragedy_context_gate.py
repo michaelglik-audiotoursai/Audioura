@@ -108,7 +108,8 @@ class TestSearchBeforeDelete(unittest.TestCase):
     def test_the_query_forbids_speculation_and_offers_an_out(self):
         from tragedy_context_gate import circumstances_query
         q = circumstances_query(self.S, "Narthex", "Newton MA")
-        self.assertIn("Do not speculate", q)
+        self.assertRegex(q, r'(?i)(do not|never)\s+speculate')
+        self.assertRegex(q, r'(?i)do not use headings')   # narration, not a report
         self.assertIn("NOT DOCUMENTED", q)
         self.assertIn("Cite your sources", q)
 

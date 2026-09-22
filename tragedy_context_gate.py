@@ -150,6 +150,18 @@ def _as_narration(raw, names):
     txt = re.sub(r'\b(Where it happened|What happened|Who was charged|'
                  r'Motive|Outcome|Circumstances)\s*:\s*', '', txt, flags=re.I)
     txt = re.sub(r'^\s*Based on [^:]{0,80}:\s*', '', txt, flags=re.I)
+    # Strip the model ARGUING WITH THE PROMPT. Found by the kiro critic on CHURCH_1:
+    #   "The premise of the deaths occurring 'near Main Altar' is not supported by
+    #    public and investigative reporting; however, the circumstances ... are
+    #    documented as follows:"
+    # — pasted straight into narration, so the tour audibly disputes its own
+    # question before telling the story. The correction is right and belongs in a
+    # log, never in a listener's ear.
+    txt = re.sub(r'^.{0,200}?\bis not supported by\b.{0,120}?;\s*however,?\s*', '',
+                 txt, flags=re.I)
+    txt = re.sub(r'^\s*The premise[^.]{0,200}\.\s*', '', txt, flags=re.I)
+    txt = re.sub(r'\b(?:are|is) documented as follows\s*:?\s*', '', txt, flags=re.I)
+    txt = re.sub(r'^\s*(?:however|but)\s*,?\s*', '', txt, flags=re.I)
     txt = ' '.join(txt.split()).strip()
     # Never cut mid-word: keep whole sentences up to the cap.
     out = []
@@ -174,13 +186,24 @@ def circumstances_query(sentence, venue_name='', location=''):
     who = ', '.join(dict.fromkeys(names[:4])) or 'the people named'
     when = f' in {years[0]}' if years else ''
     where = f' near {venue_name}' if venue_name else (f' in {location}' if location else '')
+    # Ask for NARRATION, not a report. The structured version came back with
+    # headings, bullets and the model disputing the question — "The premise of the
+    # deaths occurring 'near Main Altar' is not supported by ... however, the
+    # circumstances ... are documented as follows: * **Where and How It Happened:**"
+    # — all of which was spliced into a listener's ear. Sanitising arbitrary prose
+    # with regex is whack-a-mole; asking for one clean paragraph is not.
     return (
-        f'What were the documented circumstances of the deaths of {who}{when}{where}?\n'
-        'State only what reporting confirms: where and how it happened, who was '
-        'charged or convicted, and the stated motive IF investigators or the courts '
-        'stated one.\n'
+        f'What were the documented circumstances of the deaths of {who}{when}{where}?\n\n'
+        'Answer in ONE SHORT PARAGRAPH of plain spoken English — two or three '
+        'sentences — exactly as it would be read aloud to a visitor.\n'
+        'Name the people. Say where and how it happened, and who was charged or '
+        'convicted. Give the stated motive ONLY if investigators or the courts '
+        'stated one.\n\n'
+        'Do NOT use headings, bullet points, bold text or labels. Do NOT comment on '
+        'the question, correct its premise, or explain what you are doing — give '
+        'only the sentences a visitor would hear.\n'
         'If the circumstances are not documented, reply exactly: NOT DOCUMENTED. '
-        'Do not speculate about a motive under any condition. Cite your sources.'
+        'Never speculate about a motive. Cite your sources.'
     )
 
 
