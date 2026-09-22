@@ -513,26 +513,46 @@ STORY_CHAIN = (
 )
 
 
-def venue_story_chain(venue_name, location, ask_grounded, links=None):
-    """Run the causal chain. Returns {link: {"text":…, "sources":[…]}}.
+def venue_story_chain(venue_name, location, ask_grounded, links=None, workers=5):
+    """Run the causal chain CONCURRENTLY. Returns {link: {"text":…, "sources":[…]}}.
 
     Inspectable by design: every link is recorded separately, including the empty
     ones, so it is visible WHICH question produced the material and which failed.
     A failed link never aborts the chain (D577).
+
+    **Why concurrent (2026-09-22).** Measured across round 5, `poi_selection` was
+    50–70% of the entire tour — 137s, 328s, 354s of runs lasting 193s, 468s, 502s —
+    because the chain made ~10 grounded calls strictly one after another. The five
+    links are INDEPENDENT questions about the same venue: why it exists, who built
+    it, who paid, who came, what it is the only one of. Nothing in link N depends on
+    link N-1, so the sequencing bought nothing.
+
+    Michael's caveat, and it holds: *"we still want to remove duplicates in multiple
+    stops."* Concurrency changes only WHEN the answers arrive, never what is done
+    with them. De-duplication happens downstream and is untouched —
+    `distribute_lore` gives each fact to exactly one stop, and D534 plus
+    `strip_cross_stop_repeats` remove anything that still repeats across stops.
     """
+    from concurrent.futures import ThreadPoolExecutor
     where = f' in {location}' if location else ''
-    out = {}
-    for key, template in (links or STORY_CHAIN):
-        prompt = template.format(venue=venue_name, where=where) + \
-                 '\nGive concrete, checkable facts with names and dates. Cite your sources. ' \
-                 'If you do not know, say so rather than guessing.'
+    pairs = list(links or STORY_CHAIN)
+    suffix = ('\nGive concrete, checkable facts with names and dates. Cite your sources. '
+              'If you do not know, say so rather than guessing.')
+
+    def _one(item):
+        key, template = item
         try:
-            text, sources = ask_grounded(prompt)
+            text, sources = ask_grounded(template.format(venue=venue_name,
+                                                         where=where) + suffix)
+            return key, {"text": text or "", "sources": list(sources or [])}
         except Exception as e:
-            out[key] = {"text": "", "sources": [], "error": str(e)}
-            continue
-        out[key] = {"text": text or "", "sources": list(sources or [])}
-    return out
+            return key, {"text": "", "sources": [], "error": str(e)}
+
+    out = {}
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(pairs)))) as pool:
+        for key, payload in pool.map(_one, pairs):
+            out[key] = payload
+    return {k: out[k] for k, _ in pairs if k in out}   # stable order
 
 
 def place_stories_in_building(venue_name, location, chain, parts, ask_grounded):
