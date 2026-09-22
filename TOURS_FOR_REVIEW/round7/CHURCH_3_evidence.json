@@ -1,5 +1,9 @@
 {
-  "Nave": {
+  "Narthex": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Upper Church": {
     "status": "UNVERIFIED",
     "reason": "not in discovered landmarks"
   },
@@ -7,11 +11,7 @@
     "status": "UNVERIFIED",
     "reason": "not in discovered landmarks"
   },
-  "Altar": {
-    "status": "UNVERIFIED",
-    "reason": "not in discovered landmarks"
-  },
-  "Narthex": {
+  "Pulpit": {
     "status": "UNVERIFIED",
     "reason": "not in discovered landmarks"
   }

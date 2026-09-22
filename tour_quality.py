@@ -81,8 +81,19 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
     try:
         from derepetition_guard import _tokenize, _jaccard_similarity
         from sentence_split import split_sentences
+        # Measure repeated CONTENT, not repeated navigation. Between two stops in
+        # one building the directions are formulaic by nature — "As you exit the
+        # Concourse, head towards the main terminal building" / "As you exit the
+        # Jetbridge, walk towards the main terminal building" — and counting those
+        # as duplicates buried the defect Michael actually reported, which was the
+        # same STORY told at two stops (Mother Teresa at stops 1 and 2).
+        _body = '\n'.join(
+            ln for ln in (text or '').splitlines()
+            if not re.match(r'^(Directions|Orientation|Address|Coordinates|'
+                            r'Type/Specialty|Specific Examples|Operational Details):',
+                            ln.strip()))
         seen, dupes = [], 0
-        for s in split_sentences(text):
+        for s in split_sentences(_body):
             if len(s.split()) < 8:
                 continue
             t = _tokenize(s)
