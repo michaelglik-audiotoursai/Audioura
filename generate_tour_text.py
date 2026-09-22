@@ -14416,6 +14416,25 @@ Write the story FIRST, then add physical description if space allows.
                         # Rate limits need to be waited out, not retried at speed;
                         # honour Retry-After when the server sends one.
                         if description_response.status_code == 429:
+                            # [2026-09-22] A 429 has TWO meanings and only one is
+                            # worth waiting for. "rate_limit_exceeded" clears on its
+                            # own; "insufficient_quota" / credit_balance_exhausted
+                            # never does, and retrying it wastes 125s per stop
+                            # (5+15+45+60) achieving nothing. Measured: a whole batch
+                            # of six tours burned ~20 minutes retrying an empty
+                            # account. Fail fast and say the real reason.
+                            _body = ''
+                            try:
+                                _body = (description_response.text or '')[:300]
+                            except Exception:
+                                pass
+                            if ('insufficient_quota' in _body
+                                    or 'credit_balance_exhausted' in _body
+                                    or 'no credits remaining' in _body.lower()):
+                                print(f"  [LOCAL-292] Stop {stop_num}: OUT OF API "
+                                      f"CREDITS — not retrying. Add credits at "
+                                      f"platform.openai.com/settings/organization/billing")
+                                break
                             _ra = description_response.headers.get('Retry-After')
                             try:
                                 _backoff = max(float(_ra), 5.0) if _ra else 0
