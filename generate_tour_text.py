@@ -1244,6 +1244,14 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
     return scope
 
 
+# [2026-09-23] Run-scoped marker: the tour currently being built is a BUILDING tour
+# whose stops are parts of one venue. A per-poi flag cannot carry this — poi_list is
+# rebuilt at several points downstream and every rebuild makes fresh dicts, which is
+# how `_lore` was lost and then how `_venue_part` was lost after that. Same bug, same
+# fix: do not hang run-scoped truth on an object that gets replaced.
+_VENUE_PARTS_RUN = False
+
+
 def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                                  protect_first=True):
     """
@@ -1298,6 +1306,14 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
         _shape = _classify_stop_name(name)
         if not _shape.get('is_place', True):
             return poi, False, "high", f"[not-a-place] {_shape.get('reason', '')}"
+
+        # A building part is inside its venue BY CONSTRUCTION. This must come
+        # BEFORE the memory lookup: a verdict recorded before D578's fix is still in
+        # known_out_of_scope.json and replays "the Pulpit is outside Our Lady Help of
+        # Christians" at high confidence. D578 predicted exactly this — "it then wrote
+        # that conclusion into SCOPE-MEMORY, so it will repeat" — and it did.
+        if _VENUE_PARTS_RUN or poi.get('_venue_part'):
+            return poi, True, "high", "[D578] part of the venue by construction"
 
         remembered, why = known_out_of_scope(name, scope_name)
         if remembered:
@@ -6550,6 +6566,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"  [D571] seeded {_vp_seeded} story fact(s) from the causal "
                       f"chain onto {len(poi_list)} stop(s)")
                 _venue_parts_used = True
+                globals()['_VENUE_PARTS_RUN'] = True   # survives poi_list rebuilds
                 _facility_fill_used = True      # reuse the Phase-3A skip gate
                 _selection_reasons = {}
                 print(f"  [D571] VENUE-PARTS FILL: kind={_venue_parts_evidence.get('kind')!r} "
