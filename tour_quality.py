@@ -96,6 +96,32 @@ _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+
 # real error in that same sentence (the church's dedication turned into a founder)
 # went unflagged.
 _MANGLED = re.compile(r'\b(?:engaged|which|that|and|of)\s+of\s+[A-Z]')
+# [2026-09-23, LOCAL-530, kiro critic LOCAL-517 on LOGAN_2] Control Tower stop:
+# "They authorized of Public Works to lease this land to the U.S. Army." The
+# object noun is gone -- it read "the Department of Public Works", and a gate
+# excised the head noun "Department" (an unglossed reference), gluing the verb
+# straight onto "of". Verified by reproducing _excise_governed_construction with
+# entity="Department" -> the exact sentence, and it passed the gate's own
+# well-formedness guards (see D583/LOCAL-475 for the same gate producing broken
+# English). The gate fix is in unglossed_reference_gate.py; this is the scorer's
+# net, so that if the shape ever ships again the loop flags it for regeneration.
+#
+# _MANGLED already caught the round-3 sibling ("engaged of Public Works") because
+# 'engaged' happened to be in its alternation, but the round-7 verb ('authorized')
+# was not -- a hand-listed set of verbs is the enumeration trap D476 warns about.
+# The signature is structural: a TRANSITIVE verb that governs a direct object
+# ("authorized [a body]"), left directly abutting "of" with the object deleted.
+# Restricted to verbs of official action on an institution -- the family the gate
+# strips -- so it never fires on the legitimate "-ed of" idioms (comprised of,
+# composed of, consisted of, deprived of, accused of, approved of, died of,
+# informed of, conceived of, made of). Across all 46 tours in TOURS_FOR_REVIEW it
+# fires exactly twice, both true positives, no false positives.
+_VERB_NEEDS_OBJECT = (
+    r'authoriz|authorised|engag|establish|appoint|commission|task|direct|'
+    r'instruct|order|permit|enabl|allow|assign|designat|elect|nominat|'
+    r'compel|urg|request|requir|forbid|forbad|prohibit|mandat')
+_OBJECT_DROPPED = re.compile(
+    r'\b(?:' + _VERB_NEEDS_OBJECT + r')(?:ed|es|e)?\s+of\s+[A-Z]')
 # [2026-09-21, Michael on LOGAN_1] "...ensuring Boston's competitive edge in the
 # aviation sector.3 million passengers in 2025." A sentence was cut and the
 # remainder spliced on with no space, so the tour states ".3 million" — the leading
@@ -290,6 +316,7 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
                                   + '; '.join(blank[:3]))
 
     trunc = _TRUNC.findall(text) + _MANGLED.findall(text) + \
+        _OBJECT_DROPPED.findall(text) + \
         [m.group(0) for m in _SPLICE.finditer(text)]
     if trunc:
         defects['truncated'] = f"{len(trunc)} fragment(s), e.g. {trunc[0]!r}"
