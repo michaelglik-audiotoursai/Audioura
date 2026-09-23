@@ -136,8 +136,16 @@ def refute_claims(text, anchor, geocoder, refute_km=DEFAULT_REFUTE_KM):
         rec["checked"] += 1
         try:
             pt = geocoder(place)
-        except Exception:
-            pt = None
+        # [2026-09-23, kiro critic] A GEOCODER CRASH IS NOT "NOT FOUND".
+        # Swallowing it to None made a failed lookup indistinguishable from a place
+        # that simply is not far away, so a stop 6,000km off whose geocoder threw
+        # was reported as checked and fine. Same shape as the Gemini 402 that
+        # degraded a tour instead of stopping it. The caller is now told which it
+        # was, and D577 still governs the outcome: unverified SHIPS, refuted does not.
+        except Exception as _ge:
+            rec.setdefault("errors", []).append(f"{place}: {type(_ge).__name__}")
+            rec["unresolved"].append(place)
+            continue
         if not pt:
             rec["unresolved"].append(place)
             continue
@@ -161,8 +169,12 @@ def refute_stop_by_distance(stop_name, anchor, geocoder, refute_km=DEFAULT_REFUT
     probe = m.group(1).strip() if m else name
     try:
         pt = geocoder(probe)
-    except Exception:
-        pt = None
+    except Exception as _ge:
+        # Same rule as refute_claims: a crash is reported, not silently treated as
+        # "this stop is fine". Returning None here means NOT REFUTED, which for a
+        # failed lookup is a lie the caller cannot detect.
+        return {"stop": (stop_name or '').strip(), "resolved_as": None,
+                "km": None, "error": f"{type(_ge).__name__}: {_ge}"}
     if not pt:
         return None
     km = haversine_km(anchor, pt)

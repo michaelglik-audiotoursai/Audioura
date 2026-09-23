@@ -127,8 +127,28 @@ def validate_one(
             if refute_km is not None:
                 kwargs["refute_km"] = refute_km
             far = gr.refute_stop_by_distance(name, anchor, geocoder, **kwargs)
-        except Exception:
-            far = None
+        except Exception as _geo_err:
+            # [2026-09-23, kiro critic] A CRASH IS NOT A PASS. This used to set
+            # far=None and fall through to checks["geo"] = "not refuted by
+            # distance" — so a stop 6,000km away whose geocoder threw was reported
+            # as checked and fine, in the one module whose purpose is that nothing
+            # fails silently. Same shape as the Gemini 402 that degraded a whole
+            # tour rather than stopping it: an outage must not look like a pass.
+            checks["geo"] = {"error": f"{type(_geo_err).__name__}: {_geo_err}"}
+            return {"stop": name, "verdict": WARNING,
+                    "reason": (f"could not check where '{name}' is — the geography "
+                               f"check failed ({type(_geo_err).__name__}). Shipping "
+                               f"it unverified rather than dropping it."),
+                    "checks": checks}
+        if far and far.get("error"):
+            # The lookup itself failed. D577: unverified ships, hedged — but the
+            # caller must know it was never checked rather than reading silence
+            # as a pass.
+            checks["geo"] = {"error": far["error"]}
+            return {"stop": name, "verdict": WARNING,
+                    "reason": (f"could not check where '{name}' is — the geography "
+                               f"lookup failed. Shipping it unverified."),
+                    "checks": checks}
         if far:
             checks["geo"] = {"resolved_as": far["resolved_as"], "km": far["km"]}
             return {"stop": name, "verdict": REJECTED,
