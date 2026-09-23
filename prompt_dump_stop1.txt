@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T18:05:40.821630
+Generated: 2026-09-23T18:21:56.387846
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -106,15 +106,15 @@ DO NOT USE these phrases: the building was erected, historically important, the 
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Water Lilies
-      The painting was created in 1907 by French Impressionist artist Claude Monet (1840–1926) at his home and garden in Giverny, France.
+      The painting was created in 1907 by Claude Monet at his home and gardens in Giverny, France.
   [2] Water Lilies
-      The painting entered the Museum of Fine Arts, Boston collection in 1919 as a bequest from Alexander Cochrane and carries accession number 19.170.
+      Alexander Cochrane purchased the painting from Durand-Ruel in December 1909 and bequeathed it to the Museum of Fine Arts, Boston, in 1919.
   [3] Water Lilies
-      It is inscribed with the signature and date 'Claude Monet 1907' in the lower right corner.
+      Unlike Monet's earlier 1899–1900 water garden paintings that feature the Japanese footbridge and shoreline, this composition completely excludes the horizon and surrounding banks to depict only water, lily pads, and reflections.
   [4] Water Lilies
-      The canvas was cataloged by Daniel Wildenstein as entry number 1697 in his catalogue raisonné of Monet's work.
+      The canvas is signed and dated by the artist in the lower right corner as 'Claude Monet 1907'.
   [5] Water Lilies
-      It was included among the forty-eight 'landscapes of water' displayed at the Galerie Durand-Ruel in Paris during the landmark 1909 exhibition.
+      It was included among the forty-eight 'water landscapes' Monet exhibited at the Galerie Durand-Ruel in Paris in May–June 1909.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -280,7 +280,7 @@ Write the story FIRST, then add physical description if space allows.
 
 
 ================================================================================
-Total user message length: 20755 chars
+Total user message length: 20815 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
