@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T09:58:40.292498
+Generated: 2026-09-23T13:30:18.816196
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -12,7 +12,7 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 --- USER MESSAGE ---
 STYLE: Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.
 
-Create a detailed description for the stop "Nave" on a walking tour of Our Lady Help of Christians Catholic Church, Newton MA.
+Create a detailed description for the stop "Sacred Heart Parish" on a walking tour of Our Lady Help of Christians Catholic Church, Newton MA.
 
 NAME THE STORY OR DROP THE GESTURE. Never write that a place has a 'storied past', hosted 'luminaries', 'notable figures' or 'countless chapters of history', witnessed 'clandestine meetings', 'intrigue', 'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives ONE of them concretely: who, when, what they did, what came of it.
 - BAD:  'a storied past of hosting luminaries'
@@ -24,9 +24,8 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - On Sunday, December 8, 2002, more than 850 parishioners packed the nave of Our Lady Help of Christians in defiance of the archdiocese, giving standing ovations to Rev. Walter H. Cuenin after he denounced Cardinal Law.
-  - In September 2005, the archdiocese forced Father Cuenin to resign over 'financial irregularities', leading to protest meetings in the pews by parishioners.
-  - On Sunday, June 25, 2023, Gilda (Jill) and Bruno D’Amore were scheduled to renew their wedding vows for their 50th anniversary, but were found murdered along with Jill's mother, Lucia Arpino, in a home invasion.
+  - Sacred Heart Parish was established in 1922 by the Stigmatine Fathers.
+  - In September 1958, Father Stephen Dalla Via, pastor of Sacred Heart Church, initiated a significant project by asking Aldo A. to contribute to the church.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -99,19 +98,18 @@ NO CONDESCENSION:
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 
 VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
-This stop is "Nave" located in/near Newton on this tour of Our Lady Help of Christians Catholic Church, Newton MA.
+This stop is "Sacred Heart Parish" located in/near Newton on this tour of Our Lady Help of Christians Catholic Church, Newton MA.
 If multiple places share this name (e.g., museums in different cities), you are describing
 ONLY the one in Newton. Do NOT use facts about a same-named institution in another
 city. If you are uncertain which facts apply to THIS specific location, omit them rather
 than risk conflation.
 
 RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
-  - The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy.
-  - The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
-  - Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
-  - == History ==
-John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in order to coordinate all activities related to the Salesians in the Valdocco suburb.
-  - According to legend, a vision of the Blessed Virgin Mary appeared in a dream to Bosco in 1844 or 1845 and revealed the site of the martyrdom of the Turinese saints Solutor, Adventor and Octavius.
+  - Newton is a city in Middlesex County, Massachusetts, United States.
+  - It is located roughly 8 miles (13 km) west of Downtown Boston, and comprises a patchwork of thirteen villages.
+  - The city borders Boston to the northeast and southeast (via the neighborhoods of Brighton and West Roxbury), Brookline to the east, Watertown and Waltham to the north, and Weston, Wellesley, and Needham to the west.
+  - Census Bureau's 2025 estimates, the population of Newton, Massachusetts was 90,741.
+  - Newton is home to the Charles River, Crystal Lake, and Heartbreak Hill, among other landmarks.
 
 SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
 must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
@@ -125,12 +123,7 @@ apply to a same-named entity in a different city. If the passages do not mention
 year, collection size, or building name, do NOT supply one from memory.
 
 HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
-The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy. The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
-Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
-
-
-== History ==
-John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in or
+Newton is a city in Middlesex County, Massachusetts, United States. It is located roughly 8 miles (13 km) west of Downtown Boston, and comprises a patchwork of thirteen villages. The city borders Boston to the northeast and southeast (via the neighborhoods of Brighton and West Roxbury), Brookline to the east, Watertown and Waltham to the north, and Weston, Wellesley, and Needham to the west. According to the U.S. Census Bureau's 2025 estimates, the population of Newton, Massachusetts was 90,741.
 
 OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
@@ -144,47 +137,21 @@ If your first instinct is a locative-clause opener, delete it and lead with the 
 CATEGORY VOICE: Historical-narrative and grounded — anchor each place in its real history and layers of time. Speak as a knowledgeable neighbor walking alongside the listener through familiar streets.
 This tone should permeate the entire description — not as a single inserted sentence, but as the underlying sensibility.
 
-NARRATIVE HONESTY — UNVERIFIED WORK: This artwork's presence at this venue has NOT been
-independently confirmed. Frame this uncertainty as part of the story — not as a bureaucratic
-disclaimer, but as an intriguing layer of the narrative. Use phrasing like:
-"The story goes that this piece...", "If the records are right, what you're looking at is...",
-"There's a fascinating claim that this work..., though its exact provenance here remains a
-matter of debate among scholars."
-The uncertainty itself is interesting — present it that way. NEVER state the work's presence
-as certain fact, but also avoid robotically repeating "believed to be" or "reportedly" — vary
-your uncertainty markers and weave them into the storytelling naturally.
-
-NARRATIVE HONESTY — UNVERIFIED CLAIMS: No independent fact-checking has been performed on
-specific claims about people, events, or history for this stop. When you include a specific
-claim (a named person, a particular event, a date), frame uncertainty as part of the narrative
-rather than as a flat disclaimer:
-Instead of "reportedly" or "believed to be" (which sound clinical), use storytelling framing:
-"The story passed down through the neighborhood is that...",
-"Local tradition holds that..., though the details have shifted in each retelling",
-"One account — perhaps embellished over the years — describes...",
-"If you ask a local, they'll tell you that...".
-The uncertainty itself adds texture — present it as an intriguing element, not a legal caveat.
-General, well-known facts (a neighborhood's founding era, a cuisine's regional origin) can be
-stated plainly. The narrative-honesty requirement applies specifically to particular people or
-events tied to this specific stop. Do NOT invent specific names, dates, or incidents.
-
 DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: awe
-- Unique angle to emphasize: The vaulted ceilings of the nave, reminiscent of medieval cathedrals, are a testament to the parish's ambition during its construction in the late 19th century.
-- End with a forward-looking hook: As you proceed down the aisle, note the vibrant colors just ahead…
+- Emotional beat for this stop: curiosity
+- Unique angle to emphasize: The intricate stained-glass windows, crafted by European artisans, depict stories of local families who found solace here during times of upheaval.
+- End with a forward-looking hook: As you walk towards Our Lady Help of Christians, consider the echoes of these families' stories along the way...
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The nave of Our Lady Help of Christians was packed with over 850 parishioners on December 8, 2002, in support of Rev. Walter H. Cuenin.; Father Cuenin was forced to resign in September 2005 due to 'financial irregularities'.; Gilda and Bruno D’Amore were scheduled to renew their wedding vows for their 50th anniversary on June 25, 2023, but were found murdered along with Jill's mother, Lucia Arpino.
+Sacred Heart Parish was established on January 13, 1876 by Most Reverend Archbishop Joseph Alemany; Irish immigrants built the magnificent church of Sacred Heart Parish; Italian immigrants brought customs and traditions that enriched the parish
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Nave
-      In September 2005, the archdiocese forced Father Cuenin to resign over 'financial irregularities', leading to protest meetings in the pews by parishioners.
-  [2] Nave
-      On Sunday, December 8, 2002, more than 850 parishioners packed the nave of Our Lady Help of Christians in defiance of the archdiocese, giving standing ovations to Rev. Walter H. Cuenin after he denounced Cardinal Law.
-  [3] Nave
-      On Sunday, June 25, 2023, Gilda (Jill) and Bruno D’Amore were scheduled to renew their wedding vows for their 50th anniversary, but were found murdered along with Jill's mother, Lucia Arpino, in a home invasion.
+  [1] Sacred Heart Parish
+      Sacred Heart Parish was established in 1922 by the Stigmatine Fathers.
+  [2] Sacred Heart Parish
+      In September 1958, Father Stephen Dalla Via, pastor of Sacred Heart Church, initiated a significant project by asking Aldo A. to contribute to the church.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -266,19 +233,50 @@ DO NOT include directions to the next stop - these will be added separately.
 
 LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
+PER-STOP SOURCE MATERIAL for "Sacred Heart Parish" (from verified sources — use this as your primary factual basis):
+  Passage 1: On January 13, 1876, the Most Reverend Archbishop Joseph Alemany divided this extensive territory and established Sacred Heart Parish. The new parish started at ...
+  Passage 2: Irish immigrants struggled and built the magnificent church. Italian immigrants followed and brought their customs and traditions that enriched the parish. The ...
+  Passage 3: To accommodate this segment of the Sacred Heart parishioners, a new church was established in 1946 by the Josephite Superior, Father Edward Casserly. Through ...
+  Passage 4: On January 11, 1908 Father John J. Lennon became pastor of Sacred Heart and immediately started a kindergarten. He also saw that the church was too small. He ...
+  Passage 5: Since it was dedicated on May 8, 1881, Our Lady Help of Christians Church has been the repository of deep faith and tireless dedication of parishioners, ...
+  Passage 6: Our centenary celebration recalls the fact that Sacred Heart became a parish in 1910 when Father Denis Bailey was appointed as the first resident pastor.
+  Passage 7: Two months later on May 15, 1966, His Eminence Cardinal James Francis McIntyre, Archbishop of Los Angeles, canonically raised Sacred Heart Mission to parish ...
+  Passage 8: Before the original church was built, Father William Connelly, the first pastor, resided at the Sacred Heart Seminary for Small Boys and served as chaplain. He ...
+  Sources:
+  [Sacred Heart Parish — interpretive search] https://sholnewton.org/our-lady-help-of-christians-church (tier 3)
+  [Sacred Heart Parish — interpretive search] https://sacredheartoak.org/get-to-know-our-history (tier 3)
+  [Sacred Heart Parish — interpretive search] https://shparish.net/about-us/our-church (tier 3)
+  [Sacred Heart Parish — interpretive search] https://sacredheartventura.org/about-us (tier 3)
+  [Sacred Heart Parish — interpretive search] https://sacredheartvp.com/about/parish-history/ (tier 3)
+  [Sacred Heart Parish — interpretive search] https://bronxaltar.org/the-history-of-sacred-heart-parish (tier 3)
+  [Sacred Heart Parish — interpretive search] https://sacredheartbayside-queens.org/about/history (tier 3)
 
-THIS STOP IS TOO SHORT AT 169 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
+
+BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
+
+NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
+  - If a passage names WHERE someone came from and WHERE they went, state both.
+  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
+  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
+  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
+  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+
+
+THIS STOP IS TOO SHORT AT 93 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "The nave of Our Lady Help of Christians Catholic Church in Newton, Massachusetts, is more than just a physical space; it is a vibrant testament to the community's resilience and spirit."
-- "Cuenin, who had boldly denounced Cardinal Law."
-- "Yet, the church has also been marked by moments of profound sorrow."
-- "Tragically, they were found murdered along with Jill's mother, Lucia Arpino, in a heartbreaking home invasion."
-- "This incident cast a shadow over the community, turning what was to be a joyous occasion into a time of mourning and reflection."
-- "The church's history is not just about its architecture or its religious significance; it is about the people who have passed through its doors and the stories they have left behind."
-- "The events that have unfolded within these walls are a reminder of the complex tapestry of life, woven with both joy and tragedy."
-- "As sunlight streams through the stained glass, casting vibrant colors just ahead, the nave continues to be a living, breathing part of the community's narrative, echoing with the memories of its past."
+- "The parish has long served as a spiritual haven for residents, including the waves of immigrants who brought their customs and vitality to this Massachusetts enclave."
+- "Nestled about eight miles west of Boston, Newton comprises a patchwork of thirteen villages, each contributing to the rich tapestry of the area."
+- "Father Stephen Dalla Via, then the pastor of Sacred Heart Church, embarked on a project that would leave a lasting impact on the church's aesthetic and spiritual life."
+- "This collaboration resulted in the creation of beautiful church artifacts that continue to inspire parishioners and visitors alike."
+- "Sacred Heart Parish's story is woven into the greater narrative of Newton, a city with a population of over 90,000 as of 2025."
+- "The parish has witnessed the ebb and flow of time, adapting to the needs of its diverse congregation while preserving the traditions that have defined it for over a century."
+- "Its stained-glass windows, crafted by European artisans, are particularly noteworthy."
+- "These works of art depict the stories of local families who found solace within the church's walls during times of upheaval."
+- "As you continue your journey towards Our Lady Help of Christians, reflect on the echoes of these families' stories, preserved in the vibrant hues of the stained glass."
+- "Each pane is a reminder of the resilience and faith that have shaped this community, resonating through the generations."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
@@ -289,7 +287,7 @@ Use only the source material supplied. If the material will not support such a s
 
 
 ================================================================================
-Total user message length: 23888 chars
+Total user message length: 26258 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -297,4 +295,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Pulpit', 'Stations of the Cross', 'Altar', 'Narthex']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Our Lady Help of Christians Catholic Church', 'Sacred Heart Parish', 'Mary Immaculate of Lourdes Parish', 'St. Bernard Parish']

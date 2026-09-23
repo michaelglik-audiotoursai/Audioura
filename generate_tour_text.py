@@ -6577,7 +6577,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _vp_anchor = _vp_geo(_vp_hint(location) or location)
                 except Exception as _vp_ge:
                     _vp_anchor = None
-                    print(f"  [D571] venue anchor unavailable ({_vp_ge}) — parts keep their own coords")
+                    print(f"  [D571] venue anchor lookup raised ({_vp_ge})")
+                if not _vp_anchor:
+                    # Do not fail silently. The first version only printed on an
+                    # EXCEPTION, and the geocoder returns None instead of raising —
+                    # so the fix looked applied and was not, and six stops shipped
+                    # scattered up to 1km from their own building.
+                    print("  [D571] venue anchor is None — parts keep their own "
+                          "coordinates and WILL scatter. Investigate the geocoder.")
                 if _vp_anchor:
                     for _p in poi_list:
                         _p['coordinates'] = f"{_vp_anchor[0]:.6f}, {_vp_anchor[1]:.6f}"
@@ -6631,6 +6638,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             elif _venue_parts_evidence.get('rejected'):
                 print(f"  [D571] VENUE-PARTS rejected the venue kind "
                       f"({_venue_parts_evidence['rejected']}) — falling through")
+        except _vp.ServiceUnavailable as _vp_dead:
+            # [2026-09-23] Do NOT fall through. A dead paid service must look like an
+            # outage, not like a venue with nothing to describe. Falling through
+            # produced a tour that looked fine, scored clean, and had quietly
+            # reverted to the old path.
+            print(f"\n  [D571] *** SERVICE UNAVAILABLE — ABORTING ***\n  {_vp_dead}\n"
+                  f"  Not degrading to the generic path. Check the provider's billing.")
+            raise
         except Exception as _vp_err:
             print(f"  [D571] venue-parts unavailable ({_vp_err}) — falling through")
 

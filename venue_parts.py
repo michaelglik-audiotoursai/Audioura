@@ -362,6 +362,30 @@ def default_ask_grounded(prompt, timeout=90):
     return out.get('text', '') or '', [s for s in srcs if s]
 
 
+class ServiceUnavailable(RuntimeError):
+    """A paid service is out of credit or otherwise refusing — not a data problem.
+
+    [2026-09-23] Gemini's prepay balance hit zero mid-run. Every chain question came
+    back empty, `validate_kind_via_parts` reported "only 0 of 0 answers named
+    something you can stand next to", `build_tour_stops` returned [], and the tour
+    QUIETLY FELL BACK to the old walking path. It still produced output, still
+    scored, and only the shape of the stops betrayed it — so LEAD spent half an hour
+    chasing a coordinate bug that was a billing failure two layers down.
+
+    An outage must look like an outage. "The venue has no describable parts" and
+    "we could not ask" are different answers and must not share a code path.
+    """
+
+
+def _service_is_dead(payload):
+    """True when the asker failed for a PAYMENT/quota reason rather than a content one."""
+    blob = str(payload or '').lower()
+    return any(m in blob for m in (
+        '402', 'payment required', 'prepayment credits are depleted',
+        'insufficient_quota', 'credit_balance_exhausted', 'resource_exhausted',
+        'no credits remaining'))
+
+
 def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
                      use_cache=True):
     """The whole chain, production-shaped. Returns (stop_names, evidence).
@@ -373,6 +397,19 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
     ask_grounded = ask_grounded or default_ask_grounded
     try:
         kind = identify_venue_kind(venue_name, location, ask)
+        if not kind:
+            # Distinguish "the model had nothing to say" from "we could not ask".
+            probe = ''
+            try:
+                probe = str(ask('Reply with the single word: ok'))
+            except Exception as _pe:
+                probe = str(_pe)
+            if _service_is_dead(probe) or not probe.strip():
+                raise ServiceUnavailable(
+                    'the venue-class question returned nothing and a probe also '
+                    'failed — the model service is unavailable, not the venue '
+                    'undescribable. Refusing to fall back to the generic path, '
+                    f'which would silently degrade the tour. probe={probe[:120]!r}')
         parts = parts_for_kind(kind, ask, use_cache=use_cache)
         ok, physical, why = validate_kind_via_parts(parts)
         if not ok:
@@ -429,6 +466,8 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
                          "lore": distribute_lore(ordered, placed, chain),
                          "present": pres["present"], "unknown": pres["unknown"],
                          "absent": pres["absent"], "sources": pres["sources"]}
+    except ServiceUnavailable:
+        raise                      # never swallowed — the caller must stop, not degrade
     except Exception as e:
         return [], {"error": str(e)}
 

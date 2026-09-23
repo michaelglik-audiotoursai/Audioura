@@ -116,7 +116,95 @@ def haversine_m(a, b):
     return 2 * R * math.asin(math.sqrt(h))
 
 
+_STATE_ABBR = {
+    ' ma': ' Massachusetts', ' ny': ' New York', ' ca': ' California',
+    ' fl': ' Florida', ' tx': ' Texas', ' il': ' Illinois', ' pa': ' Pennsylvania',
+    ' nj': ' New Jersey', ' ct': ' Connecticut', ' ri': ' Rhode Island',
+    ' nh': ' New Hampshire', ' vt': ' Vermont', ' me': ' Maine',
+}
+
+# Qualifiers that describe WHAT a venue is. Nominatim indexes the NAME; leaving
+# these in turns a findable place into zero results.
+_VENUE_QUALIFIERS = (
+    'catholic church', 'orthodox church', 'parish church', 'episcopal church',
+    'baptist church', 'methodist church', 'church', 'cathedral', 'basilica',
+    'synagogue', 'mosque', 'temple', 'international airport', 'airport',
+    'museum of art', 'art museum', 'museum', 'train station', 'railway station',
+)
+
+
+def _geocode_variants(query):
+    """Progressively simpler forms of one venue string.
+
+    Measured 2026-09-23 — Nominatim on the same church:
+
+        'Our Lady Help of Christians Catholic Church, Newton MA'  -> 0 results
+        'Our Lady Help of Christians, Newton, Massachusetts'      -> FOUND
+
+    A single rigid query therefore returned None for a venue that is in the index,
+    and every downstream consumer read that as "this place has no location". Six
+    stops of one church shipped with six invented coordinates up to 1km from the
+    building because of it.
+    """
+    q = ' '.join((query or '').split())
+    if not q:
+        return []
+    out = [q]
+
+    low = q.lower()
+    for qual in _VENUE_QUALIFIERS:            # longest first — the tuple is ordered
+        if qual in low:
+            i = low.index(qual)
+            stripped = (q[:i] + q[i + len(qual):])
+            stripped = ' '.join(stripped.replace(' ,', ',').split()).strip(' ,')
+            if stripped and stripped.lower() != low:
+                out.append(stripped)
+            break
+
+    expanded = []
+    for cand in list(out):
+        cl = cand.lower()
+        for ab, full in _STATE_ABBR.items():
+            if cl.endswith(ab):
+                expanded.append(cand[:len(cand) - len(ab)] + full)
+                break
+    out.extend(expanded)
+
+    # Last resort: the name before the first comma, plus the town after it.
+    if ',' in q:
+        head, _, tail = q.partition(',')
+        town = tail.split(',')[0].strip()
+        if head.strip() and town:
+            out.append(f"{head.strip()}, {town}")
+
+    seen, uniq = set(), []
+    for c in out:
+        k = c.lower()
+        if k not in seen:
+            seen.add(k)
+            uniq.append(c)
+    return uniq
+
+
 def geocode(query):
+    """Geocode a venue, trying progressively simpler forms before giving up.
+
+    [2026-09-23] The single-query version returned None for venues that ARE in the
+    index — 'Our Lady Help of Christians Catholic Church, Newton MA' found nothing
+    while 'Our Lady Help of Christians, Newton, Massachusetts' found it. Callers
+    read None as "no location exists", so six stops of one church shipped with six
+    invented coordinates up to 1km from the building.
+    """
+    for _cand in _geocode_variants(query):
+        _hit = _geocode_once(_cand)
+        if _hit:
+            if _cand != (query or '').strip():
+                logging.info("[GEOCODE] %r resolved via fallback %r", query, _cand)
+            return _hit
+    return None
+
+
+def _geocode_once(query):
     """Resolve a free-text place to (lat, lng), or None.
 
     Returns None on any failure — no network, rate limited, no match, malformed
