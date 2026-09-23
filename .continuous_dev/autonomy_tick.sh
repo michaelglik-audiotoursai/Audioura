@@ -98,6 +98,14 @@ guard 120 "$CD/reap_orphans.sh"
 # --- Reclaim disk: drop worktrees whose branch is already merged. ---
 # Added 2026-08-04 after 188 accumulated worktrees filled the disk to 98% and
 # a dispatch failed mid-checkout. Nothing is lost; unmerged branches are kept.
+# [2026-09-23] Verify dispatched work BY EFFECT before anything prunes it.
+# Seven tasks ran overnight, all seven logged COMPLETED, four had written their
+# deliverable and never committed — and prune_worktrees.sh then deleted the
+# worktrees, destroying eight hours of work un-noticed. This MUST run before the
+# prune, and it re-files what silently failed. Michael's 30-minute check, made
+# durable: detecting a failure needs no Claude session, only judging one does.
+guard 120 "$CD/verify_deliverables.sh"
+
 guard 120 "$CD/prune_worktrees.sh"
 
 # --- Dispatch any unclaimed task files. ---
