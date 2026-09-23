@@ -822,6 +822,43 @@ def _entity_year_key(sentence):
     return names, set(_YEAR.findall(sentence or ''))
 
 
+# [2026-09-23] Common nouns that _PROPER picks up because they sit inside a
+# capitalised name -- "Stained Glass Windows" -> "windows", "Our Lady Help of
+# Christians Catholic Church" -> "church". Harmless for episode matching, but
+# cap_person_across_stops treats every extracted token as a PERSON, and that
+# caused both halves of a real failure on CHURCH_1:
+#
+#   - it "capped" a person called `church` and deleted a sentence about the altar;
+#   - it never capped Cuenin, who was in all four stops, because his sentences
+#     also yielded `windows` and so failed the "is this person the only one
+#     carrying the sentence?" guard.
+#
+# Surnames that are also common words ("Law", as in Cardinal Bernard Law) are
+# deliberately NOT here -- dropping them would reintroduce the miss this cap exists
+# to prevent.
+_NOT_PERSON = {
+    'church', 'cathedral', 'chapel', 'basilica', 'parish', 'shrine', 'abbey',
+    'altar', 'nave', 'narthex', 'transept', 'crypt', 'pulpit', 'apse', 'sanctuary',
+    'windows', 'window', 'tower', 'spire', 'bell', 'organ', 'font', 'aisle',
+    'airport', 'terminal', 'concourse', 'gate', 'checkpoint', 'runway', 'jetbridge',
+    'museum', 'gallery', 'hall', 'wing', 'court', 'garden', 'park', 'square',
+    'street', 'road', 'avenue', 'bridge', 'station', 'centre', 'center', 'building',
+    'city', 'town', 'state', 'county', 'archdiocese', 'diocese', 'university',
+    'college', 'school', 'hospital', 'company', 'association', 'society', 'war',
+}
+
+
+_RECAP_SENTENCE = re.compile(
+    r"\bthat(?:'|\u2019)s\s+\d+\s+stops?\b|\bwe(?:'|\u2019)ve\s+(?:seen|visited)\b"
+    r"|\byour\s+tour\s+(?:of|is)\b|\bto\s+recap\b", re.I)
+
+
+def _person_names(sentence):
+    """Just the names in a sentence that could plausibly be PEOPLE."""
+    names, _years = _entity_year_key(sentence)
+    return {n for n in names if n not in _NOT_PERSON and len(n) > 2}
+
+
 def _same_episode(key_a, key_b):
     """Same person and same year -> the same story, however it is worded."""
     names_a, years_a = key_a
@@ -851,8 +888,7 @@ def cap_person_across_stops(poi_list, max_stops: int = 2):
     for i, poi in enumerate(poi_list or []):
         desc = (poi.get('description') or '') if isinstance(poi, dict) else ''
         for sent in _split_into_sentences(desc):
-            names, _years = _entity_year_key(sent)
-            for n in names:
+            for n in _person_names(sent):
                 where[n].append((i, sent))
 
     removed = []
@@ -866,8 +902,14 @@ def cap_person_across_stops(poi_list, max_stops: int = 2):
                 continue
             # Only drop it if this person is the ONLY name carrying the sentence —
             # never cut a sentence that is doing other work too.
-            names, _ = _entity_year_key(sent)
-            if names != {surname}:
+            if _person_names(sent) != {surname}:
+                continue
+            # [2026-09-23] Never cut a RECAP sentence. Filtering common nouns out of
+            # the person set made "That's 4 stops -- Stained Glass Windows, where
+            # Father Walter Cuenin's story is etched..." look like a sentence about
+            # Cuenin alone, so the cap deleted half the closing recap and left it
+            # promising four stops it no longer listed.
+            if _RECAP_SENTENCE.search(sent):
                 continue
             poi = poi_list[i]
             kept = [x for x in _split_into_sentences(poi.get('description') or '')
