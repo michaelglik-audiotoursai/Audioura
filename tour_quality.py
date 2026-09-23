@@ -31,9 +31,30 @@ REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance')
 
 _STOP = re.compile(r'^Stop (\d+):\s*(.+)$', re.M)
 _YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
-_PERSON = re.compile(r'\b(?:Governor|Mayor|Father|Cardinal|Archbishop|Mother|Sister|'
-                     r'President|Rev\.?|Dr\.?|Sir|Captain|Chef|Bishop|Pope|Saint)\s+'
-                     r'[A-Z][\w\'’-]+')
+# [2026-09-23, kiro critic] The first version counted a name ONLY when a title
+# preceded it, then de-duped — so it was a count of title+name bigrams, not of
+# people. "architect James Murphy", "crafted by local artisans Eric Boeglin", and
+# the murder victims all scored zero, and LEAD read the resulting 1-vs-5 gap
+# between Logan and the church as a real difference in story density. It may not be.
+#
+# A bare capitalised bigram is far too noisy ("After World", "Airport Concourse",
+# "Christian Europe"), so a name counts when a TITLE or a ROLE introduces it — the
+# contexts in which this pipeline actually names people.
+_PERSON_TITLE = (r'Governor|Mayor|Father|Cardinal|Archbishop|Mother|Sister|President|'
+                 r'Rev\.?|Dr\.?|Sir|Captain|Chef|Bishop|Pope|Saint|Msgr\.?|General|'
+                 r'Senator|Justice|Lord|Abbot|Prior|Deacon')   # NOT 'Lady': "Our Lady Help of Christians" is a church, not a person
+_PERSON_ROLE = (r'architect|designer|builder|artisan|artisans|artist|sculptor|painter|'
+                r'engineer|founder|donor|patron|benefactor|pastor|priest|rector|'
+                r'organist|composer|mason|craftsman|craftsmen|activist|pilot|'
+                r'controller|curator|historian|photographer|author|writer')
+# NO re.IGNORECASE. With it, [A-Z] matches lowercase too, and the pattern happily
+# captured "Cuenin d", "Law r", "of P" and "here" — a count of 13 "people" in a
+# tour with four. Titles are capitalised in prose and roles are lowercase, so the
+# alternation spells both out instead.
+_PERSON = re.compile(
+    r'\b(?:(?:' + _PERSON_TITLE + r')\.?\s+'
+    r'|(?:' + _PERSON_ROLE + r')s?\s+(?:named\s+)?)'
+    r'([A-Z][a-z]{2,}(?:\s+[A-Z]\.)?(?:\s+[A-Z][a-z]{2,})?)')
 # a fragment ending on a title with no name after it
 _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+\s+'
                     r'(?:you|As|The|It|This|Its|Their|He|She|We))')
@@ -45,6 +66,26 @@ _MANGLED = re.compile(r'\b(?:engaged|which|that|and|of)\s+of\s+[A-Z]')
 # sentence that BEGINS with a decimal fragment.
 _SPLICE = re.compile(r'[a-z]\.\d|(?:^|\s)\.\d+\s+\w')
 _KM = re.compile(r'\b\d+(?:\.\d+)?\s*(?:km|kilometre|kilometer)s?\b', re.I)
+
+
+def _count_people(text):
+    """Distinct PEOPLE, de-duplicated by surname.
+
+    "Law", "Bernard Law" and "Bernard F. Law" are one man, and counting them as
+    three inflated a 4-stop tour to nine people. The surname — the last
+    capitalised token — is the identity; the fullest form seen is kept for display.
+    """
+    by_surname = {}
+    for m in _PERSON.findall(text or ''):
+        name = (m if isinstance(m, str) else m[0]).strip()
+        if not name:
+            continue
+        surname = name.split()[-1]
+        if len(surname) < 3:
+            continue
+        if len(name) > len(by_surname.get(surname, '')):
+            by_surname[surname] = name
+    return len(by_surname)
 
 
 def _stops(text):
@@ -60,7 +101,7 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
         'stops_delivered': len(stops),
         'stops_requested': requested_stops,
         'dates': len(_YEAR.findall(text)),
-        'named_people': len(set(_PERSON.findall(text))),
+        'named_people': _count_people(text),
         'chars': len(text),
     }
     defects = {}
