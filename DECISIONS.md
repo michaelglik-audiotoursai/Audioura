@@ -23948,3 +23948,64 @@ and what is missing that belongs here"* — never at defects, which are already 
   next run without talking to anyone.
 - **Never without asking** — deploying, writing to the production DB, deleting anything he has not
   agreed to lose, or spending past the ceiling.
+
+## D581 — Cache the STOPS, not the tour. Michael's reuse design.
+### 2026-09-23, 00:15. The highest-value economic change available.
+
+**The problem his arithmetic exposed.** 10,000 users, 10% generating daily, ~$1 for a 10-stop
+tour → ~$1,000/day against a budget of $50–100. That math is only right if every request is a
+fresh generation.
+
+**It is not: `tour_cache` already works** — 115 hits against 142 generations, and one entry has
+been served **82 times**. Tours are per-venue, not per-user: the first person to ask for the MFA
+at 6 stops pays; everyone after is free.
+
+**But the key destroys most of the reuse:**
+
+```
+cache_key = SHA256( location | tour_type | total_stops )
+```
+
+**`total_stops` is in the key**, so the same venue at 4 stops and at 5 stops are two unrelated
+paid generations. Michael, 2026-09-23: *"if somebody asks to generate a tour of the same venue
+that we already had generated, we should use the material we had."*
+
+### The design: a stop POOL per venue, a tour is a selection from it
+
+Generate stops once per (venue, tour_type). A tour of N is N stops drawn from that pool. The
+fifth request generates **one new stop**, not a fifth tour.
+
+**Michael named the four hard parts, and each is real:**
+
+**1.1 Geography and the seams.** *"the one extra stop needs to fit into the overall trail. And
+then from 5 to 4, the 4 stop tour needs to produce the conclusion of the 5th stop. And whatever
+stop we take out, the previous and next stop need to adjust the directions and orientation."*
+Directions and Orientation are **properties of a sequence, not of a stop**, so they cannot be
+cached with the stop. They must be recomputed per selection. The closing recap likewise summarises
+whichever stops were actually delivered.
+
+**1.2 No repetition against what already exists.** A new stop must be generated knowing the pool
+it joins — the existing stops' episodes become banned material, the same mechanism D534 and
+`strip_cross_stop_repeats` already use across stops within one tour.
+
+**1.3 Freshness is per stop, not per tour.** *"paintings can be replaced, offices can change its
+location… we will need to keep track of every stop generation not just a tour generation."* A stop
+carries its own `generated_at`, and ages out on its own. His implementation hint: the metadata
+block before the first stop announcement is not spoken, so timestamps can live there.
+
+**1.4 Ownership.** *"when people choose a tour from Home tab they will get as is, but when they
+generate, they should get their user id associated. It will be especially important for Subscribed
+when we will enable tour guides to generate their own tours and charge for them."* A pooled stop
+is shared; a generated tour instance belongs to a user. Two different lifetimes, two different
+tables.
+
+### What LEAD adds
+
+**Normalising `total_stops` out of the key is the cheap first step and is worth doing alone.**
+Even before pooling, bucketing stop counts collapses 4/5/6-stop requests for one venue into a
+single cached generation. It is a one-line key change plus a trim on delivery, and it captures a
+large share of the benefit.
+
+**The staleness risk exists today and is unguarded.** `tour_cache` has **no TTL** — a tour cached
+in July still serves in September. Fine for a nave, wrong for an airport office that moved. Per-stop
+`generated_at` fixes this properly; a blanket TTL would be the stopgap.
