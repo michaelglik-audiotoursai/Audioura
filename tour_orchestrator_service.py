@@ -174,6 +174,62 @@ def sanitize_input(input_text):
         sanitized = sanitized[:200].strip()
     
     return sanitized
+
+
+# [LOCAL-525] Ceiling on user-chosen stops — mirrors the total_stops 1..50 range.
+_MAX_USER_STOPS = 50
+
+
+def validate_stops(raw):
+    """Validate and sanitize a user-supplied ``stops`` list (LOCAL-525).
+
+    Promotes the engine's forced_stops path (LOCAL-357) to a product input at the
+    orchestrator boundary. Each name is run through ``sanitize_input`` for the same
+    filesystem/injection safety every other user string gets.
+
+    Contract:
+      * ``None`` / missing → ``(None, None)``. Normal generation, unchanged.
+      * Non-empty list of non-empty strings → ``(clean_list, None)``, order kept.
+      * Anything else → ``(None, error_message)``. Rejected, never silently ignored.
+
+    Returns:
+        tuple(clean_stops_or_None, error_message_or_None)
+    """
+    if raw is None:
+        return None, None
+
+    if not isinstance(raw, list):
+        return None, (
+            "'stops' must be a list of stop names (strings). "
+            f"Received {type(raw).__name__}."
+        )
+
+    if len(raw) == 0:
+        return None, (
+            "'stops' was provided but is empty. Omit 'stops' for automatic stop "
+            "selection, or provide at least one stop name."
+        )
+
+    if len(raw) > _MAX_USER_STOPS:
+        return None, (
+            f"'stops' has {len(raw)} entries; the maximum is {_MAX_USER_STOPS}."
+        )
+
+    clean = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, str):
+            return None, (
+                f"'stops' entry #{i + 1} must be a string, got {type(item).__name__}."
+            )
+        name = sanitize_input(item)
+        if not name:
+            return None, (
+                f"'stops' entry #{i + 1} is blank after sanitization. Every stop "
+                "name must contain usable text."
+            )
+        clean.append(name)
+
+    return clean, None
 # Log all incoming requests
 @app.before_request
 def log_request_info():
@@ -636,7 +692,7 @@ def link_stop_metrics_to_tour(tour_id, job_id):
         return -1
 
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -665,6 +721,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # [S81] Forward persona for direct-pass cases (skips DB lookup in tour-generator)
         if persona:
             generate_data["persona"] = persona
+        # [LOCAL-525] Forward user-chosen stops (validated at the orchestrator
+        # boundary). The tour-generator re-validates and passes them to the engine
+        # as forced_stops. Absent → omitted → normal generation, unchanged.
+        if stops:
+            generate_data["stops"] = stops
         
         print(f"Calling tour text generator API: {datetime.now().isoformat()}")
         print(f"Request data: {generate_data}")
@@ -1462,6 +1523,11 @@ def generate_complete_tour():
     request_string = sanitize_input(data.get('request_string'))
     language = data.get('language', 'en')  # Default to English
     persona = sanitize_input(data.get('persona'))  # [S81] Direct-pass persona (optional)
+
+    # [LOCAL-525] Optional user-chosen stops. Validated/sanitized here; forwarded
+    # to the tour-generator as 'stops' and ultimately to the engine's forced_stops
+    # path. Malformed → 400 with a clear message. Absent → normal generation.
+    stops, _stops_error = validate_stops(data.get('stops'))
     
     # [LOCAL-103] Accept is_test from request — gated by server-side allow-flag
     # Trust boundary: is_test is only honored when the server is already in test mode
@@ -1494,6 +1560,10 @@ def generate_complete_tour():
     supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
     if language not in supported_languages:
         return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
+
+    # [LOCAL-525] Reject malformed user-chosen stops with a clear message.
+    if _stops_error is not None:
+        return jsonify({"error": _stops_error}), 400
     
     # [LOCAL-474] location is required; tour_type is NOT.
     # An absent/empty tour_type means "classify it" — the downstream category
@@ -1519,6 +1589,12 @@ def generate_complete_tour():
             return jsonify({"error": "total_stops must be between 1 and 50"}), 400
     except ValueError:
         return jsonify({"error": "total_stops must be a valid integer"}), 400
+
+    # [LOCAL-525] A user-chosen stop list dictates the tour size. The engine sets
+    # total_stops = len(forced_stops), so meter/clamp against the list length, not
+    # the (possibly default) total_stops the client happened to send.
+    if stops is not None:
+        total_stops = len(stops)
     
     # Entitlements check: verify user hasn't exceeded their plan limits. FAIL-CLOSED.
     # Reject missing/anonymous user_id (matches news path — consistent policy).
@@ -1545,6 +1621,24 @@ def generate_complete_tour():
     # Clamp stops to plan maximum
     total_stops = quota['clamped_stops']
     print(f"[QUOTA] Allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}, stops_clamped={total_stops}")
+
+    # [LOCAL-525] A user-chosen stop list is a promise: "generate EXACTLY these
+    # stops." If the plan would clamp the count below the list length, silently
+    # dropping stops is exactly the "not reliably honoured" failure that motivated
+    # this feature. Reject with a clear, actionable message instead.
+    if stops is not None and len(stops) > total_stops:
+        print(f"[QUOTA] Stops list ({len(stops)}) exceeds plan max ({total_stops}) — rejecting")
+        return jsonify({
+            "allowed": False,
+            "error": "stops_exceed_plan",
+            "message": (
+                f"You provided {len(stops)} stops, but your plan allows at most "
+                f"{total_stops}. Remove some stops or upgrade your plan."
+            ),
+            "provided_stops": len(stops),
+            "max_stops": total_stops,
+            "upgrade": True,
+        }), 429
 
     # Generate job ID FIRST (needed for usage recording)
     job_id = str(uuid.uuid4())
@@ -1590,6 +1684,7 @@ def generate_complete_tour():
         "language": language,
         "persona": persona,  # [S81] Pass persona for downstream generation
         "is_test": is_test_override,  # [LOCAL-103] Track test flag
+        "stops": stops,  # [LOCAL-525] User-chosen stops (None → normal generation)
         "created_at": datetime.now().isoformat()
     }
     
@@ -1609,7 +1704,15 @@ def generate_complete_tour():
         print(f"User tracking skipped - user_id empty: {not user_id}, request_string empty: {not request_string}")
     
     # === GENERATION MODE DISPATCH ===
-    if GENERATION_MODE == 'cloud_tasks':
+    # [LOCAL-525] The Cloud Tasks enqueue path (_create_job_in_db /
+    # _enqueue_cloud_task / tour-worker) does not yet carry the user's stop list.
+    # Rather than silently drop it — the exact "not reliably honoured" failure this
+    # feature fixes — a request WITH stops runs in thread mode, which forwards them
+    # end-to-end. Requests without stops keep the configured mode unchanged.
+    _use_cloud_tasks = (GENERATION_MODE == 'cloud_tasks') and (stops is None)
+    if GENERATION_MODE == 'cloud_tasks' and stops is not None:
+        print(f"[LOCAL-525] Stops provided — using thread mode so the stop list is honoured (job {job_id})")
+    if _use_cloud_tasks:
         # Part B: Enqueue to Cloud Tasks — worker does generation synchronously
         # Job state lives in Cloud SQL (job_status table), readable by any instance
         _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language)
@@ -1619,7 +1722,7 @@ def generate_complete_tour():
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
             thread = threading.Thread(
                 target=orchestrate_tour_async,
-                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override)
+                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops)
             )
             thread.daemon = True
             thread.start()
@@ -1631,7 +1734,7 @@ def generate_complete_tour():
         sys.stdout.flush()
         thread = threading.Thread(
             target=orchestrate_tour_async,
-            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override)
+            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops)
         )
         thread.daemon = True
         thread.start()
