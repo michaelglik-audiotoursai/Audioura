@@ -469,3 +469,66 @@ Durable across sessions. Delete a line once delivered.
 - [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
       `[LOCAL-410] beats_in_delivered_text` reports a false 0 (D423), and LOCAL-455's
       `docker-compose.override.yml` never loads (D422). Neither has been fixed.
+
+## Paid-account checks — every 15 days (added 2026-09-22)
+
+- [ ] **2026-10-07 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #1).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2026-10-22 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #2).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2026-11-06 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #3).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2026-11-21 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #4).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2026-12-06 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #5).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2026-12-21 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #6).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2027-01-05 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #7).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2027-01-20 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #8).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2027-02-04 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #9).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2027-02-19 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #10).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2027-03-06 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #11).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
+- [ ] **2027-03-21 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #12).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five of six tours mid-batch.
+  - **Serper** https://serper.dev/dashboard — was 39,293 credits on 09-22, ~111 used that day
+  - **Gemini (AI Studio PREPAY)** https://console.cloud.google.com/billing — was $20.65 on 09-22, **auto-reload OFF**, so this one WILL hit zero
+  - **OpenAI** https://platform.openai.com/settings/organization/billing — topped up 09-22
+  - Run `cd ~/Audioura && set -a && . ./.env && set +a && python3 preflight.py` first — it proves the keys still work, but it CANNOT see a balance.
