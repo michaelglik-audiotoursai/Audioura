@@ -43,6 +43,7 @@ computed here are the contract, and they are testable without a key.
 """
 
 from math import radians, sin, cos, asin, sqrt
+import logging
 import re
 
 
@@ -212,28 +213,59 @@ def _order_venue_flow(poi_list):
     a no-op when the venue provides no flow hints, which is the correct
     behaviour: with no signal, the user's order stands.
     """
-    def _key(item):
-        idx, poi = item
-        floor = poi.get('floor', 0) if isinstance(poi, dict) else 0
-        flow = poi.get('flow_index', 0) if isinstance(poi, dict) else 0
+    # [2026-09-23, kiro critic] Fill missing hints in a FORWARD pass, in the user's
+    # own order, BEFORE sorting. An un-hinted stop inherits the hint of the stop
+    # before it, so it keeps its place.
+    #
+    # Defaulting a missing flow_index to 0 made it sort ahead of everything: a user
+    # who put "Gift Shop" LAST with no hint got it moved to FIRST, because 0 < 1.
+    # The docstring's promise -- "with no signal, the user's order stands" -- held
+    # only when NO stop carried a hint. This cannot be done inside the sort key:
+    # sort calls the key in an unspecified order, so "the stop before it" is only
+    # meaningful in a separate pass.
+    def _num(v, fallback):
         try:
-            floor = float(floor)
+            return float(v)
         except (TypeError, ValueError):
-            floor = 0.0
-        try:
-            flow = float(flow)
-        except (TypeError, ValueError):
-            flow = 0.0
-        return (floor, flow, idx)  # idx keeps it a stable sort
+            return fallback
 
-    indexed = list(enumerate(poi_list))
-    indexed.sort(key=_key)
-    return [poi for _, poi in indexed]
+    filled, floor_c, flow_c = [], 0.0, 0.0
+    for idx, poi in enumerate(poi_list):
+        d = poi if isinstance(poi, dict) else {}
+        floor_c = _num(d.get('floor', floor_c), floor_c)
+        flow_c = _num(d.get('flow_index', flow_c), flow_c)
+        filled.append(((floor_c, flow_c, idx), poi))
+
+    filled.sort(key=lambda t: t[0])       # idx keeps it stable
+    return [poi for _, poi in filled]
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Forced order: honour the user's own sequence verbatim
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Warnings from the most recent sequence_stops() call. The function returns a plain
+# list for backward compatibility, so this is how a caller learns that part of the
+# user's instruction could not be honoured.
+LAST_WARNINGS = []
+
+
+def unmatched_forced_labels(poi_list, forced_order):
+    """Names the user gave that match no stop — a typo, not an instruction to drop.
+
+    [2026-09-23, kiro critic] `_apply_forced_order` ignores an unmatched name
+    silently. It never LOSES a stop — the unnamed one is appended — but the user's
+    intent for it is discarded without a word: someone typing "Alter" for "Altar"
+    gets that stop moved to the END of the tour, the opposite of what they asked,
+    with nothing said. Same family as the failures fixed elsewhere today, where a
+    thing that did not work was indistinguishable from a thing that did.
+    """
+    have = {_normalize_name(p.get('name', '') if isinstance(p, dict) else p)
+            for p in (poi_list or [])}
+    return [lbl for lbl in (forced_order or [])
+            if _normalize_name(lbl) not in have]
+
 
 def _apply_forced_order(poi_list, forced_order):
     """Reorder poi_list to match `forced_order` exactly.
@@ -321,6 +353,18 @@ def sequence_stops(
 
     # 1 / 3 — ORDER (forced order wins outright; otherwise order for the mode)
     if forced_order:
+        _unmatched = unmatched_forced_labels(stops, forced_order)
+        LAST_WARNINGS.clear()
+        if _unmatched:
+            # Do not silently discard what the user asked for. sequence_stops
+            # returns a plain list, so the warning goes to the log and to
+            # LAST_WARNINGS for any caller that wants to surface it.
+            _msg = ("you asked to place " +
+                    ", ".join(f'\"{u}\"' for u in _unmatched[:4]) +
+                    " but no stop of that name is in the tour — check the spelling; "
+                    "those stops kept their original position")
+            LAST_WARNINGS.append(_msg)
+            logging.warning("[SEQUENCE] %s", _msg)
         ordered = _apply_forced_order(stops, forced_order)
     elif tour_category in ('museum', 'building', 'venue'):
         ordered = _order_venue_flow(stops)
