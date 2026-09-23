@@ -46,15 +46,35 @@ _PERSON_TITLE = (r'Governor|Mayor|Father|Cardinal|Archbishop|Mother|Sister|Presi
 _PERSON_ROLE = (r'architect|designer|builder|artisan|artisans|artist|sculptor|painter|'
                 r'engineer|founder|donor|patron|benefactor|pastor|priest|rector|'
                 r'organist|composer|mason|craftsman|craftsmen|activist|pilot|'
-                r'controller|curator|historian|photographer|author|writer')
+                r'controller|curator|historian|photographer|author|writer|'
+                # [2026-09-23] added after a second critic listed people the counter
+                # still missed: "flight attendants Betty Ann Ong", "hijackers,
+                # including Mohamed Atta", "the landing of Charles Lindbergh".
+                r'attendant|attendants|hijacker|hijackers|aviator|aviators|'
+                r'passenger|passengers|officer|officers|soldier|soldiers|nun|nuns|'
+                r'pioneer|pioneers|immigrant|immigrants|worker|workers|'
+                r'mayor|governor|senator|nurse|doctor|teacher|singer|musician')
+# Frames that introduce a person without any role word at all.
+_PERSON_FRAME = (r'(?:landing|visit|arrival|death|funeral|memory|honou?r|legacy|'
+                 r'portrait|statue|grave|story)\s+of|including|alongside|led\s+by|'
+                 r'named\s+(?:for|after)')
 # NO re.IGNORECASE. With it, [A-Z] matches lowercase too, and the pattern happily
 # captured "Cuenin d", "Law r", "of P" and "here" — a count of 13 "people" in a
 # tour with four. Titles are capitalised in prose and roles are lowercase, so the
 # alternation spells both out instead.
+# A given name plus up to two further tokens, each either a middle initial
+# ("H.") or another name word -- "Betty Ann Ong", "Walter H. Cuenin".
+# The period on an initial is REQUIRED: with it optional, [A-Z]\.? matched the
+# first letter of the surname and the name came out as "Betty A" / "Charles L".
+_NAME = r'[A-Z][a-z]{2,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]{2,})){0,2}'
 _PERSON = re.compile(
     r'\b(?:(?:' + _PERSON_TITLE + r')\.?\s+'
-    r'|(?:' + _PERSON_ROLE + r')s?\s+(?:named\s+)?)'
-    r'([A-Z][a-z]{2,}(?:\s+[A-Z]\.)?(?:\s+[A-Z][a-z]{2,})?)')
+    r'|(?:' + _PERSON_ROLE + r')s?\s*,?\s+(?:named\s+)?'
+    r'|(?:' + _PERSON_FRAME + r')\s+)'
+    r'(' + _NAME + r')'
+    # "...attendants Betty Ann Ong AND Madeline Amy Sweeney" -- one introducer,
+    # two people. Without this the second name is invisible.
+    r'(?:\s+and\s+(' + _NAME + r'))?')
 # a fragment ending on a title with no name after it
 _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+\s+'
                     r'(?:you|As|The|It|This|Its|Their|He|She|We))')
@@ -78,6 +98,12 @@ _SPLICE_OK = {'breathe', 'understand', 'together', 'whitewashed'}
 _KM = re.compile(r'\b\d+(?:\.\d+)?\s*(?:km|kilometre|kilometer)s?\b', re.I)
 
 
+try:                                    # single source of truth for "not a person"
+    from derepetition_guard import _NOT_PERSON
+except Exception:                       # pragma: no cover - keep the scorer standalone
+    _NOT_PERSON = set()
+
+
 def _count_people(text):
     """Distinct PEOPLE, de-duplicated by surname.
 
@@ -86,12 +112,21 @@ def _count_people(text):
     capitalised token — is the identity; the fullest form seen is kept for display.
     """
     by_surname = {}
+    candidates = []
     for m in _PERSON.findall(text or ''):
-        name = (m if isinstance(m, str) else m[0]).strip()
+        # Every group is a person: group 2 is the "X and Y" partner when present.
+        candidates.extend([m] if isinstance(m, str) else [g for g in m if g])
+    for name in candidates:
+        name = name.strip()
         if not name:
             continue
         surname = name.split()[-1]
         if len(surname) < 3:
+            continue
+        # A frame like "including Terminal B" hands us scenery. The person-cap
+        # already maintains this vocabulary (D584); share it rather than keeping
+        # two lists that drift apart.
+        if surname.lower() in _NOT_PERSON or name.split()[0].lower() in _NOT_PERSON:
             continue
         if len(name) > len(by_surname.get(surname, '')):
             by_surname[surname] = name
