@@ -222,6 +222,19 @@ if not _import_logger.handlers:
     _import_logger.addHandler(_h)
     _import_logger.setLevel(logging.DEBUG)
 from concurrent.futures import ThreadPoolExecutor, as_completed
+# [2026-09-23] MODULE level, deliberately. LOCAL-3498 imported this inside
+# generate_tour_text(), which left `_sfp` undefined for the LOCAL-472 and LOCAL-479
+# wiring tests -- they exec a block of this file's source in isolation to prove the
+# call site really runs, and got `NameError: name '_sfp' is not defined`. Four tests
+# went red on merge. A profiler that is off by default must never be able to break
+# the thing it measures, so it is bound once here and degrades to a no-op.
+try:
+    import story_first_profile as _sfp
+except Exception:                       # pragma: no cover - profiling is optional
+    class _SfpNoop:
+        def __getattr__(self, _name):
+            return lambda *a, **k: None
+    _sfp = _SfpNoop()
 from enhanced_tour_templates_fixed import get_enhanced_tour_template, validate_enhanced_poi_knowledge
 from poi_inclusion_exceptions import should_include_in_restaurant_tour, should_include_in_walking_tour
 # NOTE: tour_type_detector.detect_tour_type() is intentionally NOT used here.
@@ -11777,7 +11790,6 @@ Exempt: navigation directions ("Turn left", "Continue past").
     # museum-gated + off by default): the per-stop description loop and ~20 serial
     # post-description gates all live inside it. Instrument them to find where the
     # 110-150s actually goes.
-    import story_first_profile as _sfp
     _sfp.reset()
     # Michael's 4-step process (D393): for each stop, BEFORE narration, seek stories
     # specifically (not just facts), verify them against sources, adapt size, then

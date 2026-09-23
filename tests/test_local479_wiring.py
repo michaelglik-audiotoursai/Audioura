@@ -21,6 +21,7 @@ import os
 import re
 import sys
 import io
+import story_first_profile as _sfp
 import json
 import types
 import unittest
@@ -87,6 +88,12 @@ class TestWiring(unittest.TestCase):
                 'api_key': None,          # call site reads `api_key` from scope
                 'total_tokens': 0,        # call site increments these
                 'total_cost': 0.0,
+                # [2026-09-23] LOCAL-3498's sub-phase profiler is a module-level
+                # global in generate_tour_text, so the call site binds it too. It
+                # is a no-op unless STORY_FIRST_PROFILE=1. Without it here, exec()
+                # raises NameError on _sfp and this test reports a wiring failure
+                # that is really a missing binding in the harness.
+                '_sfp': _sfp,
             }
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
@@ -109,7 +116,7 @@ class TestWiring(unittest.TestCase):
         block = _extract_phase_block()
         poi_list = [{'name': 'A', 'description': 'x'}]
         ns = {'os': os, 'sys': sys, 'poi_list': poi_list, 'api_key': None,
-              'total_tokens': 0, 'total_cost': 0.0}
+              'total_tokens': 0, 'total_cost': 0.0, '_sfp': _sfp}
         os.environ['DISABLE_UNGLOSSED_REFERENCE_GATE'] = '1'
         try:
             buf = io.StringIO()

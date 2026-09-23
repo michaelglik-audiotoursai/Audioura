@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import io
+import story_first_profile as _sfp
 import json
 import types
 import unittest
@@ -100,6 +101,7 @@ class TestWiring(unittest.TestCase):
                 'sys': sys,
                 'poi_list': poi_list,
                 'api_key': 'test-key',   # call site reads `api_key` from scope
+                '_sfp': _sfp,
             }
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
@@ -119,7 +121,7 @@ class TestWiring(unittest.TestCase):
         """The DISABLE env var short-circuits the real block (no import, no run)."""
         block = _extract_phase_block()
         poi_list = [{'name': 'A', 'description': 'x'}]
-        ns = {'os': os, 'sys': sys, 'poi_list': poi_list, 'api_key': None}
+        ns = {'os': os, 'sys': sys, 'poi_list': poi_list, 'api_key': None, '_sfp': _sfp}
         os.environ['DISABLE_STOP_SPECIFICITY_GATE'] = '1'
         try:
             buf = io.StringIO()
