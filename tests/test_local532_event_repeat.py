@@ -152,3 +152,36 @@ def test_real_logan_1_lindbergh_landing_told_twice_is_collapsed():
     # Stop 4 keeps its own distinct facts.
     assert '43.5 million' in pois[3]['description']
     assert 'Channing H. Cox' in pois[3]['description']
+
+
+def test_a_preview_is_not_a_telling():
+    """LEAD review of LOCAL-532, 2026-09-23.
+
+    LOGAN_1 stop 1 previews the tour: "At the upcoming stops, you'll learn about ...
+    the historic landing of Charles Lindbergh." Event matching treated that as the
+    first telling and deleted the real narration from BOTH stop 3 and stop 4, so the
+    tour promised its best anecdote and never delivered it -- the unfulfilled-promise
+    defect R10 (LOCAL-235) exists to catch.
+
+    A preview may still be dropped as a duplicate; it may never be the thing a later
+    stop is judged against.
+    """
+    from derepetition_guard import strip_cross_stop_repeats
+    pois = [
+        {'name': 'Check-In', 'description':
+            "At the upcoming stops, you'll learn about the historic landing of "
+            "Charles Lindbergh and the airport's distinctive exterior paint."},
+        {'name': 'Jetbridge', 'description':
+            "It was here, on the tarmac just beyond the bridge, that Charles "
+            "Lindbergh once touched down, marking a moment in aviation history."},
+        {'name': 'Control Tower', 'description':
+            "In 1927, just a few years after opening, the airport gained national "
+            "attention when Charles Lindbergh landed the Spirit of St. Louis here."},
+    ]
+    strip_cross_stop_repeats(pois)
+    narrations = [i for i, p in enumerate(pois)
+                  if 'touched down' in p['description'] or 'landed the Spirit' in p['description']]
+    assert len(narrations) == 1, (
+        f'the landing should be told exactly once, found {len(narrations)}: '
+        f'{[p["description"][:60] for p in pois]}')
+    assert narrations[0] == 1, 'the EARLIEST real telling should survive, not a later one'

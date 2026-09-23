@@ -1027,6 +1027,14 @@ def cap_person_across_stops(poi_list, max_stops: int = 2):
     return removed
 
 
+_IS_PREVIEW = re.compile(
+    r"\b(?:at|in|on)\s+the\s+(?:upcoming|next|following|remaining)\s+stops?\b"
+    r"|\bin\s+the\s+stops?\s+ahead\b"
+    r"|\byou(?:'|\u2019)?ll\s+(?:learn|discover|hear|see|find)\s+about\b"
+    r"|\bwe(?:'|\u2019)?ll\s+(?:explore|visit|see)\b"
+    r"|\bcoming\s+up\b", re.I)
+
+
 def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int = 8,
                              banned_by_stop: dict = None, banned_threshold: float = 0.42):
     """[2026-09-18] Delete a sentence from a LATER stop when an earlier stop said it.
@@ -1093,7 +1101,16 @@ def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int =
                 dropped.append((sent, dup_of))
             else:
                 kept.append(sent)
-                seen.append((idx, toks, sent, _ekey))
+                # [2026-09-23] A PREVIEW is not a telling. LOGAN_1 stop 1 says "At
+                # the upcoming stops, you'll learn about ... the historic landing of
+                # Charles Lindbergh"; LOCAL-532's event matching then treated that as
+                # the first telling and deleted the real narration from BOTH stop 3
+                # and stop 4. The tour promised its best anecdote and never delivered
+                # it -- which is the unfulfilled-promise defect R10 (LOCAL-235)
+                # exists to catch. A preview may still be DROPPED as a duplicate; it
+                # just may never be the thing a later stop is judged against.
+                if not _IS_PREVIEW.search(sent):
+                    seen.append((idx, toks, sent, _ekey))
         if dropped:
             poi['description'] = ' '.join(kept).strip()
             for sent, src in dropped:
