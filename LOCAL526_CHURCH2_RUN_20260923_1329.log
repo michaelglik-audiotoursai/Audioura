@@ -1,0 +1,1304 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+==========================================================================
+  CHURCH — SERIAL — 4 stops
+==========================================================================
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:7512. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:7513. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:8414. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:8893. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:9182. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:9183. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass ReadTimeout for 'Sacred Heart Parish' (attempt 1/2)
+[OSM-VENUE] Overpass HTTP 504 for 'Sacred Heart Parish'
+[OSM-VENUE] Overpass HTTP 504 for 'Mary Immaculate of Lourdes Parish'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:10231. Caller should supply input_tokens and output_tokens separately.
+Wikipedia API returned 500 for 'Mary Immaculate of Lourdes Parish' | URL: https://en.wikipedia.org/api/rest_v1/page/summary/Mary_Immaculate_of_Lourdes_Parish | body[:200]: {"status":500,"type":"Internal error"}
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:13727. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:15036. Caller should supply input_tokens and output_tokens separately.
+LOCAL-371: _take_in_handler Case 3 declining unrepairable tail: 'intricate stonework that speaks to the skill and dedication of the Irish immigrants who built this magnificent structure.'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-526/generate_tour_text.py:18799. Caller should supply input_tokens and output_tokens separately.
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #001 | 13:29:14.926 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  tour_type: museum
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-526/LOCAL526_church2_serial_20260923_1329.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #002 | 13:29:14.926 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "churches",
+    "location": "Newton, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Our Lady Help of Christians Catholic Church",
+    "geographic_scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: churches
+   Location: Newton, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Our Lady Help of Christians Catholic Church
+  [venue_name sanity] 'Our Lady Help of Christians Catholic Church' OK
+  [S15/LOCAL-485] venue_name='Our Lady Help of Christians Catholic Church' NOT forced to museum — request names a worship/civic place class (stops are places, not works)
+[TIMING] phase=intent elapsed=2.2s cumulative=2.2s
+[LOCAL-474] tour_type='museum' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Our Lady Help of Christians Catholic Church, Newton MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #003 | 13:29:17.084 | GENERATING_PROMPT
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  user_request: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Our Lady Help of Christians Catholic Church, Newton MA...
+  [S17] no scope_constraint (precision='BUILDING', scope='Our Lady Help of Christians Catholic Church, Newton, MA')
+  [D571] VENUE-PARTS rejected the venue kind (only 0 of 0 answers name something you can stand next to — the venue kind is probably wrong) — falling through
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #004 | 13:29:17.283 | PHASE_3A_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+  poi_type_hint: churches
+
+PHASE 3A API call cost: $0.0005 (631 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #005 | 13:29:19.598 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Our Lady Help of Christians Catholic Church, Newton MA.
+List exactly 7 specific, real, well-known churches relevant to: Our Lady Help of Christians Catholic Church, Newton MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+WALKING-TOUR COMPACTNESS — this is a walking tour:
+- All
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Sacred Heart Parish", "address": "1321 Centre St, Newton, MA 02459", "reason": "Established in 1894, known for its beautiful Gothic architecture"},
+{"name": "St. Mary's Parish", "address": "1 Church Square, Waltham, MA 02452", "reason": "Founded in 1845, historic church with a vibrant community"},
+{"name": "St. Ignatius of Loyola Parish", "address": "28 Commonwealth Ave, Chestnut Hill, MA 02467", "reason": "Built in 1922, known for its stunning Spanish Renaissance architecture"},
+{"na
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Mary's Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Ignatius of Loyola Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. John Chrysostom Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Theresa of Avila Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Joseph Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Agnes Parish'
+  [LOCAL-329] Captured 1 substantive selection reason(s)
+OK PHASE 3A parsed 1 candidate POI(s):
+   - Sacred Heart Parish @ 1321 Centre St, Newton, MA 02459
+  [area_resolver] Parsed: city='Newton MA', neighborhood='Our Lady Help of Christians Catholic Church'
+  [area_resolver] Could not resolve city: 'Newton MA'
+  [WALK-D1] Area resolution failed for 'Our Lady Help of Christians Catholic Church, Newton MA' — proceeding unverified
+
+PHASE 4.5: Validating AI knowledge for Our Lady Help of Christians Catholic Church, Newton MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+
+Part C: Fetching 3 replacement POI(s), attempt 1/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'St. Ignatius of Loyola Parish'
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'St. Bernard Parish'
+   Part C attempt 1: AI returned 1 usable candidate(s)
+   Part C attempt 1: 1 survived; total now 2
+
+Part C: Fetching 2 replacement POI(s), attempt 2/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'St. Ignatius of Loyola Parish'
+   Part C attempt 2: AI returned 0 usable candidate(s)
+   Part C attempt 2: 0 survived; total now 2
+  [EXISTENCE-GATE] LOG_ONLY — 2/2 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Sacred Heart Parish' — venue_corpus canonical_title(geo): 'Newton College of the Sacred Heart' at 'Our 
+    [VERIFIED] 'Mary Immaculate of Lourdes Parish' — stop_corpus(geographic): 'Mary Immaculate of Lourdes Parish' at 'Our Lady Help o
+    [HARVEST] Summary: 0 harvested, 2 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Sacred Heart Parish': +1 passages (2 queries)
+    [INTERPRETIVE] 'Mary Immaculate of Lourdes Parish': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +2 passages, 4 queries issued, 0 attributions dropped
+
+  [LOCAL-290] REPLENISHMENT: need 2 more stops (have 2/4)
+    [LOCAL-290] Replenishment round 1: no new candidates after dedup
+  [LOCAL-290] Replenishment exhausted: 2/4 stops
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #006 | 13:29:34.313 | PHASE_3B_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0005 (638 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Newton, hint: auto)
+  [LOCAL-355] Sacred Heart Parish: no practical facts in OSM
+  [LOCAL-355] Mary Immaculate of Lourdes Parish: no practical facts in OSM
+   GEO-CHECK: skipped (fewer than 3 stops have coordinates)
+Extracted first POI coordinates: (42.32457, -71.19182)
+
+=== Extracted POI Information ===
+1. Sacred Heart Parish
+   Address: 1321 Centre St, Newton, MA 02459
+   Coordinates: 42.324570, -71.191820
+   Directions: Head northeast on Centre St, the church will be on your right after the bend in ...
+2. Mary Immaculate of Lourdes Parish
+   Address: 270 Elliot St, Newton, MA 02464
+   Coordinates: 42.330970, -71.211320
+   Directions: Continue on Centre St, then turn left onto Elliot St. The church will be on your...
+================================
+
+  [D556] Replenish round 1: need 2, proposed 4
+   OK 'Our Lady Help of Christians Catholic Church' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': The stop is physically located inside 'Our Lady Help of Christians Catholic Church, Newton, MA'. (conf=high)
+   X SCOPE-CHECK REMOVED 'Newton Cemetery' — outside 'Our Lady Help of Christians Catholic Church, Newton, MA': [scope-memory] recorded in known_out_of_scope.json: The Newton Cemetery is located outside of Our Lady Help of Christians Catholic Church in Newton, MA. (conf=high)
+  [D558] Replenishment scope check: 1/2 candidate(s) inside 'Our Lady Help of Christians Catholic Church, Newton, MA'
+  [D556]   ADDED 'Our Lady Help of Christians Catholic Church' — built in 1881, it serves as a significant landmark for the l
+  [D556] Replenish round 2: need 1, proposed 3
+   X SCOPE-CHECK REMOVED 'Jackson Homestead and Museum' — outside 'Our Lady Help of Christians Catholic Church, Newton, MA': [scope-memory] recorded in known_out_of_scope.json: The Jackson Homestead and Museum is located outside of Our Lady Help of Christians Catholic Church, Newton, MA. (conf=high)
+  [D558] Replenishment scope check: 0/1 candidate(s) inside 'Our Lady Help of Christians Catholic Church, Newton, MA'
+  [D556] Replenish round 3: need 1, proposed 3
+   X SCOPE-CHECK REMOVED 'Newton City Hall' — outside 'Our Lady Help of Christians Catholic Church, Newton, MA': [scope-memory] recorded in known_out_of_scope.json: The stop is located outside of 'Our Lady Help of Christians Catholic Church, Newton, MA'. (conf=high)
+  [D558] Replenishment scope check: 0/1 candidate(s) inside 'Our Lady Help of Christians Catholic Church, Newton, MA'
+  [D556] ⚠️  Still short: 3/4 after 3 round(s), 3 candidate(s) rejected for scope
+  [D556] +2 story fact(s) for 'Sacred Heart Parish' via openai+web(14) (2 high)
+  [D556] +3 story fact(s) for 'Mary Immaculate of Lourdes Parish' via openai+web(14) (3 high)
+  [D556] +1 story fact(s) for 'Our Lady Help of Christians Catholic Chu' via openai+web(14) (1 high)
+  [D558] Fetching coordinates for 1 replenished stop(s) so the route can place them...
+  [D558]   coords OK 'Our Lady Help of Christians Catholic Chu': 42.3466, -71.2134
+  [D559] Coordinates established for 0/3 stop(s); the rest keep the model's value and are marked low confidence
+  [ROUTE-ORDER] Computed route for 3 stops with coords (0 without): 3.50km total
+  [D558] Route order already correct after replenishment
+[TIMING] phase=poi_selection elapsed=91.8s cumulative=93.9s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Sacred Heart Parish Newton MA' → 27606 chars
+  [LOCAL-47] Sacred Heart Parish: tier=rich, facts=8
+  [LOCAL-47] Mary Immaculate of Lourdes Par: tier=empty, facts=0
+  [LOCAL-47] Our Lady Help of Christians Ca: tier=empty, facts=0
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 1, 'empty': 2}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Our Lady Help of Christians Ca model=gpt-4o tokens=1396 (in=869 out=527) cost=$0.0074 latency=6.9s
+[COST_METER] FRESH | spine_generate | $0.007443 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0074
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (22 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Sacred Heart Parish' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Mary Immaculate of Lourdes Parish' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Our Lady Help of Christians Catholic Church' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=66.0s cumulative=159.9s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=159.9s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=159.9s
+
+Generating description for Stop 1: Sacred Heart Parish by , ...
+
+Generating description for Stop 2: Mary Immaculate of Lourdes Parish by , ...
+
+Generating description for Stop 3: Our Lady Help of Christians Catholic Church by , ...
+  [LOCAL-381] stop='Sacred Heart Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Our Lady Help of Christians Catholic Church' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Mary Immaculate of Lourdes Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sacred Heart Parish', 16, ''), ('Sacred Heart Parish', 11, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12345 after=23412 (+11067 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23412)
+  [LOCAL-411] Stop 3 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Our Lady Help of Christians Catholic Church', 10, ''), ('Our Lady Help of Christians Catholic Church', 10, '')]
+  [LOCAL-402] Stop 3: injected 2 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=10697 after=20620 (+9923 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20620)
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Mary Immaculate of Lourdes Parish', 18, ''), ('Mary Immaculate of Lourdes Parish', 18, ''), ('Mary Immaculate of Lourdes Parish', 8, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10824 after=22285 (+11461 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22285)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-526/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0275 (5782 tokens, model=gpt-4o)
+Stop 1 description word count: 249 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 2 API call cost: $0.0266 (5606 tokens, model=gpt-4o)
+Stop 2 description word count: 262 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0244 (5130 tokens, model=gpt-4o)
+Stop 3 description word count: 256 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Sacred Heart Parish': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Mary Immaculate of Lourdes Parish': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Our Lady Help of Christians Catholic Church': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.001934 (input=7817, output=1269)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 2: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 6 paragraphs retried, 6 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0022 (2705 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Our Lady Help of Christians Ca': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Sacred Heart Parish': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 2 'Mary Immaculate of Lourdes Par': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 1 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Sacred Heart Parish': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Our Lady Help of Christians Ca': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 3 sentences deleted, 1 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 8
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 8
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Our Lady Help of Christians Catholic Church' conf=high reason='Generic claims about strength and unity apply to any historic church.': "Our Lady Help of Christians stands as a living testament to the strength and unity of the people who called it home."
+    [LOCAL-472] UNGROUNDED entity stop='Sacred Heart Parish' entity='Downtown Boston' reason='It does not establish a concrete link between the church and Downtown Boston.' in: "This church was built to serve the burgeoning community in Newton, a city nestled roughly 8 miles we"
+    [LOCAL-472] UNGROUNDED entity stop='Sacred Heart Parish' entity='In September' reason='No concrete link between Father Stephen Dalla Via and Sacred Heart Church is provided.' in: "In September 1958, Father Stephen Dalla Via, the pastor of Sacred Heart Church, spearheaded a signif"
+    [LOCAL-472] UNGROUNDED entity stop='Sacred Heart Parish' entity='Father Stephen Dalla Via' reason='It does not specify how Father Stephen Dalla Via is concretely linked to Sacred Heart Parish.' in: "In September 1958, Father Stephen Dalla Via, the pastor of Sacred Heart Church, spearheaded a signif"
+    [LOCAL-472] UNGROUNDED entity stop='Sacred Heart Parish' entity='Census Bureau' reason='No concrete link between "Census Bureau" and Sacred Heart Parish is provided.' in: "The parish's history is closely linked with the city's evolution. Newton, with a population of 90,74"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='Romanesque Revival' reason='No specific link to "Romanesque Revival" is provided.' in: "Now, cast your gaze upon the Romanesque Revival facade of Mary Immaculate of Lourdes Parish, where t"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='Father Charles Higgins' reason='It does not specify how Father Charles Higgins is directly connected to this stop.' in: "In 1909, a significant transformation occurred as the cornerstone of the present church building was"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='Philip Neri Parish' reason='No concrete link to Mary Immaculate of Lourdes Parish is established.' in: "In 1909, a significant transformation occurred as the cornerstone of the present church building was"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='St. Philip' reason='It does not specify a direct link between St. Philip and the stop.' in: "In 1909, a significant transformation occurred as the cornerstone of the present church building was"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/19)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 5
+    Glossed (composed): 1
+    Suppressed (already explained): 0
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 3
+    Triage: 818 tokens, $0.0002, 3.5s
+    Gloss: 402 tokens, $0.0001, 1.9s
+    Compose: 503 tokens, $0.0001, 0.9s
+    Total added cost: $0.0003
+    Stops affected: 2
+    Glosses applied:
+      • Census Bureau → DEGRADED (name dropped)
+      • Calcutta → "the founder of the Missionaries of Charity" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'Sacred Heart Parish': claim='1958 (in context: "In September 1958, Father Stephen Dalla V' contradicted_by='On January 11, 1908 Father John J. Lennon became pastor of Sacred Heart and imme' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=1 claim='1958 (in context: "In September 1958, Father Steph' evidence='On January 11, 1908 Father John J. Lennon became p' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Our Lady Help of Christians Catholic Church, Newton, MA'...
+   X SCOPE-CHECK REMOVED 'Mary Immaculate of Lourdes Parish' — outside 'Our Lady Help of Christians Catholic Church, Newton, MA': The stop is located at a different church, Mary Immaculate of Lourdes Parish, which is a separate location from Our Lady Help of Christians Catholic Church. (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "Mary Immaculate of Lourdes Parish", "aliases": [], "scope": "Our Lady Help of Christians Catholic Church, Newton, MA", "expect": "outside", "actual_location": "", "ground_truth": "The stop is located at a different church, Mary Immaculate of Lourdes Parish, which is a separate location from Our Lady Help of Christians Catholic Church.", "source": "phase_5_6_high_conf", "recorded": "2026-09-23"}
+   OK 'Our Lady Help of Christians Catholic Church' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': The stop is physically located inside Our Lady Help of Christians Catholic Church in Newton, MA. (conf=high)
+OK PHASE 5.6: 2/3 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Sacred Heart Parish' (index 30) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Sacred Heart Parish': the longest run (4 sentences, Newton) has agency=1 stakes=0 — someone is described, but nothing is risked, ref
+    stop 2 'Our Lady Help of Christians Catholic C': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Our Lady Help of Christians Cathol' (index 18)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Sacred Heart Parish' — 212w → 81w after gates, 8 sentence(s) removed
+    removed: "As you stand here, you can almost feel the echoes of the past—an era when Irish immigrants laid the "
+    removed: "In September 1958, Father Stephen Dalla Via, the pastor of Sacred Heart Church, spearheaded a signif"
+    removed: "This initiative reflects the ongoing efforts to adapt and grow, ensuring the parish remained a vital"
+    removed: "The parish's story is intertwined with the city's history."
+    removed: "Newton, with a population of 90,741 as per the 2025 Census Bureau estimates, is a patchwork of thirt"
+    removed: "The church's history mirrors the city's dynamic evolution, providing spiritual guidance and a sense "
+    removed: "As you continue your journey, take a moment to appreciate how Sacred Heart Parish has been a constan"
+    removed: "Its architecture and legacy are tangible reminders of the community's resilience and adaptability."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Our Lady Help of Christians Catholic Church' — 232w → 55w after gates, 14 sentence(s) removed
+    removed: "Now, cast your gaze upon the Romanesque Revival facade of Mary Immaculate of Lourdes Parish, where t"
+    removed: "Founded originally as St."
+    removed: "Mary's Parish in 1870, this sacred ground holds the distinction of being the mother church of Newton"
+    removed: "It was a beacon for the Catholic faithful in a time when the burgeoning communities eagerly sought a"
+    removed: "In 1909, a significant transformation occurred as the cornerstone of the present church building was"
+    removed: "The architect, Edward T."
+    removed: "P."
+    removed: "Graham, shaped its structure with an eye for timeless design, crafting a space where faith and artis"
+    removed: "Philip Neri Parish in Newton."
+    removed: "His dual responsibilities underscore the interconnectedness of these communities and the shared dedi"
+    removed: "This parish, steeped in history, is more than just bricks and mortar."
+    removed: "It is a living tapestry woven from the stories of its clergy and congregation, each thread contribut"
+    removed: "As you stand before its doors, you witness a blend of cultural influences that have touched Newton o"
+    removed: "Ahead, the narrative of faith and community continues to unfold, promising yet another chapter where"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=1)
+
+Generating description for Stop 1: Sacred Heart Parish by , ...
+  [LOCAL-381] stop='Sacred Heart Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sacred Heart Parish', 16, ''), ('Sacred Heart Parish', 11, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12345 after=23412 (+11067 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23412)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-526/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0298 (6277 tokens, model=gpt-4o)
+Stop 1 description word count: 263 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+Generating description for Stop 2: Our Lady Help of Christians Catholic Church by , ...
+  [LOCAL-381] stop='Our Lady Help of Christians Catholic Church' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Our Lady Help of Christians Catholic Church', 10, ''), ('Our Lady Help of Christians Catholic Church', 10, '')]
+  [LOCAL-402] Stop 2: injected 2 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10641 after=20564 (+9923 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20564)
+Stop 2 API call cost: $0.0276 (5801 tokens, model=gpt-4o)
+Stop 2 description word count: 288 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 250w (was 81w)
+    [LOCAL-474] regenerated and re-gated: 265w (was 55w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts) (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Chr
+  [LOCAL-427] HTTP 200 from https://canningliturgicalarts.com/portfolio/our-lady-help-of-christians/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://canningliturgicalarts.com/portfolio/our-la
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/191682034340498/posts/947293765445984/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://johncanningco.com/blog/characteristics-of-gothic-churches-and-chapels/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2148 chars from https://johncanningco.com/blog/characteristics-of-
+  [LOCAL-427] HTTP 200 from https://buildingsofnewengland.com/tag/irish-catholic-church/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://buildingsofnewengland.com/tag/irish-cathol
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/StJoeOst/posts/our-church-renovation-project-is-now-underway-after-the-final-mass-in-the-sanctu/1318040403773911/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://thebostonpilot.com/bcd/web_parish.asp?ektronid=4676 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://thebostonpilot.com/bcd/web_parish.asp?ektr
+  [D512] verb discovery: query='Our Lady Help of Christians Catholic Church, Newton MA construct' -> 14 new verb(s): conserved, dedicated, involved, uncovered, overview, pointed, hampered, revealed, consolidated, reinstated, sacred, ribbed
+  [D512] _AGENCY_VERB widened by 14 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Sacred Heart Parish                        24    35    13    45
+     2  Our Lady Help of Christians Catholic Chu   51    48     0    50
+    [LOCAL-485] index mean 37.5 over 2 stop(s), range 24-51
+    [LOCAL-485] weakest: 'Sacred Heart Parish' at 24
+[TIMING] phase=story_first elapsed=103.9s cumulative=263.8s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (98 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 98 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 98 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 2 orientation: COLLAPSED — using fallback
+  [LOCAL-246] Orientation gating summary:
+    Words before: 93
+    Words after:  62
+    Delta: -31
+    Stops affected: 1/2
+    Deletions (1):
+      [Stop 2][R7_HALLUCINATED_SENSORY] "As you stand before the Romanesque Revival facade of Our Lady Help of Christians Catholic Church in ..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 2/2
+    [LOCAL-276] Intrigue ranking completed: 1.7s, $0.0054, 876 tokens
+    [LOCAL-276] Ranked 2 stops:
+      [Sacred Heart Parish] (reversal): Their perseverance in the face of adversity is embedded in every stone and stain...
+      [Our Lady Help of Christians Catholic Church] (reversal): Her presence transformed the humble church into a place of international signifi...
+    [LOCAL-276] 2 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0026 (432 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (38 words):
+      "At Sacred Heart Parish, witness their perseverance in every stone and stained glass window. Later, at Our Lady Help of Christians Catholic Church, experience the day her presence transformed the humble church into a place of international significance."
+      Stops referenced: 2
+    Part 4 total cost: $0.0026
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+    Stop 2 'Our Lady Help of Christians Ca': removed duplicate sentence: "Her presence transformed the humble church into a place of international signifi..."
+  [LOCAL-286] Deduplication: 1 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 2 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+  [D536] ⚠️  LISTENER ASKED FOR 4 STOP(S), DELIVERING 2 — category='walking', reason='stops removed by gates or filters'
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave Sacred Heart Parish, head south on Washington S...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: D177 FAILED for 'Our Lady Help of Christians Catholic Church': fact not in delivered text
+    Fact: "Her presence transformed the humble church into a place of international signifi..."
+  [LOCAL-280] Recap composition: 1.3s, $0.0023, 406 tokens
+  [LOCAL-280] Recap built: 30 words, 2 composed clauses (1 D177 rejected, 0 navigation rejected)
+    [Sacred Heart Parish] (reversal): "Their perseverance in the face of adversity is embedded in every stone and stain..."
+      → composed: "Sacred Heart Parish, adversity's perseverance etched in stone and glass"
+    [Our Lady Help of Christians Catholic Church] (dated_event): "Constructed in 1881, this church has stood as a beacon of faith for the local Ca..."
+      → composed: "Our Lady Help of Christians Catholic Church, beacon of faith since 1881"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 2 stops and 3 kilometres — Sacred Heart Parish, adversity's perseverance etched in stone and glass and Our Lady Help of Christians Catholic Church, beacon of faith since 1881."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 2 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (3483 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='walking')
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne..."
+  [2] "That's 2 stops and 3 kilometres — Sacred Heart Parish, adversity's perseverance etched in stone and ..."
+
+=== Word Count Statistics ===
+Stop 1: Sacred Heart Parish - 249 words
+Stop 2: Our Lady Help of Christians Catholic Church - 256 words
+===========================
+
+
+Total API cost: $0.1554 (24331 tokens)
+CACHE STORE: Our Lady Help of Christians Catholic Church, Newton MA / museum / 2
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-526/LOCAL526_church2_serial_20260923_1329.txt
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Our Lady Help of Christians Catholic Church, Newton MA - Walking Tour
+Tour-Category: walking
+
+Stop 1: Sacred Heart Parish
+
+Address: 1321 Centre St, Newton, MA 02459
+
+Coordinates: 42.324570, -71.191820
+
+Type/Specialty: Catholic Church
+
+Specific Examples: Beautiful stained glass windows, ornate altar, peaceful prayer garden
+
+Operational Details: Open for prayer daily, check website for mass times
+
+Orientation: You are about to embark on a walking journey through Our...
+
+[TIMING] phase=packing elapsed=8.2s cumulative=272.1s
+[TIMING] phase=verification elapsed=0.0s cumulative=272.1s
+[TIMING] TOTAL wall=272.1s phases: story_first=103.9s, poi_selection=91.8s, fact_sheets=66.0s, packing=8.2s, intent=2.2s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+  [church/serial] wall=272.1s story_first=103.9s workers=1 stops=2 clean=False
+  [church/serial] [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+  [church/serial] defects={"thin": "2/4 stops delivered", "distance": "kilometre figure on a building tour: 3 km"}
+
+==========================================================================
+  CHURCH — PARALLEL — 4 stops
+==========================================================================
+[OSM-VENUE] Overpass ReadTimeout for 'Sacred Heart Parish' (attempt 1/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Sacred Heart Parish' (attempt 2/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Mary Immaculate of Lourdes Parish' (attempt 1/2)
+[OSM-VENUE] Overpass HTTP 504 for 'Mary Immaculate of Lourdes Parish'
+[OSM-VENUE] Overpass HTTP 504 for "Our Lady's Parish"
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #007 | 13:33:46.985 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  tour_type: museum
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-526/LOCAL526_church2_parallel_20260923_1329.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #008 | 13:33:46.985 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "churches",
+    "location": "Newton, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Our Lady Help of Christians Catholic Church",
+    "geographic_scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: churches
+   Location: Newton, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Our Lady Help of Christians Catholic Church
+  [venue_name sanity] 'Our Lady Help of Christians Catholic Church' OK
+  [S15/LOCAL-485] venue_name='Our Lady Help of Christians Catholic Church' NOT forced to museum — request names a worship/civic place class (stops are places, not works)
+[TIMING] phase=intent elapsed=1.5s cumulative=1.5s
+[LOCAL-474] tour_type='museum' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Our Lady Help of Christians Catholic Church, Newton MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #009 | 13:33:48.454 | GENERATING_PROMPT
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  user_request: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Our Lady Help of Christians Catholic Church, Newton MA...
+  [S17] no scope_constraint (precision='BUILDING', scope='Our Lady Help of Christians Catholic Church, Newton, MA')
+  [D571] VENUE-PARTS rejected the venue kind (only 0 of 0 answers name something you can stand next to — the venue kind is probably wrong) — falling through
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #010 | 13:33:48.661 | PHASE_3A_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+  poi_type_hint: churches
+
+PHASE 3A API call cost: $0.0005 (650 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #011 | 13:33:51.265 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Our Lady Help of Christians Catholic Church, Newton MA.
+List exactly 7 specific, real, well-known churches relevant to: Our Lady Help of Christians Catholic Church, Newton MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+WALKING-TOUR COMPACTNESS — this is a walking tour:
+- All
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Sacred Heart Parish", "address": "1321 Centre St, Newton, MA 02459", "reason": "Established in 1894, known for its beautiful stained glass windows and historic architecture"},
+{"name": "St. Ignatius of Loyola Parish", "address": "28 Commonwealth Ave, Chestnut Hill, MA 02467", "reason": "Founded in 1922, known for its Romanesque Revival style and vibrant community"},
+{"name": "St. John Chrysostom Parish", "address": "4750 Washington St, West Roxbury, MA 02132", "reason": "Founded in 19
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Ignatius of Loyola Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. John Chrysostom Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Mary of the Assumption Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Theresa of Avila Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Mary's Parish'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'St. Susanna Parish'
+  [LOCAL-329] Captured 1 substantive selection reason(s)
+OK PHASE 3A parsed 1 candidate POI(s):
+   - Sacred Heart Parish @ 1321 Centre St, Newton, MA 02459
+  [area_resolver] Parsed: city='Newton MA', neighborhood='Our Lady Help of Christians Catholic Church'
+  [area_resolver] City resolved: Newton MA → Q49196 (42.3369, -71.2097)
+  [area_resolver] Neighborhood 'Our Lady Help of Christians Catholic Church' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3369, -71.2097), radius=2.0km, lang=en
+  [area_cache] HIT for Q49196: 49 landmarks (tier=rich)
+  [verify_landmarks] 1/1 stops verified against 49 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 1 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Our Lady Help of Christians Catholic Church, Newton MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+
+Part C: Fetching 3 replacement POI(s), attempt 1/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'St. Bernard Parish'
+   Part C attempt 1: AI returned 2 usable candidate(s)
+   Part C attempt 1: 2 survived; total now 3
+
+Part C: Fetching 1 replacement POI(s), attempt 2/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'St. Ignatius of Loyola Parish'
+   Part C attempt 2: AI returned 0 usable candidate(s)
+   Part C attempt 2: 0 survived; total now 3
+  [EXISTENCE-GATE] LOG_ONLY — 2/3 stops verified (67%), 1 would be dropped
+    [VERIFIED] 'Sacred Heart Parish' — venue_corpus canonical_title(geo): 'Newton College of the Sacred Heart' at 'Our 
+    [VERIFIED] 'Mary Immaculate of Lourdes Parish' — stop_corpus(geographic): 'Mary Immaculate of Lourdes Parish' at 'Our Lady Help o
+    [UNVERIFIED] "Our Lady's Parish" — no evidence
+    [HARVEST] Summary: 0 harvested, 2 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Sacred Heart Parish': +2 passages (2 queries)
+    [INTERPRETIVE] 'Mary Immaculate of Lourdes Parish': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +3 passages, 4 queries issued, 0 attributions dropped
+
+  [LOCAL-290] REPLENISHMENT: need 1 more stops (have 3/4)
+    [LOCAL-290] Replenishment round 1: no new candidates after dedup
+  [LOCAL-290] Replenishment exhausted: 3/4 stops
+  [ROUTE-ORDER] Only 1 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_132914.txt'
+
+======================================================================
+CALL #012 | 13:35:04.371 | PHASE_3B_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0006 (785 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Newton, hint: auto)
+  [LOCAL-355] Sacred Heart Parish: no practical facts in OSM
+  [LOCAL-355] Mary Immaculate of Lourdes Parish: no practical facts in OSM
+  [LOCAL-355] Our Lady's Parish: no practical facts in OSM
+   GEO-CHECK: all stops flagged — keeping original list (advisory only)
+Extracted first POI coordinates: (42.299999, -71.183333)
+
+=== Extracted POI Information ===
+1. Sacred Heart Parish
+   Address: 1321 Centre St, Newton, MA 02459
+   Coordinates: 42.299999, -71.183333
+   Directions: Head southeast on Centre St, the church will be on your right after passing a sm...
+2. Mary Immaculate of Lourdes Parish
+   Address: 270 Elliot St, Newton, MA 02464
+   Coordinates: 42.321111, -71.202778
+   Directions: Continue on Centre St, then turn right onto Elliot St. The church will be on you...
+3. Our Lady's Parish
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.349722, -71.207500
+   Directions: Head north on Elliot St, then turn left onto Washington St. The church will be o...
+================================
+
+  [D556] Replenish round 1: need 1, proposed 3
+   OK 'Our Lady Help of Christians Catholic Church' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': The stop is physically located inside 'Our Lady Help of Christians Catholic Church, Newton, MA'. (conf=high)
+  [D558] Replenishment scope check: 1/1 candidate(s) inside 'Our Lady Help of Christians Catholic Church, Newton, MA'
+  [D556]   ADDED 'Our Lady Help of Christians Catholic Church' — founded in 1873, it serves as a historical landmark and acti
+  [D556] +2 story fact(s) for 'Sacred Heart Parish' via openai+web(15) (2 high)
+  [D556] +3 story fact(s) for 'Mary Immaculate of Lourdes Parish' via openai+web(14) (3 high)
+  [D556] +3 story fact(s) for 'Our Lady's Parish' via openai+web(13) (3 high)
+  [D556] +1 story fact(s) for 'Our Lady Help of Christians Catholic Chu' via openai+web(14) (1 high)
+  [D558] Fetching coordinates for 1 replenished stop(s) so the route can place them...
+  [D558]   coords OK 'Our Lady Help of Christians Catholic Chu': 42.3224, -71.2075
+  [D559] Coordinates established for 0/4 stop(s); the rest keep the model's value and are marked low confidence
+  [ROUTE-ORDER] Computed route for 4 stops with coords (0 without): 6.29km total
+  [D558] Route re-ordered after replenishment: Sacred Heart Paris -> Mary Immaculate of -> Our Lady Help of C -> Our Lady's Parish
+  [D558] Cleared 1 stale direction(s) — their preceding stop changed
+[TIMING] phase=poi_selection elapsed=201.1s cumulative=202.5s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Sacred Heart Parish Our Lady Help of Christians Catholic Church' → 8161 chars
+  [LOCAL-47] Sacred Heart Parish: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Mary Immaculate of Lourdes Parish Our Lady Help of Christians Catholic Church' → 26681 chars
+  [LOCAL-47] Mary Immaculate of Lourdes Par: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Our Lady Help of Christians Catholic Church Newton MA' → 8161 chars
+  [LOCAL-47] Our Lady Help of Christians Ca: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Our Lady's Parish Our Lady Help of Christians Catholic Church' → 15638 chars
+  [LOCAL-47] Our Lady's Parish: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Our Lady Help of Christians Ca model=gpt-4o tokens=1549 (in=879 out=670) cost=$0.0089 latency=15.9s
+[COST_METER] FRESH | spine_generate | $0.008898 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0089
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (36 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Sacred Heart Parish' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Mary Immaculate of Lourdes Parish' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Our Lady Help of Christians Catholic Church' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Our Lady's Parish' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=28.3s cumulative=230.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=230.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=230.8s
+
+Generating description for Stop 1: Sacred Heart Parish by , ...
+
+Generating description for Stop 2: Mary Immaculate of Lourdes Parish by , ...
+
+Generating description for Stop 3: Our Lady Help of Christians Catholic Church by , ...
+
+Generating description for Stop 4: Our Lady's Parish by , ...
+  [LOCAL-381] stop='Mary Immaculate of Lourdes Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Mary Immaculate of Lourdes Parish', 18, ''), ('Mary Immaculate of Lourdes Parish', 18, ''), ('Mary Immaculate of Lourdes Parish', 8, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13347 after=25082 (+11735 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25082)
+  [LOCAL-381] stop='Our Lady Help of Christians Catholic Church' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Our Lady Help of Christians Catholic Church', 18, ''), ('Our Lady Help of Christians Catholic Church', 10, '')]
+  [LOCAL-402] Stop 3: injected 2 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13006 after=22925 (+9919 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22925)
+  [LOCAL-381] stop='Sacred Heart Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sacred Heart Parish', 16, ''), ('Sacred Heart Parish', 13, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12601 after=24223 (+11622 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24223)
+  [LOCAL-381] stop='Our Lady's Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [("Our Lady's Parish", 8, ''), ("Our Lady's Parish", 6, ''), ("Our Lady's Parish", 6, '')]
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13212 after=25047 (+11835 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25047)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-526/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0286 (6011 tokens, model=gpt-4o)
+Stop 1 description word count: 266 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0295 (6218 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "The parish's roots in the community are deep and multifaceted. It has woven itself into the fabric of Newton through a rich tapestry of social projects that offer vital support to families and the elderly. This commitment to community service is not just a modern initiative but a continuation of a l"
+  [LOCAL-417] Stop 4: retrying (attempt 1, temp=0.90)...
+Stop 2 API call cost: $0.0297 (6261 tokens, model=gpt-4o)
+Stop 2 description word count: 284 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0295 (6203 tokens, model=gpt-4o)
+Stop 4 description word count: 298 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0271 (5701 tokens, model=gpt-4o)
+Stop 3 description word count: 288 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Sacred Heart Parish': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Mary Immaculate of Lourdes Parish': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Our Lady Help of Christians Catholic Church': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Our Lady's Parish': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002467 (input=9967, output=1620)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 4: retry FAILED — keeping original (R1_IMPERATIVE, R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 3 para 5: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 9 paragraphs retried, 6 fixed/improved, 3 kept original
+  [LOCAL-192] Retry cost: $0.0032 (3978 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Sacred Heart Parish': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 3 'Our Lady Help of Christians Ca': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 4 'Our Lady's Parish': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 3 rewritten, 0 deleted, 3 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 3 'Our Lady Help of Christians Ca': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] Stop 3 'Our Lady Help of Christians Ca': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-261] R3 summary: 1 sentences deleted, 1 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Sacred Heart Parish': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Mary Immaculate of Lourdes Par': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Our Lady's Parish': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 4 sentences deleted, 1 paragraphs emptied, 3 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 15
+    Transferable (high, removed): 6
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 9
+    Stops affected: 4
+    [LOCAL-472] REMOVED transferable paragraph stop='Sacred Heart Parish' conf=high reason='Generic description of church activities and features.': "This blend of cultures is reflected in the church’s activities and events, which continue to honor these diverse heritag"
+    [LOCAL-472] REMOVED transferable paragraph stop='Sacred Heart Parish' conf=high reason='Generic scene-setting applicable to any historic church.': "As you step back into the street, consider the countless footsteps that have traversed these grounds, seeking solace and"
+    [LOCAL-472] REMOVED transferable paragraph stop='Mary Immaculate of Lourdes Parish' conf=high reason='Generic statement about spiritual continuity.': "From its founding days to the present, Mary Immaculate of Lourdes Parish stands as a symbol of spiritual continuity."
+    [LOCAL-472] REMOVED transferable paragraph stop='Our Lady Help of Christians Catholic Church' conf=high reason='Generic cultural and spiritual claims apply to any historic church.': "While here, you might draw connections to Mary Immaculate of Lourdes Parish, which you visited earlier. Both parishes se"
+    [LOCAL-472] REMOVED transferable paragraph stop='Our Lady Help of Christians Catholic Church' conf=high reason='Generic description applicable to any historic church.': "Our Lady Help of Christians Catholic Church is more than just a building; it stands as a living testament to faith and c"
+    [LOCAL-472] REMOVED transferable paragraph stop='Our Lady's Parish' conf=high reason='Generic claims about church roles and initiatives.': "The church’s role extends beyond liturgical boundaries, with social projects aimed at supporting families and the elderl"
+    [LOCAL-472] UNGROUNDED entity stop='Sacred Heart Parish' entity='In September' reason='It does not specify how Father Dalla Via relates to Sacred Heart Parish.' in: "One story that stands out in the parish's vibrant history involves Father Stephen Dalla Via. In Sept"
+    [LOCAL-472] UNGROUNDED entity stop='Sacred Heart Parish' entity='Stigmatine Fathers' reason='It does not specify how the Stigmatine Fathers are directly linked to Sacred Heart Parish.' in: "One story that stands out in the parish's vibrant history involves Father Stephen Dalla Via. In Sept"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='Father Charles Higgins' reason='It does not specify how Father Charles Higgins is directly linked to the parish.' in: "Father Charles Higgins became the pastor of Mary Immaculate of Lourdes Parish and also took on the r"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='Philip Neri Parish' reason='No concrete link to Mary Immaculate of Lourdes Parish is provided.' in: "Father Charles Higgins became the pastor of Mary Immaculate of Lourdes Parish and also took on the r"
+    [LOCAL-472] UNGROUNDED entity stop='Mary Immaculate of Lourdes Parish' entity='St. Philip' reason='No concrete link between St. Philip and Mary Immaculate of Lourdes Parish is provided.' in: "Father Charles Higgins became the pastor of Mary Immaculate of Lourdes Parish and also took on the r"
+    [LOCAL-472] UNGROUNDED entity stop='Our Lady Help of Christians Catholic Church' entity='On June' reason='It does not specify where Mother Teresa's visit occurred.' in: "On June 15, 1988, an event of particular historical significance unfolded within these sacred walls."
+    [LOCAL-472] UNGROUNDED entity stop='Our Lady Help of Christians Catholic Church' entity='Mother Teresa' reason='It does not specify a concrete link to the church.' in: "On June 15, 1988, an event of particular historical significance unfolded within these sacred walls."
+    [LOCAL-472] UNGROUNDED entity stop='Our Lady's Parish' entity='Mater Dolorosa' reason='No concrete link to the stop is provided.' in: "The figure of the Mater Dolorosa—Our Lady of Sorrows—permeates the artistic and spiritual atmosphere"
+    [LOCAL-472] UNGROUNDED entity stop='Our Lady's Parish' entity='Seven Sorrows' reason='No specific link to the stop is provided.' in: "The figure of the Mater Dolorosa—Our Lady of Sorrows—permeates the artistic and spiritual atmosphere"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/29)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 8
+    Glossed (composed): 3
+    Suppressed (already explained): 2
+    Degraded (name dropped): 2
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1568 tokens, $0.0003, 7.0s
+    Gloss: 797 tokens, $0.0002, 4.9s
+    Compose: 2037 tokens, $0.0003, 8.3s
+    Total added cost: $0.0008
+    Stops affected: 4
+    Glosses applied:
+      • In September → DEGRADED (name dropped)
+      • Stigmatine Fathers → SUPPRESSED (already explained)
+      • Father Charles Higgins → "various pastoral roles in the church" [source: model]
+      • Irish → "the immigrants who built the church" [source: corpus]
+      • Mater Dolorosa → SUPPRESSED (already explained)
+      • Sorrows → DEGRADED (name dropped)
+      • Seven Sorrows → "a traditional devotion reflecting her sorrows" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'Sacred Heart Parish': claim='1922 (in context: "he foundation of Sacred Heart Parish in 1' contradicted_by='On January 13, 1876, the Most Reverend Archbishop Joseph Alemany divided this ex' → DROPPED
+  [LOCAL-229] BLOCKED Stop 1 'Sacred Heart Parish': claim='1958 (in context: "1958, Father Dalla Via, then the pastor o' contradicted_by='On January 13, 1876, the Most Reverend Archbishop Joseph Alemany divided this ex' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 2 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (2 entries):
+    stop=1 claim='1922 (in context: "he foundation of Sacred Heart P' evidence='On January 13, 1876, the Most Reverend Archbishop ' action=DROPPED
+    stop=1 claim='1958 (in context: "1958, Father Dalla Via, then th' evidence='On January 13, 1876, the Most Reverend Archbishop ' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Our Lady Help of Christians Catholic Church, Newton, MA'...
+   X SCOPE-CHECK REMOVED 'Mary Immaculate of Lourdes Parish' — outside 'Our Lady Help of Christians Catholic Church, Newton, MA': [scope-memory] recorded in known_out_of_scope.json: The stop is located at a different church, Mary Immaculate of Lourdes Parish, which is a separate location from Our Lady Help of Christians Catholic C (conf=high)
+   OK 'Our Lady Help of Christians Catholic Church' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': The stop is physically located inside 'Our Lady Help of Christians Catholic Church' in Newton, MA. (conf=high)
+   OK 'Our Lady's Parish' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': The stop is named 'Our Lady's Parish' and is described as being within the bounds of 'Our Lady Help of Christians Catholic Church, Newton, MA'. (conf=high)
+OK PHASE 5.6: 3/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [3] DELETED: 'This vision' in: This vision finds resonance in the church's commitment to addressing pain and ad
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [LOCAL-477] stripped markdown from 1 prose field(s) — these are spoken aloud
+
+  [D498] step 7c: most valuable stop is 2 'Our Lady Help of Christians Catholic C' (index 30) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 2 'Our Lady Help of Christians Catholic C': the longest run (3 sentences, Mother Teresa) has agency=1 stakes=0 — someone is described, but nothing is risk
+    stop 3 'Our Lady's Parish': the longest run (3 sentences, Sacred Heart Parish) has agency=2 stakes=0 — someone is described, but nothing i
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Our Lady's Parish' (index 25)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Our Lady Help of Christians Catholic Church' — 252w → 141w after gates, 14 sentence(s) removed
+    removed: "The Mary Immaculate of Lourdes Parish, established in 1870, stands as the mother church of Newton an"
+    removed: "This venerable institution, originally known as St."
+    removed: "Mary's Parish, was a beacon for the burgeoning Catholic community in the area."
+    removed: "The parish's inception coincided with a period of significant Catholic immigration and expansion in "
+    removed: "The church you now stand before, with its cornerstone laid in 1909, was crafted under the expertise "
+    removed: "P."
+    removed: "Graham."
+    removed: "His design incorporated elements that underscored the parish's aspirations and its role as a central"
+    removed: "The parish's architecture echoes a sense of permanence and tradition, with its robust stone facade a"
+    removed: "In a more recent chapter, Father Charles Higgins was named pastor of Mary Immaculate of Lourdes Pari"
+    removed: "Philip Neri Parish in Newton."
+    removed: "His leadership continues to guide the parish through modern challenges while upholding the tradition"
+    removed: "From the echoes of its founding days to the present, Mary Immaculate of Lourdes Parish remains a ste"
+    removed: "As you move forward on this journey, consider how architecture and history intertwine, leading us to"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Our Lady's Parish' — 267w → 85w after gates, 12 sentence(s) removed
+    removed: "The edifice was built by Irish immigrants who laid its foundation stone by stone, their labor immort"
+    removed: "As the years passed, Italian immigrants joined the community, enriching it with their customs and tr"
+    removed: "On June 15, 1988, an event of particular historical significance unfolded within these sacred walls."
+    removed: "Mother Teresa of Calcutta, a figure whose life was dedicated to serving the poorest of the poor, mad"
+    removed: "Her presence was not just a moment of reverence but a call to action, inspiring the congregation to "
+    removed: "Her visit is remembered as a pivotal moment that reinforced the parish's mission and commitment to o"
+    removed: "While here, you might draw connections to Mary Immaculate of Lourdes Parish, which you visited earli"
+    removed: "Both parishes serve as cultural and spiritual cornerstones for their communities, each with its own "
+    removed: "As you walk through the church, feel the texture of the wooden pews polished by generations of worsh"
+    removed: "The air is filled with the scent of incense, a sensory reminder of the traditions that link past to "
+    removed: "Our Lady Help of Christians Catholic Church isn't just a building; it’s a living testament to faith "
+    removed: "As you leave this monumental site, consider how its story continues to unfold, where the legacy of i"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=2)
+
+Generating description for Stop 2: Our Lady Help of Christians Catholic Church by , ...
+
+Generating description for Stop 3: Our Lady's Parish by , ...
+  [LOCAL-381] stop='Our Lady Help of Christians Catholic Church' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Our Lady Help of Christians Catholic Church', 18, ''), ('Our Lady Help of Christians Catholic Church', 10, '')]
+  [LOCAL-402] Stop 2: injected 2 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12988 after=22907 (+9919 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22907)
+  [LOCAL-381] stop='Our Lady's Parish' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [("Our Lady's Parish", 8, ''), ("Our Lady's Parish", 6, ''), ("Our Lady's Parish", 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13063 after=24898 (+11835 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24898)
+Stop 2 API call cost: $0.0297 (6244 tokens, model=gpt-4o)
+Stop 2 description word count: 261 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0327 (6880 tokens, model=gpt-4o)
+Stop 3 description word count: 313 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+    [LOCAL-474] regenerated and re-gated: 230w (was 141w)
+    [LOCAL-474] regenerated and re-gated: 294w (was 85w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [D512] _AGENCY_VERB widened by 14 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Our Lady Help of Christians Catholic Chu   26    22    14    57
+     2  Our Lady's Parish                          28    12     8    45
+    [LOCAL-485] index mean 27.0 over 2 stop(s), range 26-28
+    [LOCAL-485] weakest: 'Our Lady Help of Christians Catholic Chu' at 26
+[TIMING] phase=story_first elapsed=179.8s cumulative=410.6s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (103 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 103 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 103 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 168
+    Words after:  147
+    Delta: -21
+    Stops affected: 1/3
+    Deletions (1):
+      [Stop 3][R10_UNFULFILLED_PROMISE] "Notice the intricate details that adorn the entrance, each one a testament to the church's deep root..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 2/3
+    [LOCAL-276] Intrigue ranking completed: 2.6s, $0.0053, 846 tokens
+    [LOCAL-276] Ranked 2 stops:
+      [Our Lady Help of Christians Catholic Church] (mystery): Mother Teresa, renowned for her humanitarian work, was known for her deep compas...
+      [Our Lady's Parish] (cause): Over the years, Our Lady's Parish has initiated social projects aimed at support...
+    [LOCAL-276] 2 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0026 (438 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (32 words):
+      "At Our Lady Help of Christians Catholic Church, you'll learn about Mother Teresa's tireless dedication to the poor. Our Lady's Parish has been involved in social projects supporting families and the elderly."
+      Stops referenced: 2
+    Part 4 total cost: $0.0026
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] ⚠️  EMPTY STOP REMOVAL GATE: 1 stop(s) removed for failed/empty description
+    REMOVED: 'Sacred Heart Parish' — no narration generated (would ship as empty shell)
+    SUMMARY: requested=3 / generated=2 / failed=1 / delivered=2
+  [LOCAL-394] ⚠️  STOP COUNT INVARIANT VIOLATION: selected=3 delivered=2 — 1 stop(s) lost!
+    [LOCAL-394] LOST: 'Sacred Heart Parish'
+  [D536] ⚠️  LISTENER ASKED FOR 4 STOP(S), DELIVERING 2 — category='walking', reason='stops removed by gates or filters'
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [T4] Transition to Stop 2: As you exit Our Lady Help of Christians Catholic Church, hea...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [LOCAL-280] Recap composition: 4.1s, $0.0023, 408 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Our Lady Help of Christians Catholic Church] (mystery): "Mother Teresa, renowned for her humanitarian work, was known for her deep compas..."
+      → composed: "Our Lady Help of Christians Catholic Church, Mother Teresa known for compassion"
+    [Our Lady's Parish] (cause): "Over the years, Our Lady's Parish has initiated social projects aimed at support..."
+      → composed: "Our Lady's Parish, social projects support families and elderly"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 2 stops and 3 kilometres — Our Lady Help of Christians Catholic Church, Mother Teresa known for compassion and Our Lady's Parish, social projects support families and elderly."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 2 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (5736 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 0
+    Dropped: 1
+    AUDIT: hours | Open for visits during office hours, Sunday Mass at 10am | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_VAGUE_PROMISE — Part 4 makes only vague forward references ("more stories await") without naming actual stop content.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne..."
+  [2] "That's 2 stops and 3 kilometres — Our Lady Help of Christians Catholic Church, Mother Teresa known f..."
+
+=== Word Count Statistics ===
+Stop 1: Our Lady Help of Christians Catholic Church - 288 words
+Stop 2: Our Lady's Parish - 298 words
+===========================
+
+
+Total API cost: $0.1997 (36038 tokens)
+CACHE STORE: Our Lady Help of Christians Catholic Church, Newton MA / museum / 2
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-526/LOCAL526_church2_parallel_20260923_1329.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-526/LOCAL526_church2_parallel_20260923_1329_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Our Lady Help of Christians Catholic Church, Newton MA - Walking Tour
+Tour-Category: walking
+
+Stop 1: Our Lady Help of Christians Catholic Church
+
+Coordinates: 42.3224, -71.2075
+
+Orientation: You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Newton MA. The 6 km route from Sacred Heart Parish to Our Lady's Parish unveils a landscape shaped by Irish immigrants' struggles, community resilience, and deep-rooted faith. Es...
+
+[TIMING] phase=packing elapsed=11.3s cumulative=421.9s
+[TIMING] phase=verification elapsed=0.0s cumulative=421.9s
+[TIMING] TOTAL wall=421.9s phases: poi_selection=201.1s, story_first=179.8s, fact_sheets=28.3s, packing=11.3s, intent=1.5s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+  [church/parallel] wall=421.9s story_first=179.8s workers=2 stops=2 clean=False
+  [church/parallel] [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+  [church/parallel] defects={"thin": "2/4 stops delivered", "distance": "kilometre figure on a building tour: 6 km"}
+
+##########################################################################
+#  CHURCH SUMMARY (pair 2)
+##########################################################################
+serial    wall= 272.1s story_first=  103.9s workers=1 stops=2 clean=False repeated=False
+    [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+parallel  wall= 421.9s story_first=  179.8s workers=2 stops=2 clean=False repeated=False
+    [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+
+results -> LOCAL526_CHURCH2_RESULTS_20260923_1329.json
