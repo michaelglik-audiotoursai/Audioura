@@ -11728,6 +11728,13 @@ Exempt: navigation directions ("Turn left", "Continue past").
 
     # -------- [LOCAL-440/445] Story-first pipeline: seek + verify + size-adapt --------
     _phase_timer.start('story_first')
+    # [LOCAL-3498] Sub-phase profiler. Zero behaviour change unless STORY_FIRST_PROFILE=1.
+    # The story_first phase wraps far more than the LOCAL-440 pipeline (which is
+    # museum-gated + off by default): the per-stop description loop and ~20 serial
+    # post-description gates all live inside it. Instrument them to find where the
+    # 110-150s actually goes.
+    import story_first_profile as _sfp
+    _sfp.reset()
     # Michael's 4-step process (D393): for each stop, BEFORE narration, seek stories
     # specifically (not just facts), verify them against sources, adapt size, then
     # hand to the LOCAL-438 packer.
@@ -11977,6 +11984,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
         poi_name = poi["name"]
         artist = poi["artist"]
         year = poi["year"]
+        _sfp.mark_stop_start(idx)  # [LOCAL-3498] per-stop wall-time start (worker thread)
 
         print(f"\nGenerating description for Stop {stop_num}: {poi_name} by {artist}, {year}...")
 
@@ -14528,6 +14536,7 @@ Write the story FIRST, then add physical description if space allows.
 
     max_workers = min(len(poi_list), 5)
     _phase5_ceiling_breached = False  # [LOCAL-326] Track mid-Phase5 breach
+    _sfp.sub_start('description_generation')
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # [S9/S10/S11] Pass spine_stop and fact_sheet per stop (None when not in Storied mode)
         _spine_arc = _storied_spine.get("arc", []) if _storied_mode and _storied_spine else []
@@ -14545,6 +14554,7 @@ Write the story FIRST, then add physical description if space allows.
             futures[executor.submit(_generate_description, (i, poi, spine_stop, fact_sheet, story_type))] = i
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
+            _sfp.close_stop(idx, detail={'words': word_count})  # [LOCAL-3498] per-stop wall time
             poi_list[idx]["orientation"] = orientation
             # [LOCAL-22] Strip any "Stop N:" prefix that GPT echoed into description text.
             # This is the ROOT CAUSE of the stop-title corruption: GPT's description response
@@ -14571,6 +14581,7 @@ Write the story FIRST, then add physical description if space allows.
                 print(f"[LOCAL-326] COST CEILING BREACHED during Phase 5: "
                       f"${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f} — "
                       f"{_completed_stop_count}/{len(poi_list)} stops completed")
+    _sfp.sub_end('description_generation')
     
     # [LOCAL-388] Post-generation: verify story beats reached the prose, log per stop
     # [LOCAL-390] NOTE: This early check is INFORMATIONAL ONLY — it runs against the
@@ -14882,6 +14893,7 @@ Write the story FIRST, then add physical description if space allows.
                 _pf.write(_partial_tour)
         return _partial_tour, output_file, first_poi_coordinates
 
+    _sfp.sub_start('style_validation_5_1')
     # -------- [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry --------
     # D63: prompt instruction alone does not fix style faults. Validate generated
     # text and re-ask for paragraphs that violate error-severity rules (R1–R4).
@@ -15061,6 +15073,7 @@ REWRITE RULES (all mandatory):
                   f"{_style_retry_successes} fixed/improved, {_style_retry_failures} kept original")
             print(f"  [LOCAL-192] Retry cost: ${_style_retry_cost:.4f} ({_style_retry_tokens} tokens)")
 
+    _sfp.sub_start('r1_imperative_5_13')
     # -------- [LOCAL-255] PHASE 5.13: R1 imperative rewrite --------
     # Michael scored R1 2/5 twice. At 36% of paragraphs, deletion would gut every
     # tour. Rewrite first (deterministic rules + LLM fallback); delete only pure
@@ -15143,6 +15156,7 @@ REWRITE RULES (all mandatory):
                       f"= {_r1_total_deleted/_r1_total_hits:.1%} exceeds 10% — "
                       f"rewriter may be failing and quietly shortening tours")
 
+    _sfp.sub_start('r7_sensory_5_14')
     # -------- [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion --------
     # Michael scored this class 1/5. R7 has fired without a deletion path since
     # LOCAL-247. Now it deletes. Behind DISABLE_R7_DELETION=1 flag. $0.00 — deterministic.
@@ -15180,6 +15194,7 @@ REWRITE RULES (all mandatory):
                   f"{_r7_total_paras_emptied} paragraphs emptied, "
                   f"{_r7_stops_affected} stops affected")
 
+    _sfp.sub_start('r2_question_5_141')
     # -------- [LOCAL-261] PHASE 5.141: R2 question deletion --------
     # D165: R2 fires but had no path to the output. Questions (?) are always
     # wrong in narration. Behind DISABLE_R2_DELETION=1 flag. $0.00 — deterministic.
@@ -15217,6 +15232,7 @@ REWRITE RULES (all mandatory):
                   f"{_r2_total_paras_emptied} paragraphs emptied, "
                   f"{_r2_stops_affected} stops affected")
 
+    _sfp.sub_start('r3_suggestive_5_142')
     # -------- [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion --------
     # D165: R3 fires but had no path to the output. "you might discover…" is
     # always wrong. Behind DISABLE_R3_DELETION=1 flag. $0.00 — deterministic.
@@ -15254,6 +15270,7 @@ REWRITE RULES (all mandatory):
                   f"{_r3_total_paras_emptied} paragraphs emptied, "
                   f"{_r3_stops_affected} stops affected")
 
+    _sfp.sub_start('r4_feeling_5_143')
     # -------- [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion --------
     # D165: R4 fires but had no path to the output. Michael's reference case:
     # "you are surrounded by history and natural beauty" — scored 1/5.
@@ -15292,6 +15309,7 @@ REWRITE RULES (all mandatory):
                   f"{_r4_total_paras_emptied} paragraphs emptied, "
                   f"{_r4_stops_affected} stops affected")
 
+    _sfp.sub_start('r8_leakage_5_144')
     # -------- [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion --------
     # D165: R8 fires but had no path to the output. Model restating its own
     # instructions as narration. Behind DISABLE_R8_DELETION=1 flag. $0.00.
@@ -15329,6 +15347,7 @@ REWRITE RULES (all mandatory):
                   f"{_r8_total_paras_emptied} paragraphs emptied, "
                   f"{_r8_stops_affected} stops affected")
 
+    _sfp.sub_start('r9_generic_5_15')
     # -------- [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion --------
     # D89: a sentence that fits any stop belongs to no stop — delete it.
     # Behind DISABLE_R9_DELETION=1 flag. $0.00 — deterministic, no LLM call.
@@ -15366,6 +15385,7 @@ REWRITE RULES (all mandatory):
                   f"{_r9_total_paras_emptied} paragraphs emptied, "
                   f"{_r9_stops_affected} stops affected")
 
+    _sfp.sub_start('r10_promise_5_155')
     # -------- [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion --------
     # Michael (Round 2): "Either tell us the story or get rid of the sentence!"
     # A sentence names a subject (story, tale, history, legacy) without delivering
@@ -15406,6 +15426,7 @@ REWRITE RULES (all mandatory):
                   f"{_r10_total_paras_emptied} paragraphs emptied, "
                   f"{_r10_stops_affected} stops affected")
 
+    _sfp.sub_start('specificity_5_152')
     # -------- [LOCAL-472] PHASE 5.152: Stop-specificity gate --------
     # Michael (wdvrdaxa7h): "make sure that any paragraph is stop specific. If it
     # is not, the choice should be either remove it or make it the stop specific."
@@ -15467,6 +15488,7 @@ REWRITE RULES (all mandatory):
             except Exception as _ssg_err:
                 print(f"  [LOCAL-472] ERROR: stop-specificity gate failed (non-fatal): {_ssg_err}")
 
+    _sfp.sub_start('unsupported_claim_5_156')
     # -------- [LOCAL-263] PHASE 5.156: Unsupported-claim gate --------
     # D166: a claim survives only if something adjacent substantiates it.
     # Four claim types (PROMISE, SENSORY, FEELING, QUALITY), one shared test.
@@ -15526,6 +15548,7 @@ REWRITE RULES (all mandatory):
                     print(f"  [LOCAL-263] WARNING: Deletion rate {_ucg_removal_rate:.1%} "
                           f"exceeds 15% ceiling — review before shipping")
 
+    _sfp.sub_start('unglossed_ref_5_157')
     # -------- [LOCAL-269] PHASE 5.157: Unglossed-reference gate --------
     # The inverse of LOCAL-263: a fact that assumes knowledge the listener lacks.
     # Detects named entities with no explanation, triages via model, supplies gloss.
@@ -15600,6 +15623,7 @@ REWRITE RULES (all mandatory):
                 for gf in _urg_stats['guard_failures']:
                     print(f"      ✗ {gf['entity']}: \"{gf['gloss']}\" — {gf['reason']}")
 
+    _sfp.sub_start('entity_grounding_5_158')
     # -------- [LOCAL-378] PHASE 5.158: Prose entity grounding gate --------
     # Fires ONLY for exhibition-scoped museum tours. Removes all mentions of
     # persons not grounded in the exhibition page text or artist checklist.
@@ -15685,6 +15709,7 @@ REWRITE RULES (all mandatory):
             else:
                 print(f"\n  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)")
 
+    _sfp.sub_start('role_claim_5_158b')
     # -------- [LOCAL-458] PHASE 5.158b: Role-claim gate --------
     # Detects ROLE→AGENT claims (e.g. "published by The Hogarth Press") where
     # the agent is INVENTED: stop-record slot is empty AND agent is absent from
@@ -15724,6 +15749,7 @@ REWRITE RULES (all mandatory):
             else:
                 print(f"\n  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)")
 
+    _sfp.sub_start('org_grounding_5_158c')
     # -------- [LOCAL-479] PHASE 5.158c: Organisation grounding gate --------
     # The grammar-independent sibling of 5.158b. The Hogarth Press fabrication
     # escaped the role-claim gate on three separate runs in three constructions
@@ -15789,6 +15815,7 @@ REWRITE RULES (all mandatory):
         except Exception as _org_err:
             print(f"  [LOCAL-479] ERROR: org gate failed (non-fatal): {_org_err}")
 
+    _sfp.sub_start('form_claim_5_159')
     # -------- [LOCAL-384] PHASE 5.159: Form-claim gate --------
     # The model repeatedly infers physical form from titles (e.g. "Au Soleil du
     # Plafond" → "ceiling mural"). Five prompt-level rounds failed. This gate
@@ -15826,6 +15853,7 @@ REWRITE RULES (all mandatory):
             print(f"\n  [LOCAL-385] Form-claim gate SKIPPED "
                   f"(no exhibition scope — unscoped museum tours are not gated)")
 
+    _sfp.sub_start('numeric_claim_5_160')
     # -------- [LOCAL-386/389] PHASE 5.160: Numeric-claim gate --------
     # An ungrounded statistic ("over 1.2 million visitors annually") passed both
     # the person gate and the form-claim gate because neither inspects numeric claims.
@@ -15871,6 +15899,7 @@ REWRITE RULES (all mandatory):
                 print(f"\n  [LOCAL-389] Numeric-claim gate SKIPPED "
                       f"(no exhibition scope — unscoped museum tours are not gated)")
 
+    _sfp.sub_start('temporal_5_161')
     # -------- [LOCAL-402] PHASE 5.161: Temporal coherence gate --------
     # Catches impossible temporal relations: interactions between people whose
     # dates make it impossible (e.g. "Dalí collaborated with Freud" — Freud d.1939).
@@ -15903,6 +15932,7 @@ REWRITE RULES (all mandatory):
         if _storied_mode:
             print(f"\n  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)")
 
+    _sfp.sub_start('contradicted_5_16')
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
     # that the data is incorrect." If any sentence group contains a CONTRADICTED
@@ -16016,6 +16046,7 @@ REWRITE RULES (all mandatory):
         except ImportError as _cb_import_err:
             print(f"  [LOCAL-229] WARNING: import failed — CONTRADICTED block skipped: {_cb_import_err}")
 
+    _sfp.sub_start('venue_scope_5_5')
     # -------- PHASE 5.5: post-description validation for museum tours --------
     # Fix 4 (Claude session 7): second validate_enhanced_poi_knowledge() call for ALL tour types.
     # At this point descriptions are populated — the fictional-content patterns now have text to match.
@@ -16047,6 +16078,7 @@ REWRITE RULES (all mandatory):
                 print(f"  [PHASE 5.6] >50% of stops were outside '{_scope_for_check}' — "
                       f"scope is likely a small single venue; delivering {len(poi_list)} verified stop(s).")
 
+    _sfp.sub_start('dangling_ref_5_7')
     # -------- PHASE 5.7: Dangling-reference scrub --------
     # [LOCAL-22] If any stops were removed by 5.5b or 5.6, re-number and clean up
     # "Stop N" references in descriptions/orientations where N > final stop count.
@@ -16072,6 +16104,7 @@ REWRITE RULES (all mandatory):
                       f"of stop {p['stop_number']}: '{p['name']}'")
     print(f"OK PHASE 5.7: Dangling-reference scrub complete ({_final_stop_count} stops)")
 
+    _sfp.sub_start('dangling_demo_5_7b')
     # -------- [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub --------
     # Detect "this/these/that/those + noun" where the noun has no antecedent in
     # the same stop's spoken text. Schema lines are excluded as antecedents.
@@ -16101,6 +16134,7 @@ REWRITE RULES (all mandatory):
                     print(f"    [{_f['stop']}] DELETED: '{_f['demonstrative_np']}' in: {_f['sentence'][:80]}")
     print(f"OK PHASE 5.7b: Dangling-demonstrative scrub complete")
 
+    _sfp.sub_start('self_contradiction_5_8')
     # -------- [LOCAL-27] PHASE 5.8: Self-contradiction check --------
     # Verify that declared type_specialty is consistent with prose description.
     # If contradicting, clear the type_specialty rather than ship a lie.
@@ -16112,6 +16146,7 @@ REWRITE RULES (all mandatory):
         else:
             print(f"  [LOCAL-27] No type/prose contradictions detected")
 
+    _sfp.sub_start('audio_native_5_9')
     # -------- [LOCAL-41] PHASE 5.9: Audio-native post-processing --------
     # Strip trailing rhetorical questions from descriptions (GPT sometimes
     # ignores the "no questions" instruction). Also strip the formulaic
@@ -16149,6 +16184,7 @@ REWRITE RULES (all mandatory):
     print(f"  [LOCAL-41] Stripped {_audio_fixes} trailing question(s), "
           f"removed {_broader_context_count} 'broader context' instance(s)")
 
+    _sfp.sub_start('postgate_retry_5_17')
     # -------- [LOCAL-474] PHASE 5.17: Post-gate retry --------
     #
     # THE MEASURED PROBLEM (D472). The gate chain above is allowed to delete
@@ -16758,6 +16794,7 @@ REWRITE RULES (all mandatory):
             print(f"  [LOCAL-474] each regenerated stop was re-gated before being "
                   f"accepted; a retry can only replace text it beats after gating.")
 
+    _sfp.sub_start('anti_preaching_5_10')
     # -------- [LOCAL-44] PHASE 5.10: Anti-preaching post-processing --------
     # Strip trailing sentences that instruct the listener what to feel, notice,
     # consider, or carry away. GPT often ignores prompt bans on these closings.
@@ -16804,6 +16841,7 @@ REWRITE RULES (all mandatory):
             p['description'] = ' '.join(_sentences).strip()
     print(f"  [LOCAL-44] Stripped {_preaching_count} preaching closer(s)")
 
+    _sfp.sub_start('obligation_audit_5_20')
     # -------- [LOCAL-444] PHASE 5.20: Obligation audit --------
     # Post-draft per-stop obligation audit. Runs gpt-4o-mini per stop to identify
     # unfulfilled obligations (pointers that are never dereferenced).
@@ -17073,6 +17111,7 @@ REWRITE RULES (all mandatory):
             print(f"  [D511] loop FAILED, tour continues unchanged "
                   f"(non-fatal): {type(_d511_err).__name__}: {_d511_err}")
 
+    _sfp.sub_start('story_valuation_5_21')
     # -------- [LOCAL-485] PHASE 5.21: Story valuation index (Michael's step 5) --------
     #
     # Michael's step 5 is "we evaluate the story assigning a value index".
@@ -17110,6 +17149,9 @@ REWRITE RULES (all mandatory):
         print(f"  [LOCAL-485] WARNING: story_index_pass not importable — skipped ({_xierr})")
     except Exception as _xierr:
         print(f"  [LOCAL-485] ERROR: story index failed (non-fatal): {_xierr}")
+
+    # [LOCAL-3498] Close the story_first sub-phase profile before the phase ends.
+    _sfp.summary()
 
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')
