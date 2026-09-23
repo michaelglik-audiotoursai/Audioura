@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T09:35:50.911230
+Generated: 2026-09-23T09:58:40.292498
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -24,10 +24,9 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In December 2002, Father Walter H. Cuenin delivered a homily at Our Lady Help of Christians accusing Cardinal Bernard Law of hiding behind lawyers and bankruptcy, which contributed to Cardinal Law resigning from the Archdiocese days later.
-  - In September 2005, Father Walter H. Cuenin was forced out of Our Lady Help of Christians by the Archdiocese of Boston due to alleged financial improprieties, including a $75,000 stipend and a leased Honda Accord.
-  - On June 25, 2023, Bruno D’Amore and Gilda “Jill” D’Amore were found murdered in their home after failing to attend Mass at Our Lady Help of Christians for their 50th wedding anniversary.
-  - In early 2024, rumors of violence at Our Lady Help of Christians were dispelled when it was revealed that the church was sheltering migrant families and the disturbances were due to children setting off fire alarms.
+  - On Sunday, December 8, 2002, more than 850 parishioners packed the nave of Our Lady Help of Christians in defiance of the archdiocese, giving standing ovations to Rev. Walter H. Cuenin after he denounced Cardinal Law.
+  - In September 2005, the archdiocese forced Father Cuenin to resign over 'financial irregularities', leading to protest meetings in the pews by parishioners.
+  - On Sunday, June 25, 2023, Gilda (Jill) and Bruno D’Amore were scheduled to renew their wedding vows for their 50th anniversary, but were found murdered along with Jill's mother, Lucia Arpino, in a home invasion.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -173,21 +172,19 @@ DO NOT USE these phrases: built in the year, the facade features, architecturall
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: awe
-- Unique angle to emphasize: As you step into the nave, notice the soaring arches and consider how they mirror the aspirations of the Catholic community that built this sanctuary over a century ago.
-- End with a forward-looking hook: As you move towards the stained glass windows, imagine the stories they might tell...
+- Unique angle to emphasize: The vaulted ceilings of the nave, reminiscent of medieval cathedrals, are a testament to the parish's ambition during its construction in the late 19th century.
+- End with a forward-looking hook: As you proceed down the aisle, note the vibrant colors just ahead…
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The nave is the central part of a church, distinct from the area reserved for the choir and clergy.; In a church with side aisles, the nave includes the central aisle as well as side-aisles and transepts.
+The nave of Our Lady Help of Christians was packed with over 850 parishioners on December 8, 2002, in support of Rev. Walter H. Cuenin.; Father Cuenin was forced to resign in September 2005 due to 'financial irregularities'.; Gilda and Bruno D’Amore were scheduled to renew their wedding vows for their 50th anniversary on June 25, 2023, but were found murdered along with Jill's mother, Lucia Arpino.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Nave
-      In December 2002, Father Walter H. Cuenin delivered a homily at Our Lady Help of Christians accusing Cardinal Bernard Law of hiding behind lawyers and bankruptcy, which contributed to Cardinal Law resigning from the Archdiocese days later.
+      In September 2005, the archdiocese forced Father Cuenin to resign over 'financial irregularities', leading to protest meetings in the pews by parishioners.
   [2] Nave
-      In September 2005, Father Walter H. Cuenin was forced out of Our Lady Help of Christians by the Archdiocese of Boston due to alleged financial improprieties, including a $75,000 stipend and a leased Honda Accord.
+      On Sunday, December 8, 2002, more than 850 parishioners packed the nave of Our Lady Help of Christians in defiance of the archdiocese, giving standing ovations to Rev. Walter H. Cuenin after he denounced Cardinal Law.
   [3] Nave
-      On June 25, 2023, Bruno D’Amore and Gilda “Jill” D’Amore were found murdered in their home after failing to attend Mass at Our Lady Help of Christians for their 50th wedding anniversary.
-  [4] Nave
-      In early 2024, rumors of violence at Our Lady Help of Christians were dispelled when it was revealed that the church was sheltering migrant families and the disturbances were due to children setting off fire alarms.
+      On Sunday, June 25, 2023, Gilda (Jill) and Bruno D’Amore were scheduled to renew their wedding vows for their 50th anniversary, but were found murdered along with Jill's mother, Lucia Arpino, in a home invasion.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -260,26 +257,28 @@ IS the story's starting point.
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
+LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
-THIS STOP IS TOO SHORT AT 141 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+
+THIS STOP IS TOO SHORT AT 169 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "In December 2002, the nave witnessed a pivotal moment when Father Walter H."
-- "Cuenin delivered a homily that would reverberate far beyond these walls."
-- "Accusing Cardinal Bernard Law of hiding behind lawyers and bankruptcy amidst the sexual abuse crisis, Cuenin's words contributed to Cardinal Law's resignation from the Archdiocese days later."
-- "This episode underscored the church's role as a place of not just worship, but also moral and ethical discourse, influencing the wider Catholic Church's response to the crisis."
-- "The nave also holds memories of more personal stories."
-- "As you stand here, consider the layers of history, both public and intimate, that this space has absorbed."
-- "The nave remains a living testament to the joys and sorrows, the challenges and triumphs, of the community it serves."
-- "Each story etched into its walls adds depth to the everyday rhythms that define this place, making it more than just a physical structure, but a vibrant part of the community's fabric."
+- "The nave of Our Lady Help of Christians Catholic Church in Newton, Massachusetts, is more than just a physical space; it is a vibrant testament to the community's resilience and spirit."
+- "Cuenin, who had boldly denounced Cardinal Law."
+- "Yet, the church has also been marked by moments of profound sorrow."
+- "Tragically, they were found murdered along with Jill's mother, Lucia Arpino, in a heartbreaking home invasion."
+- "This incident cast a shadow over the community, turning what was to be a joyous occasion into a time of mourning and reflection."
+- "The church's history is not just about its architecture or its religious significance; it is about the people who have passed through its doors and the stories they have left behind."
+- "The events that have unfolded within these walls are a reminder of the complex tapestry of life, woven with both joy and tragedy."
+- "As sunlight streams through the stained glass, casting vibrant colors just ahead, the nave continues to be a living, breathing part of the community's narrative, echoing with the memories of its past."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
@@ -290,7 +289,7 @@ Use only the source material supplied. If the material will not support such a s
 
 
 ================================================================================
-Total user message length: 23981 chars
+Total user message length: 23888 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -298,4 +297,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Altar', 'Narthex', 'Baptismal Font', 'Pulpit']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Pulpit', 'Stations of the Cross', 'Altar', 'Narthex']

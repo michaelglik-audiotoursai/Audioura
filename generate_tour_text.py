@@ -16718,6 +16718,18 @@ REWRITE RULES (all mandatory):
             print(f"  [TRAGEDY-CONTEXT] skipped ({_tg_err})")
 
         try:
+            # [2026-09-23] Cap any one person's reach first. The kiro critic found
+            # Cuenin in 5 of 6 stops -- "the tour's crutch" -- and the sentence-level
+            # dedup below could not see it, because it matches person AND year and he
+            # recurs with different years.
+            try:
+                from derepetition_guard import cap_person_across_stops as _cap_person
+                for _cp in _cap_person(poi_list):
+                    print(f"      [PERSON-CAP] stop {_cp['stop']}: '{_cp['person']}' "
+                          f"already carries two stops — cut: {_cp['removed'][:80]}")
+            except Exception as _cp_err:
+                print(f"  [PERSON-CAP] skipped ({_cp_err})")
+
             from derepetition_guard import strip_cross_stop_repeats as _strip_repeats
             _stripped = _strip_repeats(poi_list, banned_by_stop=_d534_repeats_by_stop)
             if _stripped:

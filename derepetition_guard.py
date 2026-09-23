@@ -829,6 +829,60 @@ def _same_episode(key_a, key_b):
     return bool(names_a & names_b) and bool(years_a & years_b)
 
 
+def cap_person_across_stops(poi_list, max_stops: int = 2):
+    """No one person may carry the story at more than `max_stops` stops.
+
+    The kiro critic on a 6-stop church tour, 2026-09-23: *"the Cuenin / Cardinal Law
+    controversy is pasted into four of six stops. It's the tour's crutch. Assign that
+    story to ONE stop and give the other five content about the thing the listener is
+    actually standing in front of."* Verified: **Cuenin appeared in 5 of 6 stops.**
+
+    `strip_cross_stop_repeats` could not see it. That matches on person AND year, and
+    Cuenin recurs with different years (2002, 2005) and different framings — so every
+    occurrence looked like a new episode. A person is allowed to appear twice; being
+    the subject everywhere means the tour has one story and is padding with it.
+
+    The EARLIEST occurrences are kept: the first stop to use a person usually has the
+    strongest claim on them (the ovation happened in the nave). Later sentences naming
+    only that person are dropped.
+    """
+    from collections import defaultdict
+    where = defaultdict(list)          # surname -> [(stop_idx, sentence), ...]
+    for i, poi in enumerate(poi_list or []):
+        desc = (poi.get('description') or '') if isinstance(poi, dict) else ''
+        for sent in _split_into_sentences(desc):
+            names, _years = _entity_year_key(sent)
+            for n in names:
+                where[n].append((i, sent))
+
+    removed = []
+    for surname, hits in where.items():
+        stops = sorted({i for i, _ in hits})
+        if len(stops) <= max_stops:
+            continue
+        keep = set(stops[:max_stops])
+        for i, sent in hits:
+            if i in keep:
+                continue
+            # Only drop it if this person is the ONLY name carrying the sentence —
+            # never cut a sentence that is doing other work too.
+            names, _ = _entity_year_key(sent)
+            if names != {surname}:
+                continue
+            poi = poi_list[i]
+            kept = [x for x in _split_into_sentences(poi.get('description') or '')
+                    if x != sent]
+            # NEVER empty a stop. The first version of this cut the Altar down to
+            # nothing, and LOCAL-292's empty-stop gate would then have deleted the
+            # stop entirely -- trading a repetition for a missing stop, which is the
+            # worse defect. A crutch sentence is better than no stop at all (D577).
+            if not ' '.join(kept).strip():
+                continue
+            poi['description'] = ' '.join(kept).strip()
+            removed.append({'stop': i + 1, 'person': surname, 'removed': sent})
+    return removed
+
+
 def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int = 8,
                              banned_by_stop: dict = None, banned_threshold: float = 0.42):
     """[2026-09-18] Delete a sentence from a LATER stop when an earlier stop said it.
