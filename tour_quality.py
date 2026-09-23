@@ -18,6 +18,10 @@ every one of them something Michael found by reading and then had to explain:
   distance        a kilometre figure on a building tour
   spliced         "...aviation sector.3 million passengers" — a cut sentence rejoined
   foreign_venue   another airport's facts asserted as this one's (the Atlanta bug)
+  fabricated_attribution  "constructed in 1887-1889 by Gustave Eiffel" on an airport,
+                  "Founded in 1868 by St. Mary Help of Christians" on the church of
+                  that dedication — a builder/founder frame filled with a nearby
+                  famous name or the venue's own patron saint (LOCAL-527, D577)
 
 **What it deliberately cannot judge: whether a tour is INTERESTING.** That is the
 thing Michael reads for, and no counter substitutes for it. The loop is therefore
@@ -27,7 +31,8 @@ allowed to iterate on measurable defects and must hand the judgement call back.
 import os
 import re
 
-REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance')
+REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance',
+                  'fabricated_attribution')
 
 _STOP = re.compile(r'^Stop (\d+):\s*(.+)$', re.M)
 _YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
@@ -138,6 +143,85 @@ except Exception:                       # pragma: no cover - keep the scorer sta
     _NOT_PERSON = set()
 
 
+# ─── Fabricated builder/founder attribution (LOCAL-527) ──────────────────────
+# Round 7 and round 8 both shipped an airport whose Control Tower was "constructed
+# in 1887-1889 by Gustave Eiffel" (that is the Eiffel Tower), and a church "Founded
+# in 1868 by St. Mary Help of Christians" (the church's own dedication turned into a
+# person). The frame "<built|founded|constructed|...> in <YEAR> by <NAME>" is being
+# filled with whatever famous-sounding name is nearby and nothing checked it. The
+# scorer already parsed this frame — but only to COUNT the person, never to judge
+# whether the attribution was true. This adds the judgement.
+#
+# The verb and the "by NAME" are often separated by the year span, so match the
+# whole shape in one pass and stop at a sentence boundary so it cannot reach across
+# clauses. The dash between years may be a hyphen or an en/em dash.
+_ATTRIB_FRAME = re.compile(
+    # Verbs that FOUND or CONSTRUCT a place. Deliberately excludes "designed" and
+    # "created" — those are the normal verbs of art attribution ("Nu bleu IV,
+    # created in 1952 by Henri Matisse"), which is legitimate tour content, not a
+    # venue-founding claim. The three real defects are all "constructed"/"built"/
+    # "founded", so this covers them without swallowing art tours.
+    r'\b(built|constructed|founded|established|erected)\b'
+    r'[^.]{0,30}?'                                  # "... in", optional filler
+    r'\bin\s+(1[5-9]\d\d|20\d\d)'                    # the year the frame anchors on
+    r'(?:\s*[-\u2012-\u2015\u2212]\s*\d{2,4})?'      # optional "-1889" span
+    r'\s+by\s+'
+    r'(?:(?:St|Fr|Dr|Mr|Mrs|Rev|Msgr|Sir|Sister|Mother|Father)\.?\s+)?'  # optional honorific
+    r'(' + _NAME +
+    # "...by St. Mary Help of Christians": keep the dedication tail ("of Christians")
+    # so a patron-title founder is captured whole, not clipped at "Mary Help".
+    r'(?:\s+(?:of|the|for|de|del|of\s+the)\s+[A-Z][a-z]{2,})*'
+    r')',
+    re.I)
+
+# The venue's own dedication is who a church is FOR, never who founded it. "Our Lady
+# Help of Christians" is a title of the Virgin Mary; a founder attributed to any part
+# of that title is the dedication misread as a person. These are the multiword title
+# cores that must never surface as a founder of the venue that bears them.
+_DEDICATION_CORES = (
+    'help of christians', 'our lady', 'perpetual help', 'sacred heart',
+    'holy cross', 'holy trinity', 'good shepherd', 'blessed sacrament',
+    'immaculate conception', 'guardian angels', 'precious blood',
+)
+
+
+def _find_fabricated_attributions(text):
+    """Return a list of (kind, verb, year, name) attribution defects.
+
+    kind is 'dedication' when the attributed founder is the venue's own dedication
+    (catchable offline with certainty), or 'unverified' when it is a plain builder/
+    founder attribution with no grounding to confirm it (catchable offline only as
+    unverified — refuting it needs a source; see D577).
+    """
+    out = []
+    for m in _ATTRIB_FRAME.finditer(text or ''):
+        verb = m.group(1)
+        year = m.group(2)
+        name = (m.group(3) or '').strip()
+        if not name:
+            continue
+        first = name.split()[0].lower()
+        last = name.split()[-1].lower()
+        # A people-group ("funded in 1868 by Irish immigrants") or a venue part is
+        # not a fabricated person — those are handled elsewhere.
+        if first in _NOT_A_NAME or last in _NOT_A_NAME:
+            continue
+        if first in _NOT_PERSON or last in _NOT_PERSON:
+            continue
+        low = name.lower()
+        # (a) dedication / patron-saint rendered as founder — deterministic offline.
+        # The attributed "founder" carries a Marian/patronal title core ("...by St.
+        # Mary Help of Christians"): no church is FOUNDED BY the saint it is
+        # dedicated TO. The title core in the founder name is conclusive on its own.
+        ded = next((core for core in _DEDICATION_CORES if core in low), None)
+        if ded is not None:
+            out.append(('dedication', verb, year, name))
+            continue
+        # (b) otherwise it is a builder/founder attribution we cannot confirm.
+        out.append(('unverified', verb, year, name))
+    return out
+
+
 def _count_people(text):
     """Distinct PEOPLE, de-duplicated by surname.
 
@@ -174,8 +258,16 @@ def _stops(text):
 
 
 def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
-               geocoder=None):
-    """Return {'defects': {...}, 'metrics': {...}, 'clean': bool}."""
+               geocoder=None, verify_attribution=None):
+    """Return {'defects': {...}, 'metrics': {...}, 'clean': bool}.
+
+    verify_attribution, when given, is called as verify_attribution(name, year,
+    text) and must return truthy if a source confirms that person built/founded the
+    venue in that year. It clears an otherwise-unverified attribution frame. It does
+    NOT clear a dedication-as-founder error, which is wrong regardless of any source.
+    Gemini is the natural implementation but is not required — offline, an unverified
+    frame is flagged rather than refuted (D577).
+    """
     text = text or ''
     stops = _stops(text)
     metrics = {
@@ -204,6 +296,38 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
 
     if is_building_tour and _KM.search(text):
         defects['distance'] = f"kilometre figure on a building tour: {_KM.search(text).group(0)}"
+
+    # Fabricated builder/founder attribution (LOCAL-527). Two kinds:
+    #   dedication  the founder IS the venue's own dedication/patron saint — a
+    #               deterministic offline error, always a defect.
+    #   unverified  a plain "<built|founded|constructed> in <YEAR> by <NAME>" that
+    #               nothing has confirmed. Offline it can only be flagged as
+    #               unverified, never refuted (that needs a source — D577). If a
+    #               grounding source is supplied that confirms the name, it clears.
+    attribs = _find_fabricated_attributions(text)
+    if attribs:
+        confirm = None
+        if callable(verify_attribution):
+            def confirm(name, year):
+                try:
+                    return bool(verify_attribution(name, year, text))
+                except Exception:
+                    return False
+        unresolved = []
+        for kind, verb, year, name in attribs:
+            if kind == 'unverified' and confirm and confirm(name, year):
+                continue                       # a source vouches for it — keep it
+            unresolved.append((kind, verb, year, name))
+        if unresolved:
+            kind, verb, year, name = unresolved[0]
+            if kind == 'dedication':
+                why = (f"dedication/patron rendered as founder: "
+                       f"\"{verb} in {year} by {name}\"")
+            else:
+                why = (f"unverified attribution: \"{verb} in {year} by {name}\" "
+                       f"(no source confirms it)")
+            defects['fabricated_attribution'] = (
+                f"{len(unresolved)} attribution(s); {why}")
 
     try:
         from derepetition_guard import _tokenize, _jaccard_similarity
