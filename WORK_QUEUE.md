@@ -78,3 +78,44 @@ session exists at all, and it does not touch his Claude plan.
 - deleting what Michael has not agreed to lose
 - spending past the stated ceiling
 - **judging whether a tour is interesting** — `tour_quality.py` cannot, and says so
+
+
+---
+
+# THE 30-MINUTE CHECK — Michael's standing instruction, 2026-09-23
+
+> *"there were no reasons why I should have asked you for the status at 8 AM: you could
+> have done this and come up with the plan yourself and then executed it continuously
+> over night unless you get 3 consistent failures."*
+
+He is right, and the cost was concrete: seven tasks ran overnight, **four produced nothing
+and their deliverables were then deleted** by the prune script. A check at 00:45 would have
+caught it while the evidence was still on disk. Instead it was found at 08:07 because he
+asked.
+
+## Every 30 minutes, while work is in flight
+
+1. **Did the planned tasks actually finish?** `COMPLETED` in `kiro_sessions_ran.md` proves
+   nothing — CLAUDE.md: *"`exit=0` from Kiro means nothing. Verify by effect."* Check for
+   **commits**: `git rev-list --count storied..<branch>`. Zero commits means it failed,
+   whatever it logged.
+2. **If something failed, diagnose it before re-dispatching.** The worker log in
+   `kiro_session_logs/` shows what it did. Four of last night's four had *written their
+   files* — the failure was not committing, which is a different bug from not working.
+3. **Replan and execute.** Do not wait to be asked. RULE ZERO.
+4. **If there is not enough time to evaluate properly, wait** rather than half-check.
+
+## The three-failure rule
+
+**Three consistent identical failures = stop and ask Michael.** Not three failures — three
+of the *same* failure, which means the approach is wrong rather than the run unlucky.
+
+**And even then, do other work.** A blocked thread is not a blocked queue; drop to the next
+tier in the list above.
+
+## Always keep FIVE tasks ready
+
+His rule: there must be five tasks available for when the current thread blocks, needs his
+judgement, or finishes. **If the backlog falls below five, tell him** — *"we can come up
+with these tasks together"*. An empty backlog is information to report, never a reason to
+idle.
