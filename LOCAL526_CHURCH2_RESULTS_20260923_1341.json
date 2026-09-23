@@ -1,0 +1,56 @@
+[
+  {
+    "story_first_s": 127.7,
+    "wall_total_timing": 284.8,
+    "retry_summary": "[LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original",
+    "triggers": "[LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 3 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.",
+    "workers": 1,
+    "d534_lines": [
+      "[D534] Stop 2 repeats 1 thing(s) said earlier — will regenerate with them banned",
+      "[D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned",
+      "[D534] Stop 4 repeats 3 thing(s) said earlier — will regenerate with them banned",
+      "[D534] removed 1 repeated sentence(s) the capped retries could not reach:"
+    ],
+    "mode": "serial",
+    "wall_wrapped_s": 284.8,
+    "chars": 9124,
+    "stop_count": 4,
+    "clean": true,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 9,
+      "named_people": 9,
+      "chars": 9124
+    },
+    "out_file": "LOCAL526_church2_serial_20260923_1341.txt"
+  },
+  {
+    "story_first_s": 97.9,
+    "wall_total_timing": 280.2,
+    "retry_summary": "[LOCAL-474] retry summary: 4 eligible, 4 retried, 4 improved, 0 kept original",
+    "triggers": "[LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.",
+    "workers": 4,
+    "d534_lines": [
+      "[D534] No cross-stop repetition in the drafts",
+      "[D534] no repeated sentences left after the retries"
+    ],
+    "mode": "parallel",
+    "wall_wrapped_s": 280.2,
+    "chars": 8986,
+    "stop_count": 4,
+    "clean": false,
+    "defects": {
+      "distance": "kilometre figure on a building tour: 6 km"
+    },
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 14,
+      "named_people": 5,
+      "chars": 8986
+    },
+    "out_file": "LOCAL526_church2_parallel_20260923_1341.txt"
+  }
+]

@@ -16420,6 +16420,11 @@ REWRITE RULES (all mandatory):
         except Exception as _d534_err:
             print(f"  [D534] Cross-stop repetition scan error (non-fatal): {_d534_err}")
 
+        # [LOCAL-526] Eligible stops accumulate here during the serial eligibility
+        # phase; their `_generate_description` calls run concurrently afterwards
+        # and results are applied serially in stop order. See the SPLIT PHASE note
+        # further down.
+        _retry_work = []
         for _ri, _rpoi in enumerate(poi_list):
             _now = _rpoi.get('description') or ''
             _before = _pre_gate_prose.get(_ri, '')
@@ -16617,10 +16622,91 @@ REWRITE RULES (all mandatory):
                     "support such a story, write the shorter factual account rather "
                     "than inventing one — an invented story is worse than none.\n")
             _rpoi['_local474_forbidden'] = _instruction
+            # [LOCAL-526] SPLIT PHASE. The eligibility decision and instruction
+            # building above are cheap and involve no network; they stay serial
+            # and in stop order, so `_retry_stats` trigger counts, `eligible`,
+            # the step 7b rotation and every print are byte-for-byte what the
+            # serial loop produced. What was expensive — the per-stop
+            # `_generate_description` LLM call — is deferred to a concurrent phase
+            # below, and the accept/reject decision (which mutates state and must
+            # stay deterministic) is applied serially afterwards in stop order.
+            #
+            # Each work item carries its own `_rpoi` (a distinct dict) with its
+            # own `_local474_forbidden` already set, so the concurrent calls do
+            # not share the mutable instruction slot. `_retry_stats['retried']`,
+            # 'improved', 'kept_original' and `total_cost` are ONLY touched in the
+            # serial apply phase, never in a worker thread. This is safe because
+            # the cross-stop ban list (`_d534_repeats_by_stop`) is built once
+            # before the loop and each stop only READS its own slice (D534) — no
+            # iteration depends on another's regenerated output.
+            _retry_work.append({
+                'ri': _ri,
+                'rpoi': _rpoi,
+                'args': (_ri, _rpoi, _spine_stop, _fact_sheet, _story_type),
+                'now_wc': _now_wc,
+                'hollowed': _hollowed,
+                'storyless': _storyless,
+                'top_value': _top_value,
+            })
+
+        # [LOCAL-526] CONCURRENT PHASE. Run the deferred `_generate_description`
+        # calls in parallel — this is the whole point of the ticket. PHASE 5.17
+        # was measured at 52–208s of `story_first`, a per-stop serial chain of
+        # 4–6 LLM regenerations run one after another. Results are collected into
+        # a dict keyed by stop index and applied serially below, so nothing about
+        # ordering, acceptance or `_retry_stats` changes.
+        _retry_results = {}
+        if _retry_work:
+            _retry_max_workers = min(len(_retry_work), 5)
+            # [LOCAL-526] `STORY_RETRY_MAX_WORKERS` lets a measurement run force
+            # the pool to 1 — i.e. serial execution of the SAME code path — so
+            # the before/after wall-time comparison isolates the concurrency and
+            # nothing else. Unset in production; the default is the parallel pool.
+            try:
+                _rmw_override = int(os.environ.get('STORY_RETRY_MAX_WORKERS', '') or '0')
+            except ValueError:
+                _rmw_override = 0
+            if _rmw_override > 0:
+                _retry_max_workers = min(_retry_max_workers, _rmw_override)
+            print(f"\n  [LOCAL-526] PHASE 5.17: regenerating {len(_retry_work)} "
+                  f"eligible stop(s) concurrently (max_workers={_retry_max_workers})")
+            _retry_gen_t0 = time.time()
+            with ThreadPoolExecutor(max_workers=_retry_max_workers) as _retry_ex:
+                _retry_futures = {
+                    _retry_ex.submit(_generate_description, _w['args']): _w['ri']
+                    for _w in _retry_work
+                }
+                for _rf in as_completed(_retry_futures):
+                    _rf_ri = _retry_futures[_rf]
+                    try:
+                        _retry_results[_rf_ri] = ('ok', _rf.result())
+                    except Exception as _rf_err:
+                        _retry_results[_rf_ri] = ('err', _rf_err)
+            print(f"  [LOCAL-526] PHASE 5.17 regeneration wall: "
+                  f"{time.time() - _retry_gen_t0:.1f}s for {len(_retry_work)} stop(s) "
+                  f"at max_workers={_retry_max_workers}")
+
+        # [LOCAL-526] SERIAL APPLY PHASE. In stop order, exactly as the serial
+        # loop applied them: increment `_retry_stats['retried']`, re-gate the
+        # draft, run the trigger-specific acceptance test, and update
+        # `description`/`orientation`/`total_cost`/`_retry_stats`. All state
+        # mutation happens here, on the main thread, one stop at a time — so the
+        # accept/reject decisions and the retry summary are identical to a serial
+        # run on the same input.
+        for _w in sorted(_retry_work, key=lambda w: w['ri']):
+            _ri = _w['ri']
+            _rpoi = _w['rpoi']
+            _now_wc = _w['now_wc']
+            _hollowed = _w['hollowed']
+            _storyless = _w['storyless']
+            _top_value = _w['top_value']
             try:
                 _retry_stats['retried'] += 1
-                _r = _generate_description(
-                    (_ri, _rpoi, _spine_stop, _fact_sheet, _story_type))
+                _outcome, _payload = _retry_results.get(_ri, ('err', RuntimeError(
+                    'no result produced for stop')))
+                if _outcome == 'err':
+                    raise _payload
+                _r = _payload
                 _new_desc = _r[2] or ''
                 # RE-GATE THE RETRY. The gate chain has already run and will not run
                 # again, so an ungated retry could ship a fresh fabrication that the
