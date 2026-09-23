@@ -119,3 +119,31 @@ His rule: there must be five tasks available for when the current thread blocks,
 judgement, or finishes. **If the backlog falls below five, tell him** — *"we can come up
 with these tasks together"*. An empty backlog is information to report, never a reason to
 idle.
+
+
+---
+
+# THE CRITIC RUNS BEFORE MICHAEL DOES — standing rule, 2026-09-23
+
+> *"Please ALWAYS run Amazon-Q reviewer before asking for my review, then analyse the
+> review, if you agree with findings, report to me, but not stop to try to fix the issues
+> found. I can always have an option to review myself. If no issues found, then you are
+> stuck for my final word/review."*
+
+**Never hand Michael a tour that has not been critiqued first.** The order is:
+
+1. Generate.
+2. Score with `tour_quality.py` — the counters.
+3. **Run the kiro/Amazon-Q critic** — the judgement no counter makes.
+4. **Verify each finding.** A finding is a CLAIM. Two have already been wrong: one said
+   "4 of 6 files" when it was 2, another reported a stop missing that was present (the
+   file had been truncated on the way in).
+5. **Fix what survives verification.** Do not stop at reporting — *"not stop to try to
+   fix the issues found"*.
+6. **Then** hand it to Michael, with the findings and what was done about them.
+
+**If the critic finds nothing, say so plainly and stop** — that is the one state where
+his word is the only thing left, and it is a legitimate place to be blocked.
+
+His reasoning is that he should be the LAST reviewer, not the first. Every defect a
+machine can find should already be gone before he spends his attention.
