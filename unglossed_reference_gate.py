@@ -1789,6 +1789,23 @@ _DEGRADE_GUARD_ORPHAN_HYPHEN = re.compile(r'\b[A-Z][a-zà-ÿ]+-\s')  # "Pierre- 
 _DEGRADE_GUARD_ORPHAN_ADJECTIVE = re.compile(
     r'\bthe\s+nearby\s+(?:forms|has|is|was|were|are|had|have)\b', re.IGNORECASE
 )  # "the nearby forms" — adjective without noun object
+# [2026-09-23, LOCAL-530] "They authorized of Public Works to lease this land" —
+# the tour said "the Department of Public Works", and this gate excised the head
+# noun "Department" as an unglossed reference, leaving the verb "authorized"
+# abutting "of" with its object gone. The seven guards above passed it, exactly as
+# LOCAL-475 defect C passed a subjectless sentence: dropping a word from the middle
+# of a sentence is precisely the operation this gate performs. The signature is a
+# transitive verb that governs a direct OBJECT ("authorized [a body]") welded onto
+# "of" — restricted to verbs of official action on an institution so it never fires
+# on the legitimate "-ed of" idioms (comprised/composed/consisted/deprived/accused/
+# approved of). Fail-safe: when this fires the degraded sentence is judged
+# ill-formed and dropped whole, which is better than voicing broken syntax to TTS.
+_DEGRADE_GUARD_OBJECT_DROPPED = re.compile(
+    r'\b(?:authoriz|authorised|engag|establish|appoint|commission|task|direct|'
+    r'instruct|order|permit|enabl|allow|assign|designat|elect|nominat|'
+    r'compel|urg|request|requir|forbid|forbad|prohibit|mandat)'
+    r'(?:ed|es|e)?\s+of\s+[A-Z]'
+)
 
 
 _DEGRADE_OPENER = re.compile(
@@ -1927,6 +1944,8 @@ def _degrade_sentence_is_wellformed(sentence: str) -> bool:
         return False
     if _DEGRADE_GUARD_ORPHAN_ADJECTIVE.search(sentence):
         return False
+    if _DEGRADE_GUARD_OBJECT_DROPPED.search(sentence):   # [LOCAL-530]
+        return False
     return True
 
 
@@ -1985,6 +2004,15 @@ def validate_degrade_output(full_text: str) -> List[Dict]:
             violations.append({
                 'sentence': sent_stripped[:100],
                 'guard': 'orphan_hyphen',
+                'pattern_matched': m.group(),
+            })
+
+        # Guard 7: Object dropped — transitive verb welded onto "of" [LOCAL-530]
+        m = _DEGRADE_GUARD_OBJECT_DROPPED.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'object_dropped',
                 'pattern_matched': m.group(),
             })
 
