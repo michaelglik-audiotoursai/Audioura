@@ -866,6 +866,108 @@ def _same_episode(key_a, key_b):
     return bool(names_a & names_b) and bool(years_a & years_b)
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-532] Same EVENT told twice, even when the dates differ or are absent.
+#
+# The kiro critic on LOGAN_1, 2026-09-23: *"Lindbergh appears in two of four
+# stops — the file tells its single best anecdote twice."* Verified, and the
+# critic undercounted: Lindbergh is in stops 1, 3 AND 4. The two full tellings:
+#
+#   stop 3  "It was here, on the tarmac just beyond the bridge, that Charles
+#            Lindbergh once touched down, marking a significant moment..."
+#   stop 4  "In 1927, ... Charles Lindbergh landed the Spirit of St. Louis here
+#            during his goodwill tour, only months after his ... transatlantic
+#            flight."
+#
+# One landing, told twice. `_same_episode` (person AND year) cannot see it: the
+# stop-3 telling carries NO year in its sentence, so `years_a & years_b` is
+# empty and the pair reads as two unrelated mentions. `cap_person_across_stops`
+# (D584) cannot see it either — it caps at TWO stops and Lindbergh is in exactly
+# two BODY stops, which D584 permits by design.
+#
+# The unit repeated here is not a PERSON, it is an EVENT: one person + one class
+# of action (a landing/arrival). Two stops asserting the same person doing the
+# same kind of thing are one episode retold — UNLESS they carry *different*
+# explicit years, which marks two genuinely distinct events (Cuenin in 2002 and
+# again in 2005 is two episodes, not one). So the year is used as a SEPARATOR,
+# not a required match: equal years or a year on only one side = same event; two
+# different years = different events, left alone.
+#
+# How this composes with D584 (stated, per the acceptance criteria):
+#   - D584 governs how many STOPS a person may appear in (<= 2). It never fires
+#     for a person in two stops.
+#   - This rule governs whether the same EPISODE is NARRATED more than once. It
+#     is a strictly narrower unit: it only matches person + same action-class +
+#     non-conflicting year.
+#   - They cannot disagree. Removing a duplicate telling only ever REDUCES a
+#     person's stop reach, so it can never push a tour past D584's cap; and D584
+#     keeping a person in two stops for two DIFFERENT events is exactly the case
+#     this rule declines (different years, or different action-class).
+# ---------------------------------------------------------------------------
+
+# Action-class -> verbs/phrases that name that class of event. Kept deliberately
+# small and concrete: each entry is a thing a person is DATABLY recorded doing at
+# a place, which is what a tour anecdote is. A sentence with none of these
+# asserts no event and cannot be an event-repeat (so atmospheric prose like
+# "continues the legacy that Lindbergh's visit symbolized" contributes nothing).
+_EVENT_ACTIONS = {
+    'arrival': re.compile(
+        r'\b(touch(?:ed)?\s+down|land(?:ed|ing)?|arriv(?:ed|al|es)|'
+        r'flew\s+in|set\s+(?:foot|down)|disembark(?:ed)?|deplaned)\b', re.I),
+    'visit': re.compile(
+        r'\b(visit(?:ed|s)?|came\s+(?:to|here)|toured|stopped\s+(?:by|here)|'
+        r'made\s+an?\s+appearance|addressed\s+(?:the|a)\b|spoke\s+(?:at|here|to))\b',
+        re.I),
+    'birth': re.compile(r'\b(was\s+born|birthplace|born\s+(?:in|here|at))\b', re.I),
+    'death': re.compile(r'\b(died|death|passed\s+away|was\s+killed|murder(?:ed)?|'
+                        r'assassinat(?:ed|ion))\b', re.I),
+    'founding': re.compile(
+        r'\b(found(?:ed|ing)|establish(?:ed)?|open(?:ed|ing)|inaugurat(?:ed|ion)|'
+        r'dedicat(?:ed|ion)|consecrat(?:ed))\b', re.I),
+    'construction': re.compile(
+        r'\b(built|construct(?:ed|ion)|erect(?:ed)?|designed|commission(?:ed)?)\b',
+        re.I),
+    'performance': re.compile(
+        r'\b(perform(?:ed)?|play(?:ed)?\s+(?:here|at)|concert|premier(?:ed|e)|'
+        r'debut(?:ed)?)\b', re.I),
+    'ceremony': re.compile(
+        r'\b(married|wedding|coronation|crowned|ordain(?:ed)?|resign(?:ed|ation)|'
+        r'appoint(?:ed|ment)|elect(?:ed|ion))\b', re.I),
+}
+
+
+def _event_key(sentence):
+    """(person/entity cores, action-classes, years) — the fingerprint of an EVENT.
+
+    Only PEOPLE/entities that could carry an anecdote are kept (common-noun
+    scaffolding like 'windows' or 'church' is dropped, reusing `_person_names`).
+    A sentence with no action verb from `_EVENT_ACTIONS` has an empty action set
+    and therefore matches no event.
+    """
+    names, years = _entity_year_key(sentence)
+    people = {n for n in names if n not in _NOT_PERSON and len(n) > 2}
+    actions = {cls for cls, pat in _EVENT_ACTIONS.items() if pat.search(sentence or '')}
+    return people, actions, years
+
+
+def _same_event(key_a, key_b):
+    """Same actor + same action-class + non-conflicting year -> one event retold.
+
+    The year is a SEPARATOR, not a required match:
+      - shared actor AND shared action-class is the necessary condition;
+      - if BOTH tellings name a year and the years are DISJOINT, they are two
+        different events -> not a repeat;
+      - equal years, or a year on only one side, or no year at all -> same event.
+    """
+    people_a, actions_a, years_a = key_a
+    people_b, actions_b, years_b = key_b
+    if not (people_a & people_b) or not (actions_a & actions_b):
+        return False
+    if years_a and years_b and not (years_a & years_b):
+        return False          # both dated, and to different years -> distinct
+    return True
+
+
 def cap_person_across_stops(poi_list, max_stops: int = 2):
     """No one person may carry the story at more than `max_stops` stops.
 
@@ -945,7 +1047,7 @@ def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int =
     Mutates `description` in place. Returns [{stop, removed, matched_stop}].
     """
     removed_log = []
-    seen = []                      # [(stop_index, token_set, sentence)]
+    seen = []                      # [(stop_index, token_set, sentence, event_key)]
     # `banned_by_stop` carries what D534's LLM detector ALREADY identified as
     # repeated for each stop. Jaccard alone catches verbatim repeats; D534 catches
     # paraphrases ("Mother Teresa visited" vs "Saint Mother Teresa of Calcutta held
@@ -969,12 +1071,21 @@ def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int =
                 continue
             dup_of = None
             _key = _entity_year_key(sent)
+            _ekey = _event_key(sent)
             for bkey in _banned.get(idx + 1, []):
                 if _same_episode(_key, bkey):
                     dup_of = 0      # flagged by D534; source stop not tracked
                     break
             if dup_of is None:
-              for prev_idx, prev_toks, _prev in seen:
+              for prev_idx, prev_toks, _prev, prev_ekey in seen:
+                # [LOCAL-532] Same EVENT retold at a later stop, even when the two
+                # tellings carry different dates or none — the Lindbergh landing in
+                # LOGAN_1 stops 3 and 4. Checked before Jaccard because these pairs
+                # score far below the word-overlap threshold ("touched down" vs
+                # "landed the Spirit of St. Louis" share almost no content words).
+                if prev_idx != idx and _same_event(_ekey, prev_ekey):
+                    dup_of = prev_idx
+                    break
                 if _jaccard_similarity(toks, prev_toks) >= threshold:
                     dup_of = prev_idx
                     break
@@ -982,7 +1093,7 @@ def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int =
                 dropped.append((sent, dup_of))
             else:
                 kept.append(sent)
-                seen.append((idx, toks, sent))
+                seen.append((idx, toks, sent, _ekey))
         if dropped:
             poi['description'] = ' '.join(kept).strip()
             for sent, src in dropped:
