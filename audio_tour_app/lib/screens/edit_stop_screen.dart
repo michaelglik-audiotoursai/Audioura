@@ -2630,6 +2630,13 @@ class _EditStopScreenState extends State<EditStopScreen> {
                                             mediaPlaybackRequiresUserGesture: false,
                                             allowsInlineMediaPlayback: true,
                                             javaScriptEnabled: true,
+                                            // LOCAL-3482: match the Listen tab /
+                                            // news player, which read the tour
+                                            // dir and play fine. File access is
+                                            // required for the <source> to read
+                                            // the audio beside the scratch HTML.
+                                            allowFileAccess: true,
+                                            allowContentAccess: true,
                                           ),
                                           onConsoleMessage: (controller, consoleMessage) {
                                             _audioConsoleLogger.onConsoleMessage(consoleMessage);
