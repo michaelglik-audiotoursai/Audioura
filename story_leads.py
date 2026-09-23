@@ -153,7 +153,8 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
 
 
 def gemini_with_sources(prompt: str, model: str = None,
-                        resolve: bool = True, timeout: int = 90) -> Dict:
+                        resolve: bool = True, timeout: int = 90,
+                        grounded: bool = True) -> Dict:
     """[D508] Grounded Gemini, returning its SOURCES as well as its text.
 
     Michael, 2026-08-22: *"could you add another column to your matrix: sources,
@@ -193,7 +194,14 @@ def gemini_with_sources(prompt: str, model: str = None,
                       'temperature': 0.2,
                       'maxOutputTokens': int(os.environ.get('GEMINI_MAX_TOKENS', '4000')),
                       'thinkingConfig': {'thinkingBudget': 0}},
-                  'tools': [{'google_search': {}}]},
+                  # [2026-09-23] Grounding with Google Search is billed PER
+                  # REQUEST (~$35/1000, ~3.5c a call) and is independent of tokens.
+                  # It was unconditional here, so questions that cannot benefit from
+                  # a web search were paying for one: "what kind of place is this?"
+                  # and "what does a church consist of?" are CLASS knowledge — the
+                  # model either knows or it does not, and no search helps. Roughly
+                  # four of the ~15 Gemini calls per tour were paying for nothing.
+                  **({'tools': [{'google_search': {}}]} if grounded else {})},
             timeout=timeout)
         r.raise_for_status()
         d = r.json()

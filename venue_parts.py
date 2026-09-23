@@ -347,7 +347,11 @@ def default_ask(prompt, timeout=60):
         from story_leads import gemini_with_sources
     except Exception:
         return ''
-    out = gemini_with_sources(prompt, resolve=False, timeout=timeout) or {}
+    # grounded=False: Q1/Q2 are CLASS knowledge. A web search cannot tell you what
+    # a church consists of any better than the model already does, and grounding is
+    # billed per request whether it helps or not.
+    out = gemini_with_sources(prompt, resolve=False, timeout=timeout,
+                              grounded=False) or {}
     return out.get('text', '') or ''
 
 
@@ -552,7 +556,43 @@ STORY_CHAIN = (
 )
 
 
-def venue_story_chain(venue_name, location, ask_grounded, links=None, workers=5):
+COMBINED_CHAIN_PROMPT = """About "{venue}"{where}, answer all five questions below.
+
+1. CAUSE — What event, person or decision caused it to be built at all? Name them,
+   with dates. What was on the site before, and what happened to it?
+2. CREATORS — Who created it: architect, builder, artists, craftsmen, by name? What
+   else are they known for, and what did they do differently here?
+3. PATRONS — Who paid for it? Name the donors, patrons or public bodies, what it
+   cost, and what they wanted in return or wanted remembered.
+4. VISITORS — Who came here and what happened? Name visitors, congregants, workers,
+   protesters, victims, with dates. What do people still argue about?
+5. SINGULAR — What is it the largest, first, only, oldest or last of? What does it
+   hold that exists nowhere else?
+
+Answer each under a heading exactly: ## CAUSE, ## CREATORS, ## PATRONS,
+## VISITORS, ## SINGULAR.
+Give concrete, checkable facts with names and dates. Cite your sources. If you do
+not know something, say so rather than guessing."""
+
+_CHAIN_SECTION = re.compile(r'^##\s*(CAUSE|CREATORS|PATRONS|VISITORS|SINGULAR)\s*$',
+                            re.M | re.I)
+_LINK_OF = {'cause': 'cause', 'creators': 'creators', 'patrons': 'patrons',
+            'visitors': 'visitors', 'singular': 'singular'}
+
+
+def _split_combined_chain(text, sources):
+    """Split one combined answer back into the five links."""
+    out = {}
+    parts = _CHAIN_SECTION.split(text or '')
+    for i in range(1, len(parts) - 1, 2):
+        key = _LINK_OF.get(parts[i].strip().lower())
+        if key:
+            out[key] = {"text": parts[i + 1].strip(), "sources": list(sources or [])}
+    return out
+
+
+def venue_story_chain(venue_name, location, ask_grounded, links=None, workers=5,
+                      combined=True):
     """Run the causal chain CONCURRENTLY. Returns {link: {"text":…, "sources":[…]}}.
 
     Inspectable by design: every link is recorded separately, including the empty
@@ -575,6 +615,30 @@ def venue_story_chain(venue_name, location, ask_grounded, links=None, workers=5)
     from concurrent.futures import ThreadPoolExecutor
     where = f' in {location}' if location else ''
     pairs = list(links or STORY_CHAIN)
+
+    # [2026-09-23] ONE grounded call instead of five.
+    #
+    # Grounding with Google Search is billed PER REQUEST (~3.5c), not per token, so
+    # five separate grounded questions about the SAME venue cost five times what one
+    # does and search the same subject five times over. Parallelising them made the
+    # tour faster and not one cent cheaper — LEAD optimised latency and never asked
+    # whether the calls were needed. Michael, after a $20.65 prepay balance emptied
+    # in a day: *"execute your plan before I deposit more money on Gemini."*
+    #
+    # The five questions are unchanged, asked together under fixed headings and
+    # split apart on the way back, so every downstream consumer still sees the same
+    # five links. `combined=False` restores the old behaviour for comparison.
+    if combined and links is None:
+        try:
+            text, sources = ask_grounded(
+                COMBINED_CHAIN_PROMPT.format(venue=venue_name, where=where))
+            got = _split_combined_chain(text, sources)
+            if len(got) >= 3:          # a usable split; otherwise fall back
+                for key, _t in pairs:
+                    got.setdefault(key, {"text": "", "sources": []})
+                return {k: got[k] for k, _ in pairs}
+        except Exception:
+            pass                        # fall through to the five-call version
     suffix = ('\nGive concrete, checkable facts with names and dates. Cite your sources. '
               'If you do not know, say so rather than guessing.')
 
