@@ -1205,6 +1205,17 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
     pipeline_start = time.time()
     pipeline_budget = PIPELINE_WALL_BUDGET_SECONDS
 
+    # [LOCAL-518] Per-step timing instrumentation. Each internal step records its
+    # own elapsed seconds so we can see WHERE the story_first phase spends time,
+    # the same way the top-level [TIMING] line does for phases. Measured, not guessed.
+    _step_times: Dict[str, float] = {}
+
+    def _mark(step_name: str, t0: float) -> None:
+        dt = time.time() - t0
+        _step_times[step_name] = _step_times.get(step_name, 0.0) + dt
+        print(f"    [SF-STEP] stop='{(stop_data.get('canonical_title') or stop_data.get('name','') or '')[:40]}' "
+              f"step={step_name} elapsed={dt:.2f}s")
+
     if _STORY_SEEKING_DISABLED:
         return {
             'stories': [],
@@ -1225,7 +1236,9 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
           f"(budget={pipeline_budget}s)")
 
     # ── Step 1: Extract anchor facts ──
+    _t = time.time()
     anchor_facts = extract_anchor_facts(stop_data, fact_sheet)
+    _mark('1_extract_anchor_facts', _t)
     print(f"    Step 1: anchor_facts — artist='{anchor_facts['artist'][:30]}', "
           f"entities={anchor_facts['key_entities'][:3]}")
 
@@ -1235,11 +1248,14 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
 
     # ── Step 2: Story-seeking queries (use remaining budget, not full SERP budget) ──
     serp_budget = min(STORY_SEEKING_BUDGET_SECONDS, _remaining() * 0.5)
+    _t = time.time()
     seeking_result = seek_stories_for_stop(stop_data, anchor_facts,
                                            budget_seconds=serp_budget)
+    _mark('2_seek_stories', _t)
     story_seeking_results = seeking_result.get('results', [])
 
     # ── Step 2b (LOCAL-443-A): Full-page fetch for tier1/tier2 URLs ──
+    _t = time.time()
     fullpage_fetch_result = {'pages_fetched': 0, 'pages_succeeded': 0,
                              'extracted_candidates': 0, 'elapsed_seconds': 0.0}
     fetched_page_texts = []
@@ -1274,6 +1290,7 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
                 'extracted_candidates': 0,  # Updated below
                 'elapsed_seconds': time.time() - fetch_start,
             }
+    _mark('2b_fullpage_fetch', _t)
 
     # ── Budget check ──
     if _remaining() <= 2:
@@ -1294,6 +1311,7 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         }
 
     # ── Build candidate corpus ──
+    _t = time.time()
     # Merge with existing search results (LOCAL-410) as corpus for verification
     all_snippets = list(snippets or [])
     if existing_search_results:
@@ -1335,9 +1353,12 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
                 candidate_texts.append(snippet)
 
     prefilter_input_count = len(candidate_texts)
+    _mark('2d_build_candidates', _t)
 
     # ── Step 2c (LOCAL-443-B): Pre-filter before LLM ──
+    _t = time.time()
     unique_candidates = prefilter_candidates(candidate_texts, stop_name=stop_name)
+    _mark('3_prefilter', _t)
 
     print(f"    Pre-filter: {prefilter_input_count} raw → {len(unique_candidates)} "
           f"candidates for classification")
@@ -1359,6 +1380,7 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         }
 
     # ── Step 3 (LOCAL-443-C): Concurrent classification + verification ──
+    _t = time.time()
     classify_budget = max(2.0, _remaining() - 2.0)  # Reserve 2s for step 4
     verified = evaluate_candidates_concurrent(
         unique_candidates, all_snippets,
@@ -1366,8 +1388,10 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         stop_name=stop_name,
         budget_seconds=classify_budget,
     )
+    _mark('4_classify_verify', _t)
 
     # ── Step 4: Size adaptation ──
+    _t = time.time()
     stories_for_packer = []
     for v in verified:
         # Budget check
@@ -1410,6 +1434,8 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         }
         stories_for_packer.append(story_dict)
 
+    _mark('5_size_adapt', _t)
+
     elapsed = time.time() - pipeline_start
     total_cost = seeking_result.get('estimated_cost_usd', 0.0)
     budget_exhausted = elapsed >= pipeline_budget
@@ -1417,6 +1443,11 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
     print(f"    Step 4: {len(stories_for_packer)} stories ready for packer "
           f"({elapsed:.1f}s, ${total_cost:.4f})"
           f"{' [BUDGET EXHAUSTED]' if budget_exhausted else ''}")
+    # [LOCAL-518] Per-step breakdown for this stop (sum may be < elapsed due to
+    # budget-check gaps; the dominant step is what matters for optimisation).
+    _sf_breakdown = ', '.join(f"{k}={v:.2f}s" for k, v in sorted(
+        _step_times.items(), key=lambda x: x[1], reverse=True))
+    print(f"    [SF-BREAKDOWN] stop='{stop_name[:40]}' total={elapsed:.2f}s :: {_sf_breakdown}")
 
     return {
         'stories': stories_for_packer,
@@ -1430,6 +1461,7 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         'cost_usd': total_cost,
         'fallback': False,
         'budget_exhausted': budget_exhausted,
+        'step_times': _step_times,
     }
 
 
@@ -1622,5 +1654,30 @@ def story_first_pipeline_batch(
     print(f"\n  [LOCAL-445] Batch complete: {n_stops} stops in {batch_elapsed:.1f}s "
           f"(budget={tour_budget_seconds}s), "
           f"stories={total_stories}, cost=${total_cost:.4f}")
+
+    # [LOCAL-518] Aggregate per-step timings across all stops. Because stops run
+    # concurrently, SUM(step) over stops exceeds wall time — the useful figures are
+    # (a) which step dominates the per-stop critical path, and (b) mean per-stop
+    # step time. Both printed here so the profile has real numbers, not guesses.
+    _agg: Dict[str, float] = {}
+    _max_stop: Dict[str, float] = {}
+    _n_with_steps = 0
+    for r in results.values():
+        st = r.get('step_times') or {}
+        if st:
+            _n_with_steps += 1
+        for k, v in st.items():
+            _agg[k] = _agg.get(k, 0.0) + v
+            _max_stop[k] = max(_max_stop.get(k, 0.0), v)
+    if _agg:
+        _mean = {k: v / max(1, _n_with_steps) for k, v in _agg.items()}
+        _mean_str = ', '.join(f"{k}={v:.2f}s" for k, v in sorted(
+            _mean.items(), key=lambda x: x[1], reverse=True))
+        _max_str = ', '.join(f"{k}={v:.2f}s" for k, v in sorted(
+            _max_stop.items(), key=lambda x: x[1], reverse=True))
+        print(f"  [SF-AGG] stops_measured={_n_with_steps} "
+              f"wall={batch_elapsed:.2f}s")
+        print(f"  [SF-AGG] MEAN per-stop step: {_mean_str}")
+        print(f"  [SF-AGG] MAX  per-stop step (critical path drivers): {_max_str}")
 
     return results
