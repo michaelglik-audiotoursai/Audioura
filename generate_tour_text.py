@@ -1761,7 +1761,18 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None,
         elif len(clauses) == 2:
             content_part = f" — {clauses[0]} and {_lc_if_not_proper(clauses[1])}"
         else:
-            content_part = f" — {clauses[0]}, {_lc_if_not_proper(clauses[1])}, and {_lc_if_not_proper(clauses[2])}"
+            # [2026-09-23] Join with semicolons when a clause CONTAINS a comma.
+            # Each clause is "Stop Name, the interesting fact", so comma-joining
+            # three of them produced an unparseable run-on that read as six items:
+            # "That's 6 stops — Stations of the Cross, remnants of lost patterns
+            #  uncovered during preservation efforts, Altar, Italian marble speaks
+            #  to a time of change and adaptation, and Stained Glass Windows..."
+            # The kiro critic called it "generation scaffolding/self-talk that
+            # miscounts", and it was right — a listener cannot hear where one stop
+            # ends and the next begins.
+            _sep = "; " if any("," in c for c in clauses[:3]) else ", "
+            content_part = (f" — {clauses[0]}{_sep}{_lc_if_not_proper(clauses[1])}"
+                            f"{_sep}and {_lc_if_not_proper(clauses[2])}")
 
     recap = scale_part + content_part + "."
 
@@ -6555,6 +6566,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # `_lore` is the writer's own input channel (story_prompt_block
                 # states these as a REQUIREMENT, D548) and seeding it also stops
                 # the generic per-stop fetch from overwriting them.
+                # [2026-09-23] A building part IS at the venue. Geocoding each one
+                # independently scattered six parts of ONE church across ~1.5km --
+                # the Altar landed 1.2km from its own building, which would send a
+                # listener down the road. Pin every part to the venue's own point.
+                # (This is the flip side of D572: stops sharing a coordinate is
+                # INNOCENT for building parts; stops NOT sharing one is the bug.)
+                try:
+                    from geocode_stops import geocode as _vp_geo, location_hint as _vp_hint
+                    _vp_anchor = _vp_geo(_vp_hint(location) or location)
+                except Exception as _vp_ge:
+                    _vp_anchor = None
+                    print(f"  [D571] venue anchor unavailable ({_vp_ge}) — parts keep their own coords")
+                if _vp_anchor:
+                    for _p in poi_list:
+                        _p['coordinates'] = f"{_vp_anchor[0]:.6f}, {_vp_anchor[1]:.6f}"
+                    print(f"  [D571] pinned {len(poi_list)} building part(s) to the venue "
+                          f"anchor {_vp_anchor[0]:.4f}, {_vp_anchor[1]:.4f}")
+
                 _vp_lore = (_venue_parts_evidence or {}).get('lore') or {}
                 _vp_seeded = 0
                 for _p in poi_list:
