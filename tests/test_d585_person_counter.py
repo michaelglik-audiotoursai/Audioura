@@ -47,9 +47,34 @@ def test_scenery_is_not_a_person():
 
 @pytest.mark.parametrize('name,expected', [
     ('CHURCH_1', 5), ('CHURCH_2', 5), ('CHURCH_3', 5),
-    ('LOGAN_1', 2), ('LOGAN_2', 3), ('LOGAN_3', 5),
+    # LOGAN_1/2 gained Gustave Eiffel once attribution frames ("constructed in
+    # 1887-1889 by ...") were understood. He is a HALLUCINATION -- the Eiffel Tower
+    # pasted into an airport tour -- but he is genuinely a named person in the text,
+    # and counting him is correct. Catching him is a grounding problem, not a
+    # counting one; see the 'placeholder'/refutation work.
+    ('LOGAN_1', 3), ('LOGAN_2', 4), ('LOGAN_3', 5),
 ])
 def test_round7_counts_are_stable(name, expected):
     """Pins the corrected counts. LOGAN_3 ties the churches at five."""
     text = open(f'TOURS_FOR_REVIEW/round7/{name}.txt', errors='ignore').read()
     assert _count_people(text) == expected
+
+
+def test_a_people_group_is_not_a_person():
+    """"funded by Irish immigrants" produced a person called Irish."""
+    from tour_quality import _count_people
+    assert _count_people('The church was funded by Irish immigrants who settled here.') == 0
+
+
+def test_an_attribution_frame_finds_the_builder():
+    """The verb need not sit next to "by"."""
+    assert 'Gustave Eiffel' in names('a structure constructed in 1887-1889 by Gustave Eiffel.')
+
+
+def test_placeholder_stop_is_a_defect():
+    """LOGAN_3 shipped an admitted void and scored ZERO defects."""
+    from tour_quality import score_tour
+    text = open('TOURS_FOR_REVIEW/round7/LOGAN_3.txt', errors='ignore').read()
+    assert 'placeholder' in score_tour(text, 4, True)['defects']
+    clean = open('TOURS_FOR_REVIEW/round7/CHURCH_2.txt', errors='ignore').read()
+    assert 'placeholder' not in score_tour(clean, 4, True)['defects']

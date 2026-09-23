@@ -56,8 +56,15 @@ _PERSON_ROLE = (r'architect|designer|builder|artisan|artisans|artist|sculptor|pa
                 r'mayor|governor|senator|nurse|doctor|teacher|singer|musician')
 # Frames that introduce a person without any role word at all.
 _PERSON_FRAME = (r'(?:landing|visit|arrival|death|funeral|memory|honou?r|legacy|'
-                 r'portrait|statue|grave|story)\s+of|including|alongside|led\s+by|'
-                 r'named\s+(?:for|after)')
+                 r'portrait|statue|grave|story)\s+of|including|alongside|'
+                 r'named\s+(?:for|after)|'
+                 # Attribution: "constructed in 1887-1889 by Gustave Eiffel" named a
+                 # person the counter could not see at all.
+                 # The verb is often not adjacent to "by": "constructed in
+                 # 1887-1889 by Gustave Eiffel". Allow a short gap, but stop at a
+                 # sentence boundary so it cannot reach across clauses.
+                 r'(?:led|built|constructed|designed|founded|painted|sculpted|carved|'
+                 r'commissioned|donated|funded|conceived|created)\b[^.]{0,40}?\bby')
 # NO re.IGNORECASE. With it, [A-Z] matches lowercase too, and the pattern happily
 # captured "Cuenin d", "Law r", "of P" and "here" — a count of 13 "people" in a
 # tour with four. Titles are capitalised in prose and roles are lowercase, so the
@@ -95,7 +102,29 @@ _SPLICE = re.compile(r'[a-z]\.\d|(?:^|\s)\.\d+\s+\w')
 # set. _SPLICE_OK carries the exceptions found so far.
 _WORD_SPLICE = re.compile(r'\b([a-z]{6,})(the|this|that|when|after|which|were)\b', re.I)
 _SPLICE_OK = {'breathe', 'understand', 'together', 'whitewashed'}
+# [2026-09-23, kiro critic LOCAL-517 on LOGAN_3] "Terminal A Ticketing / Check-In
+# -- an exhibit at this venue. Detailed information was not available at generation
+# time." The critic: "a blank stop -- a placeholder shipped as content... the single
+# worst stop in the batch and the clearest thing tour_quality.py should have caught
+# but apparently did not (it is not truncation, not a repeat, not a refuted claim --
+# it is an admitted void)." Verified: LOGAN_3 scored ZERO defects.
+_PLACEHOLDER = re.compile(
+    r'(?:detailed\s+)?information\s+(?:was|is)\s+not\s+available'
+    r'|not\s+available\s+at\s+generation\s+time'
+    r'|no\s+(?:further\s+)?(?:details?|information)\s+(?:was|is|were)\s+(?:found|available)'
+    r'|an\s+exhibit\s+at\s+this\s+venue', re.I)
 _KM = re.compile(r'\b\d+(?:\.\d+)?\s*(?:km|kilometre|kilometer)s?\b', re.I)
+
+
+# [2026-09-23] "funded by Irish immigrants" -> a person called Irish. Attribution
+# frames often take a people-group rather than a person.
+_NOT_A_NAME = {
+    'irish', 'italian', 'german', 'french', 'polish', 'english', 'scottish',
+    'spanish', 'portuguese', 'greek', 'chinese', 'japanese', 'russian', 'dutch',
+    'swiss', 'belgian', 'mexican', 'american', 'canadian', 'australian',
+    'catholic', 'protestant', 'jewish', 'muslim', 'christian', 'orthodox',
+    'local', 'native', 'colonial', 'federal', 'royal', 'imperial',
+}
 
 
 try:                                    # single source of truth for "not a person"
@@ -128,6 +157,8 @@ def _count_people(text):
         # two lists that drift apart.
         if surname.lower() in _NOT_PERSON or name.split()[0].lower() in _NOT_PERSON:
             continue
+        if surname.lower() in _NOT_A_NAME:
+            continue
         if len(name) > len(by_surname.get(surname, '')):
             by_surname[surname] = name
     return len(by_surname)
@@ -155,6 +186,11 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
         defects['thin'] = f"{len(stops)}/{requested_stops} stops delivered"
     if metrics['named_people'] == 0:
         defects['no_story'] = "no named people anywhere in the tour"
+
+    blank = sorted({m.group(0).strip().lower() for m in _PLACEHOLDER.finditer(text)})
+    if blank:
+        defects['placeholder'] = (f"{len(blank)} stop(s) admit having no content: "
+                                  + '; '.join(blank[:3]))
 
     trunc = _TRUNC.findall(text) + _MANGLED.findall(text) + \
         [m.group(0) for m in _SPLICE.finditer(text)]
