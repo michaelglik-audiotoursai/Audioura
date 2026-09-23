@@ -65,6 +65,16 @@ _MANGLED = re.compile(r'\b(?:engaged|which|that|and|of)\s+of\s+[A-Z]')
 # digits gone. Two signatures: a full stop immediately followed by a digit, and a
 # sentence that BEGINS with a decimal fragment.
 _SPLICE = re.compile(r'[a-z]\.\d|(?:^|\s)\.\d+\s+\w')
+# [2026-09-23, kiro critic on CHURCH_2] "during the height of the Archdiocesethe
+# clergy abuse crisis" — the same splice defect, but joining two WORDS instead of a
+# word and a number, so _SPLICE missed it entirely.
+#
+# English is full of words that merely END in these ("breathe", "understand",
+# "together"), so the rule is deliberately narrow: the glued-on function word must
+# follow a stem of 6+ letters, which no common English word does for this suffix
+# set. _SPLICE_OK carries the exceptions found so far.
+_WORD_SPLICE = re.compile(r'\b([a-z]{6,})(the|this|that|when|after|which|were)\b', re.I)
+_SPLICE_OK = {'breathe', 'understand', 'together', 'whitewashed'}
 _KM = re.compile(r'\b\d+(?:\.\d+)?\s*(?:km|kilometre|kilometer)s?\b', re.I)
 
 

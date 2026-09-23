@@ -1386,8 +1386,20 @@ def _excise_governed_construction(sentence: str, entity: str) -> str:
             after = 'the ' + after.lstrip()
         else:
             after = after.lstrip()
+        # [2026-09-23] "the own historic pathways" — the entity was a possessive
+        # DETERMINER ("Logan's own pathways"), so the slot does not want an article.
+        # NB: runs after the article was prepended above, so match it too.
+        after = re.sub(r'^the\s+(?=(?:own|very)\b)', '', after)
         # Remove any preceding article/preposition that targeted the entity
         before = _strip_trailing_function_words(before)
+        # [2026-09-23, kiro critic] _strip_trailing_function_words removes the
+        # dangling preposition AND its space, so a bare `before + after` glued the
+        # words together: "the Archdiocese of Boston's clergy abuse crisis" became
+        # "the Archdiocesethe clergy abuse crisis". Four such splices reached the
+        # round-7 tours. The non-possessive branch below has always guarded this;
+        # this branch never did.
+        if before and after and not before.endswith(' ') and not after.startswith(' '):
+            before += ' '
         new_sentence = before + after
         return _clean_degrade_artifacts(new_sentence)
 
