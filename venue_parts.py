@@ -381,13 +381,34 @@ class ServiceUnavailable(RuntimeError):
     """
 
 
+# Phrases that only appear in a provider's billing/quota error. Deliberately NOT a
+# bare '402': the kiro critic caught that matching "Gallery 402 holds the Chagall",
+# "the 402nd regiment" and "built in 1402" — and because ServiceUnavailable is
+# raised and never swallowed, a false positive KILLS a perfectly good tour. A guard
+# against silent degradation that hard-fails on the digits of a gallery number is
+# worse than the thing it replaced.
+_DEAD_SERVICE_PHRASES = (
+    'payment required', 'prepayment credits are depleted', 'insufficient_quota',
+    'credit_balance_exhausted', 'resource_exhausted', 'no credits remaining',
+    'quota exceeded', 'billing account', 'enable billing',
+)
+_DEAD_STATUS = re.compile(r'\b(?:http\s*)?(?:error\s*)?(?:40[12]|429)\b'
+                          r'(?=[^0-9]*(?:client error|payment|quota|credit|billing))',
+                          re.I)
+
+
 def _service_is_dead(payload):
-    """True when the asker failed for a PAYMENT/quota reason rather than a content one."""
-    blob = str(payload or '').lower()
-    return any(m in blob for m in (
-        '402', 'payment required', 'prepayment credits are depleted',
-        'insufficient_quota', 'credit_balance_exhausted', 'resource_exhausted',
-        'no credits remaining'))
+    """True when the asker failed for a PAYMENT/quota reason rather than a content one.
+
+    Matches an explicit billing phrase, or a status code that is ACCOMPANIED by
+    billing language — never a bare number, which occurs constantly in real prose
+    about buildings.
+    """
+    blob = str(payload or '')
+    low = blob.lower()
+    if any(m in low for m in _DEAD_SERVICE_PHRASES):
+        return True
+    return bool(_DEAD_STATUS.search(blob))
 
 
 def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
@@ -419,6 +440,21 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         if not ok:
             # Q2's answer says Q1 was wrong. Do not build a tour on it.
             return [], {"kind": kind, "rejected": why, "class_parts": parts}
+        # [2026-09-23, kiro critic] The outage guard covered Q1 ONLY. Q3 and the
+        # story chain are grounded and billed, and a failure there still read as
+        # "this venue has no such parts" / "nothing is known about it" — the exact
+        # D582 pattern the Q1 guard was added to stop, left in place one step later.
+        _probe_text, _probe_src = '', []
+        try:
+            _probe_text, _probe_src = ask_grounded('Reply with the single word: ok')
+        except Exception as _pg:
+            _probe_text = str(_pg)
+        if _service_is_dead(_probe_text) or not (_probe_text or '').strip():
+            raise ServiceUnavailable(
+                'the grounded asker is not answering — refusing to treat that as '
+                '"this venue has nothing to describe", which would silently ship a '
+                f'degraded tour. probe={_probe_text[:120]!r}')
+
         pres = parts_present(venue_name, location, physical, ask_grounded)
         candidates = [p for p in physical if p in pres["present"]] + \
                      [p for p in physical if p in pres["unknown"]]
