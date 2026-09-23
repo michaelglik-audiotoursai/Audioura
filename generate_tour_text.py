@@ -16759,6 +16759,24 @@ REWRITE RULES (all mandatory):
             except Exception as _cp_err:
                 print(f"  [PERSON-CAP] skipped ({_cp_err})")
 
+            # [2026-09-23] A pronoun whose person is at ANOTHER stop reaches
+            # nothing — each stop is heard alone, minutes apart, standing somewhere
+            # else. The critic found "She was there for a final vows ceremony" in
+            # the Narthex with Mother Teresa named back at the Pulpit.
+            try:
+                from unglossed_reference_gate import cut_orphaned_pronouns as _cut_pron
+                for _pi, _ppoi in enumerate(poi_list):
+                    _pd = _ppoi.get('description') or ''
+                    if not _pd:
+                        continue
+                    _pc, _pr = _cut_pron(_pd)
+                    if _pr:
+                        _ppoi['description'] = _pc
+                        print(f"      [PRONOUN] stop {_pi+1}: cut {len(_pr)} sentence(s) "
+                              f"opening on a pronoun with no person named here: {_pr[0][:70]}")
+            except Exception as _pn_err:
+                print(f"  [PRONOUN] skipped ({_pn_err})")
+
             from derepetition_guard import strip_cross_stop_repeats as _strip_repeats
             _stripped = _strip_repeats(poi_list, banned_by_stop=_d534_repeats_by_stop)
             if _stripped:

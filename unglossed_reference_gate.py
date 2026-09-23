@@ -2495,3 +2495,43 @@ def apply_gate_to_stop_descriptions(
                                      total_stats['compose_latency'])
 
     return total_stats
+
+
+# ── A pronoun whose person lives at another stop ────────────────────────────
+# The kiro critic on a 6-stop church tour, 2026-09-23:
+#
+#   "She was there for a final vows ceremony for the sisters of the Missionaries
+#    of Charity."   — Stop 6, Narthex
+#
+# No "she" is introduced anywhere in that stop. The antecedent is Mother Teresa,
+# named at Stop 3. Each stop is heard on its own, minutes apart and standing
+# somewhere else, so a pronoun reaching back to another stop reaches nothing.
+#
+# LOCAL-479 cuts a dependant whose introduction was REMOVED. This is the sibling
+# case: the introduction was never removed, it is simply in a different stop.
+
+_LEAD_PRONOUN = re.compile(
+    r'^\s*(?:And\s+|But\s+|Then\s+)?(He|She|They|His|Her|Their|Him)\b')
+_PERSON_NEAR = re.compile(r'\b(?:Mr|Mrs|Ms|Dr|Fr|Rev|Father|Cardinal|Mother|Sister|'
+                          r'Saint|Pope|Bishop|Archbishop|Governor|Mayor|Captain)\.?\s+'
+                          r'[A-Z][\w\'’-]+|\b[A-Z][\w\'’-]+\s+[A-Z][\w\'’-]+\b')
+
+
+def cut_orphaned_pronouns(text):
+    """Drop a sentence opening on a pronoun with no person named before it here.
+
+    Returns (clean_text, removed). Conservative: only the sentence-initial case,
+    and only when NO person is named earlier in this stop's own text.
+    """
+    sents = _ss_split(text or '')
+    out, removed, seen_person = [], [], False
+    for s in sents:
+        if _PERSON_NEAR.search(s):
+            out.append(s)
+            seen_person = True
+            continue
+        if not seen_person and _LEAD_PRONOUN.match(s):
+            removed.append(s)
+            continue
+        out.append(s)
+    return ' '.join(out).strip(), removed
