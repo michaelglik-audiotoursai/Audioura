@@ -444,18 +444,27 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         # story chain are grounded and billed, and a failure there still read as
         # "this venue has no such parts" / "nothing is known about it" — the exact
         # D582 pattern the Q1 guard was added to stop, left in place one step later.
-        _probe_text, _probe_src = '', []
-        try:
-            _probe_text, _probe_src = ask_grounded('Reply with the single word: ok')
-        except Exception as _pg:
-            _probe_text = str(_pg)
-        if _service_is_dead(_probe_text) or not (_probe_text or '').strip():
-            raise ServiceUnavailable(
-                'the grounded asker is not answering — refusing to treat that as '
-                '"this venue has nothing to describe", which would silently ship a '
-                f'degraded tour. probe={_probe_text[:120]!r}')
-
         pres = parts_present(venue_name, location, physical, ask_grounded)
+
+        # Probe LAZILY — only when the answer is empty enough to be ambiguous.
+        #
+        # The first version probed unconditionally, which added a BILLED GROUNDED
+        # CALL (~3.5c) to every tour purely to check the service was alive. That is
+        # a tax on the healthy path to detect the sick one, and it landed the same
+        # afternoon LEAD cut grounded calls from 16 to 10. A venue that answers
+        # normally proves the service is up by answering; only silence needs a
+        # second opinion.
+        if not (pres.get("present") or pres.get("unknown")):
+            _probe_text = ''
+            try:
+                _probe_text, _ = ask_grounded('Reply with the single word: ok')
+            except Exception as _pg:
+                _probe_text = str(_pg)
+            if _service_is_dead(_probe_text) or not (_probe_text or '').strip():
+                raise ServiceUnavailable(
+                    'the grounded asker returned nothing for this venue AND failed '
+                    'a liveness probe — refusing to treat an outage as "this venue '
+                    f'has nothing to describe". probe={_probe_text[:120]!r}')
         candidates = [p for p in physical if p in pres["present"]] + \
                      [p for p in physical if p in pres["unknown"]]
 
