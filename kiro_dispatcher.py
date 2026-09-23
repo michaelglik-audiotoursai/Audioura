@@ -83,13 +83,43 @@ def last_status_for(task_filename):
     return last
 
 
+# An infrastructure failure means the task never RAN. Distinct from a task that
+# ran and failed, which should not be retried blindly.
+_SETUP_FAILURE = "worktree_setup_failed"
+_MAX_SETUP_RETRIES = 3
+
+
+def _setup_failure_count(task_filename):
+    if not LOG_FILE.exists():
+        return 0
+    n = 0
+    for line in LOG_FILE.read_text().splitlines():
+        m = STATUS_LINE_RE.match(line)
+        if m and m.group(2) == task_filename and m.group(1) == "FAILED" \
+                and _SETUP_FAILURE in line:
+            n += 1
+    return n
+
+
 def already_claimed(task_filename):
     """
     Claimed = currently in flight or already ran to a terminal state.
     ABANDONED (reboot recovery) is deliberately NOT claimed -- it should be
     picked up again fresh.
+
+    [2026-09-23] Nor is a FAILED whose reason is worktree_setup_failed. Four
+    correctly-allowlisted tasks were permanently unrunnable after I killed a runaway
+    dispatch mid-checkout: the kill left FAILED records, and a FAILED record blocked
+    them forever. But `git worktree add` failing means the session never started --
+    no model was called, no work was attempted, nothing was learned. Retrying it is
+    not the retry-loop this guard exists to prevent.
+
+    Capped at _MAX_SETUP_RETRIES so a genuinely broken worktree setup cannot loop;
+    reap_orphans.sh quarantines at three deaths on the same principle.
     """
-    status, _ = last_status_for(task_filename)
+    status, line = last_status_for(task_filename)
+    if status == "FAILED" and line and _SETUP_FAILURE in line:
+        return _setup_failure_count(task_filename) >= _MAX_SETUP_RETRIES
     return status in ("STARTED", "COMPLETED", "FAILED", "TIMEOUT")
 
 
