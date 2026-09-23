@@ -197,7 +197,14 @@ def parts_present(venue_name, location, parts, ask_grounded):
     )
     try:
         text, sources = ask_grounded(prompt)
-    except Exception:
+    except Exception as _pp_err:
+        # [2026-09-23] D582 again, one level deeper. This returned `rec` — every
+        # part marked "unknown" — which is a PERFECTLY VALID answer meaning "the
+        # sources do not say". So a dead grounded service produced a tour that
+        # looked like a venue nobody has written about, and the outage guard above
+        # could not fire because `unknown` was populated. The caller must be able
+        # to tell "we asked and nobody knows" from "we never got to ask".
+        rec["error"] = f"{type(_pp_err).__name__}: {_pp_err}"
         return rec
     rec["sources"] = list(sources or [])
     data = None
@@ -454,13 +461,15 @@ def build_tour_stops(venue_name, location, want, ask=None, ask_grounded=None,
         # afternoon LEAD cut grounded calls from 16 to 10. A venue that answers
         # normally proves the service is up by answering; only silence needs a
         # second opinion.
-        if not (pres.get("present") or pres.get("unknown")):
+        if pres.get("error") or not (pres.get("present") or pres.get("unknown")):
             _probe_text = ''
             try:
                 _probe_text, _ = ask_grounded('Reply with the single word: ok')
             except Exception as _pg:
                 _probe_text = str(_pg)
-            if _service_is_dead(_probe_text) or not (_probe_text or '').strip():
+            if (pres.get("error") and _service_is_dead(pres["error"])) \
+                    or _service_is_dead(_probe_text) \
+                    or not (_probe_text or '').strip():
                 raise ServiceUnavailable(
                     'the grounded asker returned nothing for this venue AND failed '
                     'a liveness probe — refusing to treat an outage as "this venue '
