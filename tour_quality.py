@@ -84,7 +84,12 @@ _PERSON = re.compile(
     r'(?:\s+and\s+(' + _NAME + r'))?')
 # a fragment ending on a title with no name after it
 _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+\s+'
-                    r'(?:you|As|The|It|This|Its|Their|He|She|We))')
+                    r'(?:you|As|The|It|This|Its|Their|He|She|We)\b)')
+# [2026-09-23] The \b above is load-bearing. Without it "He" matched the start of
+# "Help", so round 8's "Founded in 1868 by St. Mary Help of Christians" scored as a
+# truncated fragment -- the ONLY defect reported on that tour, and spurious. The
+# real error in that same sentence (the church's dedication turned into a founder)
+# went unflagged.
 _MANGLED = re.compile(r'\b(?:engaged|which|that|and|of)\s+of\s+[A-Z]')
 # [2026-09-21, Michael on LOGAN_1] "...ensuring Boston's competitive edge in the
 # aviation sector.3 million passengers in 2025." A sentence was cut and the
