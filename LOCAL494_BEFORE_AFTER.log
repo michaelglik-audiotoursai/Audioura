@@ -1,0 +1,44 @@
+LOG INFO: Cache MISS (bucket=6): Musee des Arts Asiatiques, Nice, France / museum / 6
+LOG INFO: Cache STORE (bucket=6): Musee des Arts Asiatiques, Nice, France / museum / 6 (key=ec03e66ae82b…)
+LOG INFO: Cache HIT (trimmed 6→4, bucket=6): Musee des Arts Asiatiques, Nice, France / museum / 4
+
+========================================================================
+KEY EQUALITY — 4-stop and 6-stop requests resolve to ONE cache key
+========================================================================
+  bucket(4) = 6   bucket(6) = 6
+  key(4 stops) = ec03e66ae82bf3b0…
+  key(6 stops) = ec03e66ae82bf3b0…
+  SAME KEY: True
+
+========================================================================
+REQUEST A — 6 stops (cold cache): expect MISS, then generate + store
+========================================================================
+  get_cached_tour(6) -> MISS (None)
+  [generate 6-stop tour once — this is the ONE paid generation]
+
+========================================================================
+REQUEST B — 4 stops, same venue: expect HIT (trimmed), NO generation
+========================================================================
+  get_cached_tour(4) -> HIT
+
+========================================================================
+4-STOP DELIVERY — seam + recap check
+========================================================================
+  stops delivered: 4 -> ['La geste de Bouddha', 'Daim et Daine symbolisant le premier sermon de Bouddha', 'Masque du vieillard kojô', 'Statue de Bouddha']
+  last Directions line: Directions: Your final stop in Musee Des Arts Asiatiques (Asian Art Museum): Statue de Bouddha.
+  closing recap: From La geste de Bouddha to Statue de Bouddha, you have followed the thread of The Vision of Pierre-Yves Trémois. Le musée a été inauguré le 16 octobre 1998.
+
+========================================================================
+SCORE — tour_quality.score_tour on the trimmed 4-stop delivery
+========================================================================
+  stops_delivered : 4
+  truncated defect: False
+  thin defect     : False
+  defects         : {'no_story': 'no named people anywhere in the tour'}
+
+========================================================================
+VERIFY DB — one row (one generation) served both requests
+========================================================================
+  cached total_stops = 6 (bucket max)   hit_count = 1
+
+RESULT: 1 generation, 1 stored row, 1 cache hit serving the 4-stop request.
