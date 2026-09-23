@@ -24009,3 +24009,55 @@ large share of the benefit.
 **The staleness risk exists today and is unguarded.** `tour_cache` has **no TTL** — a tour cached
 in July still serves in September. Fine for a nave, wrong for an airport office that moved. Per-stop
 `generated_at` fixes this properly; a blanket TTL would be the stopgap.
+
+## D582 — A failure that looks like a pass is the defect class of this codebase
+### 2026-09-23. Four instances in one day, in four unrelated modules, found four different ways.
+
+Not one of these was a wrong calculation. Every one was a **failure whose output was
+indistinguishable from success**, so nothing downstream could tell.
+
+| where | what failed | what the caller saw |
+|---|---|---|
+| `story_leads` / the causal chain | Gemini returned HTTP 402, out of credit | "this venue has no describable parts" → the tour **silently fell back** to the old path, produced output, and scored clean |
+| `geocode_stops.geocode` | one rigid query missed a venue that IS in the index | `None` → "this place has no location" → six stops of one church scattered over 1.5km |
+| `geo_refutation` | the geocoder raised | `pt = None` → **"not refuted"** → a stop 6,000km away reported as checked and fine |
+| `stop_route_sequencer` | a forced-order label matched nothing | silence → the stop moved to the END, the opposite of the instruction |
+
+**Add the ones from earlier in the week and the pattern is older than today:** the
+LOCAL-472 gate deleting a sentence with nothing regenerating it (D472); `_lore`,
+`_venue_part` and pinned coordinates all lost to later `poi_list` rebuilds; four overnight
+tasks logging `COMPLETED` having committed nothing; LEAD's own venue-anchor pin that
+printed on exception but not on a `None` return, so the fix looked applied and was not.
+
+### Why this class and not another
+
+The pipeline is a long chain of steps that each **degrade rather than stop**. That is
+usually right — D577 says an unverified story should still ship, and a listener is better
+served by a thin tour than by no tour. But *graceful degradation applied to an outage* is
+a lie: it converts "we could not do this" into "there was nothing to do".
+
+**The distinction that fixes it every time is the same one:**
+
+> **"we could not check" ≠ "we checked and it is fine"**
+> **"the model had nothing to say" ≠ "we could not ask"**
+> **"this venue has no crypt" ≠ "we could not confirm a crypt"**
+
+Each pair had ONE code path. Splitting the pair fixed the bug in every case.
+
+### The rule
+
+**A function that can fail must report failing differently from succeeding.** `None`,
+`[]`, `0` and a silent `except` are all ways of saying "success, nothing found" — so none
+of them may carry "I broke". Where the return type cannot express it, log it and expose it
+(`LAST_WARNINGS`, `rec["errors"]`, a `WARNING` verdict, a raised `ServiceUnavailable`).
+
+**And the corollary, which cost LEAD most of a day:** when a fix appears not to work, the
+first hypothesis should be that **the failure is being swallowed one level down**, not that
+the fix is wrong. Twice today the patch was correct and applied to the wrong layer.
+
+### How they were found, which matters for what to do next
+
+None came from reading the code. Two came from Michael reading a tour, one from the kiro
+critic reading the code, one from a trace printing `lore_facts=0`. **Instruments found
+what inspection did not** — and the cheapest instrument, a one-line trace, refuted two
+confident hypotheses in a minute.
