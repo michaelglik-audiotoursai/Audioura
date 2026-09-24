@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T20:14:42.219099
+Generated: 2026-09-23T21:59:11.327394
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -12,7 +12,7 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 --- USER MESSAGE ---
 STYLE: Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.
 
-Create a detailed description for the stop "Nave" on a walking tour of Our Lady Help of Christians Catholic Church, Newton MA.
+Create a detailed description for the stop "Nave" on a walking tour of St Nicholas Orthodox Cathedral, Nice, France.
 
 NAME THE STORY OR DROP THE GESTURE. Never write that a place has a 'storied past', hosted 'luminaries', 'notable figures' or 'countless chapters of history', witnessed 'clandestine meetings', 'intrigue', 'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives ONE of them concretely: who, when, what they did, what came of it.
 - BAD:  'a storied past of hosting luminaries'
@@ -24,10 +24,10 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In late September 2005, the Archdiocese of Boston forced Father Walter Cuenin to resign from Our Lady Help of Christians due to alleged financial irregularities.
-  - In June 1995, Mother Teresa made an unheralded visit to Our Lady Help of Christians in Massachusetts, where she prayed over a paralyzed young parishioner.
-  - In late June 2023, longtime parishioners Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found brutally beaten and stabbed to death in a random home invasion.
-  - During the 2002 Boston Globe Spotlight investigation, Our Lady Help of Christians became a center for vocal internal dissent against archdiocesan misconduct.
+  - In 1865, Nicholas Alexandrovich, the 21-year-old Tsarevich and direct heir to the Russian imperial throne, died of tuberculous meningitis in Nice, leading to the construction of a memorial chapel by his father, Tsar Alexander II.
+  - In 2014, a dispute arose over relics inside the church complex, including the bloodied shirt of Tsar Alexander II, with descendants of the White Russian parish fighting to keep them in French courts.
+  - Between 2006 and 2011, a legal battle occurred over the ownership of the cathedral, resulting in the Russian Federation being declared the legal successor to the Tsar and taking control of the church.
+  - In 1935, during a service attended by hundreds of Russian exiles, a 17th-century icon of St. Nicholas in the nave reportedly began to lighten without human intervention, which was proclaimed a miracle by Russian émigrés.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -100,19 +100,22 @@ NO CONDESCENSION:
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 
 VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
-This stop is "Nave" located in/near Newton on this tour of Our Lady Help of Christians Catholic Church, Newton MA.
+This stop is "Nave" located in/near 06000 Nice on this tour of St Nicholas Orthodox Cathedral, Nice, France.
 If multiple places share this name (e.g., museums in different cities), you are describing
-ONLY the one in Newton. Do NOT use facts about a same-named institution in another
+ONLY the one in 06000 Nice. Do NOT use facts about a same-named institution in another
 city. If you are uncertain which facts apply to THIS specific location, omit them rather
 than risk conflation.
 
 RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
-  - The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy.
-  - The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
-  - Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
+  - St Nicholas Greek Orthodox Cathedral is a parish church and Cathedral that serves as a centre for the Greek Orthodox community in West London.
+  - Located on Godolphin Road in Shepherd's Bush.
+  - The cathedral is dedicated to Saint Nicholas, Bishop of Myra.
+  - The cathedral serves under the jurisdiction of the Greek Orthodox Archdiocese of Thyateira and Great Britain Continuing its patron saint's legacy of charity, the cathedral runs local philanthropic outreach led by its parish ladies' to help the poor in need.
   - == History ==
-John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in order to coordinate all activities related to the Salesians in the Valdocco suburb.
-  - According to legend, a vision of the Blessed Virgin Mary appeared in a dream to Bosco in 1844 or 1845 and revealed the site of the martyrdom of the Turinese saints Solutor, Adventor and Octavius.
+
+
+=== Roots of the Church ===
+In 1877, vicar William Cooke requested to the Bishop of London's Fund for a grant to build the Church as the  growing population was in Shepherd's Bush, and to the London Diocesan Home Missions for an assistant fund.
 
 SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
 must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
@@ -126,12 +129,7 @@ apply to a same-named entity in a different city. If the passages do not mention
 year, collection size, or building name, do NOT supply one from memory.
 
 HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
-The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy. The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
-Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
-
-
-== History ==
-John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in or
+St Nicholas Greek Orthodox Cathedral is a parish church and Cathedral that serves as a centre for the Greek Orthodox community in West London. Located on Godolphin Road in Shepherd's Bush. The cathedral is dedicated to Saint Nicholas, Bishop of Myra. The cathedral serves under the jurisdiction of the Greek Orthodox Archdiocese of Thyateira and Great Britain Continuing its patron saint's legacy of charity, the cathedral runs local philanthropic outreach led by its parish ladies' to help the poor 
 
 OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
@@ -172,22 +170,22 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
 DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: awe and curiosity
-- Unique angle to emphasize: The soaring ceilings and intricate wooden pews hark back to the church's founding in the late 19th century, a time when the area was rapidly developing.
-- End with a forward-looking hook: As you move closer, the vibrant colors just ahead will draw you in…
+- Emotional beat for this stop: awe
+- Unique angle to emphasize: The astonishing size and the vibrant frescoes of the Nave envelop visitors, reminiscent of the Russian architectural flair that stands out amid the Mediterranean ambiance of Nice.
+- End with a forward-looking hook: As you step towards the Iconostasis, notice how the light plays on the ancient icons just ahead...
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The nave is the central part of a church, distinct from the area reserved for the choir and clergy.; In a church with side aisles, the nave includes all areas available for lay worshippers.
+In 1935, a 17th-century icon of St. Nicholas in the nave reportedly began to lighten without human intervention, proclaimed a miracle.; Between 2006 and 2011, a legal battle occurred over the ownership of the cathedral, resulting in the Russian Federation being declared the legal successor to the Tsar and taking control of the church.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Nave
-      In late September 2005, the Archdiocese of Boston forced Father Walter Cuenin to resign from Our Lady Help of Christians due to alleged financial irregularities.
+      In 1935, during a service attended by hundreds of Russian exiles, a 17th-century icon of St. Nicholas in the nave reportedly began to lighten without human intervention, which was proclaimed a miracle by Russian émigrés.
   [2] Nave
-      In June 1995, Mother Teresa made an unheralded visit to Our Lady Help of Christians in Massachusetts, where she prayed over a paralyzed young parishioner.
+      In 1865, Nicholas Alexandrovich, the 21-year-old Tsarevich and direct heir to the Russian imperial throne, died of tuberculous meningitis in Nice, leading to the construction of a memorial chapel by his father, Tsar Alexander II.
   [3] Nave
-      In late June 2023, longtime parishioners Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found brutally beaten and stabbed to death in a random home invasion.
+      In 2014, a dispute arose over relics inside the church complex, including the bloodied shirt of Tsar Alexander II, with descendants of the White Russian parish fighting to keep them in French courts.
   [4] Nave
-      During the 2002 Boston Globe Spotlight investigation, Our Lady Help of Christians became a center for vocal internal dissent against archdiocesan misconduct.
+      Between 2006 and 2011, a legal battle occurred over the ownership of the cathedral, resulting in the Russian Federation being declared the legal successor to the Tsar and taking control of the church.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -268,18 +266,14 @@ DO NOT include any section headers other than "Orientation:" - the description s
 DO NOT include directions to the next stop - these will be added separately.
 
 
-THIS STOP IS TOO SHORT AT 107 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+THIS STOP IS TOO SHORT AT 128 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "The nave of this church is not just a place of worship but a living chronicle of its community's joys, trials, and resilience."
-- "Mother Teresa, known worldwide for her compassionate work with the poor and sick, made an unheralded visit to this very church."
-- "This unexpected visit by a global figure brought a moment of grace that remains etched in the collective memory of the parish."
-- "Fast forward to late June 2023, and the nave again became a place of gathering, not in joy, but in mourning."
-- "The tragic deaths of Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino, longtime parishioners brutally taken in a random home invasion, shook the community to its core."
-- "The nave, filled with the scent of candle wax and the sound of quiet weeping, hosted a memorial that united the congregation in shared grief and a resolve to cherish the memories of those lost."
-- "Here in the nave, the intertwining of sacred silence with the vibrant pulse of life in the church's community is palpable."
-- "As you move closer to the altar, the vibrant colors ahead invite reflection and a deeper connection to the stories held within these walls."
+- "His father, Tsar Alexander II, commissioned the construction of a memorial chapel in his honor.The cathedral's design, with its onion domes and gilded icons, reflects the Russian Orthodox tradition, making it a striking presence in the Mediterranean setting of Nice."
+- "This event was declared a miracle by the émigré community, adding a layer of spiritual significance to the already sacred space."
+- "Today, as you stand in the nave, the echoes of these past events resonate, connecting you to the vibrant pulse of a community defined by its faith and resilience."
+- "The cathedral, through its architecture and stories, continues to embody a blend of spiritual devotion and cultural history, offering a glimpse into the lives and traditions that have shaped this unique sanctuary."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
@@ -290,7 +284,7 @@ Use only the source material supplied. If the material will not support such a s
 
 
 ================================================================================
-Total user message length: 23661 chars
+Total user message length: 23884 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -298,4 +292,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Altar', 'Narthex']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Iconostasis', 'Icon stand', 'Memorial table']

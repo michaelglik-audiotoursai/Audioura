@@ -1,11 +1,11 @@
-# RESTART briefing — generated 2026-09-17 12:55 EDT
+# RESTART briefing — generated 2026-09-23 21:57 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     c61b8d3 D565: the agreed sequence after build 26, and measure cost before the purpose work lands
-unpushed 0 commits
-dirty    8 files
+HEAD     63419e9 Merge LOCAL-545: ALERTS.md goes 5990 lines -> 18, and empty now means something
+unpushed 4 commits
+dirty    5 files
 ```
 
 ## Production safety
@@ -13,21 +13,22 @@ dirty    8 files
 audio_tours real rows: 36
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      684
+cost_ledger rows:      843
 ```
-ALERTS.md: 40 alert line(s) in the last 40 — read it if non-zero.
+ALERTS.md: *** 4 URGENT alert line(s) — READ .continuous_dev/ALERTS.md NOW ***
+task_hygiene.log: 1 routine event(s) in the last 200 — informational, auto-refiled, not an emergency.
 
 ## Queue
 ```
 in flight:
 
 last 6 dispatcher events:
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-483.md | at=2026-09-16T18:11:40-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-483.md | id=TLOCAL-483 | branch=LOCAL-483-webview-console-to-log
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-484.md | at=2026-09-16T21:59:50-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-484.md | id=TLOCAL-484 | branch=LOCAL-484-listen-stop-count-stal
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-485.md | at=2026-09-16T22:17:24-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-485.md | id=TLOCAL-485 | branch=LOCAL-485-venue-class-routing | 
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-546.md | at=2026-09-23T21:31:28-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-543.md | id=TLOCAL-543 | branch=LOCAL-543-evidence-carries-no-so
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-545.md | id=TLOCAL-545 | branch=LOCAL-545-split-alert-channels |
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-546.md | id=TLOCAL-546 | branch=LOCAL-546-surname-collision | ba
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-547.md | at=2026-09-23T21:49:27-04:00 | base=storied | dispatche
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-548.md | at=2026-09-23T21:49:27-04:00 | base=storied | dispatche
 ```
 
 ## Re-dispatchable (last status ABANDONED — a bounce awaiting pickup)
@@ -75,6 +76,18 @@ STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
   378:- [ ] **ONE DECISION IS YOURS AND BLOCKS NOTHING ELSE: which "story" definition wins?**
   385:- [ ] **2026-08-19 — THE NEXT WORK IS RETRIEVAL, NOT PROMPTING.** With the story in its
   469:- [ ] 2026-08-12 20:5x — **Two guards are broken; do not trust them.**
+  475:- [ ] **2026-10-07 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #1).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  480:- [ ] **2026-10-22 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #2).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  485:- [ ] **2026-11-06 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #3).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  490:- [ ] **2026-11-21 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #4).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  495:- [ ] **2026-12-06 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #5).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  500:- [ ] **2026-12-21 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #6).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  505:- [ ] **2027-01-05 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #7).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  510:- [ ] **2027-01-20 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #8).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  515:- [ ] **2027-02-04 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #9).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five 
+  520:- [ ] **2027-02-19 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #10).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five
+  525:- [ ] **2027-03-06 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #11).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five
+  530:- [ ] **2027-03-21 — CHECK THE THREE PAID ACCOUNTS (15-day cycle #12).** Michael's standing request, 2026-09-22, after an empty OpenAI balance killed five
 
 ## Read next, in this order
 - `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules

@@ -1,33 +1,34 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
-You are a knowledgeable local guide for Our Lady Help of Christians Catholic Church, Newton MA.
-List exactly 7 specific, real, well-known churches relevant to: Our Lady Help of Christians Catholic Church, Newton MA.
+You are a knowledgeable local guide for Palais Lascaris, Nice, France.
+List exactly 12 specific, real, well-known Palais Lascaris relevant to: Palais Lascaris, Nice, France.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
 - NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
 - Include a complete street address with ZIP code where applicable.
 
-WALKING-TOUR COMPACTNESS — this is a walking tour:
-- All stops must form ONE compact cluster, close enough to walk between comfortably.
-- No stop should be more than a 10–15 minute walk (roughly 1 km) from its nearest neighbour in the tour.
-- Prefer a tight set of stops in one walkable area over famous landmarks scattered across the city. A shorter, denser route is better than a long, spread-out one.
-- Prefer landmarks that are DOCUMENTED — places with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
-
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 6 most famous, notable, or significant ARTWORKS, PAINTINGS, SCULPTURES, or PERMANENT EXHIBITS at 'Palais Lascaris'.
+- Each stop MUST be named after the ARTWORK or EXHIBIT itself — NOT a room name.
+  Good examples: 'Song of Songs' (painting series), 'The Creation of the World' (mosaic), 'Jerusalem Windows' (stained glass studies)
+  Bad examples: 'East Wing Gallery', 'Room 3', 'The Main Hall'
+- For each work, if you know which room/gallery/hall it is displayed in, include that as a note in the address field (e.g. 'Concert Hall, Avenue Docteur Ménard...'). If you do NOT know the room, just use the museum's street address.
+- Do NOT suggest any other museums, institutions, or locations outside this building.
+- Do NOT fabricate artwork names — only include works you are confident exist at this museum.
+- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.
+- Prefer the museum's most iconic/signature pieces that visitors specifically come to see.
 
 Return ONLY a JSON array, no other text, no markdown fences:
-[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+[{"name": "...", "address": "..."}, ...]
 
 === OPENAI RESPONSE ===
-[
-{"name": "Sacred Heart Parish", "address": "1321 Centre St, Newton, MA 02459", "reason": "Established in 1894, known for its beautiful Romanesque Revival architecture"},
-{"name": "St. Ignatius of Loyola Parish", "address": "28 Commonwealth Ave, Chestnut Hill, MA 02467", "reason": "Founded in 1922, designed by architect Maginnis & Walsh"},
-{"name": "St. Mary of the Assumption Parish", "address": "5 Linden Pl, Brookline, MA 02445", "reason": "Built in 1845, known for its historic significance in the area"},
-{"name": "St. John Chrysostom Parish", "address": "4750 Washington St, West Roxbury, MA 02132", "reason": "Established in 1909, features a stunning bell tower"},
-{"name": "St. Theresa of Avila Parish", "address": "2078 Centre St, West Roxbury, MA 02132", "reason": "Founded in 1923, known for its vibrant community outreach programs"},
-{"name": "St. Mary's Parish", "address": "133 School St, Waltham, MA 02451", "reason": "Constructed in 1880, showcases a blend of Gothic and Romanesque architectural styles"},
-{"name": "St. Columbkille Parish", "address": "321 Market St, Brighton, MA 02135", "reason": "Established in 1876, famous for its historic church building and stained glass windows"}
-]
+[{"name": "The Annunciation", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Adoration of the Magi", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Crucifixion", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Nativity", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Deposition from the Cross", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Resurrection", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"}]
 
 === ANALYSIS ===
-Requested stops: 4
-See full chain log: /app/api_call_chain_20260923_132223.txt
+Requested stops: 6
+See full chain log: /app/api_call_chain_20260923_214746.txt
