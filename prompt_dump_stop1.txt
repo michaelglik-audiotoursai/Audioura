@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T21:59:11.327394
+Generated: 2026-09-23T22:10:22.178403
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -12,7 +12,7 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 --- USER MESSAGE ---
 STYLE: Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.
 
-Create a detailed description for the stop "Nave" on a walking tour of St Nicholas Orthodox Cathedral, Nice, France.
+Create a detailed description for the stop "Paul Revere House" on a walking tour of Faneuil Hall Marketplace, Boston MA.
 
 NAME THE STORY OR DROP THE GESTURE. Never write that a place has a 'storied past', hosted 'luminaries', 'notable figures' or 'countless chapters of history', witnessed 'clandestine meetings', 'intrigue', 'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives ONE of them concretely: who, when, what they did, what came of it.
 - BAD:  'a storied past of hosting luminaries'
@@ -24,10 +24,14 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
 VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
-  - In 1865, Nicholas Alexandrovich, the 21-year-old Tsarevich and direct heir to the Russian imperial throne, died of tuberculous meningitis in Nice, leading to the construction of a memorial chapel by his father, Tsar Alexander II.
-  - In 2014, a dispute arose over relics inside the church complex, including the bloodied shirt of Tsar Alexander II, with descendants of the White Russian parish fighting to keep them in French courts.
-  - Between 2006 and 2011, a legal battle occurred over the ownership of the cathedral, resulting in the Russian Federation being declared the legal successor to the Tsar and taking control of the church.
-  - In 1935, during a service attended by hundreds of Russian exiles, a 17th-century icon of St. Nicholas in the nave reportedly began to lighten without human intervention, which was proclaimed a miracle by Russian émigrés.
+  - In 1676, the Great Fire of Boston consumed the parsonage of the Second Church of Boston, home to Increase Mather.
+  - Around 1680, Robert Howard built the current wooden house over the footprint of Increase Mather's parsonage.
+  - On April 18, 1775, Paul Revere realized he left his spurs behind during his Midnight Ride and sent his dog back to retrieve them.
+  - On April 18, 1775, Paul Revere and his men used a flannel petticoat to muffle the sound of their oars while rowing past the HMS Somerset.
+  - In 1779, Paul Revere was accused of cowardice and insubordination during the Penobscot Expedition.
+  - Upon returning to Boston in 1779, Paul Revere was confined to house arrest in his North Square home.
+  - In February 1782, Paul Revere was acquitted by a court-martial on a technicality.
+  - Paul Revere had 16 children between two wives, Sarah Orne and Rachel Walker.
 TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
 [D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
@@ -100,22 +104,18 @@ NO CONDESCENSION:
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 
 VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
-This stop is "Nave" located in/near 06000 Nice on this tour of St Nicholas Orthodox Cathedral, Nice, France.
+This stop is "Paul Revere House" located in/near Boston on this tour of Faneuil Hall Marketplace, Boston MA.
 If multiple places share this name (e.g., museums in different cities), you are describing
-ONLY the one in 06000 Nice. Do NOT use facts about a same-named institution in another
+ONLY the one in Boston. Do NOT use facts about a same-named institution in another
 city. If you are uncertain which facts apply to THIS specific location, omit them rather
 than risk conflation.
 
 RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
-  - St Nicholas Greek Orthodox Cathedral is a parish church and Cathedral that serves as a centre for the Greek Orthodox community in West London.
-  - Located on Godolphin Road in Shepherd's Bush.
-  - The cathedral is dedicated to Saint Nicholas, Bishop of Myra.
-  - The cathedral serves under the jurisdiction of the Greek Orthodox Archdiocese of Thyateira and Great Britain Continuing its patron saint's legacy of charity, the cathedral runs local philanthropic outreach led by its parish ladies' to help the poor in need.
-  - == History ==
-
-
-=== Roots of the Church ===
-In 1877, vicar William Cooke requested to the Bishop of London's Fund for a grant to build the Church as the  growing population was in Shepherd's Bush, and to the London Diocesan Home Missions for an assistant fund.
+  - Quincy Market (originally Faneuil Hall Market) is a historic marketplace complex in Downtown Boston, Massachusetts, United States.
+  - Located at Merchants Row next to Faneuil Hall, it consists of three buildings constructed in 1826 and designed by Alexander Parris.
+  - The central two-story building (sometimes known as Quincy Market) is flanked by the 4+1⁄2-story North and South Markets, each containing multiple storefront units.
+  - Since 1976, Quincy Market has been the Faneuil Hall Marketplace, a festival marketplace.
+  - The buildings are designated as a National Historic Landmark and as Boston Landmarks.
 
 SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
 must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
@@ -129,7 +129,7 @@ apply to a same-named entity in a different city. If the passages do not mention
 year, collection size, or building name, do NOT supply one from memory.
 
 HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
-St Nicholas Greek Orthodox Cathedral is a parish church and Cathedral that serves as a centre for the Greek Orthodox community in West London. Located on Godolphin Road in Shepherd's Bush. The cathedral is dedicated to Saint Nicholas, Bishop of Myra. The cathedral serves under the jurisdiction of the Greek Orthodox Archdiocese of Thyateira and Great Britain Continuing its patron saint's legacy of charity, the cathedral runs local philanthropic outreach led by its parish ladies' to help the poor 
+Quincy Market (originally Faneuil Hall Market) is a historic marketplace complex in Downtown Boston, Massachusetts, United States. Located at Merchants Row next to Faneuil Hall, it consists of three buildings constructed in 1826 and designed by Alexander Parris. The central two-story building (sometimes known as Quincy Market) is flanked by the 4+1⁄2-story North and South Markets, each containing multiple storefront units. Since 1976, Quincy Market has been the Faneuil Hall Marketplace, a festiv
 
 OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
@@ -170,22 +170,32 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
 DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: awe
-- Unique angle to emphasize: The astonishing size and the vibrant frescoes of the Nave envelop visitors, reminiscent of the Russian architectural flair that stands out amid the Mediterranean ambiance of Nice.
-- End with a forward-looking hook: As you step towards the Iconostasis, notice how the light plays on the ancient icons just ahead...
+- Emotional beat for this stop: curiosity
+- Unique angle to emphasize: Here, you can touch the same wooden walls that sheltered a silversmith who became a midnight rider, a tangible connection to the whispers of revolution.
+- End with a forward-looking hook: As you step outside, imagine the cobblestones that once echoed with hooves leading you to a place where voices raised for change...
 
 CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-In 1935, a 17th-century icon of St. Nicholas in the nave reportedly began to lighten without human intervention, proclaimed a miracle.; Between 2006 and 2011, a legal battle occurred over the ownership of the cathedral, resulting in the Russian Federation being declared the legal successor to the Tsar and taking control of the church.
+The Paul Revere House was built around 1680 and is the oldest surviving structure in Downtown Boston.; Paul Revere owned the house from 1770 to 1800.; The house was previously the parsonage of the Second Church of Boston.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Nave
-      In 1935, during a service attended by hundreds of Russian exiles, a 17th-century icon of St. Nicholas in the nave reportedly began to lighten without human intervention, which was proclaimed a miracle by Russian émigrés.
-  [2] Nave
-      In 1865, Nicholas Alexandrovich, the 21-year-old Tsarevich and direct heir to the Russian imperial throne, died of tuberculous meningitis in Nice, leading to the construction of a memorial chapel by his father, Tsar Alexander II.
-  [3] Nave
-      In 2014, a dispute arose over relics inside the church complex, including the bloodied shirt of Tsar Alexander II, with descendants of the White Russian parish fighting to keep them in French courts.
-  [4] Nave
-      Between 2006 and 2011, a legal battle occurred over the ownership of the cathedral, resulting in the Russian Federation being declared the legal successor to the Tsar and taking control of the church.
+  [1] Paul Revere House
+      On April 18, 1775, Paul Revere realized he left his spurs behind during his Midnight Ride and sent his dog back to retrieve them.
+  [2] Paul Revere House
+      In 1676, the Great Fire of Boston consumed the parsonage of the Second Church of Boston, home to Increase Mather.
+  [3] Paul Revere House
+      Around 1680, Robert Howard built the current wooden house over the footprint of Increase Mather's parsonage.
+  [4] Paul Revere House
+      On April 18, 1775, Paul Revere and his men used a flannel petticoat to muffle the sound of their oars while rowing past the HMS Somerset.
+  [5] Paul Revere House
+      In 1779, Paul Revere was accused of cowardice and insubordination during the Penobscot Expedition.
+  [6] Paul Revere House
+      Upon returning to Boston in 1779, Paul Revere was confined to house arrest in his North Square home.
+  [7] Paul Revere House
+      In February 1782, Paul Revere was acquitted by a court-martial on a technicality.
+  [8] Paul Revere House
+      Paul Revere had 16 children between two wives, Sarah Orne and Rachel Walker.
+  [9] Paul Revere House
+      By 1902, John Phillips Reynolds Jr., Revere’s great-grandson, bought the property to prevent its demolition and restore it.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -258,33 +268,75 @@ IS the story's starting point.
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
+LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
-THIS STOP IS TOO SHORT AT 128 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
+PER-STOP SOURCE MATERIAL for "Paul Revere House" (from verified sources — use this as your primary factual basis):
+  Passage 1: The Paul Revere House, built c.1680, was the colonial home of American patriot and Founding Father Paul Revere during the time of the American Revolution.
+  Passage 2: Paul Revere House, owned by the legendary patriot from 1770-1800, is the oldest remaining structure in downtown Boston and also the only official Freedom Trail ...
+  Passage 3: Built around 1680, the Paul Revere House stands as the oldest surviving structure in Downtown Boston, a remarkable achievement given the city's extensive ...
+  Passage 4: The house occupies the former site of the Second Church of Boston's parsonage, destroyed by fire in 1676. The Revere House was built no later than 1680; its ...
+  Passage 5: The 3-story building was the home of silversmith and Boston Patriot Paul Revere from 1770-1800, previously housing the parsonage of the Second Church of Boston.
+  Passage 6: Most people think of Paul Revere solely as a silversmith, but his work as a printer and an artist was key to his role as a patriot seeking to ...
+  Passage 7: Located in Boston's oldest residential neighborhood, the North End, is the home to the Revolutionary War figure Paul Revere, who lived here from 1770 to 1800.
+  Passage 8: Paul Revere House was the home of goldsmith/silversmith and founding father Paul Revere and his family from 1770 to 1800. Paul Revere House...
+  Passage 9: Paul Revere owned the home from 1770 to 1800, although he and his family may not have lived here in some periods in the 1780s and 90s. After Revere sold the ...
+  Passage 10: Paul Revere House (1680): The oldest remaining structure in downtown Boston — the home Paul Revere lived in when he rode to Lexington on April ...
+  Passage 11: British soldiers in 1771. Lucretia Reynolds in 1947. She. John Phillips Reynolds Jr, a direct descendant of Revere, who is known for his ...
+  Passage 12: Built in 1680, the Paul Revere House has witnessed over 300 years of North End history, and been home to hundreds of people, including Puritan shipping merchant ...
+  Passage 13: Built in 1680, home of Paul Revere during his midnight ride
+  Passage 14: Houses the famous Liberty Bowl made by Paul Revere
+  Sources:
+  [Paul Revere House — interpretive search] https://faneuilhallmarketplace.com/go/paul-revere-house (tier 3)
+  [Paul Revere House — interpretive search] https://www.thefreedomtrail.org/trail-sites/paul-revere-house (tier 3)
+  [Paul Revere House — interpretive search] https://www.trolleytours.com/boston/paul-revere-house (tier 3)
+  [Paul Revere House — interpretive search] https://en.wikipedia.org/wiki/Paul_Revere_House (tier 1)
+  [Paul Revere House — interpretive search] https://goingplacesfarandnear.com/tag/faneuil-hall/ (tier 3)
+  [Paul Revere House — interpretive search] https://thelibertytrail.org/ma/trail-sites/historic-sites/paul-revere-house (tier 3)
+  [Paul Revere House — interpretive search] https://www.historyhit.com/locations/paul-revere-house/ (tier 3)
+  [Paul Revere House — interpretive search] https://events.thehistorylist.com/venues/the-paul-revere-house-boston-massachusetts (tier 3)
+  [Paul Revere House — interpretive search] https://www.traveltourister.com/articles/places-to-visit-in-boston/ (tier 3)
+  [Paul Revere House — interpretive search] https://www.paulreverehouse.org/curiosities-from-the-paul-revere-memorial-associations-archives/ (tier 3)
+  [Paul Revere House — interpretive search] https://www.placebasedboston.org/paul-revere-house (tier 3)
+  [Paul Revere House — selection-stage notability reason] llm:phase3a-selection (tier 3)
+
+GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
+
+BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
+
+NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
+  - If a passage names WHERE someone came from and WHERE they went, state both.
+  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
+  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
+  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
+  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+
+
+THIS STOP IS TOO SHORT AT 107 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
 CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
-- "His father, Tsar Alexander II, commissioned the construction of a memorial chapel in his honor.The cathedral's design, with its onion domes and gilded icons, reflects the Russian Orthodox tradition, making it a striking presence in the Mediterranean setting of Nice."
-- "This event was declared a miracle by the émigré community, adding a layer of spiritual significance to the already sacred space."
-- "Today, as you stand in the nave, the echoes of these past events resonate, connecting you to the vibrant pulse of a community defined by its faith and resilience."
-- "The cathedral, through its architecture and stories, continues to embody a blend of spiritual devotion and cultural history, offering a glimpse into the lives and traditions that have shaped this unique sanctuary."
+- "The Paul Revere House, constructed around 1680, occupies the site of the Second Church of Boston's parsonage, which was destroyed in the Great Fire of 1676."
+- "This wooden dwelling was built by Robert Howard and later became the home of Paul Revere, an American silversmith and patriot, from 1770 to 1800."
+- "As you stand in the shadow of its weathered facade, envision the flurry of activity that once filled these halls."
+- "In the backdrop of Revere's everyday life, extraordinary episodes unfolded that would etch his name into the annals of history."
+- "On the night of April 18, 1775, Revere embarked on his legendary Midnight Ride to alert colonial militia of approaching British forces."
+- "In an amusing twist, Revere realized he had forgotten his spurs, crucial for his horseback journey.As Revere and his men rowed past the HMS Somerset, they muffled the sound of their oars with a flannel petticoat, a silent rebellion against the looming threat."
+- "Yet, life for Revere was not solely defined by his midnight dash."
+- "In 1779, he faced accusations of cowardice and insubordination during the ill-fated Penobscot Expedition."
+- "Standing here, the Paul Revere House is more than a monument; it's a tangible connection to the whispers of revolution that once swept through Boston."
 
 Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
 
-THIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.
-It may be accurate and well written; it is still a description. A story here means: ONE named person, across THREE OR MORE consecutive sentences, DOING something — deciding, refusing, persuading, travelling, failing — with something at stake for them. Not 'X was an artist who worked in Paris'. Something happened, to someone, and it mattered.
-Use only the source material supplied. If the material will not support such a story, write the shorter factual account rather than inventing one — an invented story is worse than none.
-
-
 ================================================================================
-Total user message length: 23884 chars
+Total user message length: 30289 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -292,4 +344,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Iconostasis', 'Icon stand', 'Memorial table']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Paul Revere House', 'Quincy Market', 'Faneuil Hall', 'Old State House']

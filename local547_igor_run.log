@@ -1,0 +1,15 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+==========================================================================
+  LOCAL-524 — Igor's MFA case (hand-entered stops), through the SERVICE
+==========================================================================
+[22:19:28] Seeded test user ITEST-LOCAL524-IGOR on free plan; cleared prior orchestrator usage.
+[22:19:28] Busted tour_cache: 0 row(s) removed — this run is a fresh generation.
+[22:19:28] Cleared 0 prior LOCAL-524 test row(s) from audio_tours.
+[22:19:28] POST http://localhost:5002/generate-complete-tour
+[22:19:28]   location   : Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a stop at the Liberty Bowl by Paul Revere and a stop at Watson and the Shark by Copley
+[22:19:28]   tour_type  : contained
+[22:19:28]   stops      : 3  ['the Sargent Murals', 'the Liberty Bowl by Paul Revere', 'Watson and the Shark by Copley']
+[22:19:28]   job_id     : 8b9bbe5b-0d47-4a43-a5e6-f9c41be3577c
+[22:19:36]   status=processing  Text generation: Starting tour text generation...
+FAIL: service error: Text-generation status polling failed: 6 consecutive poll failures over 200s. Last error: HTTPConnectionPool(host='tour-generator', port=5000): Read timed out. (read timeout=30)

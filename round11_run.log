@@ -2004,3 +2004,1696 @@ Generating description for Stop 4: Memorial table by , ...
   [LOCAL-381] stop='Memorial table' matched_work=False medium='' work_identity_chars=0
   [LOCAL-411] Stop 4 snippet ranking: input=8 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=8 usable=8 (t1t2=0, t3=0, market=0)
     Top scores: [('Memorial table', 13, ''), ('Memorial table', 8, ''), ('Memorial table', 8, '')]
+  [LOCAL-402] Stop 4: injected 8 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 8 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15668 after=26415 (+10747 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26415)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0292 (6156 tokens, model=gpt-4o)
+Stop 3 description word count: 302 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0276 (5817 tokens, model=gpt-4o)
+Stop 1 description word count: 253 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['invites you to reflect', 'a testament to', 'stands as a testament']
+Stop 4 API call cost: $0.0352 (7418 tokens, model=gpt-4o)
+Stop 4 description word count: 289 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0275 (5794 tokens, model=gpt-4o)
+Stop 2 description word count: 280 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 10.1s for 4 stop(s) at max_workers=4
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 258w (was 188w)
+    [LOCAL-474] regenerated and re-gated: 279w (was 182w)
+    [LOCAL-474] regenerated and re-gated: 214w (was 120w)
+  [D534] removed 2 repeated sentence(s) the capped retries could not reach:
+      stop 4: One of the most poignant stories linked to this location is the tragic end of Tsarevich Ni
+      stop 4: Although he passed away at Villa Bermond, his memory lingers here, where the cathedral now
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/797379959023985/posts/1407005401394768/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://us.trip.com/moments/poi-saint-nicholas-cathedral-81056/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://us.trip.com/moments/poi-saint-nicholas-cat
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Russian_Orthodox_Cathedral,_Nice (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Russian_Orthodox_Cat
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DS9umozDCt5/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.construction21.org/italia/case-studies/h/conservative-restoration-project-of-the-orthodox-cathedral-of-st-nicholas-in-nice.html (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.construction21.org/italia/case-studies
+  [LOCAL-427] HTTP 200 from https://www.discoverwalks.com/blog/nice/top-10-fascinating-facts-about-st-nicholas-orthodox-cathedral-nice/ (attempt 1)
+  [LOCAL-459] R5: Fetched 882 chars from https://www.discoverwalks.com/blog/nice/top-10-fas
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=nKTNjMhZKn4 (attempt 1)
+  [D512] verb discovery: query='St Nicholas Orthodox Cathedral, Nice, France construction proces' -> 8 new verb(s): inspired, recommended, visited, consecrated, studied, contextualized, decade, slowed
+  [D512] _AGENCY_VERB widened by 8 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Nave                                       31    59     6    57
+     2  Iconostasis                                39    60     6    42
+     3  Icon stand                                 31    55     6    57
+     4  Memorial table                             33    23    13    15
+    [LOCAL-485] index mean 33.5 over 4 stop(s), range 31-39
+    [LOCAL-485] weakest: 'Nave' at 31
+[TIMING] phase=story_first elapsed=78.3s cumulative=239.8s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (85 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 85 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 85 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R10: 1 sentence(s) deleted
+    Stop 3 orientation R10: 2 sentence(s) deleted
+    Stop 3 orientation: COLLAPSED — using fallback
+    Stop 4 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 189
+    Words after:  114
+    Delta: -75
+    Stops affected: 3/4
+    Deletions (4):
+      [Stop 2][R10_UNFULFILLED_PROMISE] "This elaborate wall of icons, a vivid tapestry of religious art, separates the nave from the sanctua..."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "As you stand here, your gaze falls upon the icon stand, nestled within the grandeur of St Nicholas O..."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "This seemingly modest piece conceals layers of history interwoven with tales of upheaval and resilie..."
+      [Stop 4][R10_UNFULFILLED_PROMISE] "Positioned near the nave you visited earlier, its presence complements the rich tapestry of history ..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 1.6s, $0.0090, 1336 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Nave] (mystery): During a service attended by hundreds of Russian exiles, a 17th-century icon of ...
+      [Iconostasis] (reversal): It was as if the icon itself was reaching out, bridging the chasm between past a...
+      [Icon stand] (cause): It was then that White Russian refugees, fleeing the chaos of their homeland, as...
+      [Memorial table] (reversal): His mistress, Catherine Dolgorukova, fled to Nice, bringing relics of his final ...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0030 (524 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (27 words):
+      "As you continue your tour, you will learn about the White Russian refugees' preservation efforts at the Icon stand and Catherine Dolgorukova's relics at the Memorial table."
+      Stops referenced: 2
+    Part 4 total cost: $0.0030
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave the Nave of St. Nicholas Orthodox Cathedral, he...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave the Iconostasis, continue walking towards the b...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the Icon stand, head towards the main entrance ...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.6s, $0.0025, 436 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Iconostasis] (reversal): "It was as if the icon itself was reaching out, bridging the chasm between past a..."
+      → composed: "Iconostasis, bridging past and present with hope through its reaching icon"
+    [Memorial table] (reversal): "His mistress, Catherine Dolgorukova, fled to Nice, bringing relics of his final ..."
+      → composed: "Memorial table, relics of his final moments brought by Catherine Dolgorukova"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Iconostasis, bridging past and present with hope through its reaching icon and Memorial table, relics of his final moments brought by Catherine Dolgorukova."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=17 'restaurants tour in old city of Nice, France - Restaurant Tour' (0.2 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (637 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 0
+    Dropped: 1
+    AUDIT: hours | Open daily from 9am to 6pm, free entry, busiest on weekends | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 3 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 4: PARTS_OUT_OF_ORDER — Part 4 appears before Part 3 (sentence 3 vs 4).
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 4 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through St Nicholas Orthodox Cathedral, Nice, France. F..."
+  [2] "As you turn your gaze from the nave you visited earlier, you find yourself before the iconostasis of..."
+  [3] "The story of this iconostasis carries the echoes of a world on the brink of upheaval. Yet, its desti..."
+  [4] "As you make your way to the Memorial table at St Nicholas Orthodox Cathedral in Nice, notice how it ..."
+
+=== Word Count Statistics ===
+Stop 1: Nave - 226 words
+Stop 2: Iconostasis - 277 words
+Stop 3: Icon stand - 285 words
+Stop 4: Memorial table - 326 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8951 chars, 4/4 stops)
+  [LOCAL-540] no defects — tour is clean
+
+Total API cost: $0.2266 (36189 tokens)
+Grounding:      $0.2800 (8 requests)
+Tour total:     $0.5066
+CACHE STORE: St Nicholas Orthodox Cathedral, Nice, France / museum / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/STNICHOLAS.txt
+  [C5-5] Evidence persisted: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/STNICHOLAS_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: St Nicholas Orthodox Cathedral, Nice, France - Walking Tour
+Tour-Category: walking
+
+Stop 1: Nave
+
+Address: Avenue Nicolas II, 06000 Nice, France
+
+Coordinates: 43.6967, 7.2676
+
+Type/Specialty: Religious space
+
+Specific Examples: Large open space with pews, intricate ceiling frescoes, religious artwork
+
+Orientation: You are about to embark on a walking journey through St Nicholas Orthodox Cathedral, Nice, France. From the grand Nave to the serene Memorial table, you...
+
+[TIMING] phase=packing elapsed=8.2s cumulative=248.1s
+[TIMING] phase=verification elapsed=0.0s cumulative=248.1s
+[TIMING] TOTAL wall=248.1s phases: poi_selection=144.7s, story_first=78.3s, fact_sheets=15.5s, packing=8.2s, intent=1.3s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+STNICHOLAS: 8951 chars in 248s
+   defects: CLEAN
+   people:  3
+   cost:    API $0.2266 (36189 tok) + grounding $0.2800 (8 req) = $0.5066
+
+======================================================================
+RIVIERA: French Riviera coastal path, Nice, France (walking, 4 stops)
+======================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #018 | 21:59:37.650 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: French Riviera coastal path, Nice, France
+  tour_type: walking
+  total_stops_parameter: 4
+  output_file: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/RIVIERA.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #019 | 21:59:37.650 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: French Riviera coastal path, Nice, France
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "coastal path",
+    "location": "French Riviera, Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "French Riviera coastal path",
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: coastal path
+   Location: French Riviera, Nice, France
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.8s cumulative=1.8s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for French Riviera coastal path, Nice, France - walking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #020 | 21:59:39.465 | GENERATING_PROMPT
+======================================================================
+  location: French Riviera coastal path, Nice, France
+  user_request: French Riviera coastal path, Nice, France
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for French Riviera coastal path, Nice, France...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='French Riviera coastal path'
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #021 | 21:59:39.465 | PHASE_3A_REQUEST
+======================================================================
+  location: French Riviera coastal path, Nice, France
+  total_stops: 4
+  poi_type_hint: coastal path
+
+PHASE 3A API call cost: $0.0006 (761 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #022 | 21:59:42.855 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for French Riviera coastal path, Nice, France.
+List exactly 7 specific, real, well-known coastal path relevant to: French Riviera coastal path, Nice, France.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: French Riviera coastal pa
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Promenade des Anglais",
+        "address": "Promenade des Anglais, 06000 Nice, France",
+        "reason": "Iconic promenade along the coast, built in the early 19th century by the British community in Nice."
+    },
+    {
+        "name": "Castle Hill",
+        "address": "Colline du Château, 06300 Nice, France",
+        "reason": "Historic site offering panoramic views of the city and the Mediterranean Sea, with ruins dating back to the 11th century."
+    },
+    {
+       
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'Promenade des Anglais'
+   ! [LOCAL-329] Hollow reason for 'Quai des États-Unis': 'Picturesque waterfront promenade known for its vibrant atmosphere and views of t'
+   ! [LOCAL-329] Hollow reason for 'Port Lympia': 'Charming harbor area with colorful buildings, cafes, and a mix of fishing boats '
+  [LOCAL-329] Substance filter: 2 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 4 substantive selection reason(s)
+OK PHASE 3A parsed 4 candidate POI(s):
+   - Castle Hill @ Colline du Château, 06300 Nice, France
+   - Place Masséna @ Place Masséna, 06000 Nice, France
+   - Colline du Château Waterfall @ Colline du Château, 06300 Nice, France
+   - Vieux Nice @ Vieux Nice, 06300 Nice, France
+  [area_resolver] Parsed: city='Nice', neighborhood='French Riviera coastal path'
+  [area_resolver] City resolved: Nice → Q33959 (43.7019, 7.2683)
+  [area_resolver] Neighborhood 'French Riviera coastal path' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(43.7019, 7.2683), radius=2.0km, lang=fr
+  [area_cache] HIT for Q33959: 38 landmarks (tier=rich)
+  [verify_landmarks] 1/4 stops verified against 38 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 1 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for French Riviera coastal path, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Castle Hill' — stop_corpus(geographic): 'Castle Hill of Nice' at 'French Riviera walking area' 
+    [VERIFIED] 'Place Masséna' — stop_corpus(geographic): 'Place Massena' at 'French Riviera walking area' (1 pas
+    [VERIFIED] 'Colline du Château Waterfall' — stop_corpus(geographic): 'Colline du Château' at 'French Riviera cycling tour, F
+    [VERIFIED] 'Vieux Nice' — stop_corpus(geographic): 'Vieux Nice (Old Town)' at 'French Riviera cycling tour
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Castle Hill': +1 passages (2 queries)
+    [INTERPRETIVE] 'Place Masséna': +1 passages (2 queries)
+    [INTERPRETIVE] 'Colline du Château Waterfall': +2 passages (2 queries)
+    [INTERPRETIVE] 'Vieux Nice': +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 4 stops enriched, +6 passages, 8 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 1 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #023 | 22:00:02.559 | PHASE_3B_REQUEST
+======================================================================
+  location: French Riviera coastal path, Nice, France
+  stop_count: 4
+
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass HTTP 504 for 'Castle Hill'
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass 429 for 'Place Masséna' (attempt 1/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass HTTP 504 for 'Place Masséna'
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass HTTP 504 for 'Vieux Nice'
+PHASE 3B API call cost: $0.0007 (928 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Nice, hint: auto)
+  [LOCAL-355] Castle Hill: no practical facts in OSM
+  [LOCAL-355] Place Masséna: no practical facts in OSM
+  [LOCAL-355] Colline du Château Waterfall: no practical facts in OSM
+  [LOCAL-355] Vieux Nice: no practical facts in OSM
+   Coords cluster detected: 2 stops share '43.6965, 7.2797', refetching...
+   Cluster refetch OK 'Colline du Château Waterfall': 43.6962, 7.2831
+   Cluster refetch OK 'Castle Hill': 43.6988, 7.2902
+   GEO-CHECK: all 4 stops within walking distance (max leg 1.62 km, total 3.52 km, limit 12 km)
+Extracted first POI coordinates: (43.6988, 7.2902)
+
+=== Extracted POI Information ===
+1. Castle Hill
+   Address: Colline du Château, 06300 Nice, France
+   Coordinates: 43.6988, 7.2902
+   Directions: From the main street, head east towards the waterfront, then take the stairs up ...
+2. Place Masséna
+   Address: Place Masséna, 06000 Nice, France
+   Coordinates: 43.6972, 7.2702
+   Directions: Walk southwest along the Promenade du Paillon, then turn right onto Avenue Jean ...
+3. Colline du Château Waterfall
+   Address: Colline du Château, 06300 Nice, France
+   Coordinates: 43.6962, 7.2831
+   Directions: Continue south along the path until you reach the waterfall. Listen to the sooth...
+4. Vieux Nice
+   Address: Vieux Nice, 06300 Nice, France
+   Coordinates: 43.6968, 7.2724
+   Directions: Head west through the Old Town's charming alleys. Take in the vibrant sights and...
+================================
+
+  [D556] +5 story fact(s) for 'Castle Hill' via gemini (4 high)
+  [D556] +5 story fact(s) for 'Place Masséna' via gemini (5 high)
+  [D556] +4 story fact(s) for 'Colline du Château Waterfall' via gemini (4 high)
+  [D556] +6 story fact(s) for 'Vieux Nice' via gemini (4 high)
+[TIMING] phase=poi_selection elapsed=159.4s cumulative=161.2s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Castle Hill French Riviera coastal path' → 37884 chars
+  [LOCAL-47] Castle Hill: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Place Masséna French Riviera coastal path' → 18034 chars
+  [LOCAL-47] Place Masséna: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Colline du Château Waterfall Nice' → 60116 chars
+  [LOCAL-47] Colline du Château Waterfall: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Vieux Nice French Riviera coastal path' → 25636 chars
+  [LOCAL-47] Vieux Nice: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=French Riviera coastal path, N model=gpt-4o tokens=1470 (in=861 out=609) cost=$0.0082 latency=6.9s
+[COST_METER] FRESH | spine_generate | $0.008243 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0082
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (9 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Castle Hill' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Place Masséna' verdict=COVERED action=PASSED
+  [CORPUS-GATE] stop='Colline du Château Waterfall' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Vieux Nice' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 1 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=16.4s cumulative=177.7s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=177.7s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=177.7s
+
+Generating description for Stop 1: Castle Hill by , ...
+
+Generating description for Stop 2: Place Masséna by , ...
+
+Generating description for Stop 3: Colline du Château Waterfall by , ...
+
+Generating description for Stop 4: Vieux Nice by , ...
+  [LOCAL-381] stop='Place Masséna' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Place Masséna', 12, ''), ('Place Masséna', 10, ''), ('Place Masséna', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13239 after=23236 (+9997 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23236)
+  [LOCAL-381] stop='Vieux Nice' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Vieux Nice', 12, ''), ('Vieux Nice', 9, ''), ('Vieux Nice', 8, '')]
+  [LOCAL-402] Stop 4: injected 6 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15558 after=25780 (+10222 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25780)
+  [LOCAL-381] stop='Colline du Château Waterfall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Colline du Château Waterfall', 11, ''), ('Colline du Château Waterfall', 9, ''), ('Colline du Château Waterfall', 8, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15244 after=25135 (+9891 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25135)
+  [LOCAL-381] stop='Castle Hill' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Castle Hill', 8, ''), ('Castle Hill', 8, ''), ('Castle Hill', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14902 after=24443 (+9541 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24443)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0286 (6025 tokens, model=gpt-4o)
+Stop 1 description word count: 278 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0307 (6454 tokens, model=gpt-4o)
+Stop 4 description word count: 263 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0281 (5910 tokens, model=gpt-4o)
+Stop 2 description word count: 294 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0292 (6154 tokens, model=gpt-4o)
+Stop 3 description word count: 248 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Castle Hill': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=3, deduction=1, total=5
+    ✓ PASS stop='Place Masséna': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Colline du Château Waterfall': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Vieux Nice': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.001082 (input=4448, output=691)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 4: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 12 paragraphs retried, 9 fixed/improved, 3 kept original
+  [LOCAL-192] Retry cost: $0.0040 (4960 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Castle Hill': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 2 'Place Masséna': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 0 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Castle Hill': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 2 sentences deleted, 1 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Castle Hill': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Place Masséna': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Vieux Nice': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 4 sentences deleted, 2 paragraphs emptied, 3 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 13
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 6
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Colline du Château Waterfall' conf=high reason='Generic scene-setting applicable to any historic villa.': "As you depart from this serene oasis, the vibrant Place Masséna you explored earlier awaits in your memory. Each corner "
+    [LOCAL-472] UNGROUNDED entity stop='Castle Hill' entity='Catherine Ségurane' reason='It does not specify her connection to Castle Hill.' in: "In 1543, during the Siege of Nice, a local washerwoman named Catherine Ségurane became a symbol of d"
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='Sir Thomas Coventry' reason='It does not specify where he lived or conducted this tradition in relation to Vieux Nice.' in: "In the 1860s, Sir Thomas Coventry-More, a British expatriate, began a peculiar tradition. To summon "
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='Albert Spaggiari' reason='No concrete link to Vieux Nice is established.' in: "The cobblestones underfoot have witnessed stories of audacity, like that of Albert Spaggiari. In Jul"
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='In July' reason='No concrete link to Vieux Nice is established.' in: "The cobblestones underfoot have witnessed stories of audacity, like that of Albert Spaggiari. In Jul"
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='On March' reason='It does not specify a concrete link between Spaggiari and Vieux Nice.' in: "The cobblestones underfoot have witnessed stories of audacity, like that of Albert Spaggiari. In Jul"
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='Old Nice' reason='No concrete link to Old Nice is provided for Albert Spaggiari.' in: "The cobblestones underfoot have witnessed stories of audacity, like that of Albert Spaggiari. In Jul"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/34)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 14
+    Glossed (composed): 6
+    Suppressed (already explained): 1
+    Degraded (name dropped): 6
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1947 tokens, $0.0004, 5.0s
+    Gloss: 1402 tokens, $0.0003, 7.9s
+    Compose: 2005 tokens, $0.0003, 2.0s
+    Total added cost: $0.0011
+    Stops affected: 4
+    Glosses applied:
+      • Catherine Ségurane → "a symbol of local resistance" [source: model]
+      • Fontaine du Soleil → DEGRADED (name dropped)
+      • Alfred Janniot → DEGRADED (name dropped)
+      • Société Générale → "a French multinational banking company" [source: model]
+      • Participants → DEGRADED (name dropped)
+      • King Louis → DEGRADED (name dropped)
+      • Albert Spaggiari → DEGRADED (name dropped)
+      • In July → "the year of the bank heist" [source: model]
+      • Société Générale → SUPPRESSED (already explained)
+      • On March → "the date of Spaggiari's escape" [source: model]
+      • Spaggiari → "the notorious bank heist mastermind" [source: model]
+      • Catherine Ségurane → "a local heroine from the siege" [source: model]
+      • Niçois → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'French Riviera coastal path'...
+   OK 'Place Masséna' — inside 'French Riviera coastal path': [D578] part of the venue by construction (conf=high)
+   OK 'Colline du Château Waterfall' — inside 'French Riviera coastal path': [D578] part of the venue by construction (conf=high)
+   OK 'Vieux Nice' — inside 'French Riviera coastal path': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 7
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 7
+    Stops affected: 4
+    [1] DELETED: 'This duality' in: This duality of ancient and modern, of stories both grand and intimate, is what 
+    [2] DELETED: 'This bold artistic choice' in: This bold artistic choice, however, stirred the waters of public opinion.
+    [3] DELETED: 'This effort' in: This effort not only addressed a pressing need but transformed the landscape int
+    [3] DELETED: 'This drastic' in: This drastic action followed a French bomb striking the fortress's central powde
+    [3] DELETED: 'These remnants' in: These remnants, concealed beneath the peaceful exterior, reveal a history of con
+    [4] DELETED: 'This eccentric' in: This eccentric custom continues today, a reminder of the quirky charms that defi
+    [4] DELETED: 'These tales' in: These tales of cunning are woven into the fabric of Vieux Nice, speaking to a hi
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Colline du Château Waterfall' (index 44) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Castle Hill': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Place Masséna': the longest run (3 sentences, Albert Spaggiari) has agency=0 stakes=0 — someone is described, but nothing is r
+    stop 3 'Colline du Château Waterfall': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Vieux Nice': the longest run (3 sentences, Spaggiari) has agency=0 stakes=0 — someone is described, but nothing is risked, 
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Place Masséna' (index 28)
+  [D534] Stop 4 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: In 1543, during the Siege of Nice, a local washerwoman named Catherine Ségurane, a symbol of local r
+      already told: It was here, in July 1976, that Albert Spaggiari orchestrated what became known as the 'Heist of the
+
+  [LOCAL-474] PHASE 5.17: retry 'Castle Hill' — 258w → 104w after gates, 7 sentence(s) removed
+    removed: "The ruins that remain today whisper of the city's tumultuous past, where defensive walls once stood "
+    removed: "In 1543, during the Siege of Nice, a local washerwoman named Catherine Ségurane became a symbol of d"
+    removed: "As the story goes, she single-handedly bludgeoned an Ottoman soldier and brazenly mooned their troop"
+    removed: "Despite her glittering life, she died penniless in Nice and was buried atop Castle Hill in 1965."
+    removed: "Her life is a reminder of the fleeting nature of fame and fortune, yet her presence here keeps alive"
+    removed: "This duality of ancient and modern, of stories both grand and intimate, is what makes Castle Hill a "
+    removed: "As you descend the hill, consider the layers of history beneath your feet, each step a connection to"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Place Masséna' — 250w → 176w after gates, 6 sentence(s) removed
+    removed: "In the year 1956, a striking piece of art was unveiled here: the Fontaine du Soleil, crowned by the "
+    removed: "This bold artistic choice, however, stirred the waters of public opinion."
+    removed: "Place Masséna also bears witness to the cultural vibrancy of Nice, hosting the city's Carnival celeb"
+    removed: "Until the mid-20th century, these festivities included plaster fights, a raucous tradition where par"
+    removed: "This intersection of art, crime, and celebration positions Place Masséna as a living tapestry of hum"
+    removed: "As you take in the sights and sounds of this square, the cascade of water from the nearby fountain b"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Colline du Château Waterfall' — 248w → 100w after gates, 13 sentence(s) removed
+    removed: "The waterfall, constructed in 1885, serves a practical purpose beyond its enchanting allure."
+    removed: "This effort not only addressed a pressing need but transformed the landscape into a source of civic "
+    removed: "The rushing water, fed by the Canal de la Vésubie, whispers of both nature's power and human ingenui"
+    removed: "As you listen to the rhythmic sound of the waterfall, imagine the dramatic history that unfolded her"
+    removed: "In 1705, King Louis XIV ordered the demolition of the entire citadel, castle walls, and cathedral on"
+    removed: "This drastic action followed a French bomb striking the fortress's central powder magazine."
+    removed: "The resulting explosion left the hill scarred, but also sowed the seeds for its eventual rebirth as "
+    removed: "The hill's strategic importance persisted into the 20th century."
+    removed: "During World War II, Italian and Nazi German forces transformed Castle Hill into a fortified strongh"
+    removed: "These remnants, hidden beneath the tranquil surface, tell a story of conflict and resilience, juxtap"
+    removed: "As you leave this serene oasis, remember the vibrant Place Masséna you explored earlier."
+    removed: "The narrow streets of Nice's ancient quarter beckon, promising more tales of transformation and endu"
+    removed: "In this city, each corner holds a narrative, waiting to be discovered."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Vieux Nice' — 263w → 153w after gates, 12 sentence(s) removed
+    removed: "Vieux Nice, with its labyrinthine alleys and pastel-colored facades, is more than just a picturesque"
+    removed: "Here, history's pulse is palpable, echoing tales of resilience and intrigue."
+    removed: "This eccentric custom continues today, a reminder of the quirky charms that define this neighborhood"
+    removed: "The cobblestones underfoot have witnessed stories of audacity, like that of Albert Spaggiari."
+    removed: "In July 1976, Spaggiari and his crew tunneled through the city's sewer network to rob the Société Gé"
+    removed: "On March 10, 1977, Spaggiari made a daring escape from the Old Nice courthouse by leaping from a sec"
+    removed: "These tales of cunning are woven into the fabric of Vieux Nice, speaking to a history as colorful as"
+    removed: "Yet, it's not all mischief and mayhem."
+    removed: "During the Siege of Nice in August 1543, a local washerwoman named Catherine Ségurane became a symbo"
+    removed: "When Ottoman forces threatened the city, she struck down a standard-bearer, galvanizing the defender"
+    removed: "Her legacy endures here, amid the bustling life of the old town."
+    removed: "As you wander these vibrant streets, the stories of Vieux Nice reveal a tapestry of past and present"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Castle Hill by , ...
+
+Generating description for Stop 2: Place Masséna by , ...
+
+Generating description for Stop 3: Colline du Château Waterfall by , ...
+
+Generating description for Stop 4: Vieux Nice by , ...
+  [LOCAL-381] stop='Colline du Château Waterfall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Colline du Château Waterfall', 11, ''), ('Colline du Château Waterfall', 9, ''), ('Colline du Château Waterfall', 8, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15244 after=25135 (+9891 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25135)
+  [LOCAL-381] stop='Vieux Nice' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Vieux Nice', 12, ''), ('Vieux Nice', 9, ''), ('Vieux Nice', 8, '')]
+  [LOCAL-402] Stop 4: injected 6 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15558 after=25780 (+10222 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25780)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0303 (6386 tokens, model=gpt-4o)
+Stop 2 description word count: 268 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0342 (7191 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Vieux Nice is a living history book, its cobbled lanes rich with echoes from centuries gone by. Among its many stories, one that still resonates today is the tradition started by Sir Thomas Coventry-More in the 1860s. To ensure his wife returned home on time, he arranged for a cannon to be fired dai'
+  [LOCAL-417] Stop 4: retrying (attempt 1, temp=0.90)...
+Stop 3 API call cost: $0.0318 (6702 tokens, model=gpt-4o)
+Stop 3 description word count: 276 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0307 (6470 tokens, model=gpt-4o)
+Stop 1 description word count: 281 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0342 (7194 tokens, model=gpt-4o)
+Stop 4 description word count: 284 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 12.2s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 281w (was 104w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 254w (was 100w)
+    [LOCAL-474] regenerated and re-gated: 249w (was 153w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://blog.cattiecoylephotography.com/walks-in-the-french-riviera-villefranche-sur-mer-to-nice/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2234 chars from https://blog.cattiecoylephotography.com/walks-in-t
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=3lJMPN8zg80 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://loumessugo.com/easy-coastal-walks-french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1778 chars from https://loumessugo.com/easy-coastal-walks-french-r
+  [LOCAL-427] HTTP 200 from https://www.cntraveller.in/story/the-french-rivieras-best-kept-secrets-are-its-stunning-wild-coastal-paths/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1937 chars from https://www.cntraveller.in/story/the-french-rivier
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/Da2dqWbNVkc/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=j8DXUal2z68&vl=en (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.france.fr/en/article/stroll_along_the_coastal_paths/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.france.fr/en/article/stroll_along_the_
+  [D512] verb discovery: query='French Riviera coastal path, Nice, France construction process h' -> 1 new verb(s): snagged
+  [D512] _AGENCY_VERB widened by 1 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Castle Hill                                42    31    14    38
+     2  Place Masséna                              28    68     0    30
+     3  Colline du Château Waterfall               40    37    29    27
+     4  Vieux Nice                                 33    12    27    65
+    [LOCAL-485] index mean 35.8 over 4 stop(s), range 28-42
+    [LOCAL-485] weakest: 'Place Masséna' at 28
+[TIMING] phase=story_first elapsed=89.4s cumulative=267.1s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (105 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 105 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 105 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 1 orientation: COLLAPSED — using fallback
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 169
+    Words after:  84
+    Delta: -85
+    Stops affected: 3/4
+    Deletions (5):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you arrive at Castle Hill, the rustle of leaves mingles with the whispers of history carried on t..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "From the summit, gaze over the azure Mediterranean waters and the vibrant city of Nice below, where ..."
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Place Masséna is where the checkerboard pavement beneath your feet echoes an era of transformation."
+i.now();if(ticks[l]){ticks["_"+l]=ticks *wn
+           �      s["_"+l].push(v)}ticks[l]=
+v},info:function(k,v,n){ytcsi �n
+            (      l:function(p,n){ytcsi.gt(n).gel.preLoggedGelInfos.push(p @wn
+           �      ){ytcsi.tick("_start",t,n)}};
+(function(w,d){function is  n
+            (      return false;try{if(w.navigator.userAgentData&&w.navigat pn
+            (      &w.navigator.userAgentData.brands.length){var brands=w.n 0n
+            (      rands;var i=0;for(;i<brands.length;i++)if(brands[i]&&bra `n
+            (      )return true;return false}}catch(e){setTimeout(function( �n
+            (      ator.userAgent)return false;var ua=w.navigator.userAgent 8�m
+           �%      o")>0&&ua.toLowerCase().indexOf("webkit")<0&&ua.indexOf( �n
+            (      Trident")<0&&ua.indexOf("MSIE")<0}ytcsi.setStart(w.perfo �n
+            (      ing.responseStart:null);var isPrerender=(d.visibilitySta �n
+            (      ate)=="prerender";var vName=!d.visibilityState&&d.webkit ��m
+           =&      isibilitychange":"visibilitychange";if(isPrerender){var  pn
+            (      si.setStart();d.removeEventListener(vName,startTick)};d. @n
+            (      tartTick,false)}if(d.addEventListener)      [Stop 3][R7_HALLUCINATED_SENSORY] "The sound of rushing water fills the air, creating a serene atmosphere amid the lush greenery."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "This artificial waterfall, a hidden gem of Nice, invites you to explore its historic roots."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 1.6s, $0.0088, 1306 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Castle Hill] (reversal): Sir Thomas Coventry-More, a British expatriate, devised a unique way to ensure h...
+      [Place Masséna] (mystery): Spaggiari and his accomplices brazenly tunneled into the Société Générale bank v...
+      [Colline du Château Waterfall] (cause): In 1885, amidst a significant public health crisis in Nice, the creation of this...
+      [Vieux Nice] (reversal): To ensure his wife came home for lunch, he arranged for a cannon to be fired at ...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0035 (563 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (45 words):
+      "At Castle Hill, Sir Thomas Coventry-More devised a unique way to ensure his wife returned home for lunch. Moving forward, you'll learn about Spaggiari's audacious bank heist at Place Masséna and the innovative 1885 solution to a public health crisis at Colline du Château Waterfall."
+      Stops referenced: 3
+    Part 4 total cost: $0.0035
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+    Stop 1 'Castle Hill': removed duplicate sentence: "Sir Thomas Coventry-More, a British expatriate, devised a unique way to ensure h..."
+  [LOCAL-286] Deduplication: 1 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave Castle Hill, head down towards the Promenade de...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: From Place Masséna, walk towards the Promenade des Anglais a...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the Colline du Château Waterfall, head down tow...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap: D177 FAILED for 'Castle Hill': fact not in delivered text
+    Fact: "Sir Thomas Coventry-More, a British expatriate, devised a unique way to ensure h..."
+  [LOCAL-280] Recap composition: 0.9s, $0.0025, 428 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (1 D177 rejected, 0 navigation rejected)
+    [Vieux Nice] (reversal): "To ensure his wife came home for lunch, he arranged for a cannon to be fired at ..."
+      → composed: "Vieux Nice, a cannon fired at noon to call his wife"
+    [Place Masséna] (mystery): "Spaggiari and his accomplices brazenly tunneled into the Société Générale bank v..."
+      → composed: "Place Masséna, Spaggiari's crew tunneled into the bank vault silently"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops and 4 kilometres — Vieux Nice, a cannon fired at noon to call his wife and Place Masséna, Spaggiari's crew tunneled into the bank vault silently."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=17 'restaurants tour in old city of Nice, France - Restaurant Tour' (0.2 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 3 (first told at stop 1, 1705/citadel): In 1705, King Louis XIV ordered the destruction of the citadel, castle walls, an
+  [D533] 1 repeated fact(s) removed, 0 kept
+  [D533] Person-year role guard: no mismatches (1234 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 3
+    Verified: 0
+    Dropped: 3
+    AUDIT: admission | Open 24/7, free entry | (no source) | DROPPED — no source content
+    AUDIT: admission | Open 24/7, free entry | (no source) | DROPPED — no source content
+    AUDIT: admission | Open 24/7, free entry | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 3 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+
+=== Word Count Statistics ===
+Stop 1: Castle Hill - 278 words
+Stop 2: Place Masséna - 294 words
+Stop 3: Colline du Château Waterfall - 248 words
+Stop 4: Vieux Nice - 263 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (9646 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['truncated']
+  [LOCAL-540]   truncated [REQUIRED_CLEAN]: 1 fragment(s), e.g. 'order of L'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['truncated']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 1) for ['truncated']
+  [LOCAL-540] retry rewrite: 1676 tokens, $0.007963 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['truncated'] -> ['thin', 'truncated']
+  [LOCAL-540] retry did NOT remove: ['truncated'] — shipping with defect recorded (D577)
+
+Total API cost: $0.2484 (40259 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.3884
+CACHE STORE: French Riviera coastal path, Nice, France / walking / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/RIVIERA.txt
+  [C5-5] Evidence persisted: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/RIVIERA_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: French Riviera coastal path, Nice, France - Walking Tour
+Tour-Category: walking
+
+Stop 1: Castle Hill
+
+Address: Colline du Château, 06300 Nice, France
+
+Coordinates: 43.6988, 7.2902
+
+Type/Specialty: Scenic viewpoint
+
+Specific Examples: Panoramic views of Nice, waterfalls, ruins of a former military citadel
+
+Orientation: You are about to embark on a walking journey through the French Riviera coastal path in Nice, France. This tour will take you from Castle Hill to Vi...
+
+[TIMING] phase=packing elapsed=16.6s cumulative=283.7s
+[TIMING] phase=verification elapsed=0.0s cumulative=283.7s
+[TIMING] TOTAL wall=283.7s phases: poi_selection=159.4s, story_first=89.4s, packing=16.6s, fact_sheets=16.4s, intent=1.8s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+RIVIERA: 9648 chars in 284s
+   defects: ['thin', 'truncated', 'distance']
+   people:  4
+   cost:    API $0.2484 (40259 tok) + grounding $0.1400 (4 req) = $0.3884
+
+======================================================================
+FANEUIL: Faneuil Hall Marketplace, Boston MA (walking, 4 stops)
+======================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #024 | 22:04:21.351 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  tour_type: walking
+  total_stops_parameter: 4
+  output_file: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/FANEUIL.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #025 | 22:04:21.351 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "landmarks",
+    "location": "Faneuil Hall Marketplace, Boston MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Faneuil Hall Marketplace, Boston MA",
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Faneuil Hall Marketplace, Boston MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.3s cumulative=1.3s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Faneuil Hall Marketplace, Boston MA - walking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #026 | 22:04:22.616 | GENERATING_PROMPT
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  user_request: Faneuil Hall Marketplace, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Faneuil Hall Marketplace, Boston MA...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Faneuil Hall Marketplace, Boston MA'
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #027 | 22:04:22.617 | PHASE_3A_REQUEST
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  total_stops: 4
+  poi_type_hint: landmarks
+
+PHASE 3A API call cost: $0.0005 (678 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #028 | 22:04:24.655 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Faneuil Hall Marketplace, Boston MA.
+List exactly 7 specific, real, well-known landmarks relevant to: Faneuil Hall Marketplace, Boston MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Faneuil Hall Marketplace, Boston MA.
+- D
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Faneuil Hall", "address": "1 Faneuil Hall Square, Boston, MA 02109", "reason": "Historic meeting hall since 1743, hosted speeches by Samuel Adams and others during American Revolution"},
+{"name": "Quincy Market", "address": "4 S Market St, Boston, MA 02109", "reason": "Historic market building dating back to 1826, now houses various food vendors and shops"},
+{"name": "Union Oyster House", "address": "41 Union St, Boston, MA 02108", "reason": "Oldest continuously operating restaurant i
+
+  [LOCAL-329] Captured 7 substantive selection reason(s)
+OK PHASE 3A parsed 7 candidate POI(s):
+   - Faneuil Hall @ 1 Faneuil Hall Square, Boston, MA 02109
+   - Quincy Market @ 4 S Market St, Boston, MA 02109
+   - Union Oyster House @ 41 Union St, Boston, MA 02108
+   - Paul Revere House @ 19 N Square, Boston, MA 02113
+   - Old State House @ 206 Washington St, Boston, MA 02109
+   - New England Holocaust Memorial @ 98 Union St, Boston, MA 02109
+   - Custom House Tower @ 3 McKinley Square, Boston, MA 02109
+  [area_resolver] Parsed: city='Boston MA', neighborhood='Faneuil Hall Marketplace'
+  [area_resolver] City resolved: Boston MA → Q100 (42.3603, -71.0578)
+  [area_resolver] Neighborhood 'Faneuil Hall Marketplace' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3603, -71.0578), radius=2.0km, lang=en
+  [area_cache] HIT for Q100: 46 landmarks (tier=rich)
+  [verify_landmarks] 4/7 stops verified against 46 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 4 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Faneuil Hall Marketplace, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 4×VENUE_ONLY (not enough covered candidates to fill 4 stops)
+  [LOCAL-212] Selected: ['Paul Revere House=VENUE_ONLY', 'Quincy Market=VENUE_ONLY', 'Faneuil Hall=VENUE_ONLY', 'Old State House=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Union Oyster House=VENUE_ONLY', 'New England Holocaust Memorial=VENUE_ONLY', 'Custom House Tower=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Paul Revere House=8.0', 'Quincy Market=6.0', 'Faneuil Hall=5.0', 'Old State House=4.0']
+  [LOCAL-349] Yield scores (dropped):  ['Union Oyster House=0.0', 'New England Holocaust Memorial=0.0', 'Custom House Tower=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 7/7 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Paul Revere House' — stop_corpus(geographic): 'Paul Revere House' at 'Faneuil Hall, Boston, Massachus
+    [VERIFIED] 'Quincy Market' — venue_corpus canonical_title(geo): 'Quincy Market' at 'Faneuil Hall walking area
+    [VERIFIED] 'Faneuil Hall' — venue_corpus canonical_title(geo): 'Faneuil Hall' at 'Faneuil Hall walking area'
+    [VERIFIED] 'Old State House' — venue_corpus canonical_title(geo): 'Old State House (Boston)' at 'Faneuil Hall w
+    [VERIFIED] 'Union Oyster House' — venue_corpus canonical_title(geo): 'Union Oyster House' at 'Faneuil Hall walking
+    [VERIFIED] 'New England Holocaust Memorial' — venue_corpus canonical_title(geo): 'New England Holocaust Memorial' at 'Faneuil 
+    [VERIFIED] 'Custom House Tower' — wikipedia_en_summary: 'Custom House Tower' exists and mentions region
+    [HARVEST] 'Quincy Market': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Faneuil Hall': verified_no_detail (name match only, no facts in source)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Paul Revere House' (attempt 1/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Paul Revere House' (attempt 2/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Quincy Market' (attempt 1/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Quincy Market' (attempt 2/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Faneuil Hall' (attempt 1/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Faneuil Hall' (attempt 2/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Old State House' (attempt 1/2)
+WARNING:osm_venue_facts:[OSM-VENUE] Overpass ReadTimeout for 'Old State House' (attempt 2/2)
+    [HARVEST] 'Old State House': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Union Oyster House': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'New England Holocaust Memorial': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Custom House Tower': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 1 already had corpus, 6 verified_no_detail
+    [INTERPRETIVE] 'Paul Revere House': +3 passages (2 queries)
+    [INTERPRETIVE] 'Quincy Market': +5 passages (2 queries)
+    [INTERPRETIVE] 'Faneuil Hall': +8 passages (2 queries)
+    [INTERPRETIVE] 'Old State House': +2 passages (2 queries)
+    [INTERPRETIVE] 'Union Oyster House': +5 passages (2 queries)
+    [INTERPRETIVE] 'New England Holocaust Memorial': +5 passages (2 queries)
+    [INTERPRETIVE] 'Custom House Tower': +3 passages (2 queries)
+    [INTERPRETIVE] Summary: 7 stops enriched, +31 passages, 14 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 2 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_214746.txt'
+
+======================================================================
+CALL #029 | 22:04:59.719 | PHASE_3B_REQUEST
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0008 (937 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Boston, hint: auto)
+  [LOCAL-355] Paul Revere House: no practical facts in OSM
+  [LOCAL-355] Quincy Market: no practical facts in OSM
+  [LOCAL-355] Faneuil Hall: no practical facts in OSM
+  [LOCAL-355] Old State House: no practical facts in OSM
+   GEO-CHECK: all 4 stops within walking distance (max leg 0.35 km, total 0.71 km, limit 12 km)
+Extracted first POI coordinates: (42.3634, -71.0535)
+
+=== Extracted POI Information ===
+1. Paul Revere House
+   Address: 19 N Square, Boston, MA 02113
+   Coordinates: 42.3634, -71.0535
+   Directions: Head northeast on Hanover St, then turn left onto N Square. You will see the his...
+2. Quincy Market
+   Address: 4 S Market St, Boston, MA 02109
+   Coordinates: 42.3603, -71.0542
+   Directions: Walk south on N Square, then turn left onto Congress St. Quincy Market will be o...
+3. Faneuil Hall
+   Address: 1 Faneuil Hall Square, Boston, MA 02109
+   Coordinates: 42.3601, -71.0569
+   Directions: Continue south on Congress St, then turn right onto State St. Faneuil Hall will ...
+4. Old State House
+   Address: 206 Washington St, Boston, MA 02109
+   Coordinates: 42.3589, -71.057
+   Directions: Walk east on State St, and you will reach the Old State House. Notice the contra...
+================================
+
+  [D556] +9 story fact(s) for 'Paul Revere House' via gemini (9 high)
+  [D556] +5 story fact(s) for 'Quincy Market' via gemini (5 high)
+  [D556] +6 story fact(s) for 'Faneuil Hall' via gemini (5 high)
+  [D556] +6 story fact(s) for 'Old State House' via gemini (6 high)
+[TIMING] phase=poi_selection elapsed=288.6s cumulative=289.9s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Paul Revere House Faneuil Hall Marketplace' → 63844 chars
+  [LOCAL-47] Paul Revere House: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Quincy Market Faneuil Hall Marketplace' → 63844 chars
+  [LOCAL-47] Quincy Market: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Faneuil Hall Faneuil Hall Marketplace' → 51980 chars
+  [LOCAL-47] Faneuil Hall: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Old State House Faneuil Hall Marketplace' → 63844 chars
+  [LOCAL-47] Old State House: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Faneuil Hall Marketplace, Bost model=gpt-4o tokens=1525 (in=859 out=666) cost=$0.0088 latency=7.5s
+[COST_METER] FRESH | spine_generate | $0.008807 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0088
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': False, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (41 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Paul Revere House' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Quincy Market' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Faneuil Hall' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Old State House' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=15.0s cumulative=304.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=304.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=304.8s
+
+Generating description for Stop 1: Paul Revere House by , ...
+
+Generating description for Stop 2: Quincy Market by , ...
+  [LOCAL-381] stop='Paul Revere House' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 3: Faneuil Hall by , ...
+  [LOCAL-411] Stop 1 snippet ranking: input=9 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=9 usable=9 (t1t2=0, t3=0, market=0)
+    Top scores: [('Paul Revere House', 13, ''), ('Paul Revere House', 8, ''), ('Paul Revere House', 8, '')]
+  [LOCAL-402] Stop 1: injected 9 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 9 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14773 after=27931 (+13158 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27931)
+
+Generating description for Stop 4: Old State House by , ...
+  [LOCAL-381] stop='Faneuil Hall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13339 after=25765 (+12426 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25765)
+  [LOCAL-381] stop='Old State House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Old State House', 8, ''), ('Old State House', 8, ''), ('Old State House', 8, '')]
+  [LOCAL-402] Stop 4: injected 6 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13355 after=24404 (+11049 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24404)
+  [LOCAL-381] stop='Quincy Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+WARNING:_style_validator_canonical:LOCAL-371: _take_in_handler Case 3 declining unrepairable tail: 'distinctive grasshopper weathervane atop the building—a peculiar yet storied sentinel that has watched over this historic site since its completion in 1742.'
+    Top scores: [('Quincy Market', 16, ''), ('Quincy Market', 8, ''), ('Quincy Market', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15039 after=27281 (+12242 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27281)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0333 (7014 tokens, model=gpt-4o)
+Stop 1 description word count: 285 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0310 (6534 tokens, model=gpt-4o)
+Stop 3 description word count: 276 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0288 (6053 tokens, model=gpt-4o)
+Stop 4 description word count: 254 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0323 (6790 tokens, model=gpt-4o)
+Stop 2 description word count: 308 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Paul Revere House': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Quincy Market': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Faneuil Hall': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Old State House': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+  [LOCAL-439] Classification cost: $0.000546 (input=2466, output=294)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Stop 2 para 5: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry IMPROVED (4→3 errors)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 7 paragraphs retried, 4 fixed/improved, 3 kept original
+  [LOCAL-192] Retry cost: $0.0023 (2881 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'Quincy Market': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 3 'Faneuil Hall': 0 rewritten, 1 deleted
+  [LOCAL-255] Stop 4 'Old State House': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 1 deleted, 3 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/3 = 33.3% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 4 'Old State House': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Paul Revere House': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Faneuil Hall': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 3 sentences deleted, 2 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 13
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 7
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Quincy Market' conf=high reason='Generic claims about street performers and city intervention.': "In the late 20th century, Quincy Market was not just a place for goods but also for performances. By the 1980s and 1990s"
+    [LOCAL-472] REMOVED transferable paragraph stop='Old State House' conf=high reason='Generic claims about community and independence apply to many historic churches.': "The Old State House stands as a testament to a community that challenged the status quo. Echoes of independence and the "
+    [LOCAL-472] UNGROUNDED entity stop='Paul Revere House' entity='Midnight Ride' reason='It does not specify that Revere lived or stayed at the Paul Revere House.' in: "On the night of April 18, 1775, Revere embarked on his legendary Midnight Ride to alert colonial mil"
+    [LOCAL-472] UNGROUNDED entity stop='Paul Revere House' entity='As Revere' reason='It does not specify that Revere lived or stayed at the house.' in: "On the night of April 18, 1775, Revere embarked on his legendary Midnight Ride to alert colonial mil"
+    [LOCAL-472] UNGROUNDED entity stop='Paul Revere House' entity='Penobscot Expedition' reason='No concrete link between the Penobscot Expedition and the Paul Revere House is established.' in: "Life for Revere was not solely defined by his midnight dash. In 1779, he faced accusations of coward"
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='John Smibert' reason='It does not specify how Smibert is directly connected to Faneuil Hall.' in: "Faneuil Hall, designed by artist John Smibert, was a gift to the city from wealthy merchant Peter Fa"
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='In December' reason='No concrete link between Wendell Phillips and Faneuil Hall is established.' in: "Faneuil Hall, designed by artist John Smibert, was a gift to the city from wealthy merchant Peter Fa"
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='Wendell Phillips' reason='It does not specify how Phillips is directly linked to Faneuil Hall.' in: "Faneuil Hall, designed by artist John Smibert, was a gift to the city from wealthy merchant Peter Fa"
+    [LOCAL-472] UNGROUNDED entity stop='Old State House' entity='Thomas Jefferson' reason='It does not specify a direct link between Jefferson and the Old State House.' in: "Just six years later, on July 18, 1776, the same balcony became the stage for another defining momen"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/42)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 12
+    Glossed (composed): 3
+    Suppressed (already explained): 1
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 7
+    Triage: 1759 tokens, $0.0004, 5.4s
+    Gloss: 461 tokens, $0.0001, 1.8s
+    Compose: 1959 tokens, $0.0003, 2.5s
+    Total added cost: $0.0008
+    Stops affected: 3
+    Glosses applied:
+      • Great Fire → DEGRADED (name dropped)
+      • Penobscot Expedition → "a military campaign during the Revolutionary War" [source: model]
+      • National Historic Landmark → SUPPRESSED (already explained)
+      • Liberty → "the site of revolutionary dissent" [source: corpus]
+      • Royal Governor Thomas Hutchinson → "the last colonial governor of Massachusetts" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'Paul Revere House': claim='April 18, 1775' contradicted_by='he Paul Revere House, built c.1680, was the colonial home of American patriot an' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=1 claim='April 18, 1775' evidence='he Paul Revere House, built c.1680, was the coloni' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Faneuil Hall Marketplace, Boston MA'...
+   OK 'Quincy Market' — inside 'Faneuil Hall Marketplace, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Faneuil Hall' — inside 'Faneuil Hall Marketplace, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Old State House' — inside 'Faneuil Hall Marketplace, Boston MA': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 3
+    [1] DELETED: 'This wooden dwelling' in: This wooden dwelling was built by Robert Howard and later became the home of Pau
+    [2] DELETED: 'This audacious' in: This audacious theft and the subsequent recovery of the weathervane added a laye
+    [3] DELETED: 'Those unfamiliar' in: Those unfamiliar with the grasshopper weathervane—a detail every local knew—were
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 4 'Old State House' (index 64) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 2 'Quincy Market': the longest run (5 sentences, Josiah Quincy) has agency=1 stakes=0 — someone is described, but nothing is risk
+    stop 3 'Faneuil Hall': the longest run (5 sentences, Faneuil Hall) has agency=0 stakes=0 — someone is described, but nothing is riske
+    stop 4 'Old State House': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Faneuil Hall' (index 38)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Paul Revere House' — 240w → 107w after gates, 9 sentence(s) removed
+    removed: "The Paul Revere House, constructed around 1680, occupies the site of the Second Church of Boston's p"
+    removed: "This wooden dwelling was built by Robert Howard and later became the home of Paul Revere, an America"
+    removed: "As you stand in the shadow of its weathered facade, envision the flurry of activity that once filled"
+    removed: "In the backdrop of Revere's everyday life, extraordinary episodes unfolded that would etch his name "
+    removed: "On the night of April 18, 1775, Revere embarked on his legendary Midnight Ride to alert colonial mil"
+    removed: "In an amusing twist, Revere realized he had forgotten his spurs, crucial for his horseback journey.A"
+    removed: "Yet, life for Revere was not solely defined by his midnight dash."
+    removed: "In 1779, he faced accusations of cowardice and insubordination during the ill-fated Penobscot Expedi"
+    removed: "Standing here, the Paul Revere House is more than a monument; it's a tangible connection to the whis"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Quincy Market' — 308w → 227w after gates, 6 sentence(s) removed
+    removed: "In the late 20th century, Quincy Market was not just a place for goods but also for performances."
+    removed: "By the 1980s and 1990s, street performers vied for coveted spots, engaging in turf wars that added a"
+    removed: "The city intervened, establishing formal audition processes and designated timeslots, transforming s"
+    removed: "His hiding place?"
+    removed: "Among old American flags in the attic of the hall itself."
+    removed: "This audacious theft and the subsequent recovery of the weathervane added a layer of modern legend t"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Faneuil Hall' — 248w → 207w after gates, 4 sentence(s) removed
+    removed: "This hall, sometimes called "the Cradle of Liberty," has been the backdrop for fiery speeches that s"
+    removed: "Those unfamiliar with the grasshopper weathervane—a detail every local knew—were exposed as spies."
+    removed: "As you leave Faneuil Hall behind, let its stories of impassioned speeches and civic evolution linger"
+    removed: "Ahead lies another chapter of this city's history, where laws were shaped and a nation took form."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Old State House' — 254w → 189w after gates, 4 sentence(s) removed
+    removed: "From this very balcony, Royal Governor Thomas Hutchinson addressed a furious mob, desperately trying"
+    removed: "The Old State House is not merely an architectural relic; it is a vibrant testament to the spirit of"
+    removed: "Each brick and beam carries the weight of those who gathered here, debating and dreaming of a future"
+    removed: "As you stand here, echoes of independence and the rhythm of relentless change resonate, tying past s"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Paul Revere House by , ...
+
+Generating description for Stop 2: Quincy Market by , ...
+
+Generating description for Stop 3: Faneuil Hall by , ...
+
+Generating description for Stop 4: Old State House by , ...
+  [LOCAL-381] stop='Paul Revere House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=9 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=9 usable=9 (t1t2=0, t3=0, market=0)
+    Top scores: [('Paul Revere House', 13, ''), ('Paul Revere House', 8, ''), ('Paul Revere House', 8, '')]
+  [LOCAL-402] Stop 1: injected 9 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 9 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14773 after=27931 (+13158 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27931)
+  [LOCAL-381] stop='Faneuil Hall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13339 after=25765 (+12426 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25765)
+  [LOCAL-381] stop='Quincy Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Quincy Market', 16, ''), ('Quincy Market', 8, ''), ('Quincy Market', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15039 after=27281 (+12242 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27281)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0331 (6970 tokens, model=gpt-4o)
+Stop 3 description word count: 286 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0304 (6402 tokens, model=gpt-4o)
+Stop 4 description word count: 260 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0338 (7109 tokens, model=gpt-4o)
+Stop 2 description word count: 290 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0357 (7504 tokens, model=gpt-4o)
+Stop 1 description word count: 267 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 6.5s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 266w (was 107w)
+    [LOCAL-474] regenerated and re-gated: 241w (was 227w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 260w (was 189w)
+      [TRAGEDY-CONTEXT] stop='Old State House' RECOVERED circumstances (5 source(s)): On March 5, 1770, outside the Custom House on King Street near the Old State House, Britis
+  [TRAGEDY-CONTEXT] recovered 1, removed 0 sentence(s)
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 3: Faneuil Hall, designed by artist John Smibert, was a gift to the city from wealthy merchan
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://faneuilhallmarketplace.com/about/history-of-faneuil-hall (attempt 1)
+  [LOCAL-459] R5: Fetched 2015 chars from https://faneuilhallmarketplace.com/about/history-o
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Faneuil_Hall (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Faneuil_Hall
+  [LOCAL-427] HTTP 200 from https://www.masshist.org/beehiveblog/2025/01/behind-the-scenes-of-faneuil-hall-marketplace/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1954 chars from https://www.masshist.org/beehiveblog/2025/01/behin
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/DomesticGoddess603/posts/faneuil-hall-has-followed-me-through-nearly-every-version-of-my-life-i-spent-tim/1737755301263914/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.boston.gov/sites/default/files/embed/f/faneuil-hall-study-report.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/CBSBoston/posts/a-descendant-of-the-original-quincy-market-landowner-explained-why-the-roads-aro/1350971457068189/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.structuremag.org/article/from-past-to-present/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1990 chars from https://www.structuremag.org/article/from-past-to-
+  [LOCAL-427] HTTP 200 from https://faneuilhallmarketplace.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 412 chars from https://faneuilhallmarketplace.com/
+  [D512] verb discovery: query='Faneuil Hall Marketplace, Boston MA construction process how it ' -> 4 new verb(s): mixed, processed, colonnade, lined
+  [D512] _AGENCY_VERB widened by 4 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Paul Revere House                          59    48     0    72
+     2  Quincy Market                              46    70     8    45
+     3  Faneuil Hall                               28    52     0    58
+     4  Old State House                            42    53     6    57
+    [LOCAL-485] index mean 43.8 over 4 stop(s), range 28-59
+    [LOCAL-485] weakest: 'Faneuil Hall' at 28
+[TIMING] phase=story_first elapsed=71.5s cumulative=376.3s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (103 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 103 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 1 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 89 words (delta: -14)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 4 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 153
+    Words after:  98
+    Delta: -55
+    Stops affected: 2/4
+    Deletions (3):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "Standing in front of the Paul Revere House, you feel the history beneath your feet, nestled in Bosto..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "The scent of the salty sea air mingles with the aroma of nearby Italian bakeries."
+      [Stop 4][R10_UNFULFILLED_PROMISE] "Located at the intersection of Washington and State streets, this site is rich with tales that shape..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.5s, $0.0091, 1337 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Paul Revere House] (mystery): On April 18, 1775, a curious incident unfolded....
+      [Quincy Market] (mystery): Another tale from these halls involves the quirky history of Durgin-Park in the ...
+      [Faneuil Hall] (mystery): In December 1837, Wendell Phillips, a then-unknown abolitionist, commandeered an...
+      [Old State House] (dated_event_with_consequence): On March 5, 1770, outside the Custom House on King Street near the Old State Hou...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0033 (544 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (34 words):
+                                                                                                                   pP�   عי��                                                p��   ܗ�,�u                                                �   ���*�jpr�   �3Ǒ	+��                                                                                                                �x�   ��צ�\d0S�   �5d����                                                0��   �2��cw                                0z�   �.��2���Q�   ���:׈p��   ��n���H�y�   �9, ���m���   ��;�c}0��   �C���G��0w�   �)���Ƞ8                                               "Experience the curious incident of April 18, 1775, at Paul Revere House and learn about Wendell Phillips' activism in December 1837 at Faneuil Hall, before delving into the history of Durgin-Park at Quincy Market."
+      Stops referenced: 4
+    Part 4 total cost: $0.0033
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave the Paul Revere House, head southwest on North ...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave Quincy Market, head towards the cobblestone pro...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave Faneuil Hall, walk down Congress Street and con...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.7s, $0.0024, 403 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Paul Revere House] (mystery): "On April 18, 1775, a curious incident unfolded...."
+      → composed: "Paul Revere House, saw a curious incident on April 18, 1775"
+    [Quincy Market] (mystery): "Another tale from these halls involves the quirky history of Durgin-Park in the ..."
+      → composed: "Quincy Market, known for quirky history of Durgin-Park in North Market"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Paul Revere House, saw a curious incident on April 18, 1775 and Quincy Market, known for quirky history of Durgin-Park in North Market."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (6329 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 4
+    Verified: 0
+    Dropped: 4
+    AUDIT: hours | Open daily from 9:30 AM to 5:15 PM, admission fee required | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily, hours vary by shop | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily from 9:00 AM to 6:00 PM, free admission | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily from 9:00 AM to 5:00 PM, admission fee required | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 4 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 3 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 3: PARTS_OUT_OF_ORDER — Part 3 appears before Part 2 (sentence 2 vs 3).
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 4 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Faneuil Hall Marketplace, Boston MA. Built in 1..."
+  [2] "From the bustling hub of Faneuil Hall Marketplace, the Old State House stands as a beacon of America..."
+  [3] "Constructed in 1713, the Old State House is the oldest surviving public building in Boston. It serve..."
+  [4] "That's 4 stops — Paul Revere House, saw a curious incident on April 18, 1775 and Quincy Market, know..."
+
+=== Word Count Statistics ===
+Stop 1: Paul Revere House - 285 words
+Stop 2: Quincy Market - 308 words
+Stop 3: Faneuil Hall - 276 words
+Stop 4: Old State House - 254 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (9810 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['bare_death']
+  [LOCAL-540]   bare_death [REQUIRED_CLEAN]: 3 death(s) named without circumstances
+  [LOCAL-540] REQUIRED_CLEAN defect present (['bare_death']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating orientation (stop 1) for ['bare_death']
+  [LOCAL-540] retry rewrite: 726 tokens, $0.003450 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['bare_death'] -> ['bare_death']
+  [LOCAL-540] retry did NOT remove: ['bare_death'] — shipping with defect recorded (D577)
+
+Total API cost: $0.2542 (37673 tokens)
+Grounding:      $0.1750 (5 requests)
+Tour total:     $0.4292
+CACHE STORE: Faneuil Hall Marketplace, Boston MA / walking / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/FANEUIL.txt
+  [C5-5] Evidence persisted: /Users/micha/Audioura/TOURS_FOR_REVIEW/round11/FANEUIL_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Faneuil Hall Marketplace, Boston MA - Walking Tour
+Tour-Category: walking
+
+Stop 1: Paul Revere House
+
+Address: 19 N Square, Boston, MA 02113
+
+Coordinates: 42.3634, -71.0535
+
+Type/Specialty: Historic House
+
+Specific Examples: Paul Revere's living quarters, period furnishings, historical artifacts
+
+Orientation: You are about to embark on a walking journey through Faneuil Hall Marketplace, Boston MA. Witness the intertwining of revolutionary fervor and commercial vib...
+
+[TIMING] phase=packing elapsed=14.8s cumulative=391.1s
+[TIMING] phase=verification elapsed=0.0s cumulative=391.1s
+[TIMING] TOTAL wall=391.1s phases: poi_selection=288.6s, story_first=71.5s, fact_sheets=15.0s, packing=14.8s, intent=1.3s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+FANEUIL: 9750 chars in 391s
+   defects: ['bare_death']
+   people:  3
+   cost:    API $0.2542 (37673 tok) + grounding $0.1750 (5 req) = $0.4292
+
+======================================================================
+  CHURCH_1   OK      244s  defects=CLEAN
+  LOGAN_1    OK      174s  defects=CLEAN
+  LASCARIS   FAIL     46s  empty text
+  STNICHOLAS OK      248s  defects=CLEAN
+  RIVIERA    OK      284s  defects=['thin', 'truncated', 'distance']
+  FANEUIL    OK      391s  defects=['bare_death']

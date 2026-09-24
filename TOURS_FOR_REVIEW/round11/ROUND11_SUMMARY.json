@@ -1,0 +1,124 @@
+[
+  {
+    "name": "CHURCH_1",
+    "ok": true,
+    "wall_s": 243.8,
+    "chars": 9694,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 8,
+      "named_people": 6,
+      "chars": 9694
+    },
+    "cost": {
+      "total_api_cost_usd": 0.268567,
+      "total_tokens": 36932,
+      "grounding_cost_usd": 0.385,
+      "grounding_requests": 11,
+      "tour_total_cost_usd": 0.653567,
+      "cache_hit": false
+    }
+  },
+  {
+    "name": "LOGAN_1",
+    "ok": true,
+    "wall_s": 173.5,
+    "chars": 8583,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 5,
+      "named_people": 1,
+      "chars": 8583
+    },
+    "cost": {
+      "total_api_cost_usd": 0.170998,
+      "total_tokens": 26429,
+      "grounding_cost_usd": 0.14,
+      "grounding_requests": 4,
+      "tour_total_cost_usd": 0.310998,
+      "cache_hit": false
+    }
+  },
+  {
+    "name": "LASCARIS",
+    "ok": false,
+    "error": "empty text",
+    "wall_s": 46.1
+  },
+  {
+    "name": "STNICHOLAS",
+    "ok": true,
+    "wall_s": 248.1,
+    "chars": 8951,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 9,
+      "named_people": 3,
+      "chars": 8951
+    },
+    "cost": {
+      "total_api_cost_usd": 0.226636,
+      "total_tokens": 36189,
+      "grounding_cost_usd": 0.28,
+      "grounding_requests": 8,
+      "tour_total_cost_usd": 0.506636,
+      "cache_hit": false
+    }
+  },
+  {
+    "name": "RIVIERA",
+    "ok": true,
+    "wall_s": 283.7,
+    "chars": 9648,
+    "defects": {
+      "thin": "3/4 stops delivered",
+      "truncated": "1 fragment(s), e.g. 'order of L'",
+      "distance": "kilometre figure on a building tour: 4 km"
+    },
+    "metrics": {
+      "stops_delivered": 3,
+      "stops_requested": 4,
+      "dates": 9,
+      "named_people": 4,
+      "chars": 9648
+    },
+    "cost": {
+      "total_api_cost_usd": 0.248393,
+      "total_tokens": 40259,
+      "grounding_cost_usd": 0.14,
+      "grounding_requests": 4,
+      "tour_total_cost_usd": 0.388393,
+      "cache_hit": false
+    }
+  },
+  {
+    "name": "FANEUIL",
+    "ok": true,
+    "wall_s": 391.1,
+    "chars": 9750,
+    "defects": {
+      "bare_death": "3 death(s) named without circumstances"
+    },
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 20,
+      "named_people": 3,
+      "chars": 9750
+    },
+    "cost": {
+      "total_api_cost_usd": 0.254183,
+      "total_tokens": 37673,
+      "grounding_cost_usd": 0.175,
+      "grounding_requests": 5,
+      "tour_total_cost_usd": 0.429183,
+      "cache_hit": false
+    }
+  }
+]

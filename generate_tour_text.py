@@ -7690,8 +7690,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _wpn = _norm_place(_wp)
                     if not _wpn:
                         continue
-                    if any(_wpn == q or _wpn in q or q in _wpn for q in _present if q):
-                        print(f"  [D536] Requested stop '{_wp}' is already among the candidates")
+                    _already = [_p for _p in poi_list
+                                if (lambda q: q and (_wpn == q or _wpn in q or q in _wpn))(
+                                    _norm_place(_p.get('name', '')))]
+                    if _already:
+                        # [LOCAL-547] MARK it. The old code just `continue`d, so a stop
+                        # the listener named that HAPPENED to be in the GPT candidate
+                        # list never got user_explicit=True -- and every downstream
+                        # protection keys on that flag. This is the common case, not the
+                        # edge case: on Igor's real MFA run all three requested stops hit
+                        # this branch, so none was protected, and D1v2 then dropped two of
+                        # them ("Sargent Murals", "Watson and the Shark by Copley" -- no
+                        # canonical title match) exactly as if he had never asked.
+                        for _p in _already:
+                            _p['user_explicit'] = True
+                        print(f"  [D536] Requested stop '{_wp}' is already among the "
+                              f"candidates — marked user_explicit on "
+                              f"{[_p['name'] for _p in _already]}")
                         continue
                     _wp_poi = _new_poi(_wp)
                     _wp_poi['user_explicit'] = True
@@ -7834,6 +7849,43 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # Extract fields from VerificationResult
                     _pre_d1v2_candidates = list(poi_list)  # Save original GPT candidates before filtering
                     poi_list = _d1v2_result.pois
+                    # ── [LOCAL-547] A stop the listener NAMED is never silently dropped ──
+                    # D536 inserts user-named stops at 7697 with user_explicit=True. The
+                    # line above replaces the whole list with D1v2-verified works, so any
+                    # named stop that does not match a canonical title vanishes without a
+                    # word. Measured, not suspected: LOCAL-524 ran Igor's real case through
+                    # the SERVICE (tour 352, local524_igor_mfa_result.json) and got
+                    #   asked for : the Sargent Murals / the Liberty Bowl by Paul Revere /
+                    #               the Japanese Temple Room
+                    #   delivered : Huntington Avenue Facade / Entrance Portico / Period rooms
+                    #   all_chosen_stops_present: false
+                    # The names even survived into the tour TITLE and not into the itinerary.
+                    # That is D562 exactly -- Igor: "we think it is us who knows better."
+                    #
+                    # Michael, 2026-09-21: "if we have a choice to create a path for
+                    # everyone, we should do it, but if not, I would assume that the
+                    # listener needs to define the tour parameters more precise." So an
+                    # unverifiable named stop is ANNOUNCED, never removed: it comes back
+                    # with verified=False and the narration hedges, exactly as the
+                    # PALAIS-FIX restore path already does for thin tiers.
+                    _d1v2_kept = {_normalize_name(p.get('name', '')) for p in poi_list}
+                    _user_named_restored = []
+                    for _p in _pre_d1v2_candidates:
+                        if not _p.get('user_explicit'):
+                            continue
+                        if _normalize_name(_p.get('name', '')) in _d1v2_kept:
+                            continue
+                        _p['verified'] = False
+                        _user_named_restored.append(_p)
+                    if _user_named_restored:
+                        # Front of the list for the same reason D536 puts them there: the
+                        # tail is what gets trimmed to total_stops, and a stop the listener
+                        # asked for by name must not be what falls off the end.
+                        poi_list = _user_named_restored + list(poi_list)
+                        for _p in _user_named_restored:
+                            print(f"  [LOCAL-547] Requested stop '{_p['name']}' was dropped by "
+                                  f"D1v2 verification — RESTORED unverified rather than "
+                                  f"silently removed")
                     _d1_evidence_log = _d1v2_result.evidence_log
                     _d1_venue_corpus = _d1v2_result.combined_text
                     _story_corpus_result = _d1v2_result.corpus_result
@@ -8187,6 +8239,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     return None
 
                 for p in poi_list:
+                    # [LOCAL-547] A stop the listener NAMED is exempt from the
+                    # verified-only gate. LOCAL-546's restore puts it back with
+                    # verified=False precisely so the narration hedges; this gate
+                    # would then delete it again one screen later, and Igor would
+                    # once more be told what he wanted to see. Michael, 2026-09-21:
+                    # state the precondition, never drop the stop.
+                    if p.get('user_explicit'):
+                        _gate_survivors.append(p)
+                        continue
                     # Check verification status
                     if not p.get('verified', True):
                         _gate_removed.append(p['name'])
@@ -8729,7 +8790,26 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # anyway. `_det_entity` is the resolved venue in THIS scope; it is what
             # the D511 loop reads for `official_url`.
             _er_venue = locals().get('_det_entity')
-            if is_strict_mode() and _exhibition_scope is not None and _er_venue:
+            # [LOCAL-547] A request that NAMES ITS STOPS is not an exhibition request.
+            # "Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a
+            # stop at the Liberty Bowl by Paul Revere" trips LOCAL-362 scope detection,
+            # and this gate then looks for an EXHIBITION called
+            # "...with a stop at the Sargent Murals and a stop at the Liberty Bowl..."
+            # finds none, and aborts the whole generation with
+            #   "We could not find an exhibition matching '<the entire request>'"
+            # Measured on Igor's real case tonight: the stops survived D1v2 thanks to
+            # the restore above, and then died here instead. The user asked for
+            # specific WORKS; the venue is the venue and there is no exhibition to
+            # resolve. Skip the gate rather than weaken it -- it is doing its job
+            # correctly for real exhibition requests, it was simply handed the wrong
+            # kind of request.
+            _er_named_stops = named_waypoints(location)
+            if _er_named_stops:
+                print(f"  [LOCAL-547] Exhibition-resolution gate SKIPPED — request names "
+                      f"{len(_er_named_stops)} stop(s) {_er_named_stops}, so it is a "
+                      f"user-stops request, not an exhibition request")
+            if (is_strict_mode() and _exhibition_scope is not None and _er_venue
+                    and not _er_named_stops):
                 # Build coverage dict from LOCAL-212 results
                 _er_verdicts = {}
                 _er_covered_count = 0

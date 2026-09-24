@@ -1,34 +1,34 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
-You are a knowledgeable local guide for Palais Lascaris, Nice, France.
-List exactly 12 specific, real, well-known Palais Lascaris relevant to: Palais Lascaris, Nice, France.
+You are a knowledgeable local guide for Faneuil Hall Marketplace, Boston MA.
+List exactly 7 specific, real, well-known landmarks relevant to: Faneuil Hall Marketplace, Boston MA.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
 - NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
 - Include a complete street address with ZIP code where applicable.
 
-CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
-- List the 6 most famous, notable, or significant ARTWORKS, PAINTINGS, SCULPTURES, or PERMANENT EXHIBITS at 'Palais Lascaris'.
-- Each stop MUST be named after the ARTWORK or EXHIBIT itself — NOT a room name.
-  Good examples: 'Song of Songs' (painting series), 'The Creation of the World' (mosaic), 'Jerusalem Windows' (stained glass studies)
-  Bad examples: 'East Wing Gallery', 'Room 3', 'The Main Hall'
-- For each work, if you know which room/gallery/hall it is displayed in, include that as a note in the address field (e.g. 'Concert Hall, Avenue Docteur Ménard...'). If you do NOT know the room, just use the museum's street address.
-- Do NOT suggest any other museums, institutions, or locations outside this building.
-- Do NOT fabricate artwork names — only include works you are confident exist at this museum.
-- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.
-- Prefer the museum's most iconic/signature pieces that visitors specifically come to see.
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Faneuil Hall Marketplace, Boston MA.
+- Do NOT include well-known landmarks elsewhere in the city just because they are famous — if it is outside Faneuil Hall Marketplace, Boston MA, it does not belong.
+
+WALKING-TOUR COMPACTNESS — this is a walking tour:
+- All stops must form ONE compact cluster, close enough to walk between comfortably.
+- No stop should be more than a 10–15 minute walk (roughly 1 km) from its nearest neighbour in the tour.
+- Prefer a tight set of stops in one walkable area over famous landmarks scattered across the city. A shorter, denser route is better than a long, spread-out one.
+- Prefer landmarks that are DOCUMENTED — places with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
 
 Return ONLY a JSON array, no other text, no markdown fences:
-[{"name": "...", "address": "..."}, ...]
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "The Annunciation", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
-{"name": "The Adoration of the Magi", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
-{"name": "The Crucifixion", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
-{"name": "The Nativity", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
-{"name": "The Deposition from the Cross", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
-{"name": "The Resurrection", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"}]
+[{"name": "Faneuil Hall", "address": "1 Faneuil Hall Square, Boston, MA 02109", "reason": "Historic meeting hall since 1743, hosted speeches by Samuel Adams and others during American Revolution"},
+{"name": "Quincy Market", "address": "4 S Market St, Boston, MA 02109", "reason": "Historic market building dating back to 1826, now houses various food vendors and shops"},
+{"name": "Union Oyster House", "address": "41 Union St, Boston, MA 02108", "reason": "Oldest continuously operating restaurant in the U.S., established in 1826"},
+{"name": "Paul Revere House", "address": "19 N Square, Boston, MA 02113", "reason": "Home of American patriot Paul Revere, built around 1680, now a museum"},
+{"name": "Old State House", "address": "206 Washington St, Boston, MA 02109", "reason": "Oldest surviving public building in Boston, built in 1713, site of the Boston Massacre"},
+{"name": "New England Holocaust Memorial", "address": "98 Union St, Boston, MA 02109", "reason": "Memorial dedicated to the Jewish victims of the Holocaust, opened in 1995"},
+{"name": "Custom House Tower", "address": "3 McKinley Square, Boston, MA 02109", "reason": "Iconic building completed in 1849, served as a customs house, now a Marriott hotel"}]
 
 === ANALYSIS ===
-Requested stops: 6
+Requested stops: 4
 See full chain log: /app/api_call_chain_20260923_214746.txt

@@ -11,7 +11,7 @@ import requests
 import traceback
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import flask
 from flask import Flask, request, jsonify, send_file as _send_file, make_response
 import inspect as _inspect
@@ -751,11 +751,34 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         poll_count = 0
         tour_file = None
         _consecutive_poll_failures_1 = 0
-        _MAX_CONSECUTIVE_POLL_FAILURES = 6  # ~1 minute of unreachable generator
+        # [LOCAL-547, 2026-09-23] Was 6, commented "~1 minute of unreachable generator".
+        # The arithmetic never matched the comment -- each failure costs a 30s timeout
+        # plus a 10s sleep, so 6 failures is ~4 minutes, not 1 -- and more importantly
+        # the thing being measured is NOT reachability. The status endpoint is trivial;
+        # what makes it time out is the generator's own event loop being saturated by
+        # the generation it is being asked about. Busy is not dead.
+        #
+        # Measured tonight on a REAL request: Museum of Fine Arts, Boston (145 canonical
+        # titles, 689,968 chars of corpus) starved the status endpoint for 200s+ and the
+        # orchestrator killed a job the generator was still successfully working on --
+        # the tour text was being written while the caller was told it had failed. Any
+        # large museum hits this, so it is a production defect and not a test artifact.
+        #
+        # Raised to cover observed generation time. The loop is still bounded: the
+        # absolute ceiling below stops it hanging forever if the generator really is
+        # dead, which is what the original guard was for.
+        _MAX_CONSECUTIVE_POLL_FAILURES = 30
+        _POLL_LOOP_DEADLINE = datetime.now() + timedelta(minutes=20)
         _POLL_TIMEOUT = 30  # seconds; status endpoint is trivial, this measures event-loop busy-ness
         _poll_failure_start_1 = None
         while True:
             poll_count += 1
+            if datetime.now() > _POLL_LOOP_DEADLINE:
+                raise Exception(
+                    f"Text-generation exceeded the {20}-minute ceiling after "
+                    f"{poll_count} polls — giving up. The generator may still be "
+                    f"running; check its logs before assuming the tour was lost."
+                )
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
             try:
                 status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=_POLL_TIMEOUT)

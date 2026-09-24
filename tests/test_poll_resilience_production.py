@@ -116,11 +116,39 @@ def test_counter_resets_after_success(monkeypatch):
     assert PAST_THE_LOOP in err, f"expected to exit past the loop, got: {err}"
 
 
+
+def _poll_failure_budget():
+    """The orchestrator's consecutive-poll-failure budget, read from the source.
+
+    The constant is a local inside orchestrate_tour_async, so it cannot be imported;
+    parse it out rather than duplicating the number in this file.
+    """
+    import re, pathlib
+    src = pathlib.Path(__file__).resolve().parent.parent / "tour_orchestrator_service.py"
+    m = re.search(r"_MAX_CONSECUTIVE_POLL_FAILURES\s*=\s*(\d+)", src.read_text())
+    assert m, "could not find _MAX_CONSECUTIVE_POLL_FAILURES in the orchestrator"
+    return int(m.group(1))
+
+
 def test_budget_exhaustion_still_fails(monkeypatch):
-    """Six straight timeouts is a genuinely dead generator — the job must fail."""
-    polls, err = _drive(monkeypatch, [requests.Timeout("Read timed out") for _ in range(6)])
-    assert polls == 6, f"expected exactly 6 polls before giving up, got {polls}"
-    assert "6 consecutive poll failures" in err, err
+    """Enough straight timeouts is a genuinely dead generator — the job must fail.
+
+    [LOCAL-547, 2026-09-23] Budget raised 6 -> 30. The invariant this test protects is
+    unchanged and still asserted: a generator that never answers must eventually fail
+    the job rather than hang. Only the threshold moved, and it moved because 6 was
+    killing LIVE generations -- Museum of Fine Arts, Boston starved the trivial status
+    endpoint for 200s+ while successfully writing the tour, and the orchestrator
+    reported failure for a job that was working. Busy is not dead.
+
+    Read from the module rather than hard-coded, so tuning the budget in production
+    does not require editing an assertion here -- pinning the number is what made this
+    test fail for a deliberate change instead of for a regression.
+    """
+    budget = _poll_failure_budget()
+    polls, err = _drive(monkeypatch,
+                        [requests.Timeout("Read timed out") for _ in range(budget)])
+    assert polls == budget, f"expected exactly {budget} polls before giving up, got {polls}"
+    assert f"{budget} consecutive poll failures" in err, err
     assert PAST_THE_LOOP not in err, "must not proceed past a dead generator"
 
 
