@@ -47,6 +47,28 @@ REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance',
                   # was the bug this ticket exists to fix.
                   'dangling_complement', 'dangling_reference')
 
+# [LOCAL-543, LEAD at merge 2026-09-23] `unsourced_person_event` is DELIBERATELY NOT
+# in REQUIRED_CLEAN, against the task's own recommendation. It is an advisory defect:
+# reported and counted, never gating.
+#
+# The reason is a number the task itself produced: on a live 4-stop tour, **25 of 29
+# factual sentences have no source** — 4 corpus, 0 grounded, 25 parametric. That is
+# not 25 false sentences; it is a pipeline that discards the provenance it already
+# has. `gemini_with_sources` returns sources and they are thrown away.
+#
+# Since LOCAL-540 the scorer GATES: a REQUIRED_CLEAN defect triggers a paid
+# regeneration. Gating on this one would fire on essentially every tour, including
+# true statements — it flags "the airport was renamed in 1943 to honor Major General
+# Edward Lawrence Logan", which is correct and documented. The retry cannot fix a
+# missing source by rewriting the sentence; it can only delete the person and the
+# date. That trades a sourcing gap for a duller tour, which is backwards:
+# Michael, 2026-09-17, "who came to this altar and what they did is not boring."
+#
+# Promote it the day provenance is actually plumbed through to the scorer. Until
+# then it measures how much of a tour the model simply asserted, which is worth
+# knowing and is not worth spending a retry on.
+ADVISORY_ONLY = ('unsourced_person_event',)
+
 _STOP = re.compile(r'^Stop (\d+):\s*(.+)$', re.M)
 _YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
 # [2026-09-23, kiro critic] The first version counted a name ONLY when a title
@@ -1385,8 +1407,140 @@ def _stops(text):
     return _STOP.findall(text or '')
 
 
+# ─── Unsourced person-at-venue-on-a-date (LOCAL-543) ─────────────────────────
+# The worst shape a tour can ship is a NAMED PERSON, placed AT THIS VENUE, on a
+# SPECIFIC DATE, with NO SOURCE. That is the Mother Teresa sentence in round9
+# CHURCH_1 exactly —
+#     "In June 1995, the church became the site of an extraordinary moment when
+#      Mother Teresa ... made an unexpected visit."
+# — and it is the "Founded in 1868 by St. Mary Help of Christians" and "Gustave
+# Eiffel's iconic Control Tower" shape too: a confident, specific, checkable claim
+# the pipeline had no source for. The LOCAL-534 critique reports the real Mother
+# Teresa June-1995 Massachusetts visit was to New Bedford, not Newton, and calls
+# the healing fabricated — but this check does NOT try to know that. It answers the
+# cheaper, prior question (LOCAL-543): a person + this place + a date, and nothing
+# sourced it. Whether it is true is grounding's job; that it is UNSOURCED is a
+# finding on its own.
+#
+# Three ingredients must co-occur IN ONE SENTENCE (D577: the finding is the whole
+# quotable sentence, never a guess assembled across clauses):
+#   1. a named person   — the same _PERSON / possessive / appositive machinery the
+#                         people-counter uses, so the two cannot drift apart.
+#   2. a specific date  — a year (1995) or a month, not a vague era. "the Middle
+#                         Ages" is not a date; "June 1995" and "in 2002" are.
+#   3. placed at HERE   — the sentence ties the person to THIS venue: a venue/stop
+#                         word (church, nave, altar, narthex, here, this ...), or a
+#                         placement verb (visited, entered, arrived, gathered).
+#
+# `provenance`, when supplied, is a callable provenance(sentence) -> class string
+# ('corpus'/'grounded'/'parametric'), i.e. claim_provenance's classifier bound to
+# the run's captured source pool. Then the check fires ONLY on sentences whose
+# provenance is 'parametric' — a person-event the pipeline genuinely had no source
+# for. Offline, with no pool (the saved-tour case), provenance is absent and the
+# check flags the SHAPE: a person+date+venue sentence that, in a file whose only
+# evidence is a 379-byte "UNVERIFIED" record, had no source by construction.
+
+# A specific point in time. A bare year, or a month (optionally with a year). NOT a
+# vague era ("the Middle Ages", "centuries ago") — those are not checkable dates.
+_MONTH_NAME = (r'January|February|March|April|May|June|July|August|September|'
+               r'October|November|December')
+_SPECIFIC_DATE = re.compile(
+    r'\b(?:1[5-9]\d\d|20\d\d)\b'                      # a 4-digit year
+    r'|\b(?:' + _MONTH_NAME + r')\b')                 # or a named month
+
+# The sentence places the person AT THIS VENUE. Either a venue/structure word (the
+# generic ones a church/airport tour uses for its own parts) or a placement verb
+# that puts a person in a location. "here"/"this ... " are deictic to the stop.
+_VENUE_WORD = re.compile(
+    r'\b(?:church|cathedral|basilica|chapel|nave|narthex|altar|sanctuary|'
+    r'parish|congregation|pulpit|steeple|terminal|concourse|tower|hangar|'
+    r'gate|airport|station|museum|gallery|this (?:venue|site|space|place|'
+    r'entryway|entrance|building|stop)|here)\b', re.I)
+_PLACEMENT_VERB = re.compile(
+    r'\b(?:visit(?:ed|s)?|enter(?:ed|s)?|arriv(?:ed|es|al)|'
+    r'came|come|gathered?|filled|stood|walked|gave a|delivered a|'
+    r'became the site|gathered here|approached)\b', re.I)
+
+# Tour meta-narration — a PREVIEW of what a later stop will cover, not a claim that
+# the person was here on that date: "At the upcoming stops, you'll learn about ...",
+# "As you continue the tour, you'll learn about ...". These name a person and a date
+# inside a future-tense frame about the WALK, so they are not a placement claim and
+# must not be flagged. (The same class claim_provenance excludes as _TOUR_META.)
+_EVENT_META = re.compile(
+    r'\b(?:at the upcoming stops|you\'?ll learn|you will learn|'
+    r'as you continue(?: on)? the tour|in the (?:next|following|upcoming) stops?)\b',
+    re.I)
+
+
+def _find_unsourced_person_events(text, provenance=None):
+    """Return [(sentence, name, date), ...] for person+date+venue sentences that
+    have no source.
+
+    provenance(sentence) -> 'corpus'/'grounded'/'parametric' clears a sentence that
+    a source carries; when it is None (offline), the shape itself is the finding.
+    """
+    out = []
+    for sent in _sentences(text):
+        s = sent.strip()
+        if len(s.split()) < 6:
+            continue
+
+        # Tour meta-narration ("At the upcoming stops, you'll learn about ...") is a
+        # preview of the walk, not a placement of the person here on that date.
+        if _EVENT_META.search(s):
+            continue
+
+        # (1) a named person — reuse the counter's machinery verbatim.
+        names = []
+        for m in _PERSON.findall(s):
+            names.extend([m] if isinstance(m, str) else [g for g in m if g])
+        names.extend(_PERSON_POSSESSIVE.findall(s))
+        names.extend(_PERSON_APPOSITIVE.findall(s))
+        # Filter the same not-a-name / not-a-person vocabularies the counter uses,
+        # so "funded by Irish immigrants" or a place possessive is not a "person".
+        person = ''
+        for name in names:
+            name = (name or '').strip()
+            if not name:
+                continue
+            first = name.split()[0].lower()
+            last = name.split()[-1].lower()
+            if first in _NOT_A_NAME or last in _NOT_A_NAME:
+                continue
+            if first in _NOT_PERSON or last in _NOT_PERSON:
+                continue
+            if len(name.split()[-1]) < 3:
+                continue
+            person = name
+            break
+        if not person:
+            continue
+
+        # (2) a specific date.
+        dm = _SPECIFIC_DATE.search(s)
+        if not dm:
+            continue
+
+        # (3) placed at this venue.
+        if not (_VENUE_WORD.search(s) or _PLACEMENT_VERB.search(s)):
+            continue
+
+        # (4) no source. With a provenance classifier, only 'parametric' fires; a
+        # sourced sentence (corpus/grounded) is cleared. Offline the shape stands.
+        if callable(provenance):
+            try:
+                cls = provenance(s)
+            except Exception:
+                cls = 'parametric'
+            if cls in ('corpus', 'grounded'):
+                continue
+
+        out.append((s, person, dm.group(0)))
+    return out
+
+
 def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
-               geocoder=None, verify_attribution=None):
+               geocoder=None, verify_attribution=None, provenance=None):
     """Return {'defects': {...}, 'metrics': {...}, 'clean': bool}.
 
     verify_attribution, when given, is called as verify_attribution(name, year,
@@ -1395,6 +1549,13 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
     NOT clear a dedication-as-founder error, which is wrong regardless of any source.
     Gemini is the natural implementation but is not required — offline, an unverified
     frame is flagged rather than refuted (D577).
+
+    provenance, when given, is a callable provenance(sentence) -> class string
+    ('corpus'/'grounded'/'parametric') — claim_provenance's classifier bound to the
+    run's captured source pool (LOCAL-543). It gates unsourced_person_event: a
+    person-at-venue-on-a-date sentence that a source carries (corpus/grounded) is
+    cleared, and only a 'parametric' one fires. Offline, with no pool, provenance is
+    None and the check flags the SHAPE.
     """
     text = text or ''
     stops = _stops(text)
@@ -1486,6 +1647,19 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
         defects['offsite_entity'] = (
             f"{len(offsite)} place(s) framed as part of the tour but not a "
             f"stop/venue, e.g. \"{place}\" in: {frame[:100]}")
+
+    # Unsourced person-at-venue-on-a-date (LOCAL-543). A named person, placed at
+    # this venue, on a specific date, with no source — the Mother Teresa sentence
+    # exactly. `provenance` (claim_provenance's classifier bound to the run's
+    # source pool) clears any sentence a source carries; offline, with no pool,
+    # the shape itself is the finding, which is the honest reading of a tour whose
+    # only surviving evidence is a 379-byte "UNVERIFIED" record.
+    person_events = _find_unsourced_person_events(text, provenance=provenance)
+    if person_events:
+        sent, name, date = person_events[0]
+        defects['unsourced_person_event'] = (
+            f"{len(person_events)} unsourced person-event(s); "
+            f"\"{name}\" placed here in {date} with no source: \"{sent[:120]}\"")
 
     try:
         from derepetition_guard import _tokenize, _jaccard_similarity

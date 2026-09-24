@@ -19754,6 +19754,48 @@ RULES:
     _tour_total_cost = total_cost + _grounding_cost_usd
     print(f"Grounding:      ${_grounding_cost_usd:.4f} ({_grounding_requests} requests)")
     print(f"Tour total:     ${_tour_total_cost:.4f}")
+
+    # [LOCAL-543] Per-claim provenance — the question the cost lines do not answer:
+    # of the factual sentences this tour speaks in a confident voice, how many did
+    # we actually have a SOURCE for, and how many did the model say from memory?
+    # (round9 CHURCH_1's Mother Teresa "June 1995" sentence is the latter, and the
+    # only record behind it was a 379-byte "UNVERIFIED" file nobody reads.) This is
+    # NOT grounding/verification — it does not ask whether a sentence is TRUE, only
+    # whether anything sourced it. Built from the pool the pipeline ALREADY
+    # collected and would otherwise discard: the retrieval snippets per stop
+    # (_DIRECT_SNIPPETS_PER_STOP, which carry a link/domain/source) and the
+    # documented stop-record provenance names. Printed here, next to the cost, so a
+    # glance at any run sees it. Measures only; changes no generation.
+    _provenance_audit = None
+    try:
+        from claim_provenance import SourcePool as _SourcePool, audit_tour as _audit_tour, summary_line as _prov_summary
+        _prov_names = {}
+        try:
+            from provenance_gloss import provenance_names as _prov_names_for
+            for _p in poi_list:
+                _nm = _p.get('name', '')
+                if _nm:
+                    _rec_names = _prov_names_for(_p)
+                    if _rec_names:
+                        _prov_names[_nm] = _rec_names
+        except Exception:
+            pass
+        _prov_pool = _SourcePool(
+            snippets_per_stop=(_DIRECT_SNIPPETS_PER_STOP or {}),
+            grounded_supports=None,          # per-sentence grounded supports are not
+                                             # retained to this point in the pipeline
+            provenance_names=_prov_names,
+        )
+        _provenance_audit = _audit_tour(complete_tour, _prov_pool)
+        _pc = _provenance_audit['counts']
+        print(f"Provenance:     {_pc['sourced']}/{_pc['total']} factual sentences sourced, "
+              f"{_pc['unsourced']} unsourced "
+              f"({_pc['corpus']} corpus, {_pc['grounded']} grounded, {_pc['parametric']} parametric)")
+    except ImportError:
+        _import_logger.error("[LOCAL-543] MISSING: claim_provenance — per-claim "
+                             "provenance counting DISABLED")
+    except Exception as _prov_err:
+        print(f"  [LOCAL-543] Provenance audit error (non-fatal): {_prov_err}")
     # The authoritative _LAST_GENERATION_COST record is written further down
     # (the canonical [LOCAL-60] block); the grounding fields computed here are
     # folded into it there, so a caller reads one complete record.
@@ -19816,12 +19858,43 @@ RULES:
     if _d1_evidence_log and output_file:
         import json as _ej
         _evidence_path = output_file.replace('.txt', '_evidence.json')
+        # [LOCAL-543] The evidence file recorded ONLY landmark discovery status —
+        # "not in discovered landmarks", four identical lines, 379 bytes — and said
+        # nothing about where any SENTENCE of the narrative came from. Carry the
+        # per-claim provenance alongside it so the file finally records the thing it
+        # is named for: for each factual sentence, whether the pipeline had a source
+        # (corpus/grounded) or none (parametric). Landmark status stays under
+        # "landmarks"; the new material is additive.
+        _evidence_out = {"landmarks": _d1_evidence_log}
+        if _provenance_audit is not None:
+            _evidence_out["claim_provenance"] = {
+                "counts": _provenance_audit["counts"],
+                "per_stop": _provenance_audit["per_stop"],
+                "claims": _provenance_audit["claims"],
+            }
         try:
             with open(_evidence_path, 'w', encoding='utf-8') as _ef:
-                _ej.dump(_d1_evidence_log, _ef, indent=2, ensure_ascii=False)
+                _ej.dump(_evidence_out, _ef, indent=2, ensure_ascii=False)
             print(f"  [C5-5] Evidence persisted: {_evidence_path}")
         except Exception as _ee:
             print(f"  [C5-5] Evidence persist error: {_ee}")
+    elif _provenance_audit is not None and output_file:
+        # [LOCAL-543] Even when there are no discovered landmarks to log (the
+        # common case for a church/airport, which is exactly why CHURCH_1's file
+        # was so empty), the per-claim provenance is still worth persisting — it is
+        # the whole point of this task. Write it on its own.
+        import json as _ej2
+        _evidence_path = output_file.replace('.txt', '_evidence.json')
+        try:
+            with open(_evidence_path, 'w', encoding='utf-8') as _ef2:
+                _ej2.dump({"landmarks": {}, "claim_provenance": {
+                    "counts": _provenance_audit["counts"],
+                    "per_stop": _provenance_audit["per_stop"],
+                    "claims": _provenance_audit["claims"],
+                }}, _ef2, indent=2, ensure_ascii=False)
+            print(f"  [C5-5] Evidence (provenance-only) persisted: {_evidence_path}")
+        except Exception as _ee2:
+            print(f"  [C5-5] Evidence persist error: {_ee2}")
 
     # Show a preview
     preview_length = min(500, len(complete_tour))
@@ -19849,6 +19922,11 @@ RULES:
             "grounding": _grounding_cost_usd,  # [LOCAL-533] per-request Google Search
         },
     }
+    # [LOCAL-543] Fold the per-claim provenance counts into the same record a
+    # caller reads, so a run driver (e.g. run_round9) can report sourced/unsourced
+    # without re-parsing the log. None when the auditor was unavailable.
+    if _provenance_audit is not None:
+        _LAST_GENERATION_COST["provenance"] = _provenance_audit["counts"]
 
     # [LOCAL-540] Record the score BEFORE and AFTER the one-shot retry directly in
     # the generation record, so the defect is visible afterwards rather than

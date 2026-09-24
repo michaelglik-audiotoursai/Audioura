@@ -112,7 +112,19 @@ def test_retry_clears_defects_and_tracks_cost():
     assert len(seen_spans) == len(set(seen_spans)), \
         f"a section was regenerated more than once: {seen_spans}"
     assert res['retried'] is True
-    assert {'offsite_entity', 'self_contradiction'} <= set(res['removed']), res['removed']
+    # [2026-09-23, LEAD at merge] `self_contradiction` no longer clears from an
+    # orientation rewrite alone, and that is correct. LOCAL-541 added a fifth
+    # sub-check, numeric_conflict, and LOGAN_1's 12M-vs-43.5M pair lives in stop 1's
+    # BODY and stop 3 -- outside the orientation span. Verified by splicing: the
+    # sub-checks go
+    #     ['attribution_conflict', 'orientation_stop_mismatch', 'numeric_conflict']
+    #  -> ['numeric_conflict']
+    # so the rewrite removes exactly what sits in the span it rewrote. Assert that,
+    # rather than the whole defect key disappearing.
+    assert 'offsite_entity' in res['removed'], res['removed']
+    subchecks_after = [c[0] for c in tq._find_self_contradictions(res['text'])]
+    assert 'attribution_conflict' not in subchecks_after, subchecks_after
+    assert 'orientation_stop_mismatch' not in subchecks_after, subchecks_after
     assert res['retry_cost'] == {'total_cost': 0.0123, 'total_tokens': 456}, \
         res['retry_cost']
     assert "St. Mary's Cathedral" not in res['text'], \

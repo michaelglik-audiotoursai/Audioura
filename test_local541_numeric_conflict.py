@@ -174,7 +174,11 @@ def _all_txts():
 
 def test_numeric_conflict_fires_on_exactly_one_file_across_the_corpus():
     files = _all_txts()
-    assert len(files) == 48, f"expected 48 tour files, found {len(files)}"
+    # [2026-09-23, LEAD at merge] Was `== 48`. Pinning the corpus SIZE makes this
+    # test fail every time a new round is generated -- round 10 and round 11 broke it
+    # within the hour -- while saying nothing about the check itself. What matters is
+    # that the corpus is non-trivial and that exactly one file trips numeric_conflict.
+    assert len(files) >= 48, f"expected at least 48 tour files, found {len(files)}"
     hits = {os.path.relpath(p, _HERE): tq._find_numeric_conflict(_read(p))
             for p in files}
     firing = sorted(k for k, v in hits.items() if v is not None)
