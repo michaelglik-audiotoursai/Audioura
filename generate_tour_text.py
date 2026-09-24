@@ -7869,11 +7869,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # with verified=False and the narration hedges, exactly as the
                     # PALAIS-FIX restore path already does for thin tiers.
                     _d1v2_kept = {_normalize_name(p.get('name', '')) for p in poi_list}
+                    # [LOCAL-547, second pass] D1v2 keeps a verified work under its
+                    # CANONICAL title, which is often not the words the listener typed:
+                    #   VERIFIED 'Liberty Bowl by Paul Revere' -> 'Sons of Liberty Bowl'
+                    # Matching on the name alone therefore missed it, and the restore
+                    # added the user's wording back alongside the canonical entry. The
+                    # first successful run delivered the SAME OBJECT TWICE --
+                    #   Stop 1: Liberty Bowl by Paul Revere
+                    #   Stop 2: Sons of Liberty Bowl
+                    # -- and the duplicate displaced 'the Sargent Murals' off the end of
+                    # a 3-stop tour. A stop the listener asked for was lost to a bug in
+                    # the code that exists to stop stops being lost.
+                    #
+                    # The evidence log records the mapping, so consult it: anything
+                    # D1v2 marked VERIFIED is already in the list under some name and
+                    # must never be restored.
+                    _d1v2_verified_inputs = {
+                        _normalize_name(k)
+                        for k, v in (_d1v2_result.evidence_log or {}).items()
+                        if isinstance(v, dict) and v.get('status') == 'VERIFIED'
+                    }
                     _user_named_restored = []
                     for _p in _pre_d1v2_candidates:
                         if not _p.get('user_explicit'):
                             continue
-                        if _normalize_name(_p.get('name', '')) in _d1v2_kept:
+                        _pn = _normalize_name(_p.get('name', ''))
+                        if _pn in _d1v2_kept or _pn in _d1v2_verified_inputs:
                             continue
                         _p['verified'] = False
                         _user_named_restored.append(_p)

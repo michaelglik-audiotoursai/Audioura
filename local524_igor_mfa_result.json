@@ -1,0 +1,64 @@
+{
+  "job_id": "f27662f6-4329-4355-9c55-6b37da2aeb0b",
+  "wall_time_s": 529.1,
+  "tour_id": 364,
+  "tour_name": "Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a stop at the Liberty Bowl by Paul Revere and a stop at Watson and the Shark by Copley - Museum Tour",
+  "location": "Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a stop at the Liberty Bowl by Paul Revere and a stop at Watson and the Shark by Copley",
+  "tour_type": "contained",
+  "stops_requested": 3,
+  "stops_count_db": 3,
+  "stops_delivered_headers": [
+    "Liberty Bowl by Paul Revere",
+    "Sons of Liberty Bowl",
+    "Watson and the Shark by Copley"
+  ],
+  "user_chosen_stops": [
+    "the Sargent Murals",
+    "the Liberty Bowl by Paul Revere",
+    "Watson and the Shark by Copley"
+  ],
+  "stops_match": {
+    "the Sargent Murals": false,
+    "the Liberty Bowl by Paul Revere": true,
+    "Watson and the Shark by Copley": true
+  },
+  "stops_match_to_header": {
+    "the Sargent Murals": null,
+    "the Liberty Bowl by Paul Revere": 1,
+    "Watson and the Shark by Copley": 3
+  },
+  "all_chosen_stops_present": false,
+  "order_sensible": false,
+  "audio_bytes": 2009296,
+  "audio_members": [
+    "audio_1.mp3",
+    "audio_2.mp3",
+    "audio_3.mp3"
+  ],
+  "zip_filename": "museum_of_fine_arts_boston_with_a_stop_at_the_sargent_murals_and_a_stop_at_the_liberty_bowl_by_paul_revere_and_a_stop_at_watson_and_the_shark_by_copley_contained_f27662f6.zip",
+  "score_clean": true,
+  "score_metrics": {
+    "stops_delivered": 3,
+    "stops_requested": 3,
+    "dates": 7,
+    "named_people": 5,
+    "chars": 6543
+  },
+  "score_defects": {},
+  "cost_usd": 0.3827,
+  "cost_baseline_usd": 0.244,
+  "cost_rows": [
+    {
+      "op": "spine_generate",
+      "usd": 0.009573,
+      "cache_hit": false,
+      "job_id": "a6132910-788c-4e6d-8ec5-858f726dbf39"
+    },
+    {
+      "op": "tour_generate",
+      "usd": 0.373103,
+      "cache_hit": false,
+      "job_id": "a6132910-788c-4e6d-8ec5-858f726dbf39"
+    }
+  ]
+}
