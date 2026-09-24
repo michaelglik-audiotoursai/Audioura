@@ -269,7 +269,8 @@ def _graceful_shutdown(signum, frame):
 signal.signal(signal.SIGTERM, _graceful_shutdown)
 
 
-def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string, language):
+def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string,
+                        language, stops=None):
     """Enqueue a tour generation task to Cloud Tasks.
     The task will HTTP-push to tour-worker's /run-job endpoint."""
     try:
@@ -287,7 +288,16 @@ def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, reque
             "total_stops": total_stops,
             "user_id": user_id,
             "request_string": request_string,
-            "language": language
+            "language": language,
+            # [LOCAL-547, 2026-09-24] Carry the listener's chosen stops onto the CLOUD
+            # path too. This function did not take them, so `stops` reached the local
+            # thread worker (which passes them to orchestrate_tour_async) and was
+            # silently dropped the moment Cloud Tasks was the transport. The feature
+            # would therefore have worked on the Mac Mini and failed in production --
+            # the worst shape of bug, because local testing proves nothing about it.
+            # Omitted entirely when absent, so the worker's payload is unchanged for
+            # ordinary requests.
+            **({"stops": stops} if stops else {})
         })
 
         task = {
@@ -1755,7 +1765,8 @@ def generate_complete_tour():
         # Part B: Enqueue to Cloud Tasks — worker does generation synchronously
         # Job state lives in Cloud SQL (job_status table), readable by any instance
         _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language)
-        enqueued = _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string, language)
+        enqueued = _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id,
+                                       request_string, language, stops)
         if not enqueued:
             # Fallback: if Cloud Tasks enqueue fails, fall back to thread
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
