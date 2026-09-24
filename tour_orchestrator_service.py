@@ -1550,7 +1550,23 @@ def generate_complete_tour():
     # [LOCAL-525] Optional user-chosen stops. Validated/sanitized here; forwarded
     # to the tour-generator as 'stops' and ultimately to the engine's forced_stops
     # path. Malformed → 400 with a clear message. Absent → normal generation.
-    stops, _stops_error = validate_stops(data.get('stops'))
+    # [LOCAL-547, 2026-09-24] Accept the field the MOBILE APP actually sends.
+    # LOCAL-525 gave the service a `stops` list; LOCAL-523 gave the app its stop
+    # editor. They were built against different names and never integrated:
+    #     app  ->  tourData['user_stops'] = stopTitlesForGeneration(_userStops)
+    #     here ->  data.get('stops')
+    # so a listener could build their stop list, press Generate, and the names
+    # never left the phone. Nothing server-side referenced `user_stops` at all --
+    # it appeared only in user_stops_validate.py and its unit test.
+    #
+    # Worse, `stops` is already taken on the app side for the stop COUNT
+    # ("'stops': _stopCountController.text"), so simply renaming in the app would
+    # collide. Accepting both here is the compatible fix and needs no new build,
+    # which matters because the install on Michael's phone is already made.
+    _raw_stops = data.get('stops')
+    if _raw_stops is None:
+        _raw_stops = data.get('user_stops')
+    stops, _stops_error = validate_stops(_raw_stops)
     
     # [LOCAL-103] Accept is_test from request — gated by server-side allow-flag
     # Trust boundary: is_test is only honored when the server is already in test mode
