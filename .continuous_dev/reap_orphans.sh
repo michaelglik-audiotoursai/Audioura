@@ -195,8 +195,13 @@ for f in "$REPO"/new_kiro_session_is_required_*.md; do
   last=$(grep "task=$base" "$SESSIONS" 2>/dev/null | tail -1 | sed 's/^- \([A-Z]*\).*/\1/')
   if [ "$deaths" -ge "$MAX_DEATHS" ] && [ "$running" -eq 0 ] && [ "$last" != "COMPLETED" ]; then
     mv "$f" "$REPO/QUARANTINED_${base}"
+    # A quarantine is a task-lifecycle event, not a production emergency: the
+    # task file is already moved aside and the queue keeps running without it.
+    # It needs a LEAD to eventually look at it, but nothing user-facing breaks
+    # while it waits. Route to the hygiene channel so ALERTS.md stays reserved
+    # for things a human must act on now (LOCAL-545).
     echo "$(date -u +%FT%TZ) | *** QUARANTINED $base after $deaths deaths — needs LEAD ***" \
-      >> "$CD/ALERTS.md"
+      >> "$CD/task_hygiene.log"
     echo "$(date -u +%FT%TZ) | QUARANTINED $base after $deaths deaths" >> "$LOG"
   fi
 done

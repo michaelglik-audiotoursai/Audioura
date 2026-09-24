@@ -14,6 +14,10 @@
 REPO="$HOME/Audioura"
 CD="$REPO/.continuous_dev"
 LOG="$CD/autonomy.log"
+# Task-hygiene channel (LOCAL-545): routine, self-correcting events that a
+# session should be able to see but that are NOT a production emergency. Kept
+# out of ALERTS.md so a non-empty ALERTS.md stays meaningful.
+HYGIENE="$CD/task_hygiene.log"
 
 # --- Watchdog. Added 2026-09-14 after the loop was DEAD FOR 12 DAYS. ---
 # Docker Desktop stopped when the disk filled on 2026-09-02. backup_tours.sh
@@ -30,7 +34,11 @@ guard() {                       # guard <seconds> <command...>
   wait "$pid" 2>/dev/null
   local rc=$?
   kill "$watcher" 2>/dev/null
-  [ $rc -ge 128 ] && echo "$(date -u +%FT%TZ) | *** TICK STEP TIMED OUT after ${secs}s: $* ***" >> "$CD/ALERTS.md"
+  # A hung tick step is an operational hiccup, not a production emergency: the
+  # watchdog already killed it and the next launchd tick re-runs everything. It
+  # names which step to look at if the loop keeps stalling, so it is worth
+  # recording — but in the hygiene channel, not the urgent one (LOCAL-545).
+  [ $rc -ge 128 ] && echo "$(date -u +%FT%TZ) | *** TICK STEP TIMED OUT after ${secs}s: $* ***" >> "$HYGIENE"
   return $rc
 }
 
