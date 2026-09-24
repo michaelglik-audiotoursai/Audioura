@@ -2,6 +2,9 @@
 """
 Test the improved date extraction on the Rapid7 article
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta

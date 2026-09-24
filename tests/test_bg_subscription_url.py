@@ -3,6 +3,9 @@
 Test Boston Globe Authentication with Subscription URL
 """
 
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 import sys
 import logging
 from boston_globe_session_auth import BostonGlobeSessionAuth

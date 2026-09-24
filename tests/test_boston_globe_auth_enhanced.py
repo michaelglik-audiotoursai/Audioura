@@ -3,6 +3,9 @@
 Comprehensive Boston Globe Authentication Testing
 Tests enhanced authentication system with real credentials
 """
+
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
 import logging
 import json
 import time

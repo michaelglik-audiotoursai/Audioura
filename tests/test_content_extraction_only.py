@@ -3,6 +3,9 @@
 Content extraction test - NO AUDIO GENERATION
 Tests newsletter content extraction without triggering Polly TTS costs
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 import json
 from bs4 import BeautifulSoup

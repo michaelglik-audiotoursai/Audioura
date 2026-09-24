@@ -3,6 +3,9 @@
 Final test of Boston Globe authentication - standalone
 """
 
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 import logging
 from boston_globe_session_auth import BostonGlobeSessionAuth
 

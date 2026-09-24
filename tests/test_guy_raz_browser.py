@@ -4,6 +4,9 @@ Test Guy Raz newsletter URL with browser automation
 to determine if blocking is IP-based or request-pattern-based
 """
 
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 import requests
 from browser_automation import extract_newsletter_content_with_browser
 import time

@@ -2,6 +2,9 @@
 """
 Test NY Times Authentication
 """
+
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
 import sys
 sys.path.append('/app')
 
