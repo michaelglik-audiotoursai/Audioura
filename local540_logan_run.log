@@ -1,0 +1,704 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+========================================================================
+LOCAL-540 LIVE: Boston Logan International Airport, Boston MA (facility, 4 stops)
+========================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_210954.txt'
+
+======================================================================
+CALL #001 | 21:09:54.145 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  tour_type: facility
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-540/TOURS_FOR_REVIEW/local540/LOGAN_1.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_210954.txt'
+
+======================================================================
+CALL #002 | 21:09:54.145 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='facility' not prepended (pre_category='facility'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": null,
+    "location": "Boston Logan International Airport, Boston MA",
+    "theme_type": null,
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston Logan International Airport, Boston MA",
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: None
+   Location: Boston Logan International Airport, Boston MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
+[LOCAL-474] tour_type='facility' → category='facility' (source=explicit)
+
+Detected tour category: FACILITY
+Using facility template for Boston Logan International Airport, Boston MA - facility
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_210954.txt'
+
+======================================================================
+CALL #003 | 21:09:56.068 | GENERATING_PROMPT
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  user_request: Boston Logan International Airport, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Boston Logan International Airport, Boston MA...
+  [S17] no scope_constraint (precision='CITY', scope='Boston Logan International Airport, Boston MA')
+  [D571] pinned 4 building part(s) to the venue anchor 42.3632, -71.0136
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='international airport' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Air traffic control tower cab', 'Terminal A Departures Curb', 'Apron and tarmac', 'Security checkpoint lanes', 'Baggage handling system and sortation facility', 'Ticketing counter', 'Customs and immigration hall', 'Terminal entrance doors']
+  [D571]   stops: ['Terminal A Departures Curb', 'Security checkpoint lanes', 'Apron and tarmac', 'Air traffic control tower cab']
+  [D571]   precondition: some stops are not open to the public, so you will see it from outside; inside the ticketed area, so you will need admission
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Terminal A Departures Curb [?]
+   - Security checkpoint lanes [?]
+   - Apron and tarmac [?]
+   - Air traffic control tower cab [?]
+
+PHASE 4.5: Validating AI knowledge for Boston Logan International Airport, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='facility', no type-verification required)
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 4 stops pass location guard
+  [EXISTENCE-GATE] LOG_ONLY — 0/4 stops verified (0%), 4 would be dropped
+    [UNVERIFIED] 'Terminal A Departures Curb' — no evidence
+    [UNVERIFIED] 'Security checkpoint lanes' — no evidence
+    [UNVERIFIED] 'Apron and tarmac' — no evidence
+    [UNVERIFIED] 'Air traffic control tower cab' — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_210954.txt'
+
+======================================================================
+CALL #004 | 21:10:56.801 | PHASE_3B_REQUEST
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  stop_count: 4
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:9249. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:9250. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0007 (859 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.3656, -71.0188', refetching...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:9686. Caller should supply input_tokens and output_tokens separately.
+   Cluster refetch OK 'Apron and tarmac': 42.3656, -71.0170
+   Cluster refetch OK 'Security checkpoint lanes': 42.3662, -71.0172
+   Cluster refetch OK 'Terminal A Departures Curb': 42.3664, -71.0189
+   Cluster refetch OK 'Air traffic control tower cab': 42.3656, -71.0170
+Extracted first POI coordinates: (42.3664, -71.0189)
+
+=== Extracted POI Information ===
+1. Terminal A Departures Curb
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3664, -71.0189
+   Directions: Exit the T station and follow signs to Terminal A, noticing the large glass faca...
+2. Security checkpoint lanes
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3662, -71.0172
+   Directions: Walk straight from Terminal A, following signs for security, and hear the hum of...
+3. Apron and tarmac
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0170
+   Directions: After security, turn right towards the windows overlooking the apron, catching g...
+4. Air traffic control tower cab
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0170
+   Directions: Continue straight and notice the tall tower structure looming closer, with anten...
+================================
+
+[TIMING] phase=poi_selection elapsed=65.7s cumulative=67.7s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal A Departures Curb Boston Logan International Airport' → 56781 chars
+  [LOCAL-47] Terminal A Departures Curb: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Security checkpoint lanes Boston Logan International Airport' → 29445 chars
+  [LOCAL-47] Security checkpoint lanes: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Apron and tarmac Boston Logan International Airport' → 26948 chars
+  [LOCAL-47] Apron and tarmac: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Air traffic control tower cab Boston Logan International Airport' → 36313 chars
+  [LOCAL-47] Air traffic control tower cab: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=facility venue=Boston Logan International Air model=gpt-4o tokens=1228 (in=660 out=568) cost=$0.0073 latency=5.5s
+[COST_METER] FRESH | spine_generate | $0.007330 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0073
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/4 stops have per-stop passages (1 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Terminal A Departures Curb' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Security checkpoint lanes' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Apron and tarmac' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Air traffic control tower cab' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 3 EMPTY, 1 SHORTENED
+No RAG context for Terminal A Departures Curb — cannot generate fact sheet
+No RAG context for Security checkpoint lanes — cannot generate fact sheet
+No RAG context for Apron and tarmac — cannot generate fact sheet
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 1/4 generated
+  [S25] Story types assigned: ['history', 'anecdote', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=15.9s cumulative=83.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=83.5s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=83.5s
+
+Generating description for Stop 1: Terminal A Departures Curb by , ...
+Generating description for Stop 2: Security checkpoint lanes by , ...
+
+
+Generating description for Stop 3: Apron and tarmac by , ...
+Generating description for Stop 4: Air traffic control tower cab by , ...
+
+  [D571] re-attached 6 chain fact(s) to 'Terminal A Departures Curb' (lost in a poi_list rebuild)  [D571] re-attached 6 chain fact(s) to 'Security checkpoint lanes' (lost in a poi_list rebuild)
+
+  [D571] re-attached 6 chain fact(s) to 'Apron and tarmac' (lost in a poi_list rebuild)  [D571] re-attached 6 chain fact(s) to 'Air traffic control tower cab' (lost in a poi_list rebuild)
+
+  [LOCAL-381] stop='Security checkpoint lanes' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Terminal A Departures Curb' matched_work=False medium='' work_identity_chars=0  [LOCAL-381] stop='Apron and tarmac' matched_work=False medium='' work_identity_chars=0
+
+  [LOCAL-381] stop='Air traffic control tower cab' matched_work=False medium='' work_identity_chars=0
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:13801. Caller should supply input_tokens and output_tokens separately.
+Stop 2 API call cost: $0.0183 (3859 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Every inch of this area reflects a post-9/11 world, where Boston Logan's security geometry was redesigned to prioritize both protection and passenger flow. It's here that modern technology and rigorous protocols converge, ensuring each journey begins securely."
+  [LOCAL-417] Stop 2: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0177 (3726 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Here, anticipation is palpable. This curbside ballet is a testament to the intricate choreography of modern travel, where precision timing ensures smooth transitions from land to air. Each car stop marks a moment of change, a farewell or a beginning. As you watch the scene unfold, consider the journ'
+  [LOCAL-417] Stop 1: retrying (attempt 1, temp=0.90)...
+Stop 3 API call cost: $0.0184 (3880 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 82 words < 120, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0219 (4616 tokens, model=gpt-4o)
+Stop 4 description word count: 222 words
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0175 (3690 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ["subject not named (expected 'Terminal A Departures Curb' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Here, at the confluence of East Boston's past and present, take a moment to observe the seamless coordination necessary to keep this modern gateway running efficiently, a testament to the evolving dance of travel and transport."
+  [LOCAL-417] Stop 1: retrying (attempt 2, temp=1.00)...
+Stop 2 API call cost: $0.0186 (3918 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "The security checkpoint lanes at Logan are a vivid reminder of the pivotal changes following 9/11. Terminal A, which you've already seen, was key to this security upgrade. The post-9/11 redesign here pioneered a new geometry, balancing stringent security with passenger flow. Cutting-edge technology "
+  [LOCAL-417] Stop 2: retrying (attempt 2, temp=1.00)...
+Stop 3 API call cost: $0.0189 (3968 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: "The dance of activity here echoes Boston Logan's storied past. From the historic landing of Charles Lindbergh in 1927 to the state visits of Queen Elizabeth II in 1976 and Pope John Paul II in 1979, this very ground—once part of Governor John Winthrop's colonial grant known as Governors Island—has s"
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 1 API call cost: $0.0178 (3739 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'At this bustling curbside, you stand near a landmark in sustainable aviation. Delta Air Lines and Massport collaborated here to construct the world’s first LEED-certified airport terminal. Nearby, a reminder of the Maverick Mothers’ protests for better neighborhood access stands, tying today’s trave'
+  [LOCAL-417] Stop 1: retrying (attempt 3, temp=1.00)...
+Stop 2 API call cost: $0.0186 (3924 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 2: WORD FLOOR — 77 words < 120, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0189 (3978 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 105 words < 120, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0190 (4002 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 2: WORD FLOOR — 109 words < 120, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0191 (4017 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: "Historically, this site has welcomed figures like Charles Lindbergh in 1927, marking pivotal moments in aviation. Governor John Winthrop's 1632 grant became this aviation hub, evolving dramatically when Governors Island was transformed into landfill for runway expansion from 1946 to 1950. The field,"
+  [LOCAL-417] Stop 3: retrying (attempt 4, temp=1.00)...
+Stop 1 API call cost: $0.0176 (3694 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Amidst the ebb and flow of passengers, there is a palpable sense of precision. Every vehicle's carefully orchestrated movement reflects the coordinated chaos of a transportation hub connecting Boston to destinations worldwide. This curb serves as a gateway, a threshold where the excitement of depart"
+  [LOCAL-417] Stop 1: retrying (attempt 4, temp=1.00)...
+Stop 2 API call cost: $0.0192 (4046 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'After your time at Terminal A Departures Curb, this area holds a tale of transformation. In response to the events of September 11, Logan International Airport undertook a pioneering redesign to reimagine airport security. The challenge was to enhance safety without compromising the essential flow o'
+  [LOCAL-417] Stop 2: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 2: resolved final description (109 words)
+  [LOCAL-394] stop='Security checkpoint lanes' below_floor words=109 — kept (never dropped)
+Stop 2 description word count: 109 words
+Stop 3 API call cost: $0.0191 (4030 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: "Here is where history met the thrill of aviation progress: Charles Lindbergh landed in 1927, cementing the field's early fame just four years after its 1923 opening as Boston Airport. By the late 1940s, Governors Island—once a colonial landmark—was leveled to expand runways, a silent testament to th"
+  [LOCAL-417] Stop 3: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 3: resolved final description (118 words)
+  [LOCAL-394] stop='Apron and tarmac' below_floor words=118 — kept (never dropped)
+Stop 3 description word count: 118 words
+Stop 1 API call cost: $0.0175 (3687 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Here, witness the purposeful choreography performed by travelers and vehicles alike. It's a dance of precise timing and movement, choreographed to ensure orderly departures as journeying individuals step from car to curb, preparing to enter a world of endless possibility just beyond the airport door"
+  [LOCAL-417] Stop 1: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 1: resolved final description (81 words)
+  [LOCAL-394] stop='Terminal A Departures Curb' below_floor words=81 — kept (never dropped)
+Stop 1 description word count: 81 words
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Terminal A Departures Curb': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Security checkpoint lanes': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Apron and tarmac': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Air traffic control tower cab': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001935 (input=7694, output=1301)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+  [LOCAL-394] stop='Terminal A Departures Curb' below_floor words=81 — kept (never dropped)
+  [LOCAL-394] stop='Security checkpoint lanes' below_floor words=109 — kept (never dropped)
+  [LOCAL-394] stop='Apron and tarmac' below_floor words=118 — kept (never dropped)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:15114. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 2 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0012 (1542 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 4 'Air traffic control tower cab': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 3 'Apron and tarmac': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 4 'Air traffic control tower cab': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 6
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 3
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Security checkpoint lanes' entity='Logan Airport' reason='No specific link between the architects and the security checkpoint lanes is provided.' in: "The security checkpoint lanes at Logan Airport aren't just about getting through lines efficiently. "
+    [LOCAL-472] UNGROUNDED entity stop='Security checkpoint lanes' entity='John Carl Warnecke' reason='No concrete link to the security checkpoint lanes is provided.' in: "The security checkpoint lanes at Logan Airport aren't just about getting through lines efficiently. "
+    [LOCAL-472] UNGROUNDED entity stop='Apron and tarmac' entity='Boston Airport' reason='It does not specify how Lindbergh relates to Boston Airport beyond his landing.' in: "This is where history intersected with the progress of aviation. In 1927, Charles Lindbergh landed h"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/23)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 10
+    Glossed (composed): 3
+    Suppressed (already explained): 0
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 2
+    Triage: 1650 tokens, $0.0004, 4.5s
+    Gloss: 954 tokens, $0.0002, 2.9s
+    Compose: 1487 tokens, $0.0002, 1.7s
+    Total added cost: $0.0008
+    Stops affected: 4
+    Glosses applied:
+      • Delta Air Lines → DEGRADED (name dropped)
+      • Massport → DEGRADED (name dropped)
+      • John Carl Warnecke → "an architect known for memorial designs" [source: model]
+      • Pepi Architects → DEGRADED (name dropped)
+      • Charles Lindbergh → "the first solo nonstop transatlantic pilot" [source: model]
+      • Boston Logan Airport → "the largest airport in New England" [source: model]
+      • President John → DEGRADED (name dropped)
+      • Eternal Flame → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [3] DELETED: 'This bustling' in: This bustling zone invisibly yet significantly connects to your earlier journey 
+    [4] DELETED: 'This state' in: This state agency’s stewardship is evident in Logan's evolution, from its innova
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Apron and tarmac' (index 38) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Terminal A Departures Curb': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Security checkpoint lanes': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Apron and tarmac': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Air traffic control tower cab': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Terminal A Departures Curb' (index 20)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal A Departures Curb' — 81w → 56w after gates, 2 sentence(s) removed
+    removed: "Delta Air Lines and Massport collaborated here to construct the world’s first LEED-certified airport"
+    removed: "Nearby, a reminder of the Maverick Mothers’ protests for better neighborhood access stands, tying to"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Security checkpoint lanes' — 109w → 115w after gates, 1 sentence(s) removed
+    removed: "The echoes of John Carl Warnecke & Associates, alongside Desmond & Lord, resonate in the efficient y"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Apron and tarmac' — 118w → 85w after gates, 5 sentence(s) removed
+    removed: "Here is where history met the thrill of aviation progress: Charles Lindbergh landed in 1927, cementi"
+    removed: "By the late 1940s, Governors Island—once a colonial landmark—was leveled to expand runways, a silent"
+    removed: "Smell the kerosene mingling with the faint salt of the harbor air, and note the constant hustle of g"
+    removed: "This bustling zone connects invisibly yet significantly to your earlier journey through the security"
+    removed: "This airfield's past and present coexist seamlessly in the ceaseless dance of aviation logistics, la"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Air traffic control tower cab' — 206w → 124w after gates, 5 sentence(s) removed
+    removed: "The air traffic control tower at Boston Logan Airport is a marvel of engineering, completed in 1973."
+    removed: "This dual-pylon, elliptical concrete structure epitomizes the bold architectural spirit of its era, "
+    removed: "Warnecke, known for designing President John F."
+    removed: "Kennedy's Eternal Flame memorial, brought a unique vision to Logan, harmonizing functionality with a"
+    removed: "This state agency’s stewardship is evident in Logan's evolution, from its innovative terminal built "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Terminal A Departures Curb by , ...
+
+Generating description for Stop 2: Security checkpoint lanes by , ...
+Generating description for Stop 3: Apron and tarmac by , ...
+
+Generating description for Stop 4: Air traffic control tower cab by , ...
+
+  [LOCAL-381] stop='Terminal A Departures Curb' matched_work=False medium='' work_identity_chars=0  [LOCAL-381] stop='Security checkpoint lanes' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Apron and tarmac' matched_work=False medium='' work_identity_chars=0
+
+  [LOCAL-381] stop='Air traffic control tower cab' matched_work=False medium='' work_identity_chars=0
+Stop 1 API call cost: $0.0198 (4172 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 95 words < 120, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0199 (4185 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the aftermath of September 11, Logan became a focal point for pioneering airport security redesigns. The departures from here that day led to the reimagining of checkpoint layouts across the world. The focus shifted to balancing security with passenger flow, an approach that has since been adopte'
+  [LOCAL-417] Stop 2: retrying (attempt 1, temp=0.90)...
+Stop 3 API call cost: $0.0204 (4294 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: 'Here, history and aviation intersect. On September 8, 1923, the Boston Airport officially opened, marking its importance in aviation history. Notably, this very location witnessed the historic landings of Charles Lindbergh in 1927, Queen Elizabeth II in 1976, and Pope John Paul II in 1979. Each arri'
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 4 API call cost: $0.0240 (5045 tokens, model=gpt-4o)
+Stop 4 description word count: 264 words
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0201 (4230 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 114 words < 120, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0203 (4280 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: "As you watch, remember that this spot is steeped in aviation history. Charles Lindbergh’s landing here in 1927 marked the field's growing significance in aviation. Beyond the bustle, the leveling of historic Governors Island from 1946 to 1950 for runway expansion underscores the airport's ambitious "
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 2 API call cost: $0.0199 (4196 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 2: WORD FLOOR — 89 words < 120, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0203 (4281 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 105 words < 120, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0204 (4302 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: 'This site is where significant moments in aviation history unfolded. In September 1923, the airfield officially opened, marking Boston’s growing presence in the aviation world. Years later, it witnessed history when renowned aviator Charles Lindbergh landed here in 1927, sparking local fascination w'
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+Stop 2 API call cost: $0.0202 (4261 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Post-9/11, Logan was pivotal in redesigning airport security infrastructure, setting a standard in this field. The lanes you see today are the result of decades-long modernization efforts by Massport, with a $4.4 billion investment improving both security and passenger experience. Through this lens,'
+  [LOCAL-417] Stop 2: retrying (attempt 3, temp=1.00)...
+Stop 1 API call cost: $0.0207 (4365 tokens, model=gpt-4o)
+  [LOCAL-295] Stop 1: PLACEHOLDER REJECTED (reason: empty_text)
+  [LOCAL-295]   verbatim (0 words): ''
+  [LOCAL-26] Stop 1: placeholder leak detected (attempt 4), retrying (temp=1.00)...
+Stop 3 API call cost: $0.0204 (4303 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 112 words < 120, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0203 (4269 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Logan International Airport isn't just a gateway to the world; it's a testament to innovation and adaptation. Following the harrowing events of September 11, Terminal A underwent a pioneering redesign, emphasizing security and passenger flow. The layout here was inspired by this transformation, sett"
+  [LOCAL-417] Stop 2: retrying (attempt 4, temp=1.00)...
+Stop 1 API call cost: $0.0211 (4432 tokens, model=gpt-4o)
+Stop 1 description word count: 180 words
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0207 (4358 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac' or significant word)"]
+  [LOCAL-417]   verbatim: 'Here, the airport has witnessed remarkable moments in aviation history, such as when Charles Lindbergh descended onto Boston’s runways in 1927. This space serves not merely as a logistical hub but as a living tapestry of technological progress and historic milestones. From passenger hangars that tra'
+  [LOCAL-417] Stop 3: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 3: resolved final description (112 words)
+  [LOCAL-394] stop='Apron and tarmac' below_floor words=112 — kept (never dropped)
+Stop 3 description word count: 112 words
+Stop 2 API call cost: $0.0202 (4255 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Security checkpoint lanes' below_floor words=95 — kept (never dropped)
+Stop 2 description word count: 95 words
+  [LOCAL-526] PHASE 5.17 regeneration wall: 14.8s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 161w (was 56w)
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 112w (was 85w)
+    [LOCAL-474] regenerated and re-gated: 232w (was 124w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.massport.com/logan-airport/about-logan/airport-modernization (attempt 1)
+  [LOCAL-459] R5: Fetched 1851 chars from https://www.massport.com/logan-airport/about-logan
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Logan_International_Airport (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Logan_International_
+  [LOCAL-427] HTTP 200 from https://www.meetboston.com/plan/getting-here/logan-airport/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1964 chars from https://www.meetboston.com/plan/getting-here/logan
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/SenatorMikeRush/posts/as-a-member-of-the-joint-committee-on-transportation-i-joined-my-colleagues-for-/1572615789415288/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://aecom.com/projects/boston-logan-international-airports-terminal-e/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://aecom.com/projects/boston-logan-internatio
+  [LOCAL-427] HTTP 200 from https://airportscouncil.org/2023/09/13/customizing-common-use-at-boston-logan-international/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://airportscouncil.org/2023/09/13/customizing
+  [LOCAL-427] HTTP 200 from https://www.tremcosealants.com/case-studies/logan-airport (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.tremcosealants.com/case-studies/logan-
+  [D512] verb discovery: query='Boston Logan International Airport, Boston MA how it is made pro' -> 8 new verb(s): applied, expanded, united, overview, required, speed, modernized, involved
+  [D512] _AGENCY_VERB widened by 8 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Terminal A Departures Curb                 48    61     0    45
+     2  Security checkpoint lanes                  20    30     0    60
+     3  Apron and tarmac                           20    48     0    45
+     4  Air traffic control tower cab              43    24    12    45
+    [LOCAL-485] index mean 32.8 over 4 stop(s), range 20-48
+    [LOCAL-485] weakest: 'Security checkpoint lanes' at 20
+[TIMING] phase=story_first elapsed=94.2s cumulative=177.7s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (93 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 93 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 68 words (delta: -25)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Explore the symphony of coordination and technology that orchestrates the airport's daily operations..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 173
+    Words after:  150
+    Delta: -23
+    Stops affected: 1/4
+    Deletions (1):
+      [Stop 3][R7_HALLUCINATED_SENSORY] "The rhythmic hum of engines, the clanking of metal equipment, and the faint smell of aviation fuel c..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 1.7s, $0.0088, 1286 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Terminal A Departures Curb] (cause): Constructed between 2001 and 2005, it became the first terminal in the world to ...
+      [Security checkpoint lanes] (mystery): The echoes of John Carl Warnecke, an architect known for memorial designs, & Ass...
+      [Apron and tarmac] (dated_event): Charles Lindbergh famously landed here in 1927, just four years after the airpor...
+      [Air traffic control tower cab] (dated_event): Completed in 1973, it was the tallest airport control tower in the world at that...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0035 (579 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Stop 1: Terminal A Departures Curb, you'll see the first terminal to earn LEED certification between 2001 and 2005. Moving on to Stop 3: Apron and tarmac, Charles Lindbergh landed here in 1927, just four years after the airport's inception."
+      FAIL: date '2001' attributed to 'Apron and tarmac' but belongs to a different stop
+      FAIL: date '2005' attributed to 'Apron and tarmac' but belongs to a different stop
+    Part 4 LLM cost: $0.0036 (585 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (55 words):
+      "As you continue on the tour, you will learn that Charles Lindbergh famously landed at the airport in 1927, just four years after its inception at the Apron and tarmac. Additionally, the Air traffic control tower cab was completed in 1973, standing at 285 feet, making it the tallest airport control tower at that time."
+      Stops referenced: 2
+    Part 4 total cost: $0.0072
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:18911. Caller should supply input_tokens and output_tokens separately.
+  [T4] Transition to Stop 2: As you exit Terminal A Departures Curb, walk towards the lar...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: Once you pass through the security checkpoint lanes at Bosto...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the apron and tarmac area, walk towards Termina...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.1s, $0.0026, 439 tokens
+  [LOCAL-280] Recap built: 28 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Security checkpoint lanes] (mystery): "The echoes of John Carl Warnecke, an architect known for memorial designs, & Ass..."
+      → composed: "Security checkpoint lanes, designed by John Carl Warnecke, feature efficient designs"
+    [Terminal A Departures Curb] (cause): "Constructed between 2001 and 2005, it became the first terminal in the world to ..."
+      → composed: "Terminal A Departures Curb, first terminal worldwide with LEED certification, built 2001-2005"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Security checkpoint lanes, designed by John Carl Warnecke, feature efficient designs and Terminal A Departures Curb, first terminal worldwide with LEED certification, built 2001-2005."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 2 (first told at stop 1, 2001/security): They are a direct result of a significant redesign of airport security geometry 
+  [D533] 1 repeated fact(s) removed, 0 kept
+  [D533] Person-year role guard: no mismatches (42 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='facility')
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Boston Logan International Airport, Boston MA."
+  [2] "As you ascend to the air traffic control tower cab at Boston Logan International Airport, the bustli..."
+  [3] "That's 4 stops — Security checkpoint lanes, designed by John Carl Warnecke, feature efficient design..."
+
+=== Word Count Statistics ===
+Stop 1: Terminal A Departures Curb - 81 words
+Stop 2: Security checkpoint lanes - 109 words
+Stop 3: Apron and tarmac - 118 words
+Stop 4: Air traffic control tower cab - 222 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8584 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['fabricated_attribution']
+  [LOCAL-540]   fabricated_attribution [REQUIRED_CLEAN]: 1 attribution(s); unverified attribution: "constructed in 1887 by Gustave Eiffel" (no source confirms it)
+  [LOCAL-540] REQUIRED_CLEAN defect present (['fabricated_attribution']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating orientation (stop 1) for ['fabricated_attribution']
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-540/generate_tour_text.py:19704. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-540] retry rewrite: 789 tokens, $0.003750 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['fabricated_attribution'] -> []
+  [LOCAL-540] retry removed: ['fabricated_attribution']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+
+Total API cost: $0.1736 (26469 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.3136
+CACHE STORE: Boston Logan International Airport, Boston MA / facility / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-540/TOURS_FOR_REVIEW/local540/LOGAN_1.txt
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Boston Logan International Airport, Boston MA - Facility Tour
+Tour-Category: facility
+
+Stop 1: Terminal A Departures Curb
+
+Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+
+Coordinates: 42.3664, -71.0189
+
+Type/Specialty: Airport Departures
+
+Specific Examples: Check-in counters, baggage drop, security screening
+
+Operational Details: Open 24/7, busiest in the morning and late afternoon
+
+Orientation: You are about to embark on a walking ...
+
+[TIMING] phase=packing elapsed=12.4s cumulative=190.1s
+[TIMING] phase=verification elapsed=0.0s cumulative=190.1s
+[TIMING] TOTAL wall=190.1s phases: story_first=94.2s, poi_selection=65.7s, fact_sheets=15.9s, packing=12.4s, intent=1.9s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+========================================================================
+LOCAL-540 RESULT
+========================================================================
+wall: 190s  chars: 8540
+delivered-text defects (independent re-score): CLEAN
+
+-- score record --
+  defects_before: ['fabricated_attribution']
+  defects_after : []
+  retried       : True
+  removed       : ['fabricated_attribution']
+  remaining     : []
+  clean_after   : True
+
+-- two-channel cost --
+  WITH retry:
+    OpenAI    : $0.173630 (26469 tokens)
+    grounding : $0.140000 (4 requests)
+    tour total: $0.313630
+  retry alone : $0.003750 (789 tokens)
+  WITHOUT retry (OpenAI channel minus the retry):
+    OpenAI    : $0.169880 (25680 tokens)
+    grounding : $0.140000 (4 requests)  (unchanged — the retry issues no grounded requests)
+    tour total: $0.309880
+
+Saved: /Users/micha/audioura-worktrees/LOCAL-540/TOURS_FOR_REVIEW/local540/LOGAN_1.txt
+Saved: /Users/micha/audioura-worktrees/LOCAL-540/TOURS_FOR_REVIEW/local540/LOCAL540_SUMMARY.json

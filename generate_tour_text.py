@@ -2812,6 +2812,13 @@ _LAST_VERIFICATION_TIER = ""
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# [LOCAL-540] Module-level: the before/after score record from the last generation
+# (see score_and_retry in scorer_retry.py). None on a cache hit or if scoring was
+# skipped. Exposed so a caller can read the defect the scorer saw, whether a retry
+# ran, and whether it cleared the defect — the same way _LAST_GENERATION_COST
+# exposes cost.
+_LAST_SCORE_RECORD = None
+
 # [D530] Module-level: populated whenever the delivered stop count differs from
 # what the listener asked for. Empty dict means the request was met.
 #
@@ -19593,7 +19600,137 @@ RULES:
     for poi in poi_list:
         print(f"Stop {poi['stop_number']}: {poi['name']} - {poi['word_count']} words")
     print("===========================\n")
-    
+
+    # ── [LOCAL-540] SCORE THE ASSEMBLED TOUR, then retry ONCE on a defect ──────
+    # For three weeks the defect suite in tour_quality "gated" only on paper: its
+    # only callers were standalone run_local*/run_round* measurement scripts. The
+    # generation path never imported it, so a tour that failed every REQUIRED_CLEAN
+    # check was packed, cached and shipped exactly as if it had passed. Round 9
+    # shipped "Gustave Eiffel's iconic Control Tower" at Boston Logan because
+    # nothing here was ever going to stop it. This is the wiring that acts on the
+    # score. It runs BEFORE the cache store and the file write below, so a defect
+    # is caught before the tour is persisted; the retry's OpenAI cost is folded
+    # into total_cost / total_tokens BEFORE they are printed and recorded, so the
+    # cost the caller reads includes the retry. The cache-HIT path returned far
+    # above and never reaches here — a cached tour is neither re-scored nor
+    # re-generated, and still costs $0.00.
+    _score_record = None
+    try:
+        import scorer_retry as _scorer_retry
+        # is_building_tour matches the reference caller run_round9.py, which passes
+        # True for both the facility (LOGAN) and the museum (CHURCH). Building /
+        # indoor venues are the museum and facility categories.
+        _is_building_tour = tour_category in ('museum', 'facility')
+
+        def _local540_regenerate_section(_target, _full_text):
+            """One targeted LLM rewrite of a single offending section (a Stop N
+            block, its Orientation preview, or the epilog) — NOT the whole tour.
+            Returns (new_section_text, {'total_cost', 'total_tokens'}). The caller
+            (score_and_retry) splices it back in and re-scores. On any failure we
+            return None so the original section is kept (a thin tour beats no
+            tour — D577)."""
+            _span = _target.get('span')
+            if not _span:
+                return None
+            _orig_section = _full_text[_span[0]:_span[1]]
+            _defect_lines = '\n'.join(
+                f"- {_k}: {_v}" for _k, _v in _target.get('defects', {}).items())
+            _quote_lines = '\n'.join(
+                f"- {_q}" for _q in _target.get('quotes', []) if _q)
+            _delivered = [p.get('name', '') for p in poi_list]
+            _kind = _target.get('kind')
+            _what = {
+                'orientation': "the stop's Orientation preview paragraph",
+                'epilog': "the closing summary paragraph",
+                'stop': "this stop's section",
+            }.get(_kind, "this section")
+            _sys = (
+                "You repair one section of an audio-tour script. You are given the "
+                "section verbatim and a list of factual defects a scorer found in "
+                "it. Rewrite ONLY this section so those defects are gone, changing "
+                "as little else as possible. Rules: (1) Do NOT name any place as "
+                "part of THIS tour unless it is one of the delivered stops listed "
+                "below — a place that is neither the venue nor a delivered stop "
+                "must not be framed as a stop, endpoint, or itinerary member. "
+                "(2) Do NOT attribute the building/founding of a structure to a "
+                "person unless that is a plain, well-known fact; when unsure, drop "
+                "the attribution rather than invent one. (3) Do NOT contradict "
+                "yourself. (4) Keep the same headers, labels (Address:, "
+                "Coordinates:, Orientation:, Directions: etc.), format and voice. "
+                "Return ONLY the rewritten section text, no commentary, no code "
+                "fences."
+            )
+            _usr = (
+                f"Venue / tour: {location}\n"
+                f"Delivered stops (the ONLY places that belong to this tour):\n"
+                + '\n'.join(f"  {i+1}. {n}" for i, n in enumerate(_delivered))
+                + f"\n\nYou are repairing {_what}.\n\n"
+                f"Defects the scorer found in it:\n{_defect_lines}\n\n"
+                + (f"Offending quotes to remove or correct:\n{_quote_lines}\n\n"
+                   if _quote_lines else "")
+                + f"--- SECTION TO REWRITE (verbatim) ---\n{_orig_section}\n"
+                f"--- END SECTION ---\n\nRewrite the section now."
+            )
+            _model = os.environ.get("TOUR_STORY_MODEL", "gpt-4o")
+            try:
+                _resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json={
+                        "model": _model,
+                        "messages": [
+                            {"role": "system", "content": _sys},
+                            {"role": "user", "content": _usr},
+                        ],
+                        "temperature": 0.4,
+                        "max_tokens": 900,
+                    },
+                    timeout=60,
+                )
+            except Exception as _re:
+                print(f"  [LOCAL-540] retry LLM call failed: {type(_re).__name__}: {_re}")
+                return None
+            if _resp.status_code != 200:
+                print(f"  [LOCAL-540] retry LLM call HTTP {_resp.status_code}: "
+                      f"{_resp.text[:200]}")
+                return None
+            _body = _resp.json()
+            _new = (_body.get("choices", [{}])[0]
+                    .get("message", {}).get("content", "") or "").strip()
+            # Strip any accidental code fences.
+            _new = re.sub(r'^```[a-zA-Z]*\n?|\n?```$', '', _new).strip()
+            _usage = _body.get("usage", {}) or {}
+            _tok = int(_usage.get("total_tokens", 0) or 0)
+            _cost = _tour_llm_cost(_tok, model=_model)
+            print(f"  [LOCAL-540] retry rewrite: {_tok} tokens, ${_cost:.6f} "
+                  f"({_model})")
+            if not _new:
+                return None
+            return _new, {'total_cost': _cost, 'total_tokens': _tok}
+
+        _score_record = _scorer_retry.score_and_retry(
+            complete_tour,
+            requested_stops=total_stops,
+            is_building_tour=_is_building_tour,
+            regenerate_section=_local540_regenerate_section,
+        )
+        # Adopt the (possibly) repaired text so the cache store, file write and
+        # everything downstream see the retried tour.
+        complete_tour = _score_record['text']
+        # Fold the retry's OpenAI cost into the run totals BEFORE they are printed
+        # and recorded, so the cost a caller reads includes the retry (LOCAL-533's
+        # instrument, extended). A cache hit never reaches here, so its $0.00 is
+        # untouched.
+        _retry_cost = _score_record.get('retry_cost') or {}
+        total_cost += float(_retry_cost.get('total_cost', 0.0) or 0.0)
+        total_tokens += int(_retry_cost.get('total_tokens', 0) or 0)
+    except ImportError:
+        _import_logger.error("[LOCAL-540] MISSING: scorer_retry — tour NOT scored/gated")
+        print("  [LOCAL-540] scorer_retry not available — tour shipped UNSCORED")
+    except Exception as _sc_err:
+        print(f"  [LOCAL-540] scoring/retry error (non-fatal, shipping tour): "
+              f"{type(_sc_err).__name__}: {_sc_err}")
+
     # Print total cost
     print(f"\nTotal API cost: ${total_cost:.4f} ({total_tokens} tokens)")
 
@@ -19712,6 +19849,37 @@ RULES:
             "grounding": _grounding_cost_usd,  # [LOCAL-533] per-request Google Search
         },
     }
+
+    # [LOCAL-540] Record the score BEFORE and AFTER the one-shot retry directly in
+    # the generation record, so the defect is visible afterwards rather than
+    # swallowed (D577). total_cost already includes the retry's OpenAI tokens; we
+    # also break out the retry cost on its own so a caller can report the run both
+    # with and without the retry. The full before/after record is also exposed at
+    # module level as _LAST_SCORE_RECORD.
+    global _LAST_SCORE_RECORD
+    if _score_record is not None:
+        _retry_c = _score_record.get('retry_cost') or {}
+        _LAST_GENERATION_COST["score"] = {
+            "defects_before": _score_record.get('defects_before', {}),
+            "defects_after": _score_record.get('defects_after', {}),
+            "removed": _score_record.get('removed', []),
+            "remaining": _score_record.get('remaining', []),
+            "retried": _score_record.get('retried', False),
+            "clean_after": bool(_score_record.get('after', {}).get('clean', False)),
+            "retry_cost": {
+                "total_cost": float(_retry_c.get('total_cost', 0.0) or 0.0),
+                "total_tokens": int(_retry_c.get('total_tokens', 0) or 0),
+            },
+            # cost of the run WITHOUT the retry — subtract the retry's OpenAI cost
+            # from the OpenAI channel; grounding is unaffected by the retry.
+            "cost_without_retry": {
+                "total_cost": round(total_cost - float(_retry_c.get('total_cost', 0.0) or 0.0), 6),
+                "total_tokens": total_tokens - int(_retry_c.get('total_tokens', 0) or 0),
+            },
+        }
+        _LAST_SCORE_RECORD = _score_record
+    else:
+        _LAST_SCORE_RECORD = None
 
     # -------- [LOCAL-410] Post-generation chain instrumentation --------
     # Print the full chain: serp_results → snippets_injected → beats_in_delivered_text
