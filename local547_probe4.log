@@ -12,3 +12,4 @@
 [00:23:02]   stops      : 3  ['the Sargent Murals', 'the Liberty Bowl by Paul Revere', 'Watson and the Shark by Copley']
 [00:23:02]   job_id     : 4306798c-77d3-470e-a8d7-898d09547929
 [00:23:10]   status=processing  Text generation: Starting tour text generation...
+FAIL: service error: Error in tour text generation: Tour generation failed for 'Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a stop at the Liberty Bowl by Paul Revere and a stop at Watson and the Shark by Copley' — no stops could be generated (all filtered or knowledge insufficient).

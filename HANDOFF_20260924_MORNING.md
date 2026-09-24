@@ -6,6 +6,17 @@ written there reaches the Windows machine. This file is the cross-machine channe
 
 ---
 
+## ⛔ FIRST: OPENAI CREDITS ARE EXHAUSTED (as of 2026-09-24 00:46 EDT)
+
+```
+"You have no credits remaining. Add credits to continue using the API"
+"code": "credit_balance_exhausted"
+```
+
+**Your E2E will fail at the first generation call until Michael tops up the account**
+(platform.openai.com → billing). This is not a code fault and not something the deploy
+can work around. Confirm credits before you spend time debugging a failed tour.
+
 ## FOR THE GCLOUD DEPLOY SESSION — read this before you deploy
 
 **A regex was hanging every large-museum generation. It is fixed on `storied`; make
