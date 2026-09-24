@@ -840,7 +840,124 @@ def chain_to_facts(chain, per_link=6):
     return out
 
 
-def distribute_lore(stops, placed, chain, per_stop=6):
+# ── [LOCAL-528] Date vs part — a story cannot predate the thing it stands on ──
+# The parts were chosen correctly (D571), then filled with material belonging to
+# the venue as a whole. LOGAN_1 stop 3 is a JETBRIDGE and its lore is Lindbergh
+# landing in 1927; LOGAN_2 stop 3 is a jetbridge and its lore is a 1632 land grant
+# and Fort Winthrop. A jetbridge is a boarding bridge attached to a gate, and jet
+# bridges did not exist until 1958–59 (first operational AeroGangplank, O'Hare
+# 1958; first Jetway PBBs, 1959) — so a 1927 aircraft could not have arrived at
+# one, and a 1632 land grant is three centuries too early. The SAME LOGAN stop that
+# carries the impossible 1927 date also states, correctly, that Massport was
+# "established in 1959" — the tour already holds the number that condemns the
+# anachronism, and nothing was checking it.
+#
+# This is D571's problem in reverse: right part, wrong material. The fix is general
+# and one level up from D584 (which caps a PERSON across stops): a PART has an
+# earliest possible date, and a dated fact older than that date does not belong on
+# it. A 1632 land grant cannot sit on a 1970s concourse any more than on a
+# jetbridge; a WWII story cannot sit on a fixture the building only gained in 2005.
+#
+# The earliest year has two independent sources, and we take the LATER of the two:
+#   * the KIND of part — a jet bridge, an escalator, a metal detector cannot be
+#     older than the technology itself (offline table below, so the check is
+#     deterministic and runs even when the grounded service is down — the exact
+#     condition of this task: Gemini 402);
+#   * the INSTANCE — if a source says this concourse opened in 2005, nothing older
+#     than 2005 happened AT it (passed in via `part_built_years`, optional).
+# A part with no known earliest year (a nave, an altar, "the site") constrains
+# nothing — its earliest year is None and every fact fits it. We only ever REJECT
+# on positive knowledge that the part is younger than the fact; absence of a date
+# never drops a fact (D577).
+
+# Earliest year a KIND of part could exist, keyed by a distinctive lowercase word
+# or phrase found in the part name. Conservative on purpose: only technologies with
+# a hard, well-known invention floor are listed, and the EARLIEST defensible year
+# is used so the gate rejects only the indefensible. A part whose name matches
+# nothing here is unconstrained.
+PART_KIND_EARLIEST_YEAR = {
+    'jet bridge': 1958, 'jetbridge': 1958, 'jetway': 1958, 'jet way': 1958,
+    'boarding bridge': 1958, 'air bridge': 1958, 'airbridge': 1958,
+    'passenger boarding bridge': 1958,
+    'escalator': 1900, 'travelator': 1954, 'moving walkway': 1954,
+    'metal detector': 1960, 'security checkpoint': 1973,  # airport screening, US 1973
+    'baggage carousel': 1962, 'baggage claim': 1962,
+    'control tower': 1930,   # first US airport control tower, Cleveland 1930
+    'radar': 1935,
+    'x-ray': 1972,           # airport carry-on x-ray screening
+    'elevator': 1852,        # safety elevator (Otis)
+}
+
+# The year regex already used by chain_to_facts for "faccy" detection. A four-digit
+# 1500–2099 year is the anchor for a datable claim.
+_YEAR_RE = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
+
+
+def part_kind_earliest_year(part_name):
+    """Earliest year the KIND of this part could exist, or None if unconstrained.
+
+    Matches on the longest distinctive phrase in the name so "Passenger Boarding
+    Bridge" and "Jet Bridge" both resolve, and "Nave"/"Altar" resolve to None.
+    """
+    p = (part_name or '').lower()
+    best = None
+    for phrase, year in PART_KIND_EARLIEST_YEAR.items():
+        if phrase in p:
+            # take the most specific (latest) floor if several match
+            best = year if best is None else max(best, year)
+    return best
+
+
+def part_earliest_year(part_name, part_built_years=None):
+    """The later of the part-KIND floor and this INSTANCE's build year, or None.
+
+    `part_built_years` maps a stop name to the year that specific instance came into
+    being (e.g. {"Concourse": 2005}) when a source established it. Absence leaves the
+    part constrained only by its kind; if neither is known, returns None and the
+    part accepts any dated fact.
+    """
+    kind_year = part_kind_earliest_year(part_name)
+    inst_year = None
+    if part_built_years:
+        raw = part_built_years.get(part_name)
+        if isinstance(raw, int):
+            inst_year = raw
+        elif isinstance(raw, str):
+            m = _YEAR_RE.search(raw)
+            if m:
+                inst_year = int(m.group(1))
+    years = [y for y in (kind_year, inst_year) if isinstance(y, int)]
+    return max(years) if years else None
+
+
+def fact_earliest_year(fact_text):
+    """The EARLIEST four-digit year a fact mentions, or None if it names no year.
+
+    Earliest, not latest: "In 1927 Lindbergh landed; the tower was rebuilt in 1973"
+    is anchored by 1927 — the claim is ABOUT the 1927 event, and it is 1927 that a
+    jetbridge cannot host. A fact with no year is not datable and is never rejected.
+    """
+    years = [int(y) for y in _YEAR_RE.findall(fact_text or '')]
+    return min(years) if years else None
+
+
+def fact_predates_part(fact_text, part_name, part_built_years=None):
+    """True when the fact carries a year older than the part could possibly be.
+
+    Only fires on positive knowledge: both a year in the fact AND an earliest year
+    for the part are required. No year in the fact, or no known floor for the part,
+    means the fact fits (D577 — never drop on absence).
+    """
+    part_year = part_earliest_year(part_name, part_built_years)
+    if part_year is None:
+        return False
+    fy = fact_earliest_year(fact_text)
+    if fy is None:
+        return False
+    return fy < part_year
+
+
+def distribute_lore(stops, placed, chain, per_stop=6, part_built_years=None):
     """Give each stop the facts that BELONG to it, with the reason they belong.
 
     The first version dealt facts round-robin — `stops[i % len(stops)]` — which is
@@ -860,18 +977,38 @@ def distribute_lore(stops, placed, chain, per_stop=6):
 
     Now: each fact goes to the stop its own words point at, the `placed` reason
     leads, and anything unclaimed is spread over the stops that are still short.
+
+    [LOCAL-528] A fact is never placed on a part it PREDATES. A jetbridge (kind
+    floor 1958) rejects a 1927 Lindbergh landing and a 1632 land grant; a part with
+    no known floor accepts anything. A rejected fact is offered to the other stops
+    and, if none can hold it, dropped — recorded under lore['_anachronistic'] so the
+    decision is inspectable, never silent.
     """
     facts = chain_to_facts(chain)
     lore = {s: [] for s in stops}
+    dropped_anachronistic = []
     if not stops:
         return lore
 
-    # 1. The reason this stop was chosen leads — it IS the binding.
+    def _fits(fact_text, stop):
+        """False when the fact predates the stop's earliest possible year."""
+        return not fact_predates_part(fact_text, stop, part_built_years)
+
+    # 1. The reason this stop was chosen leads — it IS the binding. But even the
+    #    placement reason must not be an anachronism: if `place_stories_in_building`
+    #    put a 1927 story on the jetbridge, that binding is exactly the bug, so it
+    #    is refused here rather than trusted.
     why_by_part = {r['part']: r.get('why', '') for r in (placed or []) if r.get('part')}
     for s in stops:
-        if why_by_part.get(s):
-            lore[s].append({'fact': why_by_part[s], 'confidence': 'high',
-                            'link': 'placed'})
+        why = why_by_part.get(s)
+        if why:
+            if _fits(why, s):
+                lore[s].append({'fact': why, 'confidence': 'high', 'link': 'placed'})
+            else:
+                dropped_anachronistic.append(
+                    {'fact': why, 'link': 'placed', 'part': s,
+                     'part_earliest': part_earliest_year(s, part_built_years),
+                     'fact_year': fact_earliest_year(why)})
 
     # 2. Send each fact to the stop it actually names. A fact mentioning "control
     #    tower" belongs at the Control Tower; one mentioning "check-in" at the
@@ -891,20 +1028,34 @@ def distribute_lore(stops, placed, chain, per_stop=6):
             if keys[s] and all(k in text for k in keys[s]):
                 owner = s
                 break
-        if owner and len(lore[owner]) < per_stop:
+        # A fact that NAMES its part but predates it is the core defect: the words
+        # point at the jetbridge, but the year cannot. Do not force it there — let
+        # step 3 try to rehome it, and drop it only if nowhere fits.
+        if owner and _fits(f['fact'], owner) and len(lore[owner]) < per_stop:
             lore[owner].append(f)
         else:
             unclaimed.append(f)
 
     # 3. Venue-level facts — the founding, the patrons — belong to no single part.
     #    Spread them over the stops that are still short, fullest-last, so no stop
-    #    is left with nothing to tell.
+    #    is left with nothing to tell. A fact is only ever offered to a stop it does
+    #    not predate; a fact no stop can hold (older than every part that has a
+    #    floor, and every floorless part already full) is recorded and dropped.
     for f in unclaimed:
-        short = [s for s in stops if len(lore[s]) < per_stop]
+        short = [s for s in stops if len(lore[s]) < per_stop and _fits(f['fact'], s)]
         if not short:
-            break
+            # Distinguish "everyone is full" from "nobody can host this date".
+            if not any(_fits(f['fact'], s) for s in stops):
+                dropped_anachronistic.append(
+                    {'fact': f['fact'], 'link': f.get('link'),
+                     'fact_year': fact_earliest_year(f['fact']),
+                     'reason': 'older than every part that has a known earliest year'})
+            continue
         short.sort(key=lambda s: len(lore[s]))
         lore[short[0]].append(f)
+
+    if dropped_anachronistic:
+        lore['_anachronistic'] = dropped_anachronistic
     return lore
 
 
