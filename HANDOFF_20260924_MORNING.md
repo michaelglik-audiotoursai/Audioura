@@ -99,8 +99,12 @@ So: treat user-named stops as selected-correctly but not yet delivered-and-verif
 ## Tag: `rc-pre-igor-20260923`
 
 Marks the tree the round-10 evidence was gathered against, **before** Igor's
-user-stops work. Michael chose to merge Igor's fix into `storied` anyway so it ships
-with this deploy; the tag exists so a failure can be bisected without archaeology.
+user-stops work, so a failure can be bisected without archaeology.
+
+**It is not a deploy target.** The MFA regex-backtracking fix `19358ae` lands *after*
+the tag, so deploying it trades the work D591 holds back for a hang that killed three
+generations. Igor's fix is merged into `storied` — it just does not leave this
+machine yet.
 
 ## Quality evidence — round 11, six venues
 
