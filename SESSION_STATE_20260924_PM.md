@@ -75,6 +75,34 @@ deliverability and abuse better than we would.
   builds from. The root `create_map_delivery_service.py` is **not deployed** and its
   entry shape is two fields stale. My first attempt went there and was reverted.
 
+## ⚠️ CORRECTION — Igor's enhancement is NOT reliably working
+
+I told Michael at 16:12 that his three restaurants "now generate correctly". That was
+true of ONE run and I reported it too early. The next run, same three stops, a fresh
+location, persisted this:
+
+| requested | stop header | mentioned |
+|---|---|---|
+| Sycamore | **0** — header stripped | 7 |
+| Buttonwood | **0** | **0 — absent entirely** |
+| Little Big Diner | 1 | 5 |
+| Farmstead Table *(never requested)* | 1 | 6 |
+
+Two distinct failures, on top of each other:
+
+**1. A stop whose header was stripped.** Sycamore's prose is in the tour — "Sycamore
+began its journey under the guidance of Chef David Punch" — but there is no
+`Stop 2: Sycamore in Newton Center` line, no Address, no Type. The tour reads
+Stop 1 → Stop 3. The app parses stops by header, so that stop is invisible to it.
+
+**2. Buttonwood vanished completely** — zero mentions anywhere — and Farmstead Table,
+which nobody asked for, took the first slot.
+
+So across runs the same request produces different results: one run delivered all
+three correctly, the next delivered one. **This is non-deterministic and not ready
+for Michael to judge.** The three bugs I fixed today were real and are fixed; they
+were not the whole problem.
+
 ## What is NOT done
 
 - **ST-4's app-side button.** The server half works; the Flutter button is not written.
