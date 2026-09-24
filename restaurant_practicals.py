@@ -404,7 +404,32 @@ def closure_scan(name, city):
                 # closure notice names where.
                 if _place_key and _place_key not in low:
                     continue
-                if any(m in low for m in _CLOSED_MARKERS):
+                # [D544] The closure must be PREDICATED OF THIS VENUE, not merely
+                # co-occur with it. D543 bound the snippet to a city and stopped a
+                # Florida closure deleting a Monaco restaurant; the same flaw survived
+                # one level down, for the venue name itself.
+                #
+                # 2026-09-24, Michael's own test: Sycamore in Newton Centre -- open,
+                # 755 Beacon St, 354 reviews -- was DROPPED as permanently closed and
+                # silently replaced. The evidence was a listicle:
+                #
+                #   "Newton restaurant permanently closed after 10 years. Alison ...
+                #    Sycamore in Newton Center: Cook in Newtonville; Fiorella's in
+                #    Newtonville."
+                #
+                # The headline is about a DIFFERENT restaurant. Sycamore is simply one
+                # of several named further down. City matched, marker matched, and a
+                # live business was deleted from the listener's own request. Any
+                # round-up of local closures condemns every restaurant it lists.
+                #
+                # The binding that works is the sentence: a closure notice says
+                # "<venue> has permanently closed". Require the name and the marker in
+                # the SAME sentence. A listicle separates them; a real notice does not.
+                _sentences = re.split(r'(?<=[.!?])\s+', low)
+                _v_low = v.lower()
+                _bound = any(_v_low in _sent and any(m in _sent for m in _CLOSED_MARKERS)
+                             for _sent in _sentences)
+                if _bound:
                     return True, f"{item['snippet'][:160]} [{item.get('url','')}]"
     return False, ''
 
