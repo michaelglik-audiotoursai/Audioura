@@ -1032,6 +1032,15 @@ def _venue_tokens(text):
     return {t for t in toks if t not in drop and len(t) > 2}
 
 
+# Words that can open a sentence in capitals without naming anything -- a leading
+# "This airport," or "The terminal," is the venue being pointed at, not a new subject.
+_DEICTIC_LEAD = {'this', 'that', 'these', 'those', 'the', 'a', 'an', 'it', 'its',
+                 'here', 'today', 'meanwhile', 'inside', 'outside', 'beyond',
+                 'above', 'below', 'nearby', 'originally', 'built', 'opened',
+                 'designed', 'located', 'together', 'overall', 'in', 'at', 'on',
+                 'from', 'by', 'during', 'after', 'before', 'while', 'when'}
+
+
 def _sentence_subject(sent, venue_toks, window=''):
     """Bucket a measurement sentence by subject. Returns 'own' when it refers to the
     tour's venue, or a lowercased foreign key when it names another airport or is
@@ -1054,6 +1063,23 @@ def _sentence_subject(sent, venue_toks, window=''):
         foreign = ' '.join(sorted(toks))[:40] or 'foreign'
     if foreign:
         return foreign
+    # [2026-09-23, LEAD] A named subject that is NOT spelled "<Name> Airport" still
+    # identifies a different place. Round 11 produced the false positive this guards:
+    #   A "This airport, sprawls across 2,384 acres ..."          -> own
+    #   B "JFK, the busiest in the New York airport system,
+    #      covers 5,200 acres ..."                                -> own   (WRONG)
+    # _AIRPORT_NAME does not match a bare acronym, so B fell through to the venue and
+    # Logan's acreage was reported as contradicting JFK's. Since LOCAL-540 this defect
+    # GATES, so a false positive spends money rewriting a correct comparison.
+    # A leading capitalised subject followed by a comma, whose tokens do not appear in
+    # the venue name, belongs to something else.
+    _lead = re.match(r"\s*([A-Z][\w.&'\-]*(?:\s+[A-Z][\w.&'\-]*){0,3})\s*,", sent)
+    if _lead:
+        _lead_toks = set(re.findall(r'[a-z]+', _lead.group(1).lower()))
+        # Deictics and articles are not names -- "This airport,", "The terminal,".
+        if _lead_toks and not (_lead_toks & _DEICTIC_LEAD):
+            if not (venue_toks and (venue_toks & _lead_toks)):
+                return 'named:' + ' '.join(sorted(_lead_toks))[:40]
     # A comparison frame in the sentence itself hands the figure to another subject.
     if _COMPARISON_FRAME.search(sent):
         return 'comparison'
