@@ -1052,7 +1052,6 @@ def _count_people(text):
     for why each is a construction and not another hand-listed introducer.
     """
     text = text or ''
-    by_surname = {}
     candidates = []
     for m in _PERSON.findall(text):
         # Every group is a person: group 2 is the "X and Y" partner when present.
@@ -1069,6 +1068,13 @@ def _count_people(text):
     for m in _PERSON_APPOS_LIST.findall(text):
         candidates.extend(re.findall(_PNAME2, m))
 
+    # [LOCAL-546] Collect EVERY surviving form per surname, not just the fullest.
+    # De-dup by surname was correct for "Law"/"Bernard Law"/"Cardinal Bernard Law"
+    # (one man) but wrong for "Gilda D'Amore"/"Bruno D'Amore" (a wife and husband,
+    # two people, one surname). The distinction is settled BELOW, after grouping,
+    # by comparing the GIVEN-NAME sequences within each surname — so both behaviours
+    # coexist. Keep a list of forms here; collapse it per person afterwards.
+    by_surname = {}   # surname_key -> [form, ...]
     for name in candidates:
         name = name.strip()
         if not name:
@@ -1094,27 +1100,71 @@ def _count_people(text):
         if surname.lower().strip('.') in _PERSON_TITLE_WORD:
             continue
         surname_key = surname.lower().strip('.')
-        if len(name) > len(by_surname.get(surname_key, '')):
-            by_surname[surname_key] = name
+        by_surname.setdefault(surname_key, []).append(name)
 
-    # [LOCAL-542] Prefix subsumption: a name whose token sequence (titles removed)
-    # is a prefix of another's is the same person truncated — bare "Sean" under
-    # "Archbishop Sean O'Malley", "Edward Lawrence" under "Edward Lawrence Logan".
-    # Keep the longer form, drop the prefix, so one person is not counted twice
-    # under two surname keys. Surname de-dup still collapses "Law"/"Bernard Law".
     def _core(n):
         return tuple(t.lower().strip('.') for t in n.split()
                      if t.lower().strip('.') not in _PERSON_TITLE_WORD)
-    cores = {k: _core(v) for k, v in by_surname.items()}
-    for k in list(by_surname):
-        ck = cores[k]
-        if not ck:                      # nothing but titles left -> not a person
-            del by_surname[k]
-            continue
-        if any(k2 != k and len(c2) > len(ck) and c2[:len(ck)] == ck
-               for k2, c2 in cores.items()):
-            del by_surname[k]
-    return len(by_surname)
+
+    # [LOCAL-546] Split one surname into distinct people by GIVEN-NAME CONFLICT.
+    #
+    # Within a surname group, each form reduces to a core token sequence (titles
+    # removed) ending in the shared surname; the tokens before it are the given
+    # name(s). Two forms are the SAME person when their given-name sequences are
+    # prefix-compatible — a bare surname ("Law"), a first name ("Bernard Law"), and
+    # a fuller form ("Bernard F. Law") all nest, so they cluster into one and the
+    # D585 de-duplication is preserved intact. They are DIFFERENT people when the
+    # given-name sequences CONFLICT — neither a prefix of the other, e.g. "Gilda"
+    # vs "Bruno" under D'Amore, or "James" vs "Margaret" under Murphy. That is the
+    # husband/wife case this ticket exists to separate.
+    #
+    # This is not "keying on the full name" (which would revert D585 and re-inflate
+    # the three Law forms to three people): the surname is still the grouping key,
+    # and only a genuine given-name conflict — which the text carries precisely
+    # when it names two people ("her husband Bruno D'Amore", a counted congregant
+    # list) — forces a split. Measured over all 48 tour files it splits exactly two
+    # surnames, both genuinely two people (D'Amore in round9/CHURCH_1, Murphy in
+    # buckets/CHURCH_6stops_v2); see SUBMISSION_LOCAL-546.md.
+    def _givens(core):            # the given-name tokens (all but the surname)
+        return core[:-1]
+
+    people = []                   # [(core, display_form)] one entry per person
+    for forms in by_surname.values():
+        clusters = []             # [ [rep_core, rep_form], ... ] per surname group
+        # Longest given-name sequence first, so a fuller form seeds the cluster and
+        # a bare/short form attaches to it rather than spawning a rival cluster.
+        for form in sorted(set(forms), key=lambda f: -len(_core(f))):
+            core = _core(form)
+            if not core:          # nothing but titles left -> not a person
+                continue
+            g = _givens(core)
+            placed = False
+            for cl in clusters:
+                rg = _givens(cl[0])
+                n = min(len(g), len(rg))
+                if g[:n] == rg[:n]:            # prefix-compatible -> same person
+                    if len(core) > len(cl[0]):
+                        cl[0], cl[1] = core, form
+                    placed = True
+                    break
+            if not placed:                     # given-name conflict -> new person
+                clusters.append([core, form])
+        for core, form in clusters:
+            people.append((core, form))
+
+    # [LOCAL-542] Cross-surname prefix subsumption: a bare given name that is the
+    # prefix of a fuller name under a DIFFERENT surname key is the same person
+    # truncated — "Sean" under "Archbishop Sean O'Malley", "Edward Lawrence" under
+    # "Edward Lawrence Logan". Drop the strict prefix, keep the fuller form. (Within
+    # a surname this is already handled by the clustering above.)
+    keep = []
+    for i, (ci, _fi) in enumerate(people):
+        subsumed = any(
+            j != i and len(cj) > len(ci) and cj[:len(ci)] == ci
+            for j, (cj, _fj) in enumerate(people))
+        if not subsumed:
+            keep.append(i)
+    return len(keep)
 
 
 def _stops(text):

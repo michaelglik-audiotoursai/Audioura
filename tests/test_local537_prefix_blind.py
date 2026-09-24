@@ -68,16 +68,16 @@ def test_logan1_round9_counts_its_four_people():
 
 
 def test_church1_round9_does_not_regress():
-    """[LOCAL-542] Was pinned at 8 — the count this task exists to correct. The
-    round-9 CHURCH_1 names 17 people (CRITIQUE_ROUND9_FACTS count-check); the
-    counter now returns 15 of them: it finds everyone except Christopher Ferguson
-    (introduced by a bare active verb, "Authorities arrested ...", with no
-    structural signal that is not shared by scenery) and the SECOND D'Amore (Gilda
-    and Bruno share the surname D'Amore, and surname de-dup — the mechanism that
-    correctly folds Law/Bernard Law/Cardinal Bernard Law into one man — folds them
-    into one). Both misses are documented in SUBMISSION_LOCAL-542.md. Nothing that
-    LOCAL-537 counted was lost."""
-    assert _count_people(open(CHURCH9, errors='ignore').read()) == 15
+    """[LOCAL-546] Was 8 (the count this line of tickets exists to correct), then 15
+    (LOCAL-542), now 16. The round-9 CHURCH_1 names 17 people; the counter returns
+    16 of them: it finds everyone except Christopher Ferguson (introduced by a bare
+    active verb, "Authorities arrested ...", with no structural signal that is not
+    shared by scenery). Gilda and Bruno D'Amore share the surname D'Amore and were
+    folded into one by LOCAL-542's surname de-dup; LOCAL-546 separates them by their
+    conflicting given names while STILL folding Law/Bernard Law/Cardinal Bernard Law
+    into one man (see test_same_surname_forms_are_one_person). Nothing LOCAL-537
+    counted was lost. The remaining miss is documented in SUBMISSION_LOCAL-546.md."""
+    assert _count_people(open(CHURCH9, errors='ignore').read()) == 16
 
 
 # ── the counter must not become greedy ───────────────────────────────────────
