@@ -24,10 +24,16 @@ deploy if you do not know them:
 - **A catastrophic regex backtrack was hanging every LARGE-MUSEUM generation.** Fixed,
   but if your E2E picks a big venue and reports *"status polling failed"*, that is the
   symptom — the generator is busy, not dead. Pick at least one large museum.
-- **User-chosen stops now reach generation, but the CLOUD path fix is unverified.**
-  `stops` was threaded through `_enqueue_cloud_task` / `/run-job` / `run_generation`,
-  and Cloud Tasks cannot be exercised on the Mac Mini. If a listener's named stops are
-  ignored in production, start there.
+- **⛔ User-chosen stops (Igor's work) must NOT be deployed. `storied` HEAD is
+  therefore not deployable as-is.** Michael, 2026-09-24, asked directly: *"only on
+  local Docker before we approve the results of the Igor's test."* (D591). The
+  cloud-path threading of `stops` through `_enqueue_cloud_task` / `/run-job` /
+  `run_generation` is real but unverified, and it stays unverified until he approves
+  Igor's test — **do not verify it in production.** No TestFlight or Play build
+  carrying `1bb087e` either.
+  The tag `rc-pre-igor-20260923` does not get you around this: the regex fix
+  `19358ae` is *after* the tag. If the regex fix must ship before the gate lifts,
+  dispatch Kiro to build an env kill switch first.
 
 Also note the OpenAI balance was exhausted overnight and **Michael topped it up on the
 morning of 2026-09-24** — so that is resolved, not an open issue.

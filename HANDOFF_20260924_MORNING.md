@@ -47,9 +47,23 @@ Two changes, both on `storied`:
 **Pick at least one large museum in the E2E.** Small venues never showed this — five of
 six round-11 tours generated fine.
 
-## Igor's user-stops work IS on `storied` and is PARTIAL
+## ⛔ Igor's user-stops work is LOCAL DOCKER ONLY — DO NOT DEPLOY IT (D591)
 
-Michael asked for it to ship with this deploy, so it is in. Be aware of what it does.
+**Michael, 2026-09-24, asked directly whether it should go to GCloud:** *"only on
+local Docker before we approve the results of the Igor's test."* **This supersedes the
+earlier line in this file that said it ships with this deploy.** That line was written
+before he was asked; it is wrong and it is struck.
+
+**So: no GCloud deploy from `storied` HEAD, and no TestFlight/Play build carrying
+`1bb087e`, until Michael approves Igor's test results.**
+
+Note the tag `rc-pre-igor-20260923` is **not** a way around this — the
+catastrophic-backtracking fix `19358ae` lands *after* the tag, so deploying the tag
+brings the MFA hang back. There is no env flag on the feature today. If the regex fix
+must reach GCloud before Igor's test is approved, a kill switch has to be built first
+(Kiro writes it, LEAD reviews it).
+
+Everything below describes what the feature does, so you know what you are holding.
 
 A stop the listener names in the request ("…with a stop at X") is now marked
 `user_explicit`, survives D1v2 verification, and is exempt from the verified-only

@@ -48,3 +48,26 @@ analyse it rather than trusting it, and **tell Michael when it comes back with n
 left to fix.** Full detail in `REMINDER_NEXT_SESSION.md`.
 
 ---
+
+## 2026-09-24 — GCloud or local Docker for Igor's enhancement?
+
+**LEAD asked:** if you want Igor's enhancement on GCloud rather than just local
+Docker, say so and I'll tell you what a TestFlight build needs — I'd want your
+explicit go-ahead first, since it publishes.
+
+**Michael:** *"only on local Docker before we approve the results of the Igor's
+test."*
+
+**Answer/action.** Recorded as **D591**. No GCloud deploy from `storied` HEAD and no
+store build until he approves Igor's test results. Two tracked files said the
+opposite — `HANDOFF_20260924_MORNING.md` ("Michael asked for it to ship with this
+deploy") and `GCLOUD_STORIED_START_HERE.md` under BEFORE THIS DEPLOY — both written
+before he was asked. Both corrected and pushed, because the Windows session reads
+them at start and would otherwise have deployed unapproved work.
+
+One trap worth naming: the tag `rc-pre-igor-20260923` looks like the clean
+deploy-without-Igor point, but the MFA regex-hang fix `19358ae` lands *after* it.
+Deploying the tag trades unapproved work for a known hang. There is no feature flag;
+separating the two needs one, and Kiro writes it, not LEAD.
+
+---

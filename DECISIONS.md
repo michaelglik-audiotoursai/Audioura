@@ -24138,3 +24138,39 @@ this file.** They exist only in `git log`. Nothing in the tick chain enforces th
 **`.continuous_dev/` is gitignored**, so every script in it — the dispatcher tick, the
 row-loss backup, this verifier — exists only on this machine's disk and is in no backup.
 The loop was already dead for 12 days once.
+
+---
+
+## D591 — Igor's user-stops enhancement is LOCAL DOCKER ONLY until his test is approved
+
+**Michael's ruling, 2026-09-24:** asked whether the user-stops work should go to
+GCloud or stay on local Docker, he answered *"only on local Docker before we approve
+the results of the Igor's test."*
+
+**This reverses what two tracked files already told the Windows machine.**
+`HANDOFF_20260924_MORNING.md` said *"Michael asked for it to ship with this deploy, so
+it is in"*, and `GCLOUD_STORIED_START_HERE.md` repeated it under **BEFORE THIS
+DEPLOY**. Both were written before he was asked the question directly. A session
+reading either one this morning would have deployed unapproved work to production.
+
+**What is gated:** the LOCAL-547 / D536 chain — `user_explicit` marking, the waypoint
+block on both bypass paths, the D1v2 exemption, the restore-duplicate fix, and the
+coverage/yield override — plus the cloud-path threading of `stops` through
+`_enqueue_cloud_task` / `/run-job` / `run_generation` (`4d0ce2d`), and the mobile
+`user_stops` vs `stops` fix (`1bb087e`).
+
+**What this means concretely:**
+- **No GCloud deploy from `storied` HEAD.** The tag `rc-pre-igor-20260923` does NOT
+  solve this — the catastrophic-backtracking fix `19358ae` lands *after* the tag, so
+  deploying the tag reintroduces the hang that killed three MFA runs. There is no
+  env flag on the feature; nothing separates it from `storied` HEAD today. If a
+  GCloud deploy is needed for the regex fix before Igor's test is approved, it needs
+  a kill switch first (dispatched to Kiro, reviewed, not hand-written by LEAD).
+- **No TestFlight or Play build** carrying `1bb087e`. Publishing is irreversible and
+  was never approved.
+- Local Docker generation, E2E runs and evidence-gathering continue unrestricted —
+  that is where the approval evidence comes from.
+
+**The gate lifts when Michael approves the results of Igor's test**, not when the code
+looks right. As of this ruling, stop SELECTION is proven 3-of-3 and one end-to-end
+delivery with audio exists (`ab7ee23`); Igor has not yet tested it.
