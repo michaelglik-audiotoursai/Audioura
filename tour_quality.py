@@ -892,6 +892,213 @@ def _find_orientation_stop_mismatch(text):
     return None
 
 
+# ─── Sub-check 5: numeric_conflict (LOCAL-541) ───────────────────────────────
+# The same measured quantity, stated twice, with values that cannot both be right.
+# Round 9 LOGAN_1 does exactly this:
+#   stop 1: "...the efficient flow of nearly 12 million passengers annually"
+#   stop 3: "...Boston Logan International Airport, which saw a record 43.5 million
+#            passengers in 2024"
+# Both are the airport's annual passenger throughput; 12M and 43.5M cannot both be
+# it. This needs no world knowledge — the tour refutes itself.
+#
+# THE WHOLE TASK IS DECIDING WHAT "THE SAME QUANTITY" MEANS. Three rules, learned
+# from the 48-file corpus, keep it from firing on everything:
+#
+#  1. KEY ON THE UNIT AND THE MEASURED NOUN, NOT THE NUMBER. "passengers" and
+#     "passengers" are the same quantity; a year label ("annually" vs "in 2024")
+#     does not make them different measurements — both are annual totals. But
+#     "passengers" and "flights" are different nouns, and "285 feet" (a height) and
+#     "400,000 flights" are different units — never compared. A bare year (1943),
+#     a street number and a count of stops are not measurements at all: they carry
+#     no measured-noun unit, so they never enter the comparison.
+#
+#  2. ONLY VENUE-AGGREGATE METRICS, NEVER EVENT COUNTS. "43.5 million passengers
+#     [the airport] saw" is a whole-of-venue total. "over 850 parishioners
+#     gathered" / "1,000 marched" / "1,500 attended his farewell" are attendances
+#     at DISTINCT events — different measurements, all correct, exactly like the
+#     task's own "1923 opening vs 1959 Massport: different events". Event frames
+#     (gathered, attended, marched, filled, packed, rose, present, ...) are
+#     excluded so a church tour that recounts three different crowds stays clean.
+#
+#  3. SAME SUBJECT. A Logan tour may legitimately cite Atlanta for scale —
+#     "43.5 million passengers in 2024" (Boston) beside "106.3 million passengers
+#     in 2025" (Hartsfield–Jackson Atlanta). Those are two airports, two
+#     measurements. A figure whose sentence names a FOREIGN airport/place (one that
+#     is not this tour's venue) is bucketed to that subject and never compared with
+#     the venue's own figures. In round9/LOGAN_1 both figures are the venue's own,
+#     so they collide; in the six other multi-value Logan tours the second figure
+#     is Atlanta's, so they do not.
+#
+# The check reports BOTH offending sentences (D577); it never decides which number
+# is right — the contradiction itself is the finding.
+
+# Measured-noun equivalence classes: the noun(s) that name one venue-aggregate
+# quantity. Two measurements conflict only inside one class. Kept to whole-of-venue
+# metrics the corpus actually states as single totals; event attendances are handled
+# by _EVENT_FRAME below, not by adding a "people" class here.
+_NUMERIC_CLASSES = {
+    'passengers': ('passengers', 'travelers', 'travellers'),
+    'acres': ('acres',),
+    'height_ft': ('feet', 'foot'),
+    'height_m': ('metres', 'meters', 'metre', 'meter'),
+    'runways': ('runways',),
+    'terminals': ('terminals',),
+    'flights_air': ('flights', 'aircraft',),   # air movements; NOT passengers
+    'operations': ('operations',),
+    'workforce': ('employees', 'workers', 'staff'),
+    'stories': ('stories', 'storeys', 'floors'),
+}
+# noun -> class name
+_NOUN_TO_CLASS = {n: cls for cls, nouns in _NUMERIC_CLASSES.items() for n in nouns}
+_ALL_NOUNS = sorted(_NOUN_TO_CLASS, key=len, reverse=True)
+
+# A measured value: a number (with optional thousands separators / decimal) and an
+# optional magnitude word, then one of the measured nouns. "over"/"nearly"/"around"
+# and similar hedges may sit between the number and the noun.
+_MEASURE = re.compile(
+    r'\b(?P<num>\d[\d,]*(?:\.\d+)?)\s*'
+    r'(?P<scale>million|billion|thousand|hundred)?\s+'
+    r'(?:(?:passenger|annual|daily|record|estimated|roughly|about|approximately|'
+    r'over|nearly|around|some|more\s+than|up\s+to|an?\s+)\s+){0,3}'
+    r'(?P<noun>' + '|'.join(_ALL_NOUNS) + r')\b',
+    re.I)
+
+_SCALE = {'hundred': 1e2, 'thousand': 1e3, 'million': 1e6, 'billion': 1e9}
+
+# Event frames: the number counts a crowd at one occasion, not a venue total. If any
+# appears in the measurement's sentence, the figure is event-scoped and excluded.
+_EVENT_FRAME = re.compile(
+    r'\b(gathered|gather|attend(?:ed|ing)?|march(?:ed|ing)?|fill(?:ed|ing)?|'
+    r'pack(?:ed|ing)?|rose|rising|rise|stood|standing|present|assembled|'
+    r'came|come|spilled|crowd|audience|congregation|vigil|farewell|service|'
+    r'ovation|ovations|homily|movement|grow(?:n|ing)?|joined|drew|drawing)\b',
+    re.I)
+
+# A named place/airport in a measurement's sentence marks its subject. Used to tell
+# the venue's own figure from a comparison to another airport.
+_AIRPORT_NAME = re.compile(
+    r'([A-Z][\w.\'\u2013\u2014-]*(?:\s+[A-Z][\w.\'\u2013\u2014-]*){0,4}\s+'
+    r'(?:International\s+)?Airport|Hartsfield[\u2013\u2014-]?Jackson[^.,;]*)')
+
+# A comparison frame hands the figure to ANOTHER subject. A Boston tour reaches for
+# these only when citing Atlanta's numbers for scale, never for its own: the tells
+# are a foreign city/airport (Atlanta, Hartsfield) or a world-superlative Boston
+# Logan never claims (it is only "New England's busiest", not "the world's
+# busiest"). Generic words like "mirrors" are deliberately NOT here — they appear in
+# innocent metaphor ("the layout mirrors a mall") and would suppress real hits.
+_COMPARISON_FRAME = re.compile(
+    r'\b(Atlanta|Hartsfield|'
+    r'world\'?s\s+busiest|busiest\s+airport\s+in\s+the\s+world)\b')
+
+# A deictic that pins the figure to the tour's OWN venue: "this airport", "the
+# airport", "here". When present, a foreign name in the FOLLOWING sentence (a
+# comparison that merely comes next) must not steal the subject.
+_OWN_DEICTIC = re.compile(
+    r'\b(this\s+(?:airport|facility|hub|terminal|tower|church|cathedral)|'
+    r'the\s+airport\b|here\b|you\s+(?:stand|navigate|move)|where\s+you\s+stand)\b',
+    re.I)
+
+
+def _venue_tokens(text):
+    """Meaningful lowercase tokens of the tour's own venue name (from the title)."""
+    m = _TOUR_TITLE.search(text or '')
+    if not m:
+        return set()
+    toks = re.findall(r'[a-z]+', m.group(1).lower())
+    drop = {'the', 'of', 'and', 'a', 'an', 'international', 'airport', 'tour',
+            'facility', 'ma', 'boston'}
+    return {t for t in toks if t not in drop and len(t) > 2}
+
+
+def _sentence_subject(sent, venue_toks, window=''):
+    """Bucket a measurement sentence by subject. Returns 'own' when it refers to the
+    tour's venue, or a lowercased foreign key when it names another airport or is
+    framed as a comparison to one.
+
+    Resolution is on the sentence ITSELF first. The trailing `window` (the next
+    sentence) is consulted ONLY when the sentence names no airport of its own — the
+    corpus splits "...sector.3 million passengers in 2025. This Atlanta hub..."
+    across a boundary, orphaning the number from the "Atlanta" that identifies it.
+    The window may never flip a sentence that already names an airport, so a genuine
+    venue sentence ("this airport welcomed 43.5 million passengers.") is not
+    contaminated by an Atlanta comparison that merely follows it."""
+    named_here = False
+    foreign = None
+    for m in _AIRPORT_NAME.finditer(sent):
+        named_here = True
+        toks = set(re.findall(r'[a-z]+', m.group(0).lower()))
+        if venue_toks and (venue_toks & toks):
+            return 'own'                      # explicitly the venue
+        foreign = ' '.join(sorted(toks))[:40] or 'foreign'
+    if foreign:
+        return foreign
+    # A comparison frame in the sentence itself hands the figure to another subject.
+    if _COMPARISON_FRAME.search(sent):
+        return 'comparison'
+    # The number may be orphaned from its subject by a corpus sentence-splice
+    # ("...aviation sector.3 million passengers in 2025. This Atlanta hub..."): the
+    # identifying place lands in the NEXT sentence. Consult the window in two cases:
+    #   (a) the sentence names no airport and carries no own-deictic — a bare
+    #       orphaned number; or
+    #   (b) the next sentence OPENS with an anaphoric demonstrative naming a foreign
+    #       place ("This Atlanta hub ..."), which continues the current subject even
+    #       though the sentence also mentions the venue deictically.
+    anaphoric_foreign = bool(
+        window and re.match(r'\s*(?:This|That|These|Those)\b', window)
+        and _COMPARISON_FRAME.search(window))
+    orphaned = not named_here and not _OWN_DEICTIC.search(sent)
+    if window and (orphaned or anaphoric_foreign):
+        for m in _AIRPORT_NAME.finditer(window):
+            toks = set(re.findall(r'[a-z]+', m.group(0).lower()))
+            if venue_toks and (venue_toks & toks):
+                break                         # the window is about the venue — own
+            return ' '.join(sorted(toks))[:40] or 'foreign'
+        if _COMPARISON_FRAME.search(window):
+            return 'comparison'
+    return 'own'
+
+
+def _find_numeric_conflict(text):
+    """Sub-check 5. The same venue-aggregate quantity stated twice with values that
+    cannot both be right. Returns (class_name, quote_a, quote_b) or None.
+
+    Keyed on the measured noun's class and the subject (own venue vs a foreign
+    airport); event-scoped crowd counts and bare years are never measurements.
+    Fires only on a positive, quotable pair from one tour (D577)."""
+    venue_toks = _venue_tokens(text)
+    # class -> {normalized_value: sentence}
+    by_class = {}
+    sents = _sentences(text)
+    for i, sent in enumerate(sents):
+        subj = None                            # resolved lazily, once per hit
+        window = sents[i + 1] if i + 1 < len(sents) else ''
+        for m in _MEASURE.finditer(sent):
+            noun = m.group('noun').lower()
+            cls = _NOUN_TO_CLASS.get(noun)
+            if not cls:
+                continue
+            # Event-scoped counts are per-occasion, not a venue total — skip.
+            if _EVENT_FRAME.search(sent):
+                continue
+            val = float(m.group('num').replace(',', ''))
+            scale = (m.group('scale') or '').lower()
+            if scale:
+                val *= _SCALE[scale]
+            val = round(val)
+            if val <= 0:
+                continue
+            if subj is None:
+                subj = _sentence_subject(sent, venue_toks, window)
+            key = (cls, subj)
+            slot = by_class.setdefault(key, {})
+            # A different value for the same (class, subject) is the contradiction.
+            for prev_val, prev_sent in slot.items():
+                if prev_val != val and prev_sent != sent.strip():
+                    return (cls, prev_sent, sent.strip())
+            slot.setdefault(val, sent.strip())
+    return None
+
+
 def _find_self_contradictions(text):
     """Run all four sub-checks. Returns a list of (subcheck, quote_a, quote_b)
     tuples; each entry carries the two offending quotes so the decision is
@@ -923,6 +1130,13 @@ def _find_self_contradictions(text):
                     f"orientation previews an endpoint not in the stop list: {name}",
                     quote,
                     "[delivered] " + ' | '.join(_delivered_titles(text))))
+    nc = _find_numeric_conflict(text)
+    if nc:
+        cls, qa, qb = nc
+        out.append(('numeric_conflict',
+                    f"the same measured quantity ({cls}) stated twice with "
+                    f"irreconcilable values",
+                    qa, qb))
     return out
 
 
