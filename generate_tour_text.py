@@ -1111,6 +1111,51 @@ _WAYPOINT_RE = re.compile(
     re.IGNORECASE)
 
 
+def _apply_named_waypoints(poi_list, location, _new_poi_fn):
+    """[LOCAL-547] Mark or insert the stops the listener named, whatever built poi_list.
+
+    D536 owned this and lived inside `if not _deterministic_fill_used and not
+    _facility_fill_used:` -- so it was SKIPPED entirely whenever the venue-parts fill
+    ran, which is the normal path for a museum. The venue-parts branch sets
+    `_facility_fill_used = True` to reuse the Phase-3A skip gate, and silently took
+    the waypoint handling with it.
+
+    That is why the behaviour looked non-deterministic across runs of Igor's case:
+    when the classifier sent the request down the GPT-candidate path the stops were
+    honoured, and when it sent it down venue-parts they vanished before any of the
+    later protections could see them. Marking has to happen wherever poi_list came
+    from, so it lives here and is called from both paths.
+
+    Idempotent: a stop already flagged user_explicit is left alone, so calling it
+    twice on the same list changes nothing.
+    """
+    wps = named_waypoints(location)
+    if not wps:
+        return poi_list, []
+    inserted = []
+    for wp in wps:
+        wpn = _norm_place(wp)
+        if not wpn:
+            continue
+        already = [p for p in poi_list
+                   if (lambda q: q and (wpn == q or wpn in q or q in wpn))(
+                       _norm_place(p.get('name', '')))]
+        if already:
+            for p in already:
+                if not p.get('user_explicit'):
+                    p['user_explicit'] = True
+                    print(f"  [LOCAL-547] Requested stop '{wp}' is already a candidate "
+                          f"— marked user_explicit on '{p.get('name')}'")
+            continue
+        poi = _new_poi_fn(wp)
+        poi['user_explicit'] = True
+        poi_list.insert(0, poi)
+        inserted.append(wp)
+        print(f"  [LOCAL-547] Requested stop '{wp}' was NOT among the candidates "
+              f"— INSERTED as a user-explicit stop")
+    return poi_list, inserted
+
+
 def named_waypoints(request_text):
     """Places the request names as STOPS ON the tour, not as its extent."""
     out = []
@@ -6661,6 +6706,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                       f"→ {len(poi_list)} stop(s), Phase 3A GPT SKIPPED")
                 print(f"  [D571]   story rank: {_venue_parts_evidence.get('story_rank')}")
                 print(f"  [D571]   stops: {[p['name'] for p in poi_list]}")
+                # [LOCAL-547] The venue-parts branch sets _facility_fill_used = True to
+                # reuse the Phase-3A skip gate, which ALSO skipped the D536 waypoint
+                # block further down -- so for a museum the stops the listener named
+                # were never marked and never inserted. Measured on Igor's real case:
+                # the only D536 line in the whole run was the PHASE 3C protection set,
+                # and none of his three works appeared among the candidates at all.
+                # Mark them here, on the list venue-parts just built.
+                poi_list, _vp_wp_inserted = _apply_named_waypoints(
+                    poi_list, location, _new_poi)
+                if _vp_wp_inserted:
+                    print(f"  [LOCAL-547] {len(_vp_wp_inserted)} requested stop(s) "
+                          f"added to the venue-parts list: {_vp_wp_inserted}")
                 if _venue_parts_evidence.get('dropped_ambiguous'):
                     for _dn, _dr in _venue_parts_evidence['dropped_ambiguous']:
                         print(f"  [D571]   dropped '{_dn}' — {_dr}")
@@ -7719,6 +7776,25 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
             # [TRANSPORT-VERIFY] For unusual transport modes, verify stops are reachable
             poi_list = _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
+
+        # ── [LOCAL-547] Every fill path converges here — mark the named stops ──
+        # The D536 block above sits inside
+        #     if not _deterministic_fill_used and not _facility_fill_used:
+        # so it is skipped on BOTH bypass paths. Measured on Igor's real case:
+        #   [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works -> Phase 3A SKIPPED
+        # and the only D536 line in the entire run was the PHASE 3C protection set.
+        # The venue-parts branch skips it the same way, by setting
+        # _facility_fill_used = True to reuse the Phase-3A gate.
+        #
+        # That is why this looked non-deterministic across runs: when the classifier
+        # took the GPT-candidate path the stops were honoured, and when it took either
+        # bypass they vanished before any later protection could see them. Marking runs
+        # here, after every path, and is idempotent so the D536 block above stays
+        # harmless.
+        poi_list, _wp_inserted = _apply_named_waypoints(poi_list, location, _new_poi)
+        if _wp_inserted:
+            print(f"  [LOCAL-547] {len(_wp_inserted)} requested stop(s) were missing "
+                  f"from every fill path and were inserted: {_wp_inserted}")
 
         # -------- [D1] In-collection verification for museum tours --------
         _d1_evidence_log = {}
