@@ -1438,8 +1438,66 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
+  /// [ST-3] Does this look like a share code rather than a place?
+  ///
+  /// Michael: "if they enter the code Kostya sends them, we must figure out that it
+  /// is not a location but a code for the tour and move to the state as they would
+  /// have clicked on a tour in the map."
+  ///
+  /// A share code is exactly 8 base62 characters (see tour_sharing.py). A place name
+  /// essentially never is: real queries carry spaces, commas or accents, and the few
+  /// 8-letter single words that exist ("Brooklyn", "Portland") are all lower-case
+  /// after the first letter, whereas a generated code mixes case and digits.
+  ///
+  /// This only decides what to TRY FIRST. A code that does not resolve falls through
+  /// to the ordinary location search, so a misread costs one round trip and never a
+  /// dead end.
+  bool _looksLikeShareCode(String q) {
+    final t = q.trim();
+    if (t.length != 8) return false;
+    if (!RegExp(r'^[A-Za-z0-9]{8}$').hasMatch(t)) return false;
+    // Require a digit or internal capital -- that is what separates "JmSTVsMv" from
+    // "Brooklyn". A plain lower-case or Capitalised word is treated as a place.
+    return RegExp(r'[0-9]').hasMatch(t) || RegExp(r'^.+[A-Z]').hasMatch(t);
+  }
+
+  /// [ST-3] Resolve a share code into the same tour shape /tours-near returns.
+  /// Returns an empty list when the code is unknown, so the caller falls back to a
+  /// location search.
+  Future<List<Map<String, dynamic>>> _resolveShareCode(String code) async {
+    try {
+      final uri = await Endpoints.url(
+          Service.mapDelivery, '/tour-by-code/${Uri.encodeComponent(code.trim())}');
+      await DebugLogHelper.addDebugLog('HOME: trying share code: $uri');
+      final response = await http.get(
+        uri,
+        headers: await Endpoints.apiHeaders(Service.mapDelivery),
+      ).timeout(Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final tours = List<Map<String, dynamic>>.from(data['tours'] ?? []);
+        await DebugLogHelper.addDebugLog('HOME: share code resolved ${tours.length} tour(s)');
+        return tours;
+      }
+      // 404 is the normal "that was not a code" answer, not an error worth surfacing.
+      await DebugLogHelper.addDebugLog('HOME: share code not found (${response.statusCode})');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HOME: share code lookup failed: $e');
+    }
+    return [];
+  }
+
   Future<List<Map<String, dynamic>>> _searchTours(String query) async {
     try {
+      // [ST-3] One search box: try the share code first when the input has that
+      // shape. The tours come back identical to a /tours-near entry, so everything
+      // downstream -- pick, download, translate -- works with no further change.
+      if (_looksLikeShareCode(query)) {
+        final shared = await _resolveShareCode(query);
+        if (shared.isNotEmpty) return shared;
+        // Not a code after all; fall through and search by location.
+      }
+
       // Convert wildcard pattern to regex
       final regexPattern = query.replaceAll('*', '.*');
       

@@ -215,10 +215,32 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
           f"{sum(in_range)}/{len(word_counts)} in range; counts={word_counts[:5]}")
 
     # 8. Total length reasonable (not truncated or bloated)
+    #
+    # [LOCAL-555] The floor scales with the stop count, because a flat 1000 words
+    # CONTRADICTED the per-stop rule directly above it. That rule blesses a first/last
+    # stop at 150 words and a middle stop at 200 — so a 3-stop tour whose every stop is
+    # in range can total 500 words and still be rejected here for being "truncated".
+    #
+    # Found on 2026-09-24 on Michael's own 3-stop restaurant tour: every stop generated
+    # and sat inside the per-stop range, and the tour was destroyed at 918 words — 8%
+    # under a floor written for tours twice its size. User-chosen stops make short
+    # tours ordinary rather than exceptional, so the floor has to know how many stops
+    # it is judging.
+    #
+    # Capped at the original 1000 so nothing gets LOOSER than it was: a 6-stop tour
+    # still faces the same floor it always did. Truncation is still caught, by the
+    # per-stop rule and by a stop count that falls short of the request.
     total_words = len(tour_text.split())
-    check("Total length reasonable (1000-8000 words)",
-          1000 <= total_words <= 8000,
-          f"total={total_words} words")
+    _n = len(stops) if stops else 0
+    if _n >= 2:
+        _floor = min(1000, 150 + 150 + 200 * max(0, _n - 2))
+    elif _n == 1:
+        _floor = 150
+    else:
+        _floor = 1000
+    check(f"Total length reasonable ({_floor}-8000 words for {_n} stop(s))",
+          _floor <= total_words <= 8000,
+          f"total={total_words} words, floor={_floor}")
 
     # -------- [BLOCKER 3] Factual integrity checks --------
     # These are RELEASE-GATING: any factual failure → exit 1 regardless of style score.
