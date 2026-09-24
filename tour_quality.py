@@ -22,6 +22,14 @@ every one of them something Michael found by reading and then had to explain:
                   "Founded in 1868 by St. Mary Help of Christians" on the church of
                   that dedication — a builder/founder frame filled with a nearby
                   famous name or the venue's own patron saint (LOCAL-527, D577)
+  offsite_entity  a place presented AS PART OF THE TOUR that is neither the venue
+                  nor a stop — "St. Mary's Cathedral ... mark the endpoints" on a
+                  Boston airport (the cathedral is in Sydney); "That's 4 stops —
+                  Mary Immaculate of Lourdes" naming a different church in the recap
+                  (LOCAL-539). The test is FRAMING, not distance: the same church,
+                  named "a short distance away in Newton Upper Falls" in a stop body,
+                  is legitimate contrast; named as a covered stop in the epilog, it
+                  is the defect.
 
 **What it deliberately cannot judge: whether a tour is INTERESTING.** That is the
 thing Michael reads for, and no counter substitutes for it. The loop is therefore
@@ -32,7 +40,8 @@ import os
 import re
 
 REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance',
-                  'fabricated_attribution', 'self_contradiction')
+                  'fabricated_attribution', 'self_contradiction',
+                  'offsite_entity')
 
 _STOP = re.compile(r'^Stop (\d+):\s*(.+)$', re.M)
 _YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
@@ -691,6 +700,117 @@ def _find_self_contradictions(text):
     return out
 
 
+# ─── Off-site entity presented as part of the tour (LOCAL-539) ───────────────
+# Round 9 shipped two tours that named a place AS PART OF THE TOUR when it was
+# neither the venue nor any stop:
+#
+#   LOGAN_1 (Boston airport), stop-1 orientation:
+#       "St. Mary's Cathedral, dedicated by pioneer priest Fr John Therry, and
+#        Gustave Eiffel's iconic Control Tower mark the endpoints."
+#     — St Mary's Cathedral and Fr John Therry are in Sydney, Australia; the
+#       endpoints had already been named (Main Concourse / Baggage Claim).
+#   CHURCH_1 (Newton MA church), epilog recap:
+#       "That's 4 stops — Mary Immaculate of Lourdes showcases collaborative
+#        stained glass art..."
+#     — Mary Immaculate of Lourdes is a DIFFERENT church, in Newton Upper Falls.
+#
+# THE DISTINCTION IS FRAMING, NOT DISTANCE. A tour may talk about anywhere on
+# earth. What it may not do is claim a place is one of ITS OWN stops when it is
+# not. The very same CHURCH_1, in its stop-2 body, says "A short distance away in
+# Newton Upper Falls... At Mary Immaculate of Lourdes, the windows reveal a tale of
+# artistic collaboration that never graced Our Lady Help of Christians" — the same
+# church, correctly framed as elsewhere. That passage carries no membership frame,
+# so it is not flagged. Only the epilog, which puts the church in the "That's N
+# stops" slot, is. This is why the check keys on the FRAME, not on geography, and
+# does not build a proximity threshold — geo_refutation already owns distance.
+#
+# A "membership frame" is a phrase that asserts X belongs to the tour's itinerary:
+#   * "... X ... mark(s) the endpoints"            (tour-span claim)
+#   * "That's N stops — X ..."                      (epilog recap, first named place)
+#   * "This tour covered/covers X ..."              (epilog recap)
+#   * "your next stop, X" / "next stop is X"        (navigation)
+# The named place captured by such a frame is a defect iff it is NOT the venue and
+# NOT one of the stop names. Distance is never consulted.
+
+# A proper-name place: capitalised words, allowing "St.", "'", "-", and the
+# lowercase connectors that appear INSIDE multiword place names ("of", "the").
+_OFFSITE_PLACE = r"[A-Z][\w.'\-]+(?:\s+(?:of|the|de|del|upon|and|at|on|'s)?\s*[A-Z][\w.'\-]+)*"
+
+_MEMBERSHIP_FRAMES = (
+    # "<Place> ... mark(s) the endpoint(s)" — the tour-span claim. Non-greedy and
+    # capped so it cannot run across a sentence boundary into the next clause.
+    re.compile(r"(?P<place>" + _OFFSITE_PLACE + r")[^.\n]{0,160}?\bmarks?\s+the\s+endpoints?\b"),
+    # epilog recap: the FIRST named place after "That's N stops —" is the slot a
+    # tour fills with one of its own stops; a non-stop there is the defect. Only the
+    # first place is taken — the rest of the recap is story prose full of people and
+    # events that must not be scanned as itinerary.
+    re.compile(r"That'?s\s+\d+\s+stops?(?:\s+and\s+[^—\-–\n]*)?\s*[—\-–]\s*(?P<place>" + _OFFSITE_PLACE + r")"),
+    # "This tour covered/covers <Place>"
+    re.compile(r"[Tt]his\s+tour\s+cover(?:ed|s)\s+(?P<place>" + _OFFSITE_PLACE + r")"),
+    # navigation: "your next stop, <Place>" / "next stop is <Place>"
+    re.compile(r"next\s+stop(?:\s+is|,)?\s+(?P<place>" + _OFFSITE_PLACE + r")"),
+)
+
+_TOUR_TITLE = re.compile(r'^Step-by-Step Audio Guided Tour:\s*(.+?)(?:,|$)', re.M)
+
+
+def _norm_place(s):
+    """Lowercase, strip punctuation to bare words for own-place matching."""
+    return re.sub(r'[^a-z0-9 ]', ' ', (s or '').lower()).split()
+
+
+def _own_places(text):
+    """The venue name and every stop name — the places a tour legitimately owns.
+
+    Returned as a list of token-sets so containment can be tested robustly:
+    "Concourse" in a recap matches the stop "Terminal A Main Concourse", and
+    "St. Mary's Cathedral" matches nothing here.
+    """
+    names = []
+    m = _TOUR_TITLE.search(text or '')
+    if m:
+        names.append(m.group(1).strip())
+    names.extend(s.strip() for _, s in _STOP.findall(text or ''))
+    return [set(_norm_place(n)) for n in names if _norm_place(n)]
+
+
+# Leading words that are never the head of a place name — an article the frame
+# regex may capture when the true stop name starts lowercase ("The church...").
+_PLACE_LEADING_STOP = {'the', 'a', 'an', 'this', 'that', 'these', 'those'}
+
+
+def find_offsite_entities(text):
+    """Return [(place, frame_excerpt), ...] for places framed as part of the tour
+    that are neither the venue nor any stop.
+
+    Framing only — geography is never consulted (that is geo_refutation's job).
+    """
+    own = _own_places(text)
+    out, seen = [], set()
+    for rx in _MEMBERSHIP_FRAMES:
+        for m in rx.finditer(text or ''):
+            raw = m.group('place').strip().rstrip('.,;:')
+            toks = _norm_place(raw)
+            # Drop a leading bare article the regex may have grabbed ("The church").
+            while toks and toks[0] in _PLACE_LEADING_STOP:
+                toks = toks[1:]
+            if not toks:
+                continue
+            place = set(toks)
+            # Own iff the captured place shares its meaningful tokens with a venue
+            # or stop name — subset in either direction (partial stop references
+            # like "Concourse" for "Terminal A Main Concourse" resolve as own).
+            is_own = any(place <= o or o <= place for o in own if o)
+            if is_own:
+                continue
+            key = ' '.join(toks)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((raw, m.group(0).strip()))
+    return out
+
+
 def _count_people(text):
     """Distinct PEOPLE, de-duplicated by surname.
 
@@ -808,6 +928,17 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
                        f"(no source confirms it)")
             defects['fabricated_attribution'] = (
                 f"{len(unresolved)} attribution(s); {why}")
+
+    # Off-site entity presented as part of the tour (LOCAL-539). A place named in a
+    # membership frame ("X marks the endpoints", "That's N stops — X", "This tour
+    # covered X") that is neither the venue nor a stop. FRAMING, not distance —
+    # geo_refutation owns geography; this owns the claim of membership.
+    offsite = find_offsite_entities(text)
+    if offsite:
+        place, frame = offsite[0]
+        defects['offsite_entity'] = (
+            f"{len(offsite)} place(s) framed as part of the tour but not a "
+            f"stop/venue, e.g. \"{place}\" in: {frame[:100]}")
 
     try:
         from derepetition_guard import _tokenize, _jaccard_similarity
