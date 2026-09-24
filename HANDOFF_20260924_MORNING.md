@@ -36,6 +36,26 @@ Two changes, both on `storied`:
 **Pick at least one large museum in the E2E.** Small venues never showed this — five of
 six round-11 tours generated fine.
 
+## Igor's user-stops work IS on `storied` and is PARTIAL
+
+Michael asked for it to ship with this deploy, so it is in. Be aware of what it does.
+
+A stop the listener names in the request ("…with a stop at X") is now marked
+`user_explicit`, survives D1v2 verification, and is exempt from the verified-only
+gate. If it cannot be verified at the venue it comes back with `verified=False` and
+the narration hedges, rather than being silently swapped for something else.
+
+**Measured, end to end through the service:** 2 of 3 requested stops delivered,
+against a baseline of 0. The third was displaced by a duplicate (D1v2 keeps a work
+under its canonical title, and the restore re-added the listener's wording alongside
+it — "Liberty Bowl by Paul Revere" and "Sons of Liberty Bowl" are the same object).
+That duplicate is fixed and on `storied`, but **the fix has not yet had a clean
+verification run** — the next attempt died on an external HTTP 429 from
+metmuseum.org after five runs against the same venue in one evening.
+
+So: treat user-named stops as working-but-unproven. If the E2E exercises them and a
+stop is missing or duplicated, that is this, not a new fault.
+
 ## Tag: `rc-pre-igor-20260923`
 
 Marks the tree the round-10 evidence was gathered against, **before** Igor's
