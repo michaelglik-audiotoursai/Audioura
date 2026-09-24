@@ -2,6 +2,9 @@
 """
 Test newsletter URL content extraction to diagnose issues
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 from bs4 import BeautifulSoup
 

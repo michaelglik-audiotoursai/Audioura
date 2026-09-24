@@ -2,6 +2,9 @@
 """
 Test with 32-byte truncation method matching mobile app
 """
+
+import pytest
+pytest.importorskip("Crypto")  # LOCAL-544: skip when optional dep missing
 import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad

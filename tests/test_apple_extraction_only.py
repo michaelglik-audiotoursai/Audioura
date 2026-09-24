@@ -2,6 +2,9 @@
 """
 Test Apple Podcasts URL extraction without audio generation
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import re
 import requests
 from bs4 import BeautifulSoup

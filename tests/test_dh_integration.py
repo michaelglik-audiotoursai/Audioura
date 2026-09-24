@@ -3,6 +3,9 @@
 Test Diffie-Hellman Key Exchange Integration
 """
 
+import pytest
+pytest.importorskip("Crypto")  # LOCAL-544: skip when optional dep missing
+
 import requests
 import json
 import secrets
