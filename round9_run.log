@@ -1,0 +1,9 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+
+======================================================================
+CHURCH_1: Our Lady Help of Christians Catholic Church, Newton MA (museum, 4 stops)
+======================================================================
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:9210. Caller should supply input_tokens and output_tokens separately.
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:9211. Caller should supply input_tokens and output_tokens separately.
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:9647. Caller should supply input_tokens and output_tokens separately.
