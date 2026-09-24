@@ -32,7 +32,11 @@ import os
 import re
 
 REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance',
-                  'fabricated_attribution')
+                  'fabricated_attribution',
+                  # [LOCAL-538] a dangling complement or reference is a broken
+                  # sentence — round 9 scored CLEAN while carrying both, and that
+                  # was the bug this ticket exists to fix.
+                  'dangling_complement', 'dangling_reference')
 
 _STOP = re.compile(r'^Stop (\d+):\s*(.+)$', re.M)
 _YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
@@ -150,6 +154,154 @@ _PLACEHOLDER = re.compile(
     r'|no\s+(?:further\s+)?(?:details?|information)\s+(?:was|is|were)\s+(?:found|available)'
     r'|an\s+exhibit\s+at\s+this\s+venue', re.I)
 _KM = re.compile(r'\b\d+(?:\.\d+)?\s*(?:km|kilometre|kilometer)s?\b', re.I)
+
+
+# ─── Dangling reference (LOCAL-538) ──────────────────────────────────────────
+# Round 9 scored CLEAN while carrying two sentences broken in exactly the way
+# LOCAL-530 exists to catch, in shapes its "<verb> of <Capital>" regex cannot see.
+# Both are one grammatical fault: a phrase that REQUIRES a complement, standing
+# without one. LOCAL-530's own warning applies — "a hand-listed set of verbs is
+# the enumeration trap D476 warns about" — so neither check below is a list of the
+# words to catch. Each is a GRAMMATICAL CLASS (an agentive suffix; a [+eventive]
+# noun class; a personal pronoun) filtered by a structural test on the surrounding
+# syntax. The words that appear in the alternations are members of a linguistic
+# class, not a catalogue of the specific referents seen in round 9.
+
+# A. RELATIONAL NOUN WITH NO COMPLEMENT — LOGAN_1 (round 9), Control Tower, verbatim:
+#
+#   "Trippe, the founder and later Pan American World Airways, helped connect
+#    Boston to New York, marking the city as a pivotal node..."
+#
+# "the founder" is a relational noun: it needs "of <what>". Here the "of" was
+# deleted and the given name (Juan) with it, so LOCAL-530's _OBJECT_DROPPED — which
+# matches the "of" — has nothing to match. The signature is structural and does not
+# name "founder": an appositive ", the <AGENTIVE>" (a deverbal agentive/relational
+# nominal, marked by the -er/-or/-ist suffix — the grammar of agent nouns, not a
+# list) coordinated by "and"/"," DIRECTLY to a proper-noun phrase that STANDS ALONE
+# (a comma or period follows it, not a lowercase head noun), with NO "of",
+# possessive, or "who" complement in the coordinator span or immediately after the
+# proper noun. A correct sentence puts the "of" back — "the founder of Pan
+# American", "the founder and chairman of Pan American" — and both clear. Over all
+# 48 files in TOURS_FOR_REVIEW this fires exactly once, on the sentence above, and
+# on nothing else (measured; see SUBMISSION_LOCAL-538.md).
+_RELATIONAL_NO_COMPLEMENT = re.compile(
+    r',\s+the\s+([a-z]+(?:er|or|ist))\b'            # appositive relational/agentive noun
+    r'(\s+(?:and|,)\s+(?:later|then|also|former|current)?\s*)'  # coordinator (+ optional temporal adverb)
+    r'([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*)'       # the coordinated proper-noun phrase
+    r'(\s*[,.]|\s+[a-z]+)')                          # what follows it
+# The "of"/possessive/"who" that a relational noun needs, seen at the complement
+# site: inside the coordinator span (group 2) or right after the proper noun.
+_COMPLEMENT_IN_COORD = re.compile(r"\bof\b|['\u2019]s\b|\bwho\b")
+_COMPLEMENT_AFTER = re.compile(r"^\s*(?:of|behind|for)\b|^\s*['\u2019]s\b|^\s*,?\s*who\b")
+
+
+def _find_relational_no_complement(text):
+    """Return [(relnoun, span_text)] for relational nouns standing without their
+    complement, per the structure documented above. Empty list = none."""
+    out = []
+    for m in _RELATIONAL_NO_COMPLEMENT.finditer(text or ''):
+        relnoun, coord, _propn, follow = m.groups()
+        if _COMPLEMENT_IN_COORD.search(coord):
+            continue                                 # "founder and chairman OF ..." — complement present
+        after = text[m.end():m.end() + 40]
+        if _COMPLEMENT_AFTER.match(after):
+            continue                                 # "founder and CEO OF Acme" — complement is merely late
+        if re.match(r'\s+[a-z]', follow):
+            continue                                 # "director and Oscar winner" — 'winner' heads the proper noun
+        out.append((relnoun, m.group(0).strip()))
+    return out
+
+
+# B. DEMONSTRATIVE / PRONOUN WITH NO ANTECEDENT — CHURCH_1 (round 9), Stained Glass
+# Windows, verbatim:
+#
+#   "In the absence of stained glass, we find the church's story told through
+#    different means. This event, deeply etched into the church's modern history,
+#    demonstrates that while the church may not hold stained glass windows..."
+#
+# No event has been narrated — not in this stop, not in the one before. "This event"
+# points at nothing. The hard part is that encapsulating anaphora is ORDINARY, GOOD
+# English: "This decision", "This recognition", "This moment" legitimately package a
+# preceding clause without repeating a head noun ("achieved certification. This
+# recognition..."). Firing on those would be worse than no check. The structural
+# escape is the noun's semantic class: an EVENTIVE noun (event, incident, episode,
+# ceremony, visit, ...) denotes a HAPPENING and so demands that a happening was
+# narrated — and a narrated happening is normally DATED or NAMES an actor. So an
+# eventive anaphor that opens a stop body (first or second body sentence) whose
+# preceding two sentences carry NEITHER a year NOR a multi-word proper noun has
+# nothing to bind to. Abstract summarisers (recognition/decision/choice) are NOT in
+# the class — they can package a state or a description, so they are never flagged.
+# Over all 48 files this fires exactly once, on the sentence above. (A regex cannot
+# decide the general abstract case — whether "recognition" matches an earlier
+# "certification" is semantic; restricting to the [+eventive] class is what makes a
+# purely structural, zero-false-positive check possible. See SUBMISSION_LOCAL-538.md.)
+_EVENTIVE_ANAPHOR = re.compile(
+    r'^(This|These)\s+(?:[a-z]+\s+){0,2}'
+    r'(event|incident|episode|ceremony|gathering|confrontation|'
+    r'meeting|visit|attack|disaster|tragedy|celebration|protest)\b', re.I)
+# The pronoun sibling (the task's second case): round 7's "Her presence, though
+# unexpected..." with no woman named anywhere. A sentence-initial SINGULAR GENDERED
+# pronoun with NO person introduced earlier IN THE WHOLE TOUR (searched backwards
+# across stops, per the task). Restricted to she/he/her/his/him: a singular gendered
+# pronoun demands a specific NAMED INDIVIDUAL, whereas "they/their" routinely corefer
+# with a plural COMMON-NOUN group ("military officers ... They argue", "parishioners
+# ... Their protest") that is a legitimate antecedent the person-frame does not name
+# — flagging those is exactly the "fires on ordinary English" failure to avoid.
+# Person detection reuses the scorer's own _PERSON frame, defined below. No tour
+# currently on disk has this defect, so it fires nowhere in the corpus (0 false
+# positives) and stands as a net for the shape when it ships.
+_LEAD_PRONOUN = re.compile(
+    r'(?:(?<=[.!?]\s)|(?<=\n))(She|He|Her|His|Him)\b')
+_YEAR_ANCHOR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
+_PROPER_ANCHOR = re.compile(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+')
+
+_STOP_OR_SCHEMA = re.compile(
+    r'^(?:Address|Coordinates|Type/Specialty|Specific Examples|'
+    r'Operational Details|Orientation|Directions|Tour-Category):', re.I)
+
+
+def _stop_body_blocks(text):
+    """Yield (title, body) per stop — body is narration only (schema/nav lines
+    stripped), so the anaphor position test sees what the listener hears."""
+    stops = list(_STOP.finditer(text or ''))
+    for k, sm in enumerate(stops):
+        start = sm.end()
+        end = stops[k + 1].start() if k + 1 < len(stops) else len(text)
+        block = text[start:end]
+        body_lines = [ln.strip() for ln in block.splitlines()
+                      if ln.strip() and not _STOP_OR_SCHEMA.match(ln.strip())]
+        yield sm.group(2), '\n'.join(body_lines)
+
+
+def _split_sentences_simple(t):
+    return re.split(r'(?<=[.!?])\s+', t or '')
+
+
+def _find_dangling_references(text):
+    """Return [(kind, snippet)] for dangling demonstratives/pronouns.
+
+    kind is 'demonstrative' for an eventive anaphor opening a stop with no dated or
+    named happening in the two sentences before it, or 'pronoun' for a
+    sentence-initial personal pronoun with no person named earlier in the whole tour.
+    """
+    out = []
+    # B1 — eventive demonstrative anaphor with no antecedent happening.
+    for title, body in _stop_body_blocks(text):
+        sents = _split_sentences_simple(body)
+        for si in range(1, min(3, len(sents))):          # 2nd or 3rd body sentence
+            s = sents[si].strip()
+            if not _EVENTIVE_ANAPHOR.match(s):
+                continue
+            window = ' '.join(sents[max(0, si - 2):si])   # preceding two sentences
+            if _YEAR_ANCHOR.search(window) or _PROPER_ANCHOR.search(window):
+                continue
+            out.append(('demonstrative', s[:80]))
+    # B2 — personal pronoun with no person named anywhere earlier in the tour.
+    for m in _LEAD_PRONOUN.finditer(text or ''):
+        if _PERSON.search((text or '')[:m.start()]):
+            continue
+        out.append(('pronoun', (text or '')[m.start():m.start() + 60].replace('\n', ' ')))
+    return out
 
 
 # [2026-09-23] "funded by Irish immigrants" -> a person called Irish. Attribution
@@ -323,6 +475,24 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
 
     if is_building_tour and _KM.search(text):
         defects['distance'] = f"kilometre figure on a building tour: {_KM.search(text).group(0)}"
+
+    # Dangling reference (LOCAL-538). Both are one grammatical fault — a phrase that
+    # requires a complement, standing without one — in shapes LOCAL-530 cannot see.
+    #   dangling_complement  a relational noun ("the founder") whose "of <what>" was
+    #                        deleted (round 9 LOGAN_1).
+    #   dangling_reference   a demonstrative/pronoun ("This event", "Her presence")
+    #                        with no antecedent introduced earlier (round 9 CHURCH_1).
+    rel_nc = _find_relational_no_complement(text)
+    if rel_nc:
+        defects['dangling_complement'] = (
+            f"{len(rel_nc)} relational noun(s) without complement, "
+            f"e.g. {rel_nc[0][1]!r}")
+    dangling = _find_dangling_references(text)
+    if dangling:
+        kinds = sorted({k for k, _ in dangling})
+        defects['dangling_reference'] = (
+            f"{len(dangling)} dangling {'/'.join(kinds)} reference(s), "
+            f"e.g. {dangling[0][1]!r}")
 
     # Fabricated builder/founder attribution (LOCAL-527). Two kinds:
     #   dedication  the founder IS the venue's own dedication/patron saint — a
