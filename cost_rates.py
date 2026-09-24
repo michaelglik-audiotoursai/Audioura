@@ -48,6 +48,27 @@ GPT4O_MINI_COST_PER_1K_TOKENS = 0.000285  # ~($0.15*0.7 + $0.60*0.3) / 1000
 # --- Search (Serper) ---
 SERPER_COST_PER_QUERY = 0.001
 
+# --- Grounding (Gemini + Grounding with Google Search) ---
+# [LOCAL-533]
+# Source: https://ai.google.dev/gemini-api/docs/pricing
+# Read: 2026-09-23
+# Grounding with Google Search is billed PER REQUEST, independent of token count:
+# after a small free daily allowance, requests are billed at $35 per 1,000
+# grounding requests = $0.035 per request. This is a separate billing channel
+# from the OpenAI token cost the pipeline already sums in "Total API cost", and
+# from the Serper query cost above. Counted (not estimated) via
+# story_leads.get_grounding_requests(); one increment per grounded request issued.
+GROUNDING_COST_PER_REQUEST = 0.035
+
+
+def grounding_cost(num_requests: int) -> float:
+    """Cost in USD of `num_requests` grounded Google-Search Gemini requests.
+
+    Grounding bills per request, not per token — so this is a flat multiply.
+    A tour that issues zero grounded requests (e.g. a cache hit) costs $0.00.
+    """
+    return num_requests * GROUNDING_COST_PER_REQUEST
+
 # --- TTS (AWS Polly) ---
 # Source: https://aws.amazon.com/polly/pricing/
 # Read: 2026-08-06

@@ -34,6 +34,7 @@ os.environ.setdefault('DATABASE_URL',
 os.environ.setdefault('SNIPPET_CAP_PER_STOP', '20')
 
 from generate_tour_text import generate_tour_text  # noqa: E402
+import generate_tour_text as _gtt  # noqa: E402  [LOCAL-533] read _LAST_GENERATION_COST
 import tour_quality as tq  # noqa: E402
 
 OUT = os.path.join(HERE, 'TOURS_FOR_REVIEW', 'round9')
@@ -60,13 +61,31 @@ for name, location, tour_type, stops in VENUES:
             continue
         open(path, 'w').write(text)
         scored = tq.score_tour(text, stops, is_building_tour=True)
+        # [LOCAL-533] Read the cost record straight from the module global rather
+        # than parsing it out of the log — parsing the log is how grounding cost
+        # got lost. This captures BOTH billing channels: OpenAI tokens
+        # (total_cost) and grounded Google-Search requests (grounding_cost).
+        _cost = dict(_gtt._LAST_GENERATION_COST or {})
         rec = {'name': name, 'ok': True, 'wall_s': round(wall, 1),
                'chars': len(text), 'defects': scored['defects'],
-               'metrics': scored['metrics']}
+               'metrics': scored['metrics'],
+               'cost': {
+                   'total_api_cost_usd': round(_cost.get('total_cost', 0.0), 6),
+                   'total_tokens': _cost.get('total_tokens', 0),
+                   'grounding_cost_usd': round(_cost.get('grounding_cost', 0.0), 6),
+                   'grounding_requests': _cost.get('grounding_requests', 0),
+                   'tour_total_cost_usd': round(_cost.get('tour_total_cost', 0.0), 6),
+                   'cache_hit': _cost.get('cache_hit', False),
+               }}
         summary.append(rec)
         print(f'\n{name}: {len(text)} chars in {wall:.0f}s', flush=True)
         print(f'   defects: {list(scored["defects"].keys()) or "CLEAN"}', flush=True)
         print(f'   people:  {scored["metrics"].get("named_people")}', flush=True)
+        print(f'   cost:    API ${rec["cost"]["total_api_cost_usd"]:.4f} '
+              f'({rec["cost"]["total_tokens"]} tok) + grounding '
+              f'${rec["cost"]["grounding_cost_usd"]:.4f} '
+              f'({rec["cost"]["grounding_requests"]} req) = '
+              f'${rec["cost"]["tour_total_cost_usd"]:.4f}', flush=True)
     except Exception as e:
         wall = time.time() - t0
         summary.append({'name': name, 'ok': False, 'error': f'{type(e).__name__}: {e}',
