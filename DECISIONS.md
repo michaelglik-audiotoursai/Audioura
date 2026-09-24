@@ -24061,3 +24061,80 @@ None came from reading the code. Two came from Michael reading a tour, one from 
 critic reading the code, one from a trace printing `lore_facts=0`. **Instruments found
 what inspection did not** — and the cheapest instrument, a one-line trace, refuted two
 confident hypotheses in a minute.
+
+---
+
+## D590 — The duplicate task files were never a mystery: the verifier could not tell "merged" from "delivered nothing"
+
+**Status:** fixed 2026-09-23. Found by reading an alarm instead of dismissing it.
+
+### The open question this closes
+
+`SESSION_HANDOFF_20260923.md` recorded, of the 35-task over-dispatch:
+
+> **What creates those duplicate task files is STILL UNKNOWN** — nothing in the tick
+> chain writes them.
+
+Something in the tick chain writes them. `.continuous_dev/verify_deliverables.sh`
+re-files any task it believes delivered nothing, under `id + 3000`. That is the entire
+origin of `LOCAL-3527`, `LOCAL-3529`, `LOCAL-3530`, `LOCAL-3532`, and of `LOCAL-6497`
+(3497 re-filed a second time). **146 such files were on disk.**
+
+### The defect
+
+The verifier asked `git rev-list --count storied..$branch`. **For a branch that
+delivered and was then merged, that is 0** — the tip is an ancestor of `storied`, so
+nothing is ahead of it. Success and total failure produce the identical number.
+
+Minutes after LOCAL-527/528/529/530/532 were merged, all five were alarmed as
+`*** DELIVERED NOTHING ***` and re-filed. Measured on the real branches:
+
+```
+LOCAL-527-orientation-describes-another-stop   storied..=0   base(65de385)..=1
+LOCAL-528-content-assigned-to-wrong-structure  storied..=0   base(1a98917)..=1
+LOCAL-529-one-name-four-spellings              storied..=0   base(65de385)..=1
+LOCAL-532-best-anecdote-told-twice             storied..=0   base(65de385)..=1
+```
+
+**This is D582 exactly** — a failure that looks like a pass, in the very script written
+to catch failures that look like passes. It is worth noticing that the instrument built
+to enforce that rule was itself breaking it.
+
+### The second defect, in the same eight lines
+
+The "already handled" guard read `grep -qxF "$task" "$STATE"` — a **filename** — against
+a file that only ever contained branch **stems**. It never matched. Every tick
+re-appended the same entry: five stems accounted for **45 of the 1318 lines**. The
+`THREE IDENTICAL FAILURES → needs Michael` alarm reads that same file, so it was
+escalating one failure recorded forty-five times.
+
+### The fix
+
+Measure against the base the task was **dispatched from**, which does not move. The
+`COMPLETED` line already records `base=storied@<sha>`. Plus a belt-and-braces
+`git merge-base --is-ancestor "$branch" storied` → never alarm on a merged tip. And grep
+the stem that is actually written.
+
+Verified by effect: a fresh run adds **zero** new alarms and zero new state lines, where
+the previous run added five of each.
+
+### What it cost, and the rule
+
+1318 false failure records, 146 junk task files, 1347 `DELIVERED NOTHING` lines in
+`ALERTS.md` — a file whose real job is to alarm on production row loss (the tour-29
+deletion). **An alarm channel at 100% false positives is an alarm channel that is off.**
+`restart.sh` prints "ALERTS.md: 40 alert line(s) in the last 40" at every session start,
+and every session has learned to skip it.
+
+> **A check that cannot distinguish success from failure is not a check, and its
+> alarms train you to ignore the channel they arrive on.**
+
+### Recorded gap, not fixed here
+
+**D583–D589 are cited in commit messages and in the handoff but were never written into
+this file.** They exist only in `git log`. Nothing in the tick chain enforces that a
+`D<nnn>` referenced in a commit reaches `DECISIONS.md`.
+
+**`.continuous_dev/` is gitignored**, so every script in it — the dispatcher tick, the
+row-loss backup, this verifier — exists only on this machine's disk and is in no backup.
+The loop was already dead for 12 days once.
