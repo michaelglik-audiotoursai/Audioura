@@ -254,8 +254,16 @@ _VERB_NEEDS_OBJECT = (
     r'authoriz|authorised|engag|establish|appoint|commission|task|direct|'
     r'instruct|order|permit|enabl|allow|assign|designat|elect|nominat|'
     r'compel|urg|request|requir|forbid|forbad|prohibit|mandat')
+# [2026-09-23, LEAD] A determiner or "by" in front makes it a NOUN, not a verb with a
+# missing object. Round 11 produced the false positive:
+#   "the Citadel of Nice was reduced to ruins by the order of Louis XIV"
+# which is correct English -- "the order of <person>" is a noun phrase. The stem
+# "order" is in the verb list for "ordered of <Body>", so the bare pattern matched.
+# This matters more than it used to: since LOCAL-540 the defect GATES, so a false
+# positive spends a paid regeneration rewriting a correct sentence.
 _OBJECT_DROPPED = re.compile(
-    r'\b(?:' + _VERB_NEEDS_OBJECT + r')(?:ed|es|e)?\s+of\s+[A-Z]')
+    r'(?<!\w)(?<!the )(?<!a )(?<!an )(?<!his )(?<!her )(?<!its )(?<!by )'
+    r'(?:' + _VERB_NEEDS_OBJECT + r')(?:ed|es|e)?\s+of\s+[A-Z]')
 # [2026-09-21, Michael on LOGAN_1] "...ensuring Boston's competitive edge in the
 # aviation sector.3 million passengers in 2025." A sentence was cut and the
 # remainder spliced on with no space, so the tour states ".3 million" — the leading

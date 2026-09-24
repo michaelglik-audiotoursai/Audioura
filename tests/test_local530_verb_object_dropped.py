@@ -151,6 +151,18 @@ class TestCorpusScan:
             for m in tour_quality._OBJECT_DROPPED.finditer(txt):
                 hits.append((os.path.basename(os.path.dirname(f)), m.group(0)))
         # Exactly the round-7 "authorized of" and round-3 "engaged of".
-        assert len(hits) == 2, f"expected 2 corpus hits, got {hits}"
+        # [2026-09-23, LEAD] Was `len(hits) == 2`. Pinning a corpus-wide COUNT makes
+        # this test fail whenever a new round is generated, which says nothing about
+        # the check -- and it fired tonight on round 11 for a sentence that was
+        # CORRECT ("by the order of Louis XIV"), hiding the real finding behind an
+        # arithmetic mismatch. Assert the two known defects are still caught, and
+        # report anything new by name instead of just by count.
+        rounds = {r for r, _ in hits}
+        assert 'round3' in rounds and 'round7' in rounds, (
+            f"the two known verb-object defects must still be caught, got {hits}")
+        unexpected = [h for h in hits if h[0] not in ('round3', 'round7')]
+        assert not unexpected, (
+            f"new corpus hit(s) -- verify each is a REAL defect before widening this "
+            f"test; a false positive here spends a paid retry since LOCAL-540: {unexpected}")
         verbs = sorted(h[1].split()[0] for h in hits)
         assert verbs == ['authorized', 'engaged'], hits
