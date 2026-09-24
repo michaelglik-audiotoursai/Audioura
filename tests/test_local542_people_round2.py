@@ -12,10 +12,11 @@ standalone honorific, a role-noun+colon list, a kept title) — never a longer l
 verbs or role words, which is the enumeration trap D476/LOCAL-530 names.
 
 Every sentence here is READ from the real round-9 file, so the test measures the
-shipped text. The two people the counter still cannot reach (Christopher Ferguson,
-introduced by a bare active verb; and the second same-surname D'Amore, folded by the
-surname de-dup that correctly merges the three "Law" forms) are asserted absent, so
-the documented limitation is pinned too. Full corpus false-positive audit is in
+shipped text. The one person the counter still cannot reach (Christopher Ferguson,
+introduced by a bare active verb) is asserted absent, so the documented limitation
+is pinned too. [LOCAL-546] The second same-surname D'Amore, which LOCAL-542 left
+folded by the surname de-dup, is now separated and counted; see the coexistence
+tests below and SUBMISSION_LOCAL-546.md. Full corpus false-positive audit is in
 SUBMISSION_LOCAL-542.md.
 """
 import re
@@ -97,10 +98,21 @@ def test_title_is_kept_not_eaten():
 
 # ── the whole-file acceptance counts, on the real files ──────────────────────
 
-def test_church1_round9_counts_fifteen():
-    """Acceptance: 15 of the 17 people the critique enumerates (Ferguson and the
-    second D'Amore are the documented misses)."""
-    assert _count_people(open(CHURCH9, errors='ignore').read()) == 15
+def test_church1_round9_counts_sixteen():
+    """Acceptance: [LOCAL-546] 16 of the 17 people the critique enumerates. LOCAL-542
+    left this at 15 because the two same-surname D'Amores folded into one; LOCAL-546
+    now separates a husband and wife who share a surname (given-name conflict), so
+    both are counted. Christopher Ferguson (a bare active verb, "Authorities arrested
+    ...") remains the one documented miss."""
+    assert _count_people(open(CHURCH9, errors='ignore').read()) == 16
+
+
+def test_both_damores_are_counted():
+    """[LOCAL-546] Gilda and Bruno D'Amore share a surname but are two people; the
+    text says so ("her husband Bruno D'Amore"). Both must survive de-dup."""
+    got = _names(open(CHURCH9, errors='ignore').read())
+    assert any('Gilda' in n for n in got), got
+    assert any('Bruno' in n for n in got), got
 
 
 def test_logan1_stays_at_four():
