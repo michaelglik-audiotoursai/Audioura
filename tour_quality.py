@@ -121,6 +121,80 @@ _PERSON_POSSESSIVE = re.compile(r'\b(' + _NAME2 + r')(?:\'|\u2019)s\b')
 # invisible because _PERSON only looks for a role that PRECEDES the name.
 _PERSON_APPOSITIVE = re.compile(
     r'\b(' + _NAME + r'),\s+(?:the\s+|a\s+|an\s+)?(?:' + _PERSON_ROLE + r')s?\b')
+
+# ─── [LOCAL-542] Four more shapes in which this pipeline names a person ───────
+# LOCAL-537 fixed LOGAN_1 (4) but CHURCH_1 still returned 8 of the 17 people in it.
+# The nine it missed do NOT share a role word or a title — adding their introducers
+# to _PERSON_ROLE (already 40+ words) would be the enumeration trap D476 names and
+# LOCAL-530 fell into twice. Each rule below keys on a GRAMMATICAL construction, not
+# a hand-listed verb/noun:
+#
+#   _PERSON_AGENT      the passive agent: a past participle governs "by <Name>"
+#                      ("Designed by Jean Bazaine", "described by John Chrysostom",
+#                      "propagated by figures like Don Bosco and Vincent Pallotti").
+#                      The verb is matched as a CLASS (any word ending -ed/-en), so
+#                      no verb list is maintained. Requires a two-token name, which
+#                      is what keeps "by September"/"by These" out.
+#   _PERSON_HON_INTRO  a standalone honorific abbreviation ("Fr. Timothy Danahy").
+#                      A full given+surname is required so a dangling "Fr." before a
+#                      sentence continuation ("Fr. During the war") is not a person.
+#   _PERSON_APPOS_LIST an apposition list after a role noun + colon: "three longtime
+#                      congregants: Gilda "Jill" D'Amore, her husband Bruno D'Amore,
+#                      and ... Lucia Arpino". Punctuation-driven, not a role list.
+#   _PERSON_TITLED     keeps the TITLE in the fullest form ("Mother Teresa", not
+#                      "Teresa"); de-dup by surname still folds it onto bare mentions.
+#
+# A name word may now carry an internal apostrophe (D'Amore, O'Brien) and skip a
+# quoted nickname (Gilda "Jill" D'Amore) — both are structural features of names.
+# These are kept SEPARATE from _NAME/_NAME2 (which the tested possessive/appositive
+# rules reuse) so this change cannot perturb LOCAL-537's behaviour.
+_PNAME_W = r"(?:[A-Z][a-z]{2,}|[A-Z]['\u2019][A-Z][a-z]+|[A-Z]\.)"
+_PNAME_QNICK = r'(?:["\u201c\u2018][A-Z][a-z]+["\u201d\u2019]\s+)?'
+_PNAME = r"[A-Z][a-z]{2,}(?:\s+" + _PNAME_QNICK + _PNAME_W + r"){0,2}"
+_PNAME2 = r"[A-Z][a-z]{2,}(?:\s+" + _PNAME_QNICK + _PNAME_W + r"){1,2}"
+
+_PERSON_TITLED = re.compile(
+    r'\b((?:' + _PERSON_TITLE + r')\.?\s+(?:' + _HONORIFIC + r')?' + _PNAME + r')')
+_PERSON_AGENT = re.compile(
+    r'\b[A-Za-z]{3,}(?:ed|en)\b\s*(?:in\s+[^.]{0,25}?)?\bby\s+'
+    r'(?:figures?\s+like\s+|the\s+|a\s+|an\s+)?'
+    r'(?:(?:' + _PERSON_TITLE + r')\.?\s+)?(?:' + _HONORIFIC + r')?(' + _PNAME2 + r')'
+    r'(?:\s+and\s+(?:(?:' + _PERSON_TITLE + r')\.?\s+)?(?:' + _HONORIFIC + r')?('
+    + _PNAME2 + r'))?')
+_PERSON_HON_INTRO = re.compile(
+    r'(?<![A-Za-z.])(?:Fr|Mr|Mrs|Ms|Dr|Rev|Msgr|Sr|Prof)\.\s+(' + _PNAME2 + r')')
+_PERSON_APPOS_LIST = re.compile(
+    r'(?:congregants?|victims?|members?|parishioners?|residents?|founders?|'
+    r'donors?|survivors?|children|parents?|siblings?|family)\s*:\s+'
+    r'(' + _PNAME2 + r'(?:[^.]*?,\s*(?:and\s+)?(?:her\s+\w+\s+|his\s+\w+\s+|'
+    r"\w+['\u2019]s\s+\w+,?\s+)?" + _PNAME2 + r')+)')
+
+# Organisation head-nouns the agent rule can capture ("Conceived by Moskow Linn
+# Architects"), plus collective role plurals a title can precede ("Rev.
+# Parishioners"). A small, GENERATIVE class of institution/collective words, not a
+# name list — none of these is ever a person's identifying token.
+_PERSON_ORG_SUFFIX = {
+    'administration', 'corps', 'guard', 'architects', 'architect', 'studios',
+    'studio', 'systems', 'colors', 'colours', 'works', 'immaculate', 'help',
+    'parishioners', 'congregants', 'members', 'residents', 'faithful',
+}
+# Closed-class leading words a name-shaped match may start with but a person never
+# does (determiners, deictics, subordinators). Grammatical, not enumeration.
+_PERSON_LEAD_STOP = {
+    'every', 'these', 'this', 'that', 'those', 'many', 'some', 'during', 'their',
+    'your', 'our', 'his', 'her', 'its', 'the', 'each', 'both', 'all', 'any',
+    'inside', 'outside', 'after', 'before', 'while',
+}
+# Title / rank words that are introducers, never the person's identifying token.
+# Stripping them lets prefix-subsumption see "General Edward Lawrence Logan" and
+# "Edward Lawrence Logan" as one person, and "Mother Teresa" keep its title.
+_PERSON_TITLE_WORD = {
+    'rev', 'fr', 'dr', 'mr', 'mrs', 'ms', 'msgr', 'sr', 'jr', 'st', 'chaplain',
+    'father', 'mother', 'sister', 'deacon', 'bishop', 'cardinal', 'pope', 'saint',
+    'reverend', 'monsignor', 'archbishop', 'major', 'general', 'governor', 'mayor',
+    'senator', 'president', 'captain', 'lieutenant', 'colonel', 'sir', 'lord',
+}
+
 # a fragment ending on a title with no name after it
 _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+\s+'
                     r'(?:you|As|The|It|This|Its|Their|He|She|We)\b)')
@@ -817,38 +891,77 @@ def _count_people(text):
     "Law", "Bernard Law" and "Bernard F. Law" are one man, and counting them as
     three inflated a 4-stop tour to nine people. The surname — the last
     capitalised token — is the identity; the fullest form seen is kept for display.
+
+    [LOCAL-542] Collects from the title/role/frame rule (_PERSON), the possessive
+    and trailing-appositive rules (LOCAL-537), and four grammatical shapes that
+    carry no role word: the passive agent (_PERSON_AGENT), a standalone honorific
+    (_PERSON_HON_INTRO), a role-noun apposition list (_PERSON_APPOS_LIST), and a
+    titled name kept in full (_PERSON_TITLED). See the comments on those patterns
+    for why each is a construction and not another hand-listed introducer.
     """
+    text = text or ''
     by_surname = {}
     candidates = []
-    for m in _PERSON.findall(text or ''):
+    for m in _PERSON.findall(text):
         # Every group is a person: group 2 is the "X and Y" partner when present.
         candidates.extend([m] if isinstance(m, str) else [g for g in m if g])
-    # [LOCAL-537] A name carries no prefix in two further shapes the frame above
-    # cannot see: the possessive ("Gustave Eiffel's") and the trailing appositive
-    # ("Trippe, the founder"). De-dup by surname folds them onto any bare mention.
-    candidates.extend(_PERSON_POSSESSIVE.findall(text or ''))
-    candidates.extend(_PERSON_APPOSITIVE.findall(text or ''))
+    # [LOCAL-537] The possessive ("Gustave Eiffel's") and the trailing appositive
+    # ("Trippe, the founder") carry no preceding trigger word.
+    candidates.extend(_PERSON_POSSESSIVE.findall(text))
+    candidates.extend(_PERSON_APPOSITIVE.findall(text))
+    # [LOCAL-542] Four more constructions (see pattern comments above).
+    for m in _PERSON_AGENT.findall(text):
+        candidates.extend([g for g in m if g])
+    candidates.extend(_PERSON_HON_INTRO.findall(text))
+    candidates.extend(_PERSON_TITLED.findall(text))
+    for m in _PERSON_APPOS_LIST.findall(text):
+        candidates.extend(re.findall(_PNAME2, m))
+
     for name in candidates:
         name = name.strip()
         if not name:
             continue
-        first = name.split()[0]
-        surname = name.split()[-1]
-        if len(surname) < 3:
+        toks = name.split()
+        first, surname = toks[0], toks[-1]
+        if len(surname.strip('.')) < 3:
             continue
+        # [LOCAL-542] A name never begins with a determiner/deictic ("These", "Every
+        # July", "Inside"). Closed grammatical class, checked on the leading token.
+        if first.lower() in _PERSON_LEAD_STOP:
+            continue
+        low = {first.lower(), surname.lower()}
         # A frame like "including Terminal B" hands us scenery. The person-cap
         # already maintains this vocabulary (D584); share it rather than keeping
-        # two lists that drift apart.
-        if surname.lower() in _NOT_PERSON or first.lower() in _NOT_PERSON:
+        # two lists that drift apart. _NOT_A_NAME catches people-groups and possessive
+        # place phrases; _PERSON_ORG_SUFFIX catches institution head-nouns the agent
+        # rule can pull ("Conceived by Moskow Linn Architects"). Both ends are tested.
+        if low & _NOT_PERSON or low & _NOT_A_NAME or low & _PERSON_ORG_SUFFIX:
             continue
-        # [LOCAL-537] Check _NOT_A_NAME on BOTH ends. A possessive place phrase is
-        # betrayed by either token -- "Boston Logan's" by its first word, "New
-        # England's" by its last -- and the old surname-only test let the former
-        # through.
-        if surname.lower() in _NOT_A_NAME or first.lower() in _NOT_A_NAME:
+        # A title word alone is never a surname ("tended by Chaplain Rev." is the
+        # introducer pair, not a person named "Rev").
+        if surname.lower().strip('.') in _PERSON_TITLE_WORD:
             continue
-        if len(name) > len(by_surname.get(surname, '')):
-            by_surname[surname] = name
+        surname_key = surname.lower().strip('.')
+        if len(name) > len(by_surname.get(surname_key, '')):
+            by_surname[surname_key] = name
+
+    # [LOCAL-542] Prefix subsumption: a name whose token sequence (titles removed)
+    # is a prefix of another's is the same person truncated — bare "Sean" under
+    # "Archbishop Sean O'Malley", "Edward Lawrence" under "Edward Lawrence Logan".
+    # Keep the longer form, drop the prefix, so one person is not counted twice
+    # under two surname keys. Surname de-dup still collapses "Law"/"Bernard Law".
+    def _core(n):
+        return tuple(t.lower().strip('.') for t in n.split()
+                     if t.lower().strip('.') not in _PERSON_TITLE_WORD)
+    cores = {k: _core(v) for k, v in by_surname.items()}
+    for k in list(by_surname):
+        ck = cores[k]
+        if not ck:                      # nothing but titles left -> not a person
+            del by_surname[k]
+            continue
+        if any(k2 != k and len(c2) > len(ck) and c2[:len(ck)] == ck
+               for k2, c2 in cores.items()):
+            del by_surname[k]
     return len(by_surname)
 
 

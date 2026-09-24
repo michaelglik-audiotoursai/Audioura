@@ -46,7 +46,10 @@ def test_scenery_is_not_a_person():
 
 
 @pytest.mark.parametrize('name,expected', [
-    ('CHURCH_1', 5), ('CHURCH_2', 5), ('CHURCH_3', 5),
+    # [LOCAL-542] CHURCH_1 5->7: the passive-agent rule now finds Don Bosco and
+    # John Chrysostom ("first described by John Chrysostom", "propagated by figures
+    # like Don Bosco"), both real people that no title/role word introduced.
+    ('CHURCH_1', 7), ('CHURCH_2', 5), ('CHURCH_3', 5),
     # LOGAN_1/2 gained Gustave Eiffel once attribution frames ("constructed in
     # 1887-1889 by ...") were understood. He is a HALLUCINATION -- the Eiffel Tower
     # pasted into an airport tour -- but he is genuinely a named person in the text,
