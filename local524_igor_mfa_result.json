@@ -1,64 +1,66 @@
 {
-  "job_id": "f27662f6-4329-4355-9c55-6b37da2aeb0b",
-  "wall_time_s": 529.1,
-  "tour_id": 364,
-  "tour_name": "Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a stop at the Liberty Bowl by Paul Revere and a stop at Watson and the Shark by Copley - Museum Tour",
-  "location": "Museum of Fine Arts, Boston, with a stop at the Sargent Murals and a stop at the Liberty Bowl by Paul Revere and a stop at Watson and the Shark by Copley",
-  "tour_type": "contained",
+  "job_id": "dd5ed5ba-5d0b-4e3c-a9a7-d3d608fea890",
+  "wall_time_s": 224.5,
+  "tour_id": 365,
+  "tour_name": "Faneuil Hall Marketplace, Boston MA, with a stop at Quincy Market and a stop at the Samuel Adams statue and a stop at the Boston Massacre site - Walking Tour",
+  "location": "Faneuil Hall Marketplace, Boston MA, with a stop at Quincy Market and a stop at the Samuel Adams statue and a stop at the Boston Massacre site",
+  "tour_type": "walking",
   "stops_requested": 3,
   "stops_count_db": 3,
   "stops_delivered_headers": [
-    "Liberty Bowl by Paul Revere",
-    "Sons of Liberty Bowl",
-    "Watson and the Shark by Copley"
+    "Quincy Market",
+    "Boston Massacre Site",
+    "Samuel Adams Statue"
   ],
   "user_chosen_stops": [
-    "the Sargent Murals",
-    "the Liberty Bowl by Paul Revere",
-    "Watson and the Shark by Copley"
+    "Quincy Market",
+    "the Samuel Adams statue",
+    "the Boston Massacre site"
   ],
   "stops_match": {
     "the Sargent Murals": false,
-    "the Liberty Bowl by Paul Revere": true,
-    "Watson and the Shark by Copley": true
+    "the Liberty Bowl by Paul Revere": false,
+    "Watson and the Shark by Copley": false
   },
   "stops_match_to_header": {
     "the Sargent Murals": null,
-    "the Liberty Bowl by Paul Revere": 1,
-    "Watson and the Shark by Copley": 3
+    "the Liberty Bowl by Paul Revere": null,
+    "Watson and the Shark by Copley": null
   },
   "all_chosen_stops_present": false,
   "order_sensible": false,
-  "audio_bytes": 2009296,
+  "audio_bytes": 2072206,
   "audio_members": [
     "audio_1.mp3",
     "audio_2.mp3",
     "audio_3.mp3"
   ],
-  "zip_filename": "museum_of_fine_arts_boston_with_a_stop_at_the_sargent_murals_and_a_stop_at_the_liberty_bowl_by_paul_revere_and_a_stop_at_watson_and_the_shark_by_copley_contained_f27662f6.zip",
-  "score_clean": true,
+  "zip_filename": "faneuil_hall_marketplace_boston_ma_with_a_stop_at_quincy_market_and_a_stop_at_the_samuel_adams_statue_and_a_stop_at_the_boston_massacre_site_walking_dd5ed5ba.zip",
+  "score_clean": false,
   "score_metrics": {
     "stops_delivered": 3,
     "stops_requested": 3,
-    "dates": 7,
-    "named_people": 5,
-    "chars": 6543
+    "dates": 11,
+    "named_people": 7,
+    "chars": 6930
   },
-  "score_defects": {},
-  "cost_usd": 0.3827,
+  "score_defects": {
+    "bare_death": "7 death(s) named without circumstances"
+  },
+  "cost_usd": 0.1543,
   "cost_baseline_usd": 0.244,
   "cost_rows": [
     {
       "op": "spine_generate",
-      "usd": 0.009573,
+      "usd": 0.007563,
       "cache_hit": false,
-      "job_id": "a6132910-788c-4e6d-8ec5-858f726dbf39"
+      "job_id": "38642cf5-1c2b-4dec-834e-fd91f38722c9"
     },
     {
       "op": "tour_generate",
-      "usd": 0.373103,
+      "usd": 0.146762,
       "cache_hit": false,
-      "job_id": "a6132910-788c-4e6d-8ec5-858f726dbf39"
+      "job_id": "38642cf5-1c2b-4dec-834e-fd91f38722c9"
     }
   ]
 }

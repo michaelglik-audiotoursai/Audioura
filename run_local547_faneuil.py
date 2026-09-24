@@ -391,10 +391,15 @@ def stops_match(delivered_headers):
     stop is 'present' when a distinctive token from it appears in some header.
     """
     # A distinctive anchor token for each chosen stop (accent-insensitive).
+    # [2026-09-24, LEAD] These anchors were left as the MFA works when this file was
+    # derived from run_local547_igor_e2e.py -- only STOPS and LOCATION were changed.
+    # The Faneuil run therefore reported PARTIAL/FAIL while delivering all three
+    # requested stops correctly. A stale assertion reading as a product failure is
+    # exactly the trap the pinned corpus counts set last night.
     anchors = {
-        "the Sargent Murals": ["sargent"],
-        "the Liberty Bowl by Paul Revere": ["liberty bowl", "revere"],
-        "Watson and the Shark by Copley": ["watson and the shark", "watson", "copley"],
+        "Quincy Market": ["quincy"],
+        "the Samuel Adams statue": ["samuel adams", "adams"],
+        "the Boston Massacre site": ["boston massacre", "massacre"],
     }
     norm_headers = [_norm(h) for h in delivered_headers]
     matched, matched_to = {}, {}
