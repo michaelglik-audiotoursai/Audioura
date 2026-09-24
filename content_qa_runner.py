@@ -343,8 +343,20 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         _name_part = re.sub(r'^Stop\s+\d+:\s*', '', _header).strip()
         _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
         _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
-        # A real artwork name should be 1-8 words, start with uppercase
-        if _name_part and (len(_name_part.split()) > 15 or not _name_part[0].isupper()):
+        # [LOCAL-554] Capitalisation is NOT evidence about the world, and this is a
+        # FACTUAL check -- a failure here destroys the whole tour.
+        #
+        # On 2026-09-24 Michael typed three real Newton restaurants in lower case.
+        # All three stops generated (233/268/241 words) and the tour was discarded
+        # because one title began with a lower-case letter:
+        #     FAIL: D3(d) -- 1 suspicious title(s): ['little big diner in newton center']
+        # Little Big Diner is a real restaurant at 1247 Centre St with 625+ reviews.
+        #
+        # LOCAL-554 title-cases listener-typed stops upstream, so this should no longer
+        # fire -- but case must never again be able to fail a tour on its own, because
+        # the property is cosmetic and the verdict is factual. The length test stays:
+        # a 15+ word "title" really is a sentence masquerading as an entity.
+        if _name_part and len(_name_part.split()) > 15:
             _ungrounded.append(_name_part[:50])
     check("D3(d) Grounding assertion (titles look like real entities)",
           len(_ungrounded) == 0,

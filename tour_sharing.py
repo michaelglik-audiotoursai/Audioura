@@ -79,6 +79,24 @@ def _ensure_shared_tours_table(conn) -> None:
                 share_count INTEGER DEFAULT 0
             )
         """)
+        # [ST-1] A share must REFERENCE the tour, not duplicate its text.
+        #
+        # The original design stored a detached copy of tour_text. That copy has no
+        # audio (audio_tours.audio_tour holds the BYTEA), no link to translations
+        # (they chain off audio_tours.original_tour_id), and it drifts the moment the
+        # tour is regenerated -- so the shared version silently becomes a different
+        # tour than the one Kostya rode.
+        #
+        # Michael's Phase 1 requires a shared tour to behave exactly like one found on
+        # the home page: download the original, or translate it. That only works on a
+        # real audio_tours row.
+        #
+        # Additive and nullable on purpose: the 3 existing rows keep working through
+        # tour_text while audio_tour_id is NULL, so nothing breaks and no data is lost.
+        cur.execute("""
+            ALTER TABLE shared_tours
+            ADD COLUMN IF NOT EXISTS audio_tour_id INTEGER
+        """)
     conn.commit()
 
 
@@ -89,21 +107,34 @@ def store_shared_tour(
     tour_type: str,
     total_stops: int,
     db_url: str,
+    audio_tour_id: int = None,
 ) -> bool:
-    """Store (upsert) a shared tour. Returns True on success."""
+    """Store (upsert) a shared tour. Returns True on success.
+
+    [ST-1] `audio_tour_id` is the tour this share POINTS AT. Pass it whenever the
+    caller knows it -- it is what makes download and translation work, because those
+    flows operate on real audio_tours rows. It is optional so existing callers keep
+    compiling; a share without it still resolves through the stored text, which is
+    the pre-ST-1 behaviour and is what the 3 legacy rows rely on.
+    """
     try:
         conn = psycopg2.connect(db_url)
         _ensure_shared_tours_table(conn)
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO shared_tours (tour_id, tour_text, location, tour_type, total_stops)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO shared_tours
+                    (tour_id, tour_text, location, tour_type, total_stops, audio_tour_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tour_id) DO UPDATE
                 SET tour_text = EXCLUDED.tour_text,
                     location = EXCLUDED.location,
                     tour_type = EXCLUDED.tour_type,
-                    total_stops = EXCLUDED.total_stops
-            """, (tour_id, tour_text, location, tour_type, total_stops))
+                    total_stops = EXCLUDED.total_stops,
+                    -- COALESCE so a later share that does not know the tour id cannot
+                    -- erase a reference an earlier one established.
+                    audio_tour_id = COALESCE(EXCLUDED.audio_tour_id,
+                                             shared_tours.audio_tour_id)
+            """, (tour_id, tour_text, location, tour_type, total_stops, audio_tour_id))
         conn.commit()
         conn.close()
         _logger.info(f"Stored shared tour: {tour_id}")
@@ -120,7 +151,7 @@ def get_shared_tour(tour_id: str, db_url: str) -> Optional[dict]:
         _ensure_shared_tours_table(conn)
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT tour_id, tour_text, location, tour_type, total_stops, created_at, share_count FROM shared_tours WHERE tour_id = %s",
+                "SELECT tour_id, tour_text, location, tour_type, total_stops, created_at, share_count, audio_tour_id FROM shared_tours WHERE tour_id = %s",
                 (tour_id,),
             )
             row = cur.fetchone()
@@ -135,6 +166,10 @@ def get_shared_tour(tour_id: str, db_url: str) -> Optional[dict]:
             "total_stops": row[4],
             "created_at": row[5].isoformat() if row[5] else None,
             "share_count": row[6],
+            # [ST-1] The tour this share points at. None for the 3 legacy rows, which
+            # predate the reference and still resolve through tour_text. Callers must
+            # handle None rather than assume a reference exists.
+            "audio_tour_id": row[7],
         }
     except Exception as e:
         _logger.error(f"Error getting shared tour {tour_id}: {e}")

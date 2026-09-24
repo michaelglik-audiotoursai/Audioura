@@ -1156,6 +1156,58 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn):
     return poi_list, inserted
 
 
+def _presentable_stop_title(raw):
+    """[LOCAL-554] Turn a stop name a LISTENER TYPED into a presentable title.
+
+    forced_stops began as LOCAL-357's verification harness ("THIS IS A VERIFICATION
+    HARNESS -- NOT A PRODUCT FEATURE") and LOCAL-525 repurposed it as the product path
+    for user-chosen stops. A harness passes names through verbatim; a product cannot.
+
+    Michael typed three restaurants in lower case on 2026-09-24. They were honoured --
+    the feature worked -- and then the tour was DESTROYED at the final gate:
+
+        Stop 1: little big diner in newton center - 233 words
+        FAIL: D3(d) Grounding assertion -- 1 suspicious title(s):
+              ['little big diner in newton center']
+        [BLOCKER4c] FACTUAL QA FAILED (round 1): 1 factual failure(s)
+
+    All three stops were written, then thrown away, because one title began with a
+    lower-case letter. PHASE 3B had already derived the correct names and they were
+    discarded, since forced stops are pinned verbatim:
+
+        PHASE 3B introduced unknown names (ignored): ['Sycamore', 'Little Big Diner']
+
+    Nobody types a tour stop in title case. Presenting it properly is our job.
+
+    Deliberately conservative: a name that ALREADY contains capitals is left alone, so
+    "O'Hara's Food & Spirits" and "MoMA" survive untouched. Only an all-lower-case name
+    is rewritten -- the exact case that fails the gate and reads badly in a tour.
+    """
+    if not raw or not isinstance(raw, str):
+        return raw
+    name = raw.strip()
+    if not name or any(c.isupper() for c in name):
+        return name          # the listener supplied case; respect it
+    # Words that stay lower-case unless they lead the title.
+    _MINOR = {'a', 'an', 'the', 'in', 'on', 'at', 'of', 'for', 'and', 'or', 'by',
+              'to', 'de', 'la', 'le', 'du', 'des', 'von', 'van'}
+    out = []
+    for i, word in enumerate(name.split()):
+        if i > 0 and word.lower() in _MINOR:
+            out.append(word.lower())
+            continue
+        # Capitalise after an apostrophe only for "O'Hara", never for "diner's".
+        if "'" in word:
+            head, _, tail = word.partition("'")
+            if len(head) <= 2 and tail:
+                out.append(head.capitalize() + "'" + tail.capitalize())
+            else:
+                out.append(head.capitalize() + "'" + tail)
+            continue
+        out.append(word.capitalize())
+    return ' '.join(out)
+
+
 def named_waypoints(request_text):
     """Places the request names as STOPS ON the tour, not as its extent."""
     out = []
@@ -6836,7 +6888,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _forced_stops_active = False
     if forced_stops is not None and len(forced_stops) > 0:
         _forced_stops_active = True
-        poi_list = [_new_poi(name) for name in forced_stops]
+        # [LOCAL-554] Present the listener's own words properly. Matching and
+        # protection still key on what they typed; only the DISPLAY title changes.
+        _forced_titles = [_presentable_stop_title(n) for n in forced_stops]
+        for _orig, _pretty in zip(forced_stops, _forced_titles):
+            if _orig != _pretty:
+                print(f"  [LOCAL-554] stop title '{_orig}' -> '{_pretty}'")
+        poi_list = [_new_poi(name) for name in _forced_titles]
         # Override total_stops to match the forced list length
         total_stops = len(forced_stops)
         print(f"\n{'=' * 70}")
