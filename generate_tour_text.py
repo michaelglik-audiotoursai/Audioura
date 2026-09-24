@@ -5788,6 +5788,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
     global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
 
+    # [LOCAL-533] Zero the grounded-request counter for this generation. Grounding
+    # (Gemini + Google Search) bills per request and was absent from the printed
+    # "Total API cost". We reset here — before the cache check — so that a cache
+    # hit, which issues no grounded requests, correctly reads back 0 requests /
+    # $0.00 grounding.
+    try:
+        from story_leads import reset_grounding_requests
+        reset_grounding_requests()
+    except ImportError:
+        pass
+
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
     _disable_cache = os.environ.get("DISABLE_TOUR_CACHE", "").strip() == "1"
@@ -5800,11 +5811,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _cache_hit:
                     print(f"CACHE HIT: {location} / {tour_type} / {total_stops}")
                     # [LOCAL-60] Record cache hit cost = 0
+                    # [LOCAL-533] A cache hit issues no grounded requests, so
+                    # grounding is $0.00 / 0 requests. Read the counter (reset
+                    # just above, so 0) rather than assuming, and print the same
+                    # two lines a fresh tour prints so the format is uniform.
+                    try:
+                        from story_leads import get_grounding_requests as _get_gr
+                        _cache_gr = _get_gr()
+                    except ImportError:
+                        _cache_gr = 0
+                    try:
+                        from cost_rates import grounding_cost as _grounding_cost
+                        _cache_gr_cost = _grounding_cost(_cache_gr)
+                    except ImportError:
+                        _cache_gr_cost = 0.0
+                    print(f"\nTotal API cost: $0.0000 (0 tokens)")
+                    print(f"Grounding:      ${_cache_gr_cost:.4f} ({_cache_gr} requests)")
+                    print(f"Tour total:     ${_cache_gr_cost:.4f}")
                     _LAST_GENERATION_COST = {
                         "total_cost": 0.0,
                         "total_tokens": 0,
                         "cache_hit": True,
-                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                        "grounding_cost": _cache_gr_cost,
+                        "grounding_requests": _cache_gr,
+                        "tour_total_cost": 0.0 + _cache_gr_cost,
+                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0,
+                                      "grounding": _cache_gr_cost},
                     }
                     # Return cached tour immediately
                     if output_file:
@@ -19564,6 +19596,30 @@ RULES:
     
     # Print total cost
     print(f"\nTotal API cost: ${total_cost:.4f} ({total_tokens} tokens)")
+
+    # [LOCAL-533] Grounding cost — a separate billing channel from the OpenAI
+    # tokens summed above. Grounding (Gemini + Google Search) bills per REQUEST,
+    # not per token, so it never appeared in "Total API cost" and could rival the
+    # whole OpenAI cost of a tour while the printed number said nothing. Count the
+    # requests actually issued this generation (single chokepoint in story_leads),
+    # price them at the one constant in cost_rates, and print both lines so a
+    # glance separates them. This measures; it does not change generation.
+    try:
+        from story_leads import get_grounding_requests as _get_gr
+        _grounding_requests = _get_gr()
+    except ImportError:
+        _grounding_requests = 0
+    try:
+        from cost_rates import grounding_cost as _grounding_cost
+        _grounding_cost_usd = _grounding_cost(_grounding_requests)
+    except ImportError:
+        _grounding_cost_usd = 0.0
+    _tour_total_cost = total_cost + _grounding_cost_usd
+    print(f"Grounding:      ${_grounding_cost_usd:.4f} ({_grounding_requests} requests)")
+    print(f"Tour total:     ${_tour_total_cost:.4f}")
+    # The authoritative _LAST_GENERATION_COST record is written further down
+    # (the canonical [LOCAL-60] block); the grounding fields computed here are
+    # folded into it there, so a caller reads one complete record.
     
     # -------- [S20] Storied: store in cache after successful generation --------
     if _storied_mode and complete_tour and not _forced_stops_active:
@@ -19639,14 +19695,21 @@ RULES:
     _LAST_POI_LIST = list(poi_list)
 
     # [LOCAL-60] Expose generation cost at module level for cost metering
+    # [LOCAL-533] Grounding is a SEPARATE billing channel (per-request Google
+    # Search), added here so the one record a caller reads carries both channels
+    # and their sum. Values computed above where the two cost lines are printed.
     _LAST_GENERATION_COST = {
         "total_cost": total_cost,
         "total_tokens": total_tokens,
         "cache_hit": False,
+        "grounding_cost": _grounding_cost_usd,
+        "grounding_requests": _grounding_requests,
+        "tour_total_cost": _tour_total_cost,
         "breakdown": {
             "llm": total_cost,  # Currently all tracked cost is LLM tokens
             "tts": 0.0,         # TTS cost tracked separately at orchestrator level
             "search": 0.0,      # Search cost tracked separately via work_story_searcher
+            "grounding": _grounding_cost_usd,  # [LOCAL-533] per-request Google Search
         },
     }
 
