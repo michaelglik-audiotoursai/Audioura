@@ -8822,7 +8822,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # Within each tier, higher quality_score sorts first.
                     # When quality_scores are unavailable (all 0), original
                     # position order is preserved (stable sort).
+                    # [LOCAL-547] A stop the LISTENER NAMED outranks coverage and
+                    # yield score. This sort was the last place Igor's stops died:
+                    # they survived insertion, D1v2 and the verified-only gate, then
+                    # LOCAL-212 ranked all seven candidates by tier and quality and
+                    # sliced the top three --
+                    #   Selected: Ancient Nubia Now / Sargent's Daughters / Sons of Liberty Bowl
+                    #   Dropped:  the Sargent Murals ... Watson and the Shark by Copley
+                    # -- both dropped ones user_explicit. Coverage and yield are the
+                    # right ranking for works WE chose; they are not a reason to
+                    # discard a work the listener asked for by name. Michael,
+                    # 2026-09-21: state the precondition, never drop the stop.
                     poi_list.sort(key=lambda p: (
+                        0 if p.get('user_explicit') else 1,
                         _COVERAGE_PRIORITY.get(
                             _cs_verdicts.get(p['name'], 'EMPTY'), 3
                         ),
