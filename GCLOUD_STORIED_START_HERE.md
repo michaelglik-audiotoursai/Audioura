@@ -13,6 +13,27 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+## 📌 BEFORE THIS DEPLOY — read `HANDOFF_20260924_MORNING.md`
+
+Written by `Storied_Tours` (Mac Mini) on 2026-09-24 and tracked in git, because
+`.continuous_dev/STATUS.md` is gitignored and never reaches this machine.
+
+It carries what changed on `storied` overnight and two things that will bite this
+deploy if you do not know them:
+
+- **A catastrophic regex backtrack was hanging every LARGE-MUSEUM generation.** Fixed,
+  but if your E2E picks a big venue and reports *"status polling failed"*, that is the
+  symptom — the generator is busy, not dead. Pick at least one large museum.
+- **User-chosen stops now reach generation, but the CLOUD path fix is unverified.**
+  `stops` was threaded through `_enqueue_cloud_task` / `/run-job` / `run_generation`,
+  and Cloud Tasks cannot be exercised on the Mac Mini. If a listener's named stops are
+  ignored in production, start there.
+
+Also note the OpenAI balance was exhausted overnight and **Michael topped it up on the
+morning of 2026-09-24** — so that is resolved, not an open issue.
+
+---
+
 ## 🚫 RULE ONE — NEVER WRITE THE CODE. DISPATCH KIRO AND REVIEW IT.
 
 **Michael's ruling, 2026-09-15, after this session broke it.** This sits above
