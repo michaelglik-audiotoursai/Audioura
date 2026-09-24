@@ -79,14 +79,39 @@ _PERSON_FRAME = (r'(?:landing|visit|arrival|death|funeral|memory|honou?r|legacy|
 # The period on an initial is REQUIRED: with it optional, [A-Z]\.? matched the
 # first letter of the surname and the name came out as "Betty A" / "Charles L".
 _NAME = r'[A-Z][a-z]{2,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]{2,})){0,2}'
+# [LOCAL-537] A given+surname of at least two tokens. The bare single token is
+# too noisy for the possessive rule below ("Mary's", "Christ's", "That's"), so the
+# possessive frame demands a full name.
+_NAME2 = r'[A-Z][a-z]{2,}(?:\s+(?:[A-Z]\.|[A-Z][a-z]{2,})){1,2}'
+# [LOCAL-537] Honorific abbreviations that sit BETWEEN a trigger word and the name
+# and, being one or two letters, break the _NAME shape so the whole match failed.
+# "pioneer priest Fr John Therry" scored zero people until this let the introducer
+# step over "Fr" and anchor _NAME on "John Therry". These are only ALLOWED here,
+# never REQUIRED, so a name with no honorific still matches.
+_HONORIFIC = r'(?:Fr|St|Ss|Mr|Mrs|Ms|Dr|Rev|Msgr|Sr|Jr|Prof)\.?\s+'
 _PERSON = re.compile(
     r'\b(?:(?:' + _PERSON_TITLE + r')\.?\s+'
     r'|(?:' + _PERSON_ROLE + r')s?\s*,?\s+(?:named\s+)?'
     r'|(?:' + _PERSON_FRAME + r')\s+)'
+    r'(?:' + _HONORIFIC + r')?'
     r'(' + _NAME + r')'
     # "...attendants Betty Ann Ong AND Madeline Amy Sweeney" -- one introducer,
     # two people. Without this the second name is invisible.
-    r'(?:\s+and\s+(' + _NAME + r'))?')
+    r'(?:\s+and\s+(?:' + _HONORIFIC + r')?(' + _NAME + r'))?')
+# [LOCAL-537] A name in possessive form is the same person as the bare form
+# ("Gustave Eiffel's iconic Control Tower" names Eiffel, whom NO title/role/frame
+# introduces). Requiring the FULL given+surname (_NAME2, two+ tokens) is what keeps
+# this from turning every "Mary's" / "Peter's Basilica" / "That's 4 stops" into a
+# person. Place and organisation phrases that survive that ("Boston Logan's", "New
+# England's", "Boston Globe's") are removed by _NOT_A_NAME on their first or last
+# token -- see the words added there. De-dup by surname folds the possessive back
+# onto the bare mention, so it never double-counts.
+_PERSON_POSSESSIVE = re.compile(r'\b(' + _NAME2 + r')(?:\'|\u2019)s\b')
+# [LOCAL-537] An occupation appositive AFTER the name is as good a signal as one
+# before it: "Trippe, the founder and later Pan American World Airways" was
+# invisible because _PERSON only looks for a role that PRECEDES the name.
+_PERSON_APPOSITIVE = re.compile(
+    r'\b(' + _NAME + r'),\s+(?:the\s+|a\s+|an\s+)?(?:' + _PERSON_ROLE + r')s?\b')
 # a fragment ending on a title with no name after it
 _TRUNC = re.compile(r'\b(St|Fr|Dr|Mr|Mrs|Rev|Msgr|Jr|Sr|Prof)\.\s+(?=[A-Z][a-z]+\s+'
                     r'(?:you|As|The|It|This|Its|Their|He|She|We)\b)')
@@ -160,6 +185,16 @@ _NOT_A_NAME = {
     'swiss', 'belgian', 'mexican', 'american', 'canadian', 'australian',
     'catholic', 'protestant', 'jewish', 'muslim', 'christian', 'orthodox',
     'local', 'native', 'colonial', 'federal', 'royal', 'imperial',
+    # [LOCAL-537] Place / organisation tokens that appear inside a possessive place
+    # phrase the new _PERSON_POSSESSIVE rule would otherwise count as a person. Each
+    # is motivated by verbatim text in TOURS_FOR_REVIEW/round7-9:
+    #   "Boston Logan's iconic ...", "East Boston's tidal flats"  -> first token
+    #   "New England's busiest", "Massachusetts Legislature's decision",
+    #   "Boston Globe's Spotlight", "Middlesex District Attorney's office".
+    # 'logan' is deliberately ABSENT: it is the surname of a real person (Major
+    # General Edward Lawrence Logan), and blocking it re-hid the tour's namesake.
+    'boston', 'east', 'west', 'north', 'south', 'new', 'massachusetts',
+    'middlesex', 'england', 'globe', 'legislature', 'attorney', 'district',
 }
 
 
@@ -668,19 +703,29 @@ def _count_people(text):
     for m in _PERSON.findall(text or ''):
         # Every group is a person: group 2 is the "X and Y" partner when present.
         candidates.extend([m] if isinstance(m, str) else [g for g in m if g])
+    # [LOCAL-537] A name carries no prefix in two further shapes the frame above
+    # cannot see: the possessive ("Gustave Eiffel's") and the trailing appositive
+    # ("Trippe, the founder"). De-dup by surname folds them onto any bare mention.
+    candidates.extend(_PERSON_POSSESSIVE.findall(text or ''))
+    candidates.extend(_PERSON_APPOSITIVE.findall(text or ''))
     for name in candidates:
         name = name.strip()
         if not name:
             continue
+        first = name.split()[0]
         surname = name.split()[-1]
         if len(surname) < 3:
             continue
         # A frame like "including Terminal B" hands us scenery. The person-cap
         # already maintains this vocabulary (D584); share it rather than keeping
         # two lists that drift apart.
-        if surname.lower() in _NOT_PERSON or name.split()[0].lower() in _NOT_PERSON:
+        if surname.lower() in _NOT_PERSON or first.lower() in _NOT_PERSON:
             continue
-        if surname.lower() in _NOT_A_NAME:
+        # [LOCAL-537] Check _NOT_A_NAME on BOTH ends. A possessive place phrase is
+        # betrayed by either token -- "Boston Logan's" by its first word, "New
+        # England's" by its last -- and the old surname-only test let the former
+        # through.
+        if surname.lower() in _NOT_A_NAME or first.lower() in _NOT_A_NAME:
             continue
         if len(name) > len(by_surname.get(surname, '')):
             by_surname[surname] = name
