@@ -64,7 +64,12 @@ fi
 
 echo
 echo "── 4/4  Build and install (this takes a few minutes) ──────────────────────"
-flutter run --release -d "$PHONE_ID"
+# `flutter install` puts the app on the phone and EXITS. `flutter run` would stay
+# attached streaming logs until you press q, so the success message below would not
+# appear until after you quit -- it looks like a hang. You want the app on the device
+# to walk around with, not tethered to this terminal.
+#   Need live logs for debugging instead?  flutter run --release -d "$PHONE_ID"
+flutter install --release -d "$PHONE_ID"
 RC=$?
 
 echo
@@ -81,7 +86,7 @@ if [ $RC -eq 0 ]; then
   for something else. A silent substitution is the bug (D562).
 DONE
 else
-  echo "✗ flutter run exited $RC — read the error above; the phone may need to be"
+  echo "✗ flutter install exited $RC — read the error above; the phone may need to be"
   echo "  unlocked, or the bundle id may need a signing profile in Xcode."
 fi
 exit $RC
