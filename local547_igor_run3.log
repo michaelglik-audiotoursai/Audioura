@@ -12,3 +12,4 @@
 [23:04:08]   stops      : 3  ['the Sargent Murals', 'the Liberty Bowl by Paul Revere', 'Watson and the Shark by Copley']
 [23:04:08]   job_id     : 13214ee4-9016-4602-9531-2f8f1264c6c9
 [23:04:16]   status=processing  Text generation: Starting tour text generation...
+FAIL: timed out waiting for completion

@@ -195,3 +195,30 @@ if __name__ == '__main__':
         passed += 1
         print(f"PASS {fn.__name__}")
     print(f"\n{passed}/{len(fns)} tests passed")
+
+
+def test_a_different_airport_is_not_a_contradiction():
+    """[2026-09-23, LEAD] Round 11 produced this false positive and it had to be
+    fixed the same night, because since LOCAL-540 this defect GATES: a false
+    positive spends real money regenerating correct content.
+
+        A  "This airport, sprawls across 2,384 acres ..."          -> the venue
+        B  "JFK, the busiest in the New York airport system,
+            covers 5,200 acres ..."                                -> NOT the venue
+
+    Both are true. `_AIRPORT_NAME` does not match a bare acronym, so "JFK" resolved
+    to the venue and Logan's acreage was reported as contradicting JFK's.
+    """
+    text = _read(_HERE, 'TOURS_FOR_REVIEW', 'round11', 'LOGAN_1.txt')
+    subchecks = [c[0] for c in tq._find_self_contradictions(text)]
+    assert 'numeric_conflict' not in subchecks, (
+        "two different airports' acreage is not a self-contradiction; got %r"
+        % (subchecks,))
+
+
+def test_the_real_pair_still_fires_after_that_fix():
+    """The guard above must not buy its silence by breaking the true positive."""
+    subchecks = [c[0] for c in tq._find_self_contradictions(LOGAN_1)]
+    assert 'numeric_conflict' in subchecks, (
+        "round 9's 'nearly 12 million' vs 'a record 43.5 million' must still fire; "
+        "got %r" % (subchecks,))
