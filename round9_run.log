@@ -7,3 +7,703 @@ CHURCH_1: Our Lady Help of Christians Catholic Church, Newton MA (museum, 4 stop
 WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:9210. Caller should supply input_tokens and output_tokens separately.
 WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:9211. Caller should supply input_tokens and output_tokens separately.
 WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:9647. Caller should supply input_tokens and output_tokens separately.
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:13762. Caller should supply input_tokens and output_tokens separately.
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:15075. Caller should supply input_tokens and output_tokens separately.
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_201006.txt'
+
+======================================================================
+CALL #001 | 20:10:06.450 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  tour_type: museum
+  total_stops_parameter: 4
+  output_file: /Users/micha/Audioura/TOURS_FOR_REVIEW/round9/CHURCH_1.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_201006.txt'
+
+======================================================================
+CALL #002 | 20:10:06.451 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "churches",
+    "location": "Newton, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Our Lady Help of Christians Catholic Church",
+    "geographic_scope": "Our Lady Help of Christians Catholic Church, Newton, MA",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: churches
+   Location: Newton, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Our Lady Help of Christians Catholic Church
+  [venue_name sanity] 'Our Lady Help of Christians Catholic Church' OK
+  [S15/LOCAL-485] venue_name='Our Lady Help of Christians Catholic Church' NOT forced to museum — request names a worship/civic place class (stops are places, not works)
+[TIMING] phase=intent elapsed=2.3s cumulative=2.3s
+[LOCAL-474] tour_type='museum' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Our Lady Help of Christians Catholic Church, Newton MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_201006.txt'
+
+======================================================================
+CALL #003 | 20:10:08.766 | GENERATING_PROMPT
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  user_request: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Our Lady Help of Christians Catholic Church, Newton MA...
+  [S17] no scope_constraint (precision='BUILDING', scope='Our Lady Help of Christians Catholic Church, Newton, MA')
+  [D571] pinned 4 building part(s) to the venue anchor 42.3558, -71.1963
+  [D571] seeded 23 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='Catholic parish church' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Altar', 'Nave', 'Narthex', 'Stained Glass Windows', 'Pulpit', 'Baptismal Font', 'Stations of the Cross', 'Tabernacle']
+  [D571]   stops: ['Nave', 'Stained Glass Windows', 'Altar', 'Narthex']
+  [D571]   dropped 'Crypt' — the venue has none of these
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Nave [?]
+   - Stained Glass Windows [?]
+   - Altar [?]
+   - Narthex [?]
+  [area_resolver] Parsed: city='Newton MA', neighborhood='Our Lady Help of Christians Catholic Church'
+  [area_resolver] City resolved: Newton MA → Q49196 (42.3369, -71.2097)
+  [area_resolver] Neighborhood 'Our Lady Help of Christians Catholic Church' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3369, -71.2097), radius=2.0km, lang=en
+  [area_cache] HIT for Q49196: 49 landmarks (tier=rich)
+  [verify_landmarks] 0/4 stops verified against 49 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 0 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Our Lady Help of Christians Catholic Church, Newton MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Nave' — wikipedia_en_summary: 'Nave' exists and mentions region
+    [VERIFIED] 'Stained Glass Windows' — stop_corpus(geographic): 'Stained Glass Windows' at 'Our Lady Help of Christians
+    [VERIFIED] 'Altar' — stop_corpus(geographic): 'Altar' at 'Our Lady Help of Christians Catholic Church
+    [VERIFIED] 'Narthex' — stop_corpus(geographic): 'Narthex' at 'Our Lady Help of Christians Catholic Chur
+    [HARVEST] 'Nave': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'Stained Glass Windows': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +1 passages, 8 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Computed route for 4 stops with coords (0 without): 0.00km total
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_201006.txt'
+
+======================================================================
+CALL #004 | 20:11:23.257 | PHASE_3B_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (844 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.3496, -71.2080', refetching...
+   Cluster refetch OK 'Nave': 42.3544, -71.1995
+   Cluster refetch OK 'Altar': 42.3529, -71.2025
+   Cluster refetch OK 'Narthex': 42.3516, -71.2038
+   Cluster refetch OK 'Stained Glass Windows': 42.3552, -71.2044
+   GEO-CHECK: all 4 stops within walking distance (max leg 0.41 km, total 0.89 km, limit 12 km)
+Extracted first POI coordinates: (42.3544, -71.1995)
+
+=== Extracted POI Information ===
+1. Nave
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3544, -71.1995
+   Directions: Exit the main entrance and turn left onto Washington St, walk straight ahead unt...
+2. Stained Glass Windows
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3552, -71.2044
+   Directions: Walk straight ahead to the front of the church and enter through the main doors,...
+3. Altar
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3529, -71.2025
+   Directions: Exit the nave and head towards the front of the church, the altar is directly ah...
+4. Narthex
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3516, -71.2038
+   Directions: Exit the altar area and walk towards the back of the church, the narthex is the ...
+================================
+
+  [D556] +4 story fact(s) for 'Nave' via gemini (4 high)
+  [D556] +5 story fact(s) for 'Stained Glass Windows' via gemini (5 high)
+  [D556] +4 story fact(s) for 'Altar' via gemini (4 high)
+  [D556] +2 story fact(s) for 'Narthex' via gemini (2 high)
+[TIMING] phase=poi_selection elapsed=196.7s cumulative=199.0s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Nave Our Lady Help of Christians Catholic Church' → 2257 chars
+  [LOCAL-47] Nave: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Stained Glass Windows Our Lady Help of Christians Catholic Church' → 3276 chars
+  [LOCAL-47] Stained Glass Windows: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Altar Our Lady Help of Christians Catholic Church' → 14953 chars
+  [LOCAL-47] Altar: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Narthex Our Lady Help of Christians Catholic Church' → 9424 chars
+  [LOCAL-47] Narthex: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Our Lady Help of Christians Ca model=gpt-4o tokens=1470 (in=857 out=613) cost=$0.0083 latency=5.2s
+[COST_METER] FRESH | spine_generate | $0.008273 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0083
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (9 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Nave' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Stained Glass Windows' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Altar' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Narthex' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=13.4s cumulative=212.4s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=212.4s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=212.4s
+
+Generating description for Stop 1: Nave by , ...
+
+Generating description for Stop 2: Stained Glass Windows by , ...
+
+Generating description for Stop 3: Altar by , ...
+
+Generating description for Stop 4: Narthex by , ...
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Narthex' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Altar' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Stained Glass Windows' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 10, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14650 after=20863 (+6213 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20863)
+  [LOCAL-411] Stop 4 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Narthex', 6, ''), ('Narthex', 6, '')]
+  [LOCAL-402] Stop 4: injected 2 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=14687 after=24692 (+10005 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24692)
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Altar', 6, ''), ('Altar', 6, ''), ('Altar', 6, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15206 after=24669 (+9463 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24669)
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Stained Glass Windows', 20, ''), ('Stained Glass Windows', 12, ''), ('Stained Glass Windows', 11, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14962 after=25777 (+10815 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25777)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0247 (5198 tokens, model=gpt-4o)
+Stop 1 description word count: 230 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0301 (6344 tokens, model=gpt-4o)
+Stop 2 description word count: 290 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0293 (6163 tokens, model=gpt-4o)
+Stop 4 description word count: 282 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0289 (6093 tokens, model=gpt-4o)
+Stop 3 description word count: 296 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Nave': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+    ✓ PASS stop='Stained Glass Windows': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Altar': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+    ✓ PASS stop='Narthex': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+  [LOCAL-439] Classification cost: $0.000561 (input=2373, output=341)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 3 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 7 paragraphs retried, 5 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0028 (3493 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Altar': 2 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'Stained Glass Windows': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Altar': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 1 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 12
+    Transferable (high, removed): 3
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 21
+    Stops affected: 3
+    [LOCAL-472] REMOVED transferable paragraph stop='Nave' conf=high reason='Generic scene-setting applicable to any historic church.': "In the nave, the sacred silence intertwines with the vibrant pulse of life in the church's community."
+    [LOCAL-472] REMOVED transferable paragraph stop='Stained Glass Windows' conf=high reason='Generic scene-setting applicable to any historic church.': "Just around the corner, the heart of the church's spiritual life awaits to reveal more of its layered narrative."
+    [LOCAL-472] REMOVED transferable paragraph stop='Narthex' conf=high reason='Generic description applicable to any historic church.': "In this narthex, the rhythms of everyday life and the weight of significant moments converge.The narthex is where the li"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='In June' reason='It does not specify how Mother Teresa is concretely linked to the church.' in: "The nave of this church is not just a place of worship but a living chronicle of its community's joy"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Mother Teresa' reason='It does not specify that Mother Teresa visited or prayed at this church regularly or in a formal capacity.' in: "The nave of this church is not just a place of worship but a living chronicle of its community's joy"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Lucia Arpino' reason='It does not specify how Lucia Arpino relates to the nave.' in: "In late June 2023, the nave once again became a place of gathering, this time in mourning rather tha"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Patrick Keely' reason='It does not specify that Keely designed or contributed to this church.' in: "The stained glass tradition in churches is a tapestry woven over centuries, yet Our Lady Help of Chr"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Mary Immaculate' reason='No concrete link to Mary Immaculate at this stop.' in: "The church does not boast the storied windows of Mary Immaculate of Lourdes in Newton Upper Falls, o"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Newton Upper Falls' reason='It does not specify a direct link between Newton Upper Falls and this stop.' in: "The church does not boast the storied windows of Mary Immaculate of Lourdes in Newton Upper Falls, o"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Timothy Danahy' reason='No concrete link to the stop is provided.' in: "The church does not boast the storied windows of Mary Immaculate of Lourdes in Newton Upper Falls, o"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Zettler Studios' reason='It does not specify a direct connection between Zettler Studios and this stop.' in: "The church does not boast the storied windows of Mary Immaculate of Lourdes in Newton Upper Falls, o"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Our Lady Help' reason='No concrete link between Mother Teresa and the stop is provided.' in: "The church does not boast the storied windows of Mary Immaculate of Lourdes in Newton Upper Falls, o"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='In June' reason='It does not specify how the individuals relate to the altar.' in: "In June 2023, the church's altar became entwined in another tragic chapter when Gilda (Jill) D’Amore"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Lucia Arpino' reason='No concrete link to the altar is provided.' in: "In June 2023, the church's altar became entwined in another tragic chapter when Gilda (Jill) D’Amore"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Mary Help' reason='No concrete link to the altar is provided.' in: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='John Chrysostom' reason='No concrete link to the altar is provided.' in: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Don Bosco' reason='It does not specify a concrete link between Don Bosco and the altar.' in: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Vincent Pallotti' reason='No concrete link to the altar is provided.' in: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Christian Europe' reason='No concrete link to the altar is provided for the named figures.' in: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Middle Ages' reason='No concrete link to the altar is provided for the named figures.' in: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='Cardinal Bernard Law' reason='It does not specify a direct link between Cardinal Bernard Law and the narthex.' in: "The narthex is more than an architectural feature; it is the heart of communal life. In December 200"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='Boston Archdiocese' reason='It does not specify a concrete link between the Boston Archdiocese and the narthex.' in: "The narthex is more than an architectural feature; it is the heart of communal life. In December 200"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='In June' reason='It does not specify how the D'Amores or Lucia Arpino relate to the narthex.' in: "In June 2023, the narthex became a sanctuary for mourning and reflection following a tragic event th"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='Lucia Arpino' reason='It does not specify how Lucia Arpino relates to the narthex.' in: "In June 2023, the narthex became a sanctuary for mourning and reflection following a tragic event th"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 1
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=1, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 1
+    Deletion rate: 2.7% (1/37)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Nave' cut orphaned dependant of a removed introduction — subject 'church/nave/this': "The nave of this church is not just a place of worship but a living chronicle of"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 26
+    Glossed (composed): 8
+    Suppressed (already explained): 0
+    Degraded (name dropped): 13
+    Guard failures: 0
+    Known (skipped): 5
+    Triage: 2637 tokens, $0.0007, 7.0s
+    Gloss: 1782 tokens, $0.0004, 5.0s
+    Compose: 2461 tokens, $0.0004, 3.3s
+    Total added cost: $0.0015
+    Stops affected: 4
+    Glosses applied:
+      • Mother Teresa → "the founder of the Missionaries of Charity" [source: model]
+      • Lucia Arpino → DEGRADED (name dropped)
+      • Gilda → DEGRADED (name dropped)
+      • Our Lady Help → DEGRADED (name dropped)
+      • Patrick Keely → DEGRADED (name dropped)
+      • Mary Immaculate → DEGRADED (name dropped)
+      • Lourdes → DEGRADED (name dropped)
+      • Timothy Danahy → "an artist known for stained glass designs" [source: model]
+      • Zettler Studios → "a renowned stained glass studio in Munich" [source: model]
+      • Cuenin → DEGRADED (name dropped)
+      • Cardinal Bernard Law → DEGRADED (name dropped)
+      • Lucia Arpino → DEGRADED (name dropped)
+      • John Chrysostom → DEGRADED (name dropped)
+      • Don Bosco → "the Italian priest and educator" [source: model]
+      • Vincent Pallotti → "the Italian priest and founder" [source: model]
+      • In December → DEGRADED (name dropped)
+      • Father Walter → "a priest in the archdiocese of boston" [source: model]
+      • Cardinal Bernard Law → "the archbishop of boston from 1984 to 2002" [source: model]
+      • Boston Archdiocese → "the roman catholic archdiocese of greater boston" [source: model]
+      • Lucia Arpino → DEGRADED (name dropped)
+      • Jill → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 2 'Stained Glass Windows': claim='1881 (in context: "architect James Murphy and dedicated in 1' contradicted_by='Jean Bazaine (1904-2001) designed eight stained-glass windows on the theme of th' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=2 claim='1881 (in context: "architect James Murphy and dedi' evidence='Jean Bazaine (1904-2001) designed eight stained-gl' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Our Lady Help of Christians Catholic Church, Newton, MA'...
+   OK 'Stained Glass Windows' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': [D578] part of the venue by construction (conf=high)
+   OK 'Altar' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': [D578] part of the venue by construction (conf=high)
+   OK 'Narthex' — inside 'Our Lady Help of Christians Catholic Church, Newton, MA': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 5
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 5
+    Stops affected: 3
+    [1] DELETED: 'This unexpected' in: This unexpected visit by a global figure brought a moment of grace that remains 
+    [3] DELETED: 'This act' in: This act of courage highlighted the altar as not just a site for worship but als
+    [3] DELETED: 'This unspeakable' in: This unspeakable act sent ripples of grief through the congregation, yet the alt
+    [3] DELETED: 'This devotion' in: This devotion, propagated by figures like Don Bosco, the Italian priest and educ
+    [4] DELETED: 'This event' in: This event marked a critical point in the local church's history, showcasing the
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Altar' (index 33) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Nave': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Stained Glass Windows': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Altar': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Narthex': the longest run (3 sentences, Boston Archdiocese) has agency=0 stakes=0 — someone is described, but nothing is
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Nave' (index 20)
+  [D534] Stop 2 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: In June 1995, a quiet but profound moment unfolded here.
+  [D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: In late June 2023, the nave once again became a place of gathering, this time in mourning rather tha
+  [D534] Stop 4 repeats 3 thing(s) said earlier — will regenerate with them banned
+      already told: The tragic deaths of Gilda (Jill) D’Amore, Bruno D’Amore, and longtime parishioners brutally taken i
+      already told: In late June 2023, the nave once again became a place of gathering, this time in mourning rather tha
+      already told: In June 2023, the church's altar became entwined in another tragic chapter when Gilda (Jill) D’Amore
+
+  [LOCAL-474] PHASE 5.17: retry 'Nave' — 230w → 107w after gates, 8 sentence(s) removed
+    removed: "The nave of this church is not just a place of worship but a living chronicle of its community's joy"
+    removed: "Mother Teresa, known worldwide for her compassionate work with the poor and sick, made an unheralded"
+    removed: "This unexpected visit by a global figure brought a moment of grace that remains etched in the collec"
+    removed: "Fast forward to late June 2023, and the nave again became a place of gathering, not in joy, but in m"
+    removed: "The tragic deaths of Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino, longtime parishioners br"
+    removed: "The nave, filled with the scent of candle wax and the sound of quiet weeping, hosted a memorial that"
+    removed: "Here in the nave, the intertwining of sacred silence with the vibrant pulse of life in the church's "
+    removed: "As you move closer to the altar, the vibrant colors ahead invite reflection and a deeper connection "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Stained Glass Windows' — 244w → 127w after gates, 9 sentence(s) removed
+    removed: "The stained glass tradition in churches is a tapestry woven over centuries, yet Our Lady Help of Chr"
+    removed: "Designed by architect James Murphy and dedicated in 1881, the church notably features a flat apse wa"
+    removed: "This choice marked a distinct departure in ecclesiastical design, prioritizing painted narrative ove"
+    removed: "The church does not boast the storied windows of Mary Immaculate of Lourdes in Newton Upper Falls, o"
+    removed: "Timothy Danahy sending hand-sketched biblical designs to the famed F.X."
+    removed: "Zettler Studios in Munich, Bavaria.In the sacred confines of Our Lady Help of Christians, another ki"
+    removed: "As you stand amidst the light and color, consider the stories these windows might have told had they"
+    removed: "Yet, the absence of such windows allows the church to tell its unique story—one of architectural bol"
+    removed: "Just around the corner, the heart of the church's spiritual life awaits to reveal more of its layere"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Altar' — 296w → 182w after gates, 9 sentence(s) removed
+    removed: "Cuenin delivered a homily from this very spot, challenging the Catholic Church's handling of abuse s"
+    removed: "His words, fiery and unyielding, defied Cardinal Bernard Law and captured national attention."
+    removed: "This act of courage highlighted the altar as not just a site for worship but also for moral reckonin"
+    removed: "In June 2023, the church's altar became entwined in another tragic chapter."
+WARNING:cost_rates:[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/Audioura/generate_tour_text.py:18872. Caller should supply input_tokens and output_tokens separately.
+    removed: "Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found murdered after failing to arrive he"
+    removed: "This unspeakable act sent ripples of grief through the congregation, yet the altar remained a place "
+    removed: "The altar's historical layers deepen when you consider its namesake, Mary Help of Christians, a titl"
+    removed: "This devotion, propagated by figures like Don Bosco and Vincent Pallotti, is associated with the def"
+    removed: "As you turn to leave, observe how the altar's narrative threads weave into the larger story of the c"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Narthex' — 256w → 163w after gates, 10 sentence(s) removed
+    removed: "The narthex is more than an architectural feature; it is the heart of communal life."
+    removed: "In December 2002, this very space was the stage for an act of solidarity that reverberated beyond it"
+    removed: "Over 850 parishioners gathered here to stand with Father Walter H."
+    removed: "Cuenin, a bold critic of Cardinal Bernard Law during the Boston Archdiocese clergy abuse scandal."
+    removed: "This event marked a critical point in the local church's history, showcasing the narthex as a place "
+    removed: "More recently, in June 2023, the narthex became a sanctuary for mourning and reflection following a "
+    removed: "The brutal murder of longtime congregants Gilda “Jill” D’Amore, her husband Bruno D’Amore, and Jill’"
+    removed: "Media and community members filled the space, holding vigils and sharing memories, turning the narth"
+    removed: "It served as a reminder of the deep connections within the parish, where each person is part of a la"
+    removed: "In this narthex, the rhythms of everyday life and the weight of significant moments converge.The nar"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Nave by , ...
+
+Generating description for Stop 2: Stained Glass Windows by , ...
+
+Generating description for Stop 3: Altar by , ...
+
+Generating description for Stop 4: Narthex by , ...
+  [LOCAL-381] stop='Stained Glass Windows' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Stained Glass Windows', 20, ''), ('Stained Glass Windows', 12, ''), ('Stained Glass Windows', 11, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14962 after=25777 (+10815 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25777)
+  [LOCAL-381] stop='Altar' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Altar', 6, ''), ('Altar', 6, ''), ('Altar', 6, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15206 after=24669 (+9463 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24669)
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 10, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14650 after=20863 (+6213 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20863)
+  [LOCAL-381] stop='Narthex' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Narthex', 6, ''), ('Narthex', 6, '')]
+  [LOCAL-402] Stop 4: injected 2 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 2 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=14687 after=24692 (+10005 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24692)
+  [LOCAL-408] Prompt dump written to: /Users/micha/Audioura/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0275 (5783 tokens, model=gpt-4o)
+Stop 1 description word count: 242 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0328 (6914 tokens, model=gpt-4o)
+Stop 4 description word count: 255 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0331 (6963 tokens, model=gpt-4o)
+Stop 2 description word count: 254 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0317 (6682 tokens, model=gpt-4o)
+Stop 3 description word count: 276 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.1s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 207w (was 107w)
+    [LOCAL-474] regenerated and re-gated: 254w (was 127w)
+    [LOCAL-474] regenerated and re-gated: 250w (was 182w)
+    [LOCAL-474] regenerated and re-gated: 255w (was 163w)
+      [TRAGEDY-CONTEXT] stop='Narthex' RECOVERED circumstances (5 source(s)): On June 25, 2023, seventy-four-year-old Bruno D’Amore, his seventy-three-year-old wife Gil
+  [TRAGEDY-CONTEXT] recovered 1, removed 0 sentence(s)
+  [D534] removed 2 repeated sentence(s) the capped retries could not reach:
+      stop 2: The renowned Mother Teresa visited here on June 15, 1995, drawing thousands into this sacr
+      stop 4: On June 25, 2023, seventy-four-year-old Bruno D’Amore, his seventy-three-year-old wife Gil
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 4 improved, 0 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 3 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts) (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Chr
+  [LOCAL-427] HTTP 200 from https://canningliturgicalarts.com/portfolio/our-lady-help-of-christians/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://canningliturgicalarts.com/portfolio/our-la
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/beautyofallcatholicchurches/posts/1429365095361027/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://johncanningco.com/blog/characteristics-of-gothic-churches-and-chapels/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2148 chars from https://johncanningco.com/blog/characteristics-of-
+  [LOCAL-427] HTTP 200 from https://buildingsofnewengland.com/tag/irish-catholic-church/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://buildingsofnewengland.com/tag/irish-cathol
+  [LOCAL-427] Timeout from https://thebostonpilot.com/bcd/web_parish.asp?ektronid=4676 — retrying in 2.0s
+  [LOCAL-427] Timeout from https://thebostonpilot.com/bcd/web_parish.asp?ektronid=4676 — budget exhausted (2 attempts)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/StJoeOst/posts/our-church-renovation-project-is-now-underway-after-the-final-mass-in-the-sanctu/1318040403773911/ (attempt 1)
+  [D512] verb discovery: query='Our Lady Help of Christians Catholic Church, Newton MA construct' -> 13 new verb(s): conserved, pointed, dedicated, involved, uncovered, overview, ribbed, hampered, revealed, consolidated, reinstated, vaulted
+  [D512] _AGENCY_VERB widened by 13 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Nave                                       22    63     0    35
+     2  Stained Glass Windows                      46     0    21    57
+     3  Altar                                      52    31    12    89
+     4  Narthex                                    22    38     7    89
+    [LOCAL-485] index mean 35.5 over 4 stop(s), range 22-52
+    [LOCAL-485] weakest: 'Nave' at 22
+[TIMING] phase=story_first elapsed=109.5s cumulative=321.9s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (105 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 105 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 105 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 4 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 188
+    Words after:  170
+    Delta: -18
+    Stops affected: 1/4
+    Deletions (1):
+      [Stop 4][R10_UNFULFILLED_PROMISE] "Their presence isn't just decorative; they bear witness to the rich tapestry of stories that have un..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.4s, $0.0087, 1303 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Nave] (dated_event): Years later, in 2002, the nave again played a pivotal role during the Boston Glo...
+      [Stained Glass Windows] (mystery): At Mary Immaculate of Lourdes, the windows reveal a tale of artistic collaborati...
+      [Altar] (dated_event): Another chapter unfolded in September 2005 when Father Cuenin resigned under pre...
+      [Narthex] (dated_event): Fast forward to late June 2023, and the narthex once again became a focal point ...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0031 (532 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (38 words):
+      "As you continue the tour, you will learn about the artistic collaboration depicted in the stained glass windows at Mary Immaculate of Lourdes and the pivotal role the nave played during the Boston Globe's Spotlight investigation in 2002."
+      Stops referenced: 2
+    Part 4 total cost: $0.0031
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you exit the Nave, head towards the altar and then contin...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you stand by the beautiful Stained Glass Windows, walk st...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the altar, head towards the back of the church ...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.4s, $0.0024, 419 tokens
+  [LOCAL-280] Recap built: 26 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Stained Glass Windows] (mystery): "At Mary Immaculate of Lourdes, the windows reveal a tale of artistic collaborati..."
+      → composed: "Mary Immaculate of Lourdes showcases collaborative stained glass art"
+    [Nave] (dated_event): "Years later, in 2002, the nave again played a pivotal role during the Boston Glo..."
+      → composed: "The nave at Boston Globe's Spotlight investigation site was crucial in 2002"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Mary Immaculate of Lourdes showcases collaborative stained glass art and the nave at Boston Globe's Spotlight investigation site was crucial in 2002."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (1625 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='walking')
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne..."
+  [2] "That's 4 stops — Mary Immaculate of Lourdes showcases collaborative stained glass art and the nave a..."
+
+=== Word Count Statistics ===
+Stop 1: Nave - 230 words
+Stop 2: Stained Glass Windows - 290 words
+Stop 3: Altar - 296 words
+Stop 4: Narthex - 282 words
+===========================
+
+
+Total API cost: $0.2635 (37169 tokens)
+CACHE STORE: Our Lady Help of Christians Catholic Church, Newton MA / museum / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/Audioura/TOURS_FOR_REVIEW/round9/CHURCH_1.txt
+  [C5-5] Evidence persisted: /Users/micha/Audioura/TOURS_FOR_REVIEW/round9/CHURCH_1_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Our Lady Help of Christians Catholic Church, Newton MA - Walking Tour
+Tour-Category: walking
+
+Stop 1: Nave
+
+Address: 573 Washington St, Newton, MA 02458
+
+Coordinates: 42.3544, -71.1995
+
+Type/Specialty: Main worship area
+
+Specific Examples: High vaulted ceilings, wooden pews, religious artwork
+
+Operational Details: Open for prayer and services, check website for mass times
+
+Orientation: You are about to embark on a walking journey through Our Lady Help of Christian...
+
+[TIMING] phase=packing elapsed=9.1s cumulative=330.9s
+[TIMING] phase=verification elapsed=0.0s cumulative=330.9s
+[TIMING] TOTAL wall=330.9s phases: poi_selection=196.7s, story_first=109.5s, fact_sheets=13.4s, packing=9.1s, intent=2.3s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+CHURCH_1: 10744 chars in 331s
+   defects: CLEAN
+   people:  7
+
+======================================================================
+LOGAN_1: Boston Logan International Airport, Boston MA (facility, 4 stops)
+======================================================================

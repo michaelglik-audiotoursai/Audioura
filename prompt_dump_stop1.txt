@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-09-23T18:21:56.387846
+Generated: 2026-09-23T20:14:42.219099
 Model: gpt-4o
 Temperature: 0.7
 Max tokens: 1000
@@ -10,9 +10,9 @@ Max tokens: 1000
 You are a knowledgeable museum guide with expertise in art, architecture, and history.
 
 --- USER MESSAGE ---
-STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
+STYLE: Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.
 
-Create a detailed audio description for Water Lilies at Impressionism Now at Museum of Fine Arts, Boston, MA, focusing on museum.
+Create a detailed description for the stop "Nave" on a walking tour of Our Lady Help of Christians Catholic Church, Newton MA.
 
 NAME THE STORY OR DROP THE GESTURE. Never write that a place has a 'storied past', hosted 'luminaries', 'notable figures' or 'countless chapters of history', witnessed 'clandestine meetings', 'intrigue', 'secrets' or 'countless tales' — unless the SAME PARAGRAPH then gives ONE of them concretely: who, when, what they did, what came of it.
 - BAD:  'a storied past of hosting luminaries'
@@ -23,51 +23,55 @@ These GOOD examples are illustrations of the SHAPE required, not facts to reuse.
 
 NO UNEXPLAINED CLAIMS OF IMPORTANCE. If you call something innovative, pioneering, revolutionary, groundbreaking, influential or a turning point, the SAME SENTENCE or the next must say what specifically changed — what could be done afterwards that could not be done before, and for whom. 'A centerpiece of musical innovation' states nothing. 'The first with a pedal mechanism that let a player change key mid-piece' states something. If the source material does not tell you what changed, do not make the claim at all.
 
-Start with a brief orientation that names "Water Lilies" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+VERIFIED EPISODES ABOUT THIS PLACE — RETRIEVED AND SOURCE-CHECKED.
+  - In late September 2005, the Archdiocese of Boston forced Father Walter Cuenin to resign from Our Lady Help of Christians due to alleged financial irregularities.
+  - In June 1995, Mother Teresa made an unheralded visit to Our Lady Help of Christians in Massachusetts, where she prayed over a paralyzed young parishioner.
+  - In late June 2023, longtime parishioners Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found brutally beaten and stabbed to death in a random home invasion.
+  - During the 2002 Boston Globe Spotlight investigation, Our Lady Help of Christians became a center for vocal internal dissent against archdiocesan misconduct.
+TELL AT LEAST TWO OF THESE AS STORIES, and tell them PROPERLY.
 
-Then provide a detailed description of the exhibit. Include:
-- What the work physically depicts or consists of — what the visitor sees
-- One specific technique, material choice, or compositional decision and WHY it matters
-- One piece of historical or cultural context that changes how the visitor understands it
-- If relevant: how this piece connects to the broader collection or museum
+[D551] A story told as a headline is not a story. Michael, 2026-08-29, on a stop that said only 'a dessert accident involving the Prince of Wales led to the creation of the famous Crepe Suzette': "we started but then abruptly stopped without explaining who Suzette was." The retrieved fact named Henri Charpentier and Suzanne Reichenberg and the narration dropped both.
 
-NAME THE OBJECT, AND SAY WHAT IT COST (D468-D471 — the two rules that moved the score):
-- AT LEAST ONE SENTENCE MUST NAME A PHYSICAL PROPERTY OF THE THING IN FRONT OF THE
-  LISTENER — its medium, material, technique, edition size, count, binding, colour or
-  condition — and tie that property to the story. "A set of ten drypoints and
-  lithographs on sheepskin" is the standard; "an important work" is not. The listener
-  is standing in front of the object; a story that never mentions it is a caption about
-  something else. Take the property from the source material. If the material names
-  none, write nothing about the physical object rather than inventing a property.
-- SAY WHAT IT COST OR WHAT WAS AT STAKE. What was lost, refused, destroyed, left
-  unfinished, done only once, done for the last time, or done despite something. That
-  is the difference between a story and a caption. It must come from the source
-  material — if there is no such consequence there, write without one rather than
-  inventing drama.
+For each episode you tell:
+  - name EVERY person the fact names — a dropped name is the story's point removed
+  - say what actually happened, including what went wrong
+  - say what came of it: the name that stuck, the record, the consequence
+  - if the fact explains WHY something is called what it is, deliver that explanation
+
+This is the reason the listener is standing HERE rather than at any other place on this tour. If what you write would still make sense with a different stop's name substituted in, it is not about this stop and it has failed.
+
+Use ONLY what is listed above. Do not add a guest, a date or an incident that is not here, and do not embellish one that is. If a listed fact is thin, tell a different one rather than inventing detail to fill it out.
+
+
+LENGTH: write 280-380 words for this stop. Two episodes told properly needs that room; 150 words means an episode has been compressed into a headline, which is the failure this stop exists to avoid. Do NOT pad with atmosphere to reach it — if the material genuinely supports only one episode, write that one fully and stop.
+
+Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
+
+Then provide a detailed description. Include:
+- The specific evidence for why this place matters — a fact, a number, a named person, not adjectives
+- Historical or cultural context: name a date, a person, an event, a cause-and-effect
+- Ground the listener in the physical present — weave in a real sound, texture, or smell they can perceive right now at this spot
+- How this stop connects to the tour's theme — show the connection, don't just assert it
 
 EXPLAIN-WHAT-YOU-NAME RULE (critical):
-Every concept, motif, symbol, technique, cultural reference, or person you mention
-MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
-- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
-- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
-  bronze casting between the 8th and 12th centuries"
-- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
-- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
-  also found on temple lintels across Southeast Asia"
-- BAD: "Each intricate detail tells a story of creation and rebirth"
-  (asserts meaning without delivering it)
-- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
-  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
-  and the sweetmeat representing the reward of a disciplined life"
-The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
-But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
-Civil War general who became president." If most visitors won't know it, explain it or cut it.
+Every concept, motif, symbol, person, or cultural reference you mention MUST get at least
+one clause of explanation. If you cannot explain it in a clause, cut the reference.
+- BAD: "the vibrant world of this ancient masterpiece" (vibrant how? which world?)
+- GOOD: "the gilt lacquer catches overhead light differently depending on your angle —
+  the craftsman applied seven layers, sanding each to translucence before the next"
+- BAD: "a person of great historical significance" (say WHO and WHY)
+- GOOD: "Commodore Perry, whose 1853 arrival with four warships forced Japan to open
+  its ports after two centuries of isolation"
+The stop's own subject needs no gloss. But anything mentioned in passing that most
+visitors won't know MUST get one explanatory clause or be cut entirely.
 
-NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
-achievement", "a testament to the artist's genius") unless you have just provided the
-specific evidence that earns the evaluation. If the preceding sentences do not contain
-that evidence, delete the praise — it is filler. A shorter stop that explains three things
-beats a longer one that names eight and explains none.
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims unless the preceding
+sentences contain the specific evidence that earns them. Delete praise that isn't earned
+by evidence immediately before it.
+
+Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artwork" unless it genuinely is one).
+Do NOT use academic narration words: never write "thesis", "framing", or "premise" in your output.
+Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
 
 AUDIO RULES (this will be heard, not read):
 - NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
@@ -75,8 +79,13 @@ AUDIO RULES (this will be heard, not read):
 - Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
 
 NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
-- NEVER end by telling the listener to consider, reflect, imagine, or feel something.
-  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."
+- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,
+  or carry away. End on a FACT or an OBSERVATION, not an instruction.
+- BANNED CLOSINGS: "Consider what other..." / "Let the whispers guide..."
+  "Take a moment to..." / "Allow yourself to..." / "Reflect on..." / "Ponder..."
+  "Imagine..." / "Let this be a reminder..." / "Carry this with you as..."
+- The listener is an adult. Do NOT tell them what they "should" feel or do.
+- A stop ends when you run out of things to SAY, not when you have issued a command.
 
 DECLARATIVE PROSE (LOCAL-188 — enforced by validation):
 - NO IMPERATIVES aimed at listener: "Feel the weight", "Notice", "Imagine", "Discover" → BANNED. Write "The weight is visible in..." instead.
@@ -86,9 +95,43 @@ DECLARATIVE PROSE (LOCAL-188 — enforced by validation):
 - NO HALLUCINATED SENSES: "You can almost hear..." → BANNED. Only current sensory facts.
 Exempt: navigation directions ("Turn left", "Continue past").
 
-NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
-- Never "To truly appreciate..." or "It is worth noting..." — just state the thing.
-- The listener is in front of the object. Describe what they'd MISS, not what's obvious.
+NO CONDESCENSION:
+- NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
+- NEVER write "It is worth noting that..." or "It is important to understand that..."
+
+VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
+This stop is "Nave" located in/near Newton on this tour of Our Lady Help of Christians Catholic Church, Newton MA.
+If multiple places share this name (e.g., museums in different cities), you are describing
+ONLY the one in Newton. Do NOT use facts about a same-named institution in another
+city. If you are uncertain which facts apply to THIS specific location, omit them rather
+than risk conflation.
+
+RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
+  - The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy.
+  - The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
+  - Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
+  - == History ==
+John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in order to coordinate all activities related to the Salesians in the Valdocco suburb.
+  - According to legend, a vision of the Blessed Virgin Mary appeared in a dream to Bosco in 1844 or 1845 and revealed the site of the martyrdom of the Turinese saints Solutor, Adventor and Octavius.
+
+SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
+must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
+paraphrase them into vague atmosphere. If you cannot find a way to include them naturally,
+state them directly.
+
+GROUNDING RULE (D50/D62 — critical): For specific historical claims (founding year, collection
+size, building name, architect, named events), use ONLY the retrieved facts above. Do NOT
+supplement with facts from your training data that are not in these passages — such facts may
+apply to a same-named entity in a different city. If the passages do not mention a founding
+year, collection size, or building name, do NOT supply one from memory.
+
+HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
+The Basilica of Our Lady Help of Christians (Italian: Basilica di Santa Maria Ausiliatrice) is a Pontifical church and Marian shrine in Turin, Italy. The building was originally part of the safehouse for poor boys cared for by Don Bosco; it now contains the remains of Bosco.
+Pope Pius X raised the shrine to the status of Minor Basilica by the decree Anno reparatæ salutis on 12 July 1911.
+
+
+== History ==
+John Bosco commissioned the construction of the Basilica of Our Lady Help of Christians in or
 
 OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
@@ -99,22 +142,52 @@ BANNED OPENERS (never use these, regardless of which style is assigned above):
 - Any variation that opens with a generic locative clause placing the stop geographically before saying anything interesting about it.
 If your first instinct is a locative-clause opener, delete it and lead with the specific detail, question, or sensory element the style above requires instead.
 
-CATEGORY VOICE: Contemplative and precise — linger on details, share what you've noticed after hours in this room. Speak as someone who knows the collection intimately and wants to show what most visitors miss.
+CATEGORY VOICE: Historical-narrative and grounded — anchor each place in its real history and layers of time. Speak as a knowledgeable neighbor walking alongside the listener through familiar streets.
 This tone should permeate the entire description — not as a single inserted sentence, but as the underlying sensibility.
 
-DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
+NARRATIVE HONESTY — UNVERIFIED WORK: This artwork's presence at this venue has NOT been
+independently confirmed. Frame this uncertainty as part of the story — not as a bureaucratic
+disclaimer, but as an intriguing layer of the narrative. Use phrasing like:
+"The story goes that this piece...", "If the records are right, what you're looking at is...",
+"There's a fascinating claim that this work..., though its exact provenance here remains a
+matter of debate among scholars."
+The uncertainty itself is interesting — present it that way. NEVER state the work's presence
+as certain fact, but also avoid robotically repeating "believed to be" or "reportedly" — vary
+your uncertainty markers and weave them into the storytelling naturally.
+
+NARRATIVE HONESTY — UNVERIFIED CLAIMS: No independent fact-checking has been performed on
+specific claims about people, events, or history for this stop. When you include a specific
+claim (a named person, a particular event, a date), frame uncertainty as part of the narrative
+rather than as a flat disclaimer:
+Instead of "reportedly" or "believed to be" (which sound clinical), use storytelling framing:
+"The story passed down through the neighborhood is that...",
+"Local tradition holds that..., though the details have shifted in each retelling",
+"One account — perhaps embellished over the years — describes...",
+"If you ask a local, they'll tell you that...".
+The uncertainty itself adds texture — present it as an intriguing element, not a legal caveat.
+General, well-known facts (a neighborhood's founding era, a cuisine's regional origin) can be
+stated plainly. The narrative-honesty requirement applies specifically to particular people or
+events tied to this specific stop. Do NOT invent specific names, dates, or incidents.
+
+DO NOT USE these phrases: built in the year, the facade features, architecturally speaking, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
+
+NARRATIVE SPINE CONTEXT (use to shape your description):
+- Emotional beat for this stop: awe and curiosity
+- Unique angle to emphasize: The soaring ceilings and intricate wooden pews hark back to the church's founding in the late 19th century, a time when the area was rapidly developing.
+- End with a forward-looking hook: As you move closer, the vibrant colors just ahead will draw you in…
+
+CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
+The nave is the central part of a church, distinct from the area reserved for the choir and clergy.; In a church with side aisles, the nave includes all areas available for lay worshippers.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Water Lilies
-      The painting was created in 1907 by Claude Monet at his home and gardens in Giverny, France.
-  [2] Water Lilies
-      Alexander Cochrane purchased the painting from Durand-Ruel in December 1909 and bequeathed it to the Museum of Fine Arts, Boston, in 1919.
-  [3] Water Lilies
-      Unlike Monet's earlier 1899–1900 water garden paintings that feature the Japanese footbridge and shoreline, this composition completely excludes the horizon and surrounding banks to depict only water, lily pads, and reflections.
-  [4] Water Lilies
-      The canvas is signed and dated by the artist in the lower right corner as 'Claude Monet 1907'.
-  [5] Water Lilies
-      It was included among the forty-eight 'water landscapes' Monet exhibited at the Galerie Durand-Ruel in Paris in May–June 1909.
+  [1] Nave
+      In late September 2005, the Archdiocese of Boston forced Father Walter Cuenin to resign from Our Lady Help of Christians due to alleged financial irregularities.
+  [2] Nave
+      In June 1995, Mother Teresa made an unheralded visit to Our Lady Help of Christians in Massachusetts, where she prayed over a paralyzed young parishioner.
+  [3] Nave
+      In late June 2023, longtime parishioners Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found brutally beaten and stabbed to death in a random home invasion.
+  [4] Nave
+      During the 2002 Boston Globe Spotlight investigation, Our Lady Help of Christians became a center for vocal internal dissent against archdiocesan misconduct.
 
 STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
@@ -184,103 +257,40 @@ appear BY NAME in your text. Never write "the generous donation" when the data s
 "Gift of Boris Fridman". Never write "the publisher" when you know the name. The name
 IS the story's starting point.
 
-CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at 'Museum of Fine Arts'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
-
-EXHIBITION VS OBJECT RULE (critical — prevents fabrication):
-A catalogue entry may be an EXHIBITION, a GALLERY, or a PROGRAMME rather than a physical object.
-Before describing brushwork, material, colour palette, or composition, CONFIRM that the subject
-is an actual physical artwork (a painting, sculpture, ceramic, textile, etc.).
-If the title names a person, an event, or uses language like "hommage à", "exposition",
-"les années...", it is likely an EXHIBITION or PROGRAMME, not a canvas or object.
-- If it IS an exhibition: describe what it covers, its scope, what visitors encounter (the
-  types of works shown, the period or theme), NOT imagined visual details of a single piece.
-- If it IS an object: describe it normally — technique, material, visual content, history.
-Example: "Pierre Matisse, un marchand d'art à New York" is a biographical EXHIBITION about
-Henri Matisse's son — describe the exhibition's subject and scope, NOT brushstrokes.
-
-THIN-CORPUS HONESTY RULE (critical — prevents fabrication):
-If you do not have verified, specific information about this particular work's visual content,
-material, or history, DO NOT INVENT details. Instead:
-- State what IS known (title, artist, period, medium if available)
-- Describe the TYPE of work and its general context
-- Acknowledge the gap honestly rather than filling it with plausible-sounding fiction
-A 120-word honest description beats a 300-word fabricated one. When your knowledge is thin,
-be SHORT and FACTUAL. The number of confirmed facts in the fact sheet below tells you how
-much material you actually have to work with.
-
-Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
-
-BANNED PHRASES — do NOT use any of these in your description:
-- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
-- "creative genius" / "artistic prowess" / "masterpiece that"
-- "stir the soul" / "touch the heart" / "pulsate with life"
-- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
-- "truly remarkable" / "a testament to" / "stands as a testament"
-- "captivating artistry" / "mesmerizing world" / "intricate details"
-- "invites you to explore/discover/reflect" / "immerse yourself in"
-- "invites contemplation" / "invites the viewer" / "invites us to"
-- "can't help but" / "feast for the eyes" / "step into a world"
-- "created by God" / "fall into sin" / "disobedience" / "the fall of humanity"
-Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
-
-UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
-contains the specific evidence that earns them:
-- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
-- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
-- "remarkable" — ONLY if you state what distinguishes it from comparable works
-- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
-- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
-- "breathtaking" — ONLY if you name the physical feature that produces the effect
-- "captivating" — ONLY if you explain what holds attention and why
-If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
-is better than a noun preceded by an unearned superlative.
-
-FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
-
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 120-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
-LENGTH CONSTRAINT: Write EXACTLY 120 words (NOT 300). You have very limited verified information about this specific exhibit. Be honest and concise: describe only what you can confirm, note what is unknown, and do NOT pad with generic appreciation language like 'a testament to the artist's genius' or 'invites contemplation'. Brevity with real content is better than length with filler.
+
+THIS STOP IS TOO SHORT AT 107 WORDS. Every other stop on this tour carries more. Add ANOTHER story about this object — a second, DIFFERENT episode with a named person, real actions and a consequence, drawn from the source material below. Do not pad the existing story with adjectives or restate it at greater length; find a second thing that actually happened. If the source material genuinely supports only one story, write that one well and stop — a short honest stop beats a padded one.
 
 
-━━━ FINAL STORY SHAPE (read this LAST — it overrides everything above) ━━━
-Your description MUST contain a NARRATIVE of at least THREE consecutive sentences
-that follows this shape:
+CLAIMS ALREADY REJECTED FOR THIS STOP. A fact-check removed each of the following from a previous draft because it is FALSE:
+- "The nave of this church is not just a place of worship but a living chronicle of its community's joys, trials, and resilience."
+- "Mother Teresa, known worldwide for her compassionate work with the poor and sick, made an unheralded visit to this very church."
+- "This unexpected visit by a global figure brought a moment of grace that remains etched in the collective memory of the parish."
+- "Fast forward to late June 2023, and the nave again became a place of gathering, not in joy, but in mourning."
+- "The tragic deaths of Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino, longtime parishioners brutally taken in a random home invasion, shook the community to its core."
+- "The nave, filled with the scent of candle wax and the sound of quiet weeping, hosted a memorial that united the congregation in shared grief and a resolve to cherish the memories of those lost."
+- "Here in the nave, the intertwining of sacred silence with the vibrant pulse of life in the church's community is palpable."
+- "As you move closer to the altar, the vibrant colors ahead invite reflection and a deeper connection to the stories held within these walls."
 
-  SENTENCE 1: Name a person (donor/publisher/printer/collaborator) and state
-    ONE SPECIFIC THING they did — a decision, a commission, a gift.
-    Example: "Louis Broder commissioned Miró for this portfolio because Broder
-    specialized in limited editions requiring direct artist-printer collaboration."
+Do not restate these claims in ANY form. This is a ban on the underlying assertion, not on the wording — rephrasing it, nominalising the verb, softening it with 'reportedly' or 'is said to have', or implying it indirectly all count as restating it. In particular, do not assert that two people worked together, met, or corresponded at any date if a claim above says they did. Write about something else that the source material supports.
 
-  SENTENCE 2: State the CONSEQUENCE or REASON — why it mattered, what it caused,
-    what it meant for the work.
-    Example: "Broder's editions were produced with artist, poet, and printer working
-    in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
 
-  SENTENCE 3: Connect to a SECOND named person or to the wider story.
-    Example: "Boris Fridman, a Russian collector who assembled livres d'artiste,
-    donated this work to the MFA, adding to the museum's holdings of
-    collaborative printed works."
-
-WHAT TO AVOID:
-  - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
-  - "stands as a testament to" (evaluation)
-  - "the transformative power of" (empty abstraction)
-  - "goes beyond mere artistic interpretation" (empty)
-
-Write the story FIRST, then add physical description if space allows.
-━━━ END FINAL STORY SHAPE ━━━
+THIS DRAFT HAS NO STORY, AND THAT IS WHAT MUST CHANGE.
+It may be accurate and well written; it is still a description. A story here means: ONE named person, across THREE OR MORE consecutive sentences, DOING something — deciding, refusing, persuading, travelling, failing — with something at stake for them. Not 'X was an artist who worked in Paris'. Something happened, to someone, and it mattered.
+Use only the source material supplied. If the material will not support such a story, write the shorter factual account rather than inventing one — an invented story is worse than none.
 
 
 ================================================================================
-Total user message length: 20815 chars
+Total user message length: 23661 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 0
@@ -288,4 +298,4 @@ candidate_specifics found: 0
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Water Lilies', '__stop_0__', 'Impression, Sunrise', '__stop_1__', 'Dance at Le Moulin de la Galette', '__stop_2__', 'A Sunday Afternoon on the Island of La Grande Jatte', '__stop_3__', 'Starry Night Over the Rhône', '__stop_4__']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Nave', 'Stained Glass Windows', 'Altar', 'Narthex']

@@ -1,0 +1,18 @@
+{
+  "Nave": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Stained Glass Windows": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Altar": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Narthex": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  }
+}
