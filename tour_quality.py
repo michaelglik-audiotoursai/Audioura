@@ -32,7 +32,7 @@ import os
 import re
 
 REQUIRED_CLEAN = ('truncated', 'repeated', 'refuted', 'bare_death', 'distance',
-                  'fabricated_attribution')
+                  'fabricated_attribution', 'self_contradiction')
 
 _STOP = re.compile(r'^Stop (\d+):\s*(.+)$', re.M)
 _YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
@@ -248,6 +248,414 @@ def _find_fabricated_attributions(text):
     return out
 
 
+# ─── Self-contradiction (LOCAL-536) ──────────────────────────────────────────
+# Round 9 scored defects:{} on both tours yet each contains contradictions that
+# need NO knowledge of the world — only a comparison of the tour against its own
+# other sentences. Every fix of the attribution class so far matched a surface form
+# (a verb, a year, a "by"); the generator is not bound to a surface form, and
+# LOCAL-527's gate was already evaded by "Gustave Eiffel's iconic Control Tower".
+# Self-contradiction has no such weakness: it needs no corpus and no grounded call.
+#
+# The hard rule (D577): every sub-check fires ONLY on a positive, quotable PAIR of
+# statements from the same tour. If it cannot produce both quotes it does not raise.
+# It never decides which statement is right — the contradiction is the finding.
+
+from sentence_split import split_sentences as _split_sentences  # noqa: E402
+
+
+def _sentences(text):
+    """All sentences in the tour, flattened across lines."""
+    out = []
+    for line in (text or '').splitlines():
+        out.extend(_split_sentences(line.strip()))
+    return out
+
+
+# The named structures a tour attributes design/authorship to. A "structure" here
+# is the head noun the possessive or the passive frame attaches to — tower, church,
+# terminal, cathedral, chapel, altar, window, bridge, building, hall, dome, spire.
+_STRUCTURE_NOUN = (r'tower|church|cathedral|chapel|basilica|terminal|concourse|'
+                   r'altar|window|windows|bridge|building|hall|dome|spire|'
+                   r'facade|nave|narthex|pulpit|steeple|monument|memorial|'
+                   r'station|hangar|pavilion|rotunda|gate|gateway')
+# A capitalised agent name (person, firm, or "Firm & Firm, Inc."). Allows the
+# ampersand-joined architectural-firm form and a trailing ", Inc."/"LLC". Each
+# token must be Capitalised so a run of lowercase clause words cannot be swallowed
+# as an "agent"; 1–4 tokens keeps it to a name, not a sentence.
+_AGENT = (r'[A-Z][A-Za-z.\'’]+(?:\s+(?:&\s+)?[A-Z][A-Za-z.\'’]+){0,3}'
+          r'(?:,?\s+(?:Inc|LLC|Ltd|Co|Corp)\.?)?')
+# Verbs that attribute authorship of a STRUCTURE (not of an artwork — "created"/
+# "painted" belong to art attribution, deliberately excluded to avoid firing on
+# legitimate "Nu bleu IV, created by Matisse" content).
+_MAKE_VERB = r'designed|built|constructed|erected|founded|established|crafted|engineered'
+
+# Possessive frame: "Gustave Eiffel's iconic Control Tower" — the form LOCAL-527's
+# gate was rewritten INTO, with no verb, no year and no "by". A REAL apostrophe is
+# required (the '\u2019|\u0027' is not optional): without it, every plural noun
+# ("windows", "Christians", "departures") read as a possessive and the check fired
+# on scenery. The agent must be a capitalised name AND the structure head noun must
+# itself be Capitalised (a NAMED structure — "Control Tower", not a generic "tower"
+# in a direction line). Adjectives between are lowercase.
+_POSSESSIVE_ATTRIB = re.compile(
+    r'\b(' + _AGENT + r')(?:\u2019|\')s\s+'         # "Gustave Eiffel's" — apostrophe required
+    r'(?:[a-z]+\s+){0,3}'                            # "iconic", "famous", ...
+    r'([A-Z][a-z]+\s+)?'                             # optional Capitalised modifier "Control"
+    r'((?i:' + _STRUCTURE_NOUN + r'))\b')
+# Passive frame: "Designed by the Boston architectural firms Kubitz & Papi, Inc.
+# and Desmond & Lord, Inc., this tower ...". Filler after "by" may contain
+# capitalised descriptor words ("Boston"), so it is matched loosely (any non-period
+# run, non-greedy) up to the agent, and the agent is anchored as the capitalised
+# name-run that sits immediately before ", this/the <structure>". "Inc." periods
+# are tolerated because the agent group itself consumes them.
+_PASSIVE_ATTRIB = re.compile(
+    r'\b(?i:' + _MAKE_VERB + r')\s+by\b'
+    r'[\s\S]{0,90}?'                                 # "the Boston architectural firms ... Inc. and ... Inc.,"
+    r'(' + _AGENT + r')'                             # the agent immediately before the structure
+    r'\s*,?\s+(?:this|the)\s+'
+    r'(?:[a-z]+\s+){0,2}'
+    r'((?i:' + _STRUCTURE_NOUN + r'))\b')
+
+
+def _norm_structure(word):
+    return word.lower().rstrip('s')
+
+
+def _norm_agent(name):
+    """Collapse an agent to a comparison key. Firms keep their distinctive first
+    token; people keep the surname. 'Kubitz & Papi, Inc.' -> 'kubitz', 'Gustave
+    Eiffel' -> 'eiffel'."""
+    n = re.sub(r',?\s+(?:Inc|LLC|Ltd|Co|Corp)\.?$', '', name.strip(), flags=re.I)
+    if '&' in n:
+        return n.split('&')[0].strip().lower()
+    toks = n.split()
+    return toks[-1].lower() if toks else n.lower()
+
+
+# Owner words that make a possessive an OWNERSHIP claim ("the Airport's Control
+# Tower", "the Church's altar"), never an authorship claim. A possessive whose
+# owner ends in one of these is the venue owning its own part — not a designer —
+# and must not be compared as an attribution.
+_PLACE_OWNER = {
+    'airport', 'church', 'cathedral', 'basilica', 'chapel', 'terminal',
+    'parish', 'museum', 'university', 'college', 'city', 'town', 'state',
+    'commonwealth', 'authority', 'company', 'corporation', 'nation', 'country',
+}
+
+
+def _find_attribution_conflict(text):
+    """Sub-check 1. Same named structure credited to two DIFFERENT agents.
+
+    Returns (structure, quote_a, quote_b) or None. Extracts (structure, agent)
+    pairs from possessive AND passive frames anywhere in the tour; two distinct
+    agents for one structure is the defect."""
+    seen = {}   # structure -> (agent_key, agent_display, quote)
+    for sent in _sentences(text):
+        pairs = []   # (structure_word, agent, is_possessive)
+        for m in _POSSESSIVE_ATTRIB.finditer(sent):
+            pairs.append((m.group(3), m.group(1), True))
+        for m in _PASSIVE_ATTRIB.finditer(sent):
+            pairs.append((m.group(2), m.group(1), False))
+        for struct_word, agent, is_poss in pairs:
+            struct = _norm_structure(struct_word)
+            akey = _norm_agent(agent)
+            if not akey or len(akey) < 3:
+                continue
+            # A possessive owned by the venue itself ("the Airport's Control
+            # Tower") is ownership, not authorship — never an attribution.
+            if is_poss and any(w in _PLACE_OWNER for w in agent.lower().split()):
+                continue
+            if struct in seen:
+                prev_key, _prev_disp, prev_quote = seen[struct]
+                if prev_key != akey and prev_quote != sent:
+                    return (struct_word, prev_quote, sent)
+            else:
+                seen[struct] = (akey, agent, sent)
+    return None
+
+
+# Phrases in a body that assert the titled subject is ABSENT. Title-to-body only.
+_ABSENCE = re.compile(
+    r'in\s+the\s+absence\s+of|'
+    r'there\s+(?:is|are)\s+no\b|'
+    r'does\s+not\s+hold|do\s+not\s+hold|'
+    r'no\s+longer\s+(?:has|holds|have)|'
+    r'(?:may|does|do|did)\s+not\s+hold|'
+    r'without\s+(?:any\s+)?', re.I)
+# Words too generic to treat as the titled "thing" when checking absence.
+_TITLE_STOPWORDS = {
+    'stop', 'the', 'a', 'an', 'of', 'and', 'area', 'main', 'central', 'entry',
+    'point', 'focal', 'worship', 'space', 'terminal',
+}
+
+
+def _title_keyword(title):
+    """The content noun of a stop title, lowercased. 'Stained Glass Windows' ->
+    'stained glass windows'; keeps multiword cores so 'stained glass' can be sought
+    in the body verbatim."""
+    return re.sub(r'\s+', ' ', title.strip().lower())
+
+
+def _find_absent_subject(text):
+    """Sub-check 2. A stop's title names a thing and the stop's own body says that
+    thing is absent. Returns (title, quote) or None. Title-to-body only — no
+    cross-stop inference."""
+    # Split the tour into per-stop blocks keyed by title.
+    blocks = _stop_blocks(text)
+    for title, body in blocks:
+        key = _title_keyword(title)
+        # Reduce the title to its distinctive noun phrase (drop stopwords).
+        core_tokens = [t for t in re.split(r'\W+', key) if t and t not in _TITLE_STOPWORDS]
+        if not core_tokens:
+            continue
+        # The multiword core, e.g. "stained glass". Use the last 2 content tokens
+        # as the phrase to look for near an absence marker.
+        core = ' '.join(core_tokens[-2:]) if len(core_tokens) >= 2 else core_tokens[-1]
+        core_singular = core.rstrip('s')
+        for sent in _split_sentences(body):
+            low = sent.lower()
+            if not _ABSENCE.search(low):
+                continue
+            # The absence marker must be about the titled thing: the core phrase
+            # (or its singular) appears in the same sentence.
+            if core in low or core_singular in low:
+                return (title, sent.strip())
+    return None
+
+
+def _stop_blocks(text):
+    """Return [(title, body_text), ...] — the text of each stop from its 'Stop N:'
+    header up to the next one."""
+    lines = (text or '').splitlines()
+    blocks = []
+    cur_title = None
+    cur = []
+    for line in lines:
+        m = _STOP.match(line.strip())
+        if m:
+            if cur_title is not None:
+                blocks.append((cur_title, '\n'.join(cur)))
+            cur_title = m.group(2).strip()
+            cur = []
+        elif cur_title is not None:
+            cur.append(line)
+    if cur_title is not None:
+        blocks.append((cur_title, '\n'.join(cur)))
+    return blocks
+
+
+# The closing summary has two halves that each name stops:
+#   "That's N stops — <preview A> and <preview B>. This tour covered <X> and <Y>."
+# In EVERY healthy tour the two halves name a DIFFERENT pair of the delivered stops
+# (a teaser pair, then a covered pair), and the epilog only ever highlights two of
+# the four — so "omits a delivered stop" is the normal format and must NOT be
+# flagged (it fires on every tour, which is worse than none, D577). The only
+# quotable contradiction is an EXTRA: a name the epilog claims the tour covered or
+# previewed that corresponds to NO delivered stop. Round 9 CHURCH_1 previews "Mary
+# Immaculate of Lourdes" — a different church its own stop 2 distinguishes.
+_EPILOG_COVERED = re.compile(r"[Tt]his tour covered\s+(.+?)\.\s*$", re.S)
+_EPILOG_PREVIEW = re.compile(
+    r"That'?s\s+\d+\s+stops?\s*[\u2012-\u2015\u2212—–-]+\s*(.+?)\.\s*"
+    r"(?:This tour covered|$)", re.S | re.I)
+_EPILOG_LINE = re.compile(r"^That'?s\s+\d+\s+stops?\b", re.I)
+
+
+def _epilog_text(text):
+    """The trailing summary paragraph, or ''. It is the last non-empty block that
+    starts with "That's N stops"."""
+    paras = [p.strip() for p in (text or '').split('\n') if p.strip()]
+    for p in reversed(paras):
+        if _EPILOG_LINE.match(p):
+            return p
+    return ''
+
+
+def _delivered_titles(text):
+    return [t for t, _ in _stop_blocks(text)]
+
+
+def _covered_names(epilog):
+    """Stop names the epilog claims the tour 'covered'. Splits the tail on ' and '
+    / ','."""
+    m = _EPILOG_COVERED.search(epilog)
+    if not m:
+        return []
+    tail = m.group(1)
+    parts = re.split(r'\s+and\s+|,\s*', tail)
+    return [p.strip() for p in parts if p.strip()]
+
+
+# The leading proper-noun phrase of a preview clause: "Mary Immaculate of Lourdes
+# showcases..." -> "Mary Immaculate of Lourdes"; "the nave at Boston Globe's..." ->
+# "the nave". Captures an optional leading "the", then a run of Capitalised words
+# (allowing "of"/"the"/"A" joiners) OR a single lowercase venue-part word after
+# "the".
+_PREVIEW_HEAD = re.compile(
+    r'^(?:the\s+([a-z]+)\b'                            # "the nave"
+    r'|([A-Z][A-Za-z’\'.]+(?:\s+(?:of|the|de|del|and|[A-Z][A-Za-z’\'.]+))*))')
+
+
+def _preview_names(epilog):
+    """Leading name of each ' and '-joined preview clause in the 'That's N stops —'
+    half. Returns [name, ...]."""
+    m = _EPILOG_PREVIEW.search(epilog)
+    if not m:
+        return []
+    body = m.group(1)
+    out = []
+    for clause in re.split(r'\s+and\s+', body):
+        clause = clause.strip()
+        hm = _PREVIEW_HEAD.match(clause)
+        if not hm:
+            continue
+        name = hm.group(1) or hm.group(2)
+        if name:
+            out.append(name.strip())
+    return out
+
+
+def _title_matches(name, titles):
+    """True if `name` corresponds to one of the delivered stop titles, by
+    case-insensitive substring in either direction (so 'Control Tower' matches the
+    stop titled 'Control Tower', and 'Terminal A Baggage Claim' matches
+    'Terminal A Baggage Claim')."""
+    n = name.lower().strip()
+    for t in titles:
+        tl = t.lower().strip()
+        if n == tl or n in tl or tl in n:
+            return True
+    return False
+
+
+def _find_epilog_stop_mismatch(text):
+    """Sub-check 3. The closing summary names a stop/place that was NOT delivered.
+    Returns (name, quote) or None. Only the EXTRA direction is reported: an epilog
+    name matching no delivered stop. Omission is the normal epilog format and is
+    deliberately NOT flagged (it would fire on every tour). The name must look like
+    a proper place reference (a multiword Capitalised phrase), so a bare 'the nave'
+    that simply is not one of the two teased stops does not count."""
+    epilog = _epilog_text(text)
+    if not epilog:
+        return None
+    titles = _delivered_titles(text)
+    if not titles:
+        return None
+    for name in _covered_names(epilog) + _preview_names(epilog):
+        if _title_matches(name, titles):
+            continue
+        # Require a proper NAMED entity: at least two Capitalised tokens, so a
+        # generic lowercase word or a single common noun cannot trip it. This is
+        # what makes "Mary Immaculate of Lourdes" fire while "the nave" (which is
+        # a delivered stop anyway) or a one-word teaser does not.
+        cap_tokens = [t for t in name.split() if t[:1].isupper()]
+        if len(cap_tokens) < 2:
+            continue
+        # A PERSON named in a teaser ("... Betty Ann Ong and Madeline Amy Sweeney
+        # acted heroically") is not a stop. A place reference contains a
+        # place/joiner marker ("of", "the", or a venue-type word); a bare run of
+        # given-name + surname does not. Require such a marker so people are
+        # excluded but "Mary Immaculate of Lourdes" (has "of") still fires.
+        low = name.lower()
+        place_markers = (' of ', ' the ', ' de ', ' del ')
+        venue_words = ('church', 'cathedral', 'chapel', 'basilica', 'terminal',
+                       'tower', 'airport', 'station', 'hall', 'museum', 'parish',
+                       'lourdes', 'immaculate', 'lady', 'saint', 'st.')
+        if any(mk in f' {low} ' for mk in place_markers) or \
+                any(w in low for w in venue_words):
+            return (name, epilog)
+    return None
+
+
+# The orientation previews the route; LOGAN_1 states its endpoints TWICE in
+# consecutive sentences and gives different answers. "mark the endpoints" /
+# "spans from X to Y" name places that must be delivered stops.
+_ENDPOINTS_MARK = re.compile(
+    r'([^.]+?)\bmark(?:s)?\s+the\s+endpoints\b', re.I)
+
+
+def _orientation_text(text):
+    """Stop-1 orientation body: the text of the first 'Orientation:' block."""
+    m = re.search(r'^\s*Orientation:\s*(.+)$', text or '', re.M)
+    if not m:
+        return ''
+    return m.group(1).strip()
+
+
+# Candidate proper-noun endpoint names in an "X ... mark the endpoints" clause.
+_ENDPOINT_NAME = re.compile(
+    r"([A-Z][A-Za-z’'.]+(?:\s+[A-Z][A-Za-z’'.]+){0,4})")
+_ENDPOINT_SKIP = {'the', 'and', 'a', 'an', 'of', 'iconic', 'bustling', 'efficient'}
+
+
+def _find_orientation_stop_mismatch(text):
+    """Sub-check 4. The stop-1 orientation previews endpoints that do not match the
+    delivered stop list. Returns (endpoint_name, quote) or None."""
+    orient = _orientation_text(text)
+    if not orient:
+        return None
+    titles = _delivered_titles(text)
+    if not titles:
+        return None
+    for sent in _split_sentences(orient):
+        mm = _ENDPOINTS_MARK.search(sent)
+        if not mm:
+            continue
+        clause = mm.group(1)
+        # Names in the "... mark the endpoints" clause.
+        names = []
+        for nm in _ENDPOINT_NAME.findall(clause):
+            toks = [t for t in nm.split() if t.lower() not in _ENDPOINT_SKIP]
+            if not toks:
+                continue
+            cleaned = ' '.join(toks)
+            # Drop a leading possessive owner: "Gustave Eiffel's iconic Control
+            # Tower" -> keep "Control Tower" (the structure), not the person.
+            names.append(cleaned)
+        # A named endpoint that matches NO delivered stop title is the finding.
+        for nm in names:
+            base = re.sub(r"[’'](?:s)?$", '', nm)
+            if not _title_matches(base, titles):
+                # Skip a name that is only a possessive owner of a following
+                # structure that DOES match (avoid crediting "Gustave Eiffel").
+                if any(_title_matches(part, titles) for part in [base]):
+                    continue
+                return (nm, sent.strip())
+    return None
+
+
+def _find_self_contradictions(text):
+    """Run all four sub-checks. Returns a list of (subcheck, quote_a, quote_b)
+    tuples; each entry carries the two offending quotes so the decision is
+    inspectable. Empty when the tour does not contradict itself."""
+    out = []
+    ac = _find_attribution_conflict(text)
+    if ac:
+        struct, qa, qb = ac
+        out.append(('attribution_conflict',
+                    f"one structure ({struct}) credited to two agents",
+                    qa, qb))
+    ab = _find_absent_subject(text)
+    if ab:
+        title, quote = ab
+        out.append(('absent_subject',
+                    f"stop titled '{title}' but its body says the subject is absent",
+                    f"[title] {title}", quote))
+    em = _find_epilog_stop_mismatch(text)
+    if em:
+        name, quote = em
+        out.append(('epilog_stop_mismatch',
+                    f"closing summary names a stop/place not delivered: {name}",
+                    quote,
+                    "[delivered] " + ' | '.join(_delivered_titles(text))))
+    om = _find_orientation_stop_mismatch(text)
+    if om:
+        name, quote = om
+        out.append(('orientation_stop_mismatch',
+                    f"orientation previews an endpoint not in the stop list: {name}",
+                    quote,
+                    "[delivered] " + ' | '.join(_delivered_titles(text))))
+    return out
+
+
 def _count_people(text):
     """Distinct PEOPLE, de-duplicated by surname.
 
@@ -383,6 +791,18 @@ def score_tour(text, requested_stops=None, is_building_tour=False, anchor=None,
             defects['repeated'] = f"{dupes} near-duplicate sentence(s)"
     except Exception:
         pass
+
+    # Self-contradiction (LOCAL-536). Four independent sub-checks, each reported
+    # with BOTH offending quotes so the decision is inspectable. Every sub-check
+    # fires only on a positive, quotable pair from the same tour (D577): if it
+    # cannot produce both quotes it does not raise. It never decides which
+    # statement is right — the contradiction itself is the finding.
+    contradictions = _find_self_contradictions(text)
+    if contradictions:
+        subcheck, why, qa, qb = contradictions[0]
+        defects['self_contradiction'] = (
+            f"{len(contradictions)} contradiction(s); {subcheck}: {why} "
+            f"({qa!r} vs {qb!r})")
 
     try:
         from tragedy_context_gate import find_uncontextualised_deaths
