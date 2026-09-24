@@ -45,16 +45,31 @@ A stop the listener names in the request ("…with a stop at X") is now marked
 gate. If it cannot be verified at the venue it comes back with `verified=False` and
 the narration hedges, rather than being silently swapped for something else.
 
-**Measured, end to end through the service:** 2 of 3 requested stops delivered,
-against a baseline of 0. The third was displaced by a duplicate (D1v2 keeps a work
-under its canonical title, and the restore re-added the listener's wording alongside
-it — "Liberty Bowl by Paul Revere" and "Sons of Liberty Bowl" are the same object).
-That duplicate is fixed and on `storied`, but **the fix has not yet had a clean
-verification run** — the next attempt died on an external HTTP 429 from
-metmuseum.org after five runs against the same venue in one evening.
+**Stop SELECTION is proven by effect; stop DELIVERY is not.** On the real request
+through the service:
 
-So: treat user-named stops as working-but-unproven. If the E2E exercises them and a
-stop is missing or duplicated, that is this, not a new fault.
+```
+[LOCAL-212] Selected: ['Sons of Liberty Bowl', 'the Sargent Murals',
+                       'Watson and the Shark by Copley']
+[LOCAL-212] Dropped:  ['Ancient Nubia Now', "Sargent's Daughters", ...]
+```
+
+3 of 3 requested stops, against a baseline of 0. Four separate bugs stood between the
+listener and their stops, each hiding the next:
+
+1. the waypoint block was skipped on **both** bypass paths — the root cause, and why
+   this looked non-deterministic run to run;
+2. D1v2 verification discarded whatever survived;
+3. the restore re-added a work D1v2 had already kept under its canonical title, so
+   the same object appeared twice;
+4. coverage selection ranked the survivors out of the tour by yield score.
+
+**No tour has been delivered end to end with all four fixes.** metmuseum.org has
+returned 429 for over an hour (it is fetched because "Watson and the Shark by Copley"
+hangs in both museums), so narration fails and the tour cannot be assembled. External,
+unrelated to the fixes, and it will not affect a GCloud run against a different venue.
+
+So: treat user-named stops as selected-correctly but not yet delivered-and-verified.
 
 ## Tag: `rc-pre-igor-20260923`
 
