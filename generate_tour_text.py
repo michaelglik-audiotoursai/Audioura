@@ -19658,6 +19658,58 @@ RULES:
         complete_tour = re.sub(r'  +', ' ', complete_tour)
         complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
 
+    # ── [LOCAL-556] A stop the LISTENER NAMED cannot silently vanish ──────────
+    # Michael's ruling, 2026-09-24, and it reverses what LEAD proposed:
+    #
+    #   "How can it be that an existing stop has no information -- no information at
+    #    all? ... for a restaurant: hours, type of food, menu prices, need or no need
+    #    to reserve, reviews, geo location. This alone can be valuable for a listener.
+    #    ... When it is us who selects the stops, and we have a choice, then it is
+    #    reasonable to drop not interesting and substitute with interesting, but user
+    #    requested the stops we should take this seriously."
+    #
+    # So: a THIN stop is acceptable, a MISSING one is not. Dropping is a privilege we
+    # have over stops WE chose, never over stops the listener named.
+    #
+    # Measured on his own run, 2026-09-24. Asked for sycamore / buttonwood / little
+    # big diner, the assembled tour contained:
+    #     Stop 1: Farmstead Table            <- never requested
+    #     (no header)  Sycamore prose        <- header, Address and Type all stripped
+    #     Stop 3: Little Big Diner
+    # Buttonwood had vanished entirely, 0 mentions. The tour read Stop 1 -> Stop 3 and
+    # nothing complained, because the renumbering above counts only headers that still
+    # exist -- so a stop losing its header becomes invisible rather than an error.
+    #
+    # This is a LOUD REPORT, not a silent repair: the gates upstream are doing
+    # something wrong and hiding it would make the next occurrence harder to find.
+    try:
+        _ux = [p for p in (poi_list or []) if p.get('user_explicit')]
+        if _ux:
+            _delivered = re.findall(r'^Stop\s+\d+:\s*(.+)$', complete_tour, re.M)
+            _dl = [d.strip().lower() for d in _delivered]
+            _missing = []
+            for _p in _ux:
+                _n = (_p.get('name') or '').strip()
+                if not _n:
+                    continue
+                _nl = _n.lower()
+                if not any(_nl == d or _nl in d or d in _nl for d in _dl if d):
+                    _present = _nl in complete_tour.lower()
+                    _missing.append((_n, 'prose survived, HEADER STRIPPED' if _present
+                                     else 'absent entirely'))
+            if _missing:
+                print(f"  [LOCAL-556] ⚠️  {len(_missing)} LISTENER-NAMED stop(s) did not "
+                      f"survive assembly — this is a DEFECT, not a preference:")
+                for _n, _why in _missing:
+                    print(f"      ✗ '{_n}' — {_why}")
+                print(f"      delivered headers: {_delivered}")
+                globals()['_LAST_MISSING_USER_STOPS'] = _missing
+            else:
+                print(f"  [LOCAL-556] all {len(_ux)} listener-named stop(s) survived "
+                      f"assembly with a header")
+    except Exception as _ux_err:
+        print(f"  [LOCAL-556] check failed (non-fatal): {type(_ux_err).__name__}: {_ux_err}")
+
     # -------- [LOCAL-256] Bare field-label gate --------
     # Schema field names (Description:, Orientation:, etc.) must never reach the
     # TTS-bound artifact. LOCAL-250 round 7 v1 bounced on this exact defect;

@@ -24174,3 +24174,59 @@ coverage/yield override — plus the cloud-path threading of `stops` through
 **The gate lifts when Michael approves the results of Igor's test**, not when the code
 looks right. As of this ruling, stop SELECTION is proven 3-of-3 and one end-to-end
 delivery with audio exists (`ab7ee23`); Igor has not yet tested it.
+
+---
+
+## D592 — A thin stop is acceptable. A missing one is not. (Michael, 2026-09-24)
+
+**LEAD proposed the opposite and was overruled**, with a reason worth keeping.
+
+I asked whether a listener-named stop we cannot say much about should ship thin, or
+be announced as "we couldn't say enough about this one". I recommended the second.
+Michael:
+
+> *"Mine would be the first, definitely not second. How can it be that an existing
+> stop has no information — no information at all? I understand that maybe no
+> stories, etc. but some information must be there if the stop is real. For example,
+> for a restaurant: hours, type of food, menu prices, need or no need to reserve,
+> reviews on Internet, and geo location. This alone can be valuable for a listener."*
+
+### The distinction he drew, which is the durable part
+
+| whose choice | what we may do |
+|---|---|
+| **We** selected the stop | dropping a dull one and substituting a better one is reasonable — we had a choice |
+| **The listener** named the stop | take it seriously. Deliver it. |
+
+> *"When it is us who selects the stops, and we have a choice, then it is reasonable
+> to drop not interesting and substitute with interesting, but user requested the
+> stops we should take this seriously."*
+
+### The one honest exception
+
+> *"in some cases we can say: we are not aware of these stops, like the painting
+> example; but definitely not about restaurants"*
+
+If a painting is **not in the catalogue** — we cannot establish it is even exhibited
+there — saying so is fair and correct. A restaurant is different: it has hours, a
+cuisine, a price band, a reservation policy, reviews and a location. **Those facts
+alone are worth hearing**, and `restaurant_practicals.fetch_practicals()` already
+returns every one of them.
+
+### Why LEAD was wrong
+
+I equated "no *story*" with "nothing to say". Michael's point is that a stop is not a
+narrative slot — it is a place, and a real place always has practical facts. The
+listener asked to go there; telling them the hours and whether to book is a service,
+not a consolation prize.
+
+He also noted he got all three test restaurants from Gemini, which "has plenty to
+say" — so thinness here was our retrieval failing, not the world being empty.
+
+### Binding consequences
+
+- A `user_explicit` stop is **never** silently dropped or substituted (LOCAL-556
+  reports it loudly at assembly; the underlying gates still need fixing).
+- When prose is thin, fall back to practicals rather than to removal.
+- "We are not aware of this" is reserved for **existence** failures, not for
+  interestingness failures.
