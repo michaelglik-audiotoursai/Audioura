@@ -208,13 +208,13 @@ assert_build_context_complete() {
 # Generator env. DB pointed at Cloud SQL via socket; STORIED_MODE on; the URL-idiom
 # modules get DATABASE_URL/VENUE_CACHE_DB_URL in socket form, completed by PGPASSWORD
 # (which we set from the db-password secret via --set-secrets below).
-GEN_ENV="STORIED_MODE=true,TOUR_STORAGE_MODE=cloud,PYTHONUNBUFFERED=1,TOUR_TRACK=${TOUR_TRACK},DB_HOST=${DB_SOCKET},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_PORT=${DB_PORT},DATABASE_URL=${DATABASE_URL_NOPASS},VENUE_CACHE_DB_URL=${DATABASE_URL_NOPASS}"
+GEN_ENV="STORIED_MODE=true,TOUR_STORAGE_MODE=cloud,PYTHONUNBUFFERED=1,TOUR_TRACK=${TOUR_TRACK},USER_STOPS_ENABLED=false,DB_HOST=${DB_SOCKET},DB_NAME=${DB_NAME},DB_USER=${DB_USER},DB_PORT=${DB_PORT},DATABASE_URL=${DATABASE_URL_NOPASS},VENUE_CACHE_DB_URL=${DATABASE_URL_NOPASS}"
 # Secrets: OPENAI for generation, db-password for DB_PASSWORD, and the SAME secret
 # surfaced as PGPASSWORD so libpq can complete the password-less DATABASE_URL.
 GEN_SECRETS="OPENAI_API_KEY=openai-api-key:latest,DB_PASSWORD=db-password:latest,PGPASSWORD=db-password:latest"
 
 # Modernizer env/secrets — mirror live Beta tour-modernized exactly.
-MOD_ENV="TOUR_STORAGE_MODE=cloud,BLOB_STORAGE_TYPE=r2,R2_ENDPOINT=${R2_ENDPOINT},R2_BUCKET=${R2_BUCKET},POLLY_TTS_URL=${POLLY_TTS_URL},POLLY_FIX=v3"
+MOD_ENV="TOUR_STORAGE_MODE=cloud,USER_STOPS_ENABLED=false,BLOB_STORAGE_TYPE=r2,R2_ENDPOINT=${R2_ENDPOINT},R2_BUCKET=${R2_BUCKET},POLLY_TTS_URL=${POLLY_TTS_URL},POLLY_FIX=v3"
 MOD_SECRETS="AWS_ACCESS_KEY_ID=aws-access-key-id:latest,AWS_SECRET_ACCESS_KEY=aws-secret-access-key:latest,R2_ACCESS_KEY_ID=r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=r2-secret-access-key:latest"
 
 # ---------------------------------------------------------------- rollback ---
@@ -397,7 +397,7 @@ run "gcloud run deploy '$ORCH_SERVICE' \
   --image '$FULL_IMAGE' \
   --command 'python' \
   --args '$ORCH_ARGS' \
-  --update-env-vars 'TOUR_TRACK=${TOUR_TRACK},TOUR_GENERATOR_URL=${GEN_URL},MODERNIZED_URL=${MOD_URL}' \
+  --update-env-vars 'TOUR_TRACK=${TOUR_TRACK},USER_STOPS_ENABLED=false,TOUR_GENERATOR_URL=${GEN_URL},MODERNIZED_URL=${MOD_URL}' \
   --quiet"
 
 [ "$DRY_RUN" = "1" ] && { echo; echo "dry run complete — nothing changed. No Beta service was named."; exit 0; }

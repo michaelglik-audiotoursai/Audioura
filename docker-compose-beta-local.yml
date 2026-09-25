@@ -50,6 +50,8 @@ services:
       - "5000:5000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # [GCS-KS1] Local Docker keeps Igor's user-chosen-stops feature ON (D591).
+      - USER_STOPS_ENABLED=true
     volumes:
       - ./tours:/app/tours
     restart: unless-stopped
@@ -76,6 +78,8 @@ services:
       - DB_PORT=5432
       - JOB_STORE_MODE=memory
       - GENERATION_MODE=thread
+      # [GCS-KS1] Local Docker keeps Igor's user-chosen-stops feature ON (D591).
+      - USER_STOPS_ENABLED=true
     volumes:
       - ./tours:/app/tours
     depends_on:
@@ -122,6 +126,8 @@ services:
       - DB_USER=admin
       - DB_PASSWORD=password123
       - DB_PORT=5432
+      # [GCS-KS1] Local Docker keeps Igor's user-chosen-stops feature ON (D591).
+      - USER_STOPS_ENABLED=true
     volumes:
       - ./tours:/app/tours
     depends_on:
