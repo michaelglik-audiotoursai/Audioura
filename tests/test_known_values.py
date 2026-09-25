@@ -2,6 +2,9 @@
 """
 Test encryption/decryption with known values from Mobile App Amazon-Q
 """
+
+import pytest
+pytest.importorskip("Crypto")  # LOCAL-544: skip when optional dep missing
 import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad

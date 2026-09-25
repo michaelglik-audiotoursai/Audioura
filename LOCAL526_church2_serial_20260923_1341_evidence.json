@@ -1,0 +1,18 @@
+{
+  "Nave": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Pews": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Sanctuary": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Narthex": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  }
+}

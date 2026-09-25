@@ -82,6 +82,39 @@ YEAR | what happened, in one clause
 """
 
 
+# ── grounding request counter [LOCAL-533] ────────────────────────────────────
+# Google Search grounding bills PER REQUEST (~3.5c), independent of tokens, and
+# was invisible in the pipeline's "Total API cost" line (that sums OpenAI only).
+# Every grounded request in the live pipeline flows through the two functions
+# below (_gemini(grounded=True) and gemini_with_sources(grounded=True)) — they
+# are the only two sites that attach the `google_search` tool. We increment this
+# counter at the exact moment a grounded HTTP request is ISSUED (after the API
+# key check, so a keyless no-op is not counted, and only when grounded=True, so
+# an ungrounded Gemini call is not counted). Requests, not tokens: that is the
+# billable unit. Pricing lives in cost_rates.grounding_cost(); this module only
+# counts. A caller (generate_tour_text) resets the counter at the start of a
+# generation and reads it at the end.
+_GROUNDING_REQUESTS = 0
+
+
+def reset_grounding_requests() -> None:
+    """Zero the grounded-request counter. Call at the start of a generation."""
+    global _GROUNDING_REQUESTS
+    _GROUNDING_REQUESTS = 0
+
+
+def get_grounding_requests() -> int:
+    """Return the number of grounded requests issued since the last reset."""
+    return _GROUNDING_REQUESTS
+
+
+def _count_grounding_request() -> None:
+    """Record one grounded request actually issued. Called only from the two
+    grounded-request sites, guarded by grounded=True and a present API key."""
+    global _GROUNDING_REQUESTS
+    _GROUNDING_REQUESTS += 1
+
+
 # ── providers ────────────────────────────────────────────────────────────────
 
 def _openai(prompt: str, model: str = 'gpt-4o') -> str:
@@ -118,6 +151,11 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not key:
         return ''
+    # [LOCAL-533] A grounded request is a billable Google-Search request; count it
+    # here, where the key exists and we are about to issue it. Ungrounded calls
+    # (grounded=False) are free of the per-request grounding charge and not counted.
+    if grounded:
+        _count_grounding_request()
     r = requests.post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
         headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
@@ -153,7 +191,8 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
 
 
 def gemini_with_sources(prompt: str, model: str = None,
-                        resolve: bool = True, timeout: int = 90) -> Dict:
+                        resolve: bool = True, timeout: int = 90,
+                        grounded: bool = True) -> Dict:
     """[D508] Grounded Gemini, returning its SOURCES as well as its text.
 
     Michael, 2026-08-22: *"could you add another column to your matrix: sources,
@@ -185,6 +224,12 @@ def gemini_with_sources(prompt: str, model: str = None,
         out['error'] = 'no GEMINI_API_KEY'
         return out
     try:
+        # [LOCAL-533] Count the grounded request at the point it is issued. The
+        # key check above has already returned for keyless calls, so we only get
+        # here when a request is actually going out. Guarded by grounded=True so
+        # an explicitly ungrounded call is not charged the per-request rate.
+        if grounded:
+            _count_grounding_request()
         r = requests.post(
             f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
             headers={'Content-Type': 'application/json', 'x-goog-api-key': key},
@@ -193,7 +238,14 @@ def gemini_with_sources(prompt: str, model: str = None,
                       'temperature': 0.2,
                       'maxOutputTokens': int(os.environ.get('GEMINI_MAX_TOKENS', '4000')),
                       'thinkingConfig': {'thinkingBudget': 0}},
-                  'tools': [{'google_search': {}}]},
+                  # [2026-09-23] Grounding with Google Search is billed PER
+                  # REQUEST (~$35/1000, ~3.5c a call) and is independent of tokens.
+                  # It was unconditional here, so questions that cannot benefit from
+                  # a web search were paying for one: "what kind of place is this?"
+                  # and "what does a church consist of?" are CLASS knowledge — the
+                  # model either knows or it does not, and no search helps. Roughly
+                  # four of the ~15 Gemini calls per tour were paying for nothing.
+                  **({'tools': [{'google_search': {}}]} if grounded else {})},
             timeout=timeout)
         r.raise_for_status()
         d = r.json()

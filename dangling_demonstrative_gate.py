@@ -20,6 +20,17 @@ import re
 import sys
 from typing import Dict, List, Optional, Tuple
 
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
 # ---------------------------------------------------------------------------
 # Schema-label regex
 # ---------------------------------------------------------------------------
@@ -358,7 +369,7 @@ def detect_dangling_demonstratives(
     Relative-clause "that" and mid-sentence deictic uses are ignored.
     """
     findings = []
-    sentences = re.split(r'(?<=[.!?])\s+', stop_body)
+    sentences = _ss_split(stop_body)
     preceding_text = ''
 
     for sent in sentences:
@@ -439,7 +450,7 @@ def _find_name_in_corpus(head_noun: str, full_np: str,
     if not any(w in corpus_lower for w in np_words) and head_lower not in corpus_lower:
         return None
 
-    corpus_sents = re.split(r'(?<=[.!?])\s+', corpus_text)
+    corpus_sents = _ss_split(corpus_text)
     for sent in corpus_sents:
         sent_lower = sent.lower()
         if head_lower not in sent_lower and not any(w in sent_lower for w in np_words):

@@ -8,6 +8,17 @@ import re
 from typing import List
 from cost_rates import llm_cost as _llm_cost
 
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
 # 25+ forbidden/overused phrases compiled as case-insensitive regexes.
 # Each pattern matches the phrase (or close variants) wherever it appears.
 FORBIDDEN_PHRASES: List[re.Pattern] = [
@@ -120,7 +131,7 @@ def _jaccard_similarity(words_a: set, words_b: set) -> float:
 def _split_into_sentences(text: str) -> List[str]:
     """Split text into sentences (simple regex, no external libs)."""
     import re
-    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = _ss_split(text.strip())
     return [s.strip() for s in sentences if len(s.strip()) > 20]
 
 
@@ -783,3 +794,326 @@ def repeated_assertions_by_stop(tour_text, api_key, threshold=0.82):
         if r['first_sentence'] not in by_stop[r['repeat_stop']]:
             by_stop[r['repeat_stop']].append(r['first_sentence'])
     return by_stop
+
+
+
+
+_PROPER = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b')
+_YEAR = re.compile(r'\b(1[5-9]\d\d|20\d\d)\b')
+_TITLES = {'saint', 'st', 'mother', 'father', 'cardinal', 'sister', 'pope', 'the'}
+
+
+def _entity_year_key(sentence):
+    """(proper-noun cores, years) — the fingerprint of an EPISODE.
+
+    Word overlap cannot see that "Mother Teresa visited this very church" in 1995
+    and "Saint Mother Teresa of Calcutta held a Mass here in June 1995" are the
+    same event: they share only 4 content words out of 16, a Jaccard of ~0.25, far
+    below any threshold safe against false positives. What they DO share is a
+    person and a year, which is what an episode actually is. Titles are stripped so
+    "Mother Teresa" and "Saint Mother Teresa" match on "teresa".
+    """
+    names = set()
+    for m in _PROPER.finditer(sentence or ''):
+        parts = [p.lower() for p in m.group(1).split()
+                 if p.lower() not in _TITLES]
+        if parts:
+            names.add(parts[-1])          # surname / distinctive last token
+    return names, set(_YEAR.findall(sentence or ''))
+
+
+# [2026-09-23] Common nouns that _PROPER picks up because they sit inside a
+# capitalised name -- "Stained Glass Windows" -> "windows", "Our Lady Help of
+# Christians Catholic Church" -> "church". Harmless for episode matching, but
+# cap_person_across_stops treats every extracted token as a PERSON, and that
+# caused both halves of a real failure on CHURCH_1:
+#
+#   - it "capped" a person called `church` and deleted a sentence about the altar;
+#   - it never capped Cuenin, who was in all four stops, because his sentences
+#     also yielded `windows` and so failed the "is this person the only one
+#     carrying the sentence?" guard.
+#
+# Surnames that are also common words ("Law", as in Cardinal Bernard Law) are
+# deliberately NOT here -- dropping them would reintroduce the miss this cap exists
+# to prevent.
+_NOT_PERSON = {
+    'church', 'cathedral', 'chapel', 'basilica', 'parish', 'shrine', 'abbey',
+    'altar', 'nave', 'narthex', 'transept', 'crypt', 'pulpit', 'apse', 'sanctuary',
+    'windows', 'window', 'tower', 'spire', 'bell', 'organ', 'font', 'aisle',
+    'airport', 'terminal', 'concourse', 'gate', 'checkpoint', 'runway', 'jetbridge',
+    'museum', 'gallery', 'hall', 'wing', 'court', 'garden', 'park', 'square',
+    'street', 'road', 'avenue', 'bridge', 'station', 'centre', 'center', 'building',
+    'city', 'town', 'state', 'county', 'archdiocese', 'diocese', 'university',
+    'college', 'school', 'hospital', 'company', 'association', 'society', 'war',
+}
+
+
+_RECAP_SENTENCE = re.compile(
+    r"\bthat(?:'|\u2019)s\s+\d+\s+stops?\b|\bwe(?:'|\u2019)ve\s+(?:seen|visited)\b"
+    r"|\byour\s+tour\s+(?:of|is)\b|\bto\s+recap\b", re.I)
+
+
+def _person_names(sentence):
+    """Just the names in a sentence that could plausibly be PEOPLE."""
+    names, _years = _entity_year_key(sentence)
+    return {n for n in names if n not in _NOT_PERSON and len(n) > 2}
+
+
+def _same_episode(key_a, key_b):
+    """Same person and same year -> the same story, however it is worded."""
+    names_a, years_a = key_a
+    names_b, years_b = key_b
+    return bool(names_a & names_b) and bool(years_a & years_b)
+
+
+# ---------------------------------------------------------------------------
+# [LOCAL-532] Same EVENT told twice, even when the dates differ or are absent.
+#
+# The kiro critic on LOGAN_1, 2026-09-23: *"Lindbergh appears in two of four
+# stops — the file tells its single best anecdote twice."* Verified, and the
+# critic undercounted: Lindbergh is in stops 1, 3 AND 4. The two full tellings:
+#
+#   stop 3  "It was here, on the tarmac just beyond the bridge, that Charles
+#            Lindbergh once touched down, marking a significant moment..."
+#   stop 4  "In 1927, ... Charles Lindbergh landed the Spirit of St. Louis here
+#            during his goodwill tour, only months after his ... transatlantic
+#            flight."
+#
+# One landing, told twice. `_same_episode` (person AND year) cannot see it: the
+# stop-3 telling carries NO year in its sentence, so `years_a & years_b` is
+# empty and the pair reads as two unrelated mentions. `cap_person_across_stops`
+# (D584) cannot see it either — it caps at TWO stops and Lindbergh is in exactly
+# two BODY stops, which D584 permits by design.
+#
+# The unit repeated here is not a PERSON, it is an EVENT: one person + one class
+# of action (a landing/arrival). Two stops asserting the same person doing the
+# same kind of thing are one episode retold — UNLESS they carry *different*
+# explicit years, which marks two genuinely distinct events (Cuenin in 2002 and
+# again in 2005 is two episodes, not one). So the year is used as a SEPARATOR,
+# not a required match: equal years or a year on only one side = same event; two
+# different years = different events, left alone.
+#
+# How this composes with D584 (stated, per the acceptance criteria):
+#   - D584 governs how many STOPS a person may appear in (<= 2). It never fires
+#     for a person in two stops.
+#   - This rule governs whether the same EPISODE is NARRATED more than once. It
+#     is a strictly narrower unit: it only matches person + same action-class +
+#     non-conflicting year.
+#   - They cannot disagree. Removing a duplicate telling only ever REDUCES a
+#     person's stop reach, so it can never push a tour past D584's cap; and D584
+#     keeping a person in two stops for two DIFFERENT events is exactly the case
+#     this rule declines (different years, or different action-class).
+# ---------------------------------------------------------------------------
+
+# Action-class -> verbs/phrases that name that class of event. Kept deliberately
+# small and concrete: each entry is a thing a person is DATABLY recorded doing at
+# a place, which is what a tour anecdote is. A sentence with none of these
+# asserts no event and cannot be an event-repeat (so atmospheric prose like
+# "continues the legacy that Lindbergh's visit symbolized" contributes nothing).
+_EVENT_ACTIONS = {
+    'arrival': re.compile(
+        r'\b(touch(?:ed)?\s+down|land(?:ed|ing)?|arriv(?:ed|al|es)|'
+        r'flew\s+in|set\s+(?:foot|down)|disembark(?:ed)?|deplaned)\b', re.I),
+    'visit': re.compile(
+        r'\b(visit(?:ed|s)?|came\s+(?:to|here)|toured|stopped\s+(?:by|here)|'
+        r'made\s+an?\s+appearance|addressed\s+(?:the|a)\b|spoke\s+(?:at|here|to))\b',
+        re.I),
+    'birth': re.compile(r'\b(was\s+born|birthplace|born\s+(?:in|here|at))\b', re.I),
+    'death': re.compile(r'\b(died|death|passed\s+away|was\s+killed|murder(?:ed)?|'
+                        r'assassinat(?:ed|ion))\b', re.I),
+    'founding': re.compile(
+        r'\b(found(?:ed|ing)|establish(?:ed)?|open(?:ed|ing)|inaugurat(?:ed|ion)|'
+        r'dedicat(?:ed|ion)|consecrat(?:ed))\b', re.I),
+    'construction': re.compile(
+        r'\b(built|construct(?:ed|ion)|erect(?:ed)?|designed|commission(?:ed)?)\b',
+        re.I),
+    'performance': re.compile(
+        r'\b(perform(?:ed)?|play(?:ed)?\s+(?:here|at)|concert|premier(?:ed|e)|'
+        r'debut(?:ed)?)\b', re.I),
+    'ceremony': re.compile(
+        r'\b(married|wedding|coronation|crowned|ordain(?:ed)?|resign(?:ed|ation)|'
+        r'appoint(?:ed|ment)|elect(?:ed|ion))\b', re.I),
+}
+
+
+def _event_key(sentence):
+    """(person/entity cores, action-classes, years) — the fingerprint of an EVENT.
+
+    Only PEOPLE/entities that could carry an anecdote are kept (common-noun
+    scaffolding like 'windows' or 'church' is dropped, reusing `_person_names`).
+    A sentence with no action verb from `_EVENT_ACTIONS` has an empty action set
+    and therefore matches no event.
+    """
+    names, years = _entity_year_key(sentence)
+    people = {n for n in names if n not in _NOT_PERSON and len(n) > 2}
+    actions = {cls for cls, pat in _EVENT_ACTIONS.items() if pat.search(sentence or '')}
+    return people, actions, years
+
+
+def _same_event(key_a, key_b):
+    """Same actor + same action-class + non-conflicting year -> one event retold.
+
+    The year is a SEPARATOR, not a required match:
+      - shared actor AND shared action-class is the necessary condition;
+      - if BOTH tellings name a year and the years are DISJOINT, they are two
+        different events -> not a repeat;
+      - equal years, or a year on only one side, or no year at all -> same event.
+    """
+    people_a, actions_a, years_a = key_a
+    people_b, actions_b, years_b = key_b
+    if not (people_a & people_b) or not (actions_a & actions_b):
+        return False
+    if years_a and years_b and not (years_a & years_b):
+        return False          # both dated, and to different years -> distinct
+    return True
+
+
+def cap_person_across_stops(poi_list, max_stops: int = 2):
+    """No one person may carry the story at more than `max_stops` stops.
+
+    The kiro critic on a 6-stop church tour, 2026-09-23: *"the Cuenin / Cardinal Law
+    controversy is pasted into four of six stops. It's the tour's crutch. Assign that
+    story to ONE stop and give the other five content about the thing the listener is
+    actually standing in front of."* Verified: **Cuenin appeared in 5 of 6 stops.**
+
+    `strip_cross_stop_repeats` could not see it. That matches on person AND year, and
+    Cuenin recurs with different years (2002, 2005) and different framings — so every
+    occurrence looked like a new episode. A person is allowed to appear twice; being
+    the subject everywhere means the tour has one story and is padding with it.
+
+    The EARLIEST occurrences are kept: the first stop to use a person usually has the
+    strongest claim on them (the ovation happened in the nave). Later sentences naming
+    only that person are dropped.
+    """
+    from collections import defaultdict
+    where = defaultdict(list)          # surname -> [(stop_idx, sentence), ...]
+    for i, poi in enumerate(poi_list or []):
+        desc = (poi.get('description') or '') if isinstance(poi, dict) else ''
+        for sent in _split_into_sentences(desc):
+            for n in _person_names(sent):
+                where[n].append((i, sent))
+
+    removed = []
+    for surname, hits in where.items():
+        stops = sorted({i for i, _ in hits})
+        if len(stops) <= max_stops:
+            continue
+        keep = set(stops[:max_stops])
+        for i, sent in hits:
+            if i in keep:
+                continue
+            # Only drop it if this person is the ONLY name carrying the sentence —
+            # never cut a sentence that is doing other work too.
+            if _person_names(sent) != {surname}:
+                continue
+            # [2026-09-23] Never cut a RECAP sentence. Filtering common nouns out of
+            # the person set made "That's 4 stops -- Stained Glass Windows, where
+            # Father Walter Cuenin's story is etched..." look like a sentence about
+            # Cuenin alone, so the cap deleted half the closing recap and left it
+            # promising four stops it no longer listed.
+            if _RECAP_SENTENCE.search(sent):
+                continue
+            poi = poi_list[i]
+            kept = [x for x in _split_into_sentences(poi.get('description') or '')
+                    if x != sent]
+            # NEVER empty a stop. The first version of this cut the Altar down to
+            # nothing, and LOCAL-292's empty-stop gate would then have deleted the
+            # stop entirely -- trading a repetition for a missing stop, which is the
+            # worse defect. A crutch sentence is better than no stop at all (D577).
+            if not ' '.join(kept).strip():
+                continue
+            poi['description'] = ' '.join(kept).strip()
+            removed.append({'stop': i + 1, 'person': surname, 'removed': sent})
+    return removed
+
+
+_IS_PREVIEW = re.compile(
+    r"\b(?:at|in|on)\s+the\s+(?:upcoming|next|following|remaining)\s+stops?\b"
+    r"|\bin\s+the\s+stops?\s+ahead\b"
+    r"|\byou(?:'|\u2019)?ll\s+(?:learn|discover|hear|see|find)\s+about\b"
+    r"|\bwe(?:'|\u2019)?ll\s+(?:explore|visit|see)\b"
+    r"|\bcoming\s+up\b", re.I)
+
+
+def strip_cross_stop_repeats(poi_list, threshold: float = 0.60, min_words: int = 8,
+                             banned_by_stop: dict = None, banned_threshold: float = 0.42):
+    """[2026-09-18] Delete a sentence from a LATER stop when an earlier stop said it.
+
+    Michael, reading CHURCH_tour_3: stop 2's only story was stop 1's Mother Teresa
+    visit, and stop 4 repeated stop 3. *"I thought we had a filter that should have
+    removed the repeated close from the step description."*
+
+    There is one — `repeated_assertions_by_stop` (D534) — and it FIRED, reporting
+    "Stop 2 / 3 / 4 repeat … will regenerate with them banned". Then `LOCAL-487`
+    applied `cap=1` and retried only stop 3. Stops 2 and 4 were never regenerated,
+    so their repeats shipped and the log line was false for two of the three.
+
+    Regeneration costs a model call and is rightly capped. **Deletion costs nothing
+    and is safe here**: the content is not lost, it is still told at the earlier
+    stop. So after the capped retries, whatever still repeats is simply removed.
+
+    Mutates `description` in place. Returns [{stop, removed, matched_stop}].
+    """
+    removed_log = []
+    seen = []                      # [(stop_index, token_set, sentence, event_key)]
+    # `banned_by_stop` carries what D534's LLM detector ALREADY identified as
+    # repeated for each stop. Jaccard alone catches verbatim repeats; D534 catches
+    # paraphrases ("Mother Teresa visited" vs "Saint Mother Teresa of Calcutta held
+    # a Mass here"), which is the case Michael actually hit. Seeding the deletion
+    # with D534's findings reuses the detector we have instead of adding a second
+    # one, and a looser threshold is safe because the sentence is known to repeat.
+    _banned = {int(k): [_entity_year_key(x) for x in v]
+               for k, v in (banned_by_stop or {}).items()}
+    for idx, poi in enumerate(poi_list or []):
+        desc = (poi.get('description') or '') if isinstance(poi, dict) else ''
+        if not desc:
+            continue
+        kept, dropped = [], []
+        for sent in _split_into_sentences(desc):
+            toks = _tokenize(sent)
+            # Length guard counts RAW words, not post-stopword tokens: "Her presence
+            # drew hundreds of local residents to the doors." is 10 words but only 6
+            # content tokens, so a token-based guard skipped an exact duplicate.
+            if len(sent.split()) < min_words or not toks:
+                kept.append(sent)
+                continue
+            dup_of = None
+            _key = _entity_year_key(sent)
+            _ekey = _event_key(sent)
+            for bkey in _banned.get(idx + 1, []):
+                if _same_episode(_key, bkey):
+                    dup_of = 0      # flagged by D534; source stop not tracked
+                    break
+            if dup_of is None:
+              for prev_idx, prev_toks, _prev, prev_ekey in seen:
+                # [LOCAL-532] Same EVENT retold at a later stop, even when the two
+                # tellings carry different dates or none — the Lindbergh landing in
+                # LOGAN_1 stops 3 and 4. Checked before Jaccard because these pairs
+                # score far below the word-overlap threshold ("touched down" vs
+                # "landed the Spirit of St. Louis" share almost no content words).
+                if prev_idx != idx and _same_event(_ekey, prev_ekey):
+                    dup_of = prev_idx
+                    break
+                if _jaccard_similarity(toks, prev_toks) >= threshold:
+                    dup_of = prev_idx
+                    break
+            if dup_of is not None:
+                dropped.append((sent, dup_of))
+            else:
+                kept.append(sent)
+                # [2026-09-23] A PREVIEW is not a telling. LOGAN_1 stop 1 says "At
+                # the upcoming stops, you'll learn about ... the historic landing of
+                # Charles Lindbergh"; LOCAL-532's event matching then treated that as
+                # the first telling and deleted the real narration from BOTH stop 3
+                # and stop 4. The tour promised its best anecdote and never delivered
+                # it -- which is the unfulfilled-promise defect R10 (LOCAL-235)
+                # exists to catch. A preview may still be DROPPED as a duplicate; it
+                # just may never be the thing a later stop is judged against.
+                if not _IS_PREVIEW.search(sent):
+                    seen.append((idx, toks, sent, _ekey))
+        if dropped:
+            poi['description'] = ' '.join(kept).strip()
+            for sent, src in dropped:
+                removed_log.append({'stop': idx + 1, 'removed': sent,
+                                    'matched_stop': src + 1})
+    return removed_log

@@ -1588,3 +1588,96 @@ de-repetition guard broke coherence, the fallback flag produced a false disclosu
 exhibit, the waypoint was rescued from being a boundary then dropped from the tour, the bike
 reachability check deleted three reachable stops while keeping an island. **All were caught by
 running the thing and reading the output; the suites were green every time.**
+
+---
+
+## 2026-09-17 — SIDE: which cheap unlocked Pixel for Android field testing?
+
+**Michael:** *"It seems I need an android phone for testing. Can you look at [Amazon, unlocked Pixel, high-price=70] and decide which one would serve us the best?"*
+
+**LEAD:** Amazon returned 503 to the fetcher, so the filtered listings could not be read —
+answered from the app's own build config plus market prices.
+
+The deciding spec is **maximum Android version**, not speed or camera. `minSdk = 24` means
+almost any Pixel installs the app, so installability is not the constraint. What matters is
+that `AndroidManifest.xml` declares `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `RECORD_AUDIO`
+and `ACCESS_FINE_LOCATION`, and the app builds on Flutter 3.41.6 / `compileSdk 36` — so it
+**targets Android 16**, and each of those permissions changed behaviour in a different release.
+
+Under $70 the ceiling is **Android 13** (Pixel 4 and Pixel 4a both end there; 3a/3/2 end at 12).
+Android 13 does cover the notification-permission prompt — the one that does not exist at all
+below 13 — but not `foregroundServiceType` enforcement (14+) or edge-to-edge layout (15+,
+which `targetSdk` 35+ forces and which visibly changes the app's layout).
+
+**Recommendation: Pixel 6a, ~$119 unlocked (Swappa).** Cheapest Pixel that runs Android 16 —
+the OS the app targets. If $70 is firm: **Pixel 4a**, never a 3a, and pair it with an
+Android 16 emulator on the Mac Mini, which covers the API-level behaviour the 4a cannot while
+the 4a covers real GPS and audio in the field. Caveat on the 4a: Google's January 2025 update
+deliberately reduced battery capacity on affected units — the worst trait for a walking tour.
+
+---
+
+# 2026-09-23 — round-7 fixes, two infrastructure incidents, cost measured
+
+**Q: Are the round-7 critique fixes done?**
+Four fixed and verified gone in regenerated tours: word-splices (D583), placeholder
+stops (D586), the person-cap that capped a venue called "church" while missing the
+priest it was written for (D584), and the `named_people` counter (D585). Four more
+dispatched and merged: LOCAL-527 fabricated attribution, 529 one-name-four-spellings,
+530 a verb whose object a gate had deleted, 532 the best anecdote told twice.
+LOCAL-531 retired as moot. LOCAL-528 completed, unreviewed.
+
+**LEAD correction Michael should know about.** I told him the churches named five
+people against Logan's one — a real quality gap. **It was not real.** My counter only
+matched a name when a TITLE preceded it. Corrected: CHURCH 5/5/5, LOGAN 3/4/5. A
+second kiro critic caught it; the duplicate dispatch I had flagged as pure waste is
+what produced that second opinion.
+
+**What is still broken is one problem, not several.** Every deterministic defect is
+fixed and stays fixed. What survives is everything requiring knowledge of the world,
+and all of it scored CLEAN: Gustave Eiffel building Boston Logan, "Founded in 1868 by
+St. Mary Help of Christians" (the church's dedication rendered as its founder),
+Lindbergh landing in 1927 on a jet bridge in a stop that correctly dates Massport to
+1959.
+
+**Q: What is wrong with Docker?**
+The socket accepted connections instantly and never answered: `com.docker.backend`
+alive, the Linux VM gone. That is why `docker ps` hung instead of erroring, and why
+three app restarts failed — they restart the app, not the backend. Fix: kill the
+backend process and relaunch. Data intact, 168 rows. **Never factory-reset:
+`postgres_data` is a named volume and the backup covers one table, data only.**
+
+**Incident: the dispatcher released 35 tasks when 4 were intended** — 97 processes,
+~10GB of worktrees against 7.9GB free. Killed mid-checkout, nothing lost. Two fixes:
+an allowlist that fails closed (D587), and a `worktree_setup_failed` record no longer
+blocking a task forever, since that task never ran (D589). **What creates those
+duplicate task files is still unknown.**
+
+**Q: Lowering price per tour?**
+Measured rather than estimated: **~$0.21 for a 4-stop tour**. But that figure sums
+OpenAI call sites only — **grounding bills ~3.5c per REQUEST, independent of tokens,
+and is absent from it.** They move on opposite levers, so tuning tokens first can
+raise the real bill while the printed number falls. LOCAL-533 splits them; nothing
+should be optimised first. Caching is not the open problem — 166 cached rows, a repeat
+verified at $0.00 in 0.2s. The lever is hit rate (D581).
+
+**Q: Any work on Subscribed?** No — checked rather than recalled: zero commits, zero
+files. It lost to tier-1 work every time, four checks running. Igor's modules are
+merged but **LOCAL-524 (E2E) FAILED**, so that breakdown starts from making it pass.
+
+**Q: Should I review the round-7 tours?** No — two generations stale, its defects
+already catalogued and mostly fixed. Round 9 was generated instead, with every fix
+merged, on the same two venues so the comparison holds.
+
+**The lesson that cost the most today, three separate times:** read what a change DID
+to real text, not what its report claimed. It caught a metric that flattered the wrong
+conclusion, a gate deleting the sentence it was meant to protect, and LOCAL-532
+deleting the Lindbergh landing from every stop because it mistook a preview for a
+telling.
+
+---
+
+# VOLUME 03 IS CLOSED — 2026-09-23
+
+At 97 KB this passed the size that made Volume 01 unsearchable.
+**Continue in `STORIED_COMMUNICATION_04.MD`.**

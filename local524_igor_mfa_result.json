@@ -1,0 +1,66 @@
+{
+  "job_id": "dd5ed5ba-5d0b-4e3c-a9a7-d3d608fea890",
+  "wall_time_s": 224.5,
+  "tour_id": 365,
+  "tour_name": "Faneuil Hall Marketplace, Boston MA, with a stop at Quincy Market and a stop at the Samuel Adams statue and a stop at the Boston Massacre site - Walking Tour",
+  "location": "Faneuil Hall Marketplace, Boston MA, with a stop at Quincy Market and a stop at the Samuel Adams statue and a stop at the Boston Massacre site",
+  "tour_type": "walking",
+  "stops_requested": 3,
+  "stops_count_db": 3,
+  "stops_delivered_headers": [
+    "Quincy Market",
+    "Boston Massacre Site",
+    "Samuel Adams Statue"
+  ],
+  "user_chosen_stops": [
+    "Quincy Market",
+    "the Samuel Adams statue",
+    "the Boston Massacre site"
+  ],
+  "stops_match": {
+    "the Sargent Murals": false,
+    "the Liberty Bowl by Paul Revere": false,
+    "Watson and the Shark by Copley": false
+  },
+  "stops_match_to_header": {
+    "the Sargent Murals": null,
+    "the Liberty Bowl by Paul Revere": null,
+    "Watson and the Shark by Copley": null
+  },
+  "all_chosen_stops_present": false,
+  "order_sensible": false,
+  "audio_bytes": 2072206,
+  "audio_members": [
+    "audio_1.mp3",
+    "audio_2.mp3",
+    "audio_3.mp3"
+  ],
+  "zip_filename": "faneuil_hall_marketplace_boston_ma_with_a_stop_at_quincy_market_and_a_stop_at_the_samuel_adams_statue_and_a_stop_at_the_boston_massacre_site_walking_dd5ed5ba.zip",
+  "score_clean": false,
+  "score_metrics": {
+    "stops_delivered": 3,
+    "stops_requested": 3,
+    "dates": 11,
+    "named_people": 7,
+    "chars": 6930
+  },
+  "score_defects": {
+    "bare_death": "7 death(s) named without circumstances"
+  },
+  "cost_usd": 0.1543,
+  "cost_baseline_usd": 0.244,
+  "cost_rows": [
+    {
+      "op": "spine_generate",
+      "usd": 0.007563,
+      "cache_hit": false,
+      "job_id": "38642cf5-1c2b-4dec-834e-fd91f38722c9"
+    },
+    {
+      "op": "tour_generate",
+      "usd": 0.146762,
+      "cache_hit": false,
+      "job_id": "38642cf5-1c2b-4dec-834e-fd91f38722c9"
+    }
+  ]
+}

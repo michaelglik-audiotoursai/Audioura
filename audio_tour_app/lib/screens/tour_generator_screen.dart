@@ -22,6 +22,8 @@ import '../screens/tour_player_screen.dart';
 import '../screens/news_player_screen.dart';
 import '../widgets/language_selector.dart';
 import '../utils/tour_request_parser.dart';
+import '../utils/user_stops.dart';
+import 'user_stops_screen.dart';
 import 'main_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
@@ -41,6 +43,14 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   String _appMode = 'Tours'; // Default to Tours mode
   String _contentType = 'Article'; // Article or Newsletter
   List<String> _selectedLanguages = ['en']; // Language selection
+
+  // LOCAL-523 — who chooses the stops.
+  //  'suggest' = Audioura suggests the stops (today's behaviour, the DEFAULT).
+  //  'name'    = the user names the stops via the add-one-at-a-time loop.
+  // The default value keeps the opt-out path byte-for-byte unchanged (AC #1).
+  String _stopMode = 'suggest';
+  // The user's own ordered stop list, once they have named and reviewed it.
+  List<Map<String, dynamic>> _userStops = [];
 
   @override
   void initState() {
@@ -121,9 +131,26 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         .trim();
   }
 
+  /// LOCAL-523 — open the "name your stops" loop and keep whatever the user
+  /// builds. Passing the current `_userStops` back in lets them resume editing
+  /// a list they already started. A `null` result (Cancel) leaves the stored
+  /// list untouched.
+  Future<void> _openUserStopsLoop() async {
+    final result = await Navigator.push<List<Map<String, dynamic>>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserStopsScreen(
+          initialStops: _userStops.isEmpty ? null : _userStops,
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() => _userStops = result);
+    }
+  }
+
   Future<void> _generateTour() async {
     if (_isGenerating) return; // re-entry guard
-
     final rawInput = _tourRequestController.text.trim();
     if (rawInput.isEmpty) {
       _showError('Please enter a tour request');
@@ -137,16 +164,29 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
     
     // Validate stop count
+    //
+    // LOCAL-523: when the user opted into naming their own stops, the count and
+    // the list come from their reviewed selection, not the free-text field.
+    // Otherwise this is exactly the original 1-30 validation (AC #1 — unchanged
+    // for the default path).
     int stopCount;
-    try {
-      stopCount = int.parse(_stopCountController.text);
-      if (stopCount < 1 || stopCount > 30) {
-        _showError('Number of stops must be between 1 and 30');
+    if (_stopMode == 'name') {
+      if (!isStopListReady(_userStops)) {
+        _showError('Add and review your stops before generating.');
         return;
       }
-    } catch (e) {
-      _showError('Please enter a valid number of stops');
-      return;
+      stopCount = _userStops.length;
+    } else {
+      try {
+        stopCount = int.parse(_stopCountController.text);
+        if (stopCount < 1 || stopCount > 30) {
+          _showError('Number of stops must be between 1 and 30');
+          return;
+        }
+      } catch (e) {
+        _showError('Please enter a valid number of stops');
+        return;
+      }
     }
     
     // Check for duplicate tour
@@ -163,6 +203,12 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
+      // LOCAL-523: hand the user's own ordered stop names to generation so the
+      // tour is built from their selection. Only present when they opted in;
+      // the default request body is otherwise unchanged (AC #1, #2).
+      if (_stopMode == 'name') {
+        tourData['user_stops'] = stopTitlesForGeneration(_userStops);
+      }
       // Include user_id — required by cloud gateway for auth
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';
@@ -1158,43 +1204,112 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
               const SizedBox(height: 16),
             ],
 
-            Row(
-              children: [
-                Text(
-                  _appMode == 'Audio' ? 'Major Points Summary:' : 'Number of stops:',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2c3e50),
+            // LOCAL-523 — who chooses the stops (Tours mode only).
+            if (_appMode == 'Tours') ...[
+              const Text(
+                'Stops',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2c3e50),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'suggest',
+                    label: Text('Audioura suggests'),
+                    icon: Icon(Icons.auto_awesome),
+                  ),
+                  ButtonSegment(
+                    value: 'name',
+                    label: Text('I will name the stops'),
+                    icon: Icon(Icons.edit_location_alt),
+                  ),
+                ],
+                selected: {_stopMode},
+                onSelectionChanged: _isGenerating
+                    ? null
+                    : (selection) {
+                        setState(() => _stopMode = selection.first);
+                      },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Stop selection detail depends on the chosen mode.
+            if (_appMode == 'Tours' && _stopMode == 'name') ...[
+              // "I will name the stops": open the add-one-at-a-time loop.
+              OutlinedButton.icon(
+                onPressed: _isGenerating ? null : _openUserStopsLoop,
+                icon: const Icon(Icons.list_alt),
+                label: Text(
+                  _userStops.isEmpty
+                      ? 'Add your stops'
+                      : 'Edit your ${_userStops.length} stop${_userStops.length == 1 ? '' : 's'}',
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+              if (_userStops.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Add at least one stop, then generate from your own selection.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Tour will be generated from your ${_userStops.length} '
+                    'stop${_userStops.length == 1 ? '' : 's'}, in order.',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 80,
-                  child: TextField(
-                    controller: _stopCountController,
-                    enabled: !_isGenerating,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
+              const SizedBox(height: 20),
+            ] else ...[
+              Row(
+                children: [
+                  Text(
+                    _appMode == 'Audio' ? 'Major Points Summary:' : 'Number of stops:',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2c3e50),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _appMode == 'Audio' ? '(0-5)' : '(1-30)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
+                  const SizedBox(width: 16),
+                  SizedBox(
+                    width: 80,
+                    child: TextField(
+                      controller: _stopCountController,
+                      enabled: !_isGenerating,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _appMode == 'Audio' ? '(0-5)' : '(1-30)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
 
             Row(
               children: [
@@ -1343,16 +1458,27 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
     
     // Validate stop count
+    //
+    // LOCAL-523: named-stops mode derives count/list from the reviewed
+    // selection; otherwise unchanged 1-30 validation (AC #1).
     int stopCount;
-    try {
-      stopCount = int.parse(_stopCountController.text);
-      if (stopCount < 1 || stopCount > 30) {
-        _showError('Number of stops must be between 1 and 30');
+    if (_stopMode == 'name') {
+      if (!isStopListReady(_userStops)) {
+        _showError('Add and review your stops before generating.');
         return;
       }
-    } catch (e) {
-      _showError('Please enter a valid number of stops');
-      return;
+      stopCount = _userStops.length;
+    } else {
+      try {
+        stopCount = int.parse(_stopCountController.text);
+        if (stopCount < 1 || stopCount > 30) {
+          _showError('Number of stops must be between 1 and 30');
+          return;
+        }
+      } catch (e) {
+        _showError('Please enter a valid number of stops');
+        return;
+      }
     }
     
     // Check for duplicate tour
@@ -1364,6 +1490,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
+      // LOCAL-523: forward the user's own ordered stops when they opted in.
+      if (_stopMode == 'name') {
+        tourData['user_stops'] = stopTitlesForGeneration(_userStops);
+      }
       // Include user_id — required by cloud gateway for auth
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';

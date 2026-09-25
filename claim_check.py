@@ -19,6 +19,17 @@ import re
 import unicodedata
 from typing import Dict, List, Optional, Tuple
 
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
 
 # ─── Claim types we extract ─────────────────────────────────────────────────
 
@@ -378,7 +389,7 @@ def extract_claims(text: str) -> List[Dict]:
     Excludes: adjectives, atmosphere, second-person framing.
     """
     # Split into sentences
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = _ss_split(text)
     all_claims = []
 
     for sentence in sentences:

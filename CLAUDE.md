@@ -224,17 +224,18 @@ tokens and muddles the record; a task mistaken for a question costs one round tr
 
 # THE CONVERSATION FILES — append before moving on, or they die again
 
-Three files, three jobs. **Read `STORIED_COMMUNICATION_03.MD` at session start** —
-volume 02 is CLOSED (2026-08-14) and carries a pointer forward.
+Three files, three jobs. **Read `STORIED_COMMUNICATION_04.MD` at session start** —
+volumes 01, 02 and 03 are CLOSED and each carries a pointer forward. 03 closed
+2026-09-23 at 97 KB, the size that made 01 unsearchable.
 
 | File | Holds |
 |---|---|
-| `STORIED_COMMUNICATION_03.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. Volumes 01 and 02 are closed; open 04 only if this one becomes unsearchable. |
+| `STORIED_COMMUNICATION_04.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. Volumes 01–03 are closed; open 05 only if this one becomes unsearchable. |
 | `ANSWERS.MD` | the same answers, indexed and numbered for lookup months later, plus a **Code map** of clickable links into the source. Includes LEAD-raised items, not only Michael's questions. **One file — there is no QUESTIONS.MD** (tried 2026-08-16, merged back the same day; two overlapping indexes is what killed Volume 01). |
 | `DECISIONS.md` | binding rulings plus the evidence. LEAD only. Tasks must never edit it. |
 
 **The rule: when Michael asks a real question, append the exchange to
-`STORIED_COMMUNICATION_02.MD` before starting the next task.** Not at the end of the
+`STORIED_COMMUNICATION_04.MD` before starting the next task.** Not at the end of the
 session — sessions are killed, cleared, and restarted constantly by design (D252), and
 anything held only in context is lost.
 

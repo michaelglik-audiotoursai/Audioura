@@ -22964,3 +22964,1213 @@ Kuraly stays at the Bruins bar. Nothing new is needed in the prose pipeline.
 
 Dispatched as **LOCAL-480**. Michael's approved Cimiez tour is the regression control — a change
 to its stop list is a bounce.
+
+## D564 — The venue class decides what a stop IS. Three failures, one defect.
+### 2026-09-17. Supersedes the framing of D563 by widening it.
+
+D563 introduced a `facility` category for the Logan airport tour. Two days of Michael's field
+testing show that was the narrow reading of a general defect.
+
+**Three requests, three outcomes, one cause:**
+
+| requested | routed as | what a stop should have been | result |
+|---|---|---|---|
+| Logan Airport, walking | sightseeing stroll | facility needs — gates, transit, food, lost and found | 4 generic stops, one of them "Virtual Tour", a non-place |
+| Our Lady Help of Christians, Newton MA | **museum** | places with history — building, tower, memorial, hall | **hard failure**, `tier: unresolvable` |
+| Cimiez District, walking | sightseeing stroll | sights | **excellent** — correct by luck of category |
+
+**The church case is the proof, and it is worth stating exactly.** Routed to the museum path, the
+generator asked an LLM for *artworks* at a parish church. It answered with the **Sistine Chapel
+Ceiling (Vatican City)** and **The Last Supper (Milan)** — 6,700 km and 6,300 km from Newton — plus
+two plausible-but-uncatalogued items. The museum verification gate then refused the whole tour
+(`entity_resolved: False, sparql_works: 0, tier: unresolvable`) and clean-failed.
+
+**The gate was right. The routing was wrong.** That gate is the only reason the Sistine Chapel did
+not reach a listener standing in a Newton parish, and it must not be weakened to make churches work.
+
+**The decisive evidence that this is routing and not data:** Michael's approved Cimiez tour contains
+**Cimiez Monastery — a church — as a stop, and it works.** Same kind of building; different path
+through the code; opposite outcome. The material exists. The museum path cannot see it because it
+looks only for catalogued objects.
+
+**The rule:** `generate_tour_text.py` already encodes the fork —
+`_kf_focus = 'object' if tour_category == 'museum' else 'place'`. A museum's unit is a **catalogued
+object** verifiable against Wikidata. Everything else's unit is a **place with history**, verifiable
+the way a walking tour's stops already are. A third unit now joins them: a facility's unit is a
+**traveller need met at a mapped location**.
+
+**One detector, not three.** LOCAL-480 (facility) and LOCAL-485 (church/civic) must share a single
+venue-class mechanism. A fourth venue type must extend it, never add a parallel copy.
+
+**Second, smaller ruling — error messages may not lie by default.**
+`generate_tour_text_service.py:193` makes "could not be verified with enough works" the `else`
+branch: `exhibition_closed` and `exhibition_not_found` get true messages, and **every other
+failure** is told it lacks artworks whether artworks were ever relevant. Michael spent a day
+believing a quota had blocked him. **A catch-all message must describe the catch-all case
+("we could not find enough verified material about <venue>"), never borrow the wording of a
+specific one**, and it must name the venue.
+
+Dispatched as LOCAL-485. Cimiez remains the regression control for both tasks.
+
+## D565 — The agreed sequence after build 26, and the one thing to do before optimizing
+### 2026-09-17. Michael's plan, with LEAD's single amendment. Recorded so a cleared session inherits it.
+
+Michael's words: *"Our next task will be fixing the tour-purpose work. Testing Storied. Then looking
+at the prices per tour and article generation decide if we need to work on making the generation be
+cheaper in Storied. After that, we will need to make Storied Stable and Subscribe the preview."*
+
+**Agreed, in that order.** One amendment, which he has not yet responded to:
+
+**Measure cost per tour BEFORE the purpose work lands, not after.** Not to optimize — to have a
+baseline. LOCAL-480 and LOCAL-485 change which corpus calls fire and add OSM queries (free). Without
+a number taken beforehand, a later measurement cannot be read as improvement or regression. The
+decision about *whether* to optimize still waits until after testing; only the measurement moves.
+
+**The track swap is the end state, and it is the riskiest step in the list.** Storied becomes
+Stable, Subscribed becomes Preview. `track` is a live DB discriminator with rows already carrying
+`beta`/`storied`, the app renders it as Stable/Preview (D-wdvrdaxxmb), and `api.audioura.com` vs
+`storied-api.audioura.com` are separate Cloud Run stacks. Plan it as its own task with a rollback,
+not as a step at the end of another one.
+
+### Queue at the moment of this writing — all on disk, nothing in context
+
+| task | state |
+|---|---|
+| LOCAL-479 one-word names (Walter, Suzette) | COMPLETED, awaiting LEAD review |
+| LOCAL-480 `facility` venue class (D563) | COMPLETED, awaiting LEAD review |
+| LOCAL-481 a stop must be a real place | COMPLETED, awaiting LEAD review |
+| LOCAL-483 WebView console → debug log | filed, not dispatched |
+| LOCAL-484 stale stop count on Listen | filed, not dispatched |
+| LOCAL-485 church/civic routing (D564) | filed, not dispatched |
+
+**LOCAL-479/480/481/485 together ARE the tour-purpose work.** Review 480 and 485 as one mechanism
+(D564: one venue-class detector, never two).
+
+**Build 26 is on Michael's phone and passes everything he has tested** except the stale stop count.
+It is not yet submitted for Beta App Review; Elie and Sophie are not yet added. Michael's decision:
+control testers by invitation, not a public link, and raise `tours_per_day_override` per tester
+rather than the `free` plan default — which stays at 1.
+
+## D566 — The tour-purpose work is merged. What the live runs proved, and what only they could.
+### 2026-09-17. LOCAL-479/480/481/483/484/485 reviewed, merged, and verified by LEAD while Michael was away.
+
+Six submissions sat finished and unreviewed at the start of this session. All six are now in
+`storied`. Full review in `REVIEW_LOCAL-479_to_485.md`; this is the durable part.
+
+### D564's "one detector, not three" survived independent dispatch
+
+480 and 485 were dispatched from different bases — `git merge-base --is-ancestor` proves 485's
+base does not contain 480 — so two parallel facility detectors was the likely outcome. It did not
+happen: **485 wrote the shared `_detect_venue_class` primitive and made 480's
+`_detect_facility_class` a thin wrapper over it**, keeping the exact name 480's wiring calls.
+
+LEAD verified rather than believed: 485's `_FACILITY_CLASS_WORDS` is **byte-identical** to 480's.
+The merge conflicted in four hunks, resolved by keeping 485's shared block and **deleting 480's
+duplicate detector**; the classifier and both post-convergence guards take both branches, facility
+first. The tree now holds exactly one facility detector.
+
+**The lesson worth keeping: a later task can be told to write the seam the earlier one will merge
+into.** That is cheaper than merging two finished copies, and it is what made this merge routine.
+
+### The live-artifact gate earned its keep twice
+
+Both 480 and 485 reported honestly that they had verified **offline only** — Overpass mocked,
+nothing deployed. Neither claimed COMPLETE. Both were right to hand it over, because:
+
+**1. LOCAL-480's need-spine collapses against the real Overpass.** It issues **one query per need
+slot — ten, sequentially, two retries each**. Three live runs at Logan returned 5, 6, and 2 stops
+in 131–148s, with different slots lost each time to 429/504/ConnectionError. All 20 of its tests
+pass against a mock and none of them could see this.
+
+The mechanism is right — `Terminal C` (OSM way/29518154) and `Dunkin'` (node/5380463925) came back
+real, distinctly located, correctly sourced. **The defect is that "findable or cut" cannot
+distinguish "not mapped" from "Overpass was busy,"** so a transient 504 silently deletes a stop
+that exists. D563 counted 68 food-and-drink objects at Logan by hand; one run shipped none.
+
+**Fix direction: one combined query instead of ten** (D563 got all 331 objects in two), and
+**separate an empty result from a failed request** so an errored slot is retried, never cut.
+
+**2. D564's second ruling was only half-applied.** 485 gave `thin_evidence` its own honest,
+venue-named message but left the `else` catch-all still reading *"could not be verified with
+enough works"* — the museum wording, unnamed venue, for every unclassified failure. That is the
+precise defect the ruling names: **485 fixed the instance and not the rule.** LEAD fixed the
+catch-all (`0c7eb0c`).
+
+**The general lesson: when a ruling states a rule and cites an instance, a task that fixes only
+the instance has not satisfied the ruling.** Check the `else` branch.
+
+### A regression claim needs two trees, and this one got them
+
+The full Python run shows 20 failures and 37 collection errors. **None is ours.** Collection
+errors are missing host deps (`bs4` ×18, `selenium` ×12, `Crypto` ×4) plus three py3.9 f-string
+syntax errors in old scripts. The exhibition-extraction failures matter because 485 touches
+`generate_tour_text.py`, so they were run on a worktree at the pre-merge commit `a3d4e9d`:
+**9 failed / 88 passed on both trees, identical.** They also pass individually — pre-existing
+test-order pollution.
+
+### Two pieces of housekeeping worth recording
+
+- **`widget_test.dart` deleted.** The stock Flutter counter template, importing a package name
+  that has not existed since the rename, pumping a `MyApp` this app never had. Red since "First
+  commit", which made `Some tests failed.` the suite's normal output and would have hidden a real
+  failure. Flutter is now **132/132 green**.
+- **The worktree prune is not an incident.** `.continuous_dev/prune_worktrees.sh` removed the six
+  task worktrees minutes after they became merged-and-idle-6h, freeing ~2.5 GB and clearing the
+  DISK LOW alert. Branches and commits all survive in `.git`, exactly as that script promises.
+  Recording it because an unexplained directory disappearance on this machine reads like the
+  tour-29 event until you find the script.
+
+## D567 — The church tour no longer fails. It now ships confident, wrong facts instead.
+### 2026-09-17. Found by the first live church run after D564's routing fix. Not caused by it.
+
+**D564's defect is fixed.** `Our Lady Help of Christians Catholic Church, Newton MA` — the request
+that clean-failed `tier: unresolvable` on build 26 after being offered the Sistine Chapel —
+now produces a complete tour: 3 stops, 7,372 chars, 247s, **$0.1965**. No stop is outside Newton.
+No catalogued-artwork fabrication. The stop about the requested church is properly place-grounded
+("the very stones you see", "the spacious nave", Gothic Revival, Nonantum, 1881) and its history
+checks out.
+
+**But stop 2 is wrong in two independent ways, and nothing in the pipeline noticed.**
+
+Stop 2 is `Sacred Heart Parish`, a real church at a real Newton address (1321 Centre St). Its
+narration says:
+
+> *"The parish was canonically recognized in 1966 by Cardinal James Francis McIntyre, **Archbishop
+> of Los Angeles**."*
+
+McIntyre was Archbishop of Los Angeles. A Newton, Massachusetts parish in 1966 was under the
+Archbishop of **Boston**. That sentence belongs to a different Sacred Heart Parish, ~4,000 km away.
+
+> *"In 2002, Father Walter Cuenin became a figure of controversy… This bold stance led to a ban on
+> archdiocesan meetings **at Our Lady Help of Christians**… marking **Sacred Heart Parish** as a
+> site of defiance."*
+
+Cuenin was pastor of **Our Lady Help of Christians** — which is stop 3. The sentence names the
+correct parish and credits the wrong one **in the same breath**. The whole Cuenin story is told
+twice: correctly at stop 3, transplanted onto stop 2, and the closing recap keeps the wrong
+version — *"Sacred Heart Parish, where Father Walter Cuenin criticized Cardinal Bernard Law."*
+
+### Why nothing caught it
+
+```
+[EXISTENCE-GATE] LOG_ONLY — 2/2 stops verified (100%), 0 would be dropped
+  [VERIFIED] 'Sacred Heart Parish' — venue_corpus canonical_title(geo):
+             'Newton College of the Sacred Heart'
+```
+
+**The gate matched a parish to a defunct women's college.** `Newton College of the Sacred Heart`
+closed in 1975; it is not a parish and never was. The gate asks whether a *string* resembles a
+known title near the location. It does not ask whether the entity is the same entity, and nothing
+anywhere asks whether an attached *fact* belongs to the venue it is attached to.
+
+**This is D563/D564's failure one level down.** Those were stops in the wrong place. This is the
+right stop carrying another place's facts — and it is harder to see, because every name in the
+sentence is locally plausible.
+
+### The rule this establishes
+
+**A stop-existence check is not a fact-ownership check, and passing the first must stop implying
+the second.** Two concrete consequences, neither dispatched (Michael was away; an unattended
+dispatcher task spends money unwatched):
+
+1. **Entity-type agreement.** A stop named `... Parish` must not verify against a *college*. The
+   gate has the canonical title in hand; compare the kind, not just the string.
+2. **One story, one owner.** When the same named person or event appears at two stops, that is a
+   duplicate to resolve, not two facts. The correct owner is the venue the source ties them to —
+   here, the text itself named it.
+
+**The prose is not the problem and must not be touched** (D563 still binds). The retrieval-to-stop
+binding is.
+
+**Honest scope note:** this behaviour is not new and was not introduced by the six merges. It is
+the same "stories are real but not tied to the object" pattern recorded for the MFA tour on
+2026-08-12. What is new is that we can now see it, because the church tour runs at all.
+
+## D568 — LOCAL-480 crashed on every facility tour, and 20 green tests could not see it
+### 2026-09-17. Found by the first end-to-end facility run. The most important finding of the batch.
+
+`Walking tour around Logan Airport, Boston` routes correctly — `Detected tour category: FACILITY`,
+the exact phrasing that produced tour 423's sightseeing list. Then it **crashes**:
+
+```
+File "generate_tour_text.py", line 6444, in generate_tour_text
+    if tour_category == 'facility' and not _forced_stops_active:
+UnboundLocalError: local variable '_forced_stops_active' referenced before assignment
+```
+
+`_forced_stops_active` is assigned in the LOCAL-357 forced-stops harness **~70 lines below** the
+facility block that reads it. Every facility tour died before Phase 3A.
+
+**This is LOCAL-480's own defect, not a merge artifact.** Verified against the untouched branch
+commit: on `c85f61e` the read is at line 6327 and the first assignment at 6401. The merge
+preserved the ordering exactly.
+
+### Why twenty passing tests missed a hard crash on the only path the task existed to build
+
+LOCAL-480's suite has 20 tests. They fall into two groups, and **neither can execute the facility
+branch of `generate_tour_text()`**:
+
+- the `fill_need_spine` tests call the new module directly, with a mocked Overpass;
+- the `TestWiring` tests assert on `inspect.getsource(generate_tour_text)` — they check the
+  integration code is *textually present*.
+
+A source assertion proves the wiring exists. **It cannot prove the wiring runs.** LOCAL-465
+introduced that pattern to catch a reverted integration, and it is good at exactly that — but it
+reads like end-to-end coverage while providing none.
+
+**This extends D242.** That rule says green tests over an orphaned module prove nothing; the
+module here was *not* orphaned — `grep` found the production importer, which was the check D242
+prescribes, and the check passed. **A production caller existing is not the same as the production
+caller working.** The only instrument that could see this was running the thing.
+
+**The rule: a task that adds a new branch to `generate_tour_text()` must run `generate_tour_text()`
+down that branch at least once.** Mocking the network is fine; skipping the entry point is not.
+Where cost forbids a full run, the task must say so and hand the run to LEAD — as both 480 and 485
+correctly did for their other claims.
+
+**Fixed** by deriving `_forced_stops_active = bool(forced_stops)` before the facility block; it
+depends only on the `forced_stops` parameter, so early derivation is value-identical, and the
+LOCAL-357 block that re-derives it is untouched.
+
+## D569 — The facility tour's Overpass dependency is a single point of failure, and LEAD proved it by tripping it
+### 2026-09-17, correcting and sharpening the Overpass finding in D566.
+
+**What happened.** After D568's crash fix, the Logan facility tour ran the whole pipeline and still
+delivered nothing: `RESULT: FAILED chars=0, 197s`. All **ten** need-spine slots failed with
+`ConnectionError`, the spine filled zero stops, and the one stop that reached composition
+(`Piers Park`) failed narration and was removed:
+
+```
+[LOCAL-292] EMPTY STOP REMOVAL GATE: 1 stop(s) removed for failed/empty description
+            SUMMARY: requested=1 / generated=0 / failed=1 / delivered=0
+[LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour
+```
+
+**LOCAL-292/420 behaved correctly** — it refused to ship an empty shell. That guard is working.
+
+**The cause was LEAD, and it is the finding.** A direct probe afterwards:
+
+| host | result |
+|---|---|
+| `overpass-api.de` | **Connection refused in 0.2s** |
+| `overpass.kumi.systems` | read timeout |
+| `api.openai.com` | HTTP 401 — reached fine, egress is healthy |
+
+Connection refused in 0.2s is not a rate limit, it is a **block**. Three full ten-query sweeps plus
+two tour runs in under an hour got this machine banned from the public Overpass endpoint.
+
+**Which is exactly the production risk.** `osm_venue_facts.py:41` hardcodes
+`_OVERPASS_URL = "https://overpass-api.de/api/interpreter"` — **one endpoint, no mirror, no
+fallback** — and a facility tour spends **ten sequential queries** against it. A handful of users
+generating airport tours would do to the production server what LEAD did to this one. The failure
+is not graceful: a banned endpoint means **every facility tour returns nothing at all.**
+
+**Correcting D566's framing.** D566 described this as the spine degrading (5/6/2 stops across three
+runs) and could not tell "unmapped" from "Overpass busy." True, and now sharper: the degradation is
+continuous down to **zero**, the endpoint is a single point of failure, and *we* are the traffic
+that breaks it.
+
+**Three things the fix must do, in priority order:**
+1. **Collapse ten queries into one.** D563 pulled all 331 Logan objects in two hand-written
+   queries. Ten-per-tour is what earns the ban.
+2. **Distinguish a failed request from an empty result.** A `ConnectionError` is not evidence that
+   an airport has no food.
+3. **Fall back** — a second endpoint, and a cache of the previous successful answer for a venue.
+   A facility's mapped objects change on the order of months; re-querying them per tour is waste.
+
+**Still unverified, and honestly so: no facility tour has yet been generated end to end.** The
+crash (D568) is fixed and the pipeline now runs its full length, but the spine has never been fed
+real data in a complete run. That verification is blocked until the Overpass block lifts.
+
+## D570 — Cimiez cannot be the regression control the way D563/D564 define it. Stop selection is stochastic.
+### 2026-09-17. Three runs of the identical request settle it.
+
+D563 and D564 both end with: *"Cimiez remains the regression control. A change to its stop list is
+a bounce."* The post-merge run changed the stop list, which by that rule is a bounce. **It is not,
+and the rule is what is wrong.**
+
+Identical request — `Walking tour around Cimiez District, Nice, France`, walking, 4 stops:
+
+| run | tree | stops | cost | chars |
+|---|---|---|---|---|
+| 1 | pre-merge `a3d4e9d` | Matisse · Monastery · **Cimiez Cemetery** · Chagall | $0.2444 | 9,466 |
+| 2 | merged | Matisse · Monastery · **Roman Ruins of Cemenelum** | $0.2126 | 7,551 |
+| 3 | merged | Matisse · Monastery · **Roman Ruins of Cemenelum** · Chagall | $0.2741 | 10,487 |
+
+**Run 3 restores the requested 4-stop count and Chagall on the merged tree.** Stops 1 and 2 are
+stable everywhere. The variation is in the Phase 3A candidate list, which is LLM-generated, and in
+which candidates survive corpus loading.
+
+**Direct evidence no merged code caused it:** the post-merge runs log **no LOCAL-481 activity at
+all** — no centroid-collapse, no `place_shape` rejection. The stops that changed were never touched
+by the new code. And `Cemenelum` was already in the pre-merge candidate pool, dropped there as
+`EMPTY`; post-merge it resolved `tier=rich, facts=8`. That is corpus variance, and arguably an
+improvement, not a regression.
+
+**The methodological ruling: a stochastic pipeline cannot be regression-tested by string-comparing
+its output.** "The stop list changed" carries no signal when the same tree produces three different
+lists. Two usable replacements, both cheap:
+
+1. **Pin the input.** `LOCAL-357`'s `forced_stops` harness already bypasses candidate generation
+   entirely and runs everything downstream unchanged. A control tour with a fixed stop list makes
+   every gate, corpus and prose change observable, and is the tool for exactly this.
+2. **Compare stable properties, not the list** — stop count vs requested, every stop inside the
+   requested area, no non-place names, no fact assigned to the wrong venue (D567), cost in band.
+
+**Supersedes the "a change to its stop list is a bounce" clause of D563 and D564.** The rest of
+both rulings stands.
+
+### Cost baseline for D565, now n=3 instead of n=1
+
+Same request, merged and pre-merged trees: **$0.2444 / $0.2126 / $0.2741** — mean **$0.244**, range
+±13%, 268–361s, 36–38k tokens. **A single measurement cannot show a cost regression smaller than
+about a quarter of the total.** Any future "we made it cheaper" claim needs at least three runs on
+each side.
+
+## D571 — A named building is a building tour, and its stops come from what that kind of building IS
+### 2026-09-17. Michael's ruling, answering D567. This supersedes D564's routing of worship venues to the walking path.
+
+**The request string has a grammar, and it decides the tour.** Michael's words:
+
+> *"'Our Lady Help of Christians, Newton MA' can be broken down into 'Target+location' and the
+> target is a building. So it should be a building tour. Even if the string would say 'walking tour
+> of Our Lady Help of Christians, Newton MA' it is broken down into Tour type + constriction +
+> location so it would become a walking tour inside of the building, and immediately becomes a
+> building tour."*
+
+Two parse shapes, one outcome:
+
+| request | parses as | tour |
+|---|---|---|
+| `Our Lady Help of Christians, Newton MA` | **Target** + Location | building tour |
+| `walking tour of Our Lady Help of Christians, Newton MA` | TourType + **Constriction** + Location | walking tour *inside* the building → **still a building tour** |
+
+**A named building as the Target wins over any tour-type word in front of it.** "Walking" then
+describes how you move *within* the venue, not a neighbourhood stroll past it.
+
+### Where the stops come from: ask what the venue class consists of
+
+**Not "what artworks are here"** — that question produced the Sistine Chapel in Newton (D564).
+The question is *what does a church consist of, for a tour?* Michael's worked answer: narthex,
+baptismal font, nave and its vaulting, stained glass, pulpit and lectern, Stations of the Cross,
+rood screen or iconostasis, chancel and choir stalls, altar and altarpiece, tabernacle, transepts,
+side chapels, sacristy, crypt.
+
+And for an airport, by the same method: check-in and ticketing, the baggage sorter beneath the
+floor, the security checkpoint, concourse and gates, the jetbridge, ramp operations seen from the
+window, the ATC tower, the fire and rescue station, the operations control centre, ground support
+equipment, terminal architecture and art, sustainability systems.
+
+**The method generalises: venue class → parts list → which parts this instance has.**
+
+**Why this is safe where the museum path was not.** The class parts list is knowledge *about the
+class* — "a church has a nave" cannot be a falsehood about Newton. Only the second step is
+venue-specific, and it is a verifiable yes/no about a named part, not an open invitation to name
+objects. That two-step is the whole safety property. Michael: *"we will need to ask AI, and maybe
+more than once to get things right here."*
+
+### Two consequences that bind on code already merged
+
+**1. A building tour's stops share a coordinate, and LOCAL-481 currently calls that a defect.**
+`geocode_stops.COLLISION_CATEGORIES` includes `facility`, and the collapse threshold is 4 decimal
+places ≈ **11 metres**. The narthex, the font, the nave and the altar are all within 11 m of each
+other — an entire correct building tour would be flagged as centroid collapse and its stops
+re-resolved or dropped. `museum` is already exempt for precisely this reason ("two artworks in one
+room legitimately share a coordinate"). **A building/interior tour is the same case and must be
+exempt the same way.** This is the tour-423 detector doing the right thing to the wrong category.
+
+**2. OSM cannot supply interior parts.** Overpass has `Terminal C` and `Dunkin'`; it does not have
+the baptismal font, the rood screen, or the operations control centre. **The interior parts list
+does not come from Overpass at all** — it comes from the class knowledge plus the venue's own site
+(the Tier-1 source LOCAL-23 established). This substantially reduces, and may remove, the facility
+feature's dependence on the endpoint that D569 identifies as a single point of failure.
+
+### The open tension, stated rather than resolved
+
+**There are two different airport tours, and Michael has now described both.**
+
+- **The errand tour** — his 2026-09-15 verdict on tour 423: *"airlines, counters, terminals, lost
+  and found, children playgrounds, Lyft and Uber pickup locations, parkings, WiFi, electric
+  outlets."* This is D563's need-spine: a traveller with a flight to catch. Stops are mapped
+  objects with real coordinates.
+- **The interior tour** — the list above: ATC tower, baggage sorter, jetbridge, ARFF. This is an
+  enthusiast's or a school group's tour. Most of its stops are not publicly reachable and have no
+  mapped coordinate.
+
+**Both are legitimate and they are not the same product.** A passenger in Terminal E wants the
+first; someone who came *to see the airport* wants the second. This needs a decision before the
+facility work resumes — LEAD's recommendation is that the **errand tour stays the default for a
+facility**, because it matches the original complaint and the stops are groundable, with the
+interior tour as a separate mode. Not decided here.
+
+## D572 — There is no universal inter-stop distance. The collapse detector must key on the artifact, not on proximity.
+### 2026-09-17. Michael's correction of D571's second consequence. LEAD had it wrong.
+
+**LEAD wrote:** *"A building tour's stops are all within ~11 metres of each other,"* and proposed
+exempting the building class the way `museum` is exempted.
+
+**Michael:** *"different buildings have different dimensions… There are huge palaces and for them
+the distance can be way bigger. On the other hand our listener may ask to give him a tour in a
+museum room, then the distance between objects can be way smaller. We can not generalize the
+distance between objects no matter the tour target."*
+
+**He is right, and the error was bigger than a wrong number.** Both halves of the design are the
+wrong shape: a fixed threshold, and a per-category exemption list. A palace tour's stops may be
+300 m apart; a single-room tour's stops may be 2 m apart. Both are correct tours. **Scale is a
+property of the venue and of the requested granularity, not of the category.**
+
+### And the detector does not measure distance at all
+
+Reading `find_centroid_collapse` rather than its description: a collision is *"two or more stops
+sharing latitude **OR** longitude to `_COLLISION_DP` decimal places."* That is **axis coincidence**,
+not proximity. Two stops on the same east–west street, or two rooms along one corridor, share a
+latitude while being any distance apart in longitude — and are flagged as "not independently
+located" when they are nothing of the sort. **The false-positive rate does not fall as the building
+gets bigger; it depends on the building's orientation.**
+
+### What tour 423 actually looked like
+
+```
+Boston Bruins Bar                 42.3656, -71.0188
+Art Exhibits at Logan Airport     42.3656, -71.0173
+Boston Logan Airport Virtual Tour 42.3656, -71.0096
+Boston Logan Airport History Walk 42.3656, -71.0189
+```
+
+**Four stops, one latitude repeated exactly, longitude jittered.** That is a centroid with
+single-axis noise — the signature of coordinates that were never looked up. It is far more specific
+than "two stops round to the same 4dp latitude."
+
+### The rule
+
+**Detect the artifact, not the closeness.** A collapse is: *three or more* stops sharing an axis
+value at full precision **while the other axis varies** — a fingerprint of centroid-plus-jitter that
+has no innocent explanation. Two stops sharing a rounded axis value has many innocent explanations
+and must not fire.
+
+**Where a distance sanity check is still wanted, derive the scale from the venue,** not from a
+constant: the venue's own footprint (OSM way/relation bounding box, Wikidata area, the building's
+published dimensions — Michael: *"we can acquire that knowledge from multiple sources"*) and the
+requested granularity. A stop outside the venue's extent is suspicious; two stops close together
+inside it are not.
+
+**Consequence:** `COLLISION_CATEGORIES` and the `museum` exemption are both superseded. `museum`
+was not a principle — it was this defect being papered over for the one category where it was
+noticed. Every category needs the artifact test, and none needs a distance constant.
+
+## D573 — Both airport tours ship, and the listener is never made to choose up front
+### 2026-09-17. Michael's ruling, resolving the tension D571 left open.
+
+**The errand tour is the default for a facility; the enthusiast/interior tour is a second mode.**
+Agreed on both sides.
+
+**How to derive the errand stops — ask for the pain points, not for the places.** Michael's
+question, via Gemini:
+
+> *"What are the most common passenger pain points and customer service inquiries handled inside an
+> airport?"*
+
+This is the same two-step safety property as D571: the question is about the **class** (what do
+travellers struggle with in airports), which cannot be a falsehood about Logan; only the second
+step — *does Logan have one, and where* — is venue-specific and verifiable. Contrast with asking
+"what are the interesting places at Logan," which is what produced `Boston Logan Airport Virtual
+Tour`.
+
+The resulting categories: airline and flight logistics (terminal/gate verification, inter-terminal
+transit landside vs airside, oversized and special baggage drop); lost and found, split between the
+airline's baggage office for items left on the aircraft and the airport authority for items left in
+the terminal; document and printing services; dietary-specific dining (gluten-free, vegan, halal,
+kosher — by concourse) and water refill stations past security; ground transport (rideshare zones,
+which are often on a specific parking-garage level rather than the arrivals curb, plus rental-car
+centre and hotel shuttle pillars).
+
+### The interaction rule, which is the durable part
+
+**Michael:** *"we need a flag or an option or an ability for people to specify — IF THEY WANT — if
+they want is important: we should not force them to provide specifications; we should derive them
+from the experience or provide a bit of both and then in the end suggest a sentence what else they
+can learn if they specify… like we do for news and restaurant tours at the end of each tour."*
+
+**Never put a dialogue in front of a tour.** Default to a derived blend, then offer the alternative
+in the closing sentence.
+
+**The machinery already exists and is already doing this.** `_build_closing_offer`
+(`generate_tour_text.py:1933`, called at `:18415`) is what produced, in today's live church tour:
+
+> *"We can also generate news articles for you to listen to on the way back."*
+
+A facility tour's closing offer becomes the place to say *"ask for the behind-the-scenes tour and
+we'll cover the control tower, the baggage system and the fire station."* **This is an extension of
+a working pattern, not a new mechanism** — which is the cheapest kind of feature to add and the
+kind least likely to break something.
+
+## D574 — A list of errands is not a tour. Guidance is a separate product.
+### 2026-09-17. Michael reversing his own D573 ruling within the hour, and he is right to.
+
+**His argument, verbatim:** *"if I want to know how to get to counter for Delta airline, why would I
+care about British Air airline? If I am interested to get to Lost and Found, why would I want a nice
+restaurant on the way there? How are we better than just ask Google? We are better because we do not
+ask you to read the screen and we know your GPS coordinates to guide you… So for a tour we indeed
+want exciting spots to see, visit, learn, to know."*
+
+**The incoherence this names.** D563's need-spine assembled ten traveller needs and called the
+result a tour. But a listener wants **exactly one** of those needs at a time, and the other nine are
+noise. A sequence of unrelated errands has no through-line — it is a directory read aloud. The
+thing that makes a tour a tour, the reason to listen to the next stop, is absent by construction.
+
+**And the Logan evidence was there all along.** Michael on tour 423, 2026-09-15: *"the stories are
+really good! I was listening to the stories with a great interest."* He is now explicit that those
+stories — the history, the individual restaurants — were the tour. D563 read his complaint as "the
+stop list is wrong" and built a need-spine. The stop list *was* wrong, but the fix is **better
+interesting stops**, not a different kind of list.
+
+### Three consequences, in order of how much they simplify
+
+**1. The facility tour is just a tour.** It needs no need-spine, no ten-slot checklist, no "findable
+or cut". `facility_spine.py` (348 lines) and the FACILITY NEED-SPINE FILL block exist to build a
+product we are no longer building. **They should be parked, not extended.**
+
+**2. D569 largely dissolves.** The ten sequential Overpass queries per tour — the single point of
+failure that got this machine blocked — existed to fill the need-spine. Without it, the Overpass
+dependency shrinks to ordinary venue lookups. *The Q2 answer LEAD was about to implement is
+substantially moot.*
+
+**3. D573 is superseded.** There are not two airport tours (errand vs enthusiast). There is **one**
+tour — interesting spots, whichever they are, the ATC tower and the notable restaurant alike — plus
+a separate guidance feature. D571's ruling stands untouched: a named building is a building tour,
+and its stops come from what that kind of building consists of.
+
+### The new product: guidance
+
+*"If I want to get to Lost and Found office, I should be able to ask for that directly and we should
+be able to figure out that this is a special type of tour: guiding tour and then the stops (turns,
+escalators, etc.) are not important. So we should offer this to our listeners: specify a destination
+and we will guide you there."*
+
+**The request grammar extends cleanly** (D571's frame): `Lost and Found at Logan Airport` parses as
+**Destination + Location** → guidance; `Logan Airport` parses as **Target + Location** → tour. The
+discriminator is whether the named thing is *somewhere you need to be* or *somewhere you want to
+experience*.
+
+**The differentiator is real.** Google's indoor wayfinding makes you look at a screen. Eyes-free,
+hands-free voice guidance while dragging luggage is a genuinely different product.
+
+### Two things that must be said before anyone builds it
+
+**1. Indoor positioning is the hard part, and it is hardest at exactly the venue that motivated
+this.** GPS degrades badly inside a terminal. The app today uses `Geolocator.getCurrentPosition`
+(×6), one `getPositionStream` and one `distanceBetween` — that is **proximity, not turn-by-turn**.
+Guiding someone to a lost-and-found office two levels up needs an indoor map (floor plans, level
+connections, which escalator goes where) and indoor positioning (beacons or WiFi fingerprinting)
+that Logan does not publish. **Guidance works outdoors — a campus, a park, a district — and is a
+research problem indoors.** Prove it outdoors first; do not let the airport be the pilot.
+
+**2. Guidance is a new product line, not a tour feature.** It competes with Google Maps and the
+airline apps rather than with audio tours, and it is not on D565's agreed sequence (purpose work →
+test → cost → Stable/Preview swap). Adding it is a roadmap decision, not an implementation detail.
+
+**LEAD's recommendation:** take consequences 1–3 now — they delete code and remove a failure mode —
+and advertise guidance through `_build_closing_offer` (D573's surviving half) only once it works
+outdoors.
+
+## D575 — Guidance is landmark waypoints, not turn-by-turn. LEAD's feasibility objection was wrong.
+### 2026-09-17. Michael's correction of D574's second caveat.
+
+**LEAD objected** that guidance needs indoor positioning, which Logan does not publish, so it is a
+research problem and a separate product line. **That objection assumed turn-by-turn navigation.
+Michael is not proposing navigation.**
+
+> *"The goal is to provide our listeners guidance not step-by-step directions without forcing them
+> to look at the screen… we can roughly identify where the person is without asking for the exact
+> location. The path might be the same or similar, and we can guide the person the same way we guide
+> between stops."*
+
+**The listener is the sensor.** Each leg ends at a landmark the listener can recognise, and they
+advance manually — *"Once found, listen to the next stop."* His Logan example is three legs:
+
+1. *Find the Terminal E→C connector — look for the indoor pedestrian signs toward Terminal C or the
+   Central Parking Garage.* → listener confirms
+2. *Head to the lower level — take the nearest escalator or elevator down to Arrivals.* → confirms
+3. *Walk the lower-level hallway toward Terminal C; the Massport office is in that connecting
+   hallway, next to the Security Badge Office.*
+
+**No positioning of any kind is required.** The phone never needs to know where you are, because you
+do. LEAD's objection dissolves entirely.
+
+### It is a tour feature, because it is literally the existing data structure
+
+Ordered stops plus transitions between them, advanced by the listener. **The machinery already
+exists and already emits landmark confirmations.** From today's live church tour:
+
+> *"As you exit Mary Immaculate of Lourdes Parish, head east on Washington Street… **You'll know
+> you're there when you see the beautiful red brick facade of the church.**"*
+
+That is the same pattern as Michael's MFA leg — *"you will immediately know you are in the right
+place because this massive tapestried hall is designed to look like a European palace."* Guidance is
+a tour whose stops are waypoints and whose payload is arrival confirmation.
+
+### Michael's two points that LEAD had backwards
+
+**1. The problem is already ours, indoors, today.** A museum tour names artworks whose location we
+cannot explain and which the museum moves. His MFA example: Chagall's *Village Street* *"is not
+always out on display… check the MFA Artwork Status Page or ask a gallery attendant."* **We already
+ship museum tours whose stops the listener may not be able to find.** This is not a new problem
+being taken on; it is an existing one being named.
+
+**2. Indoors there are people to ask, and outdoors there are not.** *"In a museum, there is a guard
+almost in every room, and there are many working people in an airport."* So the human fallback is
+*more* available exactly where the technology is weakest. **The design should use that explicitly** —
+"ask any gallery attendant for Gallery 250" is a robust instruction, not a failure. This inverts
+LEAD's assumption that indoors is the hard case.
+
+### The design rule LEAD adds
+
+**Every leg must end at a self-verifiable landmark — never at a distance, a turn count, or a
+timing.** A wrong landmark is self-correcting: the listener looks for a tapestried hall, does not
+see one, and stops. A wrong turn instruction is not self-correcting — it is followed, and the
+listener ends up somewhere else with no signal that anything went wrong. **Self-verifiability is
+what makes landmark guidance safe without positioning**, and it must be a hard requirement on every
+generated leg, not a stylistic preference.
+
+### The risk moves — it does not go away
+
+The objection is no longer positioning. It is **the truthfulness of navigational claims**, and the
+bar is higher than for prose. D563 already said it: *"for a story a failed check costs a sentence,
+for a facility it costs a traveller their flight."*
+
+**And we have live evidence that our directions are ungated.** Today's church tour emitted, with no
+verification anywhere:
+
+> *"head east on Washington Street. Continue walking until you reach Centre Street, then turn left."*
+
+Those are specific street-level claims about a **5 km** walk, produced the same way the prose is
+produced — and this is the same day we found a Newton parish credited to the Archbishop of Los
+Angeles (D567). **There is no gate on directions at all.** Before guidance ships, navigational
+claims need the grounding the facts still do not have.
+
+**Sequencing recommendation, unchanged in shape but not in reasoning:** prove landmark guidance
+where a wrong leg is cheap — a museum with a gallery attendant to ask, or an outdoor district —
+before a terminal where the cost of a wrong leg is a missed flight. The reason is no longer
+"positioning is hard"; it is "we cannot yet verify a direction."
+
+## D576 — Two peer tour types, one shared primitive: can we locate the thing we named?
+### 2026-09-17. Michael's synthesis, closing the D571–D575 thread.
+
+> *"So tour can be go to see that painting and then go to see that painting and hopefully we know
+> where they are and can show on the map. But we should be able to anticipate the user's question
+> 'how can I get to…' That is a different tour and we can provide guidance."*
+
+**Two tour types, peers in the same data structure:**
+
+| type | stops are | chosen for | arrival is |
+|---|---|---|---|
+| **discovery** | things worth seeing | interest | a means |
+| **guidance** | waypoints to one named destination | recognisability (D575) | the point |
+
+**Anticipate the question; never ask it up front.** D573's surviving half: a discovery tour ends by
+offering the other — *"if you want to go back and find the Chagall, ask and I'll walk you there."*
+`_build_closing_offer` (`generate_tour_text.py:1933`) is where that lives, and it already does this
+for news.
+
+### The shared primitive, and the reason "hopefully" is the right word
+
+Both types stand or fall on the same question: **given a name, can we say where the thing is, well
+enough to direct someone to it?** Discovery needs it to put a stop on the map; guidance needs it to
+choose the destination. One mechanism serves both, and we do not have it.
+
+**The stop model cannot express an indoor location.** `_new_poi` carries `name, address, artist,
+year, directions, coordinates, type_specialty, specific_examples, operational_details, description`
+— and nothing else. There is **no gallery, level, wing, or room field**. So "where is Chagall's
+*Village Street*?" can be answered only as a street address and a building centroid: *at the MFA*.
+That is useless for both showing it on a map and walking someone to it.
+
+**This is the same root as D572.** Indoor stops share a coordinate because a coordinate is the wrong
+descriptor for them, not because they were badly geocoded. An indoor stop's location is
+`Level 2 · Evans Wing · Gallery 250`, which is a *path through a building*, not a point on a globe.
+
+**Three properties an indoor location descriptor must have:**
+1. **Hierarchical** — building → level → wing → gallery/room, so it degrades gracefully when the
+   finest level is unknown ("Art of Europe, Level 2" is useful; a wrong gallery number is not).
+2. **Freshness-stamped** — museums rotate collections and airports relocate offices. A location
+   without a date is a claim we cannot age out. The MFA publishes an artwork status page; that is
+   the Tier-1 venue source LOCAL-23 established, and it is the right source here.
+3. **Degradable to a human** — D575: *"ask any gallery attendant for Gallery 250."* Indoors there
+   are staff, and handing off is a designed outcome, not a failure.
+
+**Until that descriptor exists, both tour types are limited to venue-level precision indoors**, and
+any finer claim we make is ungrounded — the same condition as the directions D575 found ungated and
+the facts D567 found misattributed. **This is one gap, not three, and it is the next thing worth
+building.**
+
+## D577 — Ship it with honest confidence. No answer is worse than an imperfect one.
+### 2026-09-17. Michael's product philosophy, and it REVERSES D563's "findable or cut".
+
+> *"Providing no guidance when asked is worse than providing a false guidance IMHO. Providing an
+> uninteresting stop is better than providing no stop, providing unverified story is better than
+> providing no story. All we have to do is to be clear and transparent how confident we are about
+> what we are saying."*
+
+> *"we should assume that the listener is capable to ask an attendant in case if our directions are
+> flawed. And it is their problem if they miss a flight… We, as everyone else, are doing our best
+> job but can be wrong and our listener ought to understand that."*
+
+**What this overturns.** D563 ruled: *"a `low`-confidence facility stop is dropped, never downgraded
+— for a story a failed check costs a sentence, for a facility it costs a traveller their flight."*
+**That is now reversed.** The listener is an adult with a phone, a map and staff to ask.
+
+**Immediate consequence: today's Logan behaviour is wrong under the new rule.** The run delivered
+nothing (`LOCAL-292: ALL stops failed generation — cannot deliver tour`). Under D577 a thin tour
+with honest confidence beats no tour. The empty-stop gate needs revisiting, not celebrating.
+
+**And Michael's field experience reorders the priorities:**
+
+> *"our directions were not a big problem because I always asked how to get to the next stop and had
+> time to look at Google-Map or ask a person on the street. The value of our tours were the
+> suggestions what to visit and stories about these stops."*
+
+**The product is what to visit, and the stories. Directions are a convenience.** The locatability
+work (D576) therefore matters most for *choosing and showing* stops, and least for turn-by-turn
+quality.
+
+### The one distinction that must survive: unverified is not the same as refuted
+
+Michael's principle is right about **unverified** claims. Today's church tour did not ship an
+unverified story — it shipped a **confidently false** one: a Newton parish credited to the
+**Archbishop of Los Angeles**, and Father Cuenin moved to the wrong parish (D567). The pipeline
+reported `2/2 stops verified (100%)`. Nothing was hedged, because nothing knew.
+
+**Transparency about confidence only works if the confidence is calibrated.** A "high confidence"
+label on the Los Angeles sentence does not inform the listener — it launders the error. **The
+grounding work is what produces the signal Michael wants to display**; the label is worthless
+without it.
+
+**So the floor is not "verified". The floor is "not refuted."**
+
+| claim | status | ship? |
+|---|---|---|
+| a story we could not corroborate | unverified | **yes**, hedged |
+| a stop we are unsure is interesting | unverified | **yes** |
+| a Newton parish erected by the Archbishop of **Los Angeles** | **refuted** — wrong jurisdiction | **no** |
+| the **Sistine Chapel** as a stop in Newton MA | **refuted** — 6,700 km away | **no** |
+
+**Ship what we cannot verify. Never ship what we can refute.** Both of the real failures this month
+were refutable by simple geography, not by deep verification — which makes the floor cheap to
+enforce and is why it does not reintroduce the gate-heaviness D577 is rejecting.
+
+### Never tell the listener to ask an attendant
+
+> *"I do find it annoying if the tour says, ask an attendant how to get here and there, we should
+> wire it in the app and assume people know it."*
+
+**Supersedes D575's third property and D576's point 3.** "Ask a gallery attendant" is a *design
+assumption* about the listener's real-world options — it is not narration. A tour that tells an
+adult to ask someone for directions is talking down to them. **The fallback stays in the design and
+comes out of the script.**
+
+## D578 — Building parts trip every gate built for places in an area
+### 2026-09-18. Found on the first live venue-parts tour. The stop model changed; the gates did not.
+
+The D571 chain works end to end: `Our Lady Help of Christians` now yields **Nave · Stained Glass
+Windows · Pulpit · Altar** — parts of the building — instead of a tour of two *other* Newton
+parishes. And a side effect worth noting: **D567's cross-venue fact bleed disappeared.** With every
+stop inside one building there is no sibling parish for Father Cuenin to be misattributed to, and
+he is now correctly placed at this church.
+
+**But the tour delivered 3 stops, not 4.** Three separate gates fired on the Pulpit:
+
+```
+[LOCAL-472] REMOVED transferable paragraph stop='Pulpit' — 'Generic description
+            applicable to any historic church.'
+[LOCAL-472] UNGROUNDED entity stop='Pulpit' entity='Cardinal Bernard Law'
+SCOPE-CHECK REMOVED 'Pulpit' — outside 'Our Lady Help of Christians Catholic Church':
+            "The stop 'Pulpit' is located at 573 Washington St, Newton, MA 02458,
+             which is outside the bounds of 'Our Lady Help of Christians'."
+```
+
+**That last one is nonsense, and it is structural.** 573 Washington St **is** the church's own
+address. The pulpit is not outside the church; it *is* the church. The scope machinery assumes a
+stop is a separate place inside an area and asks whether its address falls within the venue — but
+every building part carries the building's own address, so the question has no meaningful answer
+and the gate answers "outside" with `conf=high`. It then wrote that conclusion into SCOPE-MEMORY,
+so it will repeat.
+
+**This is the third gate in the same family**, and the pattern is now unmistakable:
+
+| gate | assumes | breaks on a building part because |
+|---|---|---|
+| centroid collapse (D572) | stops have distinct coordinates | every part shares the building's point |
+| scope check (here) | a stop's address sits inside the venue | every part has the venue's own address |
+| no indoor descriptor (D576) | a location is a lat/lng | a part's location is level · wing · room |
+
+**One root cause: a building part is not a place in an area, and the pipeline has no way to say so.**
+D576 called for a hierarchical indoor descriptor; this is the third piece of evidence that it is the
+missing primitive, not a nicety.
+
+**Interim rule until that exists: a stop created by the venue-parts chain is by construction inside
+its venue, and the scope check must not run on it.** The provenance is already there —
+`_venue_parts_used` — so the gate can be skipped rather than argued with.
+
+**LOCAL-472 firing was correct and is good news.** It caught a genuinely generic paragraph
+("applicable to any historic church") — exactly the glossary failure Michael predicted. Under D577
+the right response is to *hedge and keep* the stop rather than delete it, but the detector itself is
+working.
+
+## D579 — We find the stories, inject them, and a gate deletes them
+### 2026-09-18. The full chain traced end to end on Logan. Three blockers fixed; the fourth needs Michael.
+
+Michael asked whether the diagnosis had been *fixed*, not just written down. Three of four were.
+
+**Fixed 1 — the handoff.** `poi_list = [_new_poi(_n) for _n in _vp_stops]` kept only the stop NAMES;
+the chain's ~25k characters of sourced material was used to order the stops and discarded. The stops
+now carry it as `poi['_lore']`, the writer's own input channel (`story_prompt_block` states lore as
+a REQUIREMENT, D548), and seeding it also suppresses the generic per-stop fetch. **24 facts seeded
+across 4 stops.**
+
+**Fixed 2 — Phase 4 excluded every stop and the tour delivered nothing.**
+*"Excluded Check-In Hall — a location within an airport, not the airport itself"*, and the same for
+Concourse, Control Tower and Baggage Claim. Correct reasoning, wrong model: these are parts of the
+venue by construction. The skip already existed for `museum` with the reason written in the code —
+*"every stop is a room/exhibit inside a known venue — type verification provides no signal"* — so
+venue-parts stops now take the same exemption.
+
+**Fixed 3 — the scope check that deleted the Pulpit** (D578). Building parts are marked
+`_venue_part` and skip it, because every part carries the venue's own address and the question is
+unanswerable.
+
+### Not fixed — and it is the one that matters
+
+The material is good. The chain returns **Mayor James Michael Curley petitioning the state in March
+1922; Governor Cox signing Chapter 404 of the Acts of 1922; the Jeffries Point flats; the 1969–73
+control tower by Desmond & Lord with Minoru Yamasaki; Perini as builder.** None of it reaches the
+listener. `LOCAL-472` strips it:
+
+```
+UNGROUNDED entity stop='Check-In Hall'  entity='Federal Aviation Administration'
+UNGROUNDED entity stop='Control Tower'  entity='Boston Logan International Airport'
+       reason='No specific person or work is mentioned with a concrete link to the stop.'
+REMOVED transferable paragraph stop='Concourse'
+       reason='Generic scene-setting claims apply to any historic church.'
+```
+
+**The gate demands every named entity be concretely tied to the stop, and a building part cannot
+satisfy that** — Curley relates to the airport, not to the check-in hall; the tower's architect
+relates to the tower, but "Boston Logan International Airport" was itself stripped *at the Control
+Tower* for lacking a concrete link. **Fifth gate in the D578 family.**
+
+Note also that it called an airport concourse *"any historic church"* — the gate's prompt is
+church/museum-scoped and is being applied to venues it was never written for. That is a defect
+independent of the ruling below.
+
+### Why LEAD did not just fix it
+
+**LOCAL-472 is the anti-fabrication gate.** D564: *"The gate was right. The routing was wrong… it
+must not be weakened to make churches work."* It is part of why D567's Los Angeles archbishop was
+the exception rather than the rule. Relaxing it to let sourced chain facts through is a real
+loosening of the defence that stops the Sistine Chapel reaching a listener, and that is Michael's
+call, not LEAD's.
+
+**The narrow version LEAD would propose:** a fact that arrived from the causal chain carries
+**sources** (8–29 per link). The gate exists to catch material invented by the writer. So exempt
+only facts whose text the writer did not invent — those seeded into `_lore` with a source — and keep
+the gate at full strength on everything the writer adds. That is not "weaken the gate"; it is "stop
+the gate from auditing evidence we already grounded."
+
+**Measured state of the Logan tour after fixes 1–3:** it generates (was: delivered nothing), 6 dates
+vs 4, and still **zero of the named people** the chain found.
+
+## D580 — The tour-quality loop runs itself. The instrument that made it possible, and the one judgement it hands back.
+### 2026-09-21. Michael's request, and a correction of LEAD's own behaviour.
+
+> *"at some point I will rely on your judgement and the described 3 steps can be done by you
+> automatically informing me but not continue without my permission unless I stop you. How can we
+> make this happen?"*
+
+The three steps he described: generate a batch → notice one is much better than the others →
+diagnose, fix, regenerate.
+
+**The first answer is that the rule already existed and LEAD was not following it.** RULE ZERO in
+`CLAUDE.md` says: do not stop and ask; ask only before something irreversible. Fixing a bug is
+`git revert`-able; generating tours inside an agreed ceiling is reversible. **LEAD asked permission
+for both, repeatedly.** No mechanism was missing — the discipline was.
+
+**The second answer is that one real piece WAS missing: an instrument.** The loop cannot run while
+Michael is the only judge. `tour_quality.py` now scores a tour on defects with an objective
+signature — every one of them something he found by reading and then had to explain:
+
+| defect | the reading that produced it |
+|---|---|
+| `no_story` | Logan, zero named people, three rounds running |
+| `thin` | the Pulpit deleted for being inside its own church (D578) |
+| `truncated` | *"Founded in 1868 by St."* |
+| `repeated` | Mother Teresa told at stops 1 and 2 |
+| `refuted` | the Archbishop of Los Angeles in Newton (D577) |
+| `bare_death` | three named people murdered, no circumstances |
+| `distance` | *"4 stops and 2 kilometres"* inside one church |
+
+It reproduced his manual read of round 3 exactly, unprompted, and then measured the round-4 fix:
+**2/3 clean and inconsistent → 3/3 clean and consistent, named people 0–2 → 1–3.**
+
+### The limit, demonstrated rather than claimed
+
+`LOGAN_3` scores **clean** with three named people, and its Security Checkpoint stop reads:
+
+> *"a point of convergence, where travelers, staff, and technology engage in a carefully
+> choreographed dance of safety and efficiency."*
+
+That is the glossary prose Michael has objected to since the beginning, and **the scorer passes
+it.** No counter can ask whether a listener would want to keep listening.
+
+**So the division is not a compromise, it is the shape of the problem:** the loop drives the
+counters to zero and consistent, then hands over tours that are *defect-free and possibly dull*.
+Michael: *"that would be perfect in my opinion."*
+
+### The second critic — Michael's idea, and the machinery was already here
+
+> *"all of you do a great job to critic the tours pointing its weaknesses sometime better than I
+> can… would it be beneficial if you create internal task for Amazon-Q to critic the tour."*
+
+`kiro-cli` **is** Amazon's agentic CLI, `kiro_dispatcher.py` already forks it headless per task
+file, and every `LOCAL-*` task this month ran through it. Nothing new is needed to run it. What is
+new is **pointing it at the gap**: the critic is asked *"would a listener want to keep listening,
+and what is missing that belongs here"* — never at defects, which are already counted.
+
+**Two constraints, both learned expensively:**
+1. **A critic's finding is a claim, not a fact.** D423: two instruments disagreed and LEAD nearly
+   published the wrong one. Reproduce before fixing.
+2. **The critic must not write the rule.** D579 is the cost of acting on an unverified premise —
+   LEAD blamed an innocent gate twice and burned two rounds of generation. The critic reports; a
+   reviewed change follows.
+
+### Controls
+
+- **Spend ceiling** — `--ceiling`, default $5. The loop halts and reports rather than continuing.
+- **Stop switch** — `.continuous_dev/PAUSE`. Michael can touch that file and the loop stops at the
+  next run without talking to anyone.
+- **Never without asking** — deploying, writing to the production DB, deleting anything he has not
+  agreed to lose, or spending past the ceiling.
+
+## D581 — Cache the STOPS, not the tour. Michael's reuse design.
+### 2026-09-23, 00:15. The highest-value economic change available.
+
+**The problem his arithmetic exposed.** 10,000 users, 10% generating daily, ~$1 for a 10-stop
+tour → ~$1,000/day against a budget of $50–100. That math is only right if every request is a
+fresh generation.
+
+**It is not: `tour_cache` already works** — 115 hits against 142 generations, and one entry has
+been served **82 times**. Tours are per-venue, not per-user: the first person to ask for the MFA
+at 6 stops pays; everyone after is free.
+
+**But the key destroys most of the reuse:**
+
+```
+cache_key = SHA256( location | tour_type | total_stops )
+```
+
+**`total_stops` is in the key**, so the same venue at 4 stops and at 5 stops are two unrelated
+paid generations. Michael, 2026-09-23: *"if somebody asks to generate a tour of the same venue
+that we already had generated, we should use the material we had."*
+
+### The design: a stop POOL per venue, a tour is a selection from it
+
+Generate stops once per (venue, tour_type). A tour of N is N stops drawn from that pool. The
+fifth request generates **one new stop**, not a fifth tour.
+
+**Michael named the four hard parts, and each is real:**
+
+**1.1 Geography and the seams.** *"the one extra stop needs to fit into the overall trail. And
+then from 5 to 4, the 4 stop tour needs to produce the conclusion of the 5th stop. And whatever
+stop we take out, the previous and next stop need to adjust the directions and orientation."*
+Directions and Orientation are **properties of a sequence, not of a stop**, so they cannot be
+cached with the stop. They must be recomputed per selection. The closing recap likewise summarises
+whichever stops were actually delivered.
+
+**1.2 No repetition against what already exists.** A new stop must be generated knowing the pool
+it joins — the existing stops' episodes become banned material, the same mechanism D534 and
+`strip_cross_stop_repeats` already use across stops within one tour.
+
+**1.3 Freshness is per stop, not per tour.** *"paintings can be replaced, offices can change its
+location… we will need to keep track of every stop generation not just a tour generation."* A stop
+carries its own `generated_at`, and ages out on its own. His implementation hint: the metadata
+block before the first stop announcement is not spoken, so timestamps can live there.
+
+**1.4 Ownership.** *"when people choose a tour from Home tab they will get as is, but when they
+generate, they should get their user id associated. It will be especially important for Subscribed
+when we will enable tour guides to generate their own tours and charge for them."* A pooled stop
+is shared; a generated tour instance belongs to a user. Two different lifetimes, two different
+tables.
+
+### What LEAD adds
+
+**Normalising `total_stops` out of the key is the cheap first step and is worth doing alone.**
+Even before pooling, bucketing stop counts collapses 4/5/6-stop requests for one venue into a
+single cached generation. It is a one-line key change plus a trim on delivery, and it captures a
+large share of the benefit.
+
+**The staleness risk exists today and is unguarded.** `tour_cache` has **no TTL** — a tour cached
+in July still serves in September. Fine for a nave, wrong for an airport office that moved. Per-stop
+`generated_at` fixes this properly; a blanket TTL would be the stopgap.
+
+## D582 — A failure that looks like a pass is the defect class of this codebase
+### 2026-09-23. Four instances in one day, in four unrelated modules, found four different ways.
+
+Not one of these was a wrong calculation. Every one was a **failure whose output was
+indistinguishable from success**, so nothing downstream could tell.
+
+| where | what failed | what the caller saw |
+|---|---|---|
+| `story_leads` / the causal chain | Gemini returned HTTP 402, out of credit | "this venue has no describable parts" → the tour **silently fell back** to the old path, produced output, and scored clean |
+| `geocode_stops.geocode` | one rigid query missed a venue that IS in the index | `None` → "this place has no location" → six stops of one church scattered over 1.5km |
+| `geo_refutation` | the geocoder raised | `pt = None` → **"not refuted"** → a stop 6,000km away reported as checked and fine |
+| `stop_route_sequencer` | a forced-order label matched nothing | silence → the stop moved to the END, the opposite of the instruction |
+
+**Add the ones from earlier in the week and the pattern is older than today:** the
+LOCAL-472 gate deleting a sentence with nothing regenerating it (D472); `_lore`,
+`_venue_part` and pinned coordinates all lost to later `poi_list` rebuilds; four overnight
+tasks logging `COMPLETED` having committed nothing; LEAD's own venue-anchor pin that
+printed on exception but not on a `None` return, so the fix looked applied and was not.
+
+### Why this class and not another
+
+The pipeline is a long chain of steps that each **degrade rather than stop**. That is
+usually right — D577 says an unverified story should still ship, and a listener is better
+served by a thin tour than by no tour. But *graceful degradation applied to an outage* is
+a lie: it converts "we could not do this" into "there was nothing to do".
+
+**The distinction that fixes it every time is the same one:**
+
+> **"we could not check" ≠ "we checked and it is fine"**
+> **"the model had nothing to say" ≠ "we could not ask"**
+> **"this venue has no crypt" ≠ "we could not confirm a crypt"**
+
+Each pair had ONE code path. Splitting the pair fixed the bug in every case.
+
+### The rule
+
+**A function that can fail must report failing differently from succeeding.** `None`,
+`[]`, `0` and a silent `except` are all ways of saying "success, nothing found" — so none
+of them may carry "I broke". Where the return type cannot express it, log it and expose it
+(`LAST_WARNINGS`, `rec["errors"]`, a `WARNING` verdict, a raised `ServiceUnavailable`).
+
+**And the corollary, which cost LEAD most of a day:** when a fix appears not to work, the
+first hypothesis should be that **the failure is being swallowed one level down**, not that
+the fix is wrong. Twice today the patch was correct and applied to the wrong layer.
+
+### How they were found, which matters for what to do next
+
+None came from reading the code. Two came from Michael reading a tour, one from the kiro
+critic reading the code, one from a trace printing `lore_facts=0`. **Instruments found
+what inspection did not** — and the cheapest instrument, a one-line trace, refuted two
+confident hypotheses in a minute.
+
+---
+
+## D590 — The duplicate task files were never a mystery: the verifier could not tell "merged" from "delivered nothing"
+
+**Status:** fixed 2026-09-23. Found by reading an alarm instead of dismissing it.
+
+### The open question this closes
+
+`SESSION_HANDOFF_20260923.md` recorded, of the 35-task over-dispatch:
+
+> **What creates those duplicate task files is STILL UNKNOWN** — nothing in the tick
+> chain writes them.
+
+Something in the tick chain writes them. `.continuous_dev/verify_deliverables.sh`
+re-files any task it believes delivered nothing, under `id + 3000`. That is the entire
+origin of `LOCAL-3527`, `LOCAL-3529`, `LOCAL-3530`, `LOCAL-3532`, and of `LOCAL-6497`
+(3497 re-filed a second time). **146 such files were on disk.**
+
+### The defect
+
+The verifier asked `git rev-list --count storied..$branch`. **For a branch that
+delivered and was then merged, that is 0** — the tip is an ancestor of `storied`, so
+nothing is ahead of it. Success and total failure produce the identical number.
+
+Minutes after LOCAL-527/528/529/530/532 were merged, all five were alarmed as
+`*** DELIVERED NOTHING ***` and re-filed. Measured on the real branches:
+
+```
+LOCAL-527-orientation-describes-another-stop   storied..=0   base(65de385)..=1
+LOCAL-528-content-assigned-to-wrong-structure  storied..=0   base(1a98917)..=1
+LOCAL-529-one-name-four-spellings              storied..=0   base(65de385)..=1
+LOCAL-532-best-anecdote-told-twice             storied..=0   base(65de385)..=1
+```
+
+**This is D582 exactly** — a failure that looks like a pass, in the very script written
+to catch failures that look like passes. It is worth noticing that the instrument built
+to enforce that rule was itself breaking it.
+
+### The second defect, in the same eight lines
+
+The "already handled" guard read `grep -qxF "$task" "$STATE"` — a **filename** — against
+a file that only ever contained branch **stems**. It never matched. Every tick
+re-appended the same entry: five stems accounted for **45 of the 1318 lines**. The
+`THREE IDENTICAL FAILURES → needs Michael` alarm reads that same file, so it was
+escalating one failure recorded forty-five times.
+
+### The fix
+
+Measure against the base the task was **dispatched from**, which does not move. The
+`COMPLETED` line already records `base=storied@<sha>`. Plus a belt-and-braces
+`git merge-base --is-ancestor "$branch" storied` → never alarm on a merged tip. And grep
+the stem that is actually written.
+
+Verified by effect: a fresh run adds **zero** new alarms and zero new state lines, where
+the previous run added five of each.
+
+### What it cost, and the rule
+
+1318 false failure records, 146 junk task files, 1347 `DELIVERED NOTHING` lines in
+`ALERTS.md` — a file whose real job is to alarm on production row loss (the tour-29
+deletion). **An alarm channel at 100% false positives is an alarm channel that is off.**
+`restart.sh` prints "ALERTS.md: 40 alert line(s) in the last 40" at every session start,
+and every session has learned to skip it.
+
+> **A check that cannot distinguish success from failure is not a check, and its
+> alarms train you to ignore the channel they arrive on.**
+
+### Recorded gap, not fixed here
+
+**D583–D589 are cited in commit messages and in the handoff but were never written into
+this file.** They exist only in `git log`. Nothing in the tick chain enforces that a
+`D<nnn>` referenced in a commit reaches `DECISIONS.md`.
+
+**`.continuous_dev/` is gitignored**, so every script in it — the dispatcher tick, the
+row-loss backup, this verifier — exists only on this machine's disk and is in no backup.
+The loop was already dead for 12 days once.
+
+---
+
+## D591 — Igor's user-stops enhancement is LOCAL DOCKER ONLY until his test is approved
+
+**Michael's ruling, 2026-09-24:** asked whether the user-stops work should go to
+GCloud or stay on local Docker, he answered *"only on local Docker before we approve
+the results of the Igor's test."*
+
+**This reverses what two tracked files already told the Windows machine.**
+`HANDOFF_20260924_MORNING.md` said *"Michael asked for it to ship with this deploy, so
+it is in"*, and `GCLOUD_STORIED_START_HERE.md` repeated it under **BEFORE THIS
+DEPLOY**. Both were written before he was asked the question directly. A session
+reading either one this morning would have deployed unapproved work to production.
+
+**What is gated:** the LOCAL-547 / D536 chain — `user_explicit` marking, the waypoint
+block on both bypass paths, the D1v2 exemption, the restore-duplicate fix, and the
+coverage/yield override — plus the cloud-path threading of `stops` through
+`_enqueue_cloud_task` / `/run-job` / `run_generation` (`4d0ce2d`), and the mobile
+`user_stops` vs `stops` fix (`1bb087e`).
+
+**What this means concretely:**
+- **No GCloud deploy from `storied` HEAD.** The tag `rc-pre-igor-20260923` does NOT
+  solve this — the catastrophic-backtracking fix `19358ae` lands *after* the tag, so
+  deploying the tag reintroduces the hang that killed three MFA runs. There is no
+  env flag on the feature; nothing separates it from `storied` HEAD today. If a
+  GCloud deploy is needed for the regex fix before Igor's test is approved, it needs
+  a kill switch first (dispatched to Kiro, reviewed, not hand-written by LEAD).
+- **No TestFlight or Play build** carrying `1bb087e`. Publishing is irreversible and
+  was never approved.
+- Local Docker generation, E2E runs and evidence-gathering continue unrestricted —
+  that is where the approval evidence comes from.
+
+**The gate lifts when Michael approves the results of Igor's test**, not when the code
+looks right. As of this ruling, stop SELECTION is proven 3-of-3 and one end-to-end
+delivery with audio exists (`ab7ee23`); Igor has not yet tested it.

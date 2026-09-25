@@ -2,6 +2,9 @@
 """
 Test different Guy Raz newsletter URL to check if corruption is article-specific
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 from bs4 import BeautifulSoup
 

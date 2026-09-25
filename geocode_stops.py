@@ -116,7 +116,95 @@ def haversine_m(a, b):
     return 2 * R * math.asin(math.sqrt(h))
 
 
+_STATE_ABBR = {
+    ' ma': ' Massachusetts', ' ny': ' New York', ' ca': ' California',
+    ' fl': ' Florida', ' tx': ' Texas', ' il': ' Illinois', ' pa': ' Pennsylvania',
+    ' nj': ' New Jersey', ' ct': ' Connecticut', ' ri': ' Rhode Island',
+    ' nh': ' New Hampshire', ' vt': ' Vermont', ' me': ' Maine',
+}
+
+# Qualifiers that describe WHAT a venue is. Nominatim indexes the NAME; leaving
+# these in turns a findable place into zero results.
+_VENUE_QUALIFIERS = (
+    'catholic church', 'orthodox church', 'parish church', 'episcopal church',
+    'baptist church', 'methodist church', 'church', 'cathedral', 'basilica',
+    'synagogue', 'mosque', 'temple', 'international airport', 'airport',
+    'museum of art', 'art museum', 'museum', 'train station', 'railway station',
+)
+
+
+def _geocode_variants(query):
+    """Progressively simpler forms of one venue string.
+
+    Measured 2026-09-23 — Nominatim on the same church:
+
+        'Our Lady Help of Christians Catholic Church, Newton MA'  -> 0 results
+        'Our Lady Help of Christians, Newton, Massachusetts'      -> FOUND
+
+    A single rigid query therefore returned None for a venue that is in the index,
+    and every downstream consumer read that as "this place has no location". Six
+    stops of one church shipped with six invented coordinates up to 1km from the
+    building because of it.
+    """
+    q = ' '.join((query or '').split())
+    if not q:
+        return []
+    out = [q]
+
+    low = q.lower()
+    for qual in _VENUE_QUALIFIERS:            # longest first — the tuple is ordered
+        if qual in low:
+            i = low.index(qual)
+            stripped = (q[:i] + q[i + len(qual):])
+            stripped = ' '.join(stripped.replace(' ,', ',').split()).strip(' ,')
+            if stripped and stripped.lower() != low:
+                out.append(stripped)
+            break
+
+    expanded = []
+    for cand in list(out):
+        cl = cand.lower()
+        for ab, full in _STATE_ABBR.items():
+            if cl.endswith(ab):
+                expanded.append(cand[:len(cand) - len(ab)] + full)
+                break
+    out.extend(expanded)
+
+    # Last resort: the name before the first comma, plus the town after it.
+    if ',' in q:
+        head, _, tail = q.partition(',')
+        town = tail.split(',')[0].strip()
+        if head.strip() and town:
+            out.append(f"{head.strip()}, {town}")
+
+    seen, uniq = set(), []
+    for c in out:
+        k = c.lower()
+        if k not in seen:
+            seen.add(k)
+            uniq.append(c)
+    return uniq
+
+
 def geocode(query):
+    """Geocode a venue, trying progressively simpler forms before giving up.
+
+    [2026-09-23] The single-query version returned None for venues that ARE in the
+    index — 'Our Lady Help of Christians Catholic Church, Newton MA' found nothing
+    while 'Our Lady Help of Christians, Newton, Massachusetts' found it. Callers
+    read None as "no location exists", so six stops of one church shipped with six
+    invented coordinates up to 1km from the building.
+    """
+    for _cand in _geocode_variants(query):
+        _hit = _geocode_once(_cand)
+        if _hit:
+            if _cand != (query or '').strip():
+                logging.info("[GEOCODE] %r resolved via fallback %r", query, _cand)
+            return _hit
+    return None
+
+
+def _geocode_once(query):
     """Resolve a free-text place to (lat, lng), or None.
 
     Returns None on any failure — no network, rate limited, no match, malformed
@@ -869,4 +957,224 @@ def fix_reversed_poi_list(poi_list):
         return rec
 
     rec.update(reason="coordinate order looks correct")
+    return rec
+
+
+# --- centroid collapse (LOCAL-481, tour 423) ---------------------------------
+#
+# Tour 423, Logan Airport, 2026-09-15:
+#
+#     Boston Bruins Bar                 42.3656, -71.0188
+#     Art Exhibits at Logan Airport     42.3656, -71.0173
+#     Boston Logan Airport Virtual Tour 42.3656, -71.0096
+#     Boston Logan Airport History Walk 42.3656, -71.0189
+#
+# All four share latitude 42.3656 EXACTLY. That is not four independently located
+# places — it is the venue centroid with the longitude jittered. The tour then
+# claimed to "span 2 kilometres" across points a few hundred metres apart on one
+# line. When the model does not know where a stop is, it reuses a coordinate it
+# already emitted and nudges the other half. A collision to 4 decimal places
+# (~11 m) is the fingerprint: two genuinely distinct destinations do not land on
+# the same parallel or meridian to 11 m by chance.
+#
+# This is deterministic and needs no network — it reads coordinates the generator
+# already holds. It does NOT decide anything on its own; it identifies the
+# colliding stops so the caller can send them back through `resolve_poi`, which
+# is the one procedure that already knows how to find a real coordinate. If
+# re-resolution moves a stop off the shared line, the collision is cured; if it
+# cannot, the stop is still flagged for the caller to drop and replenish.
+#
+# SCOPE. Genuinely co-located stops are legitimate for a `museum` tour — two
+# artworks in one room share a coordinate and should. So the collision rule runs
+# only for categories whose stops are DISTINCT PHYSICAL DESTINATIONS you walk or
+# drive between: walking, driving, biking/cycling, restaurant, specialized, and
+# the facility case behind 423. Museum (and any tour with a single venue) is
+# exempt.
+
+# Categories where every stop is a separate place with its own coordinate. A
+# collision within one of these tours is a defect. Anything NOT in this set —
+# `museum` above all — is left alone, because co-location there is expected.
+COLLISION_CATEGORIES = {
+    'walking', 'driving', 'biking', 'cycling', 'restaurant', 'specialized',
+    'facility', 'bus', 'boat', 'road_trip', 'roadtrip',
+}
+
+# 4 decimal places ≈ 11 m at the equator. Two distinct destinations do not share
+# a parallel or a meridian to this precision by accident; the model reusing a
+# coordinate it already wrote does exactly this.
+_COLLISION_DP = 4          # retained: used by callers/tests for rounding display
+_COLLAPSE_MIN_STOPS = 3   # [D572] two stops sharing an axis is innocent; three is the artifact
+
+
+def _round_dp(x, dp=_COLLISION_DP):
+    return round(float(x), dp)
+
+
+def find_centroid_collapse(poi_list, category=None):
+    """[LOCAL-481, reshaped by D572] Identify stops that were never independently located.
+
+    **This detects an artifact, not closeness.** Michael, 2026-09-17: *"different
+    buildings have different dimensions… We can not generalize the distance between
+    objects no matter the tour target."* A palace tour's stops may be 300 m apart and
+    a single-room tour's 2 m apart; both are correct. So no distance constant, and no
+    per-category exemption list.
+
+    The artifact is what tour 423 looked like::
+
+        Boston Bruins Bar                 42.3656, -71.0188
+        Art Exhibits at Logan Airport     42.3656, -71.0173
+        Boston Logan Airport Virtual Tour 42.3656, -71.0096
+        Boston Logan Airport History Walk 42.3656, -71.0189
+
+    One latitude repeated EXACTLY while longitude varies — a centroid with single-axis
+    jitter, which has no innocent explanation. Therefore a collapse requires ALL of:
+
+      * **three or more** stops (two sharing an axis is commonplace and innocent),
+      * sharing one axis at **exact** value (not rounded into a bucket),
+      * while the **other axis varies** among them.
+
+    Stops identical on BOTH axes are co-located, not collapsed — two artworks in one
+    room, two chapels given the building's coordinate. That is why `museum` no longer
+    needs an exemption: the rule itself never fired on it. `category` is accepted for
+    call-site compatibility and is no longer used to gate the check (D572).
+
+    Returns the same record shape as before::
+
+        {"action": "none"|"collision", "reason": str,
+         "colliding_indices": [...], "groups": [...], "checked": int}
+
+    Deterministic, no network, no mutation.
+    """
+    rec = {"action": "none", "reason": "", "colliding_indices": [],
+           "groups": [], "checked": 0}
+
+    pts = []          # (index, lat, lng)
+    for i, poi in enumerate(poi_list):
+        c = _parse_coords_pair(poi.get('coordinates', '') if isinstance(poi, dict) else '')
+        if c:
+            pts.append((i, float(c[0]), float(c[1])))
+    rec["checked"] = len(pts)
+    if len(pts) < _COLLAPSE_MIN_STOPS:
+        rec["reason"] = (f"fewer than {_COLLAPSE_MIN_STOPS} stops carry a coordinate "
+                         f"— the collapse artifact needs at least that many")
+        return rec
+
+    colliding = set()
+    for axis, comp, other in (("lat", 1, 2), ("lng", 2, 1)):
+        buckets = {}
+        for row in pts:
+            buckets.setdefault(row[comp], []).append(row)
+        for value, rows in buckets.items():
+            if len(rows) < _COLLAPSE_MIN_STOPS:
+                continue
+            # The other axis must VARY. If it is constant too, these stops are
+            # co-located (same room, same building) — innocent, never a collapse.
+            if len({r[other] for r in rows}) < 2:
+                continue
+            idxs = sorted(r[0] for r in rows)
+            rec["groups"].append({"axis": axis, "value": value, "indices": idxs})
+            colliding.update(idxs)
+
+    if colliding:
+        rec["action"] = "collision"
+        rec["colliding_indices"] = sorted(colliding)
+        parts = [f"{len(g['indices'])} stops share {g['axis']}={g['value']!r} exactly "
+                 f"while the other axis varies" for g in rec["groups"]]
+        rec["reason"] = "; ".join(parts)
+        logging.warning("[GEOCODE] CENTROID COLLAPSE: %s (%d stop(s) affected)",
+                        rec["reason"], len(colliding))
+    else:
+        rec["reason"] = "no centroid-plus-jitter artifact found"
+    return rec
+
+
+def repair_centroid_collapse(poi_list, tour_location, category=None,
+                             tour_anchor=None, resolver=None):
+    """[LOCAL-481] Detect a centroid collapse and re-resolve the colliding stops.
+
+    This is the wiring the task asks for: flag the tour, log every colliding
+    stop, and send those stops back through `resolve_poi` (the resolver), which
+    is the one procedure that already knows how to find a real coordinate.
+    Mutates the colliding POIs in place via the resolver. Returns a record::
+
+        {
+          ...everything from find_centroid_collapse...,
+          "reresolved": [ {name, before, after, moved, confidence} ],
+          "cured_indices": [...],        # collided before, independent after
+          "still_colliding": [...],      # still on a shared line after re-resolve
+        }
+
+    `resolver` defaults to `resolve_poi`; it is injectable so a test can drive it
+    without a network. A stop that re-resolves off the shared line is cured; one
+    that cannot move is left flagged in `still_colliding` for the caller to drop
+    and let the replenishment loop (D558) refill — repair before deletion, exactly
+    as the task requires.
+    """
+    if resolver is None:
+        resolver = resolve_poi
+
+    rec = find_centroid_collapse(poi_list, category=category)
+    rec["reresolved"] = []
+    _before_coords = {i: (poi_list[i].get("coordinates", "") if isinstance(poi_list[i], dict) else "")
+                      for i in rec["colliding_indices"]}
+    rec["cured_indices"] = []
+    rec["still_colliding"] = []
+    if rec["action"] != "collision":
+        return rec
+
+    for i in rec["colliding_indices"]:
+        poi = poi_list[i]
+        before = poi.get('coordinates', '')
+        try:
+            sub = resolver(poi, tour_location, tour_anchor)
+        except Exception as e:                       # pragma: no cover - defensive
+            logging.warning("[GEOCODE] re-resolution errored for %r: %s",
+                            poi.get('name', ''), e)
+            sub = {}
+        after = poi.get('coordinates', '')
+        rec["reresolved"].append({
+            "name": poi.get('name', ''),
+            "before": before,
+            "after": after,
+            "moved": before != after,
+            "confidence": (sub or {}).get('confidence', 'low'),
+        })
+        logging.info("[GEOCODE]   re-resolve %r: %s -> %s (%s)",
+                     poi.get('name', ''), before, after,
+                     (sub or {}).get('confidence', 'low'))
+
+    # [D572] "Cured" is a fact about the STOP, not about the group. The previous
+    # version re-ran the detector and treated "no longer in the colliding set" as
+    # cured — which silently passes a stop that never moved, because curing ONE
+    # member of a three-stop group drops the group below the detection threshold
+    # and the two untouched bogus stops get reported as cured. A stop is cured only
+    # if its own coordinate actually moved off the line it shared.
+    _shared_values = {(g["axis"], g["value"]) for g in rec["groups"]}
+
+    def _still_on_a_shared_line(poi):
+        c = _parse_coords_pair(poi.get('coordinates', '') if isinstance(poi, dict) else '')
+        if not c:
+            return True          # no coordinate at all is not a cure
+        lat, lng = float(c[0]), float(c[1])
+        for axis, value in _shared_values:
+            if (axis == "lat" and lat == value) or (axis == "lng" and lng == value):
+                return True
+        return False
+
+    for i in rec["colliding_indices"]:
+        poi = poi_list[i]
+        moved = (poi.get('coordinates', '') if isinstance(poi, dict) else '') != _before_coords.get(i)
+        if moved and not _still_on_a_shared_line(poi):
+            rec["cured_indices"].append(i)
+        else:
+            rec["still_colliding"].append(i)
+
+    if rec["cured_indices"]:
+        logging.info("[GEOCODE] centroid collapse: %d/%d colliding stop(s) cured "
+                     "by re-resolution", len(rec["cured_indices"]),
+                     len(rec["colliding_indices"]))
+    if rec["still_colliding"]:
+        logging.warning("[GEOCODE] centroid collapse: %d stop(s) still share a line "
+                        "after re-resolution — caller should drop and replenish",
+                        len(rec["still_colliding"]))
     return rec

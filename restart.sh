@@ -38,9 +38,29 @@ fi
 [ -n "$REAL" ] && echo "$REAL" > .continuous_dev/last_real_count.txt
 echo "cost_ledger rows:      $($PSQL 'SELECT count(*) FROM cost_ledger;' 2>/dev/null)"
 echo '```'
+# ALERTS.md now carries ONLY production-urgent lines (row loss, production down,
+# domain expiry, disk low, user-visible drift, leaked secret). It is meant to be
+# EMPTY in the normal case — a non-empty ALERTS.md is itself the signal, so we
+# print the whole thing, not a "last 40" window. Routine task-hygiene events
+# (delivered-nothing, backlog low, quarantines) went to task_hygiene.log in
+# D590/LOCAL-545 precisely because 1347 false DELIVERED NOTHING lines had trained
+# every session to ignore this line. Keep the two visibly different.
 if [ -f .continuous_dev/ALERTS.md ]; then
-  RECENT=$(tail -40 .continuous_dev/ALERTS.md | grep -c "\*\*\*" 2>/dev/null)
-  echo "ALERTS.md: $RECENT alert line(s) in the last 40 — read it if non-zero."
+  # Count only real alert lines: they start with a UTC timestamp and contain ***.
+  # The header of ALERTS.md documents the *** markers, so a plain grep would count
+  # the legend itself — anchor on the leading date.
+  URGENT=$(grep -cE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*\*\*\*' .continuous_dev/ALERTS.md 2>/dev/null)
+  if [ "${URGENT:-0}" -gt 0 ]; then
+    echo "ALERTS.md: *** $URGENT URGENT alert line(s) — READ .continuous_dev/ALERTS.md NOW ***"
+  else
+    echo "ALERTS.md: 0 urgent — clear."
+  fi
+else
+  echo "ALERTS.md: 0 urgent — clear."
+fi
+if [ -f .continuous_dev/task_hygiene.log ]; then
+  HYG=$(tail -200 .continuous_dev/task_hygiene.log | grep -cE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*\*\*\*' 2>/dev/null)
+  echo "task_hygiene.log: $HYG routine event(s) in the last 200 — informational, auto-refiled, not an emergency."
 fi
 echo
 echo "## Queue"

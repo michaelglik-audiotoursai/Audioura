@@ -2693,6 +2693,26 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
     _identity_corpus = _opening + "\n\n" + "\n\n".join(
         text for _, text in sections
     )
+
+    # [2026-09-23, LEAD] Match the patterns below PER SENTENCE, never across the whole
+    # corpus. Every one of them is sentence-scoped already -- each uses [^.]* on both
+    # sides of an alternation and ends in \. -- so splitting first is semantically
+    # identical and removes catastrophic backtracking.
+    #
+    # This was hanging real generations, not a theoretical risk. Museum of Fine Arts,
+    # Boston builds a 689,968-character identity corpus; the "signature programs"
+    # pattern pegged a CPU at 100% for 15+ minutes and every MFA tour died there. The
+    # orchestrator's status polls then timed out, so the symptom looked like a dead
+    # generator and the job was killed while this loop span. py-spy dump on the live
+    # process named the line directly:
+    #     extract_venue_identity (story_miner.py:2778)
+    # Smaller venues never showed it -- five of six round-11 tours generated fine.
+    #
+    # A "sentence" longer than this cap is corpus junk (a run with no full stop), and
+    # it is exactly the input that explodes. Skipping it loses nothing real.
+    _IDENTITY_UNIT_MAX = 2000
+    _identity_units = [u for u in re.split(r'(?<=\.)\s+', _identity_corpus)
+                       if u and len(u) <= _IDENTITY_UNIT_MAX]
     
     # --- Mine for architecture facts ---
     # Look for named architects (Pritzker-winners, notable names)
@@ -2709,7 +2729,7 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
     
     _found_architects = set()
     for pat in _architect_patterns:
-        for m in pat.finditer(_identity_corpus):
+        for m in (m for _u in _identity_units for m in pat.finditer(_u)):
             architect_name = m.group(1).strip().rstrip(',.')
             # Filter out generic words that aren't architect names
             _GENERIC_WORDS = {'the', 'a', 'an', 'this', 'that', 'its', 'new', 'old', 'local'}
@@ -2734,7 +2754,7 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
     ]
     _found_years = set()
     for pat in _inauguration_patterns:
-        for m in pat.finditer(_identity_corpus):
+        for m in (m for _u in _identity_units for m in pat.finditer(_u)):
             sentence = m.group(1).strip()
             # Extract the year to avoid duplicates
             # Accept years from 1500-2029 (historical buildings to modern)
@@ -2759,7 +2779,7 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
     ]
     
     for pat in _design_patterns:
-        for m in pat.finditer(_identity_corpus):
+        for m in (m for _u in _identity_units for m in pat.finditer(_u)):
             sentence = m.group(1).strip()
             if len(sentence) >= 30 and len(sentence) <= 300:
                 # Skip if it's too generic
@@ -2775,7 +2795,7 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
     ]
     
     for pat in _program_patterns:
-        for m in pat.finditer(_identity_corpus):
+        for m in (m for _u in _identity_units for m in pat.finditer(_u)):
             sentence = m.group(1).strip()
             if len(sentence) >= 25 and len(sentence) <= 300:
                 if not _is_generic_filler(sentence):
@@ -2792,7 +2812,7 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
     ]
     
     for pat in _founding_patterns:
-        for m in pat.finditer(_identity_corpus):
+        for m in (m for _u in _identity_units for m in pat.finditer(_u)):
             sentence = m.group(1).strip()
             if len(sentence) >= 30 and len(sentence) <= 300:
                 if not _is_generic_filler(sentence):

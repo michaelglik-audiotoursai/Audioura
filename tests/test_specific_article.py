@@ -3,6 +3,9 @@
 Test Boston Globe authentication with a specific article
 """
 
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 import logging
 from boston_globe_content_extractor import BostonGlobeContentExtractor
 

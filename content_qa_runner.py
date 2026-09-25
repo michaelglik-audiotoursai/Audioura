@@ -11,6 +11,17 @@ import os
 import sys
 import re
 
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
 
 def load_tour(path):
     """Load tour text from file."""
@@ -95,7 +106,7 @@ def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
                     common_proper.add(w)
 
     # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
-    _sentences_in_claim = re.split(r'[.!?]\s+', claim_text)
+    _sentences_in_claim = _ss_split(claim_text)
     _claim_proper_nouns = set()
     for sent in _sentences_in_claim:
         words = sent.split()
@@ -309,7 +320,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                             if l.strip() and not _STRUCT_RE.match(l.strip())]
             _content_text = ' '.join(_content_lines)
             # Split into sentences
-            _sentences = re.split(r'(?<=[.!?])\s+', _content_text)
+            _sentences = _ss_split(_content_text)
             for sent in _sentences:
                 _adj_matches = _UNEARNED_ADJ_RE.findall(sent)
                 if _adj_matches:
@@ -583,7 +594,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     _claim_sentences = []
     # B1 FIX: Also split on paragraph breaks — \n\n separates distinct thoughts
     for _paragraph in re.split(r'\n\n+', _combined_prolog_epilog):
-        for sent in re.split(r'[.!?]\s+', _paragraph):
+        for sent in _ss_split(_paragraph):
             sent = sent.strip()
             if not sent or len(sent) < 20:
                 continue

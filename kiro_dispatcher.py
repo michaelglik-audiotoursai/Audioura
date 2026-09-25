@@ -83,23 +83,94 @@ def last_status_for(task_filename):
     return last
 
 
+# An infrastructure failure means the task never RAN. Distinct from a task that
+# ran and failed, which should not be retried blindly.
+_SETUP_FAILURE = "worktree_setup_failed"
+_MAX_SETUP_RETRIES = 3
+
+
+def _setup_failure_count(task_filename):
+    if not LOG_FILE.exists():
+        return 0
+    n = 0
+    for line in LOG_FILE.read_text().splitlines():
+        m = STATUS_LINE_RE.match(line)
+        if m and m.group(2) == task_filename and m.group(1) == "FAILED" \
+                and _SETUP_FAILURE in line:
+            n += 1
+    return n
+
+
 def already_claimed(task_filename):
     """
     Claimed = currently in flight or already ran to a terminal state.
     ABANDONED (reboot recovery) is deliberately NOT claimed -- it should be
     picked up again fresh.
+
+    [2026-09-23] Nor is a FAILED whose reason is worktree_setup_failed. Four
+    correctly-allowlisted tasks were permanently unrunnable after I killed a runaway
+    dispatch mid-checkout: the kill left FAILED records, and a FAILED record blocked
+    them forever. But `git worktree add` failing means the session never started --
+    no model was called, no work was attempted, nothing was learned. Retrying it is
+    not the retry-loop this guard exists to prevent.
+
+    Capped at _MAX_SETUP_RETRIES so a genuinely broken worktree setup cannot loop;
+    reap_orphans.sh quarantines at three deaths on the same principle.
     """
-    status, _ = last_status_for(task_filename)
+    status, line = last_status_for(task_filename)
+    if status == "FAILED" and line and _SETUP_FAILURE in line:
+        return _setup_failure_count(task_filename) >= _MAX_SETUP_RETRIES
     return status in ("STARTED", "COMPLETED", "FAILED", "TIMEOUT")
+
+
+ALLOWLIST_FILE = WATCH_DIR / ".continuous_dev" / "RELEASED.txt"
+
+
+def released_ids():
+    """Task IDs a human (or LEAD) has explicitly approved for dispatch.
+
+    [2026-09-23] Why this exists. Clearing the PAUSE sentinel released 35 task
+    files in one tick -- 97 kiro processes, against an intended FOUR. The extra 34
+    were untracked files that had appeared at the repo root since 16:15, duplicating
+    work already completed and merged the same afternoon (LOCAL-3513 "critique the
+    round-5 tours" repeats LOCAL-3493/513). 35 worktrees at ~280MB is ~10GB against
+    7.9GB free: it would have filled the disk and re-wedged Docker, as happened
+    earlier the same day. Killed mid-checkout, so nothing was lost.
+
+    The glob is the whole problem -- it treats "a file exists at the repo root" as
+    "a human wants this run, and wants to pay for it". Those are different claims.
+    CLAUDE.md has carried "a dispatcher-side fix (allowlist, or only claiming files
+    it created) is still outstanding" since 2026-08-31; this is it.
+
+    An ABSENT allowlist file means dispatch nothing. That is deliberate: the failure
+    mode of this dispatcher is spending money, so it must fail closed.
+    """
+    if not ALLOWLIST_FILE.is_file():
+        return set()
+    ids = set()
+    for line in ALLOWLIST_FILE.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            ids.add(line)
+    return ids
 
 
 def find_task_files():
     if not WATCH_DIR.is_dir():
         return []
-    matches = []
+    allowed = released_ids()
+    matches, skipped = [], 0
     for p in sorted(WATCH_DIR.glob("new_kiro_session_is_required_*.md")):
-        if TASK_FILE_RE.match(p.name):
-            matches.append(p)
+        m = TASK_FILE_RE.match(p.name)
+        if not m:
+            continue
+        if m.group(1) not in allowed:
+            skipped += 1
+            continue
+        matches.append(p)
+    if skipped:
+        print(f"[allowlist] skipped {skipped} task file(s) not in "
+              f"{ALLOWLIST_FILE.name}; {len(matches)} allowed")
     return matches
 
 

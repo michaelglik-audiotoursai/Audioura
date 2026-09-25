@@ -18,6 +18,11 @@ import 'package:audio_tour_app_dev/services/html_audio_player_service.dart';
 /// These tests pin it. Restoring the old `file://` baseURL model — an absolute
 /// `file://` src, or a load URL whose directory is not the audio's directory —
 /// breaks these expectations and goes red (AC #6).
+///
+/// LOCAL-3482 (build-25 re-report): the load-by-URL layout was not enough on
+/// iOS — loadUrl needs an `allowingReadAccessTo` scope or it falls back to a
+/// bare load that reads nothing. The added test pins [readAccessUrl] to the
+/// audio directory; dropping the scope goes red.
 void main() {
   const audioPath =
       '/var/mobile/Containers/Data/Application/UUID/Documents/tours/paris_42/audio_3.mp3';
@@ -74,6 +79,35 @@ void main() {
 
     test('audioPath is preserved unchanged for logging/resolution', () {
       expect(model.audioPath, equals(audioPath));
+    });
+
+    // LOCAL-3482 (build-25 re-report) — the load-by-URL model above is
+    // necessary but not sufficient on iOS. flutter_inappwebview's loadUrl only
+    // grants directory read access when handed an `allowingReadAccessTo` URL;
+    // without it, it falls through to a bare WKWebView.load(URLRequest) that
+    // reads nothing beyond the HTML file, so the relative <source> stays
+    // sandbox-blocked (InAppWebView.swift:925-932). readAccessUrl is the
+    // audio directory the service passes to loadUrl(allowingReadAccessTo:).
+    test('readAccessUrl is the audio directory as a file:// URL (AC #6)', () {
+      // This is THE field the build-25 re-report turned on. If someone drops
+      // the read-access scope (reverts to loadUrl with no allowingReadAccessTo,
+      // or points it somewhere other than the audio dir), this goes red.
+      expect(model.readAccessUrl, equals('file://$audioDir'));
+
+      // The granted scope MUST be a file:// URL — WKWebView ignores a non-file
+      // allowingReadAccessTo (InAppWebView.swift:928 requires .scheme=="file").
+      expect(model.readAccessUrl, startsWith('file://'));
+
+      // And it MUST be the directory the audio lives in, not the scratch file
+      // and not the bare root. Strip the scheme and compare to the audio dir.
+      final scopePath = model.readAccessUrl.substring('file://'.length);
+      expect(scopePath, equals(audioDir));
+      expect(scopePath, isNot(equals('/')),
+          reason: 'a bare-root scope is the LOCAL-482 regression, not a fix');
+
+      // The loaded HTML must sit INSIDE the granted read-access scope, or the
+      // grant does not cover it.
+      expect(model.loadUrl, startsWith('${model.readAccessUrl}/'));
     });
   });
 }

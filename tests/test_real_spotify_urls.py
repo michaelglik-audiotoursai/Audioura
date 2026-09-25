@@ -2,6 +2,9 @@
 """
 Test Real Spotify URLs from Guy Raz Newsletter
 """
+
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
 import sys
 import os
 sys.path.append('/app')

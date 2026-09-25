@@ -1,7 +1,7 @@
 """
-LOCAL-357: Forced stops verification harness.
+LOCAL-357: Forced stops verification harness  +  LOCAL-525: user-chosen stops API.
 
-Tests that:
+The forced_stops ENGINE mechanism (LOCAL-357) is still tested here:
 1. forced_stops parameter bypasses candidate generation (Phase 3A) and injects
    exact stops in order, while keeping downstream gates/corpus/enrichment intact.
 2. The existence gate still applies to forced stops — a bogus stop fails it.
@@ -9,8 +9,12 @@ Tests that:
 4. Forced-stop tours are stamped with a banner and never cached.
 5. Museum bounds as properties (D258): 8-stop 75.0, 4-stop 81.2.
 
-These tests import production code and validate behaviour against the UNFIXED
-version would fail — the forced_stops parameter did not exist before this change.
+LOCAL-525 CHANGES THE API-LAYER DECISION. This file originally asserted the HTTP
+API must NOT expose forced_stops (it was a test harness). That assertion has been
+REPLACED — not deleted — by TestUserChosenStopsAPIContract, which encodes the new
+decision: a validated, ordered stop list IS accepted on the /generate endpoint and
+forwarded to the engine, malformed input is rejected with a clear message, and
+omitting 'stops' behaves exactly as before. The class docstring records why.
 """
 import os
 import sys
@@ -250,17 +254,32 @@ class TestMuseumBoundsProperty:
         )
 
 
-class TestForcedStopsEndToEndStructure:
-    """End-to-end structural tests that verify the pipeline handles forced stops."""
+class TestUserChosenStopsAPIContract:
+    """LOCAL-525: user-chosen stops ARE now exposed through the HTTP API.
 
-    def test_service_layer_does_not_expose_forced_stops(self):
-        """The HTTP API (generate_tour_text_service) must NOT expose forced_stops.
+    HISTORY — why this replaces the old assertion:
+        LOCAL-357 built forced_stops as an INTERNAL verification harness and this
+        file originally asserted the HTTP API must NOT expose it
+        (test_service_layer_does_not_expose_forced_stops /
+        test_orchestrator_does_not_expose_forced_stops). That decision was correct
+        at the time: the parameter was a test tool, not a product input.
 
-        This is a verification harness, not a product feature. The /generate
-        endpoint must not accept forced_stops from external callers.
-        """
-        import inspect
-        # Read the service source
+        LOCAL-525 changes the decision, on evidence. On 2026-09-23 Igor visited the
+        MFA, recorded the exact stops he wanted, and had no way to get them into a
+        tour; cramming them into the free-text request string was cumbersome and not
+        reliably honoured. The engine already accepts an exact, ordered stop list
+        (generate_tour_text(..., forced_stops=[...])) and runs every downstream gate
+        over it unchanged — so the safe move is to PROMOTE it to a product feature
+        behind validation, not to keep it walled off.
+
+        The old "must not expose" assertions are therefore deliberately replaced by
+        the contract below: a validated list is accepted and forwarded; malformed
+        input is rejected with a clear message; omitting 'stops' is unchanged.
+    """
+
+    def test_service_layer_exposes_validated_stops(self):
+        """The tour-generator /generate endpoint accepts 'stops' and forwards it
+        to the engine as forced_stops, guarded by validation."""
         service_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'generate_tour_text_service.py'
@@ -268,14 +287,23 @@ class TestForcedStopsEndToEndStructure:
         with open(service_path, 'r') as f:
             service_source = f.read()
 
-        # The service must NOT pass forced_stops to generate_tour_text
-        assert 'forced_stops' not in service_source, (
-            "generate_tour_text_service.py must NOT expose forced_stops — "
-            "this is a verification harness, not an API feature (LOCAL-357)"
+        # It reads the stops input, validates it, and threads it to the engine.
+        assert "data.get('stops')" in service_source, (
+            "generate_tour_text_service.py must read 'stops' from the request "
+            "(LOCAL-525)"
+        )
+        assert "def validate_stops(" in service_source, (
+            "generate_tour_text_service.py must validate the stops list before use "
+            "(LOCAL-525 acceptance #2)"
+        )
+        assert "forced_stops=forced_stops" in service_source, (
+            "the validated stops must be passed to generate_tour_text as "
+            "forced_stops (LOCAL-525 acceptance #1)"
         )
 
-    def test_orchestrator_does_not_expose_forced_stops(self):
-        """The orchestrator must NOT expose forced_stops to callers."""
+    def test_orchestrator_exposes_validated_stops(self):
+        """The orchestrator accepts 'stops', validates/sanitizes it, and forwards
+        it to the tour-generator."""
         orch_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'tour_orchestrator_service.py'
@@ -283,7 +311,64 @@ class TestForcedStopsEndToEndStructure:
         with open(orch_path, 'r') as f:
             orch_source = f.read()
 
-        assert 'forced_stops' not in orch_source, (
-            "tour_orchestrator_service.py must NOT expose forced_stops — "
-            "this is a verification harness, not an API feature (LOCAL-357)"
+        assert "data.get('stops')" in orch_source, (
+            "tour_orchestrator_service.py must read 'stops' from the request "
+            "(LOCAL-525)"
         )
+        assert "def validate_stops(" in orch_source, (
+            "tour_orchestrator_service.py must validate the stops list (LOCAL-525)"
+        )
+        assert 'generate_data["stops"] = stops' in orch_source, (
+            "the orchestrator must forward the validated stops to the "
+            "tour-generator (LOCAL-525 acceptance #1)"
+        )
+
+    def test_validate_stops_accepts_a_clean_ordered_list(self):
+        """A non-empty list of non-empty strings is accepted, stripped, order kept
+        (acceptance #1: 'exactly those stops, in order')."""
+        from generate_tour_text_service import validate_stops
+        clean, err = validate_stops(["  Gallery A ", "Sculpture Court", "Print Room"])
+        assert err is None
+        assert clean == ["Gallery A", "Sculpture Court", "Print Room"], (
+            "order must be preserved and names stripped"
+        )
+
+    def test_validate_stops_rejects_malformed_never_silently_ignored(self):
+        """Malformed input is rejected with a clear message (acceptance #2)."""
+        from generate_tour_text_service import validate_stops
+
+        # Not a list
+        clean, err = validate_stops("Gallery A")
+        assert clean is None and err and "list" in err.lower()
+
+        # Empty list
+        clean, err = validate_stops([])
+        assert clean is None and err and "empty" in err.lower()
+
+        # Non-string element
+        clean, err = validate_stops(["ok", 42])
+        assert clean is None and err and "string" in err.lower()
+
+        # Blank / whitespace-only element
+        clean, err = validate_stops(["ok", "   "])
+        assert clean is None and err and "blank" in err.lower()
+
+    def test_omitting_stops_behaves_as_before(self):
+        """Omitting 'stops' (None) is NOT an error and yields no forced list
+        (acceptance #3: unchanged behaviour)."""
+        from generate_tour_text_service import validate_stops
+        clean, err = validate_stops(None)
+        assert clean is None
+        assert err is None, "absent 'stops' must not be treated as malformed"
+
+    def test_orchestrator_validate_stops_sanitizes_entries(self):
+        """The orchestrator sanitizes each stop name (same safety as every other
+        user string) while preserving order."""
+        from tour_orchestrator_service import validate_stops as orch_validate_stops
+        clean, err = orch_validate_stops(["Gallery <A>", "Court/1"])
+        assert err is None
+        # sanitize_input strips angle brackets and replaces filesystem-dangerous
+        # characters; the names remain non-empty and in order.
+        assert len(clean) == 2
+        assert "<" not in clean[0] and ">" not in clean[0]
+        assert "/" not in clean[1]

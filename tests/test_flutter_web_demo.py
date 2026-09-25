@@ -4,6 +4,9 @@ AudioTours Flutter Web Demo Automated Test Suite
 Tests the web version running at http://localhost:8080
 """
 
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 import time
 import json
 from selenium import webdriver

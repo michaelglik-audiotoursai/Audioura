@@ -38,9 +38,21 @@ from typing import Dict, List, Optional, Tuple
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
 
 from style_validator_detector import (
+
     _is_style_navigation_sentence,
     _split_sentences,
 )
+
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -151,6 +163,214 @@ _HOUSE_OF_PATTERN = re.compile(
 _WORK_TITLE_PATTERN = re.compile(
     r'["""]([^"""]{3,50})["""]'
 )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-479] SINGLE-TOKEN NAME DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# `_PERSON_PATTERN` above requires TWO capitalised tokens, so it has never once
+# seen a one-word name — Walter, Reid, Suzette, Mia all pass straight through the
+# net (measured: `_PERSON_PATTERN.findall("The disappearance of Walter") == []`).
+# Every person the gate has ever caught is a First+Last. Tour 423 stop 4 shipped
+# three one-word orphans in four sentences because of this.
+#
+# The whole difficulty is the false positive. A bare capitalised token is far
+# more often a PLACE (`at Logan`, `in Boston`), a WEEKDAY/MONTH (`October`), a
+# facility (`Terminal E`), or a sentence-initial ordinary word than it is a
+# person. So the detector does not trust the capital: it reads the SURROUNDING
+# SYNTAX and fires only when the token is used the way a person is used.
+#
+#   person-shaped, FLAG:              place-shaped / not-a-person, SKIP:
+#     of Walter                         at Logan / in Boston / near Reid
+#     Reid's failed attempt             to Walter (destination)
+#     Walter was / said / built         Terminal E (facility fragment)
+#     painted by Walter                 October / Monday (calendar)
+#     who Suzette was                   sentence-initial "The" / connectives
+#
+# Sentence-initial tokens get special care: a capital there is grammatical, not a
+# signal, so a sentence-initial token is only a candidate when its own governing
+# syntax (a possessive clitic, or a following person-verb) marks it as a name.
+
+# Tokens that look like a capitalised name but never are one. Kept deliberately
+# small — the syntax test does the heavy lifting; this only removes calendar and
+# obvious-common-word noise that would otherwise satisfy a person-verb pattern
+# ("October was warm", "Spring arrived").
+_NOT_A_NAME_SINGLE = frozenset({
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december',
+    'spring', 'summer', 'autumn', 'fall', 'winter',
+    'today', 'tomorrow', 'yesterday', 'tonight',
+    'north', 'south', 'east', 'west', 'northeast', 'northwest', 'southeast',
+    'southwest',
+    # Words that open sentences and can precede a person-verb without being names
+    'the', 'this', 'that', 'these', 'those', 'their', 'his', 'her', 'its',
+    'here', 'there', 'then', 'now', 'later', 'earlier', 'meanwhile',
+    'however', 'moreover', 'therefore', 'thus', 'indeed', 'perhaps',
+    # Indefinite / generic subjects that open a clause and take a verb but are
+    # not names ("Nobody knew", "Everyone left", "Someone said", "Their protest
+    # led"). The syntax test alone would let these through the subject-verb frame.
+    'nobody', 'somebody', 'anybody', 'everybody', 'nothing', 'something',
+    'anything', 'everything', 'someone', 'anyone', 'everyone', 'none',
+    'many', 'most', 'some', 'several', 'few', 'both', 'each', 'either',
+    'neither', 'all', 'they', 'we', 'you', 'she', 'he', 'it', 'who',
+    'what', 'which', 'when', 'where', 'why', 'how', 'while', 'because',
+    'since', 'once', 'yet', 'still', 'soon', 'often', 'always', 'never',
+    # Honorifics / titles: these introduce a following name and are handled by
+    # the titled-person pattern, so as bare tokens they are never the name.
+    'saint', 'king', 'queen', 'pope', 'count', 'countess', 'duke', 'duchess',
+    'prince', 'princess', 'baron', 'baroness', 'emperor', 'empress', 'lord',
+    'lady', 'sir', 'dame', 'father', 'brother', 'sister', 'abbot', 'bishop',
+})
+
+# Place-introducing prepositions. A bare token immediately after one of these is
+# being used as a LOCATION or a DESTINATION, not as a person — "landing at
+# Logan", "in Boston", "near Reid", "to Walter". `by` is deliberately NOT here:
+# "painted by Walter" is agentive (person), while "by Logan" is rare enough that
+# the location-token exemption catches the tour's own place anyway.
+_PLACE_PREPS = frozenset({
+    'at', 'in', 'near', 'to', 'from', 'into', 'onto', 'toward', 'towards',
+    'inside', 'outside', 'beyond', 'across', 'along', 'around', 'atop',
+    'beside', 'behind', 'below', 'beneath', 'above', 'past', 'through',
+})
+
+# Facility / structure head-words. A bare token that FOLLOWS one of these is part
+# of a facility name ("Terminal E", "Gate B", "Concourse C"), not a person, and a
+# token that PRECEDES one is a facility modifier.
+_FACILITY_WORDS = frozenset({
+    'terminal', 'gate', 'concourse', 'pier', 'runway', 'hangar', 'wing',
+    'hall', 'tower', 'building', 'annex', 'lobby', 'plaza', 'station',
+    'platform', 'street', 'avenue', 'road', 'boulevard', 'square', 'park',
+    'bridge', 'harbor', 'harbour', 'airport', 'terminal.',
+})
+
+# Verbs that take a person as subject. A bare capitalised token immediately
+# followed by one of these is being predicated about as an agent — "Walter
+# vanished", "Reid attempted", "Suzette painted". Shape-based (-ed / common
+# irregulars) plus a small set of present-tense biography verbs, so this is not
+# an enumeration of the verbs we happen to have seen.
+_PERSON_VERB_PRESENT = frozenset({
+    'is', 'was', 'said', 'says', 'built', 'painted', 'wrote', 'led', 'founded',
+    'designed', 'created', 'made', 'became', 'served', 'died', 'lived',
+    'ruled', 'commanded', 'discovered', 'invented', 'composed', 'sculpted',
+    'directed', 'commissioned', 'established', 'attempted', 'vanished',
+    'disappeared', 'landed', 'flew', 'piloted', 'boarded', 'survived',
+})
+
+_SINGLE_TOKEN_RE = re.compile(r"\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})\b")
+
+
+def _looks_like_past_verb(word: str) -> bool:
+    """A lowercase word that is a past-tense/agentive verb by shape or by set."""
+    w = re.sub(r'[^A-Za-z]', '', word or '').lower()
+    if not w:
+        return False
+    if w in _PERSON_VERB_PRESENT:
+        return True
+    # -ed shape, plus the small irregular set the degrade guards already use.
+    if len(w) >= 4 and w.endswith('ed'):
+        return True
+    return w in _IRREGULAR_PAST
+
+
+def detect_single_token_names(sentence: str, sentence_index: int = 0) -> List[str]:
+    """[LOCAL-479] Detect bare capitalised SINGLE-token names used as people.
+
+    Returns the list of candidate names (one token each) whose surrounding
+    syntax marks them as persons. Multi-token names are `_PERSON_PATTERN`'s job
+    and are ignored here. Place-, calendar-, and facility-shaped uses are
+    rejected by the surrounding syntax, not by a word list alone.
+
+    The four person-shaped frames, in order of confidence:
+      1. possessive:      "Reid's failed attempt"      (X's)
+      2. of-genitive:     "the disappearance of Walter"(of X, X not a place token)
+      3. agentive by:     "a mural painted by Walter"  (by X)
+      4. subject-verb:    "Walter vanished"            (X <person-verb>)
+      5. who/whom clause: "who Suzette was"            (who X <be>)
+
+    A token immediately preceded by a place preposition ("at Logan") or adjacent
+    to a facility word ("Terminal E") is never a candidate.
+    """
+    if not sentence or len(sentence) < 5:
+        return []
+
+    found: List[str] = []
+    seen = set()
+    tokens = sentence.split()
+
+    for m in _SINGLE_TOKEN_RE.finditer(sentence):
+        name = m.group(1)
+        start, end = m.start(1), m.end(1)
+        low = name.lower()
+
+        if low in _NOT_A_NAME_SINGLE:
+            continue
+        if _is_well_known(name):
+            continue
+        if low in seen:
+            continue
+
+        before = sentence[:start]
+        after = sentence[end:]
+        # ── hyphenated compound: "Saint-Pons", "Pierre-Yves" ─────────────────
+        # A token glued to a hyphen + capital is the first half of a compound
+        # proper name that the multi-token / structure patterns own. Not a
+        # standalone single-token person.
+        if after[:1] == '-' and after[1:2].isupper():
+            continue
+        if before[-1:] == '-':
+            continue
+        # The immediately preceding word and the immediately following word.
+        prev_word = before.rstrip().split()[-1].lower() if before.strip() else ''
+        prev_word_clean = re.sub(r'[^A-Za-z]', '', prev_word)
+        # Strip a leading possessive/quote so "'s" is seen as the next token.
+        after_l = after.lstrip()
+        next_word_raw = after_l.split()[0] if after_l.split() else ''
+        next_word = re.sub(r'[^A-Za-z]', '', next_word_raw).lower()
+
+        # ── place-shaped: "at Logan", "in Boston", "to Walter" → not a person ──
+        if prev_word_clean in _PLACE_PREPS:
+            continue
+        # ── facility fragment: "Terminal E", "Gate B", or "<X> Terminal" ──────
+        if prev_word_clean in _FACILITY_WORDS or next_word in _FACILITY_WORDS:
+            continue
+
+        is_sentence_initial = not before.strip()
+
+        # ── frame 1: possessive "Reid's" ─────────────────────────────────────
+        # after_l starts with an apostrophe + s. Person-shaped even sentence-init.
+        possessive = any(after_l.startswith(ap + 's') for ap in ("'", '’', 'ʼ', '′'))
+
+        # ── frame 3/2: "by X" (agentive) or "of X" (genitive) ────────────────
+        # These need a preceding preposition; never sentence-initial.
+        prep_frame = prev_word_clean in ('of', 'by')
+
+        # ── frame 4: subject-verb "Walter vanished" ─────────────────────────
+        # A determiner directly before the token ("the Mothers", "the Plane")
+        # makes it a common noun, not a name — real names do not take "the X".
+        _det_before = prev_word_clean in (
+            'the', 'a', 'an', 'this', 'that', 'these', 'those', 'their',
+            'his', 'her', 'its', 'our', 'your', 'my', 'some', 'any', 'each',
+            'every', 'no',
+        )
+        verb_frame = (not _det_before) and _looks_like_past_verb(next_word)
+
+        # ── frame 5: "who Suzette was" / "whom Reid met" ─────────────────────
+        who_frame = prev_word_clean in ('who', 'whom', 'whose')
+
+        if is_sentence_initial:
+            # A capital here is grammar, not signal. Only the token's own
+            # governing syntax may promote it: a possessive clitic, or a
+            # person-verb directly after it.
+            if not (possessive or verb_frame):
+                continue
+
+        if possessive or prep_frame or verb_frame or who_frame:
+            seen.add(low)
+            found.append(name)
+
+    return found
 
 
 def _fold_accents(s: str) -> str:
@@ -329,6 +549,17 @@ def detect_unglossed_references(text: str, stop_names: List[str] = None,
             name = m.group(1)
             # Skip names that start with articles or are structure/place names
             if name.split()[0].lower() in ('the', 'this', 'that', 'a', 'an', 'its'):
+                continue
+            if len(name) > 3 and not _is_well_known(name):
+                entities_found.append((name, 'person'))
+
+        # [LOCAL-479] Single-token people — the one-word names the multi-token
+        # pattern above has always been blind to (Walter, Reid, Suzette). Only
+        # names whose surrounding syntax is person-shaped are returned.
+        _multi_lower = {n.lower() for (n, _c) in entities_found}
+        for name in detect_single_token_names(sent, i):
+            # Do not double-count a token already inside a multi-token match.
+            if any(name.lower() in ml.split() for ml in _multi_lower):
                 continue
             if len(name) > 3 and not _is_well_known(name):
                 entities_found.append((name, 'person'))
@@ -524,7 +755,7 @@ def _search_corpus_for_fact(entity: str, corpus_passages: List[str]) -> Optional
         passage_lower = passage.lower()
         if entity_lower in passage_lower:
             # Found entity in corpus — extract the sentence containing it
-            sents = re.split(r'(?<=[.!?])\s+', passage)
+            sents = _ss_split(passage)
             for s in sents:
                 if entity_lower in s.lower():
                     # Check if this sentence has factual content beyond just naming
@@ -1155,8 +1386,20 @@ def _excise_governed_construction(sentence: str, entity: str) -> str:
             after = 'the ' + after.lstrip()
         else:
             after = after.lstrip()
+        # [2026-09-23] "the own historic pathways" — the entity was a possessive
+        # DETERMINER ("Logan's own pathways"), so the slot does not want an article.
+        # NB: runs after the article was prepended above, so match it too.
+        after = re.sub(r'^the\s+(?=(?:own|very)\b)', '', after)
         # Remove any preceding article/preposition that targeted the entity
         before = _strip_trailing_function_words(before)
+        # [2026-09-23, kiro critic] _strip_trailing_function_words removes the
+        # dangling preposition AND its space, so a bare `before + after` glued the
+        # words together: "the Archdiocese of Boston's clergy abuse crisis" became
+        # "the Archdiocesethe clergy abuse crisis". Four such splices reached the
+        # round-7 tours. The non-possessive branch below has always guarded this;
+        # this branch never did.
+        if before and after and not before.endswith(' ') and not after.startswith(' '):
+            before += ' '
         new_sentence = before + after
         return _clean_degrade_artifacts(new_sentence)
 
@@ -1288,6 +1531,245 @@ def _drop_sentence_from_text(text: str, sentence: str) -> str:
     return result
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-479] PART 2 — CUT THE DEPENDANTS WITH THE INTRODUCTION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# When a gate removes the sentence that INTRODUCED a person or event, every
+# later sentence that referred back to that introduction with a DEFINITE
+# reference is left pointing at nothing. Tour 423 stop 4 is the proof: a gate
+# cut the sentences introducing Richard Reid and the 1960s crash (they carried
+# the unverifiable claims) and left standing
+#
+#     "The plane made an emergency landing at Logan..."
+#     "Reid's failed attempt serves as a stark reminder..."
+#     "The disappearance of Walter and passengers on that ill-fated flight..."
+#     "The incident spurred safety reviews..."
+#
+# four orphans referring to introductions that no longer exist. A stop left at
+# 217 words with four orphans is worse than a stop that never mentioned Reid —
+# so the introduction and its dependants must fall together.
+#
+# A "dependant" is a later sentence whose SUBJECT is a definite back-reference —
+#   • a definite noun phrase:  "The plane", "The incident", "That flight"
+#   • a possessive of a name:  "Reid's failed attempt"
+#   • a bare name subject:     "Walter vanished"
+# — whose antecedent (the name, or the head noun) was introduced ONLY by the
+# removed sentence and is NOT independently introduced by any surviving earlier
+# sentence. A first, indefinite mention ("A plane made an emergency landing")
+# is an introduction, not a dependant, and is never cut by this pass.
+
+# Definite-reference subject at the start of a sentence: "The plane", "The
+# incident", "That ill-fated flight", "This attempt". Captures the noun-phrase
+# words BETWEEN the determiner and the predicate verb so any of them can serve
+# as the head noun (an adjective like "ill-fated" precedes the true head).
+_DEFINITE_SUBJECT_RE = re.compile(
+    r'^\s*(?:The|That|This|These|Those)\s+([A-Za-zà-ÿ][A-Za-zà-ÿ\-\s]{1,40}?)'
+    r'\s+(?:[a-zà-ÿ]{2,}ed|is|was|were|are|has|had|have|spurred|serves?|'
+    r'made|added|led|remains?|stands?|became|brought|marks?|reflects?)\b',
+    re.IGNORECASE,
+)
+
+# Possessive-name subject: "Reid's failed attempt", "Walter's disappearance".
+_POSSESSIVE_SUBJECT_RE = re.compile(
+    r"^\s*([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})(?:'s|’s)\b"
+)
+
+# Bare-name subject followed by a person-verb: "Walter vanished".
+_BARE_NAME_SUBJECT_RE = re.compile(
+    r"^\s*([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})\s+([a-zà-ÿ]{3,})\b"
+)
+
+
+def _content_nouns(sentence: str) -> set:
+    """Lowercased content words in a sentence (>=3 chars, not function words).
+
+    Used to decide whether an introduction sentence actually introduced the
+    head noun a later definite reference points back to.
+    """
+    stop = {
+        'the', 'and', 'that', 'this', 'with', 'from', 'into', 'onto', 'for',
+        'was', 'were', 'are', 'has', 'had', 'have', 'its', 'their', 'his',
+        'her', 'which', 'who', 'whom', 'whose', 'when', 'where', 'what',
+        'added', 'layer', 'serves', 'stark', 'reminder',
+    }
+    words = re.findall(r"[A-Za-zà-ÿ]{3,}", sentence.lower())
+    return {w for w in words if w not in stop}
+
+
+def _introduced_names_and_nouns(sentence: str) -> Tuple[set, set]:
+    """What a sentence INTRODUCES: proper names (folded) and content nouns.
+
+    Names come from both the multi-token pattern and the single-token detector,
+    so "Richard Reid", "Reid", and "Walter" are all recognised as introduced.
+    """
+    names = set()
+    for m in _PERSON_PATTERN.finditer(sentence):
+        for w in m.group(1).split():
+            if len(w) > 2:
+                names.add(_fold_accents(w.lower()))
+    for n in detect_single_token_names(sentence):
+        names.add(_fold_accents(n.lower()))
+    # Also any capitalised token mid-sentence (covers a name the detectors did
+    # not frame but that a later possessive points back to).
+    for m in re.finditer(r'(?<!^)(?<![.!?]\s)\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})\b', sentence):
+        names.add(_fold_accents(m.group(1).lower()))
+    return names, _content_nouns(sentence)
+
+
+def _subject_reference(sentence: str) -> Optional[Dict]:
+    """Classify a sentence's SUBJECT as a definite back-reference, if it is one.
+
+    Returns a dict describing the reference, or None when the subject is not a
+    definite back-reference (e.g. an indefinite "A plane", or a navigation
+    sentence). Keys: kind ('definite_np'|'possessive'|'bare_name'), head (the
+    lowercased head noun for a definite NP), name (folded name for possessive /
+    bare-name).
+    """
+    s = sentence.strip()
+    if not s:
+        return None
+
+    # Indefinite subjects ("A plane", "An incident", "Some passengers") are
+    # first mentions — introductions, never dependants.
+    if re.match(r'^\s*(?:A|An|Some|Several|Many|One)\s', s):
+        return None
+
+    m = _POSSESSIVE_SUBJECT_RE.match(s)
+    if m:
+        return {'kind': 'possessive', 'name': _fold_accents(m.group(1).lower())}
+
+    m = _DEFINITE_SUBJECT_RE.match(s)
+    if m:
+        heads = {w.lower() for w in re.findall(r"[A-Za-zà-ÿ]{3,}", m.group(1))}
+        return {'kind': 'definite_np', 'heads': heads}
+
+    m = _BARE_NAME_SUBJECT_RE.match(s)
+    if m:
+        name, follow = m.group(1), m.group(2)
+        if name.lower() not in _NOT_A_NAME_SINGLE and _looks_like_past_verb(follow):
+            return {'kind': 'bare_name', 'name': _fold_accents(name.lower())}
+
+    return None
+
+
+def cut_orphaned_dependants(text: str, removed_sentences: List[str]) -> Tuple[str, List[str]]:
+    """[LOCAL-479] Drop later sentences orphaned by a removed introduction.
+
+    Given the delivered `text` and the list of sentences a gate has already
+    removed, find every surviving sentence whose SUBJECT is a definite
+    back-reference to something the removed sentence(s) introduced — and that
+    NO surviving earlier sentence independently introduces — and drop it too.
+
+    The pass iterates to a fixed point: dropping a dependant can orphan a
+    sentence that depended on IT in turn.
+
+    Returns (new_text, cascaded_drops).
+    """
+    if not text or not removed_sentences:
+        return text, []
+
+    # What the removed sentences introduced.
+    removed_names: set = set()
+    removed_nouns: set = set()
+    for rs in removed_sentences:
+        n, h = _introduced_names_and_nouns(rs)
+        removed_names |= n
+        removed_nouns |= h
+
+    if not removed_names and not removed_nouns:
+        return text, []
+
+    cascaded: List[str] = []
+    changed = True
+    # Fixed-point loop: at most a handful of iterations for any real stop.
+    for _ in range(6):
+        if not changed:
+            break
+        changed = False
+        survivors = _split_sentences(text)
+
+        # Names/nouns each SURVIVING sentence introduces, so we never cut a
+        # reference that a still-present sentence legitimately grounds.
+        intro_by_index = []
+        for s in survivors:
+            n, h = _introduced_names_and_nouns(s)
+            intro_by_index.append((n, h))
+
+        for idx, sent in enumerate(survivors):
+            ref = _subject_reference(sent)
+            if not ref:
+                continue
+            # D164: never cut a navigation sentence.
+            if _is_style_navigation_sentence(sent):
+                continue
+
+            # Is the antecedent introduced by any EARLIER surviving sentence?
+            grounded_earlier = False
+            for j in range(idx):
+                en, eh = intro_by_index[j]
+                if ref['kind'] in ('possessive', 'bare_name'):
+                    if ref['name'] in en:
+                        grounded_earlier = True
+                        break
+                else:  # definite_np
+                    if (ref['heads'] & eh) or (ref['heads'] & en):
+                        grounded_earlier = True
+                        break
+            if grounded_earlier:
+                continue
+
+            # Does the antecedent trace back to something the removed sentence
+            # introduced?
+            orphaned = False
+            if ref['kind'] in ('possessive', 'bare_name'):
+                orphaned = ref['name'] in removed_names
+            else:  # definite_np — a head noun the removed sentence introduced,
+                   # OR (when the removed sentence introduced a name but no
+                   # matching noun) a generic anaphor whose head is not grounded
+                   # anywhere in the surviving text.
+                orphaned = bool(ref['heads'] & removed_nouns)
+
+            if orphaned:
+                # Drop this dependant and carry its own introductions forward,
+                # so a sentence that depended on IT is orphaned next round.
+                n, h = _introduced_names_and_nouns(sent)
+                removed_names |= n
+                removed_nouns |= h
+                text = _drop_sentence_from_text(text, sent)
+                cascaded.append(sent)
+                changed = True
+                break  # re-split and re-evaluate from the top
+
+    return text, cascaded
+
+
+def _sentences_removed(original: str, gated: str) -> List[str]:
+    """Sentences present in `original` but absent (verbatim) from `gated`.
+
+    A sentence that was merely EDITED in place (a gloss inserted, a name
+    degraded out) is not counted as removed — its lead-in survives, so the
+    original text no longer matches, but a normalised prefix does. We treat a
+    sentence as removed only when neither it nor a meaningful prefix of it
+    survives, which is exactly the "whole sentence dropped" case Part 2 acts on.
+    """
+    orig_sents = _split_sentences(original)
+    gated_norm = re.sub(r'\s+', ' ', gated).strip().lower()
+    removed = []
+    for s in orig_sents:
+        s_norm = re.sub(r'\s+', ' ', s).strip().lower()
+        if len(s_norm) < 15:
+            continue
+        if s_norm in gated_norm:
+            continue
+        # A prefix survived → the sentence was edited, not removed.
+        prefix = ' '.join(s_norm.split()[:5])
+        if prefix and prefix in gated_norm:
+            continue
+        removed.append(s)
+    return removed
+
+
 # ─── Degrade output validators (LOCAL-289) ─────────────────────────────────────
 
 # Patterns that must NEVER appear in delivered text
@@ -1307,6 +1789,23 @@ _DEGRADE_GUARD_ORPHAN_HYPHEN = re.compile(r'\b[A-Z][a-zà-ÿ]+-\s')  # "Pierre- 
 _DEGRADE_GUARD_ORPHAN_ADJECTIVE = re.compile(
     r'\bthe\s+nearby\s+(?:forms|has|is|was|were|are|had|have)\b', re.IGNORECASE
 )  # "the nearby forms" — adjective without noun object
+# [2026-09-23, LOCAL-530] "They authorized of Public Works to lease this land" —
+# the tour said "the Department of Public Works", and this gate excised the head
+# noun "Department" as an unglossed reference, leaving the verb "authorized"
+# abutting "of" with its object gone. The seven guards above passed it, exactly as
+# LOCAL-475 defect C passed a subjectless sentence: dropping a word from the middle
+# of a sentence is precisely the operation this gate performs. The signature is a
+# transitive verb that governs a direct OBJECT ("authorized [a body]") welded onto
+# "of" — restricted to verbs of official action on an institution so it never fires
+# on the legitimate "-ed of" idioms (comprised/composed/consisted/deprived/accused/
+# approved of). Fail-safe: when this fires the degraded sentence is judged
+# ill-formed and dropped whole, which is better than voicing broken syntax to TTS.
+_DEGRADE_GUARD_OBJECT_DROPPED = re.compile(
+    r'\b(?:authoriz|authorised|engag|establish|appoint|commission|task|direct|'
+    r'instruct|order|permit|enabl|allow|assign|designat|elect|nominat|'
+    r'compel|urg|request|requir|forbid|forbad|prohibit|mandat)'
+    r'(?:ed|es|e)?\s+of\s+[A-Z]'
+)
 
 
 _DEGRADE_OPENER = re.compile(
@@ -1445,6 +1944,8 @@ def _degrade_sentence_is_wellformed(sentence: str) -> bool:
         return False
     if _DEGRADE_GUARD_ORPHAN_ADJECTIVE.search(sentence):
         return False
+    if _DEGRADE_GUARD_OBJECT_DROPPED.search(sentence):   # [LOCAL-530]
+        return False
     return True
 
 
@@ -1503,6 +2004,15 @@ def validate_degrade_output(full_text: str) -> List[Dict]:
             violations.append({
                 'sentence': sent_stripped[:100],
                 'guard': 'orphan_hyphen',
+                'pattern_matched': m.group(),
+            })
+
+        # Guard 7: Object dropped — transitive verb welded onto "of" [LOCAL-530]
+        m = _DEGRADE_GUARD_OBJECT_DROPPED.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'object_dropped',
                 'pattern_matched': m.group(),
             })
 
@@ -1635,6 +2145,7 @@ def apply_unglossed_reference_gate(
     stop_names: List[str] = None,
     exempt: List[str] = None,
     stop_record: Dict = None,
+    stop_name: str = None,
 ) -> Tuple[str, Dict]:
     """Apply the unglossed-reference gate to a stop description.
 
@@ -1662,6 +2173,7 @@ def apply_unglossed_reference_gate(
         'references_guard_failed': 0,
         'references_provenance': 0,   # [LOCAL-494] glossed from the stop record
         'references_provenance_kept': 0,  # named but unexplained — never deleted
+        'references_dependants_cut': 0,   # [LOCAL-479] orphaned dependants removed
         'triage_tokens': 0,
         'triage_cost': 0.0,
         'triage_latency': 0.0,
@@ -1774,6 +2286,29 @@ def apply_unglossed_reference_gate(
     new_description, dropped_sentences = validate_and_repair_full_text(new_description)
     stats['sentences_dropped_by_guard'] = len(dropped_sentences)
     stats['dropped_sentences'] = dropped_sentences
+
+    # [LOCAL-479] PART 2: cut the dependants with the introduction. Every
+    # sentence the gate has just removed (degraded to nothing, or dropped by a
+    # guard) may have introduced a person or event that a LATER sentence refers
+    # back to with a definite reference. Those later sentences are now orphaned
+    # and must fall with the introduction — otherwise the gate manufactures the
+    # exact orphan it exists to prevent (tour 423 stop 4, four orphans / 217 words).
+    _removed = _sentences_removed(description, new_description)
+    if _removed:
+        new_description, _cascaded = cut_orphaned_dependants(new_description, _removed)
+        stats['dependants_cut'] = _cascaded
+        stats['references_dependants_cut'] = len(_cascaded)
+        for _c in _cascaded:
+            _sr = _subject_reference(_c) or {}
+            if _sr.get('name'):
+                _ent = _sr['name']
+            elif _sr.get('heads'):
+                _ent = '/'.join(sorted(_sr['heads']))
+            else:
+                _ent = _c[:40]
+            print(f"  [LOCAL-479] stop='{(stop_name or '?')[:40]}' cut orphaned "
+                  f"dependant of a removed introduction — subject '{_ent}': "
+                  f"\"{_c[:80]}\"")
 
     # Count results
     for ref in refs:
@@ -1951,9 +2486,11 @@ def apply_gate_to_stop_descriptions(
             # instead of being degraded when the open web has never heard of
             # them, which is the normal case for a private collector.
             stop_record=poi,
+            stop_name=stop_name,
         )
 
-        if stats['references_glossed'] > 0 or stats['references_degraded'] > 0:
+        if (stats['references_glossed'] > 0 or stats['references_degraded'] > 0
+                or stats.get('references_dependants_cut', 0) > 0):
             poi_list[si]['description'] = new_desc
             total_stats['stops_affected'] += 1
 
@@ -1998,3 +2535,43 @@ def apply_gate_to_stop_descriptions(
                                      total_stats['compose_latency'])
 
     return total_stats
+
+
+# ── A pronoun whose person lives at another stop ────────────────────────────
+# The kiro critic on a 6-stop church tour, 2026-09-23:
+#
+#   "She was there for a final vows ceremony for the sisters of the Missionaries
+#    of Charity."   — Stop 6, Narthex
+#
+# No "she" is introduced anywhere in that stop. The antecedent is Mother Teresa,
+# named at Stop 3. Each stop is heard on its own, minutes apart and standing
+# somewhere else, so a pronoun reaching back to another stop reaches nothing.
+#
+# LOCAL-479 cuts a dependant whose introduction was REMOVED. This is the sibling
+# case: the introduction was never removed, it is simply in a different stop.
+
+_LEAD_PRONOUN = re.compile(
+    r'^\s*(?:And\s+|But\s+|Then\s+)?(He|She|They|His|Her|Their|Him)\b')
+_PERSON_NEAR = re.compile(r'\b(?:Mr|Mrs|Ms|Dr|Fr|Rev|Father|Cardinal|Mother|Sister|'
+                          r'Saint|Pope|Bishop|Archbishop|Governor|Mayor|Captain)\.?\s+'
+                          r'[A-Z][\w\'’-]+|\b[A-Z][\w\'’-]+\s+[A-Z][\w\'’-]+\b')
+
+
+def cut_orphaned_pronouns(text):
+    """Drop a sentence opening on a pronoun with no person named before it here.
+
+    Returns (clean_text, removed). Conservative: only the sentence-initial case,
+    and only when NO person is named earlier in this stop's own text.
+    """
+    sents = _ss_split(text or '')
+    out, removed, seen_person = [], [], False
+    for s in sents:
+        if _PERSON_NEAR.search(s):
+            out.append(s)
+            seen_person = True
+            continue
+        if not seen_person and _LEAD_PRONOUN.match(s):
+            removed.append(s)
+            continue
+        out.append(s)
+    return ' '.join(out).strip(), removed

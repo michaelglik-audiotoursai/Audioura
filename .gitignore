@@ -77,3 +77,4 @@ newEnv*
 # GCS-PLAY1 — local venv for the Play upload tool (never committed)
 tools/.venv-play/
 .pytest_cache/
+.venue_parts_cache.json

@@ -2,6 +2,9 @@
 """
 Simple Guy Raz extraction test without emoji characters
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 from bs4 import BeautifulSoup
 

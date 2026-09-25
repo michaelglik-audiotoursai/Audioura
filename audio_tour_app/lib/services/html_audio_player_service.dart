@@ -22,9 +22,21 @@ import '../screens/debug_log_viewer_screen.dart';
 /// HTML page INTO the audio's own directory and load it by URL, with a RELATIVE
 /// `<source src="audio_N.mp3">` that resolves inside the granted scope.
 ///
+/// LOCAL-3482 (build-25 re-report) — the LOCAL-482 layout above is necessary
+/// but was NOT sufficient on iOS. `flutter_inappwebview`'s `loadUrl` only
+/// grants directory read access when it is given an `allowingReadAccessTo`
+/// URL; without it, it falls through to a bare `WKWebView.load(URLRequest)`
+/// that reads nothing beyond the HTML file itself, so the relative `<source>`
+/// stayed sandbox-blocked and "Failed to load audio" persisted. The model now
+/// also carries [readAccessUrl] — the audio directory as a `file://` URL — and
+/// the service passes it to `loadUrl(allowingReadAccessTo:)`, which is what
+/// forces WKWebView's access-granting `loadFileURL(_:allowingReadAccessTo:)`
+/// path (flutter_inappwebview_ios InAppWebView.swift:925-932).
+///
 /// It is a pure function of the audio path so the access model is unit-testable
 /// without a WebView or platform channel. A test pins every field; restoring
-/// the `file://` baseURL or an absolute `src` breaks it (AC #6).
+/// the `file://` baseURL, an absolute `src`, or dropping the read-access scope
+/// breaks it (AC #6).
 class EditorAudioAccessModel {
   /// Absolute path to the audio file being played.
   final String audioPath;
@@ -43,12 +55,28 @@ class EditorAudioAccessModel {
   /// WKWebView grants read access to the audio next to it.
   final String loadUrl;
 
+  /// LOCAL-3482 — the `file://` URL of [directory] itself, passed to
+  /// `loadUrl(allowingReadAccessTo:)`.
+  ///
+  /// This is the field the build-25 re-report turned on. Writing the scratch
+  /// HTML into the audio dir and loading it BY URL (LOCAL-482) is necessary but
+  /// NOT sufficient on iOS: `flutter_inappwebview`'s `loadUrl` only routes to
+  /// WKWebView's access-granting `loadFileURL(_:allowingReadAccessTo:)` when an
+  /// `allowingReadAccessTo` URL is supplied — otherwise it falls through to a
+  /// bare `WKWebView.load(URLRequest)`, which grants the page read access to
+  /// NOTHING beyond the HTML file, so the relative `<source>` subresource is
+  /// sandbox-blocked and "Failed to load audio" returns
+  /// (flutter_inappwebview_ios InAppWebView.swift:925-932). Supplying this
+  /// directory URL is what forces the granting branch.
+  final String readAccessUrl;
+
   const EditorAudioAccessModel({
     required this.audioPath,
     required this.directory,
     required this.relativeSrc,
     required this.scratchHtmlPath,
     required this.loadUrl,
+    required this.readAccessUrl,
   });
 
   /// Dot-prefixed so it is a hidden scratch file that existing tour parsers
@@ -75,6 +103,7 @@ class EditorAudioAccessModel {
       relativeSrc: fileName,
       scratchHtmlPath: scratchHtmlPath,
       loadUrl: 'file://$scratchHtmlPath',
+      readAccessUrl: 'file://$directory',
     );
   }
 }
@@ -371,10 +400,20 @@ class HtmlAudioPlayerService {
         '(src="${access.relativeSrc}")');
 
       await controller.loadUrl(
-        urlRequest: URLRequest(url: WebUri(access.loadUrl)));
+        urlRequest: URLRequest(url: WebUri(access.loadUrl)),
+        // LOCAL-3482: THE fix for the build-25 re-report. Without this,
+        // flutter_inappwebview's loadUrl falls through to a bare
+        // WKWebView.load(URLRequest) that grants NO directory read access, so
+        // the relative <source> subresource is sandbox-blocked exactly as
+        // before. Supplying the audio directory forces the access-granting
+        // loadFileURL(_:allowingReadAccessTo:) branch
+        // (flutter_inappwebview_ios InAppWebView.swift:928-929).
+        allowingReadAccessTo: WebUri(access.readAccessUrl),
+      );
 
       await DebugLogHelper.addDebugLog(
-        'HTML_AUDIO: Loaded audio player by URL ${access.loadUrl} for $audioPath');
+        'HTML_AUDIO: Loaded audio player by URL ${access.loadUrl} '
+        '(allowingReadAccessTo=${access.readAccessUrl}) for $audioPath');
       return true;
     } catch (e) {
       await DebugLogHelper.addDebugLog('HTML_AUDIO: Error loading audio: $e');

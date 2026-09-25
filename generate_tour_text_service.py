@@ -118,7 +118,72 @@ def ensure_tours_directory():
     if not os.path.exists(TOURS_DIR):
         os.makedirs(TOURS_DIR)
 
-def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=None):
+
+# [LOCAL-525] Maximum number of user-chosen stops accepted on the /generate
+# endpoint. Mirrors the total_stops ceiling (1..50) so the two request shapes
+# cannot disagree about how large a tour may be.
+_MAX_USER_STOPS = 50
+
+
+def validate_stops(raw):
+    """Validate a user-supplied ``stops`` list (LOCAL-525).
+
+    The engine already honours ``generate_tour_text(..., forced_stops=[...])``
+    (LOCAL-357). This promotes it to a product input: a visitor who recorded the
+    exact stops they want (e.g. at the MFA) can pass them straight through.
+
+    Contract:
+      * ``None`` / missing  → returns ``(None, None)``. The caller then behaves
+        exactly as before — normal candidate generation. This is NOT an error.
+      * A non-empty list of non-empty strings → returns ``(clean_list, None)``
+        where each name is stripped. Order is preserved.
+      * Anything else (not a list, empty list, non-string element, blank/whitespace
+        element, or more than ``_MAX_USER_STOPS`` entries) → returns
+        ``(None, error_message)``. Malformed input is REJECTED with a clear
+        message, never silently ignored.
+
+    Returns:
+        tuple(clean_stops_or_None, error_message_or_None)
+    """
+    if raw is None:
+        return None, None
+
+    if not isinstance(raw, list):
+        return None, (
+            "'stops' must be a list of stop names (strings). "
+            f"Received {type(raw).__name__}."
+        )
+
+    if len(raw) == 0:
+        return None, (
+            "'stops' was provided but is empty. Omit 'stops' for automatic "
+            "stop selection, or provide at least one stop name."
+        )
+
+    if len(raw) > _MAX_USER_STOPS:
+        return None, (
+            f"'stops' has {len(raw)} entries; the maximum is {_MAX_USER_STOPS}."
+        )
+
+    clean = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, str):
+            return None, (
+                f"'stops' entry #{i + 1} must be a string, "
+                f"got {type(item).__name__}."
+            )
+        name = item.strip()
+        if not name:
+            return None, (
+                f"'stops' entry #{i + 1} is blank. Every stop name must be "
+                "non-empty."
+            )
+        clean.append(name)
+
+    return clean, None
+
+
+def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=None, forced_stops=None):
     """Generate tour text asynchronously."""
     try:
         api_call_logger.log("GENERATOR_SERVICE_ASYNC_START", {
@@ -127,6 +192,7 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             "tour_type": tour_type,
             "total_stops": total_stops,
             "user_id": user_id,
+            "forced_stops": forced_stops,
         })
         
         ACTIVE_JOBS.update(job_id, status="processing", progress="Starting tour text generation...")
@@ -163,8 +229,11 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         
         # [LOCAL-323] Pass user_id/job_id as parameters (thread-safe).
         # Previously set as module-level globals which raced under concurrency.
+        # [LOCAL-525] forced_stops carries the visitor's chosen stop list through
+        # to the engine (validated at the /generate boundary). When None, the
+        # engine runs normal candidate generation — behaviour is unchanged.
         # Generate the tour text - PASS total_stops and persona parameters
-        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value, user_id=user_id, job_id=job_id)
+        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value, user_id=user_id, job_id=job_id, forced_stops=forced_stops)
         
         if tour_text is None:
             # Check for structured evidence from degradation ladder
@@ -189,8 +258,34 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "exhibition_not_found":
                         _error_msg = _LAST_CLEAN_FAIL_EVIDENCE.get("user_message", "Exhibition not found.")
                         _error_extra["suggestions"] = _LAST_CLEAN_FAIL_EVIDENCE.get("suggestions", [])
+                    # [LOCAL-485] thin_evidence gets its OWN honest message, naming the
+                    # venue. Previously this fell through to the museum "not enough works"
+                    # catch-all below — a lie whenever artworks were never the point
+                    # (e.g. a parish church routed down the museum path). Name the venue
+                    # so the listener knows WHICH request failed, and point them at a
+                    # request shape that can succeed.
+                    elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "thin_evidence":
+                        _venue_name = (_LAST_CLEAN_FAIL_EVIDENCE.get("venue")
+                                       or location or "this venue")
+                        _error_msg = (
+                            f'We could not find enough verified material about '
+                            f'"{_venue_name}" to build a tour. Try a broader request — '
+                            f'for example a walking tour of the surrounding neighbourhood.'
+                        )
                     else:
-                        _error_msg = "This venue could not be verified with enough works to generate a quality tour."
+                        # [LOCAL-485 / D564] The catch-all must describe the CATCH-ALL case.
+                        # It previously borrowed the museum "not enough works" wording, so
+                        # every unclassified failure told the listener it lacked artworks —
+                        # whether or not artworks were ever relevant. Michael spent a day on
+                        # that message believing a quota had blocked him. Name the venue, and
+                        # say only what is actually known: we could not build the tour.
+                        _venue_name = (_LAST_CLEAN_FAIL_EVIDENCE.get("venue")
+                                       or location or "this venue")
+                        _error_msg = (
+                            f'We could not find enough verified material about '
+                            f'"{_venue_name}" to build a tour. Try a broader request — '
+                            f'for example a walking tour of the surrounding neighbourhood.'
+                        )
                     import generate_tour_text as _gtt
                     _gtt._LAST_CLEAN_FAIL_EVIDENCE = {}  # Reset for next request
             except ImportError as _cfe_err:
@@ -512,14 +607,25 @@ def generate_tour():
     tour_type = data.get('tour_type') or ''  # [LOCAL-474] None → '' so the classifier can run
     total_stops = data.get('total_stops', 10)
     user_id = data.get('user_id')  # [S46] Extract user_id for persona lookup
-    
+
+    # [LOCAL-525] Optional user-chosen stops. When present, these EXACT stops are
+    # generated in order (the engine's forced_stops path, LOCAL-357). When absent,
+    # nothing changes. Malformed input is rejected below with a clear message —
+    # never silently ignored.
+    forced_stops, _stops_error = validate_stops(data.get('stops'))
+
     api_call_logger.log("GENERATOR_SERVICE_RECEIVED_REQUEST", {
         "raw_request_body": data,
         "location": location,
         "tour_type": tour_type,
         "total_stops_raw": data.get('total_stops', '(not provided - will default to 10)'),
         "total_stops_resolved": total_stops,
+        "stops_raw": data.get('stops'),
+        "stops_validated": forced_stops,
     })
+
+    if _stops_error is not None:
+        return jsonify({"error": _stops_error}), 400
     
     # [LOCAL-474] location is required; tour_type is NOT. Empty/missing tour_type
     # means "classify it" — generate_tour_text() infers the category from the
@@ -536,7 +642,13 @@ def generate_tour():
             return jsonify({"error": "total_stops must be between 1 and 50"}), 400
     except ValueError:
         return jsonify({"error": "total_stops must be a valid integer"}), 400
-    
+
+    # [LOCAL-525] A user-chosen stop list dictates the tour size: the engine sets
+    # total_stops = len(forced_stops). Reflect that here so job tracking and the
+    # downstream count invariant agree with what will actually be generated.
+    if forced_stops is not None:
+        total_stops = len(forced_stops)
+
     # Generate job ID
     job_id = str(uuid.uuid4())
     
@@ -553,7 +665,7 @@ def generate_tour():
     # Start generation in background thread
     thread = threading.Thread(
         target=generate_tour_async,
-        args=(job_id, location, tour_type, total_stops, user_id)
+        args=(job_id, location, tour_type, total_stops, user_id, forced_stops)
     )
     thread.daemon = True
     thread.start()

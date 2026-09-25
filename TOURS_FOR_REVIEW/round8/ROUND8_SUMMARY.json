@@ -1,0 +1,32 @@
+[
+  {
+    "name": "CHURCH_1",
+    "ok": true,
+    "wall_s": 385.3,
+    "chars": 10702,
+    "defects": {
+      "truncated": "1 fragment(s), e.g. 'St'"
+    },
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 13,
+      "named_people": 6,
+      "chars": 10702
+    }
+  },
+  {
+    "name": "LOGAN_1",
+    "ok": true,
+    "wall_s": 235.4,
+    "chars": 9208,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 11,
+      "named_people": 5,
+      "chars": 9208
+    }
+  }
+]
