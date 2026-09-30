@@ -45,6 +45,13 @@ def _compat_send_file(path_or_file, **kwargs):
 
 send_file = _compat_send_file
 
+# [GCS-KS1] Env kill switch for user-chosen stops (D591). Default OFF: unless
+# USER_STOPS_ENABLED=true, a request's user-chosen stops are neutralized right at
+# this HTTP boundary so the tour is generated the normal way. Local Docker sets
+# the flag true (docker-compose-beta-local.yml et al.) so the Mac Mini keeps the
+# feature. See user_stops_flag.py for the contract.
+from user_stops_flag import neutralize_if_disabled as _neutralize_user_stops
+
 # ARCHITECTURAL NOTE: Directory Cleanup Policy
 # - ZIP files are the PRIMARY storage format in database
 # - Directories are TEMPORARY for processing/extraction only
@@ -1574,8 +1581,19 @@ def generate_complete_tour():
     # collide. Accepting both here is the compatible fix and needs no new build,
     # which matters because the install on Michael's phone is already made.
     _raw_stops = data.get('stops')
+    _stops_field_present = 'stops' if _raw_stops is not None else None
     if _raw_stops is None:
         _raw_stops = data.get('user_stops')
+        if _raw_stops is not None:
+            _stops_field_present = 'user_stops'
+    # [GCS-KS1] Kill switch (D591). When USER_STOPS_ENABLED is not 'true', the
+    # user-chosen stops are dropped here — the request then behaves exactly as if
+    # the app had sent no stops at all, and validate_stops(None) yields (None, None)
+    # so the normal automatic selection runs. Logged once, with the count, when a
+    # field was actually present, so we can see whether any installed app still
+    # sends it. When the flag is on, _raw_stops passes through unchanged.
+    _raw_stops = _neutralize_user_stops(
+        _raw_stops, request_id=user_id, field=_stops_field_present)
     stops, _stops_error = validate_stops(_raw_stops)
     
     # [LOCAL-103] Accept is_test from request — gated by server-side allow-flag

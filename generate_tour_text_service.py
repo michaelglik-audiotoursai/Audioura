@@ -44,6 +44,11 @@ import threading
 import re
 import logging
 
+# [GCS-KS1] Env kill switch for user-chosen stops (D591). Guards this service's
+# own /generate boundary too, so the switch holds even if the generator is called
+# directly (or reached on the Cloud Tasks path via the worker). Default OFF.
+from user_stops_flag import neutralize_if_disabled as _neutralize_user_stops
+
 # Import the tour text generator
 from generate_tour_text import generate_tour_text
 import api_call_logger
@@ -612,7 +617,11 @@ def generate_tour():
     # generated in order (the engine's forced_stops path, LOCAL-357). When absent,
     # nothing changes. Malformed input is rejected below with a clear message —
     # never silently ignored.
-    forced_stops, _stops_error = validate_stops(data.get('stops'))
+    # [GCS-KS1] Kill switch (D591): unless USER_STOPS_ENABLED=true, drop the field
+    # here so validate_stops sees nothing and the tour is generated the normal way.
+    _raw_stops = _neutralize_user_stops(
+        data.get('stops'), request_id=data.get('user_id'), field='stops')
+    forced_stops, _stops_error = validate_stops(_raw_stops)
 
     api_call_logger.log("GENERATOR_SERVICE_RECEIVED_REQUEST", {
         "raw_request_body": data,

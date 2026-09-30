@@ -31,6 +31,11 @@ import re
 from datetime import datetime
 from flask import Flask, request, jsonify
 
+# [GCS-KS1] Env kill switch for user-chosen stops (D591). The worker is the Cloud
+# Tasks target; guard here too so the switch holds on the cloud path even though
+# the orchestrator already neutralizes before enqueue. Default OFF.
+from user_stops_flag import neutralize_if_disabled as _neutralize_user_stops
+
 # Configure unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -501,8 +506,13 @@ def run_job():
     print(f"[RUN-JOB] job_id={job_id}, retry={retry_count}/{MAX_TASK_ATTEMPTS}, final={is_final_attempt}")
 
     try:
+        # [GCS-KS1] Kill switch (D591): neutralize any stops on the cloud path too,
+        # unless USER_STOPS_ENABLED=true. Defence in depth — the orchestrator drops
+        # them before enqueue, but a job payload could carry them from elsewhere.
+        _job_stops = _neutralize_user_stops(
+            data.get('stops'), request_id=job_id, field='stops')
         success = run_generation(job_id, location, tour_type, total_stops, user_id,
-                                 request_string, language, data.get('stops'))
+                                 request_string, language, _job_stops)
         if success:
             return jsonify({"status": "completed", "job_id": job_id}), 200
         else:

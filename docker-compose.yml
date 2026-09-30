@@ -29,6 +29,9 @@ services:
       - "5002:5002"
     volumes:
       - ./tours:/app/tours
+    environment:
+      # [GCS-KS1] Local Docker keeps Igor's user-chosen-stops feature ON (D591).
+      - USER_STOPS_ENABLED=true
     command: python tour_orchestrator_service.py
 
   map-delivery:
