@@ -939,6 +939,7 @@ Please provide ONLY a JSON response with these fields:
     "needs_research": true/false,
     "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
     "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
+    "named_places": "JSON array of the specific named establishments the listener asks to VISIT as stops (a particular restaurant, bar, cafe, bakery, shop, venue), each as its business name only, copied from the request, without city or branch/neighbourhood suffix (put that location in geographic_scope instead). Exclude places used only as a reference point ('near X', 'around X'), exclude areas, streets and cities, and exclude the museum given in venue_name. [] when none is named.",
     "scope_precision": "One of exactly these four strings: BUILDING (one structure) | CORRIDOR (one street or strip) | DISTRICT (a neighbourhood, quarter, square, or named area) | CITY (a whole town with no tighter anchor given).",
     "transport_mode": "How the visitor physically moves between stops. One of: on_foot (walking, default), animal (ANY animal-powered movement: camel, horseback, dog sled, elephant, donkey, husky, etc.), bike (cycling), vehicle (car, jeep, scooter, driving, or any motorized/robotic conveyance: segway, robot, drone-follow, golf cart), country_scale (road trip, cross-country, safari, national parks tour). Default: on_foot.",
     "country_scope": "If this is a country-scale tour (road trip, safari, cross-country, national parks), the country name (e.g. 'Italy', 'USA'). Null otherwise."
@@ -960,6 +961,10 @@ Examples:
 - "Restaurant tour near the Prudential Center, Boston" → poi_type: "restaurants", theme_type: "STANDARD", venue_name: null
 - "Architecture tour around the Lyman Estate" → poi_type: "buildings", theme_type: "STANDARD", venue_name: null
 - "Self-guided tour of Beacon Hill" → poi_type: "landmarks", theme_type: "STANDARD", venue_name: null
+- "restaurant tour of Boston Sail Loft, Boston, MA" → poi_type: "restaurants", named_places: ["Boston Sail Loft"], geographic_scope: "Boston Sail Loft, Boston, MA", scope_precision: "BUILDING"
+- "Restaurant tour of Joe's Diner - Harbor Point, Portland, ME" → poi_type: "restaurants", named_places: ["Joe's Diner"], geographic_scope: "Harbor Point, Portland, ME", scope_precision: "DISTRICT"
+- "Dinner at Sycamore and Little Big Diner in Newton Centre" → poi_type: "restaurants", named_places: ["Sycamore", "Little Big Diner"]
+- "Restaurant tour near the Prudential Center, Boston" → named_places: []
 - "walking tour over Beacon St in Brookline, ma" → geographic_scope: "Beacon St, Brookline", scope_precision: "CORRIDOR"
 - "Fairbanks House Tour in Dedham, ma" → venue_name: "Fairbanks House", geographic_scope: "Fairbanks House", scope_precision: "BUILDING"
 - "tour of the old mill district in Lowell" → geographic_scope: "the old mill district, Lowell", scope_precision: "DISTRICT"
@@ -985,7 +990,7 @@ Examples:
             {"role": "user", "content": intent_prompt}
         ],
         "temperature": 0,  # Extraction task — zero variance for deterministic results
-        "max_tokens": 400
+        "max_tokens": 500
     }
     
     # Retry on malformed JSON or null venue_name when request implies a venue
@@ -1159,6 +1164,45 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
 # "near X", "around X", "close to X" make X a reference point, not the restaurant.
 _PROXIMITY_RE = re.compile(r"\b(?:near|around|by|close\s+to|next\s+to|beside|opposite)\s+",
                            re.IGNORECASE)
+
+
+def _named_in_request(name, request_text):
+    """True when every content word of `name` occurs in the request.
+
+    The intent model is asked to COPY names; this refuses anything it invented.
+    """
+    req = set(_norm_place(request_text).split())
+    words = [w for w in _norm_place(name).split() if len(w) > 1]
+    return bool(words) and all(w in req for w in words)
+
+
+def named_restaurant_stops(intent, tour_category, request_text=''):
+    """[LOCAL-556] Every restaurant the request names, in request order.
+
+    Two sources: the intent's `named_places` (2026-10-01, "Restaurant Tour Of
+    Buttermilk & Bourbon - Back Bay, Boston, MA" came back DISTRICT "Back Bay" with
+    the restaurant dropped entirely, so a scope-only rule never saw it), and the
+    BUILDING-scope fallback in named_venue_stop(). Names not literally in the request
+    are refused.
+    """
+    if tour_category != 'restaurant' or not intent:
+        return []
+    raw = intent.get('named_places') or []
+    if isinstance(raw, str):
+        raw = [raw]
+    out = []
+    for n in list(raw) + [named_venue_stop(intent, tour_category, request_text)]:
+        n = (n or '').strip() if isinstance(n, str) else ''
+        if len(n) < 3:
+            continue
+        if not _named_in_request(n, request_text):
+            print(f"  [LOCAL-556] named place '{n}' is not in the request — refused")
+            continue
+        nn = _norm_place(n)
+        if any(nn == _norm_place(o) or nn in _norm_place(o) or _norm_place(o) in nn for o in out):
+            continue
+        out.append(n)
+    return out
 
 
 def named_venue_stop(intent, tour_category, request_text=''):
@@ -7831,12 +7875,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # bypass they vanished before any later protection could see them. Marking runs
         # here, after every path, and is idempotent so the D536 block above stays
         # harmless.
-        _named_venue = named_venue_stop(intent, tour_category, user_request)
-        if _named_venue:
-            print(f"  [LOCAL-556] Restaurant request names ONE venue: '{_named_venue}' "
-                  f"— it is the listener's stop, not a theme")
+        _named_venues = named_restaurant_stops(intent, tour_category, user_request)
+        if _named_venues:
+            print(f"  [LOCAL-556] Restaurant request names {_named_venues} "
+                  f"— the listener's stops, not a theme")
+        # Inserted at index 0 one by one, so reverse to keep the request's order.
         poi_list, _wp_inserted = _apply_named_waypoints(
-            poi_list, location, _new_poi, extra=[_named_venue] if _named_venue else None)
+            poi_list, location, _new_poi, extra=list(reversed(_named_venues)))
         if _wp_inserted:
             print(f"  [LOCAL-547] {len(_wp_inserted)} requested stop(s) were missing "
                   f"from every fill path and were inserted: {_wp_inserted}")
