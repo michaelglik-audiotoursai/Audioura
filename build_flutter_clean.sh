@@ -26,6 +26,12 @@ if [ -z "$GATEWAY_API_KEY" ]; then
     echo "Create $SOURCE_DIR/build_secrets.env with: GATEWAY_API_KEY=your-key-here"
     exit 1
 fi
+# ...and refuse a WRONG key too (2026-10-01), not just an empty one.
+if [ -f "$SOURCE_DIR/gateway_key_check.sh" ]; then
+    ( . "$SOURCE_DIR/gateway_key_check.sh" ) || exit 1
+else
+    echo "⚠️  $SOURCE_DIR/gateway_key_check.sh missing — key fingerprint NOT verified"
+fi
 
 echo "Cleaning up previous build directory..."
 rm -rf "$WORK_DIR"
