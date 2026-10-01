@@ -68,8 +68,17 @@ echo "── 4/4  Build and install (this takes a few minutes) ─────�
 # attached streaming logs until you press q, so the success message below would not
 # appear until after you quit -- it looks like a hang. You want the app on the device
 # to walk around with, not tethered to this terminal.
-#   Need live logs for debugging instead?  flutter run --release -d "$PHONE_ID"
-flutter install --release -d "$PHONE_ID"
+#   Need live logs for debugging instead?
+#     flutter run --release -d "$PHONE_ID" --dart-define=GATEWAY_API_KEY="$GATEWAY_API_KEY"
+# The key MUST be baked in. Without it the app talks to local Docker fine (no key
+# check there) but every cloud call 401s the moment you switch to Preview/Stable --
+# exactly what happened 2026-10-01 to the build this script installed on 09-24.
+SECRETS="$HOME/Audioura/build_secrets.env"
+[ -f "$SECRETS" ] || { echo "✗ $SECRETS not found — see build_ios_release.sh for how to create it"; exit 1; }
+. "$SECRETS"
+( . "$HOME/Audioura/gateway_key_check.sh" ) || exit 1
+flutter build ios --release --dart-define=GATEWAY_API_KEY="$GATEWAY_API_KEY" \
+  && flutter install --release -d "$PHONE_ID"
 RC=$?
 
 echo

@@ -23,11 +23,7 @@ if [ ! -f "$SECRETS" ]; then
 fi
 . "$SECRETS"
 
-if [ -z "${GATEWAY_API_KEY:-}" ]; then
-  echo "ERROR: GATEWAY_API_KEY is empty in $SECRETS."
-  echo "An IPA built now would 401 on every gateway call. Refusing."
-  exit 1
-fi
+. "$HOME/Audioura/gateway_key_check.sh"   # empty OR wrong key -> refuse
 
 cd "$APP_DIR"
 echo "Building $(grep '^version:' pubspec.yaml)"
