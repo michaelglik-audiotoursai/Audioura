@@ -1111,7 +1111,7 @@ _WAYPOINT_RE = re.compile(
     re.IGNORECASE)
 
 
-def _apply_named_waypoints(poi_list, location, _new_poi_fn):
+def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
     """[LOCAL-547] Mark or insert the stops the listener named, whatever built poi_list.
 
     D536 owned this and lived inside `if not _deterministic_fill_used and not
@@ -1129,7 +1129,7 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn):
     Idempotent: a stop already flagged user_explicit is left alone, so calling it
     twice on the same list changes nothing.
     """
-    wps = named_waypoints(location)
+    wps = named_waypoints(location) + [e for e in (extra or []) if e]
     if not wps:
         return poi_list, []
     inserted = []
@@ -1206,6 +1206,44 @@ def _presentable_stop_title(raw):
             continue
         out.append(word.capitalize())
     return ' '.join(out)
+# "near X", "around X", "close to X" make X a reference point, not the restaurant.
+_PROXIMITY_RE = re.compile(r"\b(?:near|around|by|close\s+to|next\s+to|beside|opposite)\s+",
+                           re.IGNORECASE)
+
+
+def named_venue_stop(intent, tour_category, request_text=''):
+    """[LOCAL-556] The one restaurant a restaurant request names, or None.
+
+    2026-10-01, Michael on Preview: "restaurant tour of Boston Sail Loft, Boston, MA",
+    1 stop -> he got Union Oyster House. Intent returned
+        poi_type: "sailing locations", venue_name: null,
+        geographic_scope: "Boston Sail Loft, Boston, MA", scope_precision: "BUILDING"
+    `venue_name` is defined for museum-like institutions only and its examples say null
+    for restaurants, so a NAMED restaurant had no slot. Phase 3A then asked for "4
+    sailing locations relevant to Boston Sail Loft" under the dining constraint and
+    the most famous waterfront restaurant won. The listener's own stop never existed
+    as a candidate, so nothing downstream could protect it.
+
+    The model did say the scope is ONE BUILDING. A restaurant tour bounded by one
+    building is that restaurant. That is a fact about the category, not a word list,
+    so it holds for any name -- "Sail" misleading the model is beside the point.
+    """
+    if tour_category != 'restaurant' or not intent:
+        return None
+    if (intent.get('scope_precision') or '').upper() != 'BUILDING':
+        return None
+    name = (intent.get('geographic_scope') or '').split(',')[0].strip()
+    if len(name) < 3:
+        return None
+    # A city-sized scope mislabelled BUILDING is not a restaurant.
+    city = (intent.get('location') or '').split(',')[0]
+    if _norm_place(name) == _norm_place(city):
+        return None
+    # "Restaurant tour near the Prudential Center": a landmark, not the venue.
+    m = re.search(re.escape(name), request_text or '', re.IGNORECASE)
+    if m and _PROXIMITY_RE.search((request_text or '')[max(0, m.start() - 20):m.start()]):
+        return None
+    return name
 
 
 def named_waypoints(request_text):
@@ -7849,7 +7887,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # bypass they vanished before any later protection could see them. Marking runs
         # here, after every path, and is idempotent so the D536 block above stays
         # harmless.
-        poi_list, _wp_inserted = _apply_named_waypoints(poi_list, location, _new_poi)
+        _named_venue = named_venue_stop(intent, tour_category, user_request)
+        if _named_venue:
+            print(f"  [LOCAL-556] Restaurant request names ONE venue: '{_named_venue}' "
+                  f"— it is the listener's stop, not a theme")
+        poi_list, _wp_inserted = _apply_named_waypoints(
+            poi_list, location, _new_poi, extra=[_named_venue] if _named_venue else None)
         if _wp_inserted:
             print(f"  [LOCAL-547] {len(_wp_inserted)} requested stop(s) were missing "
                   f"from every fill path and were inserted: {_wp_inserted}")
