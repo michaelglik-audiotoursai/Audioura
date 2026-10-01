@@ -49,3 +49,44 @@ def test_not_a_named_restaurant():
     assert named_venue_stop(dict(base, geographic_scope="Prudential Center"), "restaurant",
                             "Restaurant tour near the Prudential Center, Boston") is None
     assert named_venue_stop(None, "restaurant", REQ) is None
+
+
+# The intent the model returned for Michael's second request, 2026-10-01: the
+# restaurant was dropped and its branch label became the DISTRICT scope.
+from generate_tour_text import named_restaurant_stops
+BB_REQ = "restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma"
+BB_INTENT = {"poi_type": "restaurants", "location": "Boston, MA", "venue_name": None,
+             "geographic_scope": "Back Bay, Boston, Ma", "scope_precision": "DISTRICT",
+             "named_places": ["Buttermilk & Bourbon"]}
+
+
+def test_named_places_survive_a_district_scope():
+    assert named_restaurant_stops(BB_INTENT, "restaurant", BB_REQ) == ["Buttermilk & Bourbon"]
+
+
+def test_building_fallback_still_works_without_named_places():
+    assert named_restaurant_stops(SAIL_LOFT_INTENT, "restaurant", REQ) == ["Boston Sail Loft"]
+
+
+def test_both_sources_deduplicate():
+    i = dict(SAIL_LOFT_INTENT, named_places=["Boston Sail Loft"])
+    assert named_restaurant_stops(i, "restaurant", REQ) == ["Boston Sail Loft"]
+
+
+def test_invented_name_is_refused():
+    i = dict(BB_INTENT, named_places=["Grill 23 & Bar"])
+    assert named_restaurant_stops(i, "restaurant", BB_REQ) == []
+
+
+def test_several_named_keep_request_order():
+    req = "Dinner at Sycamore and Little Big Diner in Newton Centre"
+    i = {"named_places": ["Sycamore", "Little Big Diner"], "scope_precision": "DISTRICT",
+         "geographic_scope": "Newton Centre", "location": "Newton, MA"}
+    names = named_restaurant_stops(i, "restaurant", req)
+    out, _ = _apply_named_waypoints([_poi("Farmstead Table")], req, _poi,
+                                    extra=list(reversed(names)))
+    assert [p["name"] for p in out][:2] == ["Sycamore", "Little Big Diner"]
+
+
+def test_other_categories_ignore_named_places():
+    assert named_restaurant_stops(BB_INTENT, "walking", BB_REQ) == []
