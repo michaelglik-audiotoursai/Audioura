@@ -5864,6 +5864,17 @@ except Exception as _ocw_err:  # pragma: no cover - metering must never block ge
     _import_logger.error(f"[LOCAL-562] OpenAI cost choke point unavailable: {_ocw_err}")
     _openai_cost_wrapper = None
 
+# [LOCAL-562] Make ThreadPoolExecutor workers inherit the per-tour cost scope.
+# The per-stop story pass and several gates fan out across worker threads;
+# contextvars are NOT copied into those workers by default, so without this
+# their OpenAI calls would attribute to no tour and the ledger would undercount
+# (a live Chart House run first saw only 46 of 56 calls for exactly this reason).
+try:
+    import cost_accumulator as _cost_accumulator_boot
+    _cost_accumulator_boot.install_executor_context_propagation()
+except Exception as _cap_err:  # pragma: no cover
+    _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
+
 
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.

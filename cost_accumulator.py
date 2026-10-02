@@ -69,6 +69,8 @@ __all__ = [
     "add_search_queries",
     "add_tts_characters",
     "run_in_tour_context",
+    "install_executor_context_propagation",
+    "uninstall_executor_context_propagation",
 ]
 
 
@@ -236,6 +238,62 @@ def run_in_tour_context(accumulator: CostAccumulator, fn, *args, **kwargs):
             _current.reset(token)
 
     return _runner
+
+
+# ─── ThreadPoolExecutor context propagation ─────────────────────────────────
+# The pipeline fans per-stop work out across ~12 ThreadPoolExecutor sites (the
+# per-stop story pass at generate_tour_text.py:15076 is the single most
+# expensive LLM call of a tour). ``ThreadPoolExecutor`` does NOT copy the
+# submitting thread's contextvars into its workers, so an OpenAI call made inside
+# a worker sees ``current_accumulator() is None`` and goes uncounted — which is
+# exactly why a live Chart House run first attributed only 46 of 56 calls.
+#
+# ``install_executor_context_propagation`` patches ``ThreadPoolExecutor.submit``
+# so each submitted callable runs inside a *copy* of the submitting thread's
+# context (``contextvars.copy_context()``). Each tour's main thread holds its own
+# scope, so its workers inherit that tour's accumulator and no other — concurrent
+# tours stay isolated (the copy is taken per-submit, per-thread). Idempotent.
+_executor_patch_lock = threading.Lock()
+_executor_patch = {"installed": False, "orig_submit": None}
+
+
+def install_executor_context_propagation() -> bool:
+    """Make ThreadPoolExecutor workers inherit the submitting thread's cost scope.
+
+    Patches ``concurrent.futures.ThreadPoolExecutor.submit`` once. Safe to call
+    repeatedly. Returns True when active.
+    """
+    with _executor_patch_lock:
+        if _executor_patch["installed"]:
+            return True
+        from concurrent.futures import ThreadPoolExecutor
+
+        orig_submit = ThreadPoolExecutor.submit
+        _executor_patch["orig_submit"] = orig_submit
+
+        def _submit(self, fn, /, *args, **kwargs):
+            ctx = contextvars.copy_context()
+
+            def _in_ctx(*a, **k):
+                return ctx.run(fn, *a, **k)
+
+            return orig_submit(self, _in_ctx, *args, **kwargs)
+
+        ThreadPoolExecutor.submit = _submit
+        _executor_patch["installed"] = True
+        return True
+
+
+def uninstall_executor_context_propagation() -> None:
+    with _executor_patch_lock:
+        if not _executor_patch["installed"]:
+            return
+        from concurrent.futures import ThreadPoolExecutor
+        if _executor_patch["orig_submit"] is not None:
+            ThreadPoolExecutor.submit = _executor_patch["orig_submit"]
+        _executor_patch["orig_submit"] = None
+        _executor_patch["installed"] = False
+
 
 
 # ─── module-level convenience: attribute to the current scope ────────────────
