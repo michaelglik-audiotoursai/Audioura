@@ -1,0 +1,106 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 11,
+      "total": 12,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 11
+    },
+    "per_stop": {
+      "Boston Sail Loft": {
+        "sourced": 1,
+        "unsourced": 11,
+        "total": 12
+      }
+    },
+    "claims": [
+      {
+        "stop": "Boston Sail Loft",
+        "text": "As you explore this renowned seafood restaurant located in the North End Waterfront, established since 1984, you'll uncover the rich maritime culture of Boston through its classic New England seafood offerings and stunning Boston Harbor views.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Founded in 1984 near Long Wharf, The Boston Sail Loft has become a go-to spot for fresh seafood, earning rave reviews and a special place in Boston's culinary history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Among the bustling eateries, look for the unassuming, yet inviting, facade of the Boston Sail Loft on Atlantic Avenue.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Inside, you'll find a story of culinary daring that began in 1984.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "That year, the Sail Loft boldly shattered Boston's chowder norms by infusing their clam chowder with fresh dill and serving it so thick that a spoon could stand upright in the bowl.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Yet, it paid off spectacularly, dethroning established titans like Legal Sea Foods and Union Oyster House to win multiple 'Best of Boston' crowns.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The Sail Loft's clam chowder ended up winning multiple 'Best of Boston' crowns and dethroning historic rivals like Legal Sea Foods and Union Oyster House."
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Sail Loft's connection to Boston's maritime heritage adds an authentic layer to the dining experience.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "As you sip on classic New England, the go-to spot for fresh seafood, seafood dishes, you gaze out over the same waters that once saw ships outfitted for their voyages.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "In this cozy harbor-side spot, the Sail Loft's reputation for fresh seafood and hearty chowders has turned it into a local institution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Walk-ins are welcomed with open arms, and meals are priced under $30, offering an accessible taste of Boston's rich culinary tradition.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Boston Sail Loft operates from 11:30 am until 2:00 am on Mondays and Tuesdays.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "It offers a chance to enjoy its storied flavors and unique place in Boston's culinary landscape.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

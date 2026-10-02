@@ -1,0 +1,856 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #009 | 14:15:21.087 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: French Riviera biking tour
+  tour_type: biking
+  total_stops_parameter: 5
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #010 | 14:15:21.087 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: French Riviera biking tour
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'French Riviera biking tour' → 'French Riviera biking'
+  [LOCAL-46] Stripped transport words: 'French Riviera biking' → 'French Riviera'
+  [Bug2Fix/D536] tour_type='biking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "biking tour",
+    "location": "French Riviera",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "French Riviera",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "bike",
+    "country_scope": null
+}
+  [TRANSPORT] mode=bike, country_scope=None (keyword=bike, intent=bike)
+✅ Intent Analysis Results:
+   POI Type: biking tour
+   Location: French Riviera
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.7s cumulative=1.7s
+[LOCAL-474] tour_type='biking' → category='walking' (source=explicit)
+
+Detected tour category: BIKE
+Using walking template for French Riviera biking tour - biking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #011 | 14:15:22.746 | GENERATING_PROMPT
+======================================================================
+  location: French Riviera biking tour
+  user_request: French Riviera biking tour
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for French Riviera biking tour...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='French Riviera'
+  [LOCAL-290] Asking for 8 candidates (N=5 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #012 | 14:15:22.746 | PHASE_3A_REQUEST
+======================================================================
+  location: French Riviera biking tour
+  total_stops: 5
+  poi_type_hint: biking tour
+
+PHASE 3A API call cost: $0.0006 (726 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #013 | 14:15:28.481 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 5
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for French Riviera biking tour.
+List exactly 8 specific, real, well-known biking tour relevant to: French Riviera biking tour.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A BIKING TOUR:
+Stops should be reachable via bike paths, roads, or trails suita
+  prompt_last_300_chars:  cycling routes.
+- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Promenade des Anglais",
+        "address": "06000 Nice, France",
+        "reason": "Famous seaside promenade in Nice, offering stunning views of the Mediterranean Sea."
+    },
+    {
+        "name": "Cap Ferrat",
+        "address": "06230 Saint-Jean-Cap-Ferrat, France",
+        "reason": "Beautiful peninsula known for its scenic coastal views and luxurious villas."
+    },
+    {
+        "name": "Antibes Old Town",
+        "address": "06600 Antibes, France",
+        "reason
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'Promenade des Anglais'
+   ! [LOCAL-329] Hollow reason for 'Cap Ferrat': 'Beautiful peninsula known for its scenic coastal views and luxurious villas.'
+   ! [LOCAL-329] Hollow reason for 'Villefranche-sur-Mer': 'Quaint seaside town with a picturesque harbor and colorful buildings.'
+   ! [LOCAL-329] Hollow reason for 'Corniche d'Or': 'Scenic coastal road known for its red cliffs, coves, and crystal-clear waters.'
+   ! [LOCAL-329] Hollow reason for 'Massif de l'Esterel': 'Stunning natural park with red volcanic rocks, hiking trails, and panoramic view'
+   ! [LOCAL-329] Hollow reason for 'Paloma Beach': 'Beautiful beach known for its clear waters and relaxed atmosphere.'
+  [LOCAL-329] Substance filter: 5 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 2 substantive selection reason(s)
+OK PHASE 3A parsed 2 candidate POI(s):
+   - Antibes Old Town @ 06600 Antibes, France
+   - Eze Village @ 06360 Èze, France
+  [area_resolver] Parsed: city='French Riviera', neighborhood=''
+  [area_resolver] Resolved as region: French Riviera → Q182822
+  [area_resolver] City resolved: French Riviera → Q182822 (43.3200, 6.6650)
+  [area_resolver] Entity is a region — using wider radius: 15.0km
+  [area_resolver] Resolved: center=(43.3200, 6.6650), radius=15.0km, lang=fr
+  [LOCAL-294] P31 type filter: excluded 4 entities:
+    EXCLUDED: Canton of Sainte-Maxime (Q20688554) — P31=Q18524218
+    EXCLUDED: Sainte-Maxime (Q693017) — P31=Q484170
+    EXCLUDED: Saint-Tropez (Q1813) — P31=Q484170
+    EXCLUDED: Le Plan-de-la-Tour (Q816108) — P31=Q484170
+  [LOCAL-294] Unknown P31 types encountered (kept, not excluded):
+    UNKNOWN TYPE: Q93352 — first seen on: French Riviera
+    UNKNOWN TYPE: Q917448 — first seen on: French Riviera
+    UNKNOWN TYPE: Q1595601 — first seen on: Les Issambres
+    UNKNOWN TYPE: Q1261499 — first seen on: Action of 14 June 1742
+    UNKNOWN TYPE: Q27686 — first seen on: Cheval Blanc St-Tropez
+    UNKNOWN TYPE: Q1021711 — first seen on: Port Grimaud
+    UNKNOWN TYPE: Q123705 — first seen on: Port Grimaud
+  [LOCAL-294] P31 filter result: 11 → 7 kept, 4 excluded, 7 unknown types logged
+  [landmark_discovery] SPARQL coordinate query: 7 landmarks
+    [LOCAL-293] Wikipedia headings: 18 candidates → 0 resolved with QID + in-area coords
+  [landmark_discovery] Wikipedia extraction: +0 new names (total: 7)
+  [area_cache] STORED Q182822: 7 landmarks (tier=medium, TTL=30d)
+  [verify_landmarks] 0/2 stops verified against 7 discovered landmarks (tier: medium)
+  [WALK-D1] Verified 0 stops, tier=medium
+
+PHASE 4.5: Validating AI knowledge for French Riviera biking tour...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+
+Part C: Fetching 3 replacement POI(s), attempt 1/2...
+   Part C attempt 1: AI returned 3 usable candidate(s)
+   Part C attempt 1: 3 survived; total now 5
+  [EXISTENCE-GATE] LOG_ONLY — 5/5 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Antibes Old Town' — stop_corpus(geographic): 'Old Town of Antibes' at 'French Riviera walking area' 
+    [VERIFIED] 'Eze Village' — stop_corpus(geographic): 'Vieux Village de Roquebrune-Cap-Martin' at 'French Riv
+    [VERIFIED] 'La Croisette' — stop_corpus(geographic): 'La Croisette' at 'French Riviera walking area' (7 pass
+    [VERIFIED] 'Cap Ferrat' — stop_corpus(geographic): 'Saint-Jean-Cap-Ferrat' at "Biking tour in French Rivie
+    [VERIFIED] "Massif de l'Esterel" — wikipedia_en_summary: 'Massif de l'Esterel' exists and mentions region
+    [HARVEST] "Massif de l'Esterel": verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'Antibes Old Town': +3 passages (2 queries)
+    [INTERPRETIVE] 'Eze Village': +2 passages (2 queries)
+    [INTERPRETIVE] 'Cap Ferrat': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 3 stops enriched, +6 passages, 10 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #014 | 14:15:57.627 | PHASE_3B_REQUEST
+======================================================================
+  location: French Riviera biking tour
+  stop_count: 5
+
+PHASE 3B API call cost: $0.0009 (1083 tokens)
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: French, hint: auto)
+  [LOCAL-355] Antibes Old Town: no practical facts in OSM
+  [LOCAL-355] Eze Village: no practical facts in OSM
+  [LOCAL-355] La Croisette: no practical facts in OSM
+  [LOCAL-355] Cap Ferrat: no practical facts in OSM
+  [LOCAL-355] Massif de l'Esterel: no practical facts in OSM
+   GEO-CHECK: REMOVED 'Eze Village' — exceeds walking-tour distance limit
+   GEO-CHECK: 1 dispersed stop(s) removed; 4 remain
+   GEO-CHECK replacement: 1 stop(s) added; total now 5
+   GEO-CHECK: fetching coords for 1 replacement stop(s)...
+   GEO-CHECK coords OK 'Saint-Jean-Cap-Ferrat Peninsula Loop': 43.6944, 7.3076
+  [ROUTE-ORDER] Computed route for 5 stops with coords (0 without): 44.87km total
+
+PHASE 3B (re-order after GEO-CHECK): 5 stop(s)...
+PHASE 3B API call cost: $0.0009 (1077 tokens)
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+Extracted first POI coordinates: (43.6804, 7.3193)
+
+=== Extracted POI Information ===
+1. Cap Ferrat
+   Address: Saint-Jean-Cap-Ferrat, 06230 Villefranche-sur-Mer
+   Coordinates: 43.6804, 7.3193
+   Directions: Head southeast on the main road towards the coast, passing through charming coas...
+2. Saint-Jean-Cap-Ferrat Peninsula Loop
+   Address: Villefranche-sur-Mer, 06230, France
+   Coordinates: 43.6962, 7.3076
+   Directions: Follow the coastal road eastward, enjoying the sea breeze and occasional glimpse...
+3. Antibes Old Town
+   Address: 06600 Antibes, France
+   Coordinates: 43.5804, 7.1251
+   Directions: Cycle south towards Antibes, passing by scenic marinas and the scent of fresh se...
+4. La Croisette
+   Address: Boulevard de la Croisette, 06400 Cannes
+   Coordinates: 43.5499, 7.0174
+   Directions: Head southwest along the coast, catching glimpses of glamorous hotels and the sp...
+5. Massif de l'Esterel
+   Address: Massif de l'Esterel, 83700 Saint-Raphaël
+   Coordinates: 43.4599, 6.8651
+   Directions: Cycle westward into the rugged hills, surrounded by the scent of pine trees and ...
+================================
+
+  [D556] +5 story fact(s) for 'Cap Ferrat' via gemini (5 high)
+  [D556] +4 story fact(s) for 'Saint-Jean-Cap-Ferrat Peninsula Loop' via gemini (4 high)
+  [D556] +6 story fact(s) for 'Antibes Old Town' via gemini (5 high)
+  [D556] +5 story fact(s) for 'La Croisette' via gemini (4 high)
+  [D556] +5 story fact(s) for 'Massif de l'Esterel' via gemini (4 high)
+[TIMING] phase=poi_selection elapsed=296.6s cumulative=298.2s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Cap Ferrat French Riviera' → 9202 chars
+  [LOCAL-47] Cap Ferrat: tier=rich, facts=8
+  [LOCAL-47] Saint-Jean-Cap-Ferrat Peninsul: tier=medium, facts=3
+  [LOCAL-186] Disambiguated fetch hit: 'Antibes Old Town French Riviera' → 18034 chars
+  [LOCAL-47] Antibes Old Town: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'La Croisette French Riviera' → 28814 chars
+  [LOCAL-47] La Croisette: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Massif de l'Esterel French Riviera' → 1066 chars
+  [LOCAL-47] Massif de l'Esterel: tier=rich, facts=6
+  [LOCAL-37] Three-class retrieval: 5 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4, 'medium': 1}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=5)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=French Riviera biking tour model=gpt-4o tokens=1671 (in=883 out=788) cost=$0.0101 latency=7.0s
+[COST_METER] FRESH | spine_generate | $0.010087 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0101
+  [LOCAL-111] Spine quality: 2/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': False, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/5 stops have per-stop passages (14 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Cap Ferrat' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Saint-Jean-Cap-Ferrat Peninsula Loop' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Antibes Old Town' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='La Croisette' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Massif de l'Esterel' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture', 'history']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=17.8s cumulative=316.0s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=316.0s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=316.0s
+
+Generating description for Stop 1: Cap Ferrat by , ...
+
+Generating description for Stop 2: Saint-Jean-Cap-Ferrat Peninsula Loop by , ...
+
+Generating description for Stop 3: Antibes Old Town by , ...
+
+Generating description for Stop 4: La Croisette by , ...
+
+Generating description for Stop 5: Massif de l'Esterel by , ...
+  [LOCAL-381] stop='Saint-Jean-Cap-Ferrat Peninsula Loop' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Saint-Jean-Cap-Ferrat Peninsula Loop', 18, ''), ('Saint-Jean-Cap-Ferrat Peninsula Loop', 15, ''), ('Saint-Jean-Cap-Ferrat Peninsula Loop', 10, '')]
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-381] stop='La Croisette' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('La Croisette', 15, ''), ('La Croisette', 12, ''), ('La Croisette', 12, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13725 after=25923 (+12198 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25923)
+  [LOCAL-381] stop='Antibes Old Town' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Antibes Old Town', 16, ''), ('Antibes Old Town', 13, ''), ('Antibes Old Town', 8, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15284 after=25846 (+10562 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25846)
+  [LOCAL-381] stop='Massif de l'Esterel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [("Massif de l'Esterel", 17, ''), ("Massif de l'Esterel", 16, ''), ("Massif de l'Esterel", 14, '')]
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [LOCAL-411] Stop 5 prompt size: before_snippets=13450 after=20143 (+6693 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20143)
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13105 after=22807 (+9702 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22807)
+  [LOCAL-381] stop='Cap Ferrat' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cap Ferrat', 15, ''), ('Cap Ferrat', 15, ''), ('Cap Ferrat', 7, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=13182 after=22724 (+9542 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22724)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 4 API call cost: $0.0308 (6488 tokens, model=gpt-4o)
+Stop 4 description word count: 264 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0277 (5831 tokens, model=gpt-4o)
+Stop 1 description word count: 299 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 5 API call cost: $0.0255 (5364 tokens, model=gpt-4o)
+Stop 5 description word count: 273 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0277 (5823 tokens, model=gpt-4o)
+Stop 2 description word count: 279 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0307 (6464 tokens, model=gpt-4o)
+Stop 3 description word count: 277 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Cap Ferrat': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Saint-Jean-Cap-Ferrat Peninsula Loop': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✓ PASS stop='Antibes Old Town': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✓ PASS stop='La Croisette': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Massif de l'Esterel': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=3, deduction=1, total=5
+  [LOCAL-439] Classification cost: $0.000975 (input=4186, output=578)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 2: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 5 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 5 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 12 paragraphs retried, 8 fixed/improved, 4 kept original
+  [LOCAL-192] Retry cost: $0.0048 (5983 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Antibes Old Town': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 2 'Saint-Jean-Cap-Ferrat Peninsul': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] Stop 4 'La Croisette': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 2 'Saint-Jean-Cap-Ferrat Peninsul': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Cap Ferrat': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Saint-Jean-Cap-Ferrat Peninsul': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Antibes Old Town': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 5 'Massif de l'Esterel': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 7 sentences deleted, 2 paragraphs emptied, 4 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 14
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 10
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Cap Ferrat' conf=high reason='Generic claims about history, art, and relationships apply to any coastal viewpoint.': "Cap Ferrat is more than a picturesque stop on your biking tour; it is a place where history, art, and the intricacies of"
+    [LOCAL-472] REMOVED transferable paragraph stop='La Croisette' conf=high reason='Generic scene-setting applicable to any historic church.': "As you continue, the sun bathes the sea in a golden hue, highlighting the natural beauty surrounding this luxurious dest"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat' entity='Blanche Delacroix' reason='No concrete link to Cap Ferrat is provided.' in: "Cap Ferrat, also known as the "Billionaires' Peninsula," has long been a coveted retreat for the wea"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat' entity='Billionaires' Peninsula,' reason='No concrete link to Cap Ferrat is established.' in: "Cap Ferrat, also known as the "Billionaires' Peninsula," has long been a coveted retreat for the wea"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Jean-Cap-Ferrat Peninsula Loop' entity='King Leopold' reason='No concrete link to the stop is provided.' in: "In 1899, King Leopold II of Belgium began a scandalous affair with Blanche Zélia Joséphine Delacroix"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Jean-Cap-Ferrat Peninsula Loop' entity='Blanche Zélia Joséphine Delacroix' reason='No concrete link to the stop is provided.' in: "In 1899, King Leopold II of Belgium began a scandalous affair with Blanche Zélia Joséphine Delacroix"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Jean-Cap-Ferrat Peninsula Loop' entity='King Leopold II of' reason='No concrete link to the stop is provided.' in: "In 1899, King Leopold II of Belgium began a scandalous affair with Blanche Zélia Joséphine Delacroix"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Jean-Cap-Ferrat Peninsula Loop' entity='Béatrice de Rothschild' reason='No concrete link to the stop is provided.' in: "Invited for a mere week in 1950, Cocteau found himself entranced, remaining for twelve years. During"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Jean-Cap-Ferrat Peninsula Loop' entity='Maurice Ephrussi' reason='No concrete link to the stop is provided.' in: "Invited for a mere week in 1950, Cocteau found himself entranced, remaining for twelve years. During"
+    [LOCAL-472] UNGROUNDED entity stop='Antibes Old Town' entity='Free Commune' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "In the 1960s, the Safranier district declared itself a 'Free Commune,' complete with mock governance"
+    [LOCAL-472] UNGROUNDED entity stop='La Croisette' entity='La Belle Otero' reason='It does not specify how La Belle Otero is directly connected to La Croisette.' in: "Amidst the luxury hotels stands the Carlton, designed by Charles Dalmas in 1911. Its twin domes are "
+    [LOCAL-472] UNGROUNDED entity stop='Massif de l'Esterel' entity='Plage du Débarquement' reason='No concrete link between Abel Ballif and Plage du Débarquement is established.' in: "In more recent history, the massifs bore witness to the chaos of war. On August 15, 1944, Operation "
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/35)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 30
+    Glossed (composed): 12
+    Suppressed (already explained): 1
+    Degraded (name dropped): 13
+    Guard failures: 0
+    Known (skipped): 4
+    Triage: 3256 tokens, $0.0008, 12.9s
+    Gloss: 2114 tokens, $0.0005, 8.0s
+    Compose: 3333 tokens, $0.0006, 5.1s
+    Total added cost: $0.0019
+    Stops affected: 5
+    Glosses applied:
+      • King Leopold → DEGRADED (name dropped)
+      • King Leopold II of → "known for exploiting the Congo Free State" [source: model]
+      • Gerald Haxton → DEGRADED (name dropped)
+      • Alan Searle → DEGRADED (name dropped)
+      • Maugham → "had a complicated relationship with Liza" [source: model]
+      • Searle → DEGRADED (name dropped)
+      • Jean Cocteau → "a poet, playwright, and filmmaker" [source: model]
+      • Francine Weisweiller → "a socialite and art collector" [source: model]
+      • Villa Santo Sospir → SUPPRESSED (already explained)
+      • King Leopold → DEGRADED (name dropped)
+      • Blanche Zélia Joséphine Delacroix → DEGRADED (name dropped)
+      • King Leopold II of → "known for exploiting the Congo Free State" [source: model]
+      • Béatrice de Rothschild → DEGRADED (name dropped)
+      • Château Grimaldi → "picasso's personal art studio in 1946" [source: corpus]
+      • In May → DEGRADED (name dropped)
+      • Hôtel Martinez → "a luxury hotel in Cannes" [source: model]
+      • Hôtel Martinez when a labor strike caused a blackout → DEGRADED (name dropped)
+      • Prince Rainier → "the reigning monarch of Monaco" [source: model]
+      • Prince Rainier III → "known for marrying Grace Kelly" [source: model]
+      • Charles Dalmas → DEGRADED (name dropped)
+      • Gaspard Bouis → DEGRADED (name dropped)
+      • Mont Vinaigre → "the highest peak in the esterel massif" [source: model]
+      • Operation Dragoon → "the code name for the allied invasion" [source: model]
+      • Plage du Débarquement → DEGRADED (name dropped)
+      • Le Dramont → DEGRADED (name dropped)
+      • Infantry Division → "activated in 1917 for both world wars" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 4 'La Croisette': claim='1953 (in context: "In 1953, Brigitte Bardot sauntered onto t' contradicted_by='has been held annually since 1946. The first Cannes Film Festival was originally' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=4 claim='1953 (in context: "In 1953, Brigitte Bardot saunte' evidence='has been held annually since 1946. The first Canne' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'French Riviera'...
+   OK 'Saint-Jean-Cap-Ferrat Peninsula Loop' — inside 'French Riviera': [D578] part of the venue by construction (conf=high)
+   OK 'Antibes Old Town' — inside 'French Riviera': [D578] part of the venue by construction (conf=high)
+   OK 'La Croisette' — inside 'French Riviera': [D578] part of the venue by construction (conf=high)
+   OK 'Massif de l'Esterel' — inside 'French Riviera': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 5/5 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [1] DELETED: 'This union' in: This union, whispered about in hushed tones across Europe, speaks to the complex
+    [4] DELETED: 'This event' in: This event led her to meet Prince Rainier III, the reigning monarch of Monaco, s
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 4 'La Croisette' (index 36) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 5 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Cap Ferrat': the longest run (3 sentences, Somerset Maugham) has agency=1 stakes=0 — someone is described, but nothing is r
+    stop 2 'Saint-Jean-Cap-Ferrat Peninsula Loop': the longest run (3 sentences, Maurice Ephrussi) has agency=0 stakes=0 — someone is described, but nothing is r
+    stop 3 'Antibes Old Town': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'La Croisette': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 5 'Massif de l'Esterel': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Antibes Old Town' (index 21)
+  [D534] Stop 2 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: Then there was Jean Cocteau, a poet, playwright, and filmmaker, invited by Francine Weisweiller to V
+
+  [LOCAL-474] PHASE 5.17: retry 'Cap Ferrat' — 283w → 181w after gates, 12 sentence(s) removed
+    removed: "Cap Ferrat, also known as the "Billionaires' Peninsula," has long been a coveted retreat for the wea"
+    removed: "In the early 1900s, King Leopold II of Belgium, with his immense fortune from the Congo, acquired la"
+    removed: "This union, whispered about in hushed tones across Europe, speaks to the complex interweaving of pow"
+    removed: "By the 1960s, Cap Ferrat had evolved into a nexus of artistic and literary creativity."
+    removed: "Somerset Maugham, the celebrated writer, purchased Villa La Mauresque in 1927."
+    removed: "He lived openly with his younger partners, first Gerald Haxton, and later Alan Searle."
+    removed: "What began as a retreat for writing turned into a stage for personal dramas."
+    removed: "Maugham's legal maneuvering to disinherit his daughter, Liza, in favor of Searle was a public specta"
+    removed: "This act, as much as his literature, left an indelible mark on the villa and its stories."
+    removed: "Then there was Jean Cocteau, invited by Francine Weisweiller to Villa Santo Sospir in 1950 for a wee"
+    removed: "Cap Ferrat is more than a picturesque stop on your biking tour; it is a place where history, art, an"
+    removed: "As you glide around the cape, the peninsula's secrets start to whisper through the trees, inviting y"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Saint-Jean-Cap-Ferrat Peninsula Loop' — 256w → 155w after gates, 6 sentence(s) removed
+    removed: "The peninsula, a sanctuary of natural beauty and storied human endeavor, is graced with villas that "
+    removed: "In 1899, King Leopold II of Belgium began a scandalous affair with Blanche Zélia Joséphine Delacroix"
+    removed: "As you continue your journey, the legacy of Jean Cocteau emerges at Villa Santo Sospir, a place you "
+    removed: "During this prolonged stay, he adorned the villa with mythical drawings, transforming its walls into"
+    removed: "This peninsula, cradled by the sea and caressed by the mistral, is more than a picturesque loop; it "
+    removed: "As the path winds onward, it leads to Antibes, where the cobblestones of history await to reveal yet"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Antibes Old Town' — 255w → 79w after gates, 10 sentence(s) removed
+    removed: "Antibes, nestled between Cannes and Nice, holds a special place on the French Riviera with its rich "
+    removed: "In 1946, this town became a canvas for Pablo Picasso, who, constrained by a shortage of traditional "
+    removed: "Inside Château Grimaldi, Picasso applied marine boat enamel on industrial plywood, creating works th"
+    removed: "This choice wasn't a mere improvisation; it was a necessity born of post-war scarcity, but it led to"
+    removed: "With the ban on absinthe, local fishermen transformed these ancient spaces into conduits for contrab"
+    removed: "This illicit trade wasn't just about spirits; it was a defiant dance with authority."
+    removed: "Rumors speak of a 19th-century mayor who, caught storing these spirits beneath the marketplace, paci"
+    removed: "These stories of ingenuity and rebellion give Antibes its layered character, a place where the past "
+    removed: "The charm of Antibes Old Town is further enriched by its modern tales."
+    removed: "As you leave the old stones behind, the allure of modern glamour waits ahead in places like La Crois"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'La Croisette' — 264w → 82w after gates, 11 sentence(s) removed
+    removed: "The Croisette is renowned for its glitzy atmosphere, but it also boasts a rich tapestry of stories."
+    removed: "In May 1955, amidst the annual hubbub of the Cannes Film Festival, Grace Kelly found herself at the "
+    removed: "A labor strike plunged the hotel into darkness, leaving her in a wardrobe quandary."
+    removed: "This mishap, however, proved serendipitous."
+    removed: "It was during this time that she met Prince Rainier III, leading to a romance that would become one "
+    removed: "In 1953, Brigitte Bardot sauntered onto the Croisette sands clad in a bikini during the film festiva"
+    removed: "This moment not only changed the trajectory of Bardot's life but also redefined the region's identit"
+    removed: "Amidst the luxury hotels stands the Carlton, designed by Charles Dalmas in 1911."
+    removed: "Such stories are woven into the very fabric of this place, making it a living testament to the opule"
+    removed: "As you move along, the sun casts a golden hue over the sea, a reminder of the natural beauty that fr"
+    removed: "Beyond the city lights, the road leads towards the breathtaking vistas of the Esterel, promising ano"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Massif de l'Esterel' — 239w → 178w after gates, 7 sentence(s) removed
+    removed: "Its fiery red rhyolite rocks tell stories of an ancient world, once submerged beneath the sea."
+    removed: "This place has witnessed the passage of time and history, hosting figures like Gaspard Bouis, the in"
+    removed: "In the late 18th century, Bouis used the dense cover of Mont Vinaigre as a hideout."
+    removed: "On August 15, 1944, Operation Dragoon unfolded at Plage du Débarquement at Le Dramont, just a stone'"
+    removed: "Over 20,000 soldiers of the U.S. 36th "Texas" Infantry Division stormed the beaches, their boots imp"
+    removed: "As you stand here, the stories of the Esterel weave together—a tapestry of nature, history, and huma"
+    removed: "The road awaits, leading you back to the Riviera's gleaming shores, enriched by the tales etched int"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 5 eligible stop(s) concurrently (max_workers=5)
+
+Generating description for Stop 1: Cap Ferrat by , ...
+
+Generating description for Stop 2: Saint-Jean-Cap-Ferrat Peninsula Loop by , ...
+
+Generating description for Stop 3: Antibes Old Town by , ...
+
+Generating description for Stop 4: La Croisette by , ...
+
+Generating description for Stop 5: Massif de l'Esterel by , ...
+  [LOCAL-381] stop='Saint-Jean-Cap-Ferrat Peninsula Loop' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Saint-Jean-Cap-Ferrat Peninsula Loop', 18, ''), ('Saint-Jean-Cap-Ferrat Peninsula Loop', 15, ''), ('Saint-Jean-Cap-Ferrat Peninsula Loop', 10, '')]
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13105 after=22807 (+9702 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22807)
+  [LOCAL-381] stop='Cap Ferrat' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cap Ferrat', 15, ''), ('Cap Ferrat', 15, ''), ('Cap Ferrat', 7, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=13182 after=22724 (+9542 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22724)
+  [LOCAL-381] stop='Antibes Old Town' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Antibes Old Town', 16, ''), ('Antibes Old Town', 13, ''), ('Antibes Old Town', 8, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15284 after=25846 (+10562 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25846)
+  [LOCAL-381] stop='La Croisette' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('La Croisette', 15, ''), ('La Croisette', 12, ''), ('La Croisette', 12, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13725 after=25923 (+12198 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25923)
+  [LOCAL-381] stop='Massif de l'Esterel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [("Massif de l'Esterel", 17, ''), ("Massif de l'Esterel", 16, ''), ("Massif de l'Esterel", 14, '')]
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [LOCAL-411] Stop 5 prompt size: before_snippets=13450 after=20143 (+6693 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20143)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0303 (6382 tokens, model=gpt-4o)
+Stop 2 description word count: 247 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 5 API call cost: $0.0275 (5783 tokens, model=gpt-4o)
+Stop 5 description word count: 286 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 5: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 4 API call cost: $0.0335 (7055 tokens, model=gpt-4o)
+Stop 4 description word count: 295 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0338 (7123 tokens, model=gpt-4o)
+Stop 3 description word count: 303 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0304 (6396 tokens, model=gpt-4o)
+Stop 1 description word count: 268 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.9s for 5 stop(s) at max_workers=5
+    [LOCAL-474] regenerated and re-gated: 268w (was 181w)
+    [LOCAL-474] regenerated and re-gated: 247w (was 155w)
+    [LOCAL-474] regenerated and re-gated: 290w (was 79w)
+    [LOCAL-474] regenerated and re-gated: 295w (was 82w)
+    [LOCAL-474] regenerated and re-gated: 262w (was 178w)
+      [PERSON-CAP] stop 4: 'riviera' already carries two stops — cut: This promenade, now a cultural heritage site, is more than just a road; it's a l
+      [PERSON-CAP] stop 5: 'riviera' already carries two stops — cut: This engineering feat not only opened up this rugged landscape to travelers but 
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 5 eligible, 5 retried, 5 improved, 0 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 5 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/frenchrivieratraveltips/posts/907761758283095/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://marlameridith.com/pedaling-through-provence-french-riviera-with-backroads/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1396 chars from https://marlameridith.com/pedaling-through-provenc
+  [LOCAL-427] HTTP 200 from https://ciclismoclassico.com/tours/french-alps-to-french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1844 chars from https://ciclismoclassico.com/tours/french-alps-to-
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=50RBrrsHrG8 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.france-bike.com/en/biking-destinations/france/bike-tours-french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.france-bike.com/en/biking-destinations
+  [LOCAL-427] HTTP 200 from https://www.backroads.com/trips/BFRI-9/provence-french-riviera-bike-tour (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.backroads.com/trips/BFRI-9/provence-fr
+  [D512] verb discovery: query='French Riviera biking tour construction process how it was built' -> 3 new verb(s): opted, tapenade, unplugged
+  [D512] _AGENCY_VERB widened by 3 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Cap Ferrat                                 35    64    15    89
+     2  Saint-Jean-Cap-Ferrat Peninsula Loop       36    32    14    60
+     3  Antibes Old Town                           51    42    25    65
+     4  La Croisette                               43    59     0    77
+     5  Massif de l'Esterel                        65    51    12    77
+    [LOCAL-485] index mean 46.0 over 5 stop(s), range 35-65
+    [LOCAL-485] weakest: 'Cap Ferrat' at 35
+[TIMING] phase=story_first elapsed=142.3s cumulative=458.3s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (86 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 86 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 86 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 1 orientation: COLLAPSED — using fallback
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation: COLLAPSED — using fallback
+    Stop 4 orientation R7: 2 sentence(s) deleted
+    Stop 4 orientation: COLLAPSED — using fallback
+    Stop 5 orientation R7: 1 sentence(s) deleted
+    Stop 5 orientation R10: 1 sentence(s) deleted
+    Stop 5 orientation: COLLAPSED — using fallback
+  [LOCAL-246] Orientation gating summary:
+    Words before: 223
+    Words after:  45
+    Delta: -178
+    Stops affected: 5/5
+    Deletions (8):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you cycle into Cap Ferrat, the salty breeze from the Mediterranean Sea brushes against your skin,..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "The road narrows and dips, offering glimpses of turquoise waters before revealing the peninsula’s lu..."
+      [Stop 2][R7_HALLUCINATED_SENSORY] "This vantage point offers a sweeping view of the azure waters of the Mediterranean, a horizon that h..."
+      [Stop 3][R7_HALLUCINATED_SENSORY] "As you navigate the charming labyrinth of Antibes Old Town, pause by the Château Grimaldi, where the..."
+      [Stop 4][R7_HALLUCINATED_SENSORY] "Arriving at La Croisette, the transformation from a modest coastal path to a glittering boulevard be..."
+      [Stop 4][R7_HALLUCINATED_SENSORY] "Your position along this iconic promenade offers a view of both the Mediterranean's azure expanse an..."
+      [Stop 5][R7_HALLUCINATED_SENSORY] "As you cycle through the winding roads of the French Riviera, the Massif de l'Estérel rises dramatic..."
+      [Stop 5][R10_UNFULFILLED_PROMISE] "Pause at a vista point where the terrain unfurls in rugged splendor, the air tinged with the scent o..."
+  [LOCAL-246] ⚠️  WARNING: Orientation collapsed to 20% of original — listener may not know where to stand
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+    [LOCAL-276] Intrigue ranking completed: 2.9s, $0.0120, 1708 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [Cap Ferrat] (mystery): In 1900, he met Blanche Delacroix, a 16-year-old French courtesan, adding layers...
+      [Saint-Jean-Cap-Ferrat Peninsula Loop] (reversal): Seeking to secure his legacy, Maugham controversially attempted to adopt his sec...
+      [Antibes Old Town] (cause): In 1946, the illustrious Pablo Picasso found himself drawn to this locale, trans...
+      [La Croisette] (cause): In 1953, Brigitte Bardot made headlines when she appeared on the Croisette sands...
+      [Massif de l'Esterel] (cause): Conceived in 1901 by Abel Ballif, the first president of the Touring Club de Fra...
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+    Part 4 LLM cost: $0.0040 (675 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Cap Ferrat, you'll learn about the intriguing encounter between a 16-year-old French courtesan and a visitor in 1900. In Antibes Old Town, discover how Pablo Picasso transformed the Château Grimaldi into his personal art studio in 1946."
+      FAIL: date '1900' attributed to 'Antibes Old Town' but belongs to a different stop
+    Part 4 LLM cost: $0.0038 (664 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (29 words):
+      "As you journey through the upcoming stops, you'll learn about Maugham's attempt to adopt his secretary at Saint-Jean-Cap-Ferrat Peninsula Loop and Brigitte Bardot's iconic bikini appearance at La Croisette."
+      Stops referenced: 3
+    Part 4 total cost: $0.0077
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Start your ride from Cap Ferrat and pedal eastward along the...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: Pedal eastward from Saint-Jean-Cap-Ferrat Peninsula Loop, en...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: Hop on your bike and pedal down Avenue de Verdun towards the...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 5: Hey there! Starting from La Croisette, pedal west along the ...
+  DEBUG - POI 5 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.8s, $0.0026, 447 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Saint-Jean-Cap-Ferrat Peninsula Loop] (reversal): "Seeking to secure his legacy, Maugham controversially attempted to adopt his sec..."
+      → composed: "Saint-Jean-Cap-Ferrat Peninsula Loop, Maugham tried to adopt his secretary to secure legacy"
+    [Cap Ferrat] (mystery): "In 1900, he met Blanche Delacroix, a 16-year-old French courtesan, adding layers..."
+      → composed: "Cap Ferrat, meeting a 16-year-old French courtesan in 1900"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops and 47 kilometres — Saint-Jean-Cap-Ferrat Peninsula Loop, Maugham tried to adopt his secretary to secure legacy and Cap Ferrat, meeting a 16-year-old French courtesan in 1900."
+  [LOCAL-273] Part 1 (similar): Port Grimaud (31.1 km, verified in stop_corpus)
+  [LOCAL-275] Part 2 (museum fallback): Musee Picasso (24.9 km)
+  [D519] Treat Page: no treat within 1.0 km of any of 5 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (2756 chars of corpus checked)
+  [LOCAL-47] Capped 'French Riviera' from 6 to ≤2 occurrences
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 0
+    Dropped: 2
+    AUDIT: admission | Open 24/7, free to visit | (no source) | DROPPED — no source content
+    AUDIT: closed_day | Shops open 10am-7pm, museums closed on Mondays | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 2 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a cycling journey through the French Riviera. Pedaling from Cap Ferrat to..."
+  [2] "Amidst this natural spectacle, the Corniche d’Or weaves its tale. Conceived in 1901 by Abel Ballif, ..."
+
+=== Word Count Statistics ===
+Stop 1: Cap Ferrat - 299 words
+Stop 2: Saint-Jean-Cap-Ferrat Peninsula Loop - 279 words
+Stop 3: Antibes Old Town - 277 words
+Stop 4: La Croisette - 264 words
+Stop 5: Massif de l'Esterel - 273 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (12122 chars, 5/5 stops)
+  [LOCAL-540] defects seen: ['dangling_reference']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 2 dangling pronoun reference(s), e.g. "His presence here marked the beginning of the area's develop"
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 1) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1736 tokens, $0.008248 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference'] -> ['dangling_reference', 'thin']
+  [LOCAL-540] retry did NOT remove: ['dangling_reference'] — shipping with defect recorded (D577)
+
+Total API cost: $0.3454 (52890 tokens)
+Grounding:      $0.1750 (5 requests)
+Tour total:     $0.5204
+Provenance:     9/50 factual sentences sourced, 41 unsourced (9 corpus, 0 grounded, 41 parametric)
+CACHE STORE: French Riviera biking tour / biking / 5
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: French_Riviera_biking_tour_biking_tour_20261002_142315.txt
+  [C5-5] Evidence persisted: French_Riviera_biking_tour_biking_tour_20261002_142315_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: French Riviera biking tour
+Tour-Category: biking
+
+Stop 1: Cap Ferrat
+
+Address: Saint-Jean-Cap-Ferrat, 06230 Villefranche-sur-Mer
+
+Coordinates: 43.6804, 7.3193
+
+Type/Specialty: Scenic coastal spot
+
+Specific Examples: Cliffside views, historic villas, Mediterranean gardens
+
+Orientation: You are about to embark on a cycling journey through the French Riviera. Pedaling from Cap Ferrat to the Massif de l'Esterel, spanning approximately 47 kilometers of coastal landscap...
+
+[TIMING] phase=packing elapsed=16.3s cumulative=474.6s
+[TIMING] phase=verification elapsed=0.0s cumulative=474.6s
+[TIMING] TOTAL wall=474.6s phases: poi_selection=296.6s, story_first=142.3s, fact_sheets=17.8s, packing=16.3s, intent=1.7s, narration=0.0s, external_lookups=0.0s, verification=0.0s

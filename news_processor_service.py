@@ -229,7 +229,7 @@ def process_audio(article_id):
         
         # Get article and major points from database
         cursor.execute("""
-            SELECT article_text, request_string, major_points, article_type 
+            SELECT article_text, request_string, major_points, article_type, secret_id
             FROM article_requests 
             WHERE article_id = %s AND status = 'ready'
         """, (article_id,))
@@ -238,7 +238,7 @@ def process_audio(article_id):
         if not result:
             return jsonify({"error": "Article not found or not ready"}), 404
         
-        article_text, request_string, major_points_json, article_type = result
+        article_text, request_string, major_points_json, article_type, secret_id = result
         article_type = article_type or 'Others'  # Default if None
         
         # Decode article text
@@ -372,8 +372,28 @@ def process_audio(article_id):
             else:
                 logging.info(f"Title has {title_words} words (≤12), no short title needed")
             
+            # ── [LOCAL-193] Article text truncation for display ───────────────
+            # Truncate full_text for the HTML (what the user reads) at tier limit.
+            # TTS audio (audio-99 above) uses the ORIGINAL full_text — it has its
+            # own 5,000-char cap in clean_text_for_polly(), so no double-truncation.
+            # Search content also uses original (for full-text search quality).
+            try:
+                from article_truncation import truncate_for_user
+                display_text, was_truncated, truncation_rule = truncate_for_user(full_text, secret_id or '')
+                if was_truncated:
+                    logging.info(
+                        f"[LOCAL-193] Article truncated for display: "
+                        f"original={len(full_text)} → display={len(display_text)} | "
+                        f"rule={truncation_rule} | user={secret_id}"
+                    )
+            except Exception as trunc_err:
+                # Truncation is non-fatal — if it fails, show full text (fail open for display)
+                logging.warning(f"[LOCAL-193] Truncation failed (showing full text): {trunc_err}")
+                display_text = full_text
+            # ── end truncation ──────────────────────────────────────────────────
+
             # Create HTML file with all audio files
-            html_content = create_news_html_with_points(summary_text, full_text, request_string, major_points, audio_files)
+            html_content = create_news_html_with_points(summary_text, display_text, request_string, major_points, audio_files)
             html_path = os.path.join(temp_dir, "index.html")
             with open(html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)

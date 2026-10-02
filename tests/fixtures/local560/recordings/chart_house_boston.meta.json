@@ -1,0 +1,64 @@
+{
+  "slug": "chart_house_boston",
+  "location": "restaurant tour of Chart House, Boston, MA",
+  "tour_type": "restaurant",
+  "stops": 4,
+  "wall_s": 439.1,
+  "chars": 10478,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 107,
+  "cost_record": {
+    "total_cost": 0.25770335,
+    "total_tokens": 39241,
+    "cache_hit": false,
+    "grounding_cost": 0.45500000000000007,
+    "grounding_requests": 13,
+    "tour_total_cost": 0.7127033500000001,
+    "breakdown": {
+      "llm": 0.25770335,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.45500000000000007
+    },
+    "provenance": {
+      "sourced": 5,
+      "unsourced": 39,
+      "total": 44,
+      "corpus": 5,
+      "grounded": 0,
+      "parametric": 39
+    },
+    "score": {
+      "defects_before": {
+        "dangling_reference": "2 dangling pronoun reference(s), e.g. 'He frequented Booth #18, now permanently dedicated to his me'"
+      },
+      "defects_after": {
+        "thin": "3/4 stops delivered",
+        "dangling_reference": "1 dangling pronoun reference(s), e.g. 'His forced return to the South under President Franklin Pier'"
+      },
+      "removed": [],
+      "remaining": [
+        "dangling_reference"
+      ],
+      "retried": true,
+      "clean_after": false,
+      "retry_cost": {
+        "total_cost": 0.0069975,
+        "total_tokens": 1473
+      },
+      "cost_without_retry": {
+        "total_cost": 0.250706,
+        "total_tokens": 37768
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 3,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

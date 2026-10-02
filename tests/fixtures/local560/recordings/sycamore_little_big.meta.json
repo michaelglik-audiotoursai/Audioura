@@ -1,0 +1,61 @@
+{
+  "slug": "sycamore_little_big",
+  "location": "Dinner at Sycamore and Little Big Diner in Newton Centre, MA",
+  "tour_type": "restaurant",
+  "stops": 4,
+  "wall_s": 309.0,
+  "chars": 9452,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 104,
+  "cost_record": {
+    "total_cost": 0.22730685000000003,
+    "total_tokens": 35186,
+    "cache_hit": false,
+    "grounding_cost": 0.42000000000000004,
+    "grounding_requests": 12,
+    "tour_total_cost": 0.6473068500000001,
+    "breakdown": {
+      "llm": 0.22730685000000003,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.42000000000000004
+    },
+    "provenance": {
+      "sourced": 5,
+      "unsourced": 26,
+      "total": 31,
+      "corpus": 5,
+      "grounded": 0,
+      "parametric": 26
+    },
+    "score": {
+      "defects_before": {
+        "unsourced_person_event": "1 unsourced person-event(s); \"Before Sycamore\" placed here in 2012 with no source: \"Before Sycamore's opening in late 2012, the prevailing wisdom was that high-end dining wouldn't last here.\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "1 unsourced person-event(s); \"Before Sycamore\" placed here in 2012 with no source: \"Before Sycamore's opening in late 2012, the prevailing wisdom was that high-end dining wouldn't last here.\""
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.227307,
+        "total_tokens": 35186
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 3,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

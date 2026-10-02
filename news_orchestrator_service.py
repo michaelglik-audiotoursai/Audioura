@@ -261,6 +261,101 @@ def generate_news():
         # Generate unique article ID
         article_id = str(uuid.uuid4())
         
+        # ── NEWS CACHE CHECK ────────────────────────────────────────────────
+        # Before paying for generation, check if identical content is already cached.
+        # Cache key = SHA256(normalized_article_text | major_points_count).
+        # Matches tour_cache_layer1 pattern: check → hit → meter at $0.00 → return.
+        _cache_hit = False
+        _cached_article_id = None
+        try:
+            _db_url = f"postgresql://{os.getenv('DB_USER', 'admin')}:{os.getenv('DB_PASSWORD', 'password123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5433')}/{os.getenv('DB_NAME', 'audiotours')}"
+            from news_cache_layer1 import get_cached_news
+            _cache_result = get_cached_news(article_text, major_points_count, _db_url)
+            if _cache_result is not None:
+                _cached_article_id, _cached_audio = _cache_result
+                _cache_hit = True
+                logging.info(f"[NEWS_CACHE] HIT — reusing article_id={_cached_article_id} for request from {secret_id}")
+        except Exception as _cache_err:
+            # D14: instrumentation fails open — cache miss does not block generation
+            logging.warning(f"[NEWS_CACHE] Check failed (proceeding without cache): {_cache_err}")
+        
+        if _cache_hit:
+            # ── CACHE HIT PATH ──────────────────────────────────────────────
+            # Meter at $0.00 with cache_hit=true, matching the tour path.
+            try:
+                from cost_meter import record_operation
+                from cost_rates import CACHE_HIT_COST_USD
+                record_operation(
+                    operation_type="news_cache_hit",
+                    our_cost_usd=CACHE_HIT_COST_USD,
+                    cache_hit=True,
+                    user_id=secret_id,
+                    job_id=_cached_article_id,
+                    breakdown={"tts": 0.0, "llm": 0.0, "source": "news_cache"},
+                )
+                logging.info(f"[COST_METER] CACHE_HIT | news_cache_hit | $0.00 | user={secret_id} | job={_cached_article_id}")
+            except Exception as _meter_err:
+                # D14: instrumentation fails open
+                logging.warning(f"[NEWS_CACHE] Metering failed (non-fatal): {_meter_err}")
+
+            # [LOCAL-201] Cache-hit charging (D45 extended): charge user same as fresh.
+            # Basis comes from the original cost_ledger row. None → $0.00 (safe).
+            # Idempotency key: charge:{user}:{article_id} — same as fresh path.
+            # Retry of the same request with same article_id is a no-op in wallet.
+            if secret_id and secret_id != 'anonymous' and not is_trusted_internal:
+                try:
+                    from cost_meter import lookup_fresh_cost_for_cache_hit as _lookup_basis
+                    from pricing import compute_user_charge as _compute_charge
+                    from wallet_ledger import charge as _wallet_charge
+                    from entitlements import _get_subscription_tier
+
+                    _fresh_basis = _lookup_basis(_cached_article_id, "news_cache_hit")
+                    _charge_result = _compute_charge(
+                        our_cost_usd=0.00,
+                        cache_hit=True,
+                        operation_type="news_cache_hit",
+                        fresh_cost_usd=_fresh_basis,
+                        description=f"Article: {request_string[:200] if 'request_string' in dir() else 'news'}",
+                    )
+
+                    _user_tier = _get_subscription_tier(secret_id)
+                    if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                        _charge_idem_key = f"charge:{secret_id}:{_cached_article_id}"
+                        _row_id, _new_bal, _was_stopped = _wallet_charge(
+                            user_id=secret_id,
+                            charge_usd=_charge_result['user_charge_usd'],
+                            idempotency_key=_charge_idem_key,
+                            description=_charge_result['description'] + f" — ${_charge_result['user_charge_usd']:.2f}",
+                            job_id=_cached_article_id,
+                        )
+                        if _was_stopped:
+                            logging.error(
+                                f"[LOCAL-201] NEWS CACHE-HIT CHARGE BLOCKED (zero balance) for {secret_id} article={_cached_article_id}"
+                            )
+                            return jsonify({
+                                "error": "insufficient_balance",
+                                "message": "Insufficient balance. Please top up your credits.",
+                            }), 402
+                        logging.info(
+                            f"[LOCAL-201] News cache-hit charged: ${_charge_result['user_charge_usd']:.2f} | "
+                            f"basis=${_fresh_basis or 0:.4f} | balance={_new_bal}¢ | user={secret_id} | article={_cached_article_id}"
+                        )
+                    else:
+                        logging.info(
+                            f"[LOCAL-201] News cache-hit no charge: basis={_fresh_basis} | tier={_user_tier} | user={secret_id}"
+                        )
+                except Exception as _cache_charge_err:
+                    # Cache-hit charging fails OPEN — content already exists, not new work.
+                    logging.warning(f"[LOCAL-201] News cache-hit charging failed (non-fatal): {_cache_charge_err}")
+
+            return jsonify({
+                "status": "success",
+                "article_id": _cached_article_id,
+                "message": "News article served from cache",
+                "cache_hit": True
+            })
+        # ── END CACHE CHECK ─────────────────────────────────────────────────
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -332,10 +427,161 @@ def generate_news():
         
         logging.info(f'News generation completed successfully for {article_id}')
         
+        # ── CACHE STORE ──────────────────────────────────────────────────────
+        # Store the freshly generated article in the cache for future hits.
+        try:
+            _db_url = f"postgresql://{os.getenv('DB_USER', 'admin')}:{os.getenv('DB_PASSWORD', 'password123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5433')}/{os.getenv('DB_NAME', 'audiotours')}"
+            from news_cache_layer1 import store_news
+            store_news(
+                article_text=article_text,
+                major_points_count=major_points_count,
+                article_id=article_id,
+                db_url=_db_url,
+                request_string=request_string,
+                content_length=len(article_text),
+            )
+        except Exception as _store_err:
+            # D14: instrumentation fails open — cache store failure does not block response
+            logging.warning(f"[NEWS_CACHE] Store failed (non-fatal): {_store_err}")
+        # ── END CACHE STORE ─────────────────────────────────────────────────
+        
+        # ── [LOCAL-69] Meter news generation cost ───────────────────────────
+        # Cost model (verified by code trace):
+        #   - Polly TTS: multiple segments (summary, topics, per-topic, help, full article)
+        #     All text passes through clean_text_for_polly() which truncates to 5000 chars/segment.
+        #   - LLM (GPT-3.5-turbo): conditional short-title generation when title > 12 words
+        #     via voice_control → voice_nlp_service → OpenAI API (~60 tokens max).
+        #   - No search API cost (article text arrives pre-extracted).
+        #
+        # TTS character estimate: we know article_text length. The processor generates:
+        #   audio_1 (summary ~200 chars), audio-topics (topics list ~300 chars),
+        #   per-topic audios (N × ~300 chars), audio-help (fixed ~700 chars),
+        #   audio-99 (full article, capped at 5000 chars by clean_text_for_polly).
+        # Conservative estimate: min(article_text_chars * 1.2, 5000 + N*500 + 1200)
+        # Simplification: use article_text length as the TTS input proxy.
+        try:
+            from cost_meter import record_operation
+            from cost_rates import tts_cost, llm_cost, POLLY_COST_PER_CHAR
+
+            # Use original request_string for Wallet display (before generator overwrites it).
+            # Falls back to the generator's extracted title if request_string was generic.
+            _display_title = request_string if request_string and request_string != 'News Article' else "News Article"
+
+            # TTS cost: the processor sends cleaned text through Polly.
+            # Each segment is capped at 5000 chars. Segments: summary, topics list,
+            # N topic audios, help commands (~700 fixed), full article (capped 5000).
+            # Best proxy: take the original article length (before cleaning removes ~20%),
+            # cap at what Polly actually processes. Total TTS chars ≈ article_text * 1.5
+            # (summary + topics + full article overlap). But full article is capped at 5000.
+            _tts_chars = min(len(article_text), 5000) + 1200  # full article cap + overhead (summary + help)
+            if major_points_count > 0:
+                _tts_chars += major_points_count * 400  # topics list + per-topic audio
+            _tts_cost = tts_cost(_tts_chars)
+
+            # LLM cost: short title generation only fires when title > 12 words.
+            # We check the original request_string — if the generator finds a longer
+            # title, it may also trigger LLM, but we can't know until after processing.
+            # Use article text word count as proxy for title length post-extraction.
+            _title_words = len(_display_title.split()) if _display_title else 0
+            _llm_cost = 0.0
+            if _title_words > 12:
+                # GPT-3.5-turbo, ~100 tokens prompt + ~60 tokens response
+                _llm_cost = llm_cost(total_tokens=160)  # deprecated path; ~160 total tokens
+
+            _total_cost = _tts_cost + _llm_cost
+            _breakdown = {"tts": round(_tts_cost, 6), "llm": round(_llm_cost, 6)}
+
+            # Human-readable description for Wallet display
+            _description = f"Article: {_display_title[:200]}"
+
+            record_operation(
+                operation_type="news_generate",
+                our_cost_usd=_total_cost,
+                cache_hit=False,
+                user_id=secret_id,
+                job_id=article_id,
+                breakdown=_breakdown,
+                description=_description,
+            )
+            logging.info(
+                f"[LOCAL-69] News cost metered: ${_total_cost:.6f} | "
+                f"tts=${_tts_cost:.6f} ({_tts_chars} chars) | llm=${_llm_cost:.6f} | "
+                f"article={article_id} | user={secret_id}"
+            )
+        except Exception as _meter_err:
+            # Metering is instrumentation — fails open (D14 rule).
+            logging.error(f"[LOCAL-69] News cost metering failed (non-fatal): {_meter_err}")
+        # ── end metering ────────────────────────────────────────────────────
+
+        # ── [LOCAL-83] Charge the user's wallet — SEPARATE try block, FAILS CLOSED.
+        # This is a billing control (D14): if charging fails, do NOT deliver.
+        # Do NOT share an exception handler with cost metering above.
+        # Idempotency: use article_id as the key — a retried generation charges once.
+        if secret_id and secret_id != 'anonymous' and not is_trusted_internal:
+            try:
+                from pricing import compute_user_charge as _compute_charge
+                from wallet_ledger import charge as _wallet_charge, record_unlimited_cost as _record_unlimited
+                from entitlements import _get_subscription_tier
+
+                _user_tier = _get_subscription_tier(secret_id)
+
+                # Reuse _total_cost from metering above (or default 0 if metering failed)
+                _news_cost = _total_cost if '_total_cost' in dir() else 0.0
+
+                _charge_result = _compute_charge(
+                    our_cost_usd=_news_cost,
+                    cache_hit=False,
+                    operation_type="news_generate",
+                    description=_description if '_description' in dir() else f"Article: {request_string[:200]}",
+                )
+
+                if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                    _charge_idem_key = f"charge:{secret_id}:{article_id}"
+                    _row_id, _new_bal, _was_stopped = _wallet_charge(
+                        user_id=secret_id,
+                        charge_usd=_charge_result['user_charge_usd'],
+                        idempotency_key=_charge_idem_key,
+                        description=f"Article: {request_string[:200]} — ${_charge_result['user_charge_usd']:.2f}",
+                        job_id=article_id,
+                    )
+                    if _was_stopped:
+                        logging.error(
+                            f"[LOCAL-83] CHARGE BLOCKED (zero balance) for {secret_id} article={article_id}"
+                        )
+                        return jsonify({
+                            "error": "insufficient_balance",
+                            "message": "Insufficient balance to complete this article. Please top up your credits.",
+                        }), 402
+
+                    logging.info(
+                        f"[LOCAL-83] PPU charged: ${_charge_result['user_charge_usd']:.2f} | "
+                        f"balance={_new_bal}¢ | user={secret_id} | article={article_id}"
+                    )
+
+                elif _user_tier == 'unlimited':
+                    from decimal import Decimal as _Dec
+                    _record_unlimited(secret_id, _Dec(str(_news_cost)))
+                    logging.info(
+                        f"[LOCAL-83] Unlimited cost recorded: ${_news_cost:.6f} | user={secret_id} | article={article_id}"
+                    )
+
+                # free tier: no wallet action needed
+            except Exception as _charge_err:
+                # FAIL CLOSED (D14): charging failed — do NOT deliver unbilled article.
+                logging.error(
+                    f"[LOCAL-83] CHARGING FAILED — aborting news delivery (fail-closed): {_charge_err}"
+                )
+                return jsonify({
+                    "error": "billing_unavailable",
+                    "message": f"Billing unavailable ({type(_charge_err).__name__}). Article not delivered.",
+                }), 503
+        # ── end charging ────────────────────────────────────────────────────
+
         return jsonify({
             "status": "success",
             "article_id": article_id,
-            "message": "News article processed successfully"
+            "message": "News article processed successfully",
+            "cache_hit": False
         })
         
     except Exception as e:

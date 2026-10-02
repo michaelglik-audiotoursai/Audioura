@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY translation_service.py blobstorage.py build_manifest.py ./
+COPY translation_service.py blobstorage.py build_manifest.py cost_rates.py ./
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

@@ -10,22 +10,139 @@ import zipfile
 import io
 import re
 import uuid
+import time
+import threading
 import psycopg2
 import logging
+import requests
 from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 from bs4 import BeautifulSoup, NavigableString
 
+# [LOCAL-559] Centralised cost rates (gpt-4o-mini input/output per 1M tokens).
+try:
+    import cost_rates
+except ImportError:  # pragma: no cover - cost_rates lives at repo root; present in the image
+    cost_rates = None
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
+class TranslationArtifactError(Exception):
+    """Raised when a translation cannot produce a valid downloadable artifact.
+
+    The caller MUST treat this as a hard failure: no translation row is inserted,
+    and the HTTP endpoint returns a non-200 response with error code
+    TRANSLATION_ARTIFACT_FAILED. This prevents the historic bug (GCS-TR1) where an
+    artifact-less row was inserted and then 404'd from map-delivery/download-tour.
+    """
+    error_code = "TRANSLATION_ARTIFACT_FAILED"
+
+
 class TranslationService:
+    # [LOCAL-559] Chunk boundary: texts longer than this are split on blank lines
+    # (paragraph boundaries) and translated piecewise, then rejoined in order.
+    # Applies to BOTH engines so neither silently truncates (the old AWS path sent
+    # Text=text[:5000] and dropped everything past 5,000 characters).
+    _CHUNK_THRESHOLD_CHARS = 4500
+    # AWS Translate hard limit is 10,000 bytes per request; keep a safe ceiling.
+    _AWS_MAX_CHARS = 9000
+
+    # [LOCAL-559] LLM engine defaults.
+    _LLM_MODEL = os.getenv('TRANSLATION_LLM_MODEL', 'gpt-4o-mini')
+    _LLM_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
+    _LLM_TIMEOUT = int(os.getenv('TRANSLATION_LLM_TIMEOUT', '60'))
+
+    # [LOCAL-561] Guidebook pipeline models. The names pass needs world knowledge
+    # (established exonyms, Wikipedia forms) so it uses the stronger gpt-4o; the prose
+    # pass is high-volume and well-steered by the glossary + style rules, so it uses the
+    # cheap gpt-4o-mini. Both default sensibly and are overridable per deployment.
+    _NAMES_MODEL = os.getenv('TRANSLATION_NAMES_MODEL', 'gpt-4o')
+    _PROSE_MODEL = os.getenv('TRANSLATION_PROSE_MODEL', 'gpt-4o-mini')
+    # [LOCAL-561] Guidebook pipeline is opt-in within the llm engine. When off (default),
+    # the llm engine behaves exactly as LOCAL-559R. When on AND engine==llm, the tour path
+    # does structure-by-code + a gpt-4o names glossary + gpt-4o-mini guidebook prose.
+    _GUIDEBOOK = os.getenv('TRANSLATION_GUIDEBOOK', 'on').strip().lower() in ('1', 'on', 'true', 'yes')
+    # Sane bounds for the LLM output length ratio (translated_len / source_len).
+    # Outside this range the output is almost certainly wrong (truncated, refused,
+    # or hallucinated) and we fall back to AWS for that call.
+    _LLM_RATIO_MIN = 0.5
+    _LLM_RATIO_MAX = 2.5
+
+    # Human-readable language names for the LLM system prompt.
+    _LANGUAGE_NAMES = {
+        'es': 'Spanish', 'fr': 'French', 'de': 'German', 'ru': 'Russian',
+        'zh': 'Chinese', 'ko': 'Korean', 'ja': 'Japanese', 'it': 'Italian',
+        'pt': 'Portuguese', 'ar': 'Arabic', 'hi': 'Hindi', 'nl': 'Dutch',
+        'pl': 'Polish', 'tr': 'Turkish', 'uk': 'Ukrainian', 'he': 'Hebrew',
+    }
+
+    # [LOCAL-561] STRUCTURE BY CODE. Fixed structural labels are translated by this
+    # dictionary, never by the model (gpt-4o-mini drifted to «Стоп 1» and left Spanish
+    # "Orientation:"/"Directions:" in English — a native-looking guidebook needs these
+    # exactly right in every language). 'stop' is a format string taking the stop number;
+    # 'orientation'/'directions' are the spoken label words (no trailing colon). These are
+    # the forms a native guidebook / wayfinding sign uses, not a literal gloss.
+    _STRUCTURE_LABELS = {
+        'es': {'stop': 'Parada {n}', 'orientation': 'Orientación', 'directions': 'Cómo llegar'},
+        'fr': {'stop': 'Arrêt {n}',  'orientation': 'Orientation', 'directions': 'Itinéraire'},
+        'de': {'stop': 'Station {n}', 'orientation': 'Orientierung', 'directions': 'Wegbeschreibung'},
+        'ru': {'stop': 'Остановка {n}', 'orientation': 'Как сориентироваться', 'directions': 'Как пройти'},
+        'it': {'stop': 'Tappa {n}',  'orientation': 'Orientamento', 'directions': 'Come arrivare'},
+        'pt': {'stop': 'Parada {n}', 'orientation': 'Orientação', 'directions': 'Como chegar'},
+        'zh': {'stop': '第 {n} 站',   'orientation': '方位',       'directions': '路线'},
+        'ko': {'stop': '{n}번 정류장', 'orientation': '방향 안내',  'directions': '가는 길'},
+        'ja': {'stop': '第{n}スポット', 'orientation': '方角',      'directions': '道順'},
+        'nl': {'stop': 'Halte {n}',  'orientation': 'Oriëntatie', 'directions': 'Route'},
+        'pl': {'stop': 'Przystanek {n}', 'orientation': 'Orientacja', 'directions': 'Jak dojść'},
+        'tr': {'stop': 'Durak {n}',  'orientation': 'Yön',        'directions': 'Yol tarifi'},
+        'uk': {'stop': 'Зупинка {n}', 'orientation': 'Орієнтування', 'directions': 'Як дійти'},
+        'ar': {'stop': 'المحطة {n}', 'orientation': 'الاتجاه',    'directions': 'كيفية الوصول'},
+        'hi': {'stop': 'पड़ाव {n}',   'orientation': 'दिशा',       'directions': 'कैसे पहुँचें'},
+        'he': {'stop': 'תחנה {n}',   'orientation': 'התמצאות',    'directions': 'איך להגיע'},
+    }
+
+    # [LOCAL-559] Voice-command phrases that must remain English in article text so the
+    # mobile voice controls keep matching. Shared by the LLM prompt and the AWS post-pass.
+    _VOICE_COMMANDS = [
+        "Play", "Pause", "Next topic", "Previous topic", "Repeat",
+        "Forward 10 seconds", "Backward 5 seconds", "Play topic",
+        "Play summary", "Play full article", "List major topics",
+        "Next article", "Previous article", "What are my options"
+    ]
+
     def __init__(self):
         self.translate_client = boto3.client('translate', region_name='us-east-1')
         self.polly_client = boto3.client('polly', region_name='us-east-1')
         self.executor = ThreadPoolExecutor(max_workers=5)
-        
+        # [LOCAL-559] Translation engine selector. Default 'aws' keeps today's
+        # behaviour so nothing deployed changes until TRANSLATION_ENGINE=llm is set.
+        self.translation_engine = os.getenv('TRANSLATION_ENGINE', 'aws').strip().lower()
+        if self.translation_engine not in ('aws', 'llm'):
+            logging.warning(
+                f"[TRANSLATE] Unknown TRANSLATION_ENGINE={self.translation_engine!r}; defaulting to 'aws'"
+            )
+            self.translation_engine = 'aws'
+        self._openai_api_key = os.getenv('OPENAI_API_KEY', '')
+        # [LOCAL-559] In-process memo of identical (text, language) pairs. The HTML/ZIP
+        # paths translate the same fragments (names, labels, repeated stops) repeatedly;
+        # memoising avoids paying for them twice within a process.
+        self._translation_memo = {}
+        self._memo_lock = threading.Lock()
+        # [LOCAL-559] Per-process LLM cost accumulator and a per-tour counter the tour
+        # path resets at the start of each translation to report a per-tour total.
+        self._llm_cost_total = 0.0
+        self._llm_tour_cost = 0.0
+        # [LOCAL-559R] Stops are now translated concurrently (bounded pool), so the
+        # cost accumulators are mutated from worker threads — guard them with a lock.
+        self._cost_lock = threading.Lock()
+        # [LOCAL-561] Per-(tour, language) names glossary cache: {source name -> target
+        # name}. Built once per tour by one gpt-4o call, then reused by every stop's
+        # prose pass. Keyed (tour_id, language). Guarded by _memo_lock.
+        self._glossary_cache = {}
+
     def get_db_connection(self):
         return psycopg2.connect(
             host=os.getenv('DB_HOST', 'development-postgres-2-1'),
@@ -137,36 +254,406 @@ class TranslationService:
             return '\n'.join(english_lines + clean_body)
 
     def translate_text(self, text, target_language, preserve_voice_commands=False):
-        """Translate text using AWS Translate with optional voice command preservation"""
-        if target_language == 'en':
+        """Translate text, dispatching on the TRANSLATION_ENGINE flag.
+
+        [LOCAL-559]
+          * engine 'aws'  (DEFAULT): AWS Translate — today's behaviour.
+          * engine 'llm'          : OpenAI gpt-4o-mini, with AWS fallback per call.
+
+        Neither engine truncates: input over ~4,500 chars is split on blank lines
+        (paragraph boundaries), each chunk translated, and the pieces rejoined in
+        order. This fixes the live defect where the AWS path sent Text=text[:5000]
+        and silently dropped everything past 5,000 characters.
+
+        Results are memoised per (text, language, engine) within the process, so the
+        HTML/ZIP paths do not pay to translate the same fragment twice.
+        """
+        if target_language == 'en' or text is None or text == '':
             return text
-            
-        try:
-            response = self.translate_client.translate_text(
-                Text=text[:5000],  # AWS limit
-                SourceLanguageCode='en',
-                TargetLanguageCode=target_language
+
+        engine = self.translation_engine
+        memo_key = (engine, target_language, bool(preserve_voice_commands), text)
+        with self._memo_lock:
+            if memo_key in self._translation_memo:
+                return self._translation_memo[memo_key]
+
+        translated = self._translate_dispatch(text, target_language, preserve_voice_commands, engine)
+
+        with self._memo_lock:
+            self._translation_memo[memo_key] = translated
+        return translated
+
+    def _translate_dispatch(self, text, target_language, preserve_voice_commands, engine):
+        """Chunk if needed, then run the selected engine on each chunk."""
+        chunks = self._split_for_translation(text)
+        if len(chunks) > 1:
+            logging.info(
+                f"[TRANSLATE] Split {len(text)} chars into {len(chunks)} chunk(s) "
+                f"(engine={engine}, lang={target_language}) — no truncation"
             )
-            translated_text = response['TranslatedText']
-            
-            # Preserve English voice commands if requested
+        out_parts = []
+        for chunk in chunks:
+            if engine == 'llm':
+                out_parts.append(self._translate_text_llm(chunk, target_language, preserve_voice_commands))
+            else:
+                out_parts.append(self._translate_text_aws(chunk, target_language, preserve_voice_commands))
+        # Chunks were split on the blank line between paragraphs; rejoin with the
+        # same separator so the paragraph structure (and line count) is preserved.
+        return '\n\n'.join(out_parts)
+
+    def _split_for_translation(self, text):
+        """Split text into translate-sized chunks on blank lines (paragraph breaks).
+
+        [LOCAL-559] Returns a list of chunks each <= _CHUNK_THRESHOLD_CHARS where
+        possible. Short texts return as a single-element list (no behavioural change).
+        A single paragraph longer than the threshold is kept whole here (so we never
+        break a line mid-way and change the line count); the AWS engine additionally
+        guards the 10k-byte hard limit by line-splitting such giants.
+        """
+        if len(text) <= self._CHUNK_THRESHOLD_CHARS:
+            return [text]
+        paragraphs = text.split('\n\n')
+        chunks = []
+        current = []
+        current_len = 0
+        for para in paragraphs:
+            para_len = len(para) + 2  # account for the '\n\n' separator
+            if current and current_len + para_len > self._CHUNK_THRESHOLD_CHARS:
+                chunks.append('\n\n'.join(current))
+                current = [para]
+                current_len = para_len
+            else:
+                current.append(para)
+                current_len += para_len
+        if current:
+            chunks.append('\n\n'.join(current))
+        return chunks
+
+    def _translate_text_aws(self, text, target_language, preserve_voice_commands=False):
+        """AWS Translate for a single chunk. No truncation: a chunk still larger than
+        the AWS per-request limit is split further on single newlines and rejoined."""
+        try:
+            if len(text) > self._AWS_MAX_CHARS:
+                # Preserve every character: split on single newlines, translate, rejoin.
+                lines = text.split('\n')
+                buf, buf_len, pieces = [], 0, []
+                for ln in lines:
+                    if buf and buf_len + len(ln) + 1 > self._AWS_MAX_CHARS:
+                        pieces.append('\n'.join(buf))
+                        buf, buf_len = [ln], len(ln) + 1
+                    else:
+                        buf.append(ln)
+                        buf_len += len(ln) + 1
+                if buf:
+                    pieces.append('\n'.join(buf))
+                translated_text = '\n'.join(
+                    self._aws_translate_call(p, target_language) for p in pieces
+                )
+            else:
+                translated_text = self._aws_translate_call(text, target_language)
+
             if preserve_voice_commands:
                 translated_text = self._preserve_voice_commands(text, translated_text, target_language)
-            
             return translated_text
         except Exception as e:
             logging.error(f"Translation error: {e}")
             return text
-    
+
+    def _aws_translate_call(self, text, target_language):
+        """Single AWS Translate API call (no [:5000] truncation)."""
+        response = self.translate_client.translate_text(
+            Text=text,
+            SourceLanguageCode='en',
+            TargetLanguageCode=target_language
+        )
+        return response['TranslatedText']
+
+    def _translate_text_llm(self, text, target_language, preserve_voice_commands=False):
+        """Translate a single chunk with gpt-4o-mini, falling back to AWS on failure.
+
+        [LOCAL-559] Fallback to AWS for THIS call (logged as [TRANSLATE-LLM] FALLBACK)
+        when the LLM errors, returns empty, or returns a line count / length ratio
+        outside sane bounds. Cost is metered per call and accumulated per tour.
+        """
+        lang_name = self._LANGUAGE_NAMES.get(target_language, target_language)
+        # [LOCAL-559R] The old prompt said "keep lines starting with
+        # Address:/Coordinates:/Type-Specialty:/Specific Examples:/Operational Details:
+        # UNCHANGED". gpt-4o-mini generalised that to EVERY 'Label:' line and left the
+        # SPOKEN 'Orientation:' and 'Directions:' lines in English — a Russian listener
+        # heard English directions. The fix: translate EVERYTHING, including the
+        # 'Orientation:' and 'Directions:' labels and their text, and only special-case
+        # the five nav lines below (and only Address:/Coordinates: keep their value too).
+        system_prompt = (
+            f"You are a professional translator. Translate the user's text faithfully into {lang_name}. "
+            "Preserve the exact meaning with no additions and no omissions. "
+            "Keep every line break and the SAME NUMBER OF LINES as the input. "
+            "Translate EVERY line, INCLUDING lines that begin with a label such as "
+            "'Orientation:' or 'Directions:' — you MUST translate the label WORD itself "
+            "(e.g. 'Directions:' and 'Orientation:') into the target language as well as "
+            "the text after it. Never leave the English words 'Directions' or "
+            "'Orientation' in the output. "
+            "There are exactly FIVE special lines, identified ONLY by these exact English "
+            "label prefixes: 'Address:', 'Coordinates:', 'Type/Specialty:', "
+            "'Specific Examples:' and 'Operational Details:'. For these five lines, keep the "
+            "label word itself in English and translate only the text after the colon — "
+            "EXCEPT 'Address:' and 'Coordinates:', whose values are postal/numeric data and "
+            "must be left exactly as written. Do NOT treat any other 'Label:' line as special. "
+            "Keep names of venues and people as they are commonly written in that language. "
+            "Output only the translation, with no commentary, labels, or quotes."
+        )
+        if preserve_voice_commands:
+            # [LOCAL-559] Voice-command preservation under the LLM engine: instruct the
+            # model to leave these control phrases in English so the article voice
+            # controls keep working. A post-pass (_preserve_voice_commands) is still run
+            # as a backstop for any the model translated anyway.
+            _cmds = ', '.join(f'"{c}"' for c in self._VOICE_COMMANDS)
+            system_prompt += (
+                " Keep the following voice-command phrases in English exactly as written, "
+                f"do not translate them: {_cmds}."
+            )
+
+        # [LOCAL-559R] One LLM attempt, then — if the output contains lines that came
+        # back UNTRANSLATED (byte-identical, not one of the five nav lines, with real
+        # words in them) — ONE retry with the same prompt, then AWS fallback. All other
+        # failure modes (error / empty / line-count / ratio) fall back to AWS immediately.
+        reason = None
+        for attempt in range(2):  # attempt 0 = first call, attempt 1 = single retry
+            try:
+                if not self._openai_api_key:
+                    reason = 'no_api_key'
+                    raise RuntimeError('OPENAI_API_KEY not set')
+
+                resp = self._openai_chat(system_prompt, text)
+                translated = (resp.get('text') or '').strip('\n')
+                # [LOCAL-559R] Deterministically repair spoken labels: when the model
+                # translated a Directions:/Orientation: VALUE but kept the English label,
+                # swap just the label word for its translation. This fixes the common
+                # case without a retry/fallback (which is slow), while a line that is
+                # STILL fully English falls through to the untranslated check below.
+                translated = self._normalize_spoken_labels(text, translated, target_language)
+                reason = self._evaluate_llm_output(text, translated)
+
+                if reason is None:
+                    # Meter cost only for an accepted LLM result.
+                    self._meter_llm_cost(resp.get('input_tokens', 0), resp.get('output_tokens', 0))
+                    if preserve_voice_commands:
+                        translated = self._preserve_voice_commands(text, translated, target_language)
+                    return translated
+            except Exception as e:
+                reason = f'error {e}'
+
+            # Only an untranslated-lines failure is worth a retry — the model saw a
+            # valid prompt and simply left some lines in English. Any other reason
+            # (error/empty/line_count/ratio) will not improve on a blind retry.
+            is_untranslated = reason is not None and reason.startswith('untranslated_lines=')
+            if is_untranslated and attempt == 0:
+                logging.warning(f"[TRANSLATE-LLM] RETRY {reason}")
+                continue
+            break
+
+        logging.warning(f"[TRANSLATE-LLM] FALLBACK {reason}")
+        return self._translate_text_aws(text, target_language, preserve_voice_commands)
+
+    def _evaluate_llm_output(self, source_text, translated):
+        """Validate one LLM translation. Return a failure reason string, or None if OK.
+
+        [LOCAL-559R] Checks, in order: empty, line-count drift, length ratio, and the
+        new DETERMINISTIC untranslated-line check (byte-identical non-nav lines with
+        real words). The untranslated reason is reported as 'untranslated_lines=N' so
+        the caller can retry once before falling back to AWS.
+        """
+        if not translated.strip():
+            return 'empty'
+        src_lines = source_text.count('\n') + 1
+        out_lines = translated.count('\n') + 1
+        if out_lines != src_lines:
+            return f'line_count {out_lines}!={src_lines}'
+        ratio = len(translated) / max(len(source_text), 1)
+        if ratio < self._LLM_RATIO_MIN or ratio > self._LLM_RATIO_MAX:
+            return f'ratio {ratio:.2f}'
+        n_untranslated = self._count_untranslated_lines(source_text, translated)
+        if n_untranslated > 0:
+            return f'untranslated_lines={n_untranslated}'
+        return None
+
+    # [LOCAL-559R] A line is "untranslated" when it is byte-identical to its source
+    # line, is NOT one of the five nav lines, and carries real words (>=4 words of
+    # 4+ letters). Short/numeric/punctuation-only lines and proper-noun-only lines
+    # are legitimately identical across languages and must not trip the check.
+    _WORD_RE = re.compile(r'[^\W\d_]{4,}', re.UNICODE)  # a "letters-word" of length >= 4
+
+    # [LOCAL-559R] Spoken label lines that MUST be fully translated (label + value).
+    # These are NOT among the five nav lines, so they must never keep their English
+    # label. gpt-4o-mini frequently translates the VALUE but leaves the English label
+    # (e.g. 'Directions: Dirígete hacia el sur ...' in Spanish) — which the mobile app
+    # speaks aloud, so a listener hears the English word 'Directions'. Any output line
+    # that still starts with one of these English labels is treated as untranslated.
+    _SPOKEN_LABELS = ('Orientation:', 'Directions:')
+
+    def _is_nav_line(self, stripped_line):
+        """True if the line is one of the five nav lines (by exact English label prefix)."""
+        return any(
+            re.match(rf'^{re.escape(prefix)}', stripped_line, re.IGNORECASE)
+            for prefix in self._NAV_FIELD_PREFIXES
+        )
+
+    def _keeps_english_spoken_label(self, stripped_src, stripped_out):
+        """True if the SOURCE line was a spoken label line and the OUTPUT still begins
+        with the English label (so the label was not translated)."""
+        if not any(stripped_src.startswith(lbl) for lbl in self._SPOKEN_LABELS):
+            return False
+        return any(stripped_out.startswith(lbl) for lbl in self._SPOKEN_LABELS)
+
+    def _count_untranslated_lines(self, source_text, translated_text):
+        """Count output lines that look untranslated per the LOCAL-559R definition.
+
+        Only meaningful when line counts match (the caller guarantees this before
+        calling). A line counts as untranslated iff EITHER:
+          (a) it is byte-identical to the aligned source line, is not one of the five
+              nav lines, and contains 4 or more words of 4+ letters (prose, not a
+              name/number/short label the model is right to leave alone); OR
+          (b) the source line was a spoken label line ('Orientation:'/'Directions:')
+              and the output still begins with that English label — the value may be
+              translated but the SPOKEN label is not, and the app reads it aloud.
+        """
+        src_lines = source_text.split('\n')
+        tr_lines = translated_text.split('\n')
+        if len(src_lines) != len(tr_lines):
+            return 0  # not comparable positionally; handled by the line_count check
+        n = 0
+        for src, tr in zip(src_lines, tr_lines):
+            src_s, tr_s = src.strip(), tr.strip()
+            # (b) spoken label left in English (even if the value was translated)
+            if self._keeps_english_spoken_label(src_s, tr_s):
+                n += 1
+                continue
+            if src != tr:
+                continue  # changed → translated
+            # (a) fully byte-identical prose line
+            if not src_s or self._is_nav_line(src_s):
+                continue
+            if len(self._WORD_RE.findall(src_s)) >= 4:
+                n += 1
+        return n
+
+    def _translate_spoken_label(self, label_word, target_language):
+        """Translate a bare spoken-label word (e.g. 'Directions') via AWS Translate,
+        memoised per (word, language). AWS is used (not the LLM) because it is cheap,
+        deterministic, and the labels are exactly what the AWS engine already produces
+        (e.g. 'Cómo llegar', 'Как добраться'). Returns the English word on any failure
+        so we never crash the main path."""
+        memo_key = ('__label__', target_language, label_word)
+        with self._memo_lock:
+            if memo_key in self._translation_memo:
+                return self._translation_memo[memo_key]
+        try:
+            translated = self._aws_translate_call(label_word, target_language).strip()
+            if not translated:
+                translated = label_word
+        except Exception as e:
+            logging.warning(f"[TRANSLATE-LLM] label translate failed for {label_word!r}: {e}")
+            translated = label_word
+        with self._memo_lock:
+            self._translation_memo[memo_key] = translated
+        return translated
+
+    def _normalize_spoken_labels(self, source_text, translated_text, target_language):
+        """Repair spoken-label lines whose VALUE was translated but whose LABEL stayed
+        English. For each aligned (source, output) line where the source begins with a
+        spoken label ('Orientation:'/'Directions:'), the output still begins with that
+        English label, AND the output value differs from the English value (i.e. the
+        value WAS translated), replace the English label word with its translation.
+        Lines that are still fully English are left untouched so the untranslated check
+        can flag them for retry/fallback."""
+        src_lines = source_text.split('\n')
+        tr_lines = translated_text.split('\n')
+        if len(src_lines) != len(tr_lines):
+            return translated_text
+        changed = False
+        for idx, (src, tr) in enumerate(zip(src_lines, tr_lines)):
+            src_s = src.strip()
+            for label in self._SPOKEN_LABELS:          # 'Orientation:' / 'Directions:'
+                if not src_s.startswith(label):
+                    continue
+                tr_s = tr.strip()
+                if not tr_s.startswith(label):
+                    break  # label already translated — nothing to do
+                src_val = src_s[len(label):].strip()
+                tr_val = tr_s[len(label):].strip()
+                if tr_val and tr_val != src_val:
+                    # Value translated, label English → swap only the label word.
+                    word = label[:-1]  # drop trailing ':'
+                    new_label = self._translate_spoken_label(word, target_language)
+                    tr_lines[idx] = f"{new_label}: {tr_val}"
+                    changed = True
+                break
+        return '\n'.join(tr_lines) if changed else translated_text
+
+    def _openai_chat(self, system_prompt, user_text, model=None, response_json=False):
+        """Call the OpenAI chat completions endpoint (temperature 0).
+
+        Returns a dict: {text, input_tokens, output_tokens}. Isolated in its own
+        method so unit tests can mock the network call cleanly.
+
+        [LOCAL-561] `model` overrides the default engine model (used by the names pass
+        to call gpt-4o and the prose pass to call gpt-4o-mini). `response_json` requests
+        a JSON object response (used by the names glossary pass).
+        """
+        payload = {
+            'model': model or self._LLM_MODEL,
+            'messages': [
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_text},
+            ],
+            'temperature': 0,
+        }
+        if response_json:
+            payload['response_format'] = {'type': 'json_object'}
+        response = requests.post(
+            self._LLM_ENDPOINT,
+            headers={
+                'Authorization': f'Bearer {self._openai_api_key}',
+                'Content-Type': 'application/json',
+            },
+            json=payload,
+            timeout=self._LLM_TIMEOUT,
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f'OpenAI HTTP {response.status_code}: {response.text[:200]}')
+        data = response.json()
+        usage = data.get('usage', {}) or {}
+        return {
+            'text': data['choices'][0]['message']['content'],
+            'input_tokens': usage.get('prompt_tokens', 0),
+            'output_tokens': usage.get('completion_tokens', 0),
+        }
+
+    def _meter_llm_cost(self, input_tokens, output_tokens, model=None):
+        """Log and accumulate the cost of one accepted LLM translation call.
+
+        [LOCAL-561] `model` lets the names/prose passes meter at their own rate
+        (gpt-4o vs gpt-4o-mini). Defaults to the engine model when omitted.
+        """
+        _model = model or self._LLM_MODEL
+        if cost_rates is not None:
+            cost = cost_rates.llm_cost(
+                input_tokens=input_tokens, output_tokens=output_tokens, model=_model
+            )
+        else:  # pragma: no cover - defensive; cost_rates ships in the image
+            cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+        with self._cost_lock:
+            self._llm_cost_total += cost
+            self._llm_tour_cost += cost
+        logging.info(
+            f"[TRANSLATE-LLM] model={_model} tokens_in={input_tokens} "
+            f"tokens_out={output_tokens} cost=${cost:.6f}"
+        )
+        return cost
+
     def _preserve_voice_commands(self, original_text, translated_text, target_language='ru'):
         """Preserve English voice commands in translated text"""
         # Voice commands that must stay in English
-        voice_commands = [
-            "Play", "Pause", "Next topic", "Previous topic", "Repeat",
-            "Forward 10 seconds", "Backward 5 seconds", "Play topic",
-            "Play summary", "Play full article", "List major topics",
-            "Next article", "Previous article", "What are my options"
-        ]
+        voice_commands = self._VOICE_COMMANDS
         
         # Preserve voice command phrases
         for command in voice_commands:
@@ -206,7 +693,414 @@ class TranslationService:
         except Exception as e:
             logging.error(f"Audio generation error: {e}")
             return None
-    
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # [LOCAL-561] GUIDEBOOK PIPELINE
+    # Structure by code · names by gpt-4o · prose by gpt-4o-mini.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Spoken label prefixes as they appear in English source (label + ':').
+    _SPOKEN_LABEL_WORDS = {'Orientation': 'orientation', 'Directions': 'directions'}
+
+    def _structure_labels_for(self, target_language):
+        """Return the {stop, orientation, directions} label dict for a language, or
+        None when we have no native forms (caller then leaves structure to the model /
+        falls back). Keeping this explicit avoids silently emitting English labels."""
+        return self._STRUCTURE_LABELS.get(target_language)
+
+    def _strip_structure_for_model(self, stop_body, target_language):
+        """STRUCTURE BY CODE — strip pass.
+
+        Walk the stop body line by line and separate the fixed structure (which code
+        owns) from the prose (which the model translates):
+          * The five nav lines (Address/Coordinates/Type-Specialty/Specific Examples/
+            Operational Details) are NEVER sent to the model. Address & Coordinates are
+            copied byte-exact; the other three have their VALUE translated as prose, but
+            the label stays as the English nav prefix the mobile app parses.
+          * The spoken 'Orientation:'/'Directions:' lines keep their label OUT of the
+            model input: only the value text is translated as prose, and the native
+            label from _STRUCTURE_LABELS is prepended on restore.
+
+        Returns (template, prose_segments) where:
+          * template is a list of tokens, one per source line. A string token is an
+            output line fixed by code (nav copy, or a '{{PROSE:k}}' placeholder, or a
+            nav line with a '{{PROSE:k}}' value). Placeholders are filled on restore.
+          * prose_segments is an ordered list of the English strings to translate.
+        """
+        labels = self._structure_labels_for(target_language)
+        lines = stop_body.split('\n')
+        template = []
+        prose_segments = []
+
+        def _add_prose(text):
+            idx = len(prose_segments)
+            prose_segments.append(text)
+            return '{{PROSE:%d}}' % idx
+
+        # Nav lines whose VALUE is prose (label kept English for app parsing).
+        _value_prose_nav = ('Type/Specialty:', 'Specific Examples:', 'Operational Details:')
+        # Nav lines copied byte-exact (postal/numeric data).
+        _value_fixed_nav = ('Address:', 'Coordinates:')
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped == '':
+                template.append('')
+                continue
+
+            # Address / Coordinates — copy verbatim.
+            if any(stripped.startswith(p) for p in _value_fixed_nav):
+                template.append(line)
+                continue
+
+            # Type/Specialty / Specific Examples / Operational Details — label English,
+            # value is prose.
+            matched_value_nav = next((p for p in _value_prose_nav if stripped.startswith(p)), None)
+            if matched_value_nav:
+                value = stripped[len(matched_value_nav):].strip()
+                if value:
+                    template.append(f"{matched_value_nav} {_add_prose(value)}")
+                else:
+                    template.append(line)
+                continue
+
+            # Spoken labels — Orientation / Directions. Strip the label; the value is prose.
+            matched_spoken = None
+            for eng_label in self._SPOKEN_LABEL_WORDS:
+                if stripped.startswith(eng_label + ':'):
+                    matched_spoken = eng_label
+                    break
+            if matched_spoken:
+                value = stripped[len(matched_spoken) + 1:].strip()
+                key = self._SPOKEN_LABEL_WORDS[matched_spoken]
+                if labels is not None:
+                    native_label = labels[key]
+                else:
+                    native_label = matched_spoken  # no native form → keep English label
+                template.append(f"{native_label}: {_add_prose(value)}" if value else line)
+                continue
+
+            # The stop title line (first non-empty line) and all narration paragraphs
+            # are prose.
+            template.append(_add_prose(stripped))
+
+        return template, prose_segments
+
+    def _restore_structure(self, template, translated_segments):
+        """STRUCTURE BY CODE — restore pass. Fill '{{PROSE:k}}' placeholders in the
+        template with the translated prose segments and rejoin into the final stop body.
+        Line count is preserved EXACTLY: each source line maps to one template token, and
+        each prose segment maps to exactly one source line — so a segment's translation is
+        collapsed to a single line here (internal newlines the model may have introduced
+        around sentences are turned into spaces). Without this, a model that wraps a long
+        Orientation value onto several lines would inflate the stop's line count and break
+        the mobile app's positional parsing (observed live: 15→20 lines)."""
+        out_lines = []
+        for token in template:
+            def _sub(m):
+                k = int(m.group(1))
+                if k >= len(translated_segments):
+                    return m.group(0)
+                seg = translated_segments[k]
+                # Collapse any newlines the model inserted into a single space so the
+                # one-line-per-source-line invariant holds; trim redundant whitespace.
+                seg = re.sub(r'\s*\n\s*', ' ', seg).strip()
+                return seg
+            out_lines.append(re.sub(r'\{\{PROSE:(\d+)\}\}', _sub, token))
+        return '\n'.join(out_lines)
+
+    def _extract_candidate_names(self, tour_content):
+        """Collect candidate proper names from a tour for the glossary pass.
+
+        Deterministic, no model: pull the stop titles (the text after 'Stop N:') and the
+        'Specific Examples:' values, which between them name every venue/landmark the
+        tour visits. The gpt-4o pass is still given the whole tour for context, but this
+        list guarantees the prompt enumerates the entities that MUST be in the glossary.
+        """
+        names = []
+        for m in re.finditer(r'^\s*Stop\s+\d+:\s*(.+?)\s*$', tour_content, re.MULTILINE):
+            title = m.group(1).strip()
+            if title:
+                names.append(title)
+        return names
+
+    def _build_names_glossary(self, tour_id, tour_content, target_language):
+        """NAMES BY gpt-4o. One call per (tour, language) producing a JSON glossary
+        {source name -> established target-language name}. Cached per (tour, language).
+
+        Rules handed to the model:
+          * Use the established exonym a native guidebook / Wikipedia uses in the target
+            language (e.g. ru 'Замковая гора', 'Опера Ниццы'; es 'Ópera de Niza').
+          * Streets and squares with NO established exonym keep the ORIGINAL name in
+            Latin letters (Rue Droite stays 'Rue Droite', NOT «Рю Друат»).
+        Wikidata reconciliation (target-language labels win over the model) is layered on
+        top in _apply_wikidata_overrides. On any failure returns {} so prose still runs
+        (it will simply get no glossary — safe, just less polished).
+        """
+        if target_language == 'en':
+            return {}
+        cache_key = (tour_id, target_language)
+        with self._memo_lock:
+            if cache_key in self._glossary_cache:
+                return self._glossary_cache[cache_key]
+
+        lang_name = self._LANGUAGE_NAMES.get(target_language, target_language)
+        candidates = self._extract_candidate_names(tour_content)
+        system_prompt = (
+            f"You are a localization expert building a glossary of proper names for a "
+            f"walking-tour guidebook translated into {lang_name}. "
+            "Return ONLY a JSON object mapping each English source name to the name a "
+            f"native {lang_name} guidebook or {lang_name} Wikipedia uses. Rules: "
+            "(1) For well-known places, people and institutions, use the ESTABLISHED "
+            f"{lang_name} form (the exonym), correctly spelled and cased. "
+            "(2) Streets, squares, lanes and other minor ways that have NO established "
+            f"{lang_name} name MUST keep their ORIGINAL name in Latin letters, unchanged "
+            "(do not transliterate them). "
+            "(3) Do not add commentary. Output must be a single valid JSON object with "
+            "string keys and string values and nothing else."
+        )
+        user_text = (
+            "Tour text:\n" + tour_content + "\n\n"
+            "Names that MUST appear as keys in the glossary (there may be more in the "
+            "text):\n" + "\n".join(f"- {n}" for n in candidates)
+        )
+        try:
+            resp = self._openai_chat(system_prompt, user_text, model=self._NAMES_MODEL,
+                                     response_json=True)
+            self._meter_llm_cost(resp.get('input_tokens', 0), resp.get('output_tokens', 0),
+                                 model=self._NAMES_MODEL)
+            glossary = self._parse_glossary_json(resp.get('text', ''))
+        except Exception as e:
+            logging.warning(f"[TRANSLATE-561] names glossary failed ({target_language}): {e}")
+            glossary = {}
+
+        # Wikidata reconciliation: target-language labels win over the model.
+        glossary = self._apply_wikidata_overrides(glossary, candidates, target_language)
+
+        with self._memo_lock:
+            self._glossary_cache[cache_key] = glossary
+        logging.info(
+            f"[TRANSLATE-561] glossary tour={tour_id} lang={target_language}: "
+            f"{len(glossary)} names"
+        )
+        return glossary
+
+    @staticmethod
+    def _parse_glossary_json(text):
+        """Parse the model's glossary output into a {str: str} dict, tolerating a code
+        fence or surrounding prose. Returns {} if nothing parseable is found."""
+        if not text:
+            return {}
+        t = text.strip()
+        # Strip ```json ... ``` fences if present.
+        if t.startswith('```'):
+            t = re.sub(r'^```[a-zA-Z]*\n?', '', t)
+            t = re.sub(r'\n?```$', '', t).strip()
+        try:
+            data = json.loads(t)
+        except Exception:
+            # Last resort: grab the outermost {...}.
+            m = re.search(r'\{.*\}', t, re.DOTALL)
+            if not m:
+                return {}
+            try:
+                data = json.loads(m.group(0))
+            except Exception:
+                return {}
+        if not isinstance(data, dict):
+            return {}
+        out = {}
+        for k, v in data.items():
+            if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
+                out[k.strip()] = v.strip()
+        return out
+
+    def _apply_wikidata_overrides(self, glossary, candidate_names, target_language):
+        """Where Wikidata has a target-language label for a stop's entity, that label
+        WINS over the model's form (task spec: 'Wikidata wins'). Looks up each candidate
+        name via the Wikidata search+entity API; on any network/parse failure the model's
+        glossary entry is left untouched. Best-effort and side-effect free on failure."""
+        if not candidate_names:
+            return glossary
+        result = dict(glossary)
+        for name in candidate_names:
+            try:
+                label = self._wikidata_label(name, target_language)
+            except Exception as e:
+                logging.debug(f"[TRANSLATE-561] wikidata lookup failed for {name!r}: {e}")
+                label = None
+            if label:
+                result[name] = label
+        return result
+
+    def _wikidata_label(self, name, target_language, _timeout=8):
+        """Return the Wikidata label for `name` in `target_language`, or None.
+
+        Two cheap calls: wbsearchentities to resolve the English name to a QID, then
+        wbgetentities to read that QID's label in the target language. Isolated so unit
+        tests can mock it (and so it can be disabled without touching glossary logic)."""
+        search = requests.get(
+            'https://www.wikidata.org/w/api.php',
+            params={'action': 'wbsearchentities', 'search': name, 'language': 'en',
+                    'format': 'json', 'limit': 1, 'type': 'item'},
+            timeout=_timeout,
+        )
+        if search.status_code != 200:
+            return None
+        hits = (search.json() or {}).get('search') or []
+        if not hits:
+            return None
+        qid = hits[0].get('id')
+        if not qid:
+            return None
+        ent = requests.get(
+            'https://www.wikidata.org/w/api.php',
+            params={'action': 'wbgetentities', 'ids': qid, 'props': 'labels',
+                    'languages': target_language, 'format': 'json'},
+            timeout=_timeout,
+        )
+        if ent.status_code != 200:
+            return None
+        labels = (((ent.json() or {}).get('entities') or {}).get(qid) or {}).get('labels') or {}
+        lbl = labels.get(target_language)
+        return lbl.get('value') if isinstance(lbl, dict) else None
+
+    def _guidebook_prose_prompt(self, target_language, glossary):
+        """Build the gpt-4o-mini system prompt for guidebook-style prose. Encodes the
+        LOCAL-561 style rules (narration not orders; participles bound to their subject;
+        no calques) and injects the glossary names the model MUST reuse exactly."""
+        lang_name = self._LANGUAGE_NAMES.get(target_language, target_language)
+        glossary_block = ''
+        if glossary:
+            pairs = '\n'.join(f'  "{k}" → "{v}"' for k, v in glossary.items())
+            glossary_block = (
+                "\nUse EXACTLY these established names wherever the corresponding place or "
+                "person is mentioned, declining/inflecting them as the target language's "
+                f"grammar requires:\n{pairs}\n"
+            )
+        return (
+            f"You are a professional travel-guidebook writer translating into {lang_name}. "
+            "Translate the user's text as a NATIVE guidebook would write it, not as a literal "
+            "gloss. STYLE RULES: "
+            "(1) Listener-addressed description stays DESCRIPTION — render 'discover', 'feel', "
+            "'imagine', 'look for' as narration (future tense or impersonal, e.g. 'here you "
+            "will find…', 'the visitor can…'), NOT as a string of commands. Use the imperative "
+            "ONLY for genuine walking instructions (turn, continue, cross). "
+            "(2) No calques: choose the idiomatic word, never a word-for-word loan. "
+            "(3) Every participle and gerund must agree with and refer to its sentence's "
+            "subject — no dangling participles. "
+            f"(4) Keep the output the SAME NUMBER OF LINES as the input.{glossary_block}"
+            "Output only the translation, with no commentary, labels, or quotes."
+        )
+
+    def _translate_prose_segments_guidebook(self, segments, target_language, glossary):
+        """Translate the stop's prose segments with gpt-4o-mini in ONE call (segments are
+        joined with a rare sentinel so line structure within each segment is preserved and
+        the mapping back is unambiguous). Falls back to AWS per segment on any failure or
+        if the model drops/adds a segment. Returns a list aligned 1:1 with `segments`."""
+        if not segments:
+            return []
+        sentinel = '\n<<<SEG>>>\n'
+        joined = sentinel.join(segments)
+        system_prompt = self._guidebook_prose_prompt(target_language, glossary)
+        user_text = (
+            "Translate the following guidebook passages. They are separated by the exact "
+            "marker <<<SEG>>> on its own line. Keep that marker, unchanged, between the "
+            "passages in your output, and translate everything else.\n\n" + joined
+        )
+        reason = None
+        for attempt in range(2):
+            try:
+                if not self._openai_api_key:
+                    raise RuntimeError('OPENAI_API_KEY not set')
+                resp = self._openai_chat(system_prompt, user_text, model=self._PROSE_MODEL)
+                text = (resp.get('text') or '').strip('\n')
+                parts = [p.strip('\n') for p in text.split('<<<SEG>>>')]
+                if len(parts) != len(segments):
+                    reason = f'segment_count {len(parts)}!={len(segments)}'
+                    if attempt == 0:
+                        logging.warning(f"[TRANSLATE-561] prose RETRY {reason}")
+                        continue
+                    break
+                self._meter_llm_cost(resp.get('input_tokens', 0), resp.get('output_tokens', 0),
+                                     model=self._PROSE_MODEL)
+                return parts
+            except Exception as e:
+                reason = f'error {e}'
+                break
+        logging.warning(f"[TRANSLATE-561] prose FALLBACK {reason} → AWS per segment")
+        return [self._translate_text_aws(s, target_language) for s in segments]
+
+    def _translate_stop_guidebook(self, stop_body, stop_number, target_language, glossary):
+        """Translate ONE stop body with the guidebook pipeline and return the translated
+        body (WITHOUT the 'Stop N:' header — the caller adds the native header). Structure
+        is done by code; prose by gpt-4o-mini steered by the glossary; nav lines handled
+        per spec. Preserves line count exactly."""
+        template, segments = self._strip_structure_for_model(stop_body, target_language)
+        translated_segments = self._translate_prose_segments_guidebook(
+            segments, target_language, glossary
+        )
+        return self._restore_structure(template, translated_segments)
+
+    def _native_stop_header(self, stop_number, target_language):
+        """Return the native-language 'Stop N:' header (without trailing content). Falls
+        back to English 'Stop N' when the language has no entry — never silently wrong,
+        because the fallback is the clearly-English word, not a mis-declined guess."""
+        labels = self._structure_labels_for(target_language)
+        if labels is None:
+            return f"Stop {stop_number}"
+        return labels['stop'].format(n=stop_number)
+
+    def _translate_one_stop(self, i, stop_text, n_stops, target_language, glossary=None):
+        """Translate a single stop and derive its TTS text. Returns (translated_stop, tts_text).
+
+        [LOCAL-559R] Extracted from the former serial loop so stops can be translated
+        concurrently (bounded pool). The per-stop logic is unchanged: translate the raw
+        stop, strip nav fields positionally for TTS (two-pass fallback on line drift),
+        then restore the English Coordinates/Address labels. On any error the English
+        text is kept for both outputs, exactly as before.
+
+        [LOCAL-561] When the guidebook pipeline is active (engine='llm' AND _GUIDEBOOK),
+        the stop is translated by _translate_stop_guidebook: structure by code, prose by
+        gpt-4o-mini steered by `glossary`. The spoken Orientation/Directions labels are
+        already native (set by code), and the nav lines are already handled, so we only
+        restore the English Address/Coordinates lines for the mobile map pin and strip the
+        nav fields for TTS exactly as before. Any exception falls through to the LOCAL-559R
+        path below via the generic translate_text (which itself falls back to AWS).
+        """
+        try:
+            use_guidebook = (self.translation_engine == 'llm' and self._GUIDEBOOK
+                             and target_language != 'en')
+            if use_guidebook:
+                raw_translated = self._translate_stop_guidebook(
+                    stop_text, i + 1, target_language, glossary or {}
+                )
+            else:
+                raw_translated = self.translate_text(stop_text, target_language)
+
+            # [LOCAL-142] Try single-pass: strip nav fields positionally from
+            # the raw translation (before _restore_metadata_labels modifies it).
+            tts_text = self._strip_nav_fields_from_translated(stop_text, raw_translated)
+            if tts_text is None:
+                # Fallback: line counts diverged — use two-pass (costs one extra API call)
+                logging.warning(
+                    f"[LOCAL-142] Positional strip fallback on stop {i+1}/{n_stops} "
+                    f"(en_lines={len(stop_text.split(chr(10)))}, "
+                    f"tr_lines={len(raw_translated.split(chr(10)))})"
+                )
+                tts_text = self.translate_text(
+                    self._strip_nav_fields_for_tts(stop_text), target_language
+                )
+
+            translated_stop = self._restore_metadata_labels(
+                stop_text, raw_translated, target_language
+            )
+            logging.info(f"Translated stop {i+1}/{n_stops}")
+            return translated_stop, tts_text
+        except Exception as e:
+            logging.error(f"Error translating stop {i+1}: {e}")
+            return stop_text, stop_text  # Keep original on error
+
     def translate_tour_with_audio(self, original_tour_id, target_language):
         """Translate a tour with full audio generation preserving original HTML structure.
         
@@ -214,6 +1108,9 @@ class TranslationService:
             tuple: (translated_tour_id or None, cache_hit: bool)
                    cache_hit=True when a translation already existed and was returned as-is.
         """
+        # [LOCAL-559] Reset the per-tour LLM cost accumulator so we can report a
+        # per-tour total at the end (engine='aws' leaves this at 0.0).
+        self._llm_tour_cost = 0.0
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
@@ -231,24 +1128,36 @@ class TranslationService:
             tour_content = original_tour[7]  # tour_content column
             original_zip_data = original_tour[3]  # audio_tour column
             tour_blob_uri = original_tour[9] if len(original_tour) > 9 else None  # R2 blob key
-            
+
+            # GCS-TR1 fix: fetch the source ZIP from R2 whenever audio_tour is NULL and
+            # tour_blob_uri is set — REGARDLESS of tour_content. The R2 migration set the
+            # audio_tour BYTEA column to NULL for migrated tours, so R2-migrated tours that
+            # still have tour_content (e.g. 107/120/284) previously skipped this fetch and
+            # crashed later in _create_mobile_compatible_zip with original_zip_data == None.
+            if not original_zip_data and tour_blob_uri:
+                logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching source ZIP from R2 blob: {tour_blob_uri}")
+                try:
+                    from blobstorage import R2BlobStorage
+                    original_zip_data = R2BlobStorage().download(tour_blob_uri)
+                    logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
+                except Exception as r2_err:
+                    # Do not proceed to INSERT an artifact-less row. Signal a hard failure so
+                    # the endpoint returns non-200 and the caller can retry/report.
+                    logging.error(f"Failed to download source ZIP for tour {original_tour_id} from R2 ({tour_blob_uri}): {r2_err}")
+                    raise TranslationArtifactError(
+                        f"source ZIP unobtainable for tour {original_tour_id} (blob {tour_blob_uri}): {r2_err}"
+                    )
+
             if not tour_content:
                 logging.warning(f"No tour content found for tour {original_tour_id}, falling back to ZIP extraction")
-                
-                # If audio_tour is NULL but tour_blob_uri exists, download from R2
-                if not original_zip_data and tour_blob_uri:
-                    logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching from R2 blob: {tour_blob_uri}")
-                    try:
-                        from blobstorage import R2BlobStorage
-                        original_zip_data = R2BlobStorage().download(tour_blob_uri)
-                        logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
-                    except Exception as r2_err:
-                        logging.error(f"Failed to download tour {original_tour_id} from R2: {r2_err}")
-                
-                # Verify ZIP has actual audio before attempting fallback
+
+                # Source ZIP is required for the fallback path.
                 if not original_zip_data:
                     logging.error(f"Tour {original_tour_id} has no tour_content AND no ZIP data — cannot translate")
-                    return None, False
+                    # [GCS-TR1] Hard-fail: never insert an artifact-less row.
+                    raise TranslationArtifactError(
+                        f"tour {original_tour_id} has no tour_content and no source ZIP"
+                    )
                 try:
                     import io as _io
                     zip_bytes = original_zip_data.tobytes() if hasattr(original_zip_data, 'tobytes') else bytes(original_zip_data)
@@ -256,17 +1165,50 @@ class TranslationService:
                         audio_files_in_zip = [n for n in _z.namelist() if n.startswith('audio_') and n.endswith('.mp3')]
                     if not audio_files_in_zip:
                         logging.error(f"Tour {original_tour_id} ZIP has no audio files and no tour_content — cannot translate")
-                        return None, False
-                except Exception:
+                        # [GCS-TR1] Hard-fail: never insert an artifact-less row.
+                        raise TranslationArtifactError(
+                            f"tour {original_tour_id} ZIP has no audio files and no tour_content"
+                        )
+                except zipfile.BadZipFile:
                     pass
+                # [LOCAL-60] Preserve the (id, cache_hit) tuple contract. The ZIP path is
+                # always a fresh translation, so cache_hit is False.
                 _zip_result = self._translate_tour_from_zip(original_tour, target_language, zip_data_override=original_zip_data)
-                return (_zip_result, False) if _zip_result else (None, False)
-            
+                return _zip_result, False
+
+
             logging.info(f"Using stored tour content: {len(tour_content)} characters")
-            
-            # Check if translation already exists
+
+            # The main (tour_content) path requires the source ZIP so the translated ZIP can
+            # be assembled from the original HTML structure. If it is still missing here, fail
+            # hard rather than crash inside _create_mobile_compatible_zip and insert a NULL row.
+            if not original_zip_data:
+                logging.error(f"Tour {original_tour_id} has tour_content but no source ZIP (audio_tour NULL, tour_blob_uri {tour_blob_uri!r}) — cannot build artifact")
+                raise TranslationArtifactError(
+                    f"tour {original_tour_id} has tour_content but no source ZIP artifact"
+                )
+
+            # Does the audio_tours table have a 'track' column? Guarded like the orchestrator
+            # so the INSERT still works on a DB without the column.
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            has_track = cursor.fetchone() is not None
+            source_track = None
+            if has_track:
+                cursor.execute("SELECT track FROM audio_tours WHERE id = %s", (original_tour_id,))
+                _row = cursor.fetchone()
+                source_track = _row[0] if _row else None
+                logging.info(f"Source tour {original_tour_id} track = {source_track!r}; translation will inherit it")
+
+            # Check if a USABLE translation already exists. GCS-TR1: a row is only a valid
+            # cache hit if it actually has a downloadable artifact. Artifact-less rows (the
+            # historic bug) are ignored here and regenerated below.
             cursor.execute(
-                "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s",
+                "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s "
+                "AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)",
                 (original_tour_id, target_language)
             )
             existing = cursor.fetchone()
@@ -281,91 +1223,131 @@ class TranslationService:
             # Split tour content into stops using the same logic as tour generation
             tour_stops = self._split_tour_content_into_stops(tour_content)
             logging.info(f"Split tour content into {len(tour_stops)} stops")
-            
+
+            # [LOCAL-561] GUIDEBOOK PIPELINE — names glossary. When the guidebook pipeline
+            # is active, build the per-(tour, language) names glossary with ONE gpt-4o call
+            # BEFORE translating stops, so every stop's prose pass reuses the same
+            # established exonyms. Cached, so a re-run is free. Off/aws → empty glossary.
+            _guidebook_active = (self.translation_engine == 'llm' and self._GUIDEBOOK
+                                 and target_language != 'en')
+            _glossary = {}
+            if _guidebook_active:
+                _glossary = self._build_names_glossary(
+                    original_tour_id, tour_content, target_language
+                )
+
             # Translate each stop, then restore English metadata labels
             # [LOCAL-142] Single-pass optimization: strip nav fields from the raw
             # translation instead of translating a pre-stripped version separately.
             # This eliminates N translate_text calls per tour (one per stop).
-            translated_stops = []
-            tts_texts = []
-            for i, stop_text in enumerate(tour_stops):
-                try:
-                    raw_translated = self.translate_text(stop_text, target_language)
-
-                    # [LOCAL-142] Try single-pass: strip nav fields positionally from
-                    # the raw translation (before _restore_metadata_labels modifies it).
-                    tts_text = self._strip_nav_fields_from_translated(stop_text, raw_translated)
-                    if tts_text is None:
-                        # Fallback: line counts diverged — use two-pass (costs one extra API call)
-                        logging.warning(
-                            f"[LOCAL-142] Positional strip fallback on stop {i+1}/{len(tour_stops)} "
-                            f"(en_lines={len(stop_text.split(chr(10)))}, "
-                            f"tr_lines={len(raw_translated.split(chr(10)))})"
-                        )
-                        tts_text = self.translate_text(
-                            self._strip_nav_fields_for_tts(stop_text), target_language
-                        )
-
-                    translated_stop = self._restore_metadata_labels(
-                        stop_text, raw_translated, target_language
-                    )
-                    translated_stops.append(translated_stop)
-                    tts_texts.append(tts_text)
-                    logging.info(f"Translated stop {i+1}/{len(tour_stops)}")
-                except Exception as e:
-                    logging.error(f"Error translating stop {i+1}: {e}")
-                    translated_stops.append(stop_text)  # Keep original on error
-                    tts_texts.append(stop_text)
+            # [LOCAL-559R] Translate stops CONCURRENTLY with a bounded pool (max 5
+            # workers). The LLM engine was ~102 s for 10 stops serially; per-stop calls
+            # are independent and I/O-bound, so a small pool cuts wall time well under
+            # 30 s while preserving output order (ThreadPoolExecutor.map is ordered).
+            n_stops = len(tour_stops)
+            max_workers = min(5, n_stops) if n_stops else 1
+            with ThreadPoolExecutor(max_workers=max_workers) as _stop_pool:
+                results = list(_stop_pool.map(
+                    lambda args: self._translate_one_stop(
+                        args[0], args[1], n_stops, target_language, _glossary),
+                    list(enumerate(tour_stops))
+                ))
+            translated_stops = [r[0] for r in results]
+            tts_texts = [r[1] for r in results]
             
             # Generate audio for each translated stop
-            translated_audio_files = []
-            for i, translated_text in enumerate(tts_texts):
+            # Generate audio for each translated stop.
+            # [LOCAL-559R] Polly calls are independent and I/O-bound — run them in the
+            # same bounded pool (max 5), preserving order via map, to cut the serial tail.
+            def _gen_audio(args):
+                i, txt = args
                 try:
-                    audio_bytes = self.generate_audio(translated_text, target_language)
+                    audio_bytes = self.generate_audio(txt, target_language)
                     if audio_bytes:
-                        translated_audio_files.append(audio_bytes)
-                        logging.info(f"Generated audio for stop {i+1}/{len(translated_stops)}")
-                    else:
-                        logging.warning(f"Failed to generate audio for stop {i+1}")
-                        translated_audio_files.append(None)
+                        logging.info(f"Generated audio for stop {i+1}/{len(tts_texts)}")
+                        return audio_bytes
+                    logging.warning(f"Failed to generate audio for stop {i+1}")
+                    return None
                 except Exception as e:
                     logging.error(f"Error generating audio for stop {i+1}: {e}")
-                    translated_audio_files.append(None)
+                    return None
+
+            _audio_workers = min(5, len(tts_texts)) if tts_texts else 1
+            with ThreadPoolExecutor(max_workers=_audio_workers) as _audio_pool:
+                translated_audio_files = list(_audio_pool.map(_gen_audio, list(enumerate(tts_texts))))
             
             # Create translated ZIP by preserving original HTML structure and replacing audio
             translated_zip_data = self._create_mobile_compatible_zip(
                 original_zip_data, translated_name, translated_audio_files, target_language, translated_stops
             )
-            
+
+            # GCS-TR1: never insert a translation row without a real artifact. If the ZIP
+            # builder failed (returns None) or produced empty bytes, fail hard — do NOT INSERT.
+            if not translated_zip_data or len(translated_zip_data) == 0:
+                logging.error(f"Tour {original_tour_id}: translated ZIP is empty/None — refusing to insert artifact-less row")
+                raise TranslationArtifactError(
+                    f"translated artifact build failed for tour {original_tour_id} ({target_language})"
+                )
+
             # Store translated tour content for future reference
-            translated_tour_content = "\n\n".join([
-                f"Stop {i+1}: {stop}" for i, stop in enumerate(translated_stops)
-            ])
+            # [LOCAL-561] When the guidebook pipeline is active, the 'Stop N:' header is
+            # emitted in the TARGET language (structure by code), e.g. «Остановка 1:».
+            # Otherwise keep the historic English 'Stop N:' header unchanged.
+            if _guidebook_active:
+                translated_tour_content = "\n\n".join([
+                    f"{self._native_stop_header(i + 1, target_language)}: {stop}"
+                    for i, stop in enumerate(translated_stops)
+                ])
+            else:
+                translated_tour_content = "\n\n".join([
+                    f"Stop {i+1}: {stop}" for i, stop in enumerate(translated_stops)
+                ])
             
-            # Create new tour record
+            # Create new tour record.
+            # [LOCAL-162] Carry the source tour's stops_count onto the translation.
             _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
-            # Track B: this deployment's own track (each of Beta/Storied is a
-            # separate service instance, so a translation always belongs to
-            # whichever track produced it — see tour_orchestrator_service.py).
-            _track = os.getenv('TOUR_TRACK', 'beta').lower()
-            if _track not in ('beta', 'storied'):
-                _track = 'beta'
-            cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                       lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (
-                translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content,
-                _original_stops_count, _track
-            ))
+            # [GCS-TR1 + LOCAL-162] Track resolution: a translation inherits its source
+            # tour's track (the service is shared by both Beta and Storied, so an env var
+            # alone cannot know the caller). If the source row has no track (older rows),
+            # fall back to this deployment's TOUR_TRACK env var, then to 'beta'.
+            _env_track = os.getenv('TOUR_TRACK', 'beta').lower()
+            if _env_track not in ('beta', 'storied'):
+                _env_track = 'beta'
+            _track = source_track if (has_track and source_track) else _env_track
+            if has_track:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour_id,
+                    translated_tour_content, _original_stops_count, _track
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, tour_content, stops_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour_id,
+                    translated_tour_content, _original_stops_count
+                ))
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
             
-            logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops")
+            logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops (track={_track!r})")
+            if self.translation_engine == 'llm':
+                logging.info(f"[TRANSLATE-LLM] tour {new_tour_id} ({target_language}) total cost=${self._llm_tour_cost:.6f}")
             return new_tour_id, False  # [LOCAL-60] Fresh translation, cache_hit=False
             
+        except TranslationArtifactError:
+            # Hard failure: roll back so no partial/artifact-less row is committed, then
+            # propagate so the endpoint can return a non-200 TRANSLATION_ARTIFACT_FAILED.
+            conn.rollback()
+            raise
         except Exception as e:
             logging.error(f"Tour translation with audio error: {e}")
             conn.rollback()
@@ -1510,10 +2492,19 @@ Say 'What are my options' to hear this help again"""
                 
                 # Add translated tour content as text file for reference
                 if audio_files:
-                    # Create full Russian tour content file
-                    tour_content_text = "\n\n".join([
-                        f"Stop {i+1}: {stop}" for i, stop in enumerate(translated_stops)
-                    ])
+                    # Create full translated tour content file.
+                    # [LOCAL-561] Native 'Stop N:' header when the guidebook pipeline is on.
+                    _gb = (self.translation_engine == 'llm' and self._GUIDEBOOK
+                           and target_language != 'en')
+                    if _gb:
+                        tour_content_text = "\n\n".join([
+                            f"{self._native_stop_header(i + 1, target_language)}: {stop}"
+                            for i, stop in enumerate(translated_stops)
+                        ])
+                    else:
+                        tour_content_text = "\n\n".join([
+                            f"Stop {i+1}: {stop}" for i, stop in enumerate(translated_stops)
+                        ])
                     content_file = os.path.join(extract_dir, 'tour_content.txt')
                     with open(content_file, 'w', encoding='utf-8') as f:
                         f.write(tour_content_text)
@@ -1544,7 +2535,11 @@ Say 'What are my options' to hear this help again"""
             logging.error(f"Error creating mobile-compatible ZIP: {e}")
             import traceback
             logging.error(f"Traceback: {traceback.format_exc()}")
-            return original_zip_data  # Return original on error
+            # GCS-TR1: signal failure instead of passing the original (or None) through.
+            # The historic bug returned original_zip_data here (None for R2-migrated tours),
+            # and the caller then INSERTed an artifact-less row that 404'd. Returning None
+            # makes the caller raise TranslationArtifactError and skip the INSERT.
+            return None
     
     def _generate_translated_html(self, tour_name, translated_stops, audio_files, target_language):
         """Generate HTML with embedded translated audio data.
@@ -1678,11 +2673,6 @@ Say 'What are my options' to hear this help again"""
             
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
-                    audioElements.forEach((otherAudio, otherIndex) => {
-                        if (otherIndex !== index && !otherAudio.paused) {
-                            otherAudio.pause();
-                        }
-                    });
                     currentStopIndex = index;
                 });
             });
@@ -1713,31 +2703,69 @@ Say 'What are my options' to hear this help again"""
             original_zip_data = bytes(original_zip_data)
         
         translated_zip_data = self.translate_zip_audio(original_zip_data, target_language)
-        
+
+        # GCS-TR1: never insert a translation row without a real artifact.
+        if not translated_zip_data or len(translated_zip_data) == 0:
+            logging.error(f"Tour {original_tour[0]}: ZIP fallback produced empty/None artifact — refusing to insert")
+            raise TranslationArtifactError(
+                f"ZIP-fallback artifact build failed for tour {original_tour[0]} ({target_language})"
+            )
+
         # Create new tour record
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
+            # [LOCAL-162] Carry the source tour's stops_count onto the translation.
             _fallback_stops_count = original_tour[10] if len(original_tour) > 10 else None
-            _track = os.getenv('TOUR_TRACK', 'beta').lower()
-            if _track not in ('beta', 'storied'):
-                _track = 'beta'
+            # [GCS-TR1] Does the audio_tours table have a 'track' column? Guarded so the
+            # INSERT still works on a DB without the column.
             cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                       lat, lng, content_language, original_tour_id, stops_count, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (
-                translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour[0],
-                _fallback_stops_count, _track
-            ))
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            has_track = cursor.fetchone() is not None
+            source_track = None
+            if has_track:
+                cursor.execute("SELECT track FROM audio_tours WHERE id = %s", (original_tour[0],))
+                _row = cursor.fetchone()
+                source_track = _row[0] if _row else None
+            # [GCS-TR1 + LOCAL-162] Inherit the source tour's track; fall back to this
+            # deployment's TOUR_TRACK env var, then to 'beta', when the source has none.
+            _env_track = os.getenv('TOUR_TRACK', 'beta').lower()
+            if _env_track not in ('beta', 'storied'):
+                _env_track = 'beta'
+            _track = source_track if (has_track and source_track) else _env_track
+            if has_track:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, stops_count, track)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour[0],
+                    _fallback_stops_count, _track
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, stops_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour[0],
+                    _fallback_stops_count
+                ))
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
             
-            logging.info(f"Created translated tour {new_tour_id} in {target_language} using ZIP fallback")
+            logging.info(f"Created translated tour {new_tour_id} in {target_language} using ZIP fallback (track={_track!r})")
             return new_tour_id
             
+        except TranslationArtifactError:
+            conn.rollback()
+            raise
         except Exception as e:
             logging.error(f"Fallback tour translation error: {e}")
             conn.rollback()
@@ -1775,19 +2803,35 @@ def translate_content_with_audio():
     languages = data.get('languages', ['en'])
     
     results = {}
+    had_artifact_failure = False
     for lang in languages:
         if lang == 'en':
             results[lang] = {'status': 'original', 'id': content_id}
             continue
-        
-        # [LOCAL-60] translate_tour_with_audio now returns (id, cache_hit) tuple
+
+        # [LOCAL-60] translate_tour_with_audio returns (id, cache_hit); translate_article
+        # returns a bare id. [GCS-TR1] both may raise TranslationArtifactError when no
+        # downloadable artifact could be produced — surface that as a hard failure (non-200)
+        # instead of a silent 200 hiding an artifact-less/404-ing row.
         _cache_hit = False
-        if content_type == 'tour':
-            translated_id, _cache_hit = translation_service.translate_tour_with_audio(content_id, lang)
-        elif content_type == 'article':
-            translated_id = translation_service.translate_article(content_id, lang)
-        else:
-            translated_id = None
+        try:
+            if content_type == 'tour':
+                translated_id, _cache_hit = translation_service.translate_tour_with_audio(content_id, lang)
+            elif content_type == 'article':
+                translated_id = translation_service.translate_article(content_id, lang)
+            else:
+                translated_id = None
+        except TranslationArtifactError as e:
+            logging.error(f"Artifact failure translating {content_type} {content_id} to {lang}: {e}")
+            had_artifact_failure = True
+            results[lang] = {
+                'status': 'failed',
+                'id': None,
+                'error_code': TranslationArtifactError.error_code,
+                'error': str(e),
+            }
+            continue
+
         
         if translated_id:
             # Include translated tour_name so the mobile app can display the correct title
@@ -1813,10 +2857,12 @@ def translate_content_with_audio():
         else:
             results[lang] = {'status': 'failed', 'id': None}
     
+    status_code = 502 if had_artifact_failure else 200
     return jsonify({
-        'status': 'completed',
+        'status': 'completed' if not had_artifact_failure else 'error',
+        'error_code': TranslationArtifactError.error_code if had_artifact_failure else None,
         'translations': results
-    })
+    }), status_code
 @app.route('/translate', methods=['POST', 'OPTIONS'])
 def translate_content():
     if request.method == 'OPTIONS':

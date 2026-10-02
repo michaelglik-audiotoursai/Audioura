@@ -1,0 +1,396 @@
+{
+  "landmarks": {
+    "Antibes Old Town": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Eze Village": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 9,
+      "unsourced": 41,
+      "total": 50,
+      "corpus": 9,
+      "grounded": 0,
+      "parametric": 41
+    },
+    "per_stop": {
+      "Cap Ferrat": {
+        "sourced": 5,
+        "unsourced": 15,
+        "total": 20
+      },
+      "Antibes Old Town": {
+        "sourced": 1,
+        "unsourced": 10,
+        "total": 11
+      },
+      "La Croisette": {
+        "sourced": 1,
+        "unsourced": 9,
+        "total": 10
+      },
+      "Massif de l'Esterel": {
+        "sourced": 2,
+        "unsourced": 7,
+        "total": 9
+      }
+    },
+    "claims": [
+      {
+        "stop": "Cap Ferrat",
+        "text": "Pedaling from Cap Ferrat to the Massif de l'Esterel, spanning approximately 47 kilometers of coastal landscapes and storied streets, we'll trace a path through opulence and natural beauty.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "From Picasso's art studio in Antibes to the Cannes Film Festival's iconic venue at La Croisette, uncover how history intertwines with daily life in the enchanting region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Cap Ferrat, known for its tranquility and luxurious allure, has been a magnet for the rich and famous.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "In the early 1900s, King Leopold II of Belgium acquired half of Cap Ferrat, using the wealth he amassed from the Congo.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In the early 1900s, King Leopold II of Belgium bought up half of Cap Ferrat using the vast fortune he extracted from the Congo and met Blanche Delacroix, a 16-year-old French courtesan, in 1900."
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "In 1900, he met Blanche Delacroix, a 16-year-old French courtesan, adding layers of intrigue to the luxurious setting.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In the early 1900s, King Leopold II of Belgium bought up half of Cap Ferrat using the vast fortune he extracted from the Congo and met Blanche Delacroix, a 16-year-old French courtesan, in 1900."
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Fast forward to 1927, Somerset Maugham, the renowned British writer, purchased Villa La Mauresque.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "This villa became a backdrop for Maugham’s personal life and literary endeavors.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "He lived there openly with his younger companions, first Gerald Haxton and later Alan Searle.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Somerset Maugham purchased Villa La Mauresque in 1927 and lived openly there with his younger lovers, first Gerald Haxton, later Alan Searle."
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "By the 1960s, Maugham ensured his legacy was as dramatic as his stories.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "In a public spectacle, he legally adopted Alan Searle, effectively disinheriting his daughter, Liza, and making Searle his sole heir.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "By the 1960s, Somerset Maugham went to extreme, public lengths to prevent his legitimate daughter, Liza, from inheriting a penny by legally adopting his secretary and male companion, Alan Searle, nami"
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "This legal maneuvering highlighted the complexities of Maugham's personal life, leaving a notable imprint on the villa’s history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Another intriguing chapter of Cap Ferrat's past involves the artist Jean Cocteau.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Invited for a weekend stay at Villa Santo Sospir by Francine Weisweiller in 1950, Cocteau ended up residing there for twelve years.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1950, Francine Weisweiller invited Jean Cocteau to stay at Villa Santo Sospir for a weekend, but he stayed for twelve years."
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "This creative endeavor left an indelible mark on the villa, intertwining Cocteau's legacy with the place.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "The year was 1899 when King Leopold II of Belgium's scandalous liaison with the young Blanche Zélia Joséphine Delacroix stirred the whispers of Europe.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Their affair, which began here, became a public spectacle, culminating in their secret marriage on his deathbed in 1909.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "This union ignited a fierce legal battle with his daughters over his estates, a drama that unfolded under the gaze of the Riviera's sunlit shores.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "A different kind of story unfolded here in the late 1920s when the renowned author W. Somerset Maugham made Villa La Mauresque his home.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Seeking to secure his legacy, Maugham controversially attempted to adopt his secretary, Alan Searle, in a bid to prevent his own daughter from inheriting his estate.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap Ferrat",
+        "text": "Just ahead, the cobblestones of history pave the way to Antibes, where the stories of past and present converge in the ongoing dance of time and tide.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "Antibes Old Town is a tapestry of stories, woven through its narrow streets and picturesque squares.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "In 1946, the illustrious Pablo Picasso found himself drawn to this locale, transforming the 14th-century Château Grimaldi into his personal art studio.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "Faced with a post-war shortage of traditional art supplies, Picasso turned to marine boat enamel and industrial plywood, materials that remarkably aligned with his innovative spirit.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "These creations, born out of necessity, marked a unique chapter in his artistic journey, capturing the essence of Antibes through an unconventional lens.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "Picasso was not the only figure to leave a mark on Antibes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "In 1982, the writer Graham Greene cast a shadow over the glamorous Riviera with his pamphlet 'J’Accuse: The Dark Side of Nice.' This publication was a direct response to the troubling experiences faced by Martine Cloetta, the daughter of Greene's mistress, who found herself entangled with local organized crime.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "Greene's writings brought attention to the darker undercurrents beneath the sun-drenched facade of the Riviera, challenging the perception of this picturesque region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "In 1915, the town became a hotspot for bootlegging after the French government banned absinthe.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1915, Antibes became a hotspot for bootlegging after France banned absinthe, with local fishermen using hidden Roman cellars to move contraband."
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "Local fishermen, ever resourceful, used hidden Roman cellars to move contraband, weaving a tale of defiance against authority.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "Antibes Old Town is not just a place of ancient stones but a canvas for stories of creativity and intrigue.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Antibes Old Town",
+        "text": "As you cycle away from the historic core, the modern allure o beckons, yet the echoes of Antibes' past linger, reminding you of a town where art and audacity have long danced together under the Mediterranean sun.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "La Croisette is where 's allure crystallizes, blending history with modern opulence.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "Once a simple street along the Mediterranean, it has evolved into a glamorous stage for the Cannes Film Festival, where stories of fame and intrigue unfold.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "In 1953, Brigitte Bardot made headlines when she appeared on the Croisette sands in a bikini, a bold fashion statement that launched her into international stardom and cemented the Riviera's reputation for beach glamor.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1953, Brigitte Bardot wore a bikini on the Croisette sands during the Cannes Film Festival, which launched her into international stardom and established the French Riviera's reputation for beach g"
+      },
+      {
+        "stop": "La Croisette",
+        "text": "This singular moment not only elevated Bardot's career but also positioned the Côte d'Azur as a beacon of elegance and allure.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "Further enriching its tapestry of tales, the Carlton Hotel stands as an architectural emblem of La Croisette's storied past.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "Designed by Charles Dalmas in 1911, the hotel boasts twin cupolas, said to be inspired by La Belle Otero, a renowned Spanish courtesan.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "This unique design choice speaks to the era's fascination with opulence and the colorful characters who frequented the Riviera.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "Fast forward to July 2013, when the Carlton became the scene of a jaw-dropping diamond heist.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "An Israeli diamond magnate was showcasing his rare jewels when a lone thief made off with $136 million worth of diamonds in under two minutes, a theft that captured global attention and added another chapter to the hotel's notorious history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Croisette",
+        "text": "Moving past the city's lights, the road will eventually lead toward the natural splendor of the Esterel, promising yet another facet of this region's diverse narrative.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "Amidst this natural spectacle, the Corniche d’Or weaves its tale.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "Conceived in 1901 by Abel Ballif, the first president of the Touring Club de France, this scenic route was more than a road; it was a vision to connect and celebrate the beauty of the Côte d'Azur.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "Completed in 1903, the Corniche d’Or linked Saint-Raphaël to Cannes, a route you have recently visited.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "In the shadow of Mont Vinaigre, the highest peak of the massif standing at 618 meters, history whispers its own tales.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "The notorious Gaspard Bouis, known as Gaspard de Besse, found refuge here in the late 18th century.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In the late 18th century, Gaspard Bouis, known as Gaspard de Besse, used Mont Vinaigre as a hideout and was captured in 1780 and executed in Aix-en-Provence."
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "A Robin Hood figure of his time, Bouis hid among these hills until his capture in 1780 led to his execution in Aix-en-Provence.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "On August 15, 1944, the Plage du Débarquement at Le Dramont became the staging ground for Operation Dragoon.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On August 15, 1944, Operation Dragoon took place at Plage du Débarquement at Le Dramont, where over 20,000 soldiers from the U.S. 36th 'Texas' Infantry Division stormed ashore."
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "Over 20,000 soldiers from the U.S. 36th 'Texas' Infantry Division stormed ashore, carving a path for the liberation of Southern France from German occupation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Massif de l'Esterel",
+        "text": "This pivotal moment in World War II history left an indelible mark on the landscape and its people.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

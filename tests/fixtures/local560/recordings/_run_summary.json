@@ -1,0 +1,503 @@
+[
+  {
+    "slug": "boston_sail_loft",
+    "location": "restaurant tour of Boston Sail Loft, Boston, MA",
+    "tour_type": "restaurant",
+    "stops": 4,
+    "wall_s": 341.8,
+    "chars": 2735,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 96,
+    "cost_record": {
+      "total_cost": 0.14123975000000005,
+      "total_tokens": 37769,
+      "cache_hit": false,
+      "grounding_cost": 0.42000000000000004,
+      "grounding_requests": 12,
+      "tour_total_cost": 0.5612397500000001,
+      "breakdown": {
+        "llm": 0.14123975000000005,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.42000000000000004
+      },
+      "provenance": {
+        "sourced": 1,
+        "unsourced": 11,
+        "total": 12,
+        "corpus": 1,
+        "grounded": 0,
+        "parametric": 11
+      },
+      "score": {
+        "defects_before": {
+          "thin": "1/4 stops delivered"
+        },
+        "defects_after": {
+          "thin": "1/4 stops delivered"
+        },
+        "removed": [],
+        "remaining": [],
+        "retried": false,
+        "clean_after": true,
+        "retry_cost": {
+          "total_cost": 0.0,
+          "total_tokens": 0
+        },
+        "cost_without_retry": {
+          "total_cost": 0.14124,
+          "total_tokens": 37769
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 2,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "buttermilk_bourbon",
+    "location": "restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA",
+    "tour_type": "restaurant",
+    "stops": 4,
+    "wall_s": 327.3,
+    "chars": 4692,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 102,
+    "cost_record": {
+      "total_cost": 0.18915450000000006,
+      "total_tokens": 40120,
+      "cache_hit": false,
+      "grounding_cost": 0.42000000000000004,
+      "grounding_requests": 12,
+      "tour_total_cost": 0.6091545,
+      "breakdown": {
+        "llm": 0.18915450000000006,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.42000000000000004
+      },
+      "provenance": {
+        "sourced": 3,
+        "unsourced": 11,
+        "total": 14,
+        "corpus": 3,
+        "grounded": 0,
+        "parametric": 11
+      },
+      "score": {
+        "defects_before": {
+          "thin": "2/4 stops delivered",
+          "truncated": "1 fragment(s), e.g. 'St'",
+          "dangling_reference": "1 dangling pronoun reference(s), e.g. 'Her husband, Jim Sokolove, known for his pioneering role in '"
+        },
+        "defects_after": {
+          "thin": "2/4 stops delivered"
+        },
+        "removed": [
+          "dangling_reference",
+          "truncated"
+        ],
+        "remaining": [],
+        "retried": true,
+        "clean_after": true,
+        "retry_cost": {
+          "total_cost": 0.009062500000000001,
+          "total_tokens": 1906
+        },
+        "cost_without_retry": {
+          "total_cost": 0.180092,
+          "total_tokens": 38214
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 3,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "chart_house_boston",
+    "location": "restaurant tour of Chart House, Boston, MA",
+    "tour_type": "restaurant",
+    "stops": 4,
+    "wall_s": 439.1,
+    "chars": 10478,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 107,
+    "cost_record": {
+      "total_cost": 0.25770335,
+      "total_tokens": 39241,
+      "cache_hit": false,
+      "grounding_cost": 0.45500000000000007,
+      "grounding_requests": 13,
+      "tour_total_cost": 0.7127033500000001,
+      "breakdown": {
+        "llm": 0.25770335,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.45500000000000007
+      },
+      "provenance": {
+        "sourced": 5,
+        "unsourced": 39,
+        "total": 44,
+        "corpus": 5,
+        "grounded": 0,
+        "parametric": 39
+      },
+      "score": {
+        "defects_before": {
+          "dangling_reference": "2 dangling pronoun reference(s), e.g. 'He frequented Booth #18, now permanently dedicated to his me'"
+        },
+        "defects_after": {
+          "thin": "3/4 stops delivered",
+          "dangling_reference": "1 dangling pronoun reference(s), e.g. 'His forced return to the South under President Franklin Pier'"
+        },
+        "removed": [],
+        "remaining": [
+          "dangling_reference"
+        ],
+        "retried": true,
+        "clean_after": false,
+        "retry_cost": {
+          "total_cost": 0.0069975,
+          "total_tokens": 1473
+        },
+        "cost_without_retry": {
+          "total_cost": 0.250706,
+          "total_tokens": 37768
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 3,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "sycamore_little_big",
+    "location": "Dinner at Sycamore and Little Big Diner in Newton Centre, MA",
+    "tour_type": "restaurant",
+    "stops": 4,
+    "wall_s": 309.0,
+    "chars": 9452,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 104,
+    "cost_record": {
+      "total_cost": 0.22730685000000003,
+      "total_tokens": 35186,
+      "cache_hit": false,
+      "grounding_cost": 0.42000000000000004,
+      "grounding_requests": 12,
+      "tour_total_cost": 0.6473068500000001,
+      "breakdown": {
+        "llm": 0.22730685000000003,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.42000000000000004
+      },
+      "provenance": {
+        "sourced": 5,
+        "unsourced": 26,
+        "total": 31,
+        "corpus": 5,
+        "grounded": 0,
+        "parametric": 26
+      },
+      "score": {
+        "defects_before": {
+          "unsourced_person_event": "1 unsourced person-event(s); \"Before Sycamore\" placed here in 2012 with no source: \"Before Sycamore's opening in late 2012, the prevailing wisdom was that high-end dining wouldn't last here.\""
+        },
+        "defects_after": {
+          "unsourced_person_event": "1 unsourced person-event(s); \"Before Sycamore\" placed here in 2012 with no source: \"Before Sycamore's opening in late 2012, the prevailing wisdom was that high-end dining wouldn't last here.\""
+        },
+        "removed": [],
+        "remaining": [],
+        "retried": false,
+        "clean_after": true,
+        "retry_cost": {
+          "total_cost": 0.0,
+          "total_tokens": 0
+        },
+        "cost_without_retry": {
+          "total_cost": 0.227307,
+          "total_tokens": 35186
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 3,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "logan_airport",
+    "location": "Boston Logan International Airport, Boston MA",
+    "tour_type": "facility",
+    "stops": 4,
+    "wall_s": 198.4,
+    "chars": 9334,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 103,
+    "cost_record": {
+      "total_cost": 0.19422845000000002,
+      "total_tokens": 26898,
+      "cache_hit": false,
+      "grounding_cost": 0.14,
+      "grounding_requests": 4,
+      "tour_total_cost": 0.33422845,
+      "breakdown": {
+        "llm": 0.19422845000000002,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.14
+      },
+      "provenance": {
+        "sourced": 0,
+        "unsourced": 20,
+        "total": 20,
+        "corpus": 0,
+        "grounded": 0,
+        "parametric": 20
+      },
+      "score": {
+        "defects_before": {
+          "unsourced_person_event": "2 unsourced person-event(s); \"Charles Lindbergh\" placed here in July with no source: \"Back on July 22, 1927, famed aviator Charles Lindbergh touched down in his Spirit of St. Louis here, part of a nationwid\""
+        },
+        "defects_after": {
+          "unsourced_person_event": "2 unsourced person-event(s); \"Charles Lindbergh\" placed here in July with no source: \"Back on July 22, 1927, famed aviator Charles Lindbergh touched down in his Spirit of St. Louis here, part of a nationwid\""
+        },
+        "removed": [],
+        "remaining": [],
+        "retried": false,
+        "clean_after": true,
+        "retry_cost": {
+          "total_cost": 0.0,
+          "total_tokens": 0
+        },
+        "cost_without_retry": {
+          "total_cost": 0.194228,
+          "total_tokens": 26898
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 2,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "our_lady_help_newton",
+    "location": "Our Lady Help of Christians Catholic Church, Newton MA",
+    "tour_type": "museum",
+    "stops": 4,
+    "wall_s": 321.8,
+    "chars": 9354,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 118,
+    "cost_record": {
+      "total_cost": 0.24272500000000002,
+      "total_tokens": 40488,
+      "cache_hit": false,
+      "grounding_cost": 0.35000000000000003,
+      "grounding_requests": 10,
+      "tour_total_cost": 0.5927250000000001,
+      "breakdown": {
+        "llm": 0.24272500000000002,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.35000000000000003
+      },
+      "provenance": {
+        "sourced": 7,
+        "unsourced": 19,
+        "total": 26,
+        "corpus": 7,
+        "grounded": 0,
+        "parametric": 19
+      },
+      "score": {
+        "defects_before": {
+          "unsourced_person_event": "5 unsourced person-event(s); \"Cuenin\" placed here in September with no source: \"In September 2005, the nave once again drew attention as Father Cuenin, an outspoken priest in Boston, announced his res\""
+        },
+        "defects_after": {
+          "unsourced_person_event": "5 unsourced person-event(s); \"Cuenin\" placed here in September with no source: \"In September 2005, the nave once again drew attention as Father Cuenin, an outspoken priest in Boston, announced his res\""
+        },
+        "removed": [],
+        "remaining": [],
+        "retried": false,
+        "clean_after": true,
+        "retry_cost": {
+          "total_cost": 0.0,
+          "total_tokens": 0
+        },
+        "cost_without_retry": {
+          "total_cost": 0.242725,
+          "total_tokens": 40488
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 3,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "palais_lascaris_nice",
+    "location": "Palais Lascaris, Nice, France",
+    "tour_type": "museum",
+    "stops": 4,
+    "wall_s": 565.9,
+    "chars": 6726,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 111,
+    "cost_record": {
+      "total_cost": 0.5835393000000001,
+      "total_tokens": 51848,
+      "cache_hit": false,
+      "grounding_cost": 1.4000000000000001,
+      "grounding_requests": 40,
+      "tour_total_cost": 1.9835393000000003,
+      "breakdown": {
+        "llm": 0.5835393000000001,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 1.4000000000000001
+      },
+      "provenance": {
+        "sourced": 3,
+        "unsourced": 23,
+        "total": 26,
+        "corpus": 3,
+        "grounded": 0,
+        "parametric": 23
+      },
+      "score": {
+        "defects_before": {
+          "dangling_reference": "1 dangling pronoun reference(s), e.g. 'He used carved, painted, and gilded wood, employing a tradit'"
+        },
+        "defects_after": {
+          "thin": "3/4 stops delivered"
+        },
+        "removed": [
+          "dangling_reference"
+        ],
+        "remaining": [],
+        "retried": true,
+        "clean_after": true,
+        "retry_cost": {
+          "total_cost": 0.007325000000000001,
+          "total_tokens": 1541
+        },
+        "cost_without_retry": {
+          "total_cost": 0.576214,
+          "total_tokens": 50307
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 2,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  },
+  {
+    "slug": "french_riviera_biking",
+    "location": "French Riviera biking tour",
+    "tour_type": "biking",
+    "stops": 5,
+    "wall_s": 474.6,
+    "chars": 12125,
+    "ok": true,
+    "error": null,
+    "openai_calls_recorded": 124,
+    "cost_record": {
+      "total_cost": 0.3454214500000001,
+      "total_tokens": 52890,
+      "cache_hit": false,
+      "grounding_cost": 0.17500000000000002,
+      "grounding_requests": 5,
+      "tour_total_cost": 0.5204214500000001,
+      "breakdown": {
+        "llm": 0.3454214500000001,
+        "tts": 0.0,
+        "search": 0.0,
+        "grounding": 0.17500000000000002
+      },
+      "provenance": {
+        "sourced": 9,
+        "unsourced": 41,
+        "total": 50,
+        "corpus": 9,
+        "grounded": 0,
+        "parametric": 41
+      },
+      "score": {
+        "defects_before": {
+          "dangling_reference": "2 dangling pronoun reference(s), e.g. \"His presence here marked the beginning of the area's develop\""
+        },
+        "defects_after": {
+          "thin": "4/5 stops delivered",
+          "dangling_reference": "1 dangling pronoun reference(s), e.g. 'He lived there openly with his younger companions, first Ger'"
+        },
+        "removed": [],
+        "remaining": [
+          "dangling_reference"
+        ],
+        "retried": true,
+        "clean_after": false,
+        "retry_cost": {
+          "total_cost": 0.008247500000000001,
+          "total_tokens": 1736
+        },
+        "cost_without_retry": {
+          "total_cost": 0.337174,
+          "total_tokens": 51154
+        }
+      }
+    },
+    "phase517": {
+      "retry_markers": 3,
+      "retried_summary": null
+    },
+    "models_env": {
+      "TOUR_LLM_MODEL": "(unset)",
+      "TOUR_STORY_MODEL": "(unset)"
+    }
+  }
+]

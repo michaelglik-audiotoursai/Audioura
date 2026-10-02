@@ -1,0 +1,225 @@
+00:00 +0: loading /Users/micha/audioura-worktrees/LOCAL-87/audio_tour_app/test/wallet_evidence_test.dart
+00:00 +0: STATE 1: Wallet on Free plan
+
+══════════════════════════════════════════════════════
+  STATE 1: WALLET — FREE PLAN
+══════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────┐
+  │  [←]   Wallet              [↻]      │
+  ├─────────────────────────────────────┤
+  │                                     │
+  │       💼 (wallet icon, grey)        │
+  │                                     │
+  │          Free Plan                  │
+  │                                     │
+  │  Upgrade to generate unlimited      │
+  │  tours and articles                 │
+  │                                     │
+  │      ┌──────────────┐               │
+  │      │  View Plans  │               │
+  │      └──────────────┘               │
+  │                                     │
+  ├─────────────────────────────────────┤
+  │ 👤 Free        Period: 7/1 – 7/30   │
+  │                         [Change]    │
+  ├─────────────────────────────────────┤
+  │                                     │
+  │  Transaction History                │
+  │  (transactions listed below)        │
+  │                                     │
+  └─────────────────────────────────────┘
+
+  ✓ No balance displayed (correct for Free)
+  ✓ No top-up button (correct for Free)
+  ✓ "View Plans" upgrade button present
+
+00:00 +1: STATE 2: Wallet on Pay-Per-Use with transactions
+
+══════════════════════════════════════════════════════
+  STATE 2: WALLET — PAY-PER-USE ($7.45 balance)
+══════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────┐
+  │  [←]   Wallet              [↻]      │
+  ├─────────────────────────────────────┤
+  │                                     │
+  │       Available Balance             │
+  │                                     │
+  │         $7.45  (green, large)       │
+  │                                     │
+  │      [ This period: $2.55 ]         │
+  │                                     │
+  ├─────────────────────────────────────┤
+  │ 💰 Pay-Per-Use  Period: 7/1–7/30   │
+  │                          [Change]   │
+  ├─────────────────────────────────────┤
+  │ ┌────── Top Up ──────┐              │
+  │ │   ⊕  Top Up        │  (green)     │
+  │ └────────────────────┘              │
+  ├─────────────────────────────────────┤
+  │  Transaction History                │
+  ├─────────────────────────────────────┤
+  │ ○ Tour: French Riviera biking       │
+  │   2h ago              −$0.35        │
+  │─────────────────────────────────────│
+  │ ☁ Downloaded — no charge            │
+  │   5h ago              $0.00  (grey) │
+  │─────────────────────────────────────│
+  │ ○ Tour: Historic Boston walking     │
+  │   1d ago              −$0.45        │
+  │─────────────────────────────────────│
+  │ ○ Translation: Uffizi → French      │
+  │   1d ago              −$0.25        │
+  │─────────────────────────────────────│
+  │ ○ News article: Boston Globe        │
+  │   2d ago              −$0.15        │
+  │─────────────────────────────────────│
+  │ ☁ Downloaded — no charge            │
+  │   2d ago              $0.00  (grey) │
+  │─────────────────────────────────────│
+  │ ○ Tour: Cambridge bookshop trail    │
+  │   3d ago              −$0.40        │
+  │─────────────────────────────────────│
+  │ ⊕ Credit top-up                     │
+  │   3d ago             +$10.00 (green)│
+  │─────────────────────────────────────│
+  │ ○ Tour: Nice Matisse Museum         │
+  │   4d ago              −$0.55        │
+  │─────────────────────────────────────│
+  │ ☁ Downloaded — no charge            │
+  │   5d ago              $0.00  (grey) │
+  │─────────────────────────────────────│
+  │ 🧾 Monthly subscription —           │
+  │    billed by Apple                  │
+  │   30d ago             $0.00  (grey) │
+  └─────────────────────────────────────┘
+
+  ✓ Balance $7.45 displayed in green
+  ✓ Cache hits show "Downloaded — no charge" at $0.00
+  ✓ Monthly fee shows "billed by Apple" at $0.00 (D20)
+  ✓ Top-up shows as +$10.00 in green
+  ✓ Fresh tour charges show actual amounts
+
+00:00 +2: STATE 3: Wallet on Unlimited showing cost-stop
+
+══════════════════════════════════════════════════════
+  STATE 3: WALLET — UNLIMITED (cost-stop progress)
+══════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────┐
+  │  [←]   Wallet              [↻]      │
+  ├─────────────────────────────────────┤
+  │                                     │
+  │       Monthly Allowance             │
+  │                                     │
+  │    $18.75 / $25.00  (bold)          │
+  │                                     │
+  │  ████████████████░░░░░░  (blue bar) │
+  │                                     │
+  │          75% used                   │
+  │                                     │
+  ├─────────────────────────────────────┤
+  │ ∞ Unlimited     Period: 7/1–7/30   │
+  │                          [Change]   │
+  ├─────────────────────────────────────┤
+  │  Transaction History                │
+  │  (transactions listed)              │
+  └─────────────────────────────────────┘
+
+  ✓ Shows "Monthly Allowance" not "Available Balance"
+  ✓ Progress bar at 75% ($18.75 / $25.00)
+  ✓ No top-up button (Unlimited has no credits)
+  ✓ No fake balance displayed
+
+00:00 +3: STATE 4: Low-balance banner (PPU, $1.50)
+
+══════════════════════════════════════════════════════
+  STATE 4: LOW-BALANCE WARNING (PPU, $1.50)
+══════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────┐
+  │  [←]   Wallet              [↻]      │
+  ├─────────────────────────────────────┤
+  │                                     │
+  │       Available Balance             │
+  │                                     │
+  │         $1.50  (RED, large)         │
+  │                                     │
+  │  ┌──────────────────────────────┐   │
+  │  │ ⚠️ Low balance — top up to   │   │
+  │  │ continue generating           │   │
+  │  └──────────────────────────────┘   │
+  │                                     │
+  │      [ This period: $2.55 ]         │
+  │                                     │
+  ├─────────────────────────────────────┤
+  │ 💰 Pay-Per-Use  Period: 7/1–7/30   │
+  │                          [Change]   │
+  ├─────────────────────────────────────┤
+  │ ┌────── Top Up ──────┐              │
+  │ │   ⊕  Top Up        │  (green)     │
+  │ └────────────────────┘              │
+  └─────────────────────────────────────┘
+
+  ✓ Balance $1.50 displayed in RED (below $2 threshold)
+  ✓ Warning banner: "Low balance — top up to continue generating"
+  ✓ No auto-charge language (Apple IAP constraint)
+  ✓ Top-up button prominently available
+
+00:00 +4: STATE 5: Paywall screen (plan selection)
+
+══════════════════════════════════════════════════════
+  STATE 5: PAYWALL — PLAN SELECTION
+══════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────┐
+  │  [←]   Choose a Plan                │
+  ├─────────────────────────────────────┤
+  │                                     │
+  │  Pick the plan that fits how you    │
+  │  explore                            │
+  │                                     │
+  │  ┌─────────────────────────────┐    │
+  │  │  Free                       │    │
+  │  │  Free forever               │    │
+  │  │  ✓ Browse pre-made tours    │    │
+  │  │  ✓ Limited tour downloads   │    │
+  │  └─────────────────────────────┘    │
+  │                                     │
+  │  ┌═════════════════════════════┐    │
+  │  ║  Pay-Per-Use  [Popular]     ║    │
+  │  ║  $2.00 / month              ║    │
+  │  ║  ✓ Unlimited tour gen       ║    │
+  │  ║  ✓ Unlimited news articles  ║    │
+  │  ║  ✓ Pay only for what you use║    │
+  │  ║  ✓ Credits never expire     ║    │
+  │  ║  ┌─────────────────────┐    ║    │
+  │  ║  │ Subscribe to PPU    │    ║    │
+  │  ║  └─────────────────────┘    ║    │
+  │  ╚═════════════════════════════╝    │
+  │                                     │
+  │  ┌─────────────────────────────┐    │
+  │  │  Unlimited                  │    │
+  │  │  $50.00 / month             │    │
+  │  │  ✓ Unlimited tour gen       │    │
+  │  │  ✓ Unlimited news articles  │    │
+  │  │  ✓ No per-use charges       │    │
+  │  │  ✓ Priority processing      │    │
+  │  │  ✓ All future features      │    │
+  │  │  ┌─────────────────────┐    │    │
+  │  │  │ Subscribe to Unlim  │    │    │
+  │  │  └─────────────────────┘    │    │
+  │  └─────────────────────────────┘    │
+  │                                     │
+  │       Restore Purchases             │
+  └─────────────────────────────────────┘
+
+  ✓ Three plans displayed with prices from API
+  ✓ Pay-Per-Use highlighted with "Popular" badge
+  ✓ Features listed per plan
+  ✓ Subscribe buttons for paid plans only
+  ✓ "Restore Purchases" link at bottom
+  ✓ No hardcoded prices — all from mock API response
+
+00:00 +5: All tests passed!

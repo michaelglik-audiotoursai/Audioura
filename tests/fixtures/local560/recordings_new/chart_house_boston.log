@@ -1,0 +1,664 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_145415.txt'
+
+======================================================================
+CALL #001 | 14:54:15.258 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 4
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_145415.txt'
+
+======================================================================
+CALL #002 | 14:54:15.263 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Chart House, Boston, MA' → 'restaurant  of Chart House, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Chart House, Boston, MA' → 'restaurant of Chart House, Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "restaurants",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Chart House, Boston, MA",
+    "named_places": ["Chart House"],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+  [venue promotion] scope 'Chart House, Boston, MA' promoted to venue_name (interior preposition + institutional noun)
+  [S15] venue_name='Chart House' overridden — location contains explicit non-museum phrase
+[TIMING] phase=intent elapsed=2.3s cumulative=2.3s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Chart House, Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_145415.txt'
+
+======================================================================
+CALL #003 | 14:54:17.575 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  user_request: restaurant tour of Chart House, Boston, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for restaurant tour of Chart House, Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Chart House, Boston, MA'
+  [S17] no scope_constraint (precision='BUILDING', scope='Chart House, Boston, MA')
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_145415.txt'
+
+======================================================================
+CALL #004 | 14:54:17.575 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  total_stops: 4
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0007 (848 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_145415.txt'
+
+======================================================================
+CALL #005 | 14:54:24.613 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Chart House, Boston, MA.
+List exactly 7 specific, real, well-known restaurants relevant to: restaurant tour of Chart House, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every stop MUST be 
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Legal Sea Foods",
+        "address": "255 State St, Boston, MA 02109",
+        "reason": "Founded in 1950, it is renowned for its clam chowder, which has been served to numerous dignitaries including President Obama."
+    },
+    {
+        "name": "The Capital Grille",
+        "address": "900 Boylston St, Boston, MA 02115",
+        "reason": "Established in 1990, it is famous for its dry-aged steaks and extensive wine list, winning the Wine Spectator Award of Excellence."
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'No. 9 Park'
+  [LOCAL-329] Captured 6 substantive selection reason(s)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Legal Sea Foods @ 255 State St, Boston, MA 02109
+   - The Capital Grille @ 900 Boylston St, Boston, MA 02115
+   - Oleana @ 134 Hampshire St, Cambridge, MA 02139
+   - Union Oyster House @ 41 Union St, Boston, MA 02108
+   - Mamma Maria @ 3 North Sq, Boston, MA 02113
+   - Yvonne's @ 100 Tremont St, Boston, MA 02108
+  [LOCAL-557] Restaurant request names ['Chart House'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Chart House' was NOT among the candidates — INSERTED as a user-explicit stop
+  [LOCAL-547] 1 requested stop(s) were missing from every fill path and were inserted: ['Chart House']
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Chart House, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 7 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Chart House - Chart House is a chain of upscale seafood restaurants
+   OK Verified Legal Sea Foods - Legal Sea Foods is a well-known chain of seafood restaurants
+   OK Verified The Capital Grille - The Capital Grille is a chain of upscale steakhouses
+   X  Excluded Oleana - Oleana is a restaurant located in Cambridge, Massachusetts
+   OK Verified Union Oyster House - Union Oyster House is a historic restaurant in Boston, Massachusetts
+   OK Verified Mamma Maria - Mamma Maria is a restaurant located in Boston, Massachusetts
+   OK Verified Yvonne's - Yvonne's is a restaurant located in Boston, Massachusetts
+
+! PHASE 4 excluded 1 POI(s)
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 6 stops pass location guard
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 4×VENUE_ONLY (not enough covered candidates to fill 4 stops)
+  [LOCAL-212] Selected: ['Chart House=VENUE_ONLY', 'Union Oyster House=VENUE_ONLY', 'The Capital Grille=VENUE_ONLY', 'Mamma Maria=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ["Yvonne's=VENUE_ONLY", 'Legal Sea Foods=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Chart House=5.5', 'Union Oyster House=8.0', 'The Capital Grille=3.0', 'Mamma Maria=2.0']
+  [LOCAL-349] Yield scores (dropped):  ["Yvonne's=1.0", 'Legal Sea Foods=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 4/6 stops verified (67%), 2 would be dropped
+    [VERIFIED] 'Chart House' — wikipedia_summary: 'Chart House' is dining+city
+    [VERIFIED] 'Union Oyster House' — wikipedia_summary: 'Union Oyster House' is dining+city
+    [VERIFIED] 'The Capital Grille' — wikipedia_summary: 'The Capital Grille' is dining+city
+    [UNVERIFIED] 'Mamma Maria' — no evidence
+    [UNVERIFIED] "Yvonne's" — no evidence
+    [VERIFIED] 'Legal Sea Foods' — wikipedia_summary: 'Legal Sea Foods' is a restaurant
+    [HARVEST] 'Legal Sea Foods': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 1 verified_no_detail
+    [DINING-HARVEST] 'Legal Sea Foods': +6 passages from ['https://boston.eater.com/2015/8/20/9181971/legal-sea-foods-chestnut-hill-roger-berkowitz-40-years', 'https://en.wikipedia.org/wiki/Legal_Sea_Foods', 'https://historycambridge.org/articles/legal-seafoods/', 'https://www.facebook.com/LegalSeaFoods/videos/rolling-with-the-best-chef-tim-in-cranston-showing-us-how-its-done-during-their-/831359493309030/', 'https://www.facebook.com/TasteAtlas/posts/legendary-restaurantslegal-sea-foods-boston-ma-usa-legal-sea-foods-was-born-in-1/2547563212146033/', 'https://www.legalseafoods.com/about-us/']
+    [DINING-HARVEST] Summary: 1 harvested, 3 already had corpus, 0 no facts found
+    [INTERPRETIVE] 'Chart House': +1 passages (2 queries)
+    [INTERPRETIVE] 'Legal Sea Foods': +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +3 passages, 8 queries issued, 0 attributions dropped
+  [LOCAL-329] Persisted 1 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_145415.txt'
+
+======================================================================
+CALL #006 | 14:54:52.149 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0008 (1036 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-353] Querying OSM for dining operational details (city: Chart)
+  [LOCAL-353] Chart House: no sourceable facts in OSM — omitted
+  [LOCAL-353] Union Oyster House: no sourceable facts in OSM — omitted
+  [LOCAL-353] The Capital Grille: no sourceable facts in OSM — omitted
+  [LOCAL-353] Mamma Maria: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Chart House: no guide price, no OSM facts — silence
+  [LOCAL-354] Union Oyster House: no guide price, no OSM facts — silence
+  [LOCAL-354] The Capital Grille: no guide price, no OSM facts — silence
+  [LOCAL-354] Mamma Maria: no guide price, no OSM facts — silence
+Extracted first POI coordinates: (42.3598, -71.0506)
+
+=== Extracted POI Information ===
+1. Chart House
+   Address: 60 Long Wharf, Boston, MA 02110
+   Coordinates: 42.3598, -71.0506
+   Directions: From the Aquarium T station, exit and head towards the waterfront, walking along...
+2. Union Oyster House
+   Address: 41 Union St, Boston, MA 02108
+   Coordinates: 42.3601, -71.0573
+   Directions: Exit Chart House and head northwest on Long Wharf, turn left onto State St, then...
+3. The Capital Grille
+   Address: 900 Boylston St, Boston, MA 02115
+   Coordinates: 42.3497, -71.0785
+   Directions: Leave Union Oyster House and walk south on Union St, turn left onto Washington S...
+4. Mamma Maria
+   Address: 3 North Sq, Boston, MA 02113
+   Coordinates: 42.3645, -71.0547
+   Directions: From The Capital Grille, head northeast on Boylston St, turn right onto Arlingto...
+================================
+
+  [D538] 'Chart House' via serp(29)+openai+gemini: hours=11-10, reservation=Reservations accepted, price_band=dinner entrées around $29-$55; prix-fixe
+  [D538] ⚠️  DROPPED 'Chart House' — reported permanently closed: Chart House, a riverfront staple in Weehawken, New Jersey, has closed as of May 14. A Mastro's Steakhouse is planned for the site. [https://www.northj
+  [D538] 'Union Oyster House' via serp(26)+openai+gemini: hours=Sun–Thursday 11:00 am - 9:00 pm, Fri & S, reservation=reservations accepted/recommended (onlin, price_band=entrees around $24.95-$34.95; expect $35
+  [D538] 'The Capital Grille' via serp(29)+openai+gemini: hours=11:30 AM – 10:00 PM, reservation=reservations recommended / accepted, but, price_band=entrées from $42–$47+, overall $$$$ ($50
+  [D538] 'Mamma Maria' via serp(28)+openai+gemini: hours=Monday - Thursday 17:00-21:15, Friday - , reservation=reservation essential, often weeks ahead, price_band=Dinner $38 (Sunday-Friday)
+  [D538] 1 restaurant(s) dropped as closed; 3 remain
+  [D545] Replenish round 1: need 1, proposed 3
+  [D545]   rejected 'Legal Sea Foods - Long Wharf' — reported permanently closed: The historic Long Wharf venue has operated as Chart
+  [D545]   ADDED 'The Barking Crab' — opened in 1994 and became a popular spot for seafood lovers 
+  [D546]     practicals: hours=Sunday – Wednesday 12:00-21:00, Th, reservation=not accepting reservations, price_band=around $45 per person (soups & sal, cuisine=seafood
+  [D545] +8 story fact(s) for 'Union Oyster House' via gemini (8 high)
+        [high] In 1796, Louis Philippe, the Duke of Orléans, rented the upper floor of the Union Oyster House building to tea
+        [high] In 1775, the Union Oyster House building housed Hopestill Capen’s dry-goods business and was used by Continent
+        [high] Daniel Webster, a 19th-century statesman, was a regular at the Union Oyster House, where he consumed six plate
+  [D545] +6 story fact(s) for 'The Capital Grille' via gemini (5 high)
+        [high] John Hancock used the John Hancock Counting House, now the Chart House, as his headquarters for smuggling good
+        [high] On September 30–October 1, 1768, British warships anchored in Boston Harbor and a full armed regiment disembar
+        [low] Staff at the Chart House report ghost accounts involving cold drafts, locked office door latches turning on th
+  [D545] +7 story fact(s) for 'Mamma Maria' via gemini (7 high)
+        [high] In 1768, British customs officers seized John Hancock’s sloop, Liberty, docked at Long Wharf for illicit offlo
+        [high] The Marquis de Lafayette was greeted by roaring crowds at Long Wharf during his triumphal return tour of Ameri
+        [high] During the Blizzard of ’78, the Chart House was completely surrounded by deep Atlantic water, flooding the low
+  [D545] +8 story fact(s) for 'The Barking Crab' via gemini (7 high)
+        [high] In March 2008, developer John B. Hynes III unveiled plans for the 'Seaport Square' project, proposing to reloc
+        [high] In July 2012, a fire at the Barking Crab was caused by a discarded cigarette igniting wooden pilings beneath t
+        [high] Over Thanksgiving 2020, Boston Police caught a burglar attempting to steal high-end liquor from the Barking Cr
+  [D538] Practicals acquired for 4/4 stop(s)
+[TIMING] phase=poi_selection elapsed=224.6s cumulative=226.9s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Union Oyster House restaurant of Chart House' → 41358 chars
+  [LOCAL-47] Union Oyster House: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'The Capital Grille restaurant of Chart House' → 10023 chars
+  [LOCAL-47] The Capital Grille: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Mamma Maria restaurant of Chart House' → 81525 chars
+  [LOCAL-47] Mamma Maria: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'The Barking Crab restaurant of Chart House' → 6877 chars
+  [LOCAL-47] The Barking Crab: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Chart House model=gpt-4o tokens=1558 (in=845 out=713) cost=$0.0092 latency=6.1s
+[COST_METER] FRESH | spine_generate | $0.009243 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0092
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (31 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Union Oyster House' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='The Capital Grille' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Mamma Maria' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='The Barking Crab' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['anecdote', 'culture', 'anecdote', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=20.3s cumulative=247.2s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=247.2s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=247.2s
+
+Generating description for Stop 1: Union Oyster House by , ...
+
+Generating description for Stop 2: The Capital Grille by , ...
+
+Generating description for Stop 3: Mamma Maria by , ...
+
+Generating description for Stop 4: The Barking Crab by , ...
+  [LOCAL-381] stop='Union Oyster House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Mamma Maria' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Capital Grille' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Barking Crab' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=8 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=8 usable=8 (t1t2=0, t3=0, market=0)
+    Top scores: [('Union Oyster House', 16, ''), ('Union Oyster House', 13, ''), ('Union Oyster House', 8, '')]
+  [LOCAL-402] Stop 1: injected 8 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 8 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=15833 after=30266 (+14433 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (30266)
+  [LOCAL-411] Stop 3 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=7 usable=7 (t1t2=0, t3=0, market=0)
+    Top scores: [('Mamma Maria', 8, ''), ('Mamma Maria', 8, ''), ('Mamma Maria', 8, '')]
+  [LOCAL-402] Stop 3: injected 7 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15637 after=26818 (+11181 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26818)
+  [LOCAL-411] Stop 2 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Capital Grille', 10, ''), ('The Capital Grille', 8, ''), ('The Capital Grille', 6, '')]
+  [LOCAL-402] Stop 2: injected 6 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15514 after=27277 (+11763 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27277)
+  [LOCAL-411] Stop 4 snippet ranking: input=9 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=9 usable=9 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Barking Crab', 13, ''), ('The Barking Crab', 13, ''), ('The Barking Crab', 8, '')]
+  [LOCAL-402] Stop 4: injected 9 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=16207 after=23515 (+7308 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23515)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560B/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0361 (7609 tokens, model=gpt-4o)
+Stop 1 description word count: 353 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0284 (5973 tokens, model=gpt-4o)
+Stop 4 description word count: 336 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0324 (6822 tokens, model=gpt-4o)
+Stop 3 description word count: 318 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0319 (6715 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Inside The Capital Grille, the savory aroma of expertly prepared steaks fills the air. The dining room hums with a mix of local sports figures and business professionals, some of whom are in the midst of significant negotiations. It's here that Boston's sports media has sometimes caught wind of trad"
+  [LOCAL-417] Stop 2: retrying (attempt 1, temp=0.90)...
+Stop 2 API call cost: $0.0319 (6717 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Step inside The Capital Grille, where the ambiance is as rich as its history. Known for its expertly prepared dry-aged steaks, this upscale steakhouse offers a sophisticated dining experience that echoes Boston's maritime connections. The menu, meticulously crafted, features dishes that resonate wit"
+  [LOCAL-417] Stop 2: retrying (attempt 2, temp=1.00)...
+Stop 2 API call cost: $0.0324 (6820 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'While the Capital Grille may initially captivate with its polished wood, ambient lighting, and air of calm affluence, the stories behind these walls offer another layer of intrigue. Consider the surprising theft incidents: the restaurant has been a target for sophisticated dine-and-dash schemes, whe'
+  [LOCAL-417] Stop 2: retrying (attempt 3, temp=1.00)...
+Stop 2 API call cost: $0.0323 (6796 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Entering The Capital Grille, the scent of expertly prepared steaks—dry-aged in-house—mingles with chilled air conditioning, a welcome respite from the bustling city outside. Known for providing a luxurious dining experience, this steakhouse offers more than just its acclaimed fare. It stands as a fo'
+  [LOCAL-417] Stop 2: retrying (attempt 4, temp=1.00)...
+Stop 2 API call cost: $0.0321 (6756 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 2: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'The Capital Grille, renowned for dry-aged steaks and a rich array of fresh seafood, has been more than just a culinary destination. Once, this establishment faced scrutiny and legal battles due to worker advocacy groups alleging unfair racial steering and tip-pooling practices. Seeking justice and e'
+  [LOCAL-417] Stop 2: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 2: resolved final description (361 words)
+Stop 2 description word count: 361 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Union Oyster House': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='The Capital Grille': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Mamma Maria': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='The Barking Crab': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.003882 (input=15933, output=2486)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 1 para 5: retry IMPROVED (4→1 errors)
+  [LOCAL-192] Stop 2 para 1: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 2 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 2 para 5: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 10 paragraphs retried, 8 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0040 (4968 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Mamma Maria': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 4 'The Barking Crab': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 0 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 4 'The Barking Crab': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 2 'The Capital Grille': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Union Oyster House': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'The Capital Grille': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Mamma Maria': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 5 sentences deleted, 0 paragraphs emptied, 3 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 17
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 12
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='The Capital Grille' conf=high reason='Generic scene-setting applicable to any historic church.': "As you exit, the next destination on this tour offers an aromatic escape to a slice of Italy nestled within the city's e"
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='Imagine Daniel Webster' reason='It does not specify that Daniel Webster visited or was associated with the Union Oyster House.' in: "It is not just the history that draws visitors. Imagine Daniel Webster, the esteemed 19th-century st"
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Today, Union Oyster House remains a beloved culinary destination, offering a menu rich with classic "
+    [LOCAL-472] UNGROUNDED entity stop='The Capital Grille' entity='Restaurant Week' reason='No concrete link to "Restaurant Week" is provided.' in: "The Capital Grille is revered for its menu, where steaks are the highlight, expertly aged in-house t"
+    [LOCAL-472] UNGROUNDED entity stop='Mamma Maria' entity='Long Wharf' reason='No concrete link between Mamma Maria and Long Wharf is established.' in: "Inside, the restaurant is steeped in both culinary and local history. Mamma Maria’s story is woven i"
+    [LOCAL-472] UNGROUNDED entity stop='Mamma Maria' entity='John Hancock' reason='No concrete link between John Hancock and Mamma Maria is provided.' in: "Inside, the restaurant is steeped in both culinary and local history. Mamma Maria’s story is woven i"
+    [LOCAL-472] UNGROUNDED entity stop='Mamma Maria' entity='Stamp Act' reason='No concrete link between the Stamp Act and Mamma Maria is provided.' in: "Inside, the restaurant is steeped in both culinary and local history. Mamma Maria’s story is woven i"
+    [LOCAL-472] UNGROUNDED entity stop='Mamma Maria' entity='Eurovision Song Contest' reason='No concrete link between Eurovision and Mamma Maria is provided.' in: "Managed by John McGee since 1988, Mamma Maria continues to be a cornerstone of the community. The re"
+    [LOCAL-472] UNGROUNDED entity stop='Mamma Maria' entity='Mamma Mia' reason='No concrete link between "Mamma Mia" and Mamma Maria is provided.' in: "Managed by John McGee since 1988, Mamma Maria continues to be a cornerstone of the community. The re"
+    [LOCAL-472] UNGROUNDED entity stop='The Barking Crab' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The Barking Crab, originally opened as "Venus – Seafood in the Rough" in 1994, has become a fixture "
+    [LOCAL-472] UNGROUNDED entity stop='The Barking Crab' entity='Venus – Seafood in the Rough' reason='No concrete link to the stop is provided.' in: "The Barking Crab, originally opened as "Venus – Seafood in the Rough" in 1994, has become a fixture "
+    [LOCAL-472] UNGROUNDED entity stop='The Barking Crab' entity='In March' reason='No concrete link between John B. Hynes III and The Barking Crab is provided.' in: "Beneath its jovial surface lies a history of resilience and adaptation. In March 2008, The Barking C"
+    [LOCAL-472] UNGROUNDED entity stop='The Barking Crab' entity='Boston Inspectional Services' reason='It does not specify how Boston Inspectional Services relates to The Barking Crab.' in: "Beneath its jovial surface lies a history of resilience and adaptation. In March 2008, The Barking C"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/49)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 22
+    Glossed (composed): 4
+    Suppressed (already explained): 2
+    Degraded (name dropped): 7
+    Guard failures: 0
+    Known (skipped): 9
+    Triage: 2364 tokens, $0.0006, 6.7s
+    Gloss: 1161 tokens, $0.0002, 3.7s
+    Compose: 1737 tokens, $0.0003, 2.4s
+    Total added cost: $0.0011
+    Stops affected: 4
+    Glosses applied:
+      • National Historic Landmark → SUPPRESSED (already explained)
+      • Hopestill Capen → DEGRADED (name dropped)
+      • Ebenezer Hancock → "a prominent Boston merchant and revolutionary" [source: model]
+      • Restaurant Week → DEGRADED (name dropped)
+      • Long Wharf → DEGRADED (name dropped)
+      • Stamp Act → "a law imposing direct taxes on colonies" [source: model]
+      • Lieutenant Governor Thomas Hutchinson → "the last governor before the Revolution" [source: model]
+      • North Square → DEGRADED (name dropped)
+      • John → SUPPRESSED (already explained)
+      • Chef Antonio → DEGRADED (name dropped)
+      • Eurovision Song Contest → DEGRADED (name dropped)
+      • Seaport Square → DEGRADED (name dropped)
+      • Boston Inspectional Services → "the department enforcing building codes and safety standards" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 3 'Mamma Maria': claim='1768 (in context: "n Hancock sloop, Liberty, was seized in 1' contradicted_by='cGee bought the restaurant in 1988 and made the ...' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=3 claim='1768 (in context: "n Hancock sloop, Liberty, was s' evidence='cGee bought the restaurant in 1988 and made the ..' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Chart House, Boston, MA'...
+   X SCOPE-CHECK REMOVED 'The Capital Grille' — outside 'Chart House, Boston, MA': The Capital Grille is located at 900 Boylston St, Boston, MA 02115, which is outside the bounds of Chart House, Boston, MA. (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "The Capital Grille", "aliases": [], "scope": "Chart House, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "The Capital Grille is located at 900 Boylston St, Boston, MA 02115, which is outside the bounds of Chart House, Boston, MA.", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+   X SCOPE-CHECK REMOVED 'Mamma Maria' — outside 'Chart House, Boston, MA': The stop 'Mamma Maria' is not physically located inside or within the bounds of 'Chart House, Boston, MA'. It is a separate location in the North End neighborhood of Boston. (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "Mamma Maria", "aliases": [], "scope": "Chart House, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "The stop 'Mamma Maria' is not physically located inside or within the bounds of 'Chart House, Boston, MA'. It is a separate location in the North End neighborhood of Boston.", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+   X SCOPE-CHECK REMOVED 'The Barking Crab' — outside 'Chart House, Boston, MA': The Barking Crab is not located within the bounds of Chart House, Boston, MA. (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "The Barking Crab", "aliases": [], "scope": "Chart House, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "The Barking Crab is not located within the bounds of Chart House, Boston, MA.", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+OK PHASE 5.6: 1/4 stop(s) within scope
+  [PHASE 5.6] >50% of stops were outside 'Chart House, Boston, MA' — scope is likely a small single venue; delivering 1 verified stop(s).
+OK PHASE 5.7: Dangling-reference scrub complete (1 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Union Oyster House' (index 37) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 1 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Union Oyster House': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Union Oyster House' — 353w → 295w after gates, 11 sentence(s) removed
+    removed: "Welcome to the Union Oyster House, America’s oldest continuously operating restaurant, where history"
+    removed: "Established in 1826, this iconic eatery has been serving up its famed oysters and seafood dishes for"
+    removed: "Nestled in a building constructed between 1716 and 1717, it's now a proud National Historic Landmark"
+    removed: "One can almost imagine the bustling activity of 1775 when the building served as Hopestill Capen's d"
+    removed: "Fast forward to 1796, and the upper floors of this venerable structure hosted the Duke of Orléans, L"
+    removed: "His presence adds a regal layer to the establishment's rich tapestry, a reminder of the varied roles"
+    removed: "But it is not just the history that draws visitors."
+    removed: "Open daily, with hours extending until 9:00 pm on weekdays and 10:00 pm on weekends, it's a spot whe"
+    removed: "Expect to spend around $35 to $45 per person for a casual lunch, savoring the tastes of Boston's sea"
+    removed: "As you indulge, remember that each morsel connects you to a storied past, a savory journey through t"
+    removed: "Now, as we leave the echoes of history behind, anticipate how Boston's seafood legacy might surprise"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 1 eligible stop(s) concurrently (max_workers=1)
+
+Generating description for Stop 1: Union Oyster House by , ...
+  [LOCAL-381] stop='Union Oyster House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=8 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=8 usable=8 (t1t2=0, t3=0, market=0)
+    Top scores: [('Union Oyster House', 16, ''), ('Union Oyster House', 13, ''), ('Union Oyster House', 8, '')]
+  [LOCAL-402] Stop 1: injected 8 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 8 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=15833 after=30266 (+14433 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (30266)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560B/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0393 (8271 tokens, model=gpt-4o)
+Stop 1 description word count: 322 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 4.5s for 1 stop(s) at max_workers=1
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 0 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.chart-house.com/location/chart-house-boston-ma/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.chart-house.com/location/chart-house-b
+  [LOCAL-427] HTTP 200 from https://chickenthiefkitchens.wordpress.com/travel-wanderings-the-food-side-shows/chart-house-boston-ma-iconic-seafood-history-atmosphere-views/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1511 chars from https://chickenthiefkitchens.wordpress.com/travel-
+  [LOCAL-427] Timeout from https://www.opentable.com/r/chart-house-restaurant-boston — retrying in 2.0s
+  [LOCAL-427] Timeout from https://www.opentable.com/r/chart-house-restaurant-boston — budget exhausted (2 attempts)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DWIIx2xkhVU/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.chart-house.com/boston-private-venues/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1570 chars from https://www.chart-house.com/boston-private-venues/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/capecodrestaurantsgroup/posts/983695952871815/?locale=zh_CN&hl=en (attempt 1)
+  [D512] verb discovery: query='restaurant tour of Chart House, Boston, MA how the dish is prepa' -> 7 new verb(s): roasted, grilled, cooked, prepared, whipped, cooled, dried
+  [D512] _AGENCY_VERB widened by 7 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Union Oyster House                         37    47    16    57
+    [LOCAL-485] index mean 37.0 over 1 stop(s), range 37-37
+    [LOCAL-485] weakest: 'Union Oyster House' at 37
+[TIMING] phase=story_first elapsed=197.9s cumulative=445.1s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (81 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 81 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 53 words (delta: -28)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "From Kennedy's favorite booth to the legacy of Atwood's Oyster House, this stop reveals the deep-roo..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 42
+    Words after:  42
+    Delta: 0
+    Stops affected: 0/1
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 1/1
+    Fewer than 2 stops with content — omitting Part 4
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 1 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (1 selected == 1 delivered)
+  [D536] ⚠️  LISTENER ASKED FOR 4 STOP(S), DELIVERING 1 — category='restaurant', reason='stops removed by gates or filters'
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap: fewer than 2 delivered stops — skipped
+  [LOCAL-280] No recap — closing offer gets full 3-sentence budget
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (0.6 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 1 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (5009 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (4 line(s), 6 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 1/1 stop(s), spoken to the listener.
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 1 warning(s)
+    [ERROR] Part 3: PARTS_OUT_OF_ORDER — Part 3 appears before Part 2 (sentence 2 vs 3).
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [WARNING] Part 3: PART3_FLUFF_DOMINANT — Part 3 contains a sourced fact but is dominated by vague language.
+
+=== Word Count Statistics ===
+Stop 1: Union Oyster House - 353 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (3055 chars, 1/4 stops)
+  [LOCAL-540] defects seen: ['no_story', 'thin']
+  [LOCAL-540]   no_story [advisory]: no named people anywhere in the tour
+  [LOCAL-540]   thin [advisory]: 1/4 stops delivered
+
+Total API cost: $0.1448 (39274 tokens)
+Grounding:      $0.5250 (15 requests)
+Tour total:     $0.6698
+Provenance:     2/14 factual sentences sourced, 12 unsourced (2 corpus, 0 grounded, 12 parametric)
+CACHE STORE: restaurant tour of Chart House, Boston, MA / restaurant / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: restaurant_tour_of_Chart_House__Boston__MA_restaurant_tour_20261002_150142.txt
+  [C5-5] Evidence (provenance-only) persisted: restaurant_tour_of_Chart_House__Boston__MA_restaurant_tour_20261002_150142_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Chart House, Boston, MA
+Tour-Category: restaurant
+
+Stop 1: Union Oyster House
+
+Address: 41 Union St, Boston, MA 02108
+
+Coordinates: 42.3601, -71.0573
+
+Type/Specialty: Historic seafood restaurant
+
+Specific Examples: Clam chowder, oysters on the half shell, and a historic ambiance.
+
+Orientation: You are about to embark on a walking journey through Chart House, Boston, MA. This single stop showcases the Union Oyster House, Boston's oldest continuou...
+
+[TIMING] phase=packing elapsed=1.8s cumulative=447.0s
+[TIMING] phase=verification elapsed=0.0s cumulative=447.0s
+[TIMING] TOTAL wall=447.0s phases: poi_selection=224.6s, story_first=197.9s, fact_sheets=20.3s, intent=2.3s, packing=1.8s, narration=0.0s, external_lookups=0.0s, verification=0.0s

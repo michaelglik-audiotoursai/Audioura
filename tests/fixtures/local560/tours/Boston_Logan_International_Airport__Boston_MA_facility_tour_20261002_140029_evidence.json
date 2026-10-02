@@ -1,0 +1,177 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 0,
+      "unsourced": 20,
+      "total": 20,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 20
+    },
+    "per_stop": {
+      "Terminal A Main Concourse": {
+        "sourced": 0,
+        "unsourced": 9,
+        "total": 9
+      },
+      "boarding gates": {
+        "sourced": 0,
+        "unsourced": 3,
+        "total": 3
+      },
+      "apron": {
+        "sourced": 0,
+        "unsourced": 3,
+        "total": 3
+      },
+      "air traffic control tower": {
+        "sourced": 0,
+        "unsourced": 5,
+        "total": 5
+      }
+    },
+    "claims": [
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "From the bustling Terminal A Main Concourse to the iconic air traffic control tower, your route threads through the heart of this transportation hub.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "St. Mary's Cathedral, dedicated by Fr. John Therry, stands as a testament to Irish heritage, while the air traffic control tower, designed by Gustave Eiffel, symbolizes the airport's historical tapestry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "As you journey through the upcoming stops, you will witness the departure of American Airlines Flight 11 and United Airlines Flight 175 on September 11, 2001, from the boarding gates and the historic landing of Pope John Paul II in 1979 on the apron.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "In 2005, this terminal achieved the distinction of being the first in the world to receive a LEED Gold certification, a pioneering step in sustainable architectural design.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "The transformation from Minoru Yamasaki's original brutalist design for Eastern Air Lines into this green-certified marvel reflects a broader shift in how airports are conceived.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "Boston Logan's journey began with a legislative decision in 1922, when the Massachusetts General Court authorized an airfield's construction in East Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "This initiative, championed by military aviation leaders and the Boston Chamber of Commerce, was driven by the need for a modern base for aerial defense and commercial aviation in the post-war era.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "The initial site spanned 189 acres of tidal flats and marshland at Jeffries Point, establishing the foundation for what would become a vital hub of international travel.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "This terminal is not just a transit point but a monument to Boston's forward-thinking spirit, highlighting the intricate relationship between architectural design and the aspirations of a city continually looking to the future.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "boarding gates",
+        "text": "At these boarding gates, Boston Logan International Airport becomes a historical crossroads.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "boarding gates",
+        "text": "Back on July 22, 1927, famed aviator Charles Lindbergh touched down in his Spirit of St. Louis here, part of a nationwide tour after his pioneering solo transatlantic flight.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "boarding gates",
+        "text": "Imagine the scene as over 40,000 spectators gathered, their excitement palpable as Lindbergh, the hero of the skies, arrived.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "apron",
+        "text": "In 1976, Queen Elizabeth II and Prince Philip touched down here as part of their visit to celebrate the United States Bicentennial.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "apron",
+        "text": "They arrived aboard the British Royal Flight, marking a moment of international camaraderie and highlighting the airport's role as a gateway to the world.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "apron",
+        "text": "Just three years later, in 1979, Pope John Paul II made his historic landing here, stepping onto this pavement to begin his first visit to the United States as Pope.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower",
+        "text": "Designed by the historic architectural firm Perry, Dean, Stahl & Rogers, and completed in 1973, it serves as the nerve center of this expansive airport.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower",
+        "text": "A beacon of control and coordination, the tower manages over 1,200 flight operations daily, ensuring the seamless flow of air traffic with precision technology.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower",
+        "text": "The airport itself, named after General Edward Lawrence Logan, honors a local Spanish–American War veteran who was a staunch advocate for veterans' benefits, especially for military pilots.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower",
+        "text": "His legacy resonates through the airport, as it continues to connect New England to the world, much like the ambitions he championed during his lifetime.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower",
+        "text": "This historic moment marked a rare occasion where the spiritual met the logistical, as the airport facilitated a visit that would be remembered by thousands of faithful gathered to greet the Pope.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

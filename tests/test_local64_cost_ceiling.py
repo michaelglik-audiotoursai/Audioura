@@ -55,7 +55,7 @@ def test_under_target():
 
 
 def test_between_target_and_hard_limit():
-    """Cost between $0.15 and $1.30 → warn but NOT abort."""
+    """Cost between $0.15 and $2.00 → warn but NOT abort."""
     import importlib
     import cost_ceiling_monitor
     importlib.reload(cost_ceiling_monitor)
@@ -77,14 +77,14 @@ def test_between_target_and_hard_limit():
 
 
 def test_over_hard_limit():
-    """Cost over $1.30 → ABORT."""
+    """Cost over $2.00 → ABORT."""
     import importlib
     import cost_ceiling_monitor
     importlib.reload(cost_ceiling_monitor)
 
     with patch.dict('sys.modules', {'psycopg2': MagicMock()}):
         result = cost_ceiling_monitor.enforce_cost_ceiling(
-            total_cost=1.50,
+            total_cost=2.50,
             job_id="test-job-3",
             user_id="test-user",
             tour_category="museum",
@@ -95,7 +95,7 @@ def test_over_hard_limit():
     check("breach_level is hard_limit_exceeded", result["breach_level"] == "hard_limit_exceeded",
           f"got {result['breach_level']}")
     check("message contains ABORT", "ABORT" in result["message"], result["message"])
-    check("message mentions $1.30", "1.30" in result["message"], result["message"])
+    check("message mentions $2.00", "2.00" in result["message"], result["message"])
     print("PASS: test_over_hard_limit\n")
 
 
@@ -112,14 +112,14 @@ def test_ceiling_stats_increment():
         check("target_warnings incremented", stats["target_warnings"] == 1,
               f"got {stats['target_warnings']}")
 
-        # Trigger an abort
-        cost_ceiling_monitor.enforce_cost_ceiling(total_cost=2.00, job_id="j2")
+        # Trigger an abort (must exceed $2.00 ceiling — D45)
+        cost_ceiling_monitor.enforce_cost_ceiling(total_cost=2.50, job_id="j2")
         stats = cost_ceiling_monitor.get_ceiling_stats()
         check("hard_limit_aborts incremented", stats["hard_limit_aborts"] == 1,
               f"got {stats['hard_limit_aborts']}")
         check("last_abort_job_id set", stats["last_abort_job_id"] == "j2",
               f"got {stats['last_abort_job_id']}")
-        check("last_abort_cost set", stats["last_abort_cost"] == 2.00,
+        check("last_abort_cost set", stats["last_abort_cost"] == 2.50,
               f"got {stats['last_abort_cost']}")
     print("PASS: test_ceiling_stats_increment\n")
 
@@ -192,8 +192,8 @@ def test_exact_boundary_values():
         result = cost_ceiling_monitor.enforce_cost_ceiling(total_cost=0.15, job_id="boundary-1")
         check("cost == target → no warn", result["warn"] is False, f"got {result['warn']}")
 
-        # Exactly at hard limit — should warn but NOT abort (<=)
-        result = cost_ceiling_monitor.enforce_cost_ceiling(total_cost=1.30, job_id="boundary-2")
+        # Exactly at hard limit ($2.00 per D45) — should warn but NOT abort (<=)
+        result = cost_ceiling_monitor.enforce_cost_ceiling(total_cost=2.00, job_id="boundary-2")
         check("cost == hard_limit → no abort", result["abort"] is False, f"got {result['abort']}")
         check("cost == hard_limit → warn", result["warn"] is True, f"got {result['warn']}")
 

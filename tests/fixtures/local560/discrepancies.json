@@ -1,0 +1,996 @@
+{
+  "generated_by": "tests/fixtures/local560/mark_discrepancies.py",
+  "note": "A discrepancy case = a CHECKER call whose recorded verdict FOUND a problem. Extraction/listing checkers (has_reject_verdict=false) emit no reject verdict and are excluded from the recall denominator.",
+  "summary": {
+    "checker_sites": 16,
+    "sites_with_reject_verdict": 7,
+    "total_checker_calls": 531,
+    "total_discrepancy_cases_found": 239
+  },
+  "sites": {
+    "stop_specificity_gate.py:433": {
+      "role": "CHECKER",
+      "verdict_grammar": "VERDICT: UNGROUNDED/GENERIC (paragraph not specific to this stop)",
+      "has_reject_verdict": true,
+      "calls": 279,
+      "found": 110,
+      "clean": 169,
+      "found_examples": [
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 48,
+          "subject": "An audio-tour paragraph about the stop \"Boston Sail Loft\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific person or work is mentioned with a concrete link to the stop."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 52,
+          "subject": "An audio-tour paragraph about the stop \"Union Oyster House\" names \"Charles Forster\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify that Forster worked or dined at the Union Oyster House."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 57,
+          "subject": "An audio-tour paragraph about the stop \"Union Oyster House\" names \"John Hancock\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify a direct link between John Hancock and the Union Oyster House."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 59,
+          "subject": "An audio-tour paragraph about the stop \"Union Oyster House\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific person or work is mentioned with a concrete link to the stop."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 68,
+          "subject": "An audio-tour paragraph about the stop \"Parker's Restaurant\" names \"Boston Cream Pie\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between Boston Cream Pie and Parker's Restaurant is provided."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 70,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to \"New England\" is provided."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 72,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"Harry Berkowitz\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify how Harry Berkowitz is directly related to this stop."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 79,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific link to \"New England\" is provided."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 80,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"Restaurant Week\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 53,
+          "subject": "An audio-tour paragraph about the stop \"The Capital Grille\" names \"Darden Restaurants\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to The Capital Grille is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 54,
+          "subject": "An audio-tour paragraph about the stop \"The Capital Grille\" names \"Restaurant Opportunities Centers\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to The Capital Grille is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 57,
+          "subject": "An audio-tour paragraph about the stop \"The Capital Grille\" names \"Chef Jason Santos\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to The Capital Grille is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 58,
+          "subject": "A paragraph from an audio tour was written about the stop \"The Capital Grille\" (a church).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic scene-setting without specific claims."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 61,
+          "subject": "An audio-tour paragraph about the stop \"Stephanie's On Newbury\" names \"Kathy Sidell\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 62,
+          "subject": "An audio-tour paragraph about the stop \"Stephanie's On Newbury\" names \"Sidell Hospitality\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify a direct connection to \"Stephanie's On Newbury.\""
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 64,
+          "subject": "A paragraph from an audio tour was written about the stop \"Stephanie's On Newbury\" (a church).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic description of dining atmosphere."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 67,
+          "subject": "An audio-tour paragraph about the stop \"Saltie Girl\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to Kathy Sidell's relationship with the stop."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 70,
+          "subject": "An audio-tour paragraph about the stop \"Saltie Girl\" names \"Jason Santos\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify how Jason Santos is directly linked to Saltie Girl."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 73,
+          "subject": "An audio-tour paragraph about the stop \"Mistral\" names \"Southern France\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific person or work is mentioned with a concrete link to the stop."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 75,
+          "subject": "An audio-tour paragraph about the stop \"Mistral\" names \"Tom Brady\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to Mistral is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 76,
+          "subject": "An audio-tour paragraph about the stop \"Mistral\" names \"Gisele Bündchen\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to Mistral is provided."
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 79,
+          "subject": "A paragraph from an audio tour was written about the stop \"Mistral\" (a restaurant).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic claims about dining experience and hours."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 64,
+          "subject": "An audio-tour paragraph about the stop \"Union Oyster House\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific person or work is mentioned with a concrete link to the stop."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 67,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"Ronald Reagan\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to Legal Sea Foods - Long Wharf."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 69,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"On September\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between Hancock and Legal Sea Foods is provided."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 70,
+          "subject": "An audio-tour paragraph about the stop \"Legal Sea Foods - Long Wharf\" names \"John Hancock\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between John Hancock and Legal Sea Foods is provided."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 77,
+          "subject": "A paragraph from an audio tour was written about the stop \"The Capital Grille\" (a church).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic scene-setting claims apply to any historic church."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 79,
+          "subject": "An audio-tour paragraph about the stop \"The Barking Crab\" names \"In March\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between Hynes III and The Barking Crab is established."
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 80,
+          "subject": "An audio-tour paragraph about the stop \"The Barking Crab\" names \"In July\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between July and The Barking Crab is established."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 45,
+          "subject": "An audio-tour paragraph about the stop \"Cap Ferrat\" names \"Blanche Delacroix\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to Cap Ferrat is provided."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 47,
+          "subject": "An audio-tour paragraph about the stop \"Cap Ferrat\" names \"Billionaires' Peninsula,\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to Cap Ferrat is established."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 58,
+          "subject": "A paragraph from an audio tour was written about the stop \"Cap Ferrat\" (a viewpoint).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic claims about history, art, and relationships apply to any coastal viewpoint."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 59,
+          "subject": "An audio-tour paragraph about the stop \"Saint-Jean-Cap-Ferrat Peninsula Loop\" names \"King Leopold\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 60,
+          "subject": "An audio-tour paragraph about the stop \"Saint-Jean-Cap-Ferrat Peninsula Loop\" names \"Blanche Zélia Joséphine Delacroix\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 61,
+          "subject": "An audio-tour paragraph about the stop \"Saint-Jean-Cap-Ferrat Peninsula Loop\" names \"King Leopold II of\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 63,
+          "subject": "An audio-tour paragraph about the stop \"Saint-Jean-Cap-Ferrat Peninsula Loop\" names \"Béatrice de Rothschild\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 64,
+          "subject": "An audio-tour paragraph about the stop \"Saint-Jean-Cap-Ferrat Peninsula Loop\" names \"Maurice Ephrussi\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 69,
+          "subject": "An audio-tour paragraph about the stop \"Antibes Old Town\" names \"Free Commune\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific person or work is mentioned with a concrete link to the stop."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 81,
+          "subject": "An audio-tour paragraph about the stop \"La Croisette\" names \"La Belle Otero\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify how La Belle Otero is directly connected to La Croisette."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 83,
+          "subject": "A paragraph from an audio tour was written about the stop \"La Croisette\" (a church).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic scene-setting applicable to any historic church."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 89,
+          "subject": "An audio-tour paragraph about the stop \"Massif de l'Esterel\" names \"Plage du Débarquement\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between Abel Ballif and Plage du Débarquement is established."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 46,
+          "subject": "An audio-tour paragraph about the stop \"Terminal A Main Concourse\" names \"Environmental Design\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link to the stop is provided for Kallmann McKinnell & Wood."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 47,
+          "subject": "An audio-tour paragraph about the stop \"Terminal A Main Concourse\" names \"Boston City Hall\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify a direct link between Boston City Hall and the terminal."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 55,
+          "subject": "A paragraph from an audio tour was written about the stop \"Terminal A Main Concourse\" (a church).",
+          "verdict": "VERDICT: TRANSFERABLE  \nREASON: Generic claims about a church's role and design."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 56,
+          "subject": "An audio-tour paragraph about the stop \"boarding gates\" names \"At Boston Logan International Airport\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between named entities and the stop is provided."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 57,
+          "subject": "An audio-tour paragraph about the stop \"boarding gates\" names \"On September\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It mentions events but does not specify a concrete link to the stop."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 58,
+          "subject": "An audio-tour paragraph about the stop \"boarding gates\" names \"Boston Airport\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify a concrete link between Lindbergh and Boston Airport."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 61,
+          "subject": "An audio-tour paragraph about the stop \"boarding gates\" names \"St. Louis\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify how \"St. Louis\" relates to the boarding gates."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 65,
+          "subject": "An audio-tour paragraph about the stop \"apron\" names \"British Royal Flight\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between Queen Elizabeth II and the stop is provided."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 69,
+          "subject": "An audio-tour paragraph about the stop \"air traffic control tower\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific link to the air traffic control tower."
+        }
+      ]
+    },
+    "story_gate.py:201": {
+      "role": "CHECKER",
+      "verdict_grammar": "\"is_story\": false (candidate rejected as not a real story)",
+      "has_reject_verdict": true,
+      "calls": 116,
+      "found": 90,
+      "clean": 26,
+      "found_examples": [
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 26,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information and context about the Union Oyster House but lacks a clear narrative arc with a named person experiencing a struggle and resolut"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 27,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not present a named person with a clear arc of setup, struggle, and resolution. It focuses on the restaurant's history and innovations without a narrative "
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 28,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information about Charles Forster and his innovation but lacks a narrative arc with a named person experiencing a struggle and resolution.\","
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 29,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information about Charles Forster and his introduction of the wooden toothpick but lacks a narrative arc with a named person experiencing a "
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 30,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a clear narrative arc with a named person experiencing a struggle and resolution; it presents facts without a cohesive story.\", \"emotional_content\": 1, \"n"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 31,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a clear narrative arc with a setup, struggle, and resolution. It primarily provides atmospheric information about Booth 18 and John F. Kennedy without pre"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 32,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person with a clear arc of setup, struggle, and resolution. It primarily provides atmospheric and evaluative information about the Union Oyster Ho"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 33,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it primarily provides atmospheric and evaluative information about the Union Oyster House without a narrative st"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 26,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical context and information about The Capital Grille but lacks a named person, real actions with a clear arc, and does not present a struggle or"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 27,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides atmospheric and evaluative information about the steakhouse but lacks a named person, real actions, and a narrative arc with setup, struggle, and resol"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 28,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides atmospheric and evaluative descriptions of The Capital Grille but lacks a named person, real actions, and a narrative arc with setup, struggle, and res"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 29,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it consists of atmospheric descriptions and facts without a narrative structure.\", \"emotional_content\": 1, \"new_"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 30,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not present a named person or a clear narrative arc with a setup, struggle, and resolution. It primarily provides atmospheric and evaluative information ab"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 31,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not present a named person or a narrative arc; it focuses on factual information about a lawsuit without a clear setup, struggle, or resolution.\", \"emotion"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 32,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and a narrative arc; it primarily provides information and context without a story structure.\", \"emotional_content\": 1, \"new"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 33,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it primarily provides atmospheric and evaluative content without a narrative structure.\", \"emotional_content\": 0"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 34,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it primarily provides information about the restaurant without a narrative structure.\", \"emotional_content\": 0, "
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 35,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not contain a named person, real actions, or an arc; it is purely atmospheric and evaluative.\", \"emotional_content\": 0, \"new_information\": 0, \"deduction\": "
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 36,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not contain a named person, real actions, or a narrative arc; it is primarily descriptive and atmospheric.\", \"emotional_content\": 1, \"new_information\": 1, "
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 34,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical anecdotes about Daniel Webster and John F. Kennedy but lacks a clear narrative arc with a setup, struggle, and resolution. It primarily desc"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 37,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides atmospheric descriptions and historical context but lacks a clear narrative arc with a named person and real actions. It does not present a struggle or"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 38,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text describes the atmosphere and history of the steakhouse but does not present a named person, real actions, or a narrative arc with a setup, struggle, and resolut"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 39,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides atmospheric and evaluative descriptions of the steakhouse but lacks a named person, real actions, and a narrative arc with setup, struggle, and resolut"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 40,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it primarily provides atmospheric descriptions without a narrative structure.\", \"emotional_content\": 1, \"new_inf"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 41,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it describes an atmosphere and context without a narrative structure.\", \"emotional_content\": 1, \"new_information"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 42,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it primarily provides atmospheric and evaluative content about dining in the city.\", \"emotional_content\": 1, \"ne"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 43,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text describes an atmosphere and the experience of dining but lacks a named person, real actions with a clear arc, and does not present a struggle or resolution.\", \""
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 44,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text describes an atmosphere and experience without a named person, real actions, or a clear narrative arc.\", \"emotional_content\": 1, \"new_information\": 0, \"deductio"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 45,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person and a clear narrative arc; it describes a situation without a specific story structure.\", \"emotional_content\": 1, \"new_information\": 2, \"de"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 46,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not present a named person or a clear narrative arc with a setup, struggle, and resolution. It consists of evaluative statements about the Capital Grille's"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 47,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not present a named person or a narrative arc; it consists of factual information and atmospheric commentary without a clear story structure.\", \"emotional_"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 48,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not contain a named person, real actions, or an arc; it primarily provides practical information and atmospheric commentary.\", \"emotional_content\": 0, \"new"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 49,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides practical information and atmospheric context but lacks a named person, real actions, and a narrative arc.\", \"emotional_content\": 0, \"new_information\":"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 50,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and a narrative arc; it is primarily descriptive and atmospheric.\", \"emotional_content\": 1, \"new_information\": 1, \"deduction"
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 24,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information and context about Cap Ferrat and its notable figures but lacks a clear narrative arc with a named person experiencing a struggle"
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 26,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides a series of historical anecdotes and atmospheric descriptions without a clear narrative arc involving a single named person and their struggle and reso"
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 28,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides atmospheric and evaluative descriptions of Antibes and its history but lacks a clear narrative arc with a named person, real actions, and a resolution."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 11,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical and factual information about the terminal but lacks a narrative arc with a named person and real actions. It does not present a struggle or"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 12,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides factual information about the terminal's significance and achievements but lacks a named person, real actions, and a narrative arc (setup, struggle, re"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 13,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides information about the airport terminal's certification and design but lacks a named person, real actions, and a narrative arc (setup, struggle, resolut"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 14,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text does not present a named person, real actions, or a narrative arc; it focuses on facts and descriptions without a story structure.\", \"emotional_content\": 0, \"ne"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 15,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical and factual information about the design and history of Boston Logan International Airport but lacks a named person, real actions, and an ar"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 16,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information about the airport's creation but lacks a named person, real actions with a narrative arc, and does not present a struggle or res"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 17,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information about the creation of an airfield but lacks a named person, real actions with a personal narrative, and an arc of setup, struggl"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 18,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and an arc; it primarily provides atmospheric and evaluative information about the airport without a narrative structure.\", "
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 19,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and a narrative arc; it primarily provides atmospheric and evaluative descriptions without a story structure.\", \"emotional_c"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 20,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text lacks a named person, real actions, and a narrative arc; it consists of atmospheric and evaluative statements about the terminal.\", \"emotional_content\": 0, \"new"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 21,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical facts and context about the airport but lacks a named person with a personal story arc involving struggle and resolution.\", \"emotional_conte"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 22,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical facts about the airport but lacks a named person with a personal story arc involving struggle and resolution.\", \"emotional_content\": 0, \"new"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 23,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "verdict": "{\"is_story\": false, \"reason\": \"The text provides historical facts about the airfield and Charles Lindbergh's landing but lacks a named person with a personal arc, struggle, or resolution. It consists "
+        }
+      ]
+    },
+    "unglossed_reference_gate.py:690": {
+      "role": "CHECKER",
+      "verdict_grammar": "GLOSS_NEEDED (reference needs explanation)",
+      "has_reject_verdict": true,
+      "calls": 33,
+      "found": 32,
+      "clean": 1,
+      "found_examples": [
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 82,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: While some may have heard of New England, the specific cultural and historical context related to seafood dishes and maritime history may not be widely known."
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 84,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — \"In Booth\" is not a widely recognized reference without context.\n2. KNOWN_ENOUGH — The Revolutionary War is a common historical event known to the general audience.\n3. GLOSS_NEEDED —"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 87,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1.  GLOSS_NEEDED: General audience would not know who Malcolm Little is without explanation.\n2.  GLOSS_NEEDED: General audience would not know who Jacqueline Bouvier is without explanation.\n3.  KNOWN_"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 90,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. KNOWN_ENOUGH: New England is a well-known region in the U.S. and its seafood cuisine is commonly recognized.\n2. GLOSS_NEEDED: Harry Berkowitz is not a widely known figure outside of specific histor"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 80,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. KNOWN_ENOUGH: Boston is a well-known city with significant historical and cultural relevance.\n2. GLOSS_NEEDED: Darden Restaurants is not widely recognized by a general audience, and the context is "
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 83,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience likely does not know who Stephanie Sokolove is without explanation.\n2. KNOWN_ENOUGH: Boston is a well-known city and its hospitality is a common concept understood by"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 85,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: \"Sidell\" is not widely recognized by a general audience without context.\n2. GLOSS_NEEDED: \"Jason Santos\" may not be known to a general audience, especially without context about his s"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 88,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: While Southern France is a known region, the specific culinary context may not be familiar to all tourists.\n2. KNOWN_ENOUGH: Tom Brady is a widely recognized figure, especially in rel"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 84,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — general audience may not know who Ronald Reagan is in this context.\n2. GLOSS_NEEDED — general audience likely does not know the specific date or its significance without context.\n3. "
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 87,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. LOAD_BEARING: While many may know Boston as a city, the specific cultural context of \"Boston power play\" and \"private wine locker\" culture may not be familiar to a general audience.\n2. GLOSS_NEEDED"
+        },
+        {
+          "tour": "chart_house_boston",
+          "record_index": 89,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience would not know what \"Seaport Square\" refers to without explanation."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 96,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. LOAD_BEARING: While some may know of King Leopold II, the context of his actions in the Congo is crucial for understanding the sentence.\n2. GLOSS_NEEDED: King Leopold II is not widely recognized by"
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 99,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: King Leopold II is not widely known outside of historical contexts.\n2. GLOSS_NEEDED: Blanche Zélia Joséphine Delacroix is not a common reference for the general audience.\n3. GLOSS_NEE"
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 102,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience would not know what Château Grimaldi is."
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 104,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — general audience would not know the significance of \"In May\" in this context.\n2. KNOWN_ENOUGH — the Cannes Film Festival is a well-known event.\n3. KNOWN_ENOUGH — Grace Kelly is a wid"
+        },
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 107,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: Gaspard Bouis is not widely known among a general audience.\n2. GLOSS_NEEDED: Mont Vinaigre is not a common reference for most tourists.\n3. KNOWN_ENOUGH: The date \"August 15, 1944\" is "
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 82,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. KNOWN_ENOUGH: Boston City Hall is a well-known landmark in Boston.\n2. GLOSS_NEEDED: Kallmann is not widely recognized outside of architectural circles.\n3. KNOWN_ENOUGH: Boston Logan International A"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 85,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1.  GLOSS_NEEDED: While many may recognize Logan International Airport, not all would know it by name or its significance without context.\n2.  GLOSS_NEEDED: The term \"Boston Airport\" is not widely rec"
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 88,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. KNOWN_ENOUGH: Queen Elizabeth II is a widely recognized figure, especially in relation to significant events like the Bicentennial.\n2. GLOSS_NEEDED: The term \"British Royal Flight\" is not commonly "
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 90,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — general audience may not know what \"New England\" specifically refers to in this context.\n2. KNOWN_ENOUGH — Boston is a well-known city and generally recognized by a general audience."
+        },
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 96,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience may not know the significance of the date without context.\n2. GLOSS_NEEDED: General audience likely does not know who Cuenin is without explanation.\n3. LOAD_BEARING: "
+        },
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 99,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — general audience would not know this\n2. GLOSS_NEEDED — general audience would not know this\n3. GLOSS_NEEDED — general audience would not know this\n4. KNOWN_ENOUGH — general audience "
+        },
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 102,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1.  GLOSS_NEEDED: General audience likely does not know who Eric Boeglin is.\n2.  GLOSS_NEEDED: General audience likely does not know who Deacon Jim is.\n3.  GLOSS_NEEDED: Cardinal Bernard Law is not wi"
+        },
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 105,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. 1. GLOSS_NEEDED: General audience likely does not know this specific church name.\n2. 2. GLOSS_NEEDED: General audience likely does not know this specific school name.\n3. 3. GLOSS_NEEDED: General au"
+        },
+        {
+          "tour": "palais_lascaris_nice",
+          "record_index": 72,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — general audience would not know who the Viscountess of Beaumont is.\n2. GLOSS_NEEDED — general audience would not know what Château de Busset is.\n3. KNOWN_ENOUGH — general audience kn"
+        },
+        {
+          "tour": "palais_lascaris_nice",
+          "record_index": 75,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience likely does not know who Antoine Gautier is without explanation.\n2. KNOWN_ENOUGH: \"Nice\" is a well-known city in France, familiar to a general audience.\n3. LOAD_BEARI"
+        },
+        {
+          "tour": "palais_lascaris_nice",
+          "record_index": 78,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1.  GLOSS_NEEDED: General audience likely does not know who William Turner is or the significance of Gravel Lane.\n2.  GLOSS_NEEDED: General audience may not know about Nice's connection to the viol or"
+        },
+        {
+          "tour": "palais_lascaris_nice",
+          "record_index": 81,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — \"Testore basse de violon\" is not commonly known by a general audience.\n2. KNOWN_ENOUGH — \"France\" is widely recognized and understood by a general audience."
+        },
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 83,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience likely does not know who Ericka Harindranath is.\n2. KNOWN_ENOUGH: New England is a well-known region in the United States.\n3. GLOSS_NEEDED: General audience likely do"
+        },
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 86,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: General audience may not know the specific culinary significance of \"Japanese\" in this context.\n2. KNOWN_ENOUGH: \"Greater Boston\" is a well-known geographical reference for a general "
+        },
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 89,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED: Bentley College is not widely known among a general audience and requires explanation."
+        },
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 91,
+          "subject": "You are triaging named references in an audio tour for a general audience.",
+          "verdict": "1. GLOSS_NEEDED — general audience would not know who Chef David Punch is without explanation.\n2. KNOWN_ENOUGH — Greater Boston is a well-known geographical area that most tourists would recognize.\n3."
+        }
+      ]
+    },
+    "unsupported_claim_gate.py:452": {
+      "role": "CHECKER",
+      "verdict_grammar": "DELETE:N / UNGROUNDED (claim not supported by corpus)",
+      "has_reject_verdict": true,
+      "calls": 1,
+      "found": 1,
+      "clean": 0,
+      "found_examples": [
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 82,
+          "subject": "You are adjudicating tour narration claims against source material.",
+          "verdict": "DELETE: 1"
+        }
+      ]
+    },
+    "generate_tour_text.py:1083": {
+      "role": "CHECKER",
+      "verdict_grammar": "\"matches\": false (candidate is not actually of the requested type)",
+      "has_reject_verdict": true,
+      "calls": 20,
+      "found": 2,
+      "clean": 18,
+      "found_examples": [
+        {
+          "tour": "chart_house_boston",
+          "record_index": 4,
+          "subject": "Is \"Mike's Pastry\" actually a restaurant?",
+          "verdict": "{\n    \"matches\": false,\n    \"reason\": \"Mike's Pastry is a bakery, not a restaurant\",\n    \"confidence\": \"high\"\n}"
+        },
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 7,
+          "subject": "Is \"Sycamore\" actually a restaurant?",
+          "verdict": "{\n    \"matches\": false,\n    \"reason\": \"There are many establishments named 'Sycamore', please provide more specific details for accurate verification\",\n    \"confidence\": \"medium\"\n}"
+        }
+      ]
+    },
+    "generate_tour_text.py:1577": {
+      "role": "CHECKER",
+      "verdict_grammar": "\"inside_scope\": false (stop is outside the bounded tour area)",
+      "has_reject_verdict": true,
+      "calls": 5,
+      "found": 4,
+      "clean": 1,
+      "found_examples": [
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 93,
+          "subject": "You are a geography fact-checker for location tours.",
+          "verdict": "{\"inside_scope\": false, \"confidence\": \"high\", \"reason\": \"The stop is not within the bounds of 'Boston Sail Loft, Boston, MA'\"}"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 94,
+          "subject": "You are a geography fact-checker for location tours.",
+          "verdict": "{\"inside_scope\": false, \"confidence\": \"high\", \"reason\": \"Legal Sea Foods - Long Wharf is not physically located inside Boston Sail Loft, Boston, MA. It is a separate establishment at Long Wharf in Bos"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 91,
+          "subject": "You are a geography fact-checker for location tours.",
+          "verdict": "{\"inside_scope\": false, \"confidence\": \"high\", \"reason\": \"Mistral is not physically located inside 'Buttermilk & Bourbon - Back Bay, Boston, MA'\"}"
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 92,
+          "subject": "You are a geography fact-checker for location tours.",
+          "verdict": "{\"inside_scope\": false, \"confidence\": \"high\", \"reason\": \"Saltie Girl is not physically located inside or within the bounds of 'Buttermilk & Bourbon - Back Bay, Boston, MA'. It is a separate establishm"
+        }
+      ]
+    },
+    "story_element_extractor.py:419": {
+      "role": "CHECKER",
+      "verdict_grammar": "conflicting/not-same-subject (claims disagree)",
+      "has_reject_verdict": true,
+      "calls": 1,
+      "found": 0,
+      "clean": 1,
+      "found_examples": []
+    },
+    "fact_extractor.py:76": {
+      "role": "CHECKER",
+      "verdict_grammar": "extraction (JSON facts) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 32,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:1008": {
+      "role": "CHECKER",
+      "verdict_grammar": "intent extraction (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 10,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:9580": {
+      "role": "CHECKER",
+      "verdict_grammar": "stop ordering (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 9,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:18583": {
+      "role": "CHECKER",
+      "verdict_grammar": "fact ranking (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 7,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:9983": {
+      "role": "CHECKER",
+      "verdict_grammar": "coordinate extraction — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 9,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:7770": {
+      "role": "CHECKER",
+      "verdict_grammar": "restaurant listing (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 5,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:8781": {
+      "role": "CHECKER",
+      "verdict_grammar": "restaurant listing (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 2,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "generate_tour_text.py:10105": {
+      "role": "CHECKER",
+      "verdict_grammar": "stop listing (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 1,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    },
+    "theme_thread_discoverer.py:260": {
+      "role": "CHECKER",
+      "verdict_grammar": "theme discovery (JSON) — no reject verdict",
+      "has_reject_verdict": false,
+      "calls": 1,
+      "found": 0,
+      "clean": 0,
+      "found_examples": []
+    }
+  }
+}

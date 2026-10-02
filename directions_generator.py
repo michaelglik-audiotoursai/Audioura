@@ -17,6 +17,8 @@ import json
 import logging
 import re
 import requests
+# [LOCAL-560] writer-model central setting (directions are prose the listener hears)
+from llm_models import write_model as _write_model
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +185,7 @@ def generate_real_directions(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": _write_model(site_default="gpt-3.5-turbo"),
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
@@ -335,7 +337,7 @@ def generate_walking_directions(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": _write_model(site_default="gpt-3.5-turbo"),
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},

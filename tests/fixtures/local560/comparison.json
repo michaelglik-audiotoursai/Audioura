@@ -1,0 +1,184 @@
+{
+  "sites": {
+    "stop_specificity_gate.py:433": {
+      "old_found": 110,
+      "old_clean": 169,
+      "recall_hit": 108,
+      "recall_miss": 2,
+      "false_alarm": 3,
+      "old_cost": 0.3139525,
+      "new_cost": 0.3142925000000002,
+      "misses": [
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 58,
+          "subject": "An audio-tour paragraph about the stop \"Stained Glass Windows\" names \"Doherty Rest\".",
+          "old_verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify how William J. Doherty relates to this stop.",
+          "new_verdict": "VERDICT: GROUNDED | REASON: The window is a tribute to William J. Doherty, linking him directly to this stop."
+        },
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 87,
+          "subject": "An audio-tour paragraph about the stop \"Stations of the Cross\" names \"St. Alphonsus\".",
+          "old_verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify a direct link between St. Alphonsus and this stop.",
+          "new_verdict": "VERDICT: GROUNDED | REASON: St. Alphonsus Ligouri's version of the Stations of the Cross is recognized in this church."
+        }
+      ],
+      "false_alarms_examples": [
+        {
+          "tour": "french_riviera_biking",
+          "record_index": 85,
+          "subject": "An audio-tour paragraph about the stop \"Massif de l'Esterel\" names \"Mont Vinaigre\".",
+          "old_verdict": "VERDICT: GROUNDED  \nREASON: Gaspard Bouis used Mont Vinaigre as a hideout.",
+          "new_verdict": "VERDICT: UNGROUNDED  \nREASON: It mentions Gaspard Bouis's legend without a direct link to Mont Vinaigre."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 64,
+          "subject": "An audio-tour paragraph about the stop \"apron\" names \"Prince Philip\".",
+          "old_verdict": "VERDICT: GROUNDED | REASON: Prince Philip arrived at this stop during America's Bicentennial celebrations.",
+          "new_verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify how Prince Philip is concretely linked to Logan's apron."
+        },
+        {
+          "tour": "our_lady_help_newton",
+          "record_index": 74,
+          "subject": "An audio-tour paragraph about the stop \"Altar\" names \"Father Cuenin\".",
+          "old_verdict": "VERDICT: GROUNDED | REASON: Father Cuenin delivered a pivotal homily at this altar.",
+          "new_verdict": "VERDICT: UNGROUNDED  \nREASON: It does not specify Father Cuenin's direct connection to the altar."
+        }
+      ],
+      "recall": 0.9818181818181818,
+      "false_alarm_rate": 0.01775147928994083,
+      "passes": false
+    },
+    "story_gate.py:201": {
+      "old_found": 90,
+      "old_clean": 26,
+      "recall_hit": 90,
+      "recall_miss": 0,
+      "false_alarm": 4,
+      "old_cost": 0.19914999999999994,
+      "new_cost": 0.19946999999999998,
+      "misses": [],
+      "false_alarms_examples": [
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 34,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "old_verdict": "{\"is_story\": true, \"reason\": \"The text includes a named person (Ebenezer Hancock), real actions (managing French silver livres), and an arc of historical significance (setup of the Union Oyster House,",
+          "new_verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information about the Union Oyster House but lacks a named person with a clear arc involving struggle and resolution. It focuses on facts ra"
+        },
+        {
+          "tour": "boston_sail_loft",
+          "record_index": 36,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "old_verdict": "{\"is_story\": true, \"reason\": \"The text presents a narrative about Legal Sea Foods, including its origins, struggles with tradition, and a notable event that highlights its controversial stance on sust",
+          "new_verdict": "{\"is_story\": false, \"reason\": \"The text provides information about Legal Sea Foods but lacks a clear narrative arc with a named person and real actions that follow a setup, struggle, and resolution.\","
+        },
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 39,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "old_verdict": "{\"is_story\": true, \"reason\": \"The text includes named individuals (Tom Brady and Gisele Bündchen) and describes real actions (dining at the restaurant, the incident with the chauffeur), creating a nar",
+          "new_verdict": "{\"is_story\": false, \"reason\": \"The text provides information about the restaurant and its features but lacks a clear narrative arc with a named person experiencing a struggle and resolution.\", \"emotio"
+        },
+        {
+          "tour": "palais_lascaris_nice",
+          "record_index": 46,
+          "subject": "You are evaluating a candidate story-unit from an audio tour.",
+          "old_verdict": "{\"is_story\": true, \"reason\": \"The text includes named individuals (William Turner and Antoine Gautier), real actions (crafting the instrument, bequeathing it), and an arc that shows the instrument's j",
+          "new_verdict": "{\"is_story\": false, \"reason\": \"The text provides historical information about the bass viola da gamba and its journey but lacks a clear narrative arc with a named person experiencing a struggle and re"
+        }
+      ],
+      "recall": 1.0,
+      "false_alarm_rate": 0.15384615384615385,
+      "passes": false
+    },
+    "unglossed_reference_gate.py:690": {
+      "old_found": 32,
+      "old_clean": 1,
+      "recall_hit": 32,
+      "recall_miss": 0,
+      "false_alarm": 0,
+      "old_cost": 0.06911499999999998,
+      "new_cost": 0.06906499999999999,
+      "misses": [],
+      "false_alarms_examples": [],
+      "recall": 1.0,
+      "false_alarm_rate": 0.0,
+      "passes": true
+    },
+    "unsupported_claim_gate.py:452": {
+      "old_found": 1,
+      "old_clean": 0,
+      "recall_hit": 1,
+      "recall_miss": 0,
+      "false_alarm": 0,
+      "old_cost": 0.000645,
+      "new_cost": 0.000645,
+      "misses": [],
+      "false_alarms_examples": [],
+      "recall": 1.0,
+      "false_alarm_rate": null,
+      "passes": true
+    },
+    "generate_tour_text.py:1083": {
+      "old_found": 2,
+      "old_clean": 18,
+      "recall_hit": 1,
+      "recall_miss": 1,
+      "false_alarm": 0,
+      "old_cost": 0.0021519999999999994,
+      "new_cost": 0.012042500000000001,
+      "misses": [
+        {
+          "tour": "sycamore_little_big",
+          "record_index": 7,
+          "subject": "Is \"Sycamore\" actually a restaurant?",
+          "old_verdict": "{\n    \"matches\": false,\n    \"reason\": \"There are many establishments named 'Sycamore', please provide more specific details for accurate verification\",\n    \"confidence\": \"medium\"\n}",
+          "new_verdict": "{\"matches\": true, \"reason\": \"Sycamore is a restaurant known for its food and dining experience.\", \"confidence\": \"high\"}"
+        }
+      ],
+      "false_alarms_examples": [],
+      "recall": 0.5,
+      "false_alarm_rate": 0.0,
+      "passes": false
+    },
+    "generate_tour_text.py:1577": {
+      "old_found": 4,
+      "old_clean": 1,
+      "recall_hit": 3,
+      "recall_miss": 1,
+      "false_alarm": 0,
+      "old_cost": 0.0011275,
+      "new_cost": 0.0064275,
+      "misses": [
+        {
+          "tour": "buttermilk_bourbon",
+          "record_index": 92,
+          "subject": "You are a geography fact-checker for location tours.",
+          "old_verdict": "{\"inside_scope\": false, \"confidence\": \"high\", \"reason\": \"Saltie Girl is not physically located inside or within the bounds of 'Buttermilk & Bourbon - Back Bay, Boston, MA'. It is a separate establishment.\"}",
+          "new_verdict": "{\n  \"inside_scope\": true,\n  \"confidence\": \"high\",\n  \"reason\": \"The address 281 Dartmouth St, Boston, MA 02116 is located in the Back Bay neighborhood, which is where Buttermilk & Bourbon is situated.\"\n}"
+        }
+      ],
+      "false_alarms_examples": [],
+      "recall": 0.75,
+      "false_alarm_rate": 0.0,
+      "passes": false
+    },
+    "story_element_extractor.py:419": {
+      "old_found": 0,
+      "old_clean": 1,
+      "recall_hit": 0,
+      "recall_miss": 0,
+      "false_alarm": 0,
+      "old_cost": 0.0011325,
+      "new_cost": 0.0011325,
+      "misses": [],
+      "false_alarms_examples": [],
+      "recall": null,
+      "false_alarm_rate": 0.0,
+      "passes": true
+    }
+  }
+}

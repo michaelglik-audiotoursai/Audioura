@@ -119,21 +119,39 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
-# --- Swipe Preference Routes (LOCAL-107 / LOCAL-112) ---
+# --- Wallet API Blueprint (LOCAL-68 / LOCAL-154) ---
+# The Dart client calls GET /wallet/<id>, GET /wallet/<id>/transactions,
+# GET /plans/available, POST /wallet/<id>/topup on this service (port 5002).
+# Without this registration all wallet screens show "connection error" and
+# the topup flow silently fails.
+#
+# Failure is logged at ERROR, not printed. A swallowed ImportError is how
+# corpus mining silently degraded for two days (see D31).
+try:
+    from wallet_api import wallet_bp
+    app.register_blueprint(wallet_bp)
+    print("[ORCHESTRATOR] Wallet API blueprint registered (LOCAL-68)")
+except ImportError as _wallet_err:
+    import logging as _wallet_logging
+    _wallet_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-154] Wallet API NOT registered — wallet screens will fail: {_wallet_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: wallet API unavailable: {_wallet_err}")
+
+# --- Swipe Preference Routes (LOCAL-107 / LOCAL-154) ---
 # The Dart client posts to /user/<id>/stop-feedback on this service (port
 # 5002). Without this registration every swipe 404s and LOCAL-105's offline
 # queue retries ten times and discards it.
 #
-# Failure is logged at ERROR, not printed. A swallowed ImportError is how
-# corpus mining silently degraded for two days (see CLAUDE.md, D31).
+# Failure is logged at ERROR, not printed (D31, LOCAL-146).
 try:
     from swipe_preference_service import register_preference_routes
     register_preference_routes(app)
-    print("[ORCHESTRATOR] Preference routes registered (LOCAL-112)")
+    print("[ORCHESTRATOR] Preference routes registered (LOCAL-107)")
 except ImportError as _pref_err:
     import logging as _pref_logging
     _pref_logging.getLogger("tour_orchestrator_service").error(
-        f"[LOCAL-112] Preference routes NOT registered — every swipe will 404: {_pref_err}"
+        f"[LOCAL-154] Preference routes NOT registered — every swipe will 404: {_pref_err}"
     )
     print(f"[ORCHESTRATOR] ERROR: preference routes unavailable: {_pref_err}")
 
@@ -155,6 +173,10 @@ def after_request(response):
 @app.route('/download/<job_id>', methods=['OPTIONS'])
 @app.route('/serve/<job_id>', methods=['OPTIONS'])
 @app.route('/jobs', methods=['OPTIONS'])
+@app.route('/wallet/<user_id>', methods=['OPTIONS'])
+@app.route('/wallet/<user_id>/transactions', methods=['OPTIONS'])
+@app.route('/wallet/<user_id>/topup', methods=['OPTIONS'])
+@app.route('/plans/available', methods=['OPTIONS'])
 def handle_options(*args, **kwargs):
     response = make_response()
     return add_cors_headers(response)
@@ -431,8 +453,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         dict with keys:
             success (bool): True if stored or already existed.
             existing_tour_id (int|None): If the tour already exists, its ID.
-            action (str): 'inserted', 'already_exists', or 'error'.
+            action (str): 'inserted', 'updated', 'already_exists', or 'error'.
             error (str|None): Error message on failure.
+        Legacy callers can still treat the return value as truthy/falsy via __bool__
+        but the richer dict carries the distinction between "stored OK" and
+        "already exists" that LOCAL-156 needs.
     """
     print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
     print(f"Tour name: {tour_name}")
@@ -444,7 +469,8 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
     def _result(success, action, existing_tour_id=None, error=None):
         """Build a result dict that also supports bool() for backward compat."""
         return {"success": success, "action": action,
-                "existing_tour_id": existing_tour_id, "error": error}
+                "existing_tour_id": existing_tour_id, "error": error,
+                "__bool__": success}
     
     try:
         import psycopg2
@@ -585,7 +611,8 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Existing tour (unique-index-aware check): {existing_tour}")
 
         # [LOCAL-156] If an original tour with this name already exists, reuse it.
-        # Increment number_requested and return the existing ID.
+        # Per Michael: "it cost us and our clients nothing when they download a tour
+        # already pre-created". Increment number_requested and return the existing ID.
         if existing_tour:
             existing_id = existing_tour[0]
             print(f"[LOCAL-156] Tour already exists (id={existing_id}). "
@@ -1195,13 +1222,63 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         if not store_success:
             # [LOCAL-156] FAIL CLOSED: storage failed — do NOT report completed.
-            # No wallet on storied, so no compensating credit — just fail the job.
+            # Issue a compensating credit if the user was already charged.
             print(f"[LOCAL-156] STORAGE FAILED: {store_error}")
             print(f"[LOCAL-156] Job {job_id} will NOT report completed — billing must not diverge from delivery (D14).")
+            
+            # Issue compensating service_credit to reverse the charge
+            if user_id:
+                try:
+                    from wallet_ledger import record_movement, get_balance_cents
+                    from entitlements import _get_subscription_tier
+                    _refund_tier = _get_subscription_tier(user_id)
+                    if _refund_tier == 'ppu':
+                        # Find the charge for this job and reverse it
+                        _refund_idem_key = f"service_credit:store_failed:{user_id}:{job_id}"
+                        _charge_idem_key = f"charge:{user_id}:{job_id}"
+                        import psycopg2 as _pg2_refund
+                        _refund_conn = _pg2_refund.connect(
+                            host=os.getenv('DB_HOST', 'postgres-2'),
+                            database=os.getenv('DB_NAME', 'audiotours'),
+                            user=os.getenv('DB_USER', 'admin'),
+                            password=os.getenv('DB_PASSWORD', 'password123'),
+                            port=os.getenv('DB_PORT', '5432')
+                        )
+                        _refund_cur = _refund_conn.cursor()
+                        _refund_cur.execute(
+                            "SELECT amount_cents FROM wallet_ledger WHERE idempotency_key = %s",
+                            (_charge_idem_key,)
+                        )
+                        _charge_row = _refund_cur.fetchone()
+                        _refund_cur.close()
+                        _refund_conn.close()
+                        
+                        if _charge_row and _charge_row[0] < 0:
+                            # Reverse the charge with a positive credit
+                            _credit_cents = abs(_charge_row[0])
+                            from decimal import Decimal as _Dec
+                            _credit_usd = _Dec(_credit_cents) / _Dec(100)
+                            _row, _bal = record_movement(
+                                user_id=user_id,
+                                movement_type="service_credit",
+                                amount_cents=_credit_cents,
+                                idempotency_key=_refund_idem_key,
+                                description=f"Refund: tour storage failed — {tour_name[:100]}",
+                                reference_id=job_id,
+                            )
+                            print(f"[LOCAL-156] SERVICE_CREDIT issued: +{_credit_cents}¢ | "
+                                  f"balance={_bal}¢ | user={user_id} | job={job_id}")
+                        else:
+                            print(f"[LOCAL-156] No charge found to reverse for job={job_id}")
+                except Exception as _refund_err:
+                    # Refund failure is logged but does not change the job status —
+                    # the job is already failed. Manual reconciliation needed.
+                    print(f"[LOCAL-156] ERROR: Could not issue service_credit: {_refund_err}")
             
             ACTIVE_JOBS[job_id]["status"] = "error"
             ACTIVE_JOBS[job_id]["error"] = (
                 f"Tour storage failed: {store_error}. "
+                f"A compensating credit has been issued if applicable."
             )
             ACTIVE_JOBS[job_id]["error_type"] = "store_failed"
             print(f"Keeping extraction directory due to database storage failure: {extract_path}")
@@ -1210,7 +1287,17 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Tour stored (or already existed). Determine the english_tour_id.
         if store_action == "already_exists" and store_existing_id:
             english_tour_id = store_existing_id
-            print(f"[LOCAL-156] Reusing existing tour id={english_tour_id} (no new storage needed)")
+            print(f"[LOCAL-172] Reusing existing tour id={english_tour_id} (no new storage needed)")
+            # [LOCAL-172 / D47] Tour reuse charges the same as a fresh generation.
+            # Michael's reasoning (same as D45 for translations):
+            #   1. Price predictability — user should not wonder why the same
+            #      request sometimes costs nothing.
+            #   2. Cost sharing — the first requester should not pay for everyone.
+            # The charge already happened upstream in generate_tour_text_service.py.
+            # Previously LOCAL-156 issued a service_credit refund here; D47 removes it.
+            # Free-tier users are never charged (entitlements gate + _our_cost check
+            # in generate_tour_text_service.py skip the charge block entirely).
+            print(f"[LOCAL-172] Charge retained for reuse (D47) | user={user_id} | job={job_id}")
         else:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
             
@@ -1297,11 +1384,18 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
                         ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
                         
-                        # [LOCAL-60] Meter translation cost
+                        # [LOCAL-60] Meter translation cost to cost_ledger
+                        # [LOCAL-169] Charge wallet for BOTH fresh and cached translations (D45)
                         try:
                             from cost_meter import record_operation
-                            from cost_rates import CACHE_HIT_COST_USD
+                            from cost_rates import CACHE_HIT_COST_USD, translation_cost, DEPLOYED_TRANSLATION_PASSES
+
+                            # Always compute fresh translation cost for charging
+                            _source_chars = len(tour_content) if tour_content else 16000
+                            _total_translation_cost = translation_cost(_source_chars, passes=DEPLOYED_TRANSLATION_PASSES)
+
                             if _translation_cache_hit:
+                                # cost_ledger: record TRUE cost ($0.00) — our accounting
                                 record_operation(
                                     operation_type="translation_cache_hit",
                                     our_cost_usd=CACHE_HIT_COST_USD,
@@ -1311,22 +1405,64 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                                     breakdown={"translate": 0.0, "tts": 0.0},
                                 )
                             else:
-                                # Estimate translation cost (Google Translate + Polly TTS)
-                                # Typical tour: ~17k chars translate + ~8k chars TTS
-                                from cost_rates import translation_cost, tts_cost
-                                _est_translate = translation_cost(17000)
-                                _est_tts = tts_cost(8000)
-                                _total_translation_cost = _est_translate + _est_tts
+                                # cost_ledger: record real cost
                                 record_operation(
                                     operation_type="translation_generate",
                                     our_cost_usd=_total_translation_cost,
                                     cache_hit=False,
                                     user_id=user_id,
                                     job_id=job_id,
-                                    breakdown={"translate": _est_translate, "tts": _est_tts},
+                                    breakdown={
+                                        "translate_and_tts": _total_translation_cost,
+                                        "source_chars": _source_chars,
+                                        "translation_passes": DEPLOYED_TRANSLATION_PASSES,
+                                    },
                                 )
                         except Exception as _meter_err:
                             print(f"[LOCAL-60] Translation cost metering failed (non-fatal): {_meter_err}")
+
+                        # [LOCAL-169] Charge the user's wallet (D45: cache hit charges same as fresh)
+                        # This is a billing control — separate try, FAILS CLOSED for fresh,
+                        # non-fatal for cache hits (translation already served).
+                        if user_id:
+                            try:
+                                from pricing import compute_user_charge as _compute_charge
+                                from wallet_ledger import charge as _wallet_charge, record_unlimited_cost as _record_unlimited
+                                from entitlements import _get_subscription_tier
+                                from cost_rates import translation_cost as _tc, DEPLOYED_TRANSLATION_PASSES as _dtp
+
+                                _user_tier = _get_subscription_tier(user_id)
+                                _source_chars_w = len(tour_content) if tour_content else 16000
+                                _fresh_cost = _tc(_source_chars_w, passes=_dtp)
+
+                                _op_type = "translation_cache_hit" if _translation_cache_hit else "translation_generate"
+                                _charge_result = _compute_charge(
+                                    our_cost_usd=CACHE_HIT_COST_USD if _translation_cache_hit else _fresh_cost,
+                                    cache_hit=_translation_cache_hit,
+                                    operation_type=_op_type,
+                                    description=f"Translation to {language}",
+                                    fresh_cost_usd=_fresh_cost if _translation_cache_hit else None,
+                                )
+
+                                if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                                    _charge_idem_key = f"charge:{user_id}:{job_id}:translation"
+                                    _row_id, _new_bal, _was_stopped = _wallet_charge(
+                                        user_id=user_id,
+                                        charge_usd=_charge_result['user_charge_usd'],
+                                        idempotency_key=_charge_idem_key,
+                                        description=f"Translation to {language} — ${_charge_result['user_charge_usd']:.2f}",
+                                        job_id=job_id,
+                                    )
+                                    print(f"[LOCAL-169] PPU translation charged: ${_charge_result['user_charge_usd']:.2f} | "
+                                          f"cache_hit={_translation_cache_hit} | balance={_new_bal}¢ | user={user_id}")
+
+                                elif _user_tier == 'unlimited':
+                                    from decimal import Decimal as _Dec
+                                    _record_unlimited(user_id, _Dec(str(_fresh_cost)))
+                                    print(f"[LOCAL-169] Unlimited translation cost recorded: ${_fresh_cost:.6f} | user={user_id}")
+
+                            except Exception as _charge_err:
+                                print(f"[LOCAL-169] Translation wallet charge failed: {_charge_err}")
                     else:
                         print(f"Warning: Translation completed but no tour ID returned")
                         ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id

@@ -1,0 +1,113 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 12,
+      "total": 13,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 12
+    },
+    "per_stop": {
+      "Boston Sail Loft": {
+        "sourced": 1,
+        "unsourced": 12,
+        "total": 13
+      }
+    },
+    "claims": [
+      {
+        "stop": "Boston Sail Loft",
+        "text": "As you explore this renowned seafood restaurant located in the North End Waterfront, you will uncover the rich history of classic New England seafood and captivating Boston Harbor views.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Founded in 1984, the Boston Sail Loft has been a staple for fresh seafood, offering a taste of maritime charm and culinary tradition.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Step inside this dining establishment and immerse yourself in the tales of resilience and passion that have shaped Boston's culinary landscape over the years.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Head southeast on Atlantic Ave, enjoy the salty breeze from the waterfront.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Upon entering, you are immediately embraced by the warm atmosphere of a classic New England seafood haven.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Boston Sail Loft, a staple on the North End Waterfront since 1984, offers not just meals but experiences that reflect the history of this maritime city.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The restaurant, run by the Slesinger family at the helm and general manager Meredith Tipping, ensures that every visitor feels like part of the family, adding a special touch to the Sail Loft.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "One of its intriguing culinary tales unfolds when the restaurant opened in 1984, introducing a revolutionary clam chowder laced with fresh dill.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Then there's the quirky tradition that sets the Boston Sail Loft apart from more conventional seafood spots.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Since the 1980s, they've served bowls or jars of Nabisco Oreo cookies alongside pints of beer and plates of oysters.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Since the 1980s, the Boston Sail Loft became famous for serving bowls or jars of Nabisco Oreo cookies alongside pints of beer and oysters."
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Stepping inside the Sail Loft means entering a place where history, family, and a touch of culinary rebellion blend seamlessly.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Sail Loft is open every day from 11:30 am until 2:00 am, requiring no reservations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "With prices under $30, it is welcoming to both your wallet and your palate.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

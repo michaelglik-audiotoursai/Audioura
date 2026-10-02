@@ -10,6 +10,7 @@ Operation types:
     translation_generate    — fresh translation (Google Translate + TTS)
     translation_cache_hit   — translation already existed (cost ≈ 0)
     news_generate           — fresh news audio generation
+    news_cache_hit          — news served from cache (cost ≈ 0)
     photo_extension         — (future) photo-based tour extension
 
 Usage:
@@ -73,7 +74,7 @@ def _get_db_url() -> Optional[str]:
 
 def _ensure_table(conn) -> None:
     """Create cost_ledger table if not present (idempotent, for dev convenience).
-    Production should use migration/sql/005_cost_ledger.sql.
+    Production should use migration/sql/005_cost_ledger.sql + 007_cost_ledger_description.sql.
     """
     with conn.cursor() as cur:
         cur.execute("""
@@ -85,8 +86,13 @@ def _ensure_table(conn) -> None:
                 cache_hit BOOLEAN NOT NULL DEFAULT FALSE,
                 job_id VARCHAR(128),
                 breakdown JSONB,
+                description VARCHAR(256),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
+        """)
+        # Add description column if table already exists without it (migration path)
+        cur.execute("""
+            ALTER TABLE cost_ledger ADD COLUMN IF NOT EXISTS description VARCHAR(256)
         """)
         # Index for user-level queries and time-range aggregations
         cur.execute("""
@@ -107,6 +113,7 @@ def record_operation(
     user_id: Optional[str] = None,
     job_id: Optional[str] = None,
     breakdown: Optional[dict] = None,
+    description: Optional[str] = None,
 ) -> Optional[str]:
     """Record a billable operation in the cost ledger.
 
@@ -118,6 +125,8 @@ def record_operation(
         job_id: Correlation ID (job_id from the orchestrator or generation service).
         breakdown: Optional JSON-serializable dict with component costs
                    e.g. {"llm": 0.05, "tts": 0.01, "search": 0.005}
+        description: Human-readable label for Wallet display,
+                     e.g. "Article: How I Built This" or "Tour: French Riviera biking".
 
     Returns:
         The ledger row UUID as a string, or None on failure.
@@ -142,16 +151,20 @@ def record_operation(
     row_id = str(uuid.uuid4())
     breakdown_json = json.dumps(breakdown) if breakdown else None
 
+    # Truncate description to 256 chars (DB column limit)
+    if description and len(description) > 256:
+        description = description[:253] + "..."
+
     try:
         conn = psycopg2.connect(db_url)
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO cost_ledger (id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO cost_ledger (id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown, description, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (row_id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown_json, datetime.now(timezone.utc)),
+                (row_id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown_json, description, datetime.now(timezone.utc)),
             )
         conn.commit()
         conn.close()
@@ -215,4 +228,108 @@ def get_operation_cost(job_id: str) -> Optional[dict]:
 
     except Exception as e:
         logger.error(f"[COST_METER] Query failed: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# LOCAL-200: Look up original fresh cost for cache-hit charging
+# ---------------------------------------------------------------------------
+
+# Sanity ceiling per operation type (our cost, in USD).
+# If a stored ledger row exceeds this, it is implausible — likely a pre-LOCAL-197
+# inflated rate (gpt-3.5-turbo at ~2.5× real cost). We refuse to use it and
+# fall back to $0.00 rather than overcharge.
+# These are 3× the max observed fresh cost for each type.
+_FRESH_COST_SANITY_CEILING = {
+    "tour_generate": 0.25,       # max observed ~$0.08, 3× = $0.24 → round to $0.25
+    "news_generate": 0.05,       # max observed ~$0.011, 3× ≈ $0.033 → round to $0.05
+    "translation_generate": 1.80,  # max observed ~$0.54, 3× = $1.62 → round to $1.80
+}
+
+# Map from cache-hit operation type to the fresh-generation type to search for.
+_CACHE_HIT_TO_FRESH_TYPE = {
+    "tour_cache_hit": "tour_generate",
+    "news_cache_hit": "news_generate",
+    "translation_cache_hit": "translation_generate",
+}
+
+
+def lookup_fresh_cost_for_cache_hit(
+    job_id: str,
+    operation_type: str,
+) -> Optional[float]:
+    """Look up the original fresh generation cost from cost_ledger for cache-hit charging.
+
+    Searches for the FIRST non-cache-hit cost_ledger row matching the original
+    job_id. The job_id for a cache hit is typically the job_id of the original
+    generation that produced the cached content.
+
+    Returns:
+        The original our_cost_usd as float if found and plausible.
+        None if: no row exists, row is a cache hit itself, or cost exceeds
+        the sanity ceiling (pre-LOCAL-197 inflated rate).
+
+    When None is returned, the caller should charge $0.00 (safe fallback).
+    """
+    db_url = _get_db_url()
+    if not db_url:
+        logger.warning("[COST_METER] No DB URL — cannot look up fresh cost for cache hit")
+        return None
+
+    fresh_type = _CACHE_HIT_TO_FRESH_TYPE.get(operation_type)
+    if not fresh_type:
+        logger.warning(f"[COST_METER] Unknown cache-hit type for lookup: {operation_type}")
+        return None
+
+    try:
+        conn = psycopg2.connect(db_url)
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            # Find the original generation row for this job_id.
+            # A job_id uniquely identifies a generation. The cache-hit caller
+            # passes the original job_id so we can find what it cost.
+            cur.execute(
+                """
+                SELECT our_cost_usd
+                FROM cost_ledger
+                WHERE job_id = %s
+                  AND cache_hit = FALSE
+                  AND operation_type = %s
+                ORDER BY created_at ASC
+                LIMIT 1
+                """,
+                (job_id, fresh_type),
+            )
+            row = cur.fetchone()
+        conn.close()
+
+        if row is None:
+            logger.info(
+                f"[COST_METER] No fresh cost_ledger row for job_id={job_id} "
+                f"type={fresh_type} — cache hit will charge $0.00"
+            )
+            return None
+
+        cost = float(row[0])
+
+        # Sanity check: reject implausible costs (pre-LOCAL-197 inflated rates)
+        ceiling = _FRESH_COST_SANITY_CEILING.get(fresh_type, 0.25)
+        if cost > ceiling:
+            logger.warning(
+                f"[COST_METER] Fresh cost ${cost:.6f} exceeds sanity ceiling "
+                f"${ceiling:.2f} for {fresh_type} (job_id={job_id}) — "
+                f"likely pre-LOCAL-197 inflated rate. Refusing to use."
+            )
+            return None
+
+        if cost <= 0:
+            logger.info(
+                f"[COST_METER] Fresh cost is $0 for job_id={job_id} — no basis to charge"
+            )
+            return None
+
+        return cost
+
+    except Exception as e:
+        logger.error(f"[COST_METER] lookup_fresh_cost_for_cache_hit failed: {e}")
         return None

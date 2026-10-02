@@ -1,0 +1,66 @@
+{
+  "slug": "buttermilk_bourbon",
+  "location": "restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA",
+  "tour_type": "restaurant",
+  "stops": 4,
+  "wall_s": 327.3,
+  "chars": 4692,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 102,
+  "cost_record": {
+    "total_cost": 0.18915450000000006,
+    "total_tokens": 40120,
+    "cache_hit": false,
+    "grounding_cost": 0.42000000000000004,
+    "grounding_requests": 12,
+    "tour_total_cost": 0.6091545,
+    "breakdown": {
+      "llm": 0.18915450000000006,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.42000000000000004
+    },
+    "provenance": {
+      "sourced": 3,
+      "unsourced": 11,
+      "total": 14,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 11
+    },
+    "score": {
+      "defects_before": {
+        "thin": "2/4 stops delivered",
+        "truncated": "1 fragment(s), e.g. 'St'",
+        "dangling_reference": "1 dangling pronoun reference(s), e.g. 'Her husband, Jim Sokolove, known for his pioneering role in '"
+      },
+      "defects_after": {
+        "thin": "2/4 stops delivered"
+      },
+      "removed": [
+        "dangling_reference",
+        "truncated"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.009062500000000001,
+        "total_tokens": 1906
+      },
+      "cost_without_retry": {
+        "total_cost": 0.180092,
+        "total_tokens": 38214
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 3,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

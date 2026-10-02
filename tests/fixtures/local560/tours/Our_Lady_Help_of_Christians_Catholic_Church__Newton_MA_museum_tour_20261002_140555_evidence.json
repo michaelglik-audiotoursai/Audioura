@@ -1,0 +1,236 @@
+{
+  "landmarks": {
+    "Nave": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Stained Glass Windows": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Altar": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Stations of the Cross": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 7,
+      "unsourced": 19,
+      "total": 26,
+      "corpus": 7,
+      "grounded": 0,
+      "parametric": 19
+    },
+    "per_stop": {
+      "Nave": {
+        "sourced": 3,
+        "unsourced": 5,
+        "total": 8
+      },
+      "Stained Glass Windows": {
+        "sourced": 2,
+        "unsourced": 4,
+        "total": 6
+      },
+      "Altar": {
+        "sourced": 0,
+        "unsourced": 4,
+        "total": 4
+      },
+      "Stations of the Cross": {
+        "sourced": 2,
+        "unsourced": 6,
+        "total": 8
+      }
+    },
+    "claims": [
+      {
+        "stop": "Nave",
+        "text": "The tour will take you from the peaceful serenity of the Nave to the contemplative path of the Stations of the Cross.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Designed by Jean Bazaine, the stained glass windows depict the sacraments, while the newly crafted altar holds a rich history dating back to 1879.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Alphonsus Ligouri and Leonard of Port Maurice's influences resonate in the Stations of the Cross, offering a glimpse into the spiritual fabric of this sacred space.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Exit the main entrance and turn left onto Washington St, the Nave is the large central area visible through the main doors.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Walter H. Delivered a homily that resonated deeply within these walls.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Accusing Cardinal Bernard Law of hiding \"behind lawyers and bankruptcy,\" Cuenin's words rippled through the congregation, earning multiple standing ovations from over 850 parishioners.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On Sunday, December 8, 2002, Rev. Walter H. Cuenin delivered a homily at OLHC accusing Cardinal Bernard Law of hiding 'behind lawyers and bankruptcy', receiving multiple standing ovations from over 85"
+      },
+      {
+        "stop": "Nave",
+        "text": "In September 2005, the nave once again drew attention as Father Cuenin, an outspoken priest in Boston, announced his resignation due to allegations of financial impropriety, including a $500 monthly stipend and a leased Honda Accord.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In September 2005, Father Cuenin announced his forced resignation from OLHC due to a financial audit alleging improprieties, including a $500 monthly stipend and a leased Honda Accord."
+      },
+      {
+        "stop": "Nave",
+        "text": "1995, it was Mother Teresa of Calcutta who graced this space, addressing the congregation on themes of service, peace, and the sanctity of life.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In June 1995, Mother Teresa of Calcutta visited Our Lady Help of Christians, addressing the congregation on service, peace, and sanctity of life."
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "In the 1870s, Nonantum was a working-class Irish enclave, a community striving to carve out its identity amidst affluent Protestant neighbors.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "It was within this context that the parishioners of Our Lady Help of Christians embraced the nickel-and-dime subscriptions of the era.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "In 1964, the Charles J. Connick Associates studio was entrusted with a poignant task.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1964, Charles J. Connick Associates studio was commissioned to install two memorial windows at Our Lady Help of Christians."
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "Charles I. Doherty placed an urgent order for two custom panels, inscribed with 'May the Soul of William J. Doherty Rest in Peace.' His urgent commission ensured that the legacy of William J. Doherty would be immortalized in the church's sacred spaces.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Charles I. Doherty placed an urgent order for two custom panels in 1964, inscribed with 'May the Soul of William J. Doherty Rest in Peace'."
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "The legendary figure of Lady Richeldis de Faverches, an Anglo-Saxon noblewoman, is said to have received a vision of the Virgin Mary in 1061, leading to the establishment of Walsingham as a pilgrimage site.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "This vision, among the earliest recorded Marian apparitions in England, connected Walsingham to the sacred mystery of the Annunciation and reverberates through the centuries, echoing in the spirit of the stained glass here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "In December 2002, Father Walter H. Cuenin delivered a powerful homily here, openly rebuking Cardinal Bernard Law for his handling of the sex abuse scandal within the Archdiocese.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "His words resonated deeply with the congregation, leading to multiple standing ovations from over 850 parishioners present that day.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "Shortly after, Cardinal Law resigned amidst a national uproar, marking a significant turning point in the local church's relationship with the broader Archdiocese.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "These modern tragedies echo the past struggles of the parish, from the clashes between Italian immigrants and the Irish Catholic hierarchy in the late 19th and early 20th centuries, to the more recent events of community activism and mourning.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "Look for the fourteen small, vivid tableaux lining the walls, each capturing a moment from Jesus Christ's final hours.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "The Stations of the Cross, deeply embedded in Catholic tradition, are more than mere depictions; they are pathways of faith and reflection.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "Created with precision, each station here draws upon the 1787 version by St. Alphonsus Ligouri, a text widely recognized across America for its emotional depth and spiritual resonance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "This devotion, beginning with Jesus’ condemnation and ending with his entombment, offers a meditative experience that has been embraced by believers for centuries.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "One poignant episode from the church's past involves Joan Cavanagh, a parishioner and writer.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "As a young girl at Our Lady Help of Christians Grammar School, she witnessed an elderly Italian immigrant woman, overwhelmed with emotion, kissing the feet of the crucifix during a Stations of the Cross devotion.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Joan Cavanagh, a parishioner and writer, recounted being a nine-year-old schoolgirl in Sister Paul Marie’s classroom at Our Lady Help of Christians Grammar School, where she witnessed an elderly Itali"
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "This moment, seared into Joan's memory, highlights the personal and cultural significance the stations hold for many parishioners.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "She came to attend the final vows ceremony of several Missionaries of Charity sisters.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On June 15, 1995, Mother Teresa of Calcutta paid an unannounced visit to Our Lady Help of Christians to attend the final vows ceremony of several Missionaries of Charity sisters."
+      }
+    ]
+  }
+}
