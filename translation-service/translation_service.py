@@ -10,22 +10,96 @@ import zipfile
 import io
 import re
 import uuid
+import time
+import threading
 import psycopg2
 import logging
+import requests
 from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 from bs4 import BeautifulSoup, NavigableString
 
+# [LOCAL-559] Centralised cost rates (gpt-4o-mini input/output per 1M tokens).
+try:
+    import cost_rates
+except ImportError:  # pragma: no cover - cost_rates lives at repo root; present in the image
+    cost_rates = None
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
+class TranslationArtifactError(Exception):
+    """Raised when a translation cannot produce a valid downloadable artifact.
+
+    The caller MUST treat this as a hard failure: no translation row is inserted,
+    and the HTTP endpoint returns a non-200 response with error code
+    TRANSLATION_ARTIFACT_FAILED. This prevents the historic bug (GCS-TR1) where an
+    artifact-less row was inserted and then 404'd from map-delivery/download-tour.
+    """
+    error_code = "TRANSLATION_ARTIFACT_FAILED"
+
+
 class TranslationService:
+    # [LOCAL-559] Chunk boundary: texts longer than this are split on blank lines
+    # (paragraph boundaries) and translated piecewise, then rejoined in order.
+    # Applies to BOTH engines so neither silently truncates (the old AWS path sent
+    # Text=text[:5000] and dropped everything past 5,000 characters).
+    _CHUNK_THRESHOLD_CHARS = 4500
+    # AWS Translate hard limit is 10,000 bytes per request; keep a safe ceiling.
+    _AWS_MAX_CHARS = 9000
+
+    # [LOCAL-559] LLM engine defaults.
+    _LLM_MODEL = os.getenv('TRANSLATION_LLM_MODEL', 'gpt-4o-mini')
+    _LLM_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
+    _LLM_TIMEOUT = int(os.getenv('TRANSLATION_LLM_TIMEOUT', '60'))
+    # Sane bounds for the LLM output length ratio (translated_len / source_len).
+    # Outside this range the output is almost certainly wrong (truncated, refused,
+    # or hallucinated) and we fall back to AWS for that call.
+    _LLM_RATIO_MIN = 0.5
+    _LLM_RATIO_MAX = 2.5
+
+    # Human-readable language names for the LLM system prompt.
+    _LANGUAGE_NAMES = {
+        'es': 'Spanish', 'fr': 'French', 'de': 'German', 'ru': 'Russian',
+        'zh': 'Chinese', 'ko': 'Korean', 'ja': 'Japanese', 'it': 'Italian',
+        'pt': 'Portuguese', 'ar': 'Arabic', 'hi': 'Hindi', 'nl': 'Dutch',
+        'pl': 'Polish', 'tr': 'Turkish', 'uk': 'Ukrainian', 'he': 'Hebrew',
+    }
+
+    # [LOCAL-559] Voice-command phrases that must remain English in article text so the
+    # mobile voice controls keep matching. Shared by the LLM prompt and the AWS post-pass.
+    _VOICE_COMMANDS = [
+        "Play", "Pause", "Next topic", "Previous topic", "Repeat",
+        "Forward 10 seconds", "Backward 5 seconds", "Play topic",
+        "Play summary", "Play full article", "List major topics",
+        "Next article", "Previous article", "What are my options"
+    ]
+
     def __init__(self):
         self.translate_client = boto3.client('translate', region_name='us-east-1')
         self.polly_client = boto3.client('polly', region_name='us-east-1')
         self.executor = ThreadPoolExecutor(max_workers=5)
-        
+        # [LOCAL-559] Translation engine selector. Default 'aws' keeps today's
+        # behaviour so nothing deployed changes until TRANSLATION_ENGINE=llm is set.
+        self.translation_engine = os.getenv('TRANSLATION_ENGINE', 'aws').strip().lower()
+        if self.translation_engine not in ('aws', 'llm'):
+            logging.warning(
+                f"[TRANSLATE] Unknown TRANSLATION_ENGINE={self.translation_engine!r}; defaulting to 'aws'"
+            )
+            self.translation_engine = 'aws'
+        self._openai_api_key = os.getenv('OPENAI_API_KEY', '')
+        # [LOCAL-559] In-process memo of identical (text, language) pairs. The HTML/ZIP
+        # paths translate the same fragments (names, labels, repeated stops) repeatedly;
+        # memoising avoids paying for them twice within a process.
+        self._translation_memo = {}
+        self._memo_lock = threading.Lock()
+        # [LOCAL-559] Per-process LLM cost accumulator and a per-tour counter the tour
+        # path resets at the start of each translation to report a per-tour total.
+        self._llm_cost_total = 0.0
+        self._llm_tour_cost = 0.0
+
     def get_db_connection(self):
         return psycopg2.connect(
             host=os.getenv('DB_HOST', 'development-postgres-2-1'),
@@ -137,36 +211,233 @@ class TranslationService:
             return '\n'.join(english_lines + clean_body)
 
     def translate_text(self, text, target_language, preserve_voice_commands=False):
-        """Translate text using AWS Translate with optional voice command preservation"""
-        if target_language == 'en':
+        """Translate text, dispatching on the TRANSLATION_ENGINE flag.
+
+        [LOCAL-559]
+          * engine 'aws'  (DEFAULT): AWS Translate — today's behaviour.
+          * engine 'llm'          : OpenAI gpt-4o-mini, with AWS fallback per call.
+
+        Neither engine truncates: input over ~4,500 chars is split on blank lines
+        (paragraph boundaries), each chunk translated, and the pieces rejoined in
+        order. This fixes the live defect where the AWS path sent Text=text[:5000]
+        and silently dropped everything past 5,000 characters.
+
+        Results are memoised per (text, language, engine) within the process, so the
+        HTML/ZIP paths do not pay to translate the same fragment twice.
+        """
+        if target_language == 'en' or text is None or text == '':
             return text
-            
-        try:
-            response = self.translate_client.translate_text(
-                Text=text[:5000],  # AWS limit
-                SourceLanguageCode='en',
-                TargetLanguageCode=target_language
+
+        engine = self.translation_engine
+        memo_key = (engine, target_language, bool(preserve_voice_commands), text)
+        with self._memo_lock:
+            if memo_key in self._translation_memo:
+                return self._translation_memo[memo_key]
+
+        translated = self._translate_dispatch(text, target_language, preserve_voice_commands, engine)
+
+        with self._memo_lock:
+            self._translation_memo[memo_key] = translated
+        return translated
+
+    def _translate_dispatch(self, text, target_language, preserve_voice_commands, engine):
+        """Chunk if needed, then run the selected engine on each chunk."""
+        chunks = self._split_for_translation(text)
+        if len(chunks) > 1:
+            logging.info(
+                f"[TRANSLATE] Split {len(text)} chars into {len(chunks)} chunk(s) "
+                f"(engine={engine}, lang={target_language}) — no truncation"
             )
-            translated_text = response['TranslatedText']
-            
-            # Preserve English voice commands if requested
+        out_parts = []
+        for chunk in chunks:
+            if engine == 'llm':
+                out_parts.append(self._translate_text_llm(chunk, target_language, preserve_voice_commands))
+            else:
+                out_parts.append(self._translate_text_aws(chunk, target_language, preserve_voice_commands))
+        # Chunks were split on the blank line between paragraphs; rejoin with the
+        # same separator so the paragraph structure (and line count) is preserved.
+        return '\n\n'.join(out_parts)
+
+    def _split_for_translation(self, text):
+        """Split text into translate-sized chunks on blank lines (paragraph breaks).
+
+        [LOCAL-559] Returns a list of chunks each <= _CHUNK_THRESHOLD_CHARS where
+        possible. Short texts return as a single-element list (no behavioural change).
+        A single paragraph longer than the threshold is kept whole here (so we never
+        break a line mid-way and change the line count); the AWS engine additionally
+        guards the 10k-byte hard limit by line-splitting such giants.
+        """
+        if len(text) <= self._CHUNK_THRESHOLD_CHARS:
+            return [text]
+        paragraphs = text.split('\n\n')
+        chunks = []
+        current = []
+        current_len = 0
+        for para in paragraphs:
+            para_len = len(para) + 2  # account for the '\n\n' separator
+            if current and current_len + para_len > self._CHUNK_THRESHOLD_CHARS:
+                chunks.append('\n\n'.join(current))
+                current = [para]
+                current_len = para_len
+            else:
+                current.append(para)
+                current_len += para_len
+        if current:
+            chunks.append('\n\n'.join(current))
+        return chunks
+
+    def _translate_text_aws(self, text, target_language, preserve_voice_commands=False):
+        """AWS Translate for a single chunk. No truncation: a chunk still larger than
+        the AWS per-request limit is split further on single newlines and rejoined."""
+        try:
+            if len(text) > self._AWS_MAX_CHARS:
+                # Preserve every character: split on single newlines, translate, rejoin.
+                lines = text.split('\n')
+                buf, buf_len, pieces = [], 0, []
+                for ln in lines:
+                    if buf and buf_len + len(ln) + 1 > self._AWS_MAX_CHARS:
+                        pieces.append('\n'.join(buf))
+                        buf, buf_len = [ln], len(ln) + 1
+                    else:
+                        buf.append(ln)
+                        buf_len += len(ln) + 1
+                if buf:
+                    pieces.append('\n'.join(buf))
+                translated_text = '\n'.join(
+                    self._aws_translate_call(p, target_language) for p in pieces
+                )
+            else:
+                translated_text = self._aws_translate_call(text, target_language)
+
             if preserve_voice_commands:
                 translated_text = self._preserve_voice_commands(text, translated_text, target_language)
-            
             return translated_text
         except Exception as e:
             logging.error(f"Translation error: {e}")
             return text
-    
+
+    def _aws_translate_call(self, text, target_language):
+        """Single AWS Translate API call (no [:5000] truncation)."""
+        response = self.translate_client.translate_text(
+            Text=text,
+            SourceLanguageCode='en',
+            TargetLanguageCode=target_language
+        )
+        return response['TranslatedText']
+
+    def _translate_text_llm(self, text, target_language, preserve_voice_commands=False):
+        """Translate a single chunk with gpt-4o-mini, falling back to AWS on failure.
+
+        [LOCAL-559] Fallback to AWS for THIS call (logged as [TRANSLATE-LLM] FALLBACK)
+        when the LLM errors, returns empty, or returns a line count / length ratio
+        outside sane bounds. Cost is metered per call and accumulated per tour.
+        """
+        lang_name = self._LANGUAGE_NAMES.get(target_language, target_language)
+        system_prompt = (
+            f"You are a professional translator. Translate the user's text faithfully into {lang_name}. "
+            "Preserve the exact meaning with no additions and no omissions. "
+            "Keep every line break and the SAME NUMBER OF LINES as the input. "
+            "Keep any line that starts with 'Address:', 'Coordinates:', 'Type/Specialty:', "
+            "'Specific Examples:' or 'Operational Details:' UNCHANGED (do not translate it). "
+            "Keep names of venues and people as they are commonly written in that language. "
+            "Output only the translation, with no commentary, labels, or quotes."
+        )
+        if preserve_voice_commands:
+            # [LOCAL-559] Voice-command preservation under the LLM engine: instruct the
+            # model to leave these control phrases in English so the article voice
+            # controls keep working. A post-pass (_preserve_voice_commands) is still run
+            # as a backstop for any the model translated anyway.
+            _cmds = ', '.join(f'"{c}"' for c in self._VOICE_COMMANDS)
+            system_prompt += (
+                " Keep the following voice-command phrases in English exactly as written, "
+                f"do not translate them: {_cmds}."
+            )
+
+        reason = None
+        try:
+            if not self._openai_api_key:
+                reason = 'no_api_key'
+                raise RuntimeError('OPENAI_API_KEY not set')
+
+            resp = self._openai_chat(system_prompt, text)
+            translated = (resp.get('text') or '').strip('\n')
+
+            if not translated.strip():
+                reason = 'empty'
+            else:
+                src_lines = text.count('\n') + 1
+                out_lines = translated.count('\n') + 1
+                if out_lines != src_lines:
+                    reason = f'line_count {out_lines}!={src_lines}'
+                else:
+                    ratio = len(translated) / max(len(text), 1)
+                    if ratio < self._LLM_RATIO_MIN or ratio > self._LLM_RATIO_MAX:
+                        reason = f'ratio {ratio:.2f}'
+
+            if reason is None:
+                # Meter cost only for an accepted LLM result.
+                self._meter_llm_cost(resp.get('input_tokens', 0), resp.get('output_tokens', 0))
+                if preserve_voice_commands:
+                    translated = self._preserve_voice_commands(text, translated, target_language)
+                return translated
+        except Exception as e:
+            if reason is None:
+                reason = f'error {e}'
+
+        logging.warning(f"[TRANSLATE-LLM] FALLBACK {reason}")
+        return self._translate_text_aws(text, target_language, preserve_voice_commands)
+
+    def _openai_chat(self, system_prompt, user_text):
+        """Call the OpenAI chat completions endpoint (gpt-4o-mini, temperature 0).
+
+        Returns a dict: {text, input_tokens, output_tokens}. Isolated in its own
+        method so unit tests can mock the network call cleanly.
+        """
+        response = requests.post(
+            self._LLM_ENDPOINT,
+            headers={
+                'Authorization': f'Bearer {self._openai_api_key}',
+                'Content-Type': 'application/json',
+            },
+            json={
+                'model': self._LLM_MODEL,
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': user_text},
+                ],
+                'temperature': 0,
+            },
+            timeout=self._LLM_TIMEOUT,
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f'OpenAI HTTP {response.status_code}: {response.text[:200]}')
+        data = response.json()
+        usage = data.get('usage', {}) or {}
+        return {
+            'text': data['choices'][0]['message']['content'],
+            'input_tokens': usage.get('prompt_tokens', 0),
+            'output_tokens': usage.get('completion_tokens', 0),
+        }
+
+    def _meter_llm_cost(self, input_tokens, output_tokens):
+        """Log and accumulate the cost of one accepted LLM translation call."""
+        if cost_rates is not None:
+            cost = cost_rates.llm_cost(
+                input_tokens=input_tokens, output_tokens=output_tokens, model=self._LLM_MODEL
+            )
+        else:  # pragma: no cover - defensive; cost_rates ships in the image
+            cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+        self._llm_cost_total += cost
+        self._llm_tour_cost += cost
+        logging.info(
+            f"[TRANSLATE-LLM] tokens_in={input_tokens} tokens_out={output_tokens} cost=${cost:.6f}"
+        )
+        return cost
+
     def _preserve_voice_commands(self, original_text, translated_text, target_language='ru'):
         """Preserve English voice commands in translated text"""
         # Voice commands that must stay in English
-        voice_commands = [
-            "Play", "Pause", "Next topic", "Previous topic", "Repeat",
-            "Forward 10 seconds", "Backward 5 seconds", "Play topic",
-            "Play summary", "Play full article", "List major topics",
-            "Next article", "Previous article", "What are my options"
-        ]
+        voice_commands = self._VOICE_COMMANDS
         
         # Preserve voice command phrases
         for command in voice_commands:
@@ -214,6 +485,9 @@ class TranslationService:
             tuple: (translated_tour_id or None, cache_hit: bool)
                    cache_hit=True when a translation already existed and was returned as-is.
         """
+        # [LOCAL-559] Reset the per-tour LLM cost accumulator so we can report a
+        # per-tour total at the end (engine='aws' leaves this at 0.0).
+        self._llm_tour_cost = 0.0
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
@@ -231,24 +505,36 @@ class TranslationService:
             tour_content = original_tour[7]  # tour_content column
             original_zip_data = original_tour[3]  # audio_tour column
             tour_blob_uri = original_tour[9] if len(original_tour) > 9 else None  # R2 blob key
-            
+
+            # GCS-TR1 fix: fetch the source ZIP from R2 whenever audio_tour is NULL and
+            # tour_blob_uri is set — REGARDLESS of tour_content. The R2 migration set the
+            # audio_tour BYTEA column to NULL for migrated tours, so R2-migrated tours that
+            # still have tour_content (e.g. 107/120/284) previously skipped this fetch and
+            # crashed later in _create_mobile_compatible_zip with original_zip_data == None.
+            if not original_zip_data and tour_blob_uri:
+                logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching source ZIP from R2 blob: {tour_blob_uri}")
+                try:
+                    from blobstorage import R2BlobStorage
+                    original_zip_data = R2BlobStorage().download(tour_blob_uri)
+                    logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
+                except Exception as r2_err:
+                    # Do not proceed to INSERT an artifact-less row. Signal a hard failure so
+                    # the endpoint returns non-200 and the caller can retry/report.
+                    logging.error(f"Failed to download source ZIP for tour {original_tour_id} from R2 ({tour_blob_uri}): {r2_err}")
+                    raise TranslationArtifactError(
+                        f"source ZIP unobtainable for tour {original_tour_id} (blob {tour_blob_uri}): {r2_err}"
+                    )
+
             if not tour_content:
                 logging.warning(f"No tour content found for tour {original_tour_id}, falling back to ZIP extraction")
-                
-                # If audio_tour is NULL but tour_blob_uri exists, download from R2
-                if not original_zip_data and tour_blob_uri:
-                    logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching from R2 blob: {tour_blob_uri}")
-                    try:
-                        from blobstorage import R2BlobStorage
-                        original_zip_data = R2BlobStorage().download(tour_blob_uri)
-                        logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
-                    except Exception as r2_err:
-                        logging.error(f"Failed to download tour {original_tour_id} from R2: {r2_err}")
-                
-                # Verify ZIP has actual audio before attempting fallback
+
+                # Source ZIP is required for the fallback path.
                 if not original_zip_data:
                     logging.error(f"Tour {original_tour_id} has no tour_content AND no ZIP data — cannot translate")
-                    return None, False
+                    # [GCS-TR1] Hard-fail: never insert an artifact-less row.
+                    raise TranslationArtifactError(
+                        f"tour {original_tour_id} has no tour_content and no source ZIP"
+                    )
                 try:
                     import io as _io
                     zip_bytes = original_zip_data.tobytes() if hasattr(original_zip_data, 'tobytes') else bytes(original_zip_data)
@@ -256,17 +542,50 @@ class TranslationService:
                         audio_files_in_zip = [n for n in _z.namelist() if n.startswith('audio_') and n.endswith('.mp3')]
                     if not audio_files_in_zip:
                         logging.error(f"Tour {original_tour_id} ZIP has no audio files and no tour_content — cannot translate")
-                        return None, False
-                except Exception:
+                        # [GCS-TR1] Hard-fail: never insert an artifact-less row.
+                        raise TranslationArtifactError(
+                            f"tour {original_tour_id} ZIP has no audio files and no tour_content"
+                        )
+                except zipfile.BadZipFile:
                     pass
+                # [LOCAL-60] Preserve the (id, cache_hit) tuple contract. The ZIP path is
+                # always a fresh translation, so cache_hit is False.
                 _zip_result = self._translate_tour_from_zip(original_tour, target_language, zip_data_override=original_zip_data)
-                return (_zip_result, False) if _zip_result else (None, False)
-            
+                return _zip_result, False
+
+
             logging.info(f"Using stored tour content: {len(tour_content)} characters")
-            
-            # Check if translation already exists
+
+            # The main (tour_content) path requires the source ZIP so the translated ZIP can
+            # be assembled from the original HTML structure. If it is still missing here, fail
+            # hard rather than crash inside _create_mobile_compatible_zip and insert a NULL row.
+            if not original_zip_data:
+                logging.error(f"Tour {original_tour_id} has tour_content but no source ZIP (audio_tour NULL, tour_blob_uri {tour_blob_uri!r}) — cannot build artifact")
+                raise TranslationArtifactError(
+                    f"tour {original_tour_id} has tour_content but no source ZIP artifact"
+                )
+
+            # Does the audio_tours table have a 'track' column? Guarded like the orchestrator
+            # so the INSERT still works on a DB without the column.
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            has_track = cursor.fetchone() is not None
+            source_track = None
+            if has_track:
+                cursor.execute("SELECT track FROM audio_tours WHERE id = %s", (original_tour_id,))
+                _row = cursor.fetchone()
+                source_track = _row[0] if _row else None
+                logging.info(f"Source tour {original_tour_id} track = {source_track!r}; translation will inherit it")
+
+            # Check if a USABLE translation already exists. GCS-TR1: a row is only a valid
+            # cache hit if it actually has a downloadable artifact. Artifact-less rows (the
+            # historic bug) are ignored here and regenerated below.
             cursor.execute(
-                "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s",
+                "SELECT id FROM audio_tours WHERE original_tour_id = %s AND content_language = %s "
+                "AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)",
                 (original_tour_id, target_language)
             )
             existing = cursor.fetchone()
@@ -336,36 +655,65 @@ class TranslationService:
             translated_zip_data = self._create_mobile_compatible_zip(
                 original_zip_data, translated_name, translated_audio_files, target_language, translated_stops
             )
-            
+
+            # GCS-TR1: never insert a translation row without a real artifact. If the ZIP
+            # builder failed (returns None) or produced empty bytes, fail hard — do NOT INSERT.
+            if not translated_zip_data or len(translated_zip_data) == 0:
+                logging.error(f"Tour {original_tour_id}: translated ZIP is empty/None — refusing to insert artifact-less row")
+                raise TranslationArtifactError(
+                    f"translated artifact build failed for tour {original_tour_id} ({target_language})"
+                )
+
             # Store translated tour content for future reference
             translated_tour_content = "\n\n".join([
                 f"Stop {i+1}: {stop}" for i, stop in enumerate(translated_stops)
             ])
             
-            # Create new tour record
+            # Create new tour record.
+            # [LOCAL-162] Carry the source tour's stops_count onto the translation.
             _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
-            # Track B: this deployment's own track (each of Beta/Storied is a
-            # separate service instance, so a translation always belongs to
-            # whichever track produced it — see tour_orchestrator_service.py).
-            _track = os.getenv('TOUR_TRACK', 'beta').lower()
-            if _track not in ('beta', 'storied'):
-                _track = 'beta'
-            cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                       lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (
-                translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content,
-                _original_stops_count, _track
-            ))
+            # [GCS-TR1 + LOCAL-162] Track resolution: a translation inherits its source
+            # tour's track (the service is shared by both Beta and Storied, so an env var
+            # alone cannot know the caller). If the source row has no track (older rows),
+            # fall back to this deployment's TOUR_TRACK env var, then to 'beta'.
+            _env_track = os.getenv('TOUR_TRACK', 'beta').lower()
+            if _env_track not in ('beta', 'storied'):
+                _env_track = 'beta'
+            _track = source_track if (has_track and source_track) else _env_track
+            if has_track:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, tour_content, stops_count, track)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour_id,
+                    translated_tour_content, _original_stops_count, _track
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, tour_content, stops_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour_id,
+                    translated_tour_content, _original_stops_count
+                ))
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
             
-            logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops")
+            logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops (track={_track!r})")
+            if self.translation_engine == 'llm':
+                logging.info(f"[TRANSLATE-LLM] tour {new_tour_id} ({target_language}) total cost=${self._llm_tour_cost:.6f}")
             return new_tour_id, False  # [LOCAL-60] Fresh translation, cache_hit=False
             
+        except TranslationArtifactError:
+            # Hard failure: roll back so no partial/artifact-less row is committed, then
+            # propagate so the endpoint can return a non-200 TRANSLATION_ARTIFACT_FAILED.
+            conn.rollback()
+            raise
         except Exception as e:
             logging.error(f"Tour translation with audio error: {e}")
             conn.rollback()
@@ -1544,7 +1892,11 @@ Say 'What are my options' to hear this help again"""
             logging.error(f"Error creating mobile-compatible ZIP: {e}")
             import traceback
             logging.error(f"Traceback: {traceback.format_exc()}")
-            return original_zip_data  # Return original on error
+            # GCS-TR1: signal failure instead of passing the original (or None) through.
+            # The historic bug returned original_zip_data here (None for R2-migrated tours),
+            # and the caller then INSERTed an artifact-less row that 404'd. Returning None
+            # makes the caller raise TranslationArtifactError and skip the INSERT.
+            return None
     
     def _generate_translated_html(self, tour_name, translated_stops, audio_files, target_language):
         """Generate HTML with embedded translated audio data.
@@ -1678,11 +2030,6 @@ Say 'What are my options' to hear this help again"""
             
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
-                    audioElements.forEach((otherAudio, otherIndex) => {
-                        if (otherIndex !== index && !otherAudio.paused) {
-                            otherAudio.pause();
-                        }
-                    });
                     currentStopIndex = index;
                 });
             });
@@ -1713,31 +2060,69 @@ Say 'What are my options' to hear this help again"""
             original_zip_data = bytes(original_zip_data)
         
         translated_zip_data = self.translate_zip_audio(original_zip_data, target_language)
-        
+
+        # GCS-TR1: never insert a translation row without a real artifact.
+        if not translated_zip_data or len(translated_zip_data) == 0:
+            logging.error(f"Tour {original_tour[0]}: ZIP fallback produced empty/None artifact — refusing to insert")
+            raise TranslationArtifactError(
+                f"ZIP-fallback artifact build failed for tour {original_tour[0]} ({target_language})"
+            )
+
         # Create new tour record
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
+            # [LOCAL-162] Carry the source tour's stops_count onto the translation.
             _fallback_stops_count = original_tour[10] if len(original_tour) > 10 else None
-            _track = os.getenv('TOUR_TRACK', 'beta').lower()
-            if _track not in ('beta', 'storied'):
-                _track = 'beta'
+            # [GCS-TR1] Does the audio_tours table have a 'track' column? Guarded so the
+            # INSERT still works on a DB without the column.
             cursor.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                                       lat, lng, content_language, original_tour_id, stops_count, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
-            """, (
-                translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour[0],
-                _fallback_stops_count, _track
-            ))
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'audio_tours' AND column_name = 'track'
+            """)
+            has_track = cursor.fetchone() is not None
+            source_track = None
+            if has_track:
+                cursor.execute("SELECT track FROM audio_tours WHERE id = %s", (original_tour[0],))
+                _row = cursor.fetchone()
+                source_track = _row[0] if _row else None
+            # [GCS-TR1 + LOCAL-162] Inherit the source tour's track; fall back to this
+            # deployment's TOUR_TRACK env var, then to 'beta', when the source has none.
+            _env_track = os.getenv('TOUR_TRACK', 'beta').lower()
+            if _env_track not in ('beta', 'storied'):
+                _env_track = 'beta'
+            _track = source_track if (has_track and source_track) else _env_track
+            if has_track:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, stops_count, track)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour[0],
+                    _fallback_stops_count, _track
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                                           lat, lng, content_language, original_tour_id, stops_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                """, (
+                    translated_name, translated_request, translated_zip_data, original_tour[4],
+                    original_tour[5], original_tour[6], target_language, original_tour[0],
+                    _fallback_stops_count
+                ))
             
             new_tour_id = cursor.fetchone()[0]
             conn.commit()
             
-            logging.info(f"Created translated tour {new_tour_id} in {target_language} using ZIP fallback")
+            logging.info(f"Created translated tour {new_tour_id} in {target_language} using ZIP fallback (track={_track!r})")
             return new_tour_id
             
+        except TranslationArtifactError:
+            conn.rollback()
+            raise
         except Exception as e:
             logging.error(f"Fallback tour translation error: {e}")
             conn.rollback()
@@ -1775,19 +2160,35 @@ def translate_content_with_audio():
     languages = data.get('languages', ['en'])
     
     results = {}
+    had_artifact_failure = False
     for lang in languages:
         if lang == 'en':
             results[lang] = {'status': 'original', 'id': content_id}
             continue
-        
-        # [LOCAL-60] translate_tour_with_audio now returns (id, cache_hit) tuple
+
+        # [LOCAL-60] translate_tour_with_audio returns (id, cache_hit); translate_article
+        # returns a bare id. [GCS-TR1] both may raise TranslationArtifactError when no
+        # downloadable artifact could be produced — surface that as a hard failure (non-200)
+        # instead of a silent 200 hiding an artifact-less/404-ing row.
         _cache_hit = False
-        if content_type == 'tour':
-            translated_id, _cache_hit = translation_service.translate_tour_with_audio(content_id, lang)
-        elif content_type == 'article':
-            translated_id = translation_service.translate_article(content_id, lang)
-        else:
-            translated_id = None
+        try:
+            if content_type == 'tour':
+                translated_id, _cache_hit = translation_service.translate_tour_with_audio(content_id, lang)
+            elif content_type == 'article':
+                translated_id = translation_service.translate_article(content_id, lang)
+            else:
+                translated_id = None
+        except TranslationArtifactError as e:
+            logging.error(f"Artifact failure translating {content_type} {content_id} to {lang}: {e}")
+            had_artifact_failure = True
+            results[lang] = {
+                'status': 'failed',
+                'id': None,
+                'error_code': TranslationArtifactError.error_code,
+                'error': str(e),
+            }
+            continue
+
         
         if translated_id:
             # Include translated tour_name so the mobile app can display the correct title
@@ -1813,10 +2214,12 @@ def translate_content_with_audio():
         else:
             results[lang] = {'status': 'failed', 'id': None}
     
+    status_code = 502 if had_artifact_failure else 200
     return jsonify({
-        'status': 'completed',
+        'status': 'completed' if not had_artifact_failure else 'error',
+        'error_code': TranslationArtifactError.error_code if had_artifact_failure else None,
         'translations': results
-    })
+    }), status_code
 @app.route('/translate', methods=['POST', 'OPTIONS'])
 def translate_content():
     if request.method == 'OPTIONS':
