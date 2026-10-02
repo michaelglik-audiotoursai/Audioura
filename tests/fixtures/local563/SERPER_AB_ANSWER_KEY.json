@@ -1,0 +1,90 @@
+{
+ "_about": "LEAD answer key for the Serper-vs-Gemini A/B (LOCAL-563/564), built 2026-10-02 from the pages listed per fact. 'must' = the research must produce it if it mentions the topic; 'must_not' = stating it is a failure; 'unverified' = may appear only with a cited source, never scored as correct.",
+ "sail_loft": {
+  "must": {
+   "opened": "1984",
+   "reservations": "no reservations (first come, first served)",
+   "address": "80 Atlantic Avenue, Boston, MA 02110",
+   "status": "open"
+  },
+  "sources": [
+   "http://thebostonsailloft.com/ (official: 'Since 1984', 'first come, first serve basis (no reservations)')"
+  ]
+ },
+ "buttermilk": {
+  "must": {
+   "chef": "Jason Santos",
+   "opened": "February 2017",
+   "address": "160 Commonwealth Ave, Back Bay",
+   "status": "open"
+  },
+  "sources": [
+   "https://www.bostonglobe.com/lifestyle/names/2017/02/23/santos-ready-serve-buttermilk-bourbon-back-bay/NFduXcc56abIEFMmF8Ys2H/story.html",
+   "https://www.bostonmagazine.com/restaurants/2017/02/13/buttermilk-bourbon-jason-santos-first-look-photos/"
+  ]
+ },
+ "chart_house": {
+  "must": {
+   "building": "Gardiner Building, built 1763 (rebuilt 1812), oldest surviving structure on Long Wharf",
+   "history": "once John Hancock's counting house",
+   "address": "60 Long Wharf",
+   "status": "open"
+  },
+  "sources": [
+   "https://en.wikipedia.org/wiki/Long_Wharf_(Boston)"
+  ]
+ },
+ "sycamore": {
+  "must": {
+   "status": "OPEN (a 'permanently closed' verdict is an automatic FAIL: the D544 bug)",
+   "address": "755 Beacon Street, Newton MA 02459",
+   "opened": "late 2012",
+   "chef_owner": "David Punch",
+   "hours": "dinner Tue-Sat from 4:30pm",
+   "reservations": "phone 617.244.4445 or OpenTable"
+  },
+  "sources": [
+   "https://www.sycamorenewton.com/ (official)"
+  ]
+ },
+ "la_maree": {
+  "must": {
+   "status": "CLOSED permanently, 30 September 2020 (lease dispute after Port Palace Hotel sale)"
+  },
+  "must_not": {
+   "status": "open"
+  },
+  "sources": [
+   "https://foursquare.com/mareemonaco ('Now Closed')",
+   "https://monaco-hebdo.com/economie/restaurant-la-maree-repris/"
+  ]
+ },
+ "logan": {
+  "must": {
+   "named_for": "Major General Edward Lawrence Logan (Spanish-American War officer from South Boston)",
+   "opened": "September 8, 1923 as 'Boston Airport' at Jeffries Point",
+   "renamed": "General Edward Lawrence Logan International Airport, by act of the legislature, April 29, 1954",
+   "dedication": "dedicated 8 Sep 1923; Mayor James Michael Curley attended and started a plane race to Boston Light"
+  },
+  "unverified": {
+   "Governor Channing Cox": "no source found (Wikipedia, Boston Globe 2023, Airways Magazine checked); may appear only with a cited source"
+  },
+  "sources": [
+   "https://en.wikipedia.org/wiki/Logan_International_Airport",
+   "https://www.bostonglobe.com/2023/10/12/metro/logan-airport-100-years-of-history/ (Curley at the 1923 dedication; NOT in Wikipedia)"
+  ]
+ },
+ "not_keyed": [
+  "our_lady",
+  "lascaris",
+  "riviera_bike",
+  "faneuil: scored by recall and invented-fact checks only, no answer key"
+ ],
+ "_principle": "Michael, 2026-10-02: do not rely solely on Wikipedia. Audioura's value is finding facts in many, including little-known, sources and VERIFYING them against high-reliability ones. The A/B therefore rewards discovery: a fact from a less-known source that is corroborated by a high-reliability source counts MORE than a Wikipedia-only fact, and the answer key itself draws on newspapers and official sites, not only Wikipedia.",
+ "_reliability_tiers": {
+  "high": "official site of the place or its operator; museums, museum associations, historical societies, archives, government (.gov) and universities (.edu); established newspapers and magazines (Boston Globe, NYT, Le Monde, Monaco Hebdo); Wikipedia and Wikidata",
+  "medium": "established travel and dining guides with editors (Michelin, Eater, Boston Magazine, Atlas Obscura)",
+  "discovery": "blogs, local forums, review sites, niche or community history pages: valuable for leads, but a fact from here counts only once corroborated by a high tier source",
+  "never_alone": "AI-generated pages, content farms, SEO listicles"
+ }
+}
