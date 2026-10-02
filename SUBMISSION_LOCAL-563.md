@@ -243,3 +243,60 @@ is the healthiest profile — the richest answer set (359 facts) with the *lowes
 discovery share (24%), because the Palais Lascaris museum and departement06 / nice.fr
 official pages carry most of its claims. chart_house, logan and faneuil sit in between.
 This per-tour split is the input a corroboration check (scoring step 2) would run next.
+
+---
+
+## Item 5 — answer-key check of the Gemini runs
+
+`tests/fixtures/local563/answer_key_check.json`. For each keyed tour: was each `must`
+fact stated (in the tour text or a Gemini answer), did any `must_not` appear, did any
+`unverified` claim appear and with what source. A `must` fact counts as *stated* when a
+distinctive probe from its value (a year, a proper-name run, or a ≥5-char token)
+appears in the combined text. The one short value, `status: open`, is read as *stated*
+only when the venue reads as operating — i.e. "open" appears **and** the venue was not
+given a D538 "permanently closed" verdict (`method: operating_inference`).
+
+| tour | must facts stated | must_not appeared | unverified appeared | notes |
+|---|---|---|---|---|
+| sail_loft | opened ✓, reservations ✓, address ✓, **status(open) ✓** | — | — | all four met |
+| buttermilk | chef ✓, opened ✓, address ✓, **status(open) ✗** | — | — | **status fails: D538 called it "permanently closed" in run1** (wrong — key says open) |
+| chart_house | building ✓, history ✓, address ✓, **status(open) ✗** | — | — | **status fails: D538 called it "permanently closed" in both runs** — the pipeline matched the *Weehawken NJ* Chart House closure, not Boston's Long Wharf one |
+| sycamore | status ✓, address ✓, opened ✓, chef_owner ✓, hours ✓, reservations ✓ | — (no "closed" on Sycamore) | — | all six met; **the D544 auto-FAIL did NOT fire** — the only closed verdict was for *The Local*, a replenished neighbour stop, not Sycamore |
+| la_maree | status(CLOSED 2020) ✓ | **status=open did NOT appear ✓** | — | correctly presented as permanently closed; the must_not ("open") never appeared |
+| logan | named_for ✓, opened ✓, renamed ✓, dedication ✓ | — | **"Governor Channing Cox" appeared** | appeared in both runs' tour text via `venue_parts.py:default_ask_grounded`; **no grounding support span backs it** — the exact "may appear only with a cited source" case the key flags |
+
+### Findings
+
+- **Two wrong "permanently closed" verdicts cost `must: status=open`.** buttermilk and
+  chart_house are both open per the key, but D538 dropped them as permanently closed
+  (buttermilk once, chart_house both runs). chart_house is a name-collision failure:
+  the closed source is the *Weehawken, New Jersey* Chart House ("riverfront staple …
+  closed as of May 14"), not Boston's Long Wharf location. This is the same
+  false-closed failure family the key warns about with Sycamore (D544).
+- **Sycamore itself passed its must_not.** Despite the D544 risk the key calls out,
+  neither Sycamore run produced a "closed" verdict for Sycamore — the run1 closed
+  verdict named *The Local*, a replenished neighbour, so Sycamore's `status: OPEN`
+  must-fact holds and the auto-FAIL did not trigger.
+- **la_maree is correct in the hard direction:** it is stated as permanently closed
+  (2020, Port Palace Hotel lease dispute) and the `must_not: status=open` never
+  appeared — the pipeline did not re-open a closed venue.
+- **One unverified claim surfaced unsourced.** logan's "Governor Channing Cox" appears
+  in both runs' tour text, but no `groundingSupports` span carries it
+  (`backed_by_grounding_support_span: false`). Under the key this may appear only with
+  a cited source; here it is stated with none. (`answer_domains_when_appeared` lists the
+  answer's whole source set, but none of those spans actually mention Channing — the
+  fallback, not a citation.)
+
+---
+
+## Reproduce
+
+```
+python3 tests/fixtures/local563/analyze_baseline.py
+```
+
+Regenerates `baseline_summary.json`, `gemini_questions.jsonl`,
+`gemini_questions_dedup.json`, `gemini_facts.json` and `answer_key_check.json` from the
+recordings. No network, no generation, no API calls — reads only the saved
+`.txt` / `.json` / `.log` / `.gemini.jsonl` files, `tour_quality.score_tour`,
+`sentence_split.split_sentences`, and `SERPER_AB_ANSWER_KEY.json`.

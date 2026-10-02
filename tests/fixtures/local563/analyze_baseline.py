@@ -552,11 +552,32 @@ def answer_key_check():
             hits = [p for p in probes if p and p in full]
             in_tour = any(p in tour_only for p in hits)
             in_gem = any(p in gem_only for p in hits)
+            method = 'phrase_probe'
+            # Short status values ("open") produce no >=5-char probe. Treat a
+            # "status: open" must-fact as satisfied when the venue reads as
+            # operating: the word "open" appears AND the keyed venue was not given
+            # a D538 closed verdict (and the venue is not called permanently closed).
+            if fname == 'status' and not hits and 'open' in _norm(fval):
+                method = 'operating_inference'
+                venue_closed_text = (venue_token and
+                                     f'{venue_token}' in full and
+                                     ('permanently closed' in full or
+                                      f'{venue_token} is closed' in full
+                                      or f'{venue_token} has closed' in full))
+                operating = ('open' in full and not rec['keyed_venue_got_closed_verdict']
+                             and not venue_closed_text)
+                in_tour = 'open' in tour_only and not rec['keyed_venue_got_closed_verdict']
+                in_gem = 'open' in gem_only and not rec['keyed_venue_got_closed_verdict']
+                stated = bool(operating)
+                hits = ['open (operating)'] if operating else []
+            else:
+                stated = bool(hits)
             rec['must'][fname] = {
                 'value': fval,
+                'method': method,
                 'probes': probes,
                 'matched_probes': hits,
-                'stated': bool(hits),
+                'stated': stated,
                 'in_tour_text': in_tour,
                 'in_gemini_answer': in_gem,
             }
