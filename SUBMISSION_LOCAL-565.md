@@ -66,3 +66,38 @@ have to call `add_search_queries` for each Serper query.
   encoding-safe, strips script/style, trims to length).
 
 Keys present in `.env`: OPENAI_API_KEY, SERP_API_KEY, GEMINI_API_KEY (GEMINI not used here).
+
+## Step 3 — `serper_with_sources(prompt)` built (behind RESEARCH_PROVIDER)
+
+Added to `story_leads.py` (committed), with `research_with_sources(prompt)` as the
+engine-agnostic dispatcher: `RESEARCH_PROVIDER=serper` → Serper engine;
+`gemini` / unset / unknown → `gemini_with_sources` (default unchanged, fail-safe).
+
+Pipeline, matching the gemini_with_sources shape exactly:
+
+1. **Queries** — `_derive_queries` asks gpt-4o-mini for 1–3 web queries, logged; falls
+   back to a trimmed prompt line if the query model is down (engine still searches).
+2. **Search** — one Serper query per derived query (`add_search_queries(1)` each →
+   `search` bucket), top-10 organic with snippets; candidates de-duplicated by URL then
+   by **domain** so the reader sees DISTINCT sources (discovery over echo); top 3–5
+   fetched with `requests.get` (12s timeout) and cleaned via `extract_clean_text`, then
+   `_trim_to_relevant` keeps the passage window overlapping the prompt/snippet. Pages that
+   fail to fetch fall back to the Serper snippet so a source is never lost.
+3. **Reader** — gpt-4o-mini answers the ORIGINAL prompt using ONLY the numbered sources,
+   every fact tagged `[n]`. The response is split into sentences; **any sentence with no
+   `[n]` marker is dropped** (JSON-object answers keep the raw block iff it carries at
+   least one marker). `supports` records which source each kept sentence points at.
+4. **Cost** — Serper queries → `search` bucket directly; reader + query-model tokens →
+   `llm` bucket, auto-counted by `openai_cost_wrapper` inside a `tour_scope`. No Gemini
+   call, no grounding charge.
+
+Verified live on one real prompt (Boston Sail Loft) inside a `tour_scope`: 3 queries
+logged, 5 distinct-domain sources (incl. official `thebostonsailloft.com`), output shape =
+`{text, sources, supports, queries, error}`, unsourced sentences dropped, cost
+`search=$0.003 (3 q) + llm=$0.00015` ≈ **$0.0032/question** → ~$0.50 projected for the
+157-question replay (well under the $8 cap).
+
+Unit test `tests/test_local565_serper_with_sources.py` (offline, mocked search/fetch/reader),
+5 tests pass: shape parity, unsourced-sentence drop, cost lands in `search` bucket, no-key
+error shape, and default provider = gemini.
+

@@ -293,6 +293,321 @@ def gemini_with_sources(prompt: str, model: str = None,
     return out
 
 
+# ── Serper research path [LOCAL-565] ─────────────────────────────────────────
+# A second grounded-research engine behind RESEARCH_PROVIDER, returning the SAME
+# shape as gemini_with_sources so every caller is engine-agnostic:
+#
+#   1. QUERIES   derive 1–3 web queries from the prompt (gpt-4o-mini), logged.
+#   2. SEARCH    Serper top-10 per query with snippets; fetch the full text of
+#                the top 3–5 DISTINCT pages (one per domain) with a timeout, each
+#                trimmed to the passages that overlap the prompt/snippet.
+#   3. READER    gpt-4o-mini answers the ORIGINAL prompt using ONLY those numbered
+#                sources. Every sentence must carry the index of the source it came
+#                from; a sentence with no source is DROPPED (that is the discipline
+#                that keeps an engine from reciting from memory — the exact harm the
+#                Gemini prompts warn about).
+#   4. COST      one Serper query per issued search (search bucket) plus the reader
+#                tokens (llm bucket, auto-counted by openai_cost_wrapper inside a
+#                tour_scope). No Gemini, no grounding charge.
+#
+# The engine takes a model's answer as a HYPOTHESIS and keeps only what a fetched
+# page supports — the same LEAD→VERIFY→KEEP stance as the rest of this module.
+
+_SERPER_QUERY_PROMPT = """\
+You turn a research request into web search queries.
+
+Read the request below and output 1 to 3 Google search queries that would surface
+the facts it asks for. Favour the specific named entity (venue, person, work),
+its city/location, and the exact topic (opening hours, closure, founding date,
+who it is named for, history). Keep each query short — the words a careful person
+would actually type. One query per line, no numbering, no quotes, no commentary.
+
+REQUEST:
+{prompt}
+"""
+
+_SERPER_READER_PROMPT = """\
+You answer the REQUEST below using ONLY the numbered SOURCES that follow it. The
+sources are web pages found for this request; treat them as the only knowledge you
+have. Do NOT use anything you remember — an unsupported fact here sends a listener
+to a locked door, the exact harm this exists to prevent.
+
+Rules, enforced:
+- Answer the request in the EXACT format it asks for (if it asks for JSON with
+  specific keys, return that JSON; otherwise write plain sentences).
+- Every factual sentence (or every JSON field value) MUST be followed by a source
+  marker [n] naming the source it came from, e.g. [1] or [2][3]. A statement you
+  cannot attach a source number to must be LEFT OUT entirely — omit the field or
+  drop the sentence. Never guess, never fill a gap from memory.
+- Prefer facts that more than one source agrees on; you may cite several: [1][2].
+- Do not say a place is closed/permanently closed unless a source states it has
+  closed, shut, or been replaced. Absence of evidence is "unknown", never "closed".
+
+REQUEST:
+{prompt}
+
+SOURCES:
+{sources}
+
+Your answer (every fact carries a [n] marker; drop anything you cannot source):
+"""
+
+_SRC_MARKER = re.compile(r'\[(\d+)\]')
+
+
+def _domain_of(url: str) -> str:
+    """Bare registrable-ish domain of a URL (host without a leading www.)."""
+    try:
+        from urllib.parse import urlparse
+        host = (urlparse(url).netloc or '').lower()
+        return host[4:] if host.startswith('www.') else host
+    except Exception:
+        return ''
+
+
+def _derive_queries(prompt: str, max_queries: int = 3) -> List[str]:
+    """1–3 web queries from the prompt via gpt-4o-mini. Falls back to a trimmed
+    prompt if the model is unavailable, so the engine still searches."""
+    try:
+        raw = _openai(_SERPER_QUERY_PROMPT.format(prompt=prompt[:4000]),
+                      model='gpt-4o-mini')
+    except Exception:
+        raw = ''
+    queries: List[str] = []
+    for line in (raw or '').splitlines():
+        q = line.strip().lstrip('-•*0123456789. ').strip().strip('"').strip("'")
+        if len(q) >= 3 and q not in queries:
+            queries.append(q)
+        if len(queries) >= max_queries:
+            break
+    if not queries:
+        # Last resort: a compact query from the longest prompt line (keeps the
+        # engine searching even if the query model is down).
+        lines = [l.strip() for l in prompt.splitlines() if l.strip()]
+        seed = max(lines, key=len) if lines else prompt
+        queries = [re.sub(r'\s+', ' ', seed)[:120]] if seed else []
+    return queries
+
+
+def _fetch_page_text(url: str, timeout: int = 12, max_length: int = 6000) -> str:
+    """Fetch a page and return cleaned text, trimmed. Empty on any failure."""
+    try:
+        import requests
+        from robust_text_extractor import extract_clean_text
+        headers = {'User-Agent': 'Mozilla/5.0 (compatible; AudiouraResearch/1.0)'}
+        r = requests.get(url, headers=headers, timeout=timeout)
+        if r.status_code != 200 or not r.content:
+            return ''
+        return extract_clean_text(r.content, max_length=max_length)
+    except Exception:
+        return ''
+
+
+def _trim_to_relevant(text: str, prompt: str, snippet: str,
+                      window: int = 2200) -> str:
+    """Keep the slice of a page most relevant to the request.
+
+    A full page is mostly navigation and boilerplate. We score each ~sentence by
+    how many salient prompt/snippet words it contains and return a contiguous
+    window around the best-scoring region, so the reader sees the passage that
+    actually carries the answer rather than the whole page."""
+    if not text:
+        return ''
+    if len(text) <= window:
+        return text
+    import re as _re
+    terms = set(w for w in _re.findall(r"[A-Za-zÀ-ÿ0-9']{4,}",
+                                       _fold(prompt + ' ' + (snippet or '')))
+                if len(w) >= 4)
+    if not terms:
+        return text[:window]
+    sents = _re.split(r'(?<=[.!?])\s+', text)
+    best_i, best_score = 0, -1
+    for i, s in enumerate(sents):
+        f = _fold(s)
+        score = sum(1 for t in terms if t in f)
+        if score > best_score:
+            best_score, best_i = score, i
+    # Build a contiguous window of sentences around the best hit.
+    out, lo, hi = [], best_i, best_i
+    cur = len(sents[best_i]) if sents else 0
+    while cur < window and (lo > 0 or hi < len(sents) - 1):
+        if lo > 0:
+            lo -= 1
+            cur += len(sents[lo]) + 1
+        if hi < len(sents) - 1 and cur < window:
+            hi += 1
+            cur += len(sents[hi]) + 1
+    out = sents[lo:hi + 1]
+    return ' '.join(out)[:window]
+
+
+def serper_with_sources(prompt: str, model: str = 'gpt-4o-mini',
+                        max_queries: int = 3, max_pages: int = 5,
+                        per_query_results: int = 10, timeout: int = 12,
+                        log=None) -> Dict:
+    """[LOCAL-565] Serper + a cheap reader, same shape as gemini_with_sources.
+
+    Returns {'text', 'sources': [{'domain','url'}], 'supports':
+    [{'text','sources':[...]}], 'queries': [...], 'error': str}.
+
+    `sources` is the de-duplicated list of pages the reader was given (domain +
+    url, order preserved); `supports` maps each answer sentence to the source(s)
+    its [n] markers point at; `queries` is what was searched. Serper queries are
+    priced into the `search` bucket of the current cost scope; the reader's gpt
+    tokens are priced into `llm` automatically by openai_cost_wrapper.
+    """
+    import cost_accumulator
+    from work_story_searcher import _serp_search
+
+    out = {'text': '', 'sources': [], 'supports': [], 'queries': [], 'error': ''}
+
+    def _log(msg):
+        if log:
+            try:
+                log(msg)
+            except Exception:
+                pass
+
+    if not os.environ.get('SERP_API_KEY'):
+        out['error'] = 'no SERP_API_KEY'
+        return out
+
+    # 1. QUERIES ---------------------------------------------------------------
+    queries = _derive_queries(prompt, max_queries=max_queries)
+    out['queries'] = queries
+    _log(f'[serper] queries: {queries}')
+    if not queries:
+        out['error'] = 'no queries derived'
+        return out
+
+    # 2. SEARCH ----------------------------------------------------------------
+    # Serper top-N per query (with snippets), charged one query each. Collect
+    # candidate pages, de-duplicated by domain so the reader sees DISTINCT
+    # sources rather than five pages from one site.
+    candidates: List[Dict] = []
+    seen_urls = set()
+    for q in queries:
+        results, _latency = _serp_search(q)       # work_story_searcher does num=8
+        cost_accumulator.add_search_queries(1)    # one billable Serper query
+        for r in results[:per_query_results]:
+            url = r.get('url', '') or ''
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            candidates.append({'url': url, 'title': r.get('title', ''),
+                               'snippet': r.get('snippet', ''),
+                               'domain': _domain_of(url)})
+
+    if not candidates:
+        out['error'] = 'no search results'
+        return out
+
+    # Prefer distinct domains for the fetch set (discovery over echo), keeping
+    # original rank order within that constraint.
+    fetch_set, used_domains = [], set()
+    for c in candidates:
+        d = c['domain']
+        if d and d in used_domains:
+            continue
+        used_domains.add(d)
+        fetch_set.append(c)
+        if len(fetch_set) >= max_pages:
+            break
+
+    # 3. Build numbered sources from fetched page text (fall back to the Serper
+    # snippet when a page cannot be fetched, so a usable source is never lost).
+    numbered: List[Dict] = []
+    for c in fetch_set:
+        body = _fetch_page_text(c['url'], timeout=timeout)
+        passage = _trim_to_relevant(body, prompt, c['snippet']) if body else ''
+        if not passage:
+            passage = c['snippet'] or ''
+        if not passage:
+            continue
+        numbered.append({'domain': c['domain'], 'url': c['url'],
+                         'title': c['title'], 'text': passage})
+    if not numbered:
+        out['error'] = 'no readable sources'
+        return out
+
+    out['sources'] = [{'domain': n['domain'], 'url': n['url']} for n in numbered]
+    _log(f'[serper] fetched {len(numbered)} sources: '
+         f'{[n["domain"] for n in numbered]}')
+
+    # 4. READER ----------------------------------------------------------------
+    blocks = []
+    for i, n in enumerate(numbered, start=1):
+        blocks.append(f'[{i}] {n["domain"]} — {n.get("title","")}\n{n["text"]}')
+    sources_block = '\n\n'.join(blocks)
+    try:
+        answer = _openai(
+            _SERPER_READER_PROMPT.format(prompt=prompt, sources=sources_block),
+            model=model)
+    except Exception as e:
+        out['error'] = f'reader failed: {type(e).__name__}: {e}'
+        return out
+
+    # 5. Per-sentence attribution; DROP any sentence with no [n] marker. This is
+    # the Serper analogue of Gemini's groundingSupports: text keeps only sourced
+    # sentences, and `supports` records which source each one points at.
+    out['supports'] = []
+    kept = []
+    for seg in re.split(r'(?<=[.!?])\s+', (answer or '').strip()):
+        seg = seg.strip()
+        if not seg:
+            continue
+        idxs = [int(m) for m in _SRC_MARKER.findall(seg)]
+        valid = [i for i in idxs if 1 <= i <= len(numbered)]
+        if not valid:
+            # No source marker → unsupported → dropped (not placed in text).
+            continue
+        srcs = [{'domain': numbered[i - 1]['domain'], 'url': numbered[i - 1]['url']}
+                for i in dict.fromkeys(valid)]
+        out['supports'].append({'text': seg, 'sources': srcs})
+        kept.append(seg)
+
+    # If the answer is a single JSON object (restaurant-practicals prompts), the
+    # sentence split does not apply cleanly; keep the raw answer as text but still
+    # require at least one [n] marker somewhere, else it is unsourced.
+    if not kept:
+        if _SRC_MARKER.search(answer or ''):
+            out['text'] = (answer or '').strip()
+            # Attribute the whole block to the sources it cites.
+            cited = sorted({int(m) for m in _SRC_MARKER.findall(answer or '')
+                            if 1 <= int(m) <= len(numbered)})
+            out['supports'] = [{
+                'text': out['text'],
+                'sources': [{'domain': numbered[i - 1]['domain'],
+                             'url': numbered[i - 1]['url']} for i in cited],
+            }]
+        else:
+            out['text'] = ''
+            out['error'] = out['error'] or 'no sourced sentences'
+    else:
+        out['text'] = ' '.join(kept)
+    return out
+
+
+def research_with_sources(prompt: str, **kwargs) -> Dict:
+    """Engine-agnostic grounded research behind RESEARCH_PROVIDER.
+
+    RESEARCH_PROVIDER=gemini (DEFAULT) → gemini_with_sources
+    RESEARCH_PROVIDER=serper           → serper_with_sources
+
+    Both return the identical shape, so callers do not branch. The default is
+    gemini — this task does not change production behaviour; it only adds the
+    serper path for the A/B replay.
+    """
+    provider = (os.environ.get('RESEARCH_PROVIDER', 'gemini') or 'gemini').lower()
+    if provider == 'serper':
+        return serper_with_sources(prompt, **kwargs)
+    # Unknown value → default engine, not an error (fail safe to Gemini).
+    gem_kwargs = {k: v for k, v in kwargs.items()
+                  if k in ('model', 'resolve', 'timeout', 'grounded')}
+    return gemini_with_sources(prompt, **gem_kwargs)
+
+
 def _gemini_grounded(prompt: str) -> str:
     return _gemini(prompt, grounded=True)
 
