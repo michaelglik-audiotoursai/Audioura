@@ -249,5 +249,43 @@ def test_two_tours_in_parallel_no_crosstalk():
     )
 
 
+def test_executor_workers_inherit_tour_scope():
+    """Calls made inside ThreadPoolExecutor workers must land in the tour scope.
+
+    Regression guard for the live finding: the per-stop story pass and several
+    gates run in worker threads, and contextvars are NOT copied into
+    ThreadPoolExecutor workers by default — so without the propagation patch a
+    live Chart House run attributed only 46 of 56 calls. This replays recorded
+    calls from inside a real executor and asserts every one is counted.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    records = _load_records(REC_CHART)
+    oracle = _independent_wire_cost(records)
+
+    cost_accumulator.install_executor_context_propagation()
+    try:
+        with cost_accumulator.tour_scope(job_id="executor-fanout") as acc:
+            def _price(rec):
+                u = rec.get("usage") or {}
+                return cost_accumulator.add_llm_usage(
+                    input_tokens=u.get("prompt_tokens") or 0,
+                    output_tokens=u.get("completion_tokens") or 0,
+                    model=rec.get("model"),
+                )
+
+            # Fan the calls out across workers, exactly like the per-stop pass.
+            with ThreadPoolExecutor(max_workers=5) as ex:
+                list(ex.map(_price, records))
+            snap = acc.snapshot()
+    finally:
+        cost_accumulator.uninstall_executor_context_propagation()
+
+    assert snap["llm"]["calls"] == len(records), (
+        f"executor workers attributed {snap['llm']['calls']} of {len(records)} calls"
+    )
+    assert abs(snap["breakdown"]["llm"] - oracle) < TOLERANCE
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
