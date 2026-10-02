@@ -34,9 +34,14 @@ def _json_field_true(field):
     return lambda t: bool(pat.search(t or ""))
 
 def _specificity_found(t):
-    # UNGROUNDED/GENERIC verdict = flagged; SPECIFIC = clean
-    t = (t or "").upper()
-    return "UNGROUNDED" in t or "GENERIC" in t
+    # Two prompt variants, each with its own grammar (confirmed from recordings):
+    #   NAMES variant: VERDICT: GROUNDED (clean) | UNGROUNDED (found a problem)
+    #   SWAP  variant: VERDICT: SPECIFIC (clean) | TRANSFERABLE (found a problem)
+    # Decide ONLY from the VERDICT token, never from the free-text REASON
+    # (a SPECIFIC verdict may use the word "generic" in its reason).
+    m = re.search(r"VERDICT:\s*([A-Z_]+)", t or "", re.I)
+    tok = (m.group(1).upper() if m else "")
+    return tok in ("UNGROUNDED", "TRANSFERABLE", "GENERIC")
 
 def _gloss_triage_found(t):
     # any GLOSS_NEEDED among the triaged references = found a reference to gloss

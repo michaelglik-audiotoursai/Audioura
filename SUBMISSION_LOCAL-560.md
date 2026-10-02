@@ -85,4 +85,107 @@ WRITER subtotal: **334 calls**, old cost ≈ **$2.6512**.
   the WRITER ones (style rewrite, prolog, preview, recap, directions) keep gpt-4o-mini-or-better
   under WRITE_LLM_MODEL but are not re-pointed to a cheaper model.
 
-(Replay recall / false-alarm / new-cost analysis per site: §2–§4 below.)
+(Replace fallbacks and switch decisions: §5 below.)
+
+---
+
+## §2 — Discrepancy cases (what the OLD checkers flagged)
+
+A **discrepancy case** = a recorded CHECKER call whose verdict FOUND a problem. Decided purely
+from each gate's recorded `response_text` using its own verdict grammar (confirmed from the
+recordings and the `.log` outcome markers: `[LOCAL-472] UNGROUNDED`, `[LOCAL-229] BLOCKED`,
+`DROPPED`, `is_story:false`, `GLOSS_NEEDED`, `inside_scope:false`, `DELETE:N`). Script:
+`tests/fixtures/local560/mark_discrepancies.py` → `discrepancies.json`.
+
+The specificity gate uses **two prompt variants** with different vocabularies (both decided from
+the `VERDICT:` token only, never the free-text reason):
+- NAMES variant: `GROUNDED` (clean) vs **`UNGROUNDED`** (flagged) — 100 UNGROUNDED
+- SWAP variant: `SPECIFIC` (clean) vs **`TRANSFERABLE`** (flagged) — 10 TRANSFERABLE
+
+**239 discrepancy cases** across 7 verdict-emitting checker sites:
+
+| Checker site | Found / calls | Verdict that signals "found a problem" |
+|---|---|---|
+| `stop_specificity_gate.py:433` | 110/279 | VERDICT UNGROUNDED (names) or TRANSFERABLE (swap) |
+| `story_gate.py:201` | 90/116 | `"is_story": false` |
+| `unglossed_reference_gate.py:690` | 32/33 | `GLOSS_NEEDED` |
+| `generate_tour_text.py:1577` | 4/5 | `"inside_scope": false` |
+| `generate_tour_text.py:1083` | 2/20 | `"matches": false` |
+| `unsupported_claim_gate.py:452` | 1/1 | `DELETE:N` (N≥1) / UNGROUNDED |
+| `story_element_extractor.py:419` | 0/1 | conflicting / not-same-subject |
+
+The 9 extraction/listing checkers (fact_extractor, intent, ordering, fact-ranking, coords,
+restaurant/stop listing, theme discovery) emit no accept/reject verdict, so a single call cannot be
+labelled FOUND vs CLEAN from its response. They are inventoried as checkers but excluded from the
+recall denominator (no discrepancy verdict to miss).
+
+---
+
+## §3 — Replay with gpt-4o-mini
+
+Every one of the **531 recorded CHECKER calls** was replayed against gpt-4o-mini with the same
+messages, temperature, max_tokens and response_format, in a bounded thread pool of 8. Script:
+`tests/fixtures/local560/replay_mini.py` → `replay_mini.jsonl`. **531/531 succeeded (status 200,
+0 errors, 0 null responses).**
+
+---
+
+## §4 — Per-site comparison: recall, false alarms, cost
+
+Script: `tests/fixtures/local560/compare.py` → `comparison.json`. Recall = of the OLD-model
+discrepancy cases, how many gpt-4o-mini also flags. False-alarm rate = of the OLD-clean calls,
+how many gpt-4o-mini newly flags. Costs from recorded/replay `usage` at `cost_rates.py` rates.
+
+| Call site | Old found | Recall | Misses | False alarms | Old $ | New $ | PASS |
+|---|---:|---|---:|---|---:|---:|:--:|
+| `stop_specificity_gate.py:433` | 110 | **98%** (108/110) | 2 | 2% (3/169) | $0.3140 | $0.3143 | ❌¹ |
+| `story_gate.py:201` | 90 | **100%** (90/90) | 0 | **15%** (4/26) | $0.1991 | $0.1995 | ❌² |
+| `unglossed_reference_gate.py:690` | 32 | **100%** (32/32) | 0 | 0% (0/1) | $0.0691 | $0.0691 | ✅ |
+| `generate_tour_text.py:1577` | 4 | 75% (3/4) | 1 | 0% (0/1) | $0.0011 | $0.0064 | ❌³ |
+| `generate_tour_text.py:1083` | 2 | 50% (1/2) | 1 | 0% (0/18) | $0.0022 | $0.0120 | ❌⁴ |
+| `unsupported_claim_gate.py:452` | 1 | **100%** (1/1) | 0 | n/a | $0.0006 | $0.0006 | ✅ |
+| `story_element_extractor.py:419` | 0 | n/a | 0 | 0% (0/1) | $0.0011 | $0.0011 | ✅ |
+
+Note: `stop_specificity_gate.py:433`, `story_gate.py:201`, `unglossed_reference_gate.py:690`,
+`unsupported_claim_gate.py:452`, `story_element_extractor.py:419` are **already on gpt-4o-mini**
+today — their old≈new cost confirms the replay reproduces the same spend, and the recall figure
+measures determinism of the gate on the recorded inputs.
+
+### Every miss (recorded discrepancy the new model did NOT reproduce), adjudicated
+
+1. **`stop_specificity_gate.py:433` — 2 misses:**
+   - `our_lady_help_newton` #58 — stop "Stained Glass Windows", names "Doherty".
+     OLD: UNGROUNDED. NEW: GROUNDED. **Old-model false positive.** The source paragraph quotes the
+     window's own inscription — *"May the Soul of William J. Doherty Rest in Peace," a tribute from
+     Charles I. Doherty* — i.e. the entity is physically on THIS stop. gpt-4o-mini is correct;
+     the old UNGROUNDED was the error. Excusable under Michael's clause (miss = old false positive,
+     source quoted).
+   - `our_lady_help_newton` #87 — stop "Stations of the Cross", names "St. Alphonsus".
+     OLD: UNGROUNDED. NEW: GROUNDED. **Genuine miss.** The source only says St. Alphonsus's "1787
+     version remains the most recognized in America" — it does NOT state that THESE stations are his
+     version. The old UNGROUNDED was correct; gpt-4o-mini relaxed it. This is a real recall loss.
+2. **`story_gate.py:201` — 0 misses, but 4 false alarms (15% > 10%):** gpt-4o-mini is *stricter*
+   and rejects 4 story-units the old model accepted (Ebenezer Hancock; Legal Sea Foods;
+   Tom Brady/Gisèle; William Turner viola). For a story GATE a false alarm = dropping a usable
+   story, a content regression. Exceeds the 10% cap.
+3. **`generate_tour_text.py:1577` (geography) — 1 miss (75% recall):** `buttermilk_bourbon` #92,
+   "Saltie Girl". OLD: inside_scope=false (correctly out of scope). NEW: inside_scope=true —
+   gpt-4o-mini trusted a plausible but **explicitly UNVERIFIED** address the prompt warned about.
+   Genuine miss on a scope gate.
+4. **`generate_tour_text.py:1083` (is-restaurant) — 1 miss (50% recall):** `sycamore_little_big`
+   #7, "Sycamore". OLD: matches=false (ambiguous name). NEW: matches=true. Only 2 discrepancy cases
+   exist for this site; one miss drops recall to 50%. Fails the strict rule on this recorded set.
+
+### Extraction checkers (no reject verdict) — structural agreement
+All 9 extraction/listing checkers (currently gpt-3.5-turbo except theme-discovery on gpt-4o)
+produce **valid JSON on both models for every recorded call** (coords site emits Lat/Lng text,
+not JSON, on both). So gpt-4o-mini is structurally drop-in for extraction, but there is no
+discrepancy-verdict to measure recall against — they cannot be *proven* safe by Michael's rule.
+
+### Cost headline
+Old OpenAI cost across the 8 tours ≈ **$3.288**; CHECKER calls ≈ **$0.637** of that. The three
+PASS sites are already gpt-4o-mini, so they yield **no new savings** — the real checker spend is
+already on the cheap model. The gpt-3.5-turbo checkers that the ticket targets are small in
+absolute cost ($0.047 total) and most are extraction (unprovable) or fail recall (1577, 1083).
+The dominant spend is the WRITER `generate_tour_text.py:14129` (gpt-4o, $2.165), explicitly out of
+scope.

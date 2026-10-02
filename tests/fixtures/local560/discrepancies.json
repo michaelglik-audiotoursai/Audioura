@@ -5,7 +5,7 @@
     "checker_sites": 16,
     "sites_with_reject_verdict": 7,
     "total_checker_calls": 531,
-    "total_discrepancy_cases_found": 241
+    "total_discrepancy_cases_found": 239
   },
   "sites": {
     "stop_specificity_gate.py:433": {
@@ -13,20 +13,14 @@
       "verdict_grammar": "VERDICT: UNGROUNDED/GENERIC (paragraph not specific to this stop)",
       "has_reject_verdict": true,
       "calls": 279,
-      "found": 112,
-      "clean": 167,
+      "found": 110,
+      "clean": 169,
       "found_examples": [
         {
           "tour": "boston_sail_loft",
           "record_index": 48,
           "subject": "An audio-tour paragraph about the stop \"Boston Sail Loft\" names \"New England\".",
           "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific person or work is mentioned with a concrete link to the stop."
-        },
-        {
-          "tour": "boston_sail_loft",
-          "record_index": 49,
-          "subject": "A paragraph from an audio tour was written about the stop \"Boston Sail Loft\" (a church).",
-          "verdict": "VERDICT: SPECIFIC  \nREASON: Unique maritime heritage claim does not apply generically."
         },
         {
           "tour": "boston_sail_loft",
@@ -315,6 +309,12 @@
           "record_index": 65,
           "subject": "An audio-tour paragraph about the stop \"apron\" names \"British Royal Flight\".",
           "verdict": "VERDICT: UNGROUNDED  \nREASON: No concrete link between Queen Elizabeth II and the stop is provided."
+        },
+        {
+          "tour": "logan_airport",
+          "record_index": 69,
+          "subject": "An audio-tour paragraph about the stop \"air traffic control tower\" names \"New England\".",
+          "verdict": "VERDICT: UNGROUNDED  \nREASON: No specific link to the air traffic control tower."
         }
       ]
     },
