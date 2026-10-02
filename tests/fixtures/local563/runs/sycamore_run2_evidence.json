@@ -1,0 +1,174 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 2,
+      "unsourced": 19,
+      "total": 21,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 19
+    },
+    "per_stop": {
+      "Little Big Diner": {
+        "sourced": 2,
+        "unsourced": 12,
+        "total": 14
+      },
+      "Sycamore": {
+        "sourced": 0,
+        "unsourced": 7,
+        "total": 7
+      }
+    },
+    "claims": [
+      {
+        "stop": "Little Big Diner",
+        "text": "This culinary exploration leads you from the creative hub of Little Big Diner, famed for its innovative takes on classic dishes like the renowned fried chicken sandwich, to the refined haven of Sycamore.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The fusion of Asian-inspired comfort food and locally-sourced New American cuisine reflects the shared passion of both establishments' chefs for culinary innovation and community engagement.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "At Sycamore, don't miss 'The Board,' featuring a single animal prepared in four distinct ways.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Opened in 2016, the diner stands as a testament to the culinary vision of Chef David Punch and Alison Hearn.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Chef David Punch and Alison Hearn opened Little Big Diner in 2016, which became an immediate sensation with a strict no-reservations policy."
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Upon its opening, Little Big Diner quickly captured the hearts and palates of locals with its bold flavors and innovative dishes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The kitchen, though compact at just 675 square feet, is a bustling hub where line cooks work tirelessly to craft dishes like ramen and bao buns.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "This tiny yet mighty kitchen became not just a place of work but a launching pad for other culinary ventures, notably Jinny's Pizzeria, which drew inspiration from the success and culinary experimentation honed here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Chef David Punch, known for taking calculated risks, made a significant career move when he departed from Ten Tables in Harvard Square to open Sycamore in late 2012.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "This decision might have seemed daunting at the time, yet it paid off, paving the way for Little Big Diner's later success.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The diner’s strict no-reservations policy stirred strong reactions among Newton Centre diners, leading to wait times that could stretch over two hours during peak hours.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Newton Centre diners clashed with Little Big Diner's no-reservations policy, leading to wait times over two hours during peak hours."
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Little Big Diner specializes in Japanese and Asian dishes, offering a modern twist on comfort food favorites.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The menu features soups, ramen, rice bowls, and small plates, with prices ranging from $12 to $20 per dish.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "As you consider dining here, note that the diner operates Monday and Tuesday from 4:30 pm to 9:00 pm, maintaining its no-reservations policy.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Whether you're drawn by the promise of a steaming bowl of ramen or the allure of the diner’s vibrant atmosphere, Little Big Diner offers an experience that keeps locals coming back for more.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "This restaurant stands as a testament to culinary creativity and dedication, its unassuming facade hiding a world of flavors inspired by French, American, and Spanish cuisines.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "The culinary artistry shines at Sycamore.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "By prioritizing weekends off to prevent burnout, he fosters strong relationships with his team his partner in Jinny's Pizzeria.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "This approach ensures a nurturing environment for both staff and guests at Sycamore.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Sycamore's menu is a celebration of seasonal and locally-sourced ingredients, reflecting New England's evolving palate.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "It illustrates the delicate dance of flavors and techniques that Sycamore’s team performs to keep each dining experience unique and memorable.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "David Punch’s culinary journey is reflected in each dish, establishing Sycamore as a must-visit in Newton's culinary scene.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

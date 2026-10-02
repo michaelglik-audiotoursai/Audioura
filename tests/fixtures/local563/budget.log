@@ -11,3 +11,7 @@
 [2026-10-02T18:01:13] PAIR START 'chart_house'; cumulative_before=11 ($0.39)
 [2026-10-02T18:03:58] PAIR DONE 'chart_house' wall=166s run1=ok(2gr) run2=ok(2gr) cumulative_after=15 ($0.53 of $14.00)
 [2026-10-02T18:03:58] SESSION END; cumulative=15 ($0.53)
+[2026-10-02T18:04:07] SESSION START; cumulative=15 ($0.53); queue=['sycamore']
+[2026-10-02T18:04:07] PAIR START 'sycamore'; cumulative_before=15 ($0.53)
+[2026-10-02T18:07:44] PAIR DONE 'sycamore' wall=217s run1=ok(7gr) run2=ok(8gr) cumulative_after=30 ($1.05 of $14.00)
+[2026-10-02T18:07:44] SESSION END; cumulative=30 ($1.05)

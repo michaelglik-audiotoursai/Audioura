@@ -1,0 +1,131 @@
+{
+  "slug": "sycamore",
+  "run": "run1",
+  "request": "Dinner at Sycamore and Little Big Diner in Newton Centre, MA",
+  "location_passed": "restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA",
+  "restaurant_signal_appended": true,
+  "tour_type": "restaurant",
+  "stops_requested": 2,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 216.1,
+  "chars": 5341,
+  "gemini_calls": {
+    "total": 7,
+    "grounded_this_run": 7,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 7,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 7,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 15,
+    "cumulative_grounded_after": 30,
+    "cumulative_cost_after_usd": 1.05,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.11576785000000003,
+    "total_tokens": 62277,
+    "cache_hit": false,
+    "grounding_cost": 0.24500000000000002,
+    "grounding_requests": 7,
+    "tour_total_cost": 0.36076785000000006,
+    "breakdown": {
+      "llm": 0.11576785000000003,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.24500000000000002
+    },
+    "provenance": {
+      "sourced": 2,
+      "unsourced": 24,
+      "total": 26,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 24
+    },
+    "score": {
+      "defects_before": {
+        "repeated": "1 near-duplicate sentence(s)"
+      },
+      "defects_after": {
+        "repeated": "1 near-duplicate sentence(s)"
+      },
+      "removed": [],
+      "remaining": [
+        "repeated"
+      ],
+      "retried": true,
+      "clean_after": false,
+      "retry_cost": {
+        "total_cost": 0.0035425000000000005,
+        "total_tokens": 745
+      },
+      "cost_without_retry": {
+        "total_cost": 0.10134,
+        "total_tokens": 21132
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": false,
+    "defects": [
+      "repeated"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "repeated": "1 near-duplicate sentence(s)"
+    },
+    "named_people": 2,
+    "stops_delivered": 2,
+    "stops_requested": 2,
+    "dates": 3,
+    "chars": 5341,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 0,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 10,
+      "total": 10
+    },
+    "restaurant_practicals": {
+      "stops": [
+        {
+          "name": "Little Big Diner",
+          "provider": "serp(23)+openai+gemini",
+          "nothing_actionable": false,
+          "hours": true,
+          "closed_days": false,
+          "reservation": true,
+          "price_band": true,
+          "raw": "hours=Mon - 4:30 pm - 9:00 pm, Tue - 4:30 pm -, reservation=We do not take reservations, price_band=ramen $19.50-$21.50, rice bowls $17.50-$"
+        },
+        {
+          "name": "The Local",
+          "provider": "serp(25)+openai+gemini",
+          "nothing_actionable": true,
+          "hours": false,
+          "closed_days": false,
+          "reservation": false,
+          "price_band": false,
+          "raw": "nothing actionable"
+        }
+      ],
+      "stops_with_any_practical": 1,
+      "hours_count": 1,
+      "reservation_count": 1,
+      "price_band_count": 1,
+      "closed_dropped": [
+        {
+          "name": "The Local",
+          "reason": "reported permanently closed: The Local closed its Newton location at 1391 Washington Street, where it was succeeded by Ninebark Kitchen + Drinks and later Mexicana Grill & Cantina"
+        }
+      ]
+    }
+  }
+}

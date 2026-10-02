@@ -1,0 +1,209 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 2,
+      "unsourced": 24,
+      "total": 26,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 24
+    },
+    "per_stop": {
+      "Little Big Diner": {
+        "sourced": 2,
+        "unsourced": 12,
+        "total": 14
+      },
+      "Sycamore": {
+        "sourced": 0,
+        "unsourced": 12,
+        "total": 12
+      }
+    },
+    "claims": [
+      {
+        "stop": "Little Big Diner",
+        "text": "From the comforting embrace of Little Big Diner to the culinary haven of Sycamore, your path weaves through a landscape where immigrant chefs reimagine classic comfort food.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Opened in 2016, Little Big Diner tantalizes with creative spins on traditional dishes like their renowned fried chicken sandwich.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "At the heart of Newton Centre, these eateries tell stories of heritage and innovation, where bold flavors and community spirit converge to create culinary masterpieces that celebrate the past while embracing the present.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "At Little Big Diner, Chef David Punch brings his expertise in Asian-inspired cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Little Big Diner, opened in early 2016 by Chef David Punch, a diner located in Newton, Massachusetts, and co-owner Alison Hearn, is a compact yet bustling spot in Newton Centre.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Chef David Punch and co-owner Alison Hearn opened Little Big Diner in early 2016 with a space of 675 square feet and 19 seats."
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "With just 675 square feet and 19 seats, this diner quickly became known for its inventive takes on Asian comfort food.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The menu offers a delightful mix of Japanese, Sichuan, and Thai flavors, all presented with a modern twist.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Here, you can savor dishes like their famous ramen, priced between $19.50 and $21.50, or opt for a rice bowl costing $17.50 to $18.50.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "If you're looking for something hearty, their dishes and burgers range from $13.50 to $19.50.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Chef David Punch, formerly of Ten Tables, a restaurant in Harvard Square, in Harvard Square, brings his expertise in Asian-inspired cuisine to Little Big Diner.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The diner's signature dish, the Chef’s Ultra Ramen, a dish featuring chili ground pork, features a flavorful combination of chili ground pork, char siu pork, grilled chicken, and ajitama egg in a spicy paitan broth.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The Chef’s Ultra Ramen at Little Big Diner is a large bowl with chili ground pork, char siu pork, grilled chicken, and ajitama egg in a spicy, rich paitan broth."
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Chef Punch's efforts extended beyond Little Big Diner as he expanded his presence in Newton Centre with the opening of Jinny Pizzeria, creating what they playfully refer to as the ' '.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Little Big Diner is open Monday and Tuesday from 4:30 pm to 9:00 pm, and reservations aren't necessary.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "This is just one of the stops on our culinary journey through Newton Centre.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Standing at the corner of Beacon Street, you find yourself at Sycamore, an inviting spot in Newton Centre, where the air is often filled with the rich aromas of French and American culinary artistry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "This stop offers a deeper dive into the local food scene after the bustling, ramen-filled experience you had at Little Big Diner a moment ago.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "The duo made a deliberate break from the Ten Tables empire to create something uniquely their own.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Their decision to establish Sycamore on Beacon Street was not just about opening another restaurant; it was about planting their flag in Newton Centre and committing to a community-driven culinary venture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Punch and Reichert aimed to transform the area into a vibrant dining destination, a vision they extended with other ventures like Buttonwood and Jinny’s Pizzeria.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "One particularly intriguing aspect of Sycamore is Punch's commitment to work-life balance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "This decision was driven by his desire to spend weekends with his wife and family, a choice that speaks volumes about the ethos that underpins Sycamore: excellence in professional life balanced with personal fulfillment.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Inside Sycamore, the menu reflects a blend of French, American, Spanish, and contemporary influences, crafted with seasonal ingredients that evoke both nostalgia and surprise.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "The restaurant is open from Tuesday to Saturday, between 4:30 and 9:30 PM, and given its popularity, reservations are recommended.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Dining here is not just about the food; it's about savoring a moment in time, a snapshot of New England's evolving culinary traditions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "As you consider stepping inside, think of Sycamore as more than just a restaurant.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "The next culinary experience awaits, promising to deepen your appreciation for this vibrant part of Newton Centre.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
