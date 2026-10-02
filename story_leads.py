@@ -444,15 +444,31 @@ def _derive_queries(prompt: str, max_queries: int = 3) -> List[str]:
 
 
 def _fetch_page_text(url: str, timeout: int = 12, max_length: int = 6000) -> str:
-    """Fetch a page and return cleaned text, trimmed. Empty on any failure."""
+    """Fetch a page and return cleaned text, trimmed. Empty on any failure.
+
+    Prefers robust_text_extractor (BeautifulSoup, a pinned production dep). If
+    BeautifulSoup is unavailable, falls back to a stdlib tag-stripper rather than
+    silently returning nothing — so the engine still reads page text in a bare
+    environment (a silent empty here degrades Serper to snippet-only, which is a
+    real measurement hazard, LOCAL-565)."""
     try:
         import requests
-        from robust_text_extractor import extract_clean_text
         headers = {'User-Agent': 'Mozilla/5.0 (compatible; AudiouraResearch/1.0)'}
         r = requests.get(url, headers=headers, timeout=timeout)
         if r.status_code != 200 or not r.content:
             return ''
-        return extract_clean_text(r.content, max_length=max_length)
+        try:
+            from robust_text_extractor import extract_clean_text
+            return extract_clean_text(r.content, max_length=max_length)
+        except Exception:
+            # stdlib fallback: strip script/style and tags, collapse whitespace.
+            html = r.content.decode('utf-8', errors='replace') if isinstance(
+                r.content, (bytes, bytearray)) else str(r.content)
+            html = re.sub(r'(?is)<(script|style|head|noscript).*?</\1>', ' ', html)
+            text = re.sub(r'(?s)<[^>]+>', ' ', html)
+            text = re.sub(r'&[a-zA-Z#0-9]+;', ' ', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            return text[:max_length]
     except Exception:
         return ''
 

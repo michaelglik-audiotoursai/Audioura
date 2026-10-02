@@ -143,4 +143,133 @@ reader variant that returns the required object plus a `_sources` index array
 (attribution without corrupting the format), and the explicit "NO RELIABLE
 INFORMATION" sentinel is recorded distinctly from dropped-prose.
 
+### Mid-step correction (recorded for honesty)
+
+During scoring the invented-fact check returned **0 characters for every page**, which
+exposed that `robust_text_extractor` could not be imported on this Python 3.9
+(an f-string-with-backslash `SyntaxError` in its `__main__` test helper) AND that
+`beautifulsoup4` (a pinned production dep, `beautifulsoup4==4.12.2`) was not installed
+locally. The consequence: **the first replay never read full pages** — `_fetch_page_text`
+silently caught the ImportError and the Serper engine fell back to Serper *snippets*
+only (support text averaged 155 chars = snippet length). The task requires full-page
+fetching, so this was a real measurement defect, not cosmetic.
+
+Fixes: (1) corrected the two `SyntaxError` lines in `robust_text_extractor.py` (a genuine
+3.9 bug in a test helper, unbreaks every caller); (2) installed the pinned
+`beautifulsoup4==4.12.2`; (3) made `_fetch_page_text` fall back to a stdlib tag-stripper
+when BeautifulSoup is unavailable, so it never silently degrades to snippet-only again.
+The replay was then **re-run with real page fetching** (112 answered vs 107, OpenAI
+$0.078, latency 13.3s/q as full pages are now read) and all scoring is on that data.
+
+## Step 5 — both engines scored the same way (`score.json` + tables, committed)
+
+`tests/fixtures/local565_score.py` → `tests/fixtures/local565/score.json`. Gemini is read
+from the recorded fixtures; Serper from the re-run replay. Both engines use the IDENTICAL
+tier classifier (copied from `analyze_baseline.py`) so comparisons are symmetric.
+Total OpenAI for scoring: **$1.28** (whole task ≈ $1.4, cap $8 never approached).
+
+### Recall judge calibration
+
+gpt-4o judge calibrated on **30 hand-labeled pairs** (clear matches / clear misses /
+near-misses with a changed number/name/status). **Agreement 96.7% (29/30)**; the single
+miss was conservative (judge said NO to "Logan opened September 8, 1923" vs text "The field
+opened 8 Sep 1923 as Boston Airport"), so the judge is strict and biases recall *down* for
+both engines — an acceptable, conservative direction. Full per-pair detail is in
+`score.json → judge_calibration`.
+
+### Answer key (keyed tours) — must-facts, closure verdicts
+
+| tour | engine | must stated | says_closed | auto-FAIL (wrong closed on open) |
+|---|---|---|---|---|
+| sail_loft | gemini / serper | 4/4 · 3/4 | no · no | no · no |
+| buttermilk | gemini / serper | 3/4 · 0/4 | no · no | no · no |
+| chart_house | gemini / serper | 4/4 · 4/4 | no · no | no · no |
+| sycamore | gemini / serper | 3/6 · 1/6 | **yes · yes** | **YES · YES** |
+| la_maree | gemini / serper | 0/1 · 0/1 | yes · yes (correct) | no · no |
+| logan | gemini / serper | 1/4 · 1/4 | no · no | no · no |
+
+- **LOCAL-564 regression — does Serper repeat Gemini's errors?** No. In this replay
+  **neither** engine marks **Chart House** or **Buttermilk** as closed; both report them
+  open. Serper even recovered Chart House's Gardiner-Building/1763/John-Hancock history
+  (though it gave conflicting opening years 1971 vs 1973 across blocks). The Weehawken-NJ
+  and BarLola closure errors are not reproduced here.
+- **sycamore (D544 open-venue test): BOTH engines auto-FAIL.** Gemini returned
+  `status: closed_permanently`; Serper **confused the venue entirely** — it answered about
+  "THE LOCAL NEWTON" / "Sullivan's Steakhouse" and declared *those* closed. Different cause,
+  same failure: a "closed" verdict on a venue that is open.
+- **la_maree:** both say closed — which is **correct** (genuinely closed 2020); not scored
+  as a fail because the key's status is not "open".
+- No `must_not` violations and no `unverified` claims (e.g. logan's "Governor Channing Cox")
+  were detected for either engine on the keyed tours.
+
+### Recall — of Gemini's atomic facts, the share Serper also states (keyed tours)
+
+**Overall recall 7.1%.** This low number is the A/B's central finding, not a Serper
+failure: the Gemini facts Serper does *not* reproduce are overwhelmingly **Gemini's own
+unverifiable narrative** — e.g. sail_loft's "Great Dill Chowder Feud", the "Heresy Debate",
+"the chowder went on to defeat nearly every legacy establishment". Serper, by construction,
+states only what a fetched page backs, so it correctly does not echo invented storytelling.
+Read recall *together with* the invented-fact rate below. Every missed fact per keyed tour
+is listed in `score.json → recall.missed_facts`.
+
+### Invented facts — exact cited page, 50 per engine (apples-to-apples)
+
+Both checks fetch the **exact cited URL** and ask the judge whether that page states the
+fact. (Gemini's `gemini_facts.json` carries only domains, so exact URLs were rebuilt from
+the recorded per-run `*.gemini.jsonl` `grounding.supports`.)
+
+| engine | sampled | unsupported rate |
+|---|---|---|
+| **Gemini** | 50 | **0.52** |
+| **Serper** | 50 | **0.44** |
+
+Both are high (the check is strict — paraphrase gaps and page-fetch failures count against),
+but **Serper's cited facts are supported by their page more often than Gemini's** (56% vs
+48%). Per-fact detail incl. page_chars and exact_url flags in `score.json → invented_facts`.
+
+### Discovery (Michael's criterion)
+
+| metric | Gemini | Serper |
+|---|---|---|
+| total atomic facts | 1431 | 345 |
+| distinct cited domains | 220 | 88 |
+| Wikipedia-only share | 2.7% | 9.9% |
+| discovery-tier share | 59.7% | 72.8% |
+| confirmed discoveries (disc fact + high-tier in same answer) | 600 | 155 |
+| confirmed-discovery share of discovery facts | 70.3% | 61.8% |
+
+Gemini produces **far more facts and from more domains** (it writes freely); Serper produces
+fewer, more disciplined facts. Serper leans **more on Wikipedia** (9.9% vs 2.7%) and more on
+discovery-tier sources (72.8%). Gemini's **confirmed-discovery share is higher** (70% vs 62%)
+— when it uses a little-known source it more often also carries a high-tier one in the same
+answer. Caveat recorded in `score.json`: the generic classifier cannot know a venue's
+official site is "high", so official sites (thebostonsailloft.com, sycamorenewton.com) count
+as discovery for **both** engines — symmetric, but it inflates both discovery shares.
+
+### Cost & latency (per the 157 research questions), with 563B noise floor
+
+| | Serper (this replay) | Gemini baseline (recorded) |
+|---|---|---|
+| research cost, 157 q | **$0.549** ($0.078 llm + $0.471 search) | **$5.495** grounding (157 × $0.035) |
+| whole-tour cost (context) | — | $9.62 ($4.13 llm + $5.50 grounding) |
+| avg latency / question | 13.3 s | (whole-tour wall only recorded) |
+
+**Serper is ~10× cheaper on the research questions** ($0.549 vs $5.495 grounding). Per-tour
+cost/latency for both engines is in `score.json → cost_latency.per_tour`. The **563B noise
+floor** (`score.json → noise_floor_563B`) sits next to every tour comparison: run-to-run
+named-people deltas averaged 1.4 (max 4 on riviera_bike) and story-defect deltas averaged
+0.6 — so per-tour differences smaller than those are within run-to-run noise and are not
+claimed as engine effects.
+
+### Bottom line
+
+Serper + a cheap gpt-4o-mini reader answers the same 157 questions for **~1/10th the research
+cost**, does **not** reproduce Gemini's LOCAL-564 closure errors, and has a **lower invented-fact
+rate** on an exact-page check (44% vs 52%). Its discipline shows as low "recall" of Gemini's
+output — but that gap is mostly Gemini's unverifiable narrative, which Serper correctly omits.
+Both engines still **fail the sycamore open-venue test** (Serper via venue confusion), so venue
+disambiguation is the clear next weakness to fix. Default provider remains Gemini; the Serper
+path is additive and behind `RESEARCH_PROVIDER`.
+
+
 

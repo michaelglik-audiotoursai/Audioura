@@ -110,7 +110,8 @@ def test_robust_extractor():
         extracted = extract_clean_text(guy_raz_content)
         print(f"Length: {len(extracted)} chars")
         print(f"First 200 chars: {extracted[:200]}")
-        print(f"Corruption markers: {extracted.count('\ufffd')}")
+        _marks = extracted.count('\ufffd')
+        print(f"Corruption markers: {_marks}")
         print()
         
     except FileNotFoundError:
@@ -135,7 +136,8 @@ def test_robust_extractor():
     extracted = extract_clean_text(problematic_html)
     print(f"Length: {len(extracted)} chars")
     print(f"Content: {extracted}")
-    print(f"Corruption markers: {extracted.count('\ufffd')}")
+    _marks = extracted.count('\ufffd')
+    print(f"Corruption markers: {_marks}")
 
 if __name__ == "__main__":
     test_robust_extractor()

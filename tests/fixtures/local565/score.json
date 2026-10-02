@@ -1,0 +1,2974 @@
+{
+ "_about": "LOCAL-565 Serper-vs-Gemini scoring. Both engines scored the same way; Gemini from recorded fixtures, Serper from the replay.",
+ "judge_calibration": {
+  "pairs": 30,
+  "agreement": 0.9667,
+  "detail": [
+   {
+    "fact": "Boston Sail Loft opened in 1984.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "The restaurant takes no reservations.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Logan Airport is named for Edward Lawrence Logan.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Buttermilk's chef is Jason Santos.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "La Maree closed permanently in 2020.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Sycamore is in Newton, Massachusetts.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Chart House sits on Long Wharf.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "The Gardiner Building dates to 1763.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Logan opened on September 8, 1923.",
+    "human": true,
+    "judge": false,
+    "agree": false
+   },
+   {
+    "fact": "Buttermilk opened in February 2017.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "The venue serves New England seafood.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Sycamore's chef-owner is David Punch.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Dinner is served Tuesday to Saturday.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "The airport was renamed in 1954.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Mayor Curley attended the 1923 dedication.",
+    "human": true,
+    "judge": true,
+    "agree": true
+   },
+   {
+    "fact": "Boston Sail Loft opened in 1984.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Logan is named for Edward Lawrence Logan.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Buttermilk's chef is Jason Santos.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Sycamore is open.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "La Maree closed in 2020.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Chart House is on Long Wharf.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "The building dates to 1763.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Dinner Tuesday to Saturday.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Opened September 8, 1923.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Chef is David Punch.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Boston Sail Loft opened in 1984.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Buttermilk's chef is Jason Santos.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Logan opened in 1923.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Sycamore is open.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   },
+   {
+    "fact": "Buttermilk opened in February 2017.",
+    "human": false,
+    "judge": false,
+    "agree": true
+   }
+  ]
+ },
+ "answer_key": {
+  "gemini": {
+   "sail_loft": {
+    "must_total": 4,
+    "must_stated": 4,
+    "must_missed": [],
+    "must_detail": [
+     {
+      "field": "opened",
+      "value": "1984",
+      "stated": true
+     },
+     {
+      "field": "reservations",
+      "value": "no reservations (first come, first served)",
+      "stated": true
+     },
+     {
+      "field": "address",
+      "value": "80 Atlantic Avenue, Boston, MA 02110",
+      "stated": true
+     },
+     {
+      "field": "status",
+      "value": "open",
+      "stated": true
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "buttermilk": {
+    "must_total": 4,
+    "must_stated": 3,
+    "must_missed": [
+     "opened"
+    ],
+    "must_detail": [
+     {
+      "field": "chef",
+      "value": "Jason Santos",
+      "stated": true
+     },
+     {
+      "field": "opened",
+      "value": "February 2017",
+      "stated": false
+     },
+     {
+      "field": "address",
+      "value": "160 Commonwealth Ave, Back Bay",
+      "stated": true
+     },
+     {
+      "field": "status",
+      "value": "open",
+      "stated": true
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "chart_house": {
+    "must_total": 4,
+    "must_stated": 4,
+    "must_missed": [],
+    "must_detail": [
+     {
+      "field": "building",
+      "value": "Gardiner Building, built 1763 (rebuilt 1812), oldest surviving structure on Long Wharf",
+      "stated": true
+     },
+     {
+      "field": "history",
+      "value": "once John Hancock's counting house",
+      "stated": true
+     },
+     {
+      "field": "address",
+      "value": "60 Long Wharf",
+      "stated": true
+     },
+     {
+      "field": "status",
+      "value": "open",
+      "stated": true
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "sycamore": {
+    "must_total": 6,
+    "must_stated": 3,
+    "must_missed": [
+     "opened",
+     "hours",
+     "reservations"
+    ],
+    "must_detail": [
+     {
+      "field": "status",
+      "value": "OPEN (a 'permanently closed' verdict is an automatic FAIL: the D544 bug)",
+      "stated": true
+     },
+     {
+      "field": "address",
+      "value": "755 Beacon Street, Newton MA 02459",
+      "stated": true
+     },
+     {
+      "field": "opened",
+      "value": "late 2012",
+      "stated": false
+     },
+     {
+      "field": "chef_owner",
+      "value": "David Punch",
+      "stated": true
+     },
+     {
+      "field": "hours",
+      "value": "dinner Tue-Sat from 4:30pm",
+      "stated": false
+     },
+     {
+      "field": "reservations",
+      "value": "phone 617.244.4445 or OpenTable",
+      "stated": false
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": true,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": true
+   },
+   "la_maree": {
+    "must_total": 1,
+    "must_stated": 0,
+    "must_missed": [
+     "status"
+    ],
+    "must_detail": [
+     {
+      "field": "status",
+      "value": "CLOSED permanently, 30 September 2020 (lease dispute after Port Palace Hotel sale)",
+      "stated": false
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": false,
+    "text_says_closed": true,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "logan": {
+    "must_total": 4,
+    "must_stated": 1,
+    "must_missed": [
+     "named_for",
+     "opened",
+     "renamed"
+    ],
+    "must_detail": [
+     {
+      "field": "named_for",
+      "value": "Major General Edward Lawrence Logan (Spanish-American War officer from South Boston)",
+      "stated": false
+     },
+     {
+      "field": "opened",
+      "value": "September 8, 1923 as 'Boston Airport' at Jeffries Point",
+      "stated": false
+     },
+     {
+      "field": "renamed",
+      "value": "General Edward Lawrence Logan International Airport, by act of the legislature, April 29, 1954",
+      "stated": false
+     },
+     {
+      "field": "dedication",
+      "value": "dedicated 8 Sep 1923; Mayor James Michael Curley attended and started a plane race to Boston Light",
+      "stated": true
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": false,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   }
+  },
+  "serper": {
+   "sail_loft": {
+    "must_total": 4,
+    "must_stated": 3,
+    "must_missed": [
+     "address"
+    ],
+    "must_detail": [
+     {
+      "field": "opened",
+      "value": "1984",
+      "stated": true
+     },
+     {
+      "field": "reservations",
+      "value": "no reservations (first come, first served)",
+      "stated": true
+     },
+     {
+      "field": "address",
+      "value": "80 Atlantic Avenue, Boston, MA 02110",
+      "stated": false
+     },
+     {
+      "field": "status",
+      "value": "open",
+      "stated": true
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "buttermilk": {
+    "must_total": 4,
+    "must_stated": 0,
+    "must_missed": [
+     "chef",
+     "opened",
+     "address",
+     "status"
+    ],
+    "must_detail": [
+     {
+      "field": "chef",
+      "value": "Jason Santos",
+      "stated": false
+     },
+     {
+      "field": "opened",
+      "value": "February 2017",
+      "stated": false
+     },
+     {
+      "field": "address",
+      "value": "160 Commonwealth Ave, Back Bay",
+      "stated": false
+     },
+     {
+      "field": "status",
+      "value": "open",
+      "stated": false
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "chart_house": {
+    "must_total": 4,
+    "must_stated": 4,
+    "must_missed": [],
+    "must_detail": [
+     {
+      "field": "building",
+      "value": "Gardiner Building, built 1763 (rebuilt 1812), oldest surviving structure on Long Wharf",
+      "stated": true
+     },
+     {
+      "field": "history",
+      "value": "once John Hancock's counting house",
+      "stated": true
+     },
+     {
+      "field": "address",
+      "value": "60 Long Wharf",
+      "stated": true
+     },
+     {
+      "field": "status",
+      "value": "open",
+      "stated": true
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "sycamore": {
+    "must_total": 6,
+    "must_stated": 1,
+    "must_missed": [
+     "address",
+     "opened",
+     "chef_owner",
+     "hours",
+     "reservations"
+    ],
+    "must_detail": [
+     {
+      "field": "status",
+      "value": "OPEN (a 'permanently closed' verdict is an automatic FAIL: the D544 bug)",
+      "stated": true
+     },
+     {
+      "field": "address",
+      "value": "755 Beacon Street, Newton MA 02459",
+      "stated": false
+     },
+     {
+      "field": "opened",
+      "value": "late 2012",
+      "stated": false
+     },
+     {
+      "field": "chef_owner",
+      "value": "David Punch",
+      "stated": false
+     },
+     {
+      "field": "hours",
+      "value": "dinner Tue-Sat from 4:30pm",
+      "stated": false
+     },
+     {
+      "field": "reservations",
+      "value": "phone 617.244.4445 or OpenTable",
+      "stated": false
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": true,
+    "text_says_closed": true,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": true
+   },
+   "la_maree": {
+    "must_total": 1,
+    "must_stated": 0,
+    "must_missed": [
+     "status"
+    ],
+    "must_detail": [
+     {
+      "field": "status",
+      "value": "CLOSED permanently, 30 September 2020 (lease dispute after Port Palace Hotel sale)",
+      "stated": false
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": false,
+    "text_says_closed": true,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   },
+   "logan": {
+    "must_total": 4,
+    "must_stated": 1,
+    "must_missed": [
+     "named_for",
+     "renamed",
+     "dedication"
+    ],
+    "must_detail": [
+     {
+      "field": "named_for",
+      "value": "Major General Edward Lawrence Logan (Spanish-American War officer from South Boston)",
+      "stated": false
+     },
+     {
+      "field": "opened",
+      "value": "September 8, 1923 as 'Boston Airport' at Jeffries Point",
+      "stated": true
+     },
+     {
+      "field": "renamed",
+      "value": "General Edward Lawrence Logan International Airport, by act of the legislature, April 29, 1954",
+      "stated": false
+     },
+     {
+      "field": "dedication",
+      "value": "dedicated 8 Sep 1923; Mayor James Michael Curley attended and started a plane race to Boston Light",
+      "stated": false
+     }
+    ],
+    "must_not_violations": [],
+    "unverified_present": [],
+    "key_status_is_open": false,
+    "text_says_closed": false,
+    "text_says_open": false,
+    "auto_fail_wrong_closed": false
+   }
+  },
+  "notes": {
+   "la_maree": "genuinely CLOSED; must_not=open",
+   "sycamore": "must be OPEN; a closed verdict is auto-FAIL (D544)",
+   "local564": "Gemini baseline wrongly reported Chart House (Weehawken NJ) and Buttermilk (BarLola) as closed; see per-tour text_says_closed for whether Serper repeats it."
+  }
+ },
+ "recall": {
+  "per_tour": {
+   "sail_loft": {
+    "gemini_facts": 39,
+    "serper_states": 4,
+    "recall": 0.1026
+   },
+   "buttermilk": {
+    "gemini_facts": 41,
+    "serper_states": 1,
+    "recall": 0.0244
+   },
+   "chart_house": {
+    "gemini_facts": 50,
+    "serper_states": 5,
+    "recall": 0.1
+   },
+   "sycamore": {
+    "gemini_facts": 82,
+    "serper_states": 9,
+    "recall": 0.1098
+   },
+   "la_maree": {
+    "gemini_facts": 38,
+    "serper_states": 1,
+    "recall": 0.0263
+   },
+   "logan": {
+    "gemini_facts": 73,
+    "serper_states": 3,
+    "recall": 0.0411
+   }
+  },
+  "overall_recall": 0.0712,
+  "missed_facts": {
+   "sail_loft": [
+    "Instead, its \"juicy\" stories live in genuine local restaurant lore, maritime quirkiness, and high-stakes operations that tour groups and food lovers appreciate:\n\n---\n\n### 1.",
+    "The Great \"Dill Chowder\" Feud\nIn New England, tampering with clam chowder recipe traditions can provoke passionate reactions.",
+    "Purists typically mandate salt pork or bacon, clams, potatoes, cream, and strictly nothing green.",
+    "When the Sail Loft opened in **1984**, they introduced a New England clam chowder seasoned with fresh dill and served overflowing in a branded coffee mug.",
+    "It quickly sparked debates among traditionalists:\n* **The \"Heresy\" Debate:** Longtime traditionalists initially dismissed it as tourist trap trickery, arguing true Yankee chowder should never contain garden herbs.",
+    "* **The Triumph:** The chowder went on to defeat nearly every legacy establishment in the city, sweeping regional awards and national morning shows.",
+    "The mug presentation was not just an aesthetic choice, but designed so servers could transport bowls through crowded floors without dripping on patrons.",
+    "High Tide and the \"Floating\" Harbor Floor\nThe restaurant sits directly over the water on historical pilings.",
+    "During major nor’easters and astronomical \"king tides,\" the Atlantic rises directly beneath the floorboards:\n* Over the decades, staff and longtime diners have watched water lap right up to the thresholds of the back deck windows.",
+    "* While modern coastal engineering has reinforced much of the waterfront, veteran bartenders often tell tales of massive winter storms where swells visibly jostled the floorboards beneath customers' barstools.",
+    "Patrons continued sipping pints while waves crashed inches beneath their feet.",
+    "The Ten-Turn Machine and the North End Territory\nThe North End of Boston is one of the tightest, most fiercely guarded culinary territories in America, dominated by Italian-American dining empires.",
+    "* A seafood shack managed to carve out beachfront real estate in this neighborhood and survive for over four decades as an independent family-run outfit.",
+    "* Behind the scenes, the Sail Loft operates at an intense volume rarely seen outside massive corporate chains.",
+    "The restaurant is famous in Boston service-industry circles for managing roughly **10 table turns a day** without ever accepting reservations.",
+    "To keep up with the chaos and avoid bottlenecks, management overstaffs the dining room with multiple managers and runners on a single shift, creating a relentless, fast-paced environment behind the kitchen swinging doors.",
+    "The Bar Clam \"Takeout Hack\"\nBefore social media popularized it, locals knew an unwritten workaround to avoid the Sail Loft's hour-plus waits:\n* If the line wrapped out the door down Atlantic Avenue, regulars would bypass host stands entirely, wedge themselves sideways into the packed bar, order a quart tub of hot chowder \"to-go\" from the bartender, and eat it out of paper containers on the granite benches of Christopher Columbus Park.",
+    "* It remains an enduring, open secret for bypassing one of the toughest casual dining waits on the waterfront.",
+    "Please adhere to our 90 minute time limit on dining tables.\",\n  \"price_band\": \"main courses around $23.95-$39.95, brunch prix fixe $19.95\",\n  \"michelin\": \"\",\n  \"cuisine\": \"classic New England seafood, famous for clam chowder and lobster rolls\",\n  \"evidence\": \"We are excited to offer both indoor and outdoor dining now!\"\n}",
+    "While the **Boston Sail Loft** (opened in 1984 on Atlantic Avenue) is not a hotbed of tabloid scandals or organized crime shootouts, it has plenty of colorful, genuine, real-life quirks and harbor lore that make great talking points for a restaurant tour:\n\n---\n\n### 1.",
+    "The Building’s \"Salty\" Secret: You’re Literally Hanging Over the Harbor\n* **The Setting:** One of the most fascinating physical facts to tell a group is that the back section of the restaurant isn’t on bedrock—it is **partially cantilevered on wooden pilings suspended right over Boston Harbor**.",
+    "* **The Juicy Detail:** Long before it was a restaurant, the building served Boston’s 19th-century maritime trade as an actual **sail loft**—an open floor where sailmakers laid out massive bolts of canvas to cut and sew sails for cargo schooners and clipper ships.",
+    "* **The High-Tide Thrill:** Because of how it sits over the water, during severe Nor’easters and seasonal \"King Tides,\" the water rises directly beneath diners' feet.",
+    "The restaurant occasionally finds itself right at the waterline of Atlantic Avenue’s flood zone, adding a bit of genuine adventure to eating there during foul weather.",
+    "The Great \"Dill Chowder\" Feud\n* **The Incident:** Bostonians are notoriously combative and puritanical about clam chowder: potatoes, heavy cream, salt pork/bacon, clams, and absolutely *no* non-traditional seasonings.",
+    "* **The Twist:** The Sail Loft committed what purists once considered **culinary heresy** by heavily infusing their chowder with **fresh dill**.",
+    "* **The Drama:** When they first introduced it, traditionalists scoffed at the idea of green herbs in New England clam chowder.",
+    "However, the gamble created a sensation—the restaurant repeatedly scooped up *Best of Boston* awards, sparking friendly rivalries across the city and landing them in high-profile TV chowder face-offs (including competitions against classic Manhattan chowders on national television).",
+    "The \"Overflowing Mug\" Trademark & Spill Tactics\n* **The Routine:** If anyone orders clam chowder, it never arrives in a standard bowl.",
+    "It arrives in an **enormous coffee mug filled deliberately past the brim** so that hot chowder spills down the sides into a saucer beneath it.",
+    "* **Tour Note:** Point this out to guests as an intentional, old-school Boston Sail Loft tradition.",
+    "Waitstaff and runners have to develop specialized balancing techniques to carry trays loaded with intentionally sloshing chowder mugs across crowded dining rooms without losing half the soup on guests.",
+    "A North End Waterfront Outlier\n* **The Dynamic:** The Sail Loft sits on the thin boundary line where Boston’s **Italian North End meets the commercial working docks**.",
+    "* **The Story:** Back when it opened in 1984, surrounding establishments were shifting into red-sauce Italian joints or high-end harbor dining.",
+    "---\n\n*Tip for your tour:* Frame the Sail Loft not as a place of dark scandals, but as one of the last unapologetic, rough-around-the-edges harbor institutions where you can drink a pint, eat chowder that broke New England tradition, and literally feel the tide shifting beneath the floorboards."
+   ],
+   "buttermilk": [
+    "While **Buttermilk & Bourbon** (160 Commonwealth Ave) hasn’t been the epicenter of trashy celebrity blowups or illicit crime scandals, the restaurant and its exact basement footprint harbor some of the most compelling, somber, and colorful real-life stories in Boston.",
+    "Here are the most notable true incidents and lore connected to the space and its crew:\n\n---\n\n### 1.",
+    "The Tragic Ground: The 1972 Hotel Vendome Collapse\nBefore it was a Southern restaurant, 160 Commonwealth Avenue was the historic **Hotel Vendome**, a Gilded Age luxury hotel that hosted figures like Mark Twain and President Ulysses S. Grant.",
+    "On **June 17, 1972**, it became the site of the deadliest disaster in the history of the Boston Fire Department.",
+    "A four-alarm fire broke out while the building was being renovated into condos and retail.",
+    "Firefighters had essentially contained the blaze and were doing routine overhaul work when a massive structural section—spanning five stories—suddenly collapsed down into the lower levels and basement.",
+    "Nine firefighters were killed, buried under tons of rubble.",
+    "Because Buttermilk & Bourbon occupies the subterranean/garden level of the Vendome, staff and paranormal investigators frequently note that the restaurant sits directly on the footprint of that collapse.",
+    "Across the street on the Commonwealth Avenue Mall, you will find the **Vendome Memorial**, featuring a firefighter's helmet and coat sculpted in bronze, forever facing the restaurant’s building.",
+    "The Kitchen Nightmares That Almost Kept It from Opening\nChef Jason Santos (famous for his bright electric-blue hair and appearances alongside Gordon Ramsay on *Hell’s Kitchen* and Jon Taffer on *Bar Rescue*) took over the location after a popular French restaurant called Petit Robert Bistro vacated it.",
+    "Santos has openly talked about how difficult the physical site was during the initial buildout:\n* **The \"Labyrinth\" Layout:** Because of the Vendome’s 19th-century foundations, the basement isn’t one big open hall—it is broken up into a maze of smaller, cavernous brick rooms, narrow arches, and uneven floors.",
+    "Santos had to design the restaurant around awkward historical load-bearing brickwork, turning a logistical nightmare into themed \"pocket rooms\" (like a parlor room, a courtyard room, and an oyster lounge).",
+    "* **The Slush-Machine Explosion:** In the restaurant’s opening weeks, one of their signature gimmicks—a custom machine that dispenses frozen sweet tea and bourbon cocktails—malfunctioned during a chaotic dinner rush, spewing sticky, bourbon-soaked slush across prep areas and forcing the staff into an all-hands panic mop-down while trying to execute high-volume service.",
+    "The \"Blue Hair\" Origins & Barroom Pranks\nA staple piece of trivia for tour guides stopping at the restaurant is Chef Jason Santos’s signature electric blue hair.",
+    "* Santos didn’t do it for TV branding; he originally dyed it on a whim the night before appearing on a morning news cooking segment when he was just 19 years old.",
+    "Network producers were furious the next morning, but the segment was a massive hit.",
+    "* At Buttermilk & Bourbon, servers and bartenders have had to repeatedly field questions from patrons asking if Santos actually lives in the restaurant or if Gordon Ramsay is in the kitchen.",
+    "Ramsay’s production teams and Santos’s *Bar Rescue* connections have occasionally led to surprise drop-ins by national TV personalities, creating instant buzz inside the dining room.",
+    "The Pig-Head Feast Showstopper\nIf you want a juicy culinary incident, Santos created a dish at the Back Bay location meant specifically to make fellow diners turn their heads in shock: the **Whole Roasted Pig Head**.",
+    "When patrons ordered it, the kitchen served an entire split, slow-roasted swine head on a platter—snout, ears, and teeth intact—garnished with cracklings and hot sauce, meant to be eaten like tacos.",
+    "It routinely caused scenes in the small, intimate basement dining rooms, with nearby tables often either shrieking in disgust, pulling out their phones, or asking to be moved away from a literal roasted pig's face staring across the room.",
+    "When taking a food or history tour through **Buttermilk & Bourbon** in Boston’s Back Bay (located at **160 Commonwealth Avenue**), the most fascinating, dramatic, and real-life stories are tied directly to the building’s history and its celebrity chef owner:\n\n---\n\n### 1.",
+    "The Basement Sits on One of Boston’s Darkest Tragedy Sites\nBefore Buttermilk & Bourbon was serving fried chicken and hurricanes in the subterranean space, 160 Commonwealth Avenue was the historic **Hotel Vendome**.",
+    "* **The Incident:** On June 17, 1972, a four-alarm fire broke out in the building while it was undergoing renovations.",
+    "Firefighters extinguished the fire, but while crews were doing cleanup in the late afternoon, the entire southeast corner of the building unexpectedly collapsed.",
+    "* **The Aftermath:** The collapse buried dozens of firefighters under tons of rubble.",
+    "**Nine Boston firefighters died**, making it the single deadliest incident in the history of the Boston Fire Department.",
+    "* **The Tour Connection:** If you look directly across the street on the Commonwealth Avenue Mall, you’ll see the **Hotel Vendome Memorial**—a bronze firefighter's coat and helmet resting over a curved granite base.",
+    "Because of this disaster, local ghost and historic tours frequently point to the building's basement level (right where diners sit today) as one of the most solemn and reputedly haunted spaces in the Back Bay.",
+    "The 1882 Thomas Edison \"Black Magic\" Demo\nBefore its tragic fire, the Hotel Vendome was Boston’s most elite luxury hotel, hosting figures like Mark Twain, Oscar Wilde, and President Ulysses S. Grant.",
+    "* **The Incident:** In 1882, the hotel made international history by installing an independent electrical lighting plant designed by **Thomas Edison himself**, making it the first commercial hotel in Boston (and one of the first in the world) to be completely lit by electric light.",
+    "* **The Drama:** At the time, diners and guests genuinely feared electrocution and \"sorcery.\" Patrons in the dining rooms would jump or shield their eyes when the switches were flicked, half-expecting explosions.",
+    "Chef Jason Santos: From Gordon Ramsay’s Wrath to TV Fame\nThe man behind Buttermilk & Bourbon is celebrity chef **Jason Santos**, instantly recognizable by his neon-blue hair.",
+    "* Santos originally rose to fame on Fox’s **_Hell’s Kitchen_ (Season 7)**, finishing as the runner-up.",
+    "* His dynamic with Gordon Ramsay made him a cult favorite, leading Ramsay to eventually bring Santos back onto the show not as a contestant, but as his trusted **Blue Team Sous Chef**.",
+    "* Santos took the grit and intensity from those TV pressure-cookers and channeled it into his Boston restaurants, along with becoming a recurring culinary fixer on Paramount's **_Bar Rescue_** alongside Jon Taffer.",
+    "High-End Back Bay Meets \"Flamin’ Hot Cheetos\" & Soft-Serve Hurricanes\nA lighter, \"juicy\" restaurant tidbit for foodies involves the sheer culture clash Santos created when opening the venue:\n* Back Bay’s Commonwealth Avenue is known for ultra-traditional Boston Brahmin elegance—brownstones, fine art, and quiet money.",
+    "* When Buttermilk & Bourbon moved into the stately Vendome brownstone, Santos intentionally threw traditional New England dining out the window.",
+    "He installed **frozen taps pouring Bourbon Hurricanes**, soft-serve swirl machines, and put **Flamin' Hot Cheeto Mac & Cheese** right alongside freshly shucked local oysters.",
+    "It ruffled some neighborhood purists early on, but quickly became a Back Bay staple."
+   ],
+   "chart_house": [
+    "The Redcoat \"Invasion\" Watched from the Dining Room\n* **The Incident:** On **October 1, 1768**, two full regiments of British Regulars (the 14th and 29th) backed by armed royal warships sailed into Boston Harbor and landed on Long Wharf.",
+    "* **The Juicy Detail:** John Hancock—the wealthiest merchant in Boston and a notorious smuggler—was sitting right in his second-floor office (what is today the **second-floor dining room**).",
+    "He stood by the window and watched hundreds of red-coated soldiers, bayonets fixed and drums rolling, march right past his building down Long Wharf to intimidate the rebellious city.",
+    "A few years later, Paul Revere immortalized that exact perspective in his famous 1768 landing engraving.",
+    "The Smuggler’s Iron Safe Still in the Wall\n* **The Incident:** John Hancock inherited his trading firm, *House of Hancock*, from his uncle Thomas.",
+    "While history remembers him for his oversized signature on the Declaration of Independence, to the British Crown, he was essentially an organized crime boss and tax cheat.",
+    "He routinely ran illicit Madeira wine, Dutch tea, and rum into the Boston harbor without paying duties.",
+    "During the volatile 1760s and 1770s, that very iron box concealed the ship manifests, smuggled accounts, and correspondence with other Sons of Liberty (like Samuel Adams) out of reach of royal customs agents.",
+    "The Custom House Raid & The *Liberty* Riot Connection\n* **The Incident:** In May 1768, royal customs agents boarded Hancock’s ship, the *Lydia*, docked at Long Wharf.",
+    "Hancock stormed down, cornered the inspectors, demanded their search warrants, and when they didn't have specific dates listed, had his men physically throw the British customs officers off the vessel.",
+    "* **The Escalation:** A month later, customs agents seized another of his sloops, the *Liberty*, right at Long Wharf for smuggling Madeira wine.",
+    "When royal marines towed the boat away, a furious Boston mob gathered at the wharf, beat several customs officials nearly to death, dragged a collector's pleasure boat through the streets, and burned it on Boston Common.",
+    "That Long Wharf riot was the very catalyst that caused the British to deploy the troops that occupied the city.",
+    "Nathaniel Hawthorne’s Gritty Wharf Life\n* **The Incident:** In 1839, author **Nathaniel Hawthorne** (author of *The Scarlet Letter*) took a job as a measurer of salt and coal at the Boston Custom House on Long Wharf.",
+    "* **The Detail:** Long before the Chart House was an upscale restaurant serving prime rib, Long Wharf was a gritty, pungent place of rough sailors, tavern brawls, and foul-smelling cargo.",
+    "In his personal notebooks while working steps from the building, Hawthorne wrote bluntly about the environment: \n  > *\"Long Wharf is devoted to ponderous, evil-smelling, inelegant necessaries of life...\"*\n\n---\n\n### 5.",
+    "An 18th-Century Child Prodigy Upstairs\n* **The Incident:** Long before he became the most celebrated portrait painter in American history—painting George Washington, Paul Revere, and John Adams—**John Singleton Copley** grew up in the building adjacent to this block of Long Wharf.",
+    "* **The Detail:** His widowed mother, Mary Singleton Copley, operated a small tobacco and pipe shop on the wharf, living above the store.",
+    "The rough seamen and traders docking outside the modern Chart House doors were the daily characters young Copley observed and sketched as a child.",
+    "The Building’s Modern \"Save\": The Surfer & the Blizzard\n* **The Restaurant's Roots (1973):** The Chart House chain wasn't founded by Bostonians, but by two legendary Hawaiian big-wave surfers/sailors, Joey Cabell and Buzzy Bent, in Colorado.",
+    "When they expanded to Long Wharf in 1973, urban renewal projects were tearing down old port buildings; the Chart House founders painstakingly restored the colonial brick arches and massive hand-hewn chestnut beams that you still duck under today.",
+    "* **The Blizzard of ’78:** In February 1978, the catastrophic **\"Blizzard of '78\"** slammed Boston with hurricane-force winds and a record 15-foot storm surge.",
+    "Long Wharf was submerged under several feet of icy seawater.",
+    "While neighboring piers and waterfront properties suffered devastating structural collapses, the sturdy 1763 brick-and-timber structure absorbed the flooding and survived nearly intact, as it has through 260+ years of harbor storms.",
+    "It is the **oldest surviving building on Long Wharf** and holds substantial historical intrigue.",
+    "Documented historical facts, incidents, and genuine tour-worthy details about the site include:\n\n---\n\n### 1.",
+    "The Smuggler’s Fortress: John Hancock’s Original Wall Safe\n* **The Location:** On the second floor dining area, embedded right into the exposed original red-brick wall, is a heavy, dark iron safe.",
+    "Before Hancock became famed for his large signature on the Declaration of Independence, he was one of the wealthiest shipping tycoons in New England—and an unapologetic smuggler who avoided steep British taxes on goods like Madeira wine, rum, and Dutch tea.",
+    "* **The Juicy Detail:** Diners on tours can touch and swing open the heavy cast-iron doors of Hancock’s personal safe.",
+    "A Front-Row View of the British Invasion (October 1768)\n* **The Incident:** On October 1, 1768, British warships anchored in Boston Harbor to crack down on tax resistance and civil unrest.",
+    "The 14th and 29th Regiments of the British Army disembarked at the head of Long Wharf in full combat dress with bayonets fixed, drums pounding, and fifes playing.",
+    "* **The Scene:** Because the wharf was the direct entryway into the city, the redcoats marched right past this exact building toward the Town House (now the Old State House).",
+    "* **The Detail for Diners:** Tour guides often bring guests to the **second-floor front windows**.",
+    "If you stand next to Hancock’s safe and look down onto the cobblestones, you are looking at the exact route where hundreds of invading British soldiers marched past a furious John Hancock watching from inside.",
+    "The 1768 Sloop *Liberty* Riots\n* **The Incident:** Just months before the British troop arrival, British customs collectors boarded and seized John Hancock’s commercial ship, the sloop *Liberty*, right at Long Wharf, accusing him of illicitly unloading casks of Madeira wine without paying duties.",
+    "* **The Drama:** The seizure caused a violent riot on the dock.",
+    "Sons of Liberty mobs assaulted royal customs officials, vandalized customs property, and burned a collector’s boat on Boston Common.",
+    "The British military occupation of Boston later that year was directly sparked by the near-anarchy along this stretch of wharf.",
+    "Architectural Survival: The Timber Girders and Surviving the Great Fires\n* **The Building’s Survival:** Boston suffered several devastating fires—most notably the catastrophic **Great Boston Fire of 1872**, which wiped out more than 700 buildings across 65 acres of downtown.",
+    "* **What to Notice:** When walking inside, the massive timber posts, rough-hewn support beams, exposed brick, and wooden flooring are authentic colonial architecture.",
+    "While nearly all other original wooden and brick warehouses on Long Wharf burned down, collapsed, or were demolished during 19th-century renovations and 20th-century waterfront redevelopments, this structure miraculously survived intact.",
+    "Water That Moved: Standing in What Was Once Open Harbor\n* **The Landscape Trick:** When guests enter the Chart House from modern State Street/Atlantic Avenue, they walk across dry ground.",
+    "* **The Incident/History:** In the 1700s, Long Wharf was an isolated pier jutting nearly a third of a mile out into deep open ocean from the shoreline (which originally ended back near Faneuil Hall).",
+    "* **The Detail:** To visit Hancock’s counting house back then, one had to walk down a precarious, wind-swept wooden pier flanked by moored clipper ships, brigantines, and longshoremen.",
+    "The entire ground surrounding the restaurant today was filled in with dirt, ship ballast, and debris during massive 19th-century land-reclamation projects."
+   ],
+   "sycamore": [
+    "The \"Big Misnomer\": A 19-Seat Pressure Cooker\nWhen chef David Punch and co-owner Alison Hearn opened Little Big Diner in early 2016, they named it with heavy irony.",
+    "* **The Drama of the Line:** Because they operate strictly on a no-reservations walk-in policy, opening months saw massive crowds of hungry suburbanites and college students spilling onto Centre Street in the freezing New England winter.",
+    "* **The \"LBD Waiting Ritual\":** Customers quickly learned that a 19-seat counter meant wait times could easily surpass 90 minutes.",
+    "A classic Newton Centre workaround emerged: diners put their names on the waitlist at Little Big Diner, walked over to grab a craft cocktail at *Sycamore* (Punch's bistro right around the corner), and sprinted back the moment their phone buzzed.",
+    "If a party took too long to return, the tight seating line skipped them instantly.",
+    "The Kitchen Line Paradox: 5 Cooks in a Closet\nWorking the line at Little Big Diner has a reputation in the local culinary circuit for being borderline claustrophobic.",
+    "* Dave Punch famously revealed in interviews that despite having a footprint barely larger than a home living room, they consistently crammed **five line cooks** behind the counter during peak services.",
+    "* Punch acknowledged to the culinary press that he warned incoming cooks: *\"It's going to be a really, really hard job when you come to work here, but you're going to leave this restaurant a better cook.\"* Watching five people dance around simmering, 12-hour broths and boiling noodle baskets without colliding became part of the dinner theater for anyone seated at the window counter.",
+    "The Newton vs. Cambridge Culture Shock\nBefore opening Sycamore (2013) and Little Big Diner (2016), Dave Punch was a mainstay of the urban Cambridge culinary scene (having run the kitchen at *Ten Tables* in Harvard Square).",
+    "When he set out to build an empire in suburban Newton Centre, industry peers thought opening an edgy, compact ramen-and-craft-beer bar was a gamble for a leafy, family-centric suburb.",
+    "* Punch often joked about the culture clash—at Sycamore and LBD, they initially had to balance Newton diners who brought their young children alongside urban transplants craving hardcore street food.",
+    "* To win over the neighborhood while keeping culinary edge, they leaned into items like *Schmaltz* (chicken fat) in chicken ramen and ultra-rich paitan broths.",
+    "It became such a runaway success that the same team ended up expanding their footprint down the block to open **Jinny’s Pizzeria** (home to their famous turquoise oven nicknamed *\"Dottie McLovin\"*), completing what locals call the \"Punch Triangle\" of Newton Centre.",
+    "The Famous \"Chef’s Ultra Ramen\" Showdowns\nThe culinary centerpiece of the diner is the **Chef’s Ultra Ramen**—a colossal bowl loaded with chili ground pork, char siu pork, grilled chicken, and ajitama egg packed into a spicy, rich paitan broth.",
+    "It frequently caught first-timers off guard; local food reviewers and regulars frequently trade stories of seeing people order the Ultra alongside multiple appetizers (like the signature spam musubi and karaage), only to realize the ramen bowl alone is essentially a multi-pound food marathon.",
+    "While **Sycamore** and **Little Big Diner** have steered remarkably clear of lawsuits, public scandals, or tabloid-style drama, their rise created plenty of “inside baseball” lore, industry shakeups, and chaotic front-of-house moments in Newton Centre.",
+    "Here are some real, documented stories and colorful behind-the-scenes realities about the team and their spots:\n\n---\n\n### 1.",
+    "The Cambridge Departure & The “Suburban Bet”\n* **The Backstory:** Before Sycamore existed, chef-owner **David Punch** made his name running the kitchen at **Ten Tables** in Cambridge.",
+    "At the time, conventional restaurant wisdom held that serious, farm-to-table, upscale bistro food had to stay in Boston or Cambridge/Somerville.",
+    "Suburbs like Newton were where chefs went when they wanted to compromise.",
+    "* **The Incident/Juice:** Punch and co-chef/business partner **Lydia Reichert** made a clean and sudden break from the Ten Tables empire to open Sycamore in late 2012 on Beacon Street.",
+    "Industry insiders openly questioned whether a sophisticated, ever-changing seasonal bistro with house-made charcuterie and offbeat wines could survive the perceived \"steak-and-potatoes\" Newton suburbs.",
+    "Instead, it was an explosive hit—pulling foodies and city chefs out on the Green Line.",
+    "Punch later acknowledged that suburban expectations differed sharply from Cambridge: early on, managing high-net-worth Newton regulars who expected immediate reservations, tailored modifications, and private club treatment in a cozy, independent bistro required a crash course in hospitality diplomacy.",
+    "The 675-Square-Foot Chaos at Little Big Diner\n* **The Misnomer:** When Punch opened Little Big Diner just a few doors away in early 2016, the name itself was tongue-in-cheek.",
+    "It wasn’t an American diner, and at roughly **675 square feet** with only about 20 seats, it definitely wasn’t big.",
+    "Because the dining room was essentially the size of a master bedroom and took no reservations, lines immediately snaked down Centre Street in the dead of New England winter.",
+    "* **The Pressure:** Diners crammed shoulder-to-shoulder at the communal counter, slurping hot ramen while standing patrons hovered inches behind them watching every bite.",
+    "Wait times routinely hit two hours for a 20-minute bowl of noodles.",
+    "The tiny open kitchen churned out hundreds of bowls of ultra-rich paitan broth a night under intense humidity and heat, making front-of-house seat turnover an Olympic sport.",
+    "Punch famously instituted a strict 5-cook line system to survive the sheer volume in a space where two people could barely pass each other.",
+    "The Unprecedented \"Chef Off-Days\" Defiance\n* **The Industry Anomaly:** For decades, restaurant culture mandated that head chefs live in their kitchens 80+ hours a week, typically taking dark Monday/Tuesday days off.",
+    "* **The Twist:** At Sycamore, Punch caused a bit of a stir among fellow Boston-area kitchen lifers by unapologetically taking **Saturdays and Sundays off** about 75% of the time to spend weekends with his wife and family.",
+    "In high-end dining, a chef taking prime Saturday service off was almost considered heresy.",
+    "Punch openly pushed back on toxic kitchen hours, arguing that if your line staff of five is properly trained and treated like family, you don’t need the ego of the executive chef hovering on the busiest night of the week.",
+    "* Then **Buttonwood** in Newton Highlands.",
+    "* Then **Jinny’s Pizzeria**, directly behind Little Big Diner.",
+    "* **The \"Dottie McLovin\" Lore:** At Jinny's (named after Reichert’s grandmother), they imported a wood-fired oven from Italy and named it \"Dottie McLovin,\" complete with a turquoise polka-dot paint job.",
+    "The concentration of four distinct concepts by the same small restaurant group within a tight radius gave them an outsized footprint in local city politics—frequently dealing with Newton's notoriously tough parking battles, liquor board scrutiny, and historic commission requirements.",
+    "We do not take reservations.\"\n}",
+    "Takeout pickup times: 5pm-close Tuesday-Saturday.\"\n}",
+    "The \"Suburban Wait-Time Meltdowns\" (Little Big Diner)\nWhen Chef David Punch and Alison Hearn opened Little Big Diner in 2016, it was an immediate sensation—and a logistical powder keg.",
+    "* **The Setup:** The space is microscopic (around 675 square feet with just 19–20 counter/table seats).",
+    "True to authentic Tokyo ramen-ya culture, the restaurant adopted a strict **no-reservations** policy.",
+    "* **The Culture Clash:** Newton Centre diners—accustomed to booking leisurely dinner tables ahead of time—regularly clashed with the format.",
+    "During peak hours, wait times stretched well past two hours in freezing Massachusetts winter weather.",
+    "The Kitchen Staffing Gamble That Paid Off\nBefore opening Sycamore (in late 2012) and Little Big Diner (in 2016), upscale suburban dining in the Boston area had a reputation among top-tier kitchen talent for being where culinary creativity went to die.",
+    "* Punch had left the acclaimed *Ten Tables* in Harvard Square to open Sycamore, and many in the city thought leaving Cambridge for suburban Newton was a massive risk.",
+    "* When Punch opened Little Big Diner, line cooks were skeptical because of how brutal the tight physical space was: five cooks crammed into an open, boiling-hot 675-square-foot galley churning out continuous bowls of rolling six-hour bone broths.",
+    "Punch famously warned applicants that working that line would be an intensely grueling trial by fire, but promised they would leave as better cooks.",
+    "The micro-kitchen turned out to be an unexpected success, serving as an incubator that helped launch the team's third venture down the block, *Jinny's Pizzeria*.",
+    "The \"Beignet Ritual\" at Sycamore\nIf you're highlighting fun food rituals on a tour, Sycamore's signature dessert has its own cult following.",
+    "Regulars consider it a non-negotiable rule to order the warm sugared beignets with salted milk jam (dulce de leche).",
+    "The dessert became so universally demanded that patrons have been known to stop in late in the evening *just* at the bar for dessert and nightcaps, leading the kitchen to consistently crank them out until the fryer is finally turned off for the night.",
+    "***\n\n*(Note: While some Massachusetts restaurants have made headlines for dramatic incidents—such as the viral 2024 dine-and-dash confrontations involving guns at restaurants out in Western Mass—neither Sycamore nor Little Big Diner has been involved in any such controversies.)*",
+    "Rather than harboring sensationalized tabloid scandals or salacious police blotter drama, the real “inside juice” of the **Sycamore** and **Little Big Diner** orbit (founded by chef David Punch and his close-knit team) centers on the high-wire, quirky, and surprisingly candid realities of running two of the Boston area’s most tightly packed, high-pressure restaurants.",
+    "Here are genuine behind-the-scenes stories, design mishaps, and operational lore from both spots:\n\n---\n\n### 1.",
+    "The Disappearing Chef Controversy (Cambridge to Newton)\nBefore opening Sycamore, David Punch made a massive name for himself as head chef at the beloved Cambridge neighborhood spot *Ten Tables*.",
+    "In late 2012, foodies across Cambridge were blindsided when Punch abruptly vanished from the kitchen without much fanfare.",
+    "When word got out that he had relocated to **Newton Centre**—traditionally viewed by city purists as a quiet, culinary-sleepy suburb—it caused genuine confusion and skepticism among Cambridge/Boston food critics.",
+    "Diners famously complained about having to navigate rush-hour traffic down Commonwealth Avenue and the Green Line just to eat his signature *boudin blanc* and French bistro food.",
+    "By proving an urban-caliber, unpretentious, chef-driven restaurant could survive—and pack every seat—in Newton Centre, Punch completely altered how operators viewed Boston's inner suburbs.",
+    "Little Big Diner: The 675-Square-Foot Pressure Cooker\nWhen Punch and co-owner Alison Hearn opened **Little Big Diner** just down the street in 2016, they walked into an operational squeeze that was legendary among local service workers:\n* **The Blueprint:** The entire footprint was a microscopic **675 square feet**—including the kitchen, prep space, walk-in, and dining area.",
+    "* **The \"Elbow-to-Elbow\" Drama:** The close quarters led to unique dinner service tension: customers would stare down seated diners, willing them to slurp their ramen faster.",
+    "Front-of-house staff became masters of subtle “table turning,” balancing warm hospitality with the urgent reality that a single table lingering over a cocktail could bottleneck the kitchen’s entire evening workflow.",
+    "The \"One-Animal\" Board Madness at Sycamore\nOne of Sycamore's breakout culinary features early on was simply known as **“The Board”**.",
+    "Rather than standard cuts of meat, the kitchen would take a single animal (such as a whole pig, goat, or lamb) and serve it to a table in four drastically distinct, hyper-labor-intensive preparations (e.g., braised, confit, roasted, and sausage).",
+    "Kitchen veterans have noted how chaotic this was on the line: Sycamore squeezed a five-person line into an intimate kitchen, meaning that multiple tables ordering \"The Board\" at once turned the cook station into pure organized madness.",
+    "It was a gluttonous, showstopping centerpiece that frequently ran out early in the night, sparking disappointment among late-table walk-ins.",
+    "Staff Mentorship (and the Expanding Triangle)\nThe dynamic inside Punch’s restaurants has often been unusually familial compared to the notoriously toxic kitchen culture common in fine dining.",
+    "* Punch famously admitted that to avoid the burnout that destroys most chef marriages and families, he insisted on taking weekends off—an almost unheard-of luxury in high-end culinary service—which required near-absolute trust in his lieutenants.",
+    "* This reliance led to tight partnerships: long-time Sycamore co-chef **Lydia Reichert** worked alongside Punch for years before they co-founded **Jinny’s Pizzeria** nearby (named after Reichert’s boisterous grandmother, known for jumping on tables at dinner parties).",
+    "* This effectively created an unofficial \"David Punch restaurant crawl\" across Newton Centre (Sycamore $\\to$ Little Big Diner $\\to$ Jinny’s), turning the square into a self-contained dining ecosystem run entirely by the same group of alumni."
+   ],
+   "la_maree": [
+    "When digging into real, documented events surrounding **La Marée** in Monaco (the luxury seafood restaurant perched on the 6th-floor rooftop of the Port Palace Hotel overlooking Port Hercule), there are no tabloids of drunken brawls or Hollywood bar fights.",
+    "Instead, the real \"juicy\" stories revolve around classic Monaco dynamics: **oligarch-scale luxury, high-stakes real estate takeovers, and behind-the-scenes legal drama.**\n\n---\n\n### 1.",
+    "The High-Drama 2020 Lockout and Bailiff Showdown\nThe single most dramatic documented incident in the restaurant’s history happened in October 2020, when the restaurant suddenly went dark.",
+    "* **The Background:** La Marée was initially franchised out under an operating company (SARL La Mape) starting around 2013.",
+    "Meanwhile, ownership of the building and its business assets shifted when French real estate mogul Jean-Pierre Madar’s holding acquired the property company from Tunisian businessman Lotfi Maktouf.",
+    "* **The Incident:** As lease negotiations broke down at the end of September 2020, the restaurant abruptly shuttered.",
+    "On Friday, October 9, 2020, **26 staff members gathered outside the Port Palace Hotel with a Monégasque bailiff (*huissier de justice*)** to formally record that they were barred access to their own workplace.",
+    "* **The Accusations:** Restaurant management went public in local press (*Monaco-Matin*, *L’Observateur de Monaco*), alleging the new landlords were trying to push them out with an \"immoral contract\" that breached local labor rights.",
+    "The landlords fired back, arguing that the operating team had abandoned ship just before the off-season.",
+    "The bitter dispute eventually cleared the way for the rooftop space to be completely redeveloped (it later became *La Môme Monte-Carlo*).",
+    "The Russian Oligarch Connection: \"Seafood Jet-Set\"\nLa Marée was not a traditional local bistro—it was an outpost of an exclusive Russian fine-dining empire founded by seafood importer **Mehdi Douss**, famous in Moscow and Saint Petersburg as the go-to seafood supplier for Russia’s elite and Kremlin-adjacent billionaires.",
+    "* **The Lavish Gimmick:** La Marée in Monaco brought Moscow’s \"crudo & caviar\" spending culture directly onto Port Hercule.",
+    "Rather than ordering off a regular printed menu, guests were escorted to an enormous refrigerated raw bar packed with Alaskan king crabs, Faroe Island sea urchins, Beluga caviar, and whole Mediterranean wild fish flown in daily.",
+    "You chose the exact creature on ice and instructed the kitchen on how to prepare it (raw, grilled, or encrusted in sea salt).",
+    "* **The Yacht Supply Service:** One of the most famous perks of La Marée was its private yacht-runner operation.",
+    "Patrons moored below on multi-million-dollar superyachts didn't always come up to the restaurant; instead, the restaurant's private procurement service delivered whole live crabs, oysters, and chef-prepped platters directly over the water to superyacht galleys.",
+    "Grand Prix Balcony Spying and Extravagant Spending\nBecause the rooftop sits squarely over the harbor section between the tunnel exit and the chicane, La Marée became infamous among Grand Prix high-rollers:\n\n* **Crazy Seat Pricing:** During the Monaco Grand Prix weekend, individual tables were sold out for tens of thousands of euros just for unobstructed views of the track.",
+    "* **Spectator Shenanigans:** It was widely reported by yacht guests and attendees that during race days, the restaurant was a battleground of billionaire one-upmanship, featuring competing multi-magnum deliveries of Dom Pérignon and Cristal popping against the engine roar below, often with resident resident tennis pros (like Daniil Medvedev) and Formula 1 figures dining just tables away from private international financiers.",
+    "*(Note: There have been isolated violent incidents in other Monaco eateries over the years—such as a kitchen stabbing at Pulcinella in 2017 and an attempted murder case at L'Estragon in 2023—but none of these took place at La Marée.",
+    "La Marée’s genuine scandals have strictly been about big money, evictions, and Mediterranean opulence.)*",
+    "While **La Marée** in Monaco (perched on the 6th-floor rooftop of the Port Palace Hotel overlooking Port Hercule) was renowned for its lavish seafood counters and Russian-oligarch clientele, its most captivating, high-stakes true stories happened behind the scenes:\n\n---\n\n### 1.",
+    "The High-Stakes Lockout & Bailiff Showdown (October 2020)\nThe juiciest real-life drama involving the restaurant came during its dramatic collapse and closure in autumn 2020:\n\n* **The Takeover:** The underlying business assets of the Port Palace Hotel were acquired by the French real estate investment giant Madar Group.",
+    "* **The Sudden Lockout:** The operating company running La Marée (*SARL La Mape*) and the new owners clashed over a lease extension.",
+    "Without warning, the restaurant’s doors were suddenly locked to employees and diners alike as the lease ended.",
+    "* **The Street Confrontation:** On October 9, 2020, 26 staff members—including long-time waitstaff and chefs—marched onto Avenue J.F. Kennedy accompanied by a court bailiff (*huissier de justice*).",
+    "The bailiff was brought to legally document that the staff were physically barred entry to their own workplace.",
+    "* **The National Scandal:** The standoff escalated into a major scandal in Monaco’s tight-knit hospitality scene.",
+    "Management traded fierce accusations in the local press: the operating team accused the building owners of pushing an \"immoral contract\" in defiance of Monegasque labor rules, while the owners accused the operators of abandoning ship right at the start of the low season.",
+    "The incident became so contentious that Monaco's government, labor inspectorate, and trade unions had to step in directly to enforce employee protections before the venue finally changed hands permanently.",
+    "The Moscow Oligarch Seafood Connection\n* **Russian Decadence on the Port:** La Marée was not simply a local Monegasque bistro; it was the Mediterranean flagship of a luxury restaurant chain that originated in Moscow and Saint Petersburg.",
+    "* **Wild Display of Wealth:** The concept brought a distinct brand of post-Soviet luxury to Port Hercule.",
+    "Instead of ordering from a standard menu, patrons walked up to a massive ice-laden “fish market boutique” inside the dining room.",
+    "Diners pointed at live Alaskan king crabs, rare Faroe Island sea urchins, and Mediterranean catches to have them weighed and cooked to order on the spot.",
+    "* **Yacht Deliveries:** During peak events like the Monaco Grand Prix and the Monaco Yacht Show, guests who didn't want to dine on the terrace often sent private superyacht deckhands and chefs up to La Marée to purchase thousands of euros worth of raw lobster, whole turbot, and caviar straight from the restaurant's tanks to take back down to their moored yachts.",
+    "The Grand Prix Trackside Vantage\n* Sitting on the 6th floor directly above the chic harbor, La Marée had a birds-eye view of the infamous corner entering the harbour chicane and the pit-lane entrance.",
+    "* During the Formula 1 Grand Prix, tables were traded for astronomical sums among ultra-high-net-worth visitors, turning the venue into a closed-door haven of champagne-fueled debauchery where race viewing was secondary to networking among Monaco’s most secretive tycoons.",
+    "---\n\n*(Note: La Marée closed permanently following the 2020 lease dispute and has since been replaced on the Port Palace rooftop by **La Môme Monte-Carlo**.)*"
+   ],
+   "logan": [
+    "## CAUSE\n\n* **Event and Decision:** On May 12, 1922, Massachusetts Governor Channing H. Cox signed Chapter 404 of the Acts of 1922, authorizing the Commonwealth to lease state-owned tidal flats in East Boston to the federal government and appropriate funds to build an airfield.",
+    "The project was championed by Boston Mayor James Michael Curley and civilian/military aviation advocates who sought to secure Boston’s position on national airmail routes and maintain a base for the U.S. Army Air Service and Massachusetts National Guard.",
+    "The airfield formally opened on September 8, 1923, as the East Boston Airport (often called Jeffery Field).",
+    "However, successive post-WWII expansions systematically consumed several Boston Harbor islands—including Bird Island and Governors Island (along with historic Fort Winthrop, which was leveled in the 1940s to provide runway fill)—and Frederick Law Olmsted’s 75-acre Wood Island Park (completed 1898), which was condemned and bulldozed by the Massachusetts Port Authority (Massport) in the late 1960s alongside residential Neptune Road.",
+    "* **Sources:** *Acts and Resolves Passed by the General Court of Massachusetts (1922, Ch.",
+    "404)*; Michael Connelly, *Mr. Blue Sky: The Story of Boston’s Logan Airport*; Massport Historical Archives; National Park Service (Olmsted National Historic Site).",
+    "---\n\n## CREATORS\n\n* **Master Planners and Early Engineers:** The original 1922–1923 cinder runways and hangars were planned and engineered by the U.S. Army Air Service and the Massachusetts Department of Public Works under state engineer Frank E. Winsor.",
+    "* **Minoru Yamasaki:** Architect of the World Trade Center and St. Louis Airport Terminal.",
+    "In the late 1960s, Yamasaki & Associates designed Logan’s Eastern Airlines terminal (later demolished).",
+    "Rather than using the delicate Gothic arches or concrete shells seen in his other airport work, Yamasaki incorporated strong, functional structural bays suited to Eastern's rapid-turnaround \"shuttle\" passenger operations.",
+    "* **Perry, Dean, Stahl & Rogers:** Designed the airport’s 285-foot air traffic control tower (completed 1973), famous for its striking pair of cylindrical concrete pylons linked by a high-altitude horizontal bridge supporting the cab—a departure from the conventional single-shaft towers favored elsewhere by the FAA.",
+    "* **Maginnis & Walsh (with Kennedy):** Designed the original circular *Our Lady of the Airways* chapel (dedicated 1952).",
+    "Known nationally for collegiate Gothic and Roman Catholic ecclesiastical monuments (e.g., Boston College, Basilica of the National Shrine in Washington), they adapted their style to a modernist, utilitarian airport apron building.",
+    "* **AECOM and luis vidal + architects:** Designed the $680 million Terminal E modern expansion (completed 2023).",
+    "Known for Heathrow Terminal 2, Vidal’s team customized a dynamic red-to-orange prismatic exterior coating specially formulated by Monopol Colors called \"Boston Red.\"\n* **Sources:** *Architectural Record* (Air Traffic Control Tower BOS, 1974); Wendy Cadge, *Paging God: Religion in the Halls of Medicine / Airport Chapels Studies*; Massport Terminal E Modernization Project Briefs.",
+    "---\n\n## PATRONS\n\n* **Founding Public Bodies:** The initial $35,000 appropriation in 1922 was split between the Commonwealth of Massachusetts (paying ~60%) and the City of Boston (~40%), with the U.S. Federal Government financing airfield equipment and hangar installation.",
+    "* **The Massachusetts Port Authority (Massport):** Created by the Massachusetts Legislature in 1956 (enacted under Chapter 465) as an independent, self-financing public authority.",
+    "Massport took operational control of the airport in February 1959, funding capital expansions through airport revenue bonds, user fees, and federal Airport Improvement Program (AIP) grants, requiring no taxpayer backing from the state's General Fund.",
+    "* **Patron Demands and Intentions:** \n  * Early civic promoters (including Mayor Curley) demanded an economic hub ensuring Boston would not be bypassed by commercial commerce and airmail networks.",
+    "* In 1943, the state legislature officially renamed the field **General Edward Lawrence Logan Airport** to honor Major General Edward L. Logan, a prominent South Boston native, municipal judge, state legislator, and WWI commander of the 101st Infantry Regiment.",
+    "* **Religious Patron:** Archbishop Richard Cushing and the Roman Catholic Archdiocese of Boston secured and funded the construction and 1951 lease ($100/year) of *Our Lady of the Airways*.",
+    "Cushing wanted airport laborers—who worked shifts preventing regular parish church attendance—to have consecrated ground for Mass on site.",
+    "* **Sources:** Mass.",
+    "465 (1956); Boston Pilot Archives; Archdiocese of Boston Records.",
+    "---\n\n## VISITORS\n\n* **Historic Aviation Figures:** Charles Lindbergh visited on his transatlantic victory tour aboard the *Spirit of St. Louis* in July 1927.",
+    "Amelia Earhart operated here frequently and helped launch Boston-Maine Airways (later Northeast Airlines) from the site in the early 1930s.",
+    "* **Protesters (\"Maverick Mothers\"):** On April 23, 1969, a group of East Boston mothers, pushing baby strollers, blocked dump trucks on Maverick and Prescott streets to halt Massport’s demolition of Neptune Road and Wood Island Park.",
+    "The protests catalyzed Boston's modern environmental justice movement and spurred Governor Francis Sargent’s 1970 transportation moratorium.",
+    "* **Victims:** \n  * On October 4, 1960, Eastern Air Lines Flight 375 struck a flock of European starlings seconds after takeoff from Runway 09, crashing into Winthrop Bay; 62 of the 72 passengers and crew died in what led directly to FAA wildlife-management regulations.",
+    "* On July 31, 1973, Delta Air Lines Flight 723 crashed into a sea wall while attempting an instrument landing in dense fog, killing all 89 people aboard.",
+    "* On September 11, 2001, five hijackers boarded American Airlines Flight 11 (Terminal B) and five hijackers boarded United Airlines Flight 175 (Terminal C), which were hijacked after departure and flown into the Twin Towers of the World Trade Center.",
+    "* **Ongoing Arguments:** Communities in East Boston, Winthrop, Revere, and Milton continuously litigate and protest over health disparities, particulate emissions (ultrafine particles), and noise pollution generated by Logan’s RNAV concentrated flight paths and runway use patterns.",
+    "* **Sources:** NTSB Aircraft Accident Reports (EAL 375, DAL 723); National Commission on Terrorist Attacks Upon the United States (*9/11 Commission Report*, 2004); GBH News archives on East Boston protests.",
+    "---\n\n## SINGULAR\n\n* **First Airport Chapel in the World:** Opened in 1951 and dedicated in January 1952, *Our Lady of the Airways* was the first dedicated airport chapel in the United States and the world, establishing the precedent for multi-faith airport chaplains and reflection rooms worldwide.",
+    "* **First U.S. Direct Rapid-Transit Airport Connection:** In 1952, Boston’s Metropolitan Transit Authority (now the MBTA) extended its rapid transit line (the Blue Line) to Airport Station, making Logan the first airport in the United States connected directly to a regional rapid-transit subway system.",
+    "* **First LEED-Certified Airport Terminal:** When Terminal A was reconstructed and reopened in 2005, it became the first airport terminal in the world to be awarded LEED (Leadership in Energy and Environmental Design) certification for environmental design from the U.S. Green Building Council.",
+    "* **Unique Physical Feature:** Logan features an iconic **285-foot double-elliptical pylon control tower** (completed in 1973), which remains one of the tallest airport control towers with an open center-span bridge connecting dual support pylons.",
+    "* **Sources:** Wendy Cadge, *Paging God* (University of Chicago Press); U.S. Green Building Council (Terminal A Case Study, 2005); MBTA Transit History Records.",
+    "## CAUSE\n* **Who & What Caused It:** In March 1922, Boston Mayor James Michael Curley petitioned Massachusetts Governor Channing H. Cox to create a dedicated aviation field to support civil commerce and national air defense.",
+    "On May 12, 1922, Governor Cox signed Chapter 404 of the Acts of 1922, authorizing the Commonwealth to lease state-owned tidal flats to the federal government and establish an aircraft landing field.",
+    "In 1943, the Massachusetts General Court voted to rename the facility after **Major General Edward Lawrence Logan**, a South Boston native, Spanish-American War veteran, and World War I commander of the 101st Infantry Regiment who was a champion of aviator benefits.",
+    "* **What Was on the Site Before:** The airfield was sited on Jeffries Point in East Boston, then consisting of tidal mudflats, shallow marshes, and filled dredge land.",
+    "* **What Happened to It:** Over subsequent decades, massive landfill operations submerged or leveled surrounding harbor topography.",
+    "The airfield expanded over **Apple Island**, **Governor's Island** (demolishing historical Fort Winthrop), **Bird Island**, and parts of **Noddle’s Island**, combining them into a single contiguous airfield footprint.",
+    "---\n\n## CREATORS\nLogan Airport grew incrementally via distinct architects, engineers, and builders rather than a single master planner:\n* **Early Airfield (1923):** Built under the direction of the **U.S.",
+    "Army Corps of Engineers** alongside the Massachusetts Department of Public Works, laying a basic 1,500-foot cinder strip and steel hangars.",
+    "Known regionally for institutional and Brutalist civic structures, they built Logan's distinctive 270-foot concrete air traffic control tower with a massive central cantilever bridge spanning between two cylindrical concrete shafts.",
+    "* **Modern Terminals & Sustainable Design:**\n  * **Terminal A (2005):** Designed by **Hellmuth, Obata + Kassabaum (HOK)** and built by **Skanska USA**.",
+    "Known globally for landmark sports stadiums and airport terminals, HOK designed Terminal A as the first airport terminal in the world to secure LEED certification, using heat-reflecting roofs, low-flow fixtures, and stormwater filtration.",
+    "* **Terminal E Modernization (2023):** Designed by **luis vidal + architects** with **AECOM**.",
+    "Vidal (famous for Heathrow’s Terminal 2) created the bold, flowing roofline clad in custom prism-coated \"Boston Red\" panels designed to change hues with the harbor's shifting sunlight.",
+    "* **Our Lady of the Airways (1951):** The initial airport chapel was designed by the renowned ecclesiastical architectural firm **Maginnis & Walsh** (notable for the Basilica of the National Shrine of the Immaculate Conception in Washington, D.C.).",
+    "---\n\n## PATRONS\n* **Who Paid for It:**\n  * The initial layout was funded through the Commonwealth of Massachusetts under the 1922 legislative act, which allocated $35,000 for site grading and cinder runways, with the City of Boston agreeing to pay roughly 40% of the cost.",
+    "The federal government and U.S. Army provided hangars and aircraft infrastructure.",
+    "* Between 1929 and the 1940s, the City of Boston Parks Department and federal New Deal Works Progress Administration (WPA) funds financed runway paving and early administrative buildings.",
+    "* In **1956**, the state created the **Massachusetts Port Authority (Massport)**.",
+    "Since then, Massport has funded the airport entirely through airport revenue bonds, user fees, gate leases, and airline tenant funding (without state tax dollars).",
+    "* **What They Wanted:** State and city leaders sought to guarantee Boston's status as a preeminent commercial, maritime, and transatlantic aviation hub.",
+    "In return for capital leases, airline patrons (such as Colonial Air Transport, Pan Am, and later Delta) secured dedicated hubs and gates.",
+    "---\n\n## VISITORS\n* **Pioneers & Dignitaries:** \n  * **Charles Lindbergh** landed the *Spirit of St. Louis* at the airfield on **July 22, 1927**, greeted by crowds of tens of thousands during his post-transatlantic national tour.",
+    "* In 1928, **Amelia Earhart** departed Boston Airport for Newfoundland ahead of her historic transatlantic flight aboard the *Friendship*.",
+    "* **Protesters & Neighborhood Resistance:** \n  * On **April 23, 1969**, Massport bulldozers cut down dozens of historic mature trees in **Wood Island Park** to clear Runway 15R/33L.",
+    "This prompted immediate, fierce protests: neighborhood mothers blocked dump trucks with baby carriages along Maverick and Prescott Streets, and residents chained themselves to trees.",
+    "* **September 11, 2001 (Victims & Perpetrators):**\n  * Logan was the departure point for two hijacked airliners involved in the 9/11 attacks: **American Airlines Flight 11** and **United Airlines Flight 175**, which were flown into the Twin Towers of the World Trade Center.",
+    "Ten hijackers (led by Mohamed Atta) cleared screening checkpoints at Terminals B and C; 147 passengers, pilots, and crew members aboard both flights were killed.",
+    "* **Ongoing Arguments:** Communities in East Boston, Chelsea, and Winthrop continually litigate and protest against Massport over jet-engine noise pollution, ultrafine particulate matter (air pollution), nocturnal flights, and runway expansions.",
+    "---\n\n## SINGULAR\n* **First Airport Chapel in the United States:** Logan’s chapel, **Our Lady of the Airways** (established in 1951 by Archbishop Richard Cushing in Terminal C), was the first dedicated airport chapel built in the United States.",
+    "* **World’s First LEED-Certified Airport Terminal:** When Delta's **Terminal A** opened in 2005 (certified in 2006), it became the world’s first commercial airport terminal certified under the U.S. Green Building Council’s LEED program.",
+    "* **Destruction of Olmsted’s Wood Island Park:** Logan is the only major U.S. airport built directly over a demolished metropolitan park designed by famed landscape architect **Frederick Law Olmsted**.",
+    "Massport's controversial 1969 leveling of Wood Island Park remains one of the defining preservation and eminent domain struggles in American civic history."
+   ]
+  }
+ },
+ "invented_facts": {
+  "gemini": {
+   "engine": "gemini",
+   "sampled": 50,
+   "unsupported": 26,
+   "unsupported_rate": 0.52,
+   "fetch_method": {
+    "exact_cited_url": 50,
+    "domain_homepage_proxy": 0
+   },
+   "method_note": "Serper facts carry the exact cited URL (strong check); Gemini recorded facts carry only domains, so the cited page is approximated by the domain homepage (weaker — a deep fact may not appear on the homepage, biasing Gemini unsupported upward). Compare engines with this caveat.",
+   "detail": [
+    {
+     "tour": "logan",
+     "fact": "* In 1943, the state legislature officially renamed the field **General Edward Lawrence Logan Airport** to honor Major General Edward L.",
+     "domain": "airwaysmag.com",
+     "url": "https://www.airwaysmag.com/new-post/boston-logan-airport",
+     "exact_url": true,
+     "page_chars": 7243,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The \"Working-Class Pennies\" Origin\nOur Lady Help of Christians (designed by James Murphy and dedicated in 1881) was not funded by wealthy Brahmin patrons.",
+     "domain": "wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The Empty Pews and the 50th Anniversary Triple Tragedy (June 2023)\nOne of the most chilling, heartbreaking incidents connected to the parish sanctuary occurred ",
+     "domain": "cbsnews.com",
+     "url": "https://www.cbsnews.com/boston/news/christopher-ferguson-newton-murders-court-gilda-bruno-damore-lucia-arpino/",
+     "exact_url": true,
+     "page_chars": 3272,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "Unlike many surviving viols from the seventeenth century, it escaped being irreversibly recut or converted into a cello when musical tastes shifted.",
+     "domain": "departement06.fr",
+     "url": "https://portail-savoirs.departement06.fr/annuaire-general/la-collection-dinstruments-de-musique-du-palais-lascaris",
+     "exact_url": true,
+     "page_chars": 17,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "Cardinal Law banned official archdiocesan meetings on parish grounds after Cuenin called for transparency and accountability; Cuenin drew widespread regional me",
+     "domain": "boston.com",
+     "url": "https://graphics.boston.com/globe/spotlight/abuse/stories3/120902_ovation.htm",
+     "exact_url": true,
+     "page_chars": 4209,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "Gautier conditioned the gift of his musical instrument collection on the city granting an annual stipend of 600 francs to the luthier François Bovis for its pre",
+     "domain": "wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Palais_Lascaris",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": true
+    },
+    {
+     "tour": "chart_house",
+     "fact": "* **The Story:** This building served as **John Hancock’s counting house and maritime trading office**.",
+     "domain": "chart-house.com",
+     "url": "https://chickenthiefkitchens.wordpress.com/2017/11/07/chart-house-restaurant-on-long-wharf-where-history-lives-and-icons-are-repurposed/",
+     "exact_url": true,
+     "page_chars": 3849,
+     "supported": true
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "It turned out to be Sagan again, fresh off a night out partying.",
+     "domain": "escapecollective.com",
+     "url": "https://escapecollective.com/peter-sagan-given-suspended-prison-sentence-for-drunk-driving-in-monaco/",
+     "exact_url": true,
+     "page_chars": 1973,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The 2002 Pulpit Defiance Against Cardinal Law\nIn December 2002, the Catholic Archdiocese of Boston was crumbling under Cardinal Bernard Law.",
+     "domain": "wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Sexual_abuse_scandal_in_the_Archdiocese_of_Boston",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": false
+    },
+    {
+     "tour": "sail_loft",
+     "fact": "* **Tour Note:** Point this out to guests as an intentional, old-school Boston Sail Loft tradition.",
+     "domain": "foodrepublic.com",
+     "url": "https://www.foodrepublic.com/2041013/boston-sail-loft-restaurant-mug-clam-chowder-boston/",
+     "exact_url": true,
+     "page_chars": 3694,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The Modern Restorations\nIn the late 20th and early 21st centuries, the interior of Our Lady Help of Christians underwent a major, high-stakes historic preservat",
+     "domain": "johncanningco.com",
+     "url": "https://johncanningco.com/portfolio/our-lady-help-of-christians/",
+     "exact_url": true,
+     "page_chars": 3712,
+     "supported": true
+    },
+    {
+     "tour": "la_maree",
+     "fact": "Management traded fierce accusations in the local press: the operating team accused the building owners of pushing an \"immoral contract\" in defiance of Monegasq",
+     "domain": "lobservateurdemonaco.com",
+     "url": "https://lobservateurdemonaco.com/infos/fermeture-restaurant-la-maree-monaco/",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "While tourists know it today for street performers and retail shops, the building and the cobblestone strip right outside have seen everything from real estate ",
+     "domain": "facebook.com",
+     "url": "https://ghostcitytours.com/boston/haunted-boston/faneuil-hall/",
+     "exact_url": true,
+     "page_chars": 7507,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "* **Italian Immigrants (1900s–Present):** Nonantum emerged as Newton’s vibrant \"Lake\" Italian enclave; Italian families soon integrated and largely came to domi",
+     "domain": "blogspot.com",
+     "url": "http://backsideofamerica.blogspot.com/2020/08/i-seek-newton-part-ix-nonantum-section-3.html",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "restoration of the nave, transept, sanctuary, and aisles).",
+     "domain": "johncanningco.com",
+     "url": "https://johncanningco.com/portfolio/our-lady-help-of-christians/",
+     "exact_url": true,
+     "page_chars": 3712,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "In his will, Gautier stipulated that the city could receive his collection only on the condition of paying an annual maintenance stipend of 600 francs to the lu",
+     "domain": "wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Palais_Lascaris",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": true
+    },
+    {
+     "tour": "logan",
+     "fact": "* **Terminal E Modernization (2023):** Designed by **luis vidal + architects** with **AECOM**.",
+     "domain": "metalocus.es",
+     "url": "https://www.metalocus.es/en/news/luis-vidal-architects-and-aecom-complete-new-boston-logan-international-airport-terminal-e-modernization",
+     "exact_url": true,
+     "page_chars": 8000,
+     "supported": true
+    },
+    {
+     "tour": "la_maree",
+     "fact": "* **The National Scandal:** The standoff escalated into a major scandal in Monaco’s tight-knit hospitality scene.",
+     "domain": "lobservateurdemonaco.com",
+     "url": "https://lobservateurdemonaco.com/infos/restaurant-la-maree-monaco-reprise-employes/",
+     "exact_url": true,
+     "page_chars": 6547,
+     "supported": false
+    },
+    {
+     "tour": "logan",
+     "fact": "Direct Rapid-Transit Airport Connection:** In 1952, Boston’s Metropolitan Transit Authority (now the MBTA) extended its rapid transit line (the Blue Line) to Ai",
+     "domain": "facebook.com",
+     "url": "https://www.facebook.com/airwaysmagazine/posts/-take-a-journey-through-the-history-of-boston-logan-international-airport-from-i/1252832737019562/",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "Architectural Conservation Project Reports on Our Lady Help of Christians, Newton.",
+     "domain": "johncanningco.com",
+     "url": "https://johncanningco.com/blog/characteristics-of-gothic-churches-and-chapels/",
+     "exact_url": true,
+     "page_chars": 8000,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "It's like we are in exile.\"*\n* Rather than shock or silence, the congregation erupted into **two roaring standing ovations** inside the church.",
+     "domain": "boston.com",
+     "url": "https://graphics.boston.com/globe/spotlight/abuse/stories3/120902_ovation.htm",
+     "exact_url": true,
+     "page_chars": 4209,
+     "supported": true
+    },
+    {
+     "tour": "chart_house",
+     "fact": "The Building’s Modern \"Save\": The Surfer & the Blizzard\n* **The Restaurant's Roots (1973):** The Chart House chain wasn't founded by Bostonians, but by two lege",
+     "domain": "wordpress.com",
+     "url": "https://chickenthiefkitchens.wordpress.com/travel-wanderings-the-food-side-shows/chart-house-boston-ma-iconic-seafood-history-atmosphere-views/",
+     "exact_url": true,
+     "page_chars": 6364,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "* **The Ban:** In response, Cardinal Law issued a decree barring Cuenin and the parish from hosting official archdiocesan gatherings.",
+     "domain": "boston.com",
+     "url": "https://graphics.boston.com/globe/spotlight/abuse/stories3/120902_ovation.htm",
+     "exact_url": true,
+     "page_chars": 4209,
+     "supported": true
+    },
+    {
+     "tour": "buttermilk",
+     "fact": "* Santos took the grit and intensity from those TV pressure-cookers and channeled it into his Boston restaurants, along with becoming a recurring culinary fixer",
+     "domain": "barandrestaurantexpo.com",
+     "url": "https://www.barandrestaurantexpo.com/person/jason-santos",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "Durgin-Park originally fed the market's burly longshoremen, butcher boys, and teamsters at long communal tables.",
+     "domain": "newengland.com",
+     "url": "https://newengland.com/travel/massachusetts/durgin-park-boston/",
+     "exact_url": true,
+     "page_chars": 7997,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "The viol entered the city of Nice's public collections through the May 1901 bequest of local amateur musician and collector Antoine Gautier.",
+     "domain": "grandsudinsolite.fr",
+     "url": "https://en.wikipedia.org/wiki/Palais_Lascaris",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "Cuenin complied, apologized, and agreed to repay the money, though he and parish lay leaders argued the expenditures had been approved locally and claimed the a",
+     "domain": "thebostonpilot.com",
+     "url": "https://www.thebostonpilot.com/article.php?ID=1983",
+     "exact_url": true,
+     "page_chars": 4480,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "* **Recent Debates:** In **2023–2024**, the parish campus became the center of heated local community debate when empty school/convent spaces were leased to Cat",
+     "domain": "facebook.com",
+     "url": "https://www.facebook.com/groups/beautyofallcatholicchurches/posts/1429365095361027/",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "Schlee was also the public business manager and long-rumored lover of Hollywood’s most reclusive icon, **Greta Garbo**.",
+     "domain": "hellomonaco.com",
+     "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGCL-i4d8YAm2NNEFzIEUUCFZnTO27WT0fe5lcnEqGLfBfJ0HhhashIO7QNmzfZxf-jjChWG4pNV_PzdKL6clY_x9TCnjd1s5AzYhG--pNvqudeVOgNit8gDJYlA00KUXx16xrY7FkFdZWNBXhNAQNlmjqDSzAN7Z7OFrMktz7pGh7ZS6O6GCy151CrmYqKoD4fcjRdJFck-IIrVm8T5QR3B-zJ_xriG3plZrEs",
+     "exact_url": true,
+     "page_chars": 116,
+     "supported": false
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "* **The Intrigue:** Born in Saint-Tropez, Allard was an officer under Napoleon.",
+     "domain": "sainttropeztourisme.com",
+     "url": "https://www.sainttropeztourisme.com/en/be-inspired-in-saint-tropez/saint-tropez-tourisme-heritage-culture-history-of-saint-tropez/",
+     "exact_url": true,
+     "page_chars": 23,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "Boston police officers who were monitoring the meeting attempted to silence a speaker, which sent the crowd into a rage.",
+     "domain": "oldnorth.com",
+     "url": "https://oldnorth.com/blog/police-protests-italian-immigrants-and-north-end-buildings-that-remain/",
+     "exact_url": true,
+     "page_chars": 7285,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "and South Market St.) were paved into cobblestone pedestrian lanes and leased to a private management corporation.",
+     "domain": "faneuilhallmarketplace.com",
+     "url": "https://content.next.westlaw.com/Link/Document/FullText?findType=Y&serNum=1990127096&pubNum=345&originatingDoc=I0f6d2ff68bac11d99a6fdc806bf1638e&refType=RP&fi=co_pp_sp_345_70&originationContext=document&transitionType=DocumentItem&ppcid=b5cfd19cf07b47a7bb0a29900ff6e5e8&contextData=(sc.Default)",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The issues involved parish-funded automobile leases (including a Honda Accord) and extra Mass stipends that exceeded canon law limits.",
+     "domain": "bishop-accountability.org",
+     "url": "https://bishop-accountability.org/abuse2005b-archives/013798.html",
+     "exact_url": true,
+     "page_chars": 1846,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "Following the passage of the Fugitive Slave Act, southern \"slave-catchers\" frequently stayed in downtown Boston hotels and stalked the docks and markets near So",
+     "domain": "nps.gov",
+     "url": "https://www.nps.gov/articles/000/faneuil-hall-and-boston-vigilance-committees.htm",
+     "exact_url": true,
+     "page_chars": 7997,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "This instrument was built in Paris in 1780 by Jean-Henri Naderman, who served as the official harp maker to Queen Marie-Antoinette.",
+     "domain": "jansantiques.com",
+     "url": "https://jansantiques.com/Lot/jac2423.php",
+     "exact_url": true,
+     "page_chars": 7997,
+     "supported": true
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "* **What cyclists actually encounter:** Because it has a barren, limestone “lunar” landscape with zero light pollution, it attracts amateur ufologists, skywatch",
+     "domain": "epicroadrides.com",
+     "url": "https://epicroadrides.com/cycling-france/nice-cote-dazur/col-de-vence-loop/",
+     "exact_url": true,
+     "page_chars": 8001,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "The case turned stranger when detectives received a tip from an anonymous attorney directing them to a locker at the Park Square bus terminal.",
+     "domain": "hubhistory.com",
+     "url": "https://www.hubhistory.com/episodes/the-gold-gilded-grasshopper-episode-196/",
+     "exact_url": true,
+     "page_chars": 7995,
+     "supported": false
+    },
+    {
+     "tour": "sycamore",
+     "fact": "Cambridge Culture Shock\nBefore opening Sycamore (2013) and Little Big Diner (2016), Dave Punch was a mainstay of the urban Cambridge culinary scene (having run ",
+     "domain": "edibleboston.com",
+     "url": "https://www.edibleboston.com/blog/qa-chef-david-punch-sycamore-and-little-big-diner",
+     "exact_url": true,
+     "page_chars": 7996,
+     "supported": true
+    },
+    {
+     "tour": "chart_house",
+     "fact": "It is one of the few places in Boston where visitors can physically interact with a secure colonial fixture that once stored Hancock's ledgers and smuggled fort",
+     "domain": "chart-house.com",
+     "url": "https://emergingrevolutionarywar.org/2016/12/07/stepping-onto-long-wharf-and-into-history-the-day-the-british-came-to-boston/",
+     "exact_url": true,
+     "page_chars": 7999,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "However, Paolo Antonio Testore was not born until around 1690 to 1700, making it chronologically impossible for him to have built it in 1696.",
+     "domain": "academia.edu",
+     "url": "https://amorimfineviolins.com/mc-maker/paolo-antonio-testore/",
+     "exact_url": true,
+     "page_chars": 1904,
+     "supported": true
+    },
+    {
+     "tour": "chart_house",
+     "fact": "Water That Moved: Standing in What Was Once Open Harbor\n* **The Landscape Trick:** When guests enter the Chart House from modern State Street/Atlantic Avenue, t",
+     "domain": "emergingrevolutionarywar.org",
+     "url": "https://chickenthiefkitchens.wordpress.com/2017/11/07/chart-house-restaurant-on-long-wharf-where-history-lives-and-icons-are-repurposed/",
+     "exact_url": true,
+     "page_chars": 3849,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "Chewing gum and swearing like a sailor, she became a Boston celebrity whom diners specifically waited in line for just to be publicly humiliated while eating pr",
+     "domain": "newengland.com",
+     "url": "https://newengland.com/travel/massachusetts/durgin-park-boston/",
+     "exact_url": true,
+     "page_chars": 7997,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "* **Controversies and Tensions:**\n  * **Clergy Abuse Revelations (2002):** Parishioners at Our Lady Help of Christians were active voices and participants in me",
+     "domain": "pulitzer.org",
+     "url": "https://www.pulitzer.org/winners/boston-globe-1",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "*The Mystery:* His bike was recovered on the cliffs above.",
+     "domain": "road.cc",
+     "url": "https://road.cc/content/news/147318-mystery-over-death-british-cyclist-french-riviera",
+     "exact_url": true,
+     "page_chars": 290,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "Murphy designed an interior with an unusually airy groin-vaulted plaster ceiling and incorporated delicate, feminine, polychromatic decorative stenciling and pa",
+     "domain": "facebook.com",
+     "url": "https://johncanningco.com/blog/characteristics-of-gothic-churches-and-chapels/",
+     "exact_url": true,
+     "page_chars": 8000,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "Whispers and Secrets: The Migrant Shelter Rumor Mill (2024)\nIn early 2024, the parish grounds became the center of neighborhood drama and local conspiracy theor",
+     "domain": "universalhub.com",
+     "url": "https://www.universalhub.com/2024/newton-church-had-quietly-been-housing-30-migrant",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "To ensure the preserved instruments did not fall into neglect, Gautier's testament required Nice to pay 600 francs annually to a local luthier for their ongoing",
+     "domain": "wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Palais_Lascaris",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": true
+    },
+    {
+     "tour": "logan",
+     "fact": "* **Patron Demands and Intentions:** \n  * Early civic promoters (including Mayor Curley) demanded an economic hub ensuring Boston would not be bypassed by comme",
+     "domain": "newenglandaviationhistory.com",
+     "url": "https://newenglandaviationhistory.com/east-boston-airport-1922/",
+     "exact_url": true,
+     "page_chars": 3792,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "On **Sunday, December 8, 2002**, the nave became the setting of open defiance:\n* More than **850 parishioners packed the nave shoulder-to-shoulder**—more than d",
+     "domain": "boston.com",
+     "url": "https://graphics.boston.com/globe/spotlight/abuse/stories3/120902_ovation.htm",
+     "exact_url": true,
+     "page_chars": 4209,
+     "supported": true
+    },
+    {
+     "tour": "sycamore",
+     "fact": "* This reliance led to tight partnerships: long-time Sycamore co-chef **Lydia Reichert** worked alongside Punch for years before they co-founded **Jinny’s Pizze",
+     "domain": "jinnyspizza.com",
+     "url": "https://www.jinnyspizza.com/our-story",
+     "exact_url": true,
+     "page_chars": 1318,
+     "supported": true
+    }
+   ]
+  },
+  "serper": {
+   "engine": "serper",
+   "sampled": 50,
+   "unsupported": 22,
+   "unsupported_rate": 0.44,
+   "fetch_method": {
+    "exact_cited_url": 50,
+    "domain_homepage_proxy": 0
+   },
+   "method_note": "Serper facts carry the exact cited URL (strong check); Gemini recorded facts carry only domains, so the cited page is approximated by the domain homepage (weaker — a deep fact may not appear on the homepage, biasing Gemini unsupported upward). Compare engines with this caveat.",
+   "detail": [
+    {
+     "tour": "our_lady",
+     "fact": "The cost of construction is not detailed in the sources, nor is there specific information on what the patrons wanted in return [1][3].",
+     "domain": "facebook.com",
+     "url": "https://sholnewton.org/our-lady-help-of-christians-church",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "The museum showcases the musical legacy of the Lascaris family, emphasizing their contributions to the arts and culture of the region [2].",
+     "domain": "rivieraloisirs.com",
+     "url": "https://www.rivieraloisirs.com/en/activities/palais-lascaris/",
+     "exact_url": true,
+     "page_chars": 4877,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "It is noted for its Gothic Revival architecture, which is a significant characteristic of the buildings in this district [2].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "This bustling environment attracts around 18 million visitors each year, making it one of the most popular tourist attractions in the United States [4].",
+     "domain": "masshist.org",
+     "url": "https://www.masshist.org/beehiveblog/2025/01/behind-the-scenes-of-faneuil-hall-marketplace/",
+     "exact_url": true,
+     "page_chars": 3350,
+     "supported": true
+    },
+    {
+     "tour": "sail_loft",
+     "fact": "Overall, the Boston Sail Loft is not just a place to eat; it offers a cozy escape with delicious food and a welcoming atmosphere that leaves a lasting impressio",
+     "domain": "hgfoodandtravel.substack.com",
+     "url": "https://hgfoodandtravel.substack.com/p/boston-sail-loft-a-north-end-seafood",
+     "exact_url": true,
+     "page_chars": 4554,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "PART 1\n\nCONFIRMED Paolo Antonio Testore was a Milanese luthier who lived from 1700 to 1767 — source [5].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Paolo_Antonio_Testore",
+     "exact_url": true,
+     "page_chars": 1650,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "Unknown | The collection at the Palais Lascaris has been enriched by the city of Nice since the bequest of Antoine Gautier [1][4].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Palais_Lascaris",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "This weathervane was historically used during the War of 1812 to identify spies, as anyone unable to answer the question about what topped Faneuil Hall would be",
+     "domain": "thefreedomtrail.org",
+     "url": "https://www.thefreedomtrail.org/trail-sites/faneuil-hall",
+     "exact_url": true,
+     "page_chars": 2781,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "2013 | The Palais Lascaris received a collection of musical instruments on loan from the Institut de France [4].",
+     "domain": "grandsudinsolite.fr",
+     "url": "https://www.grandsudinsolite.fr/551--.html",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED He was one of the three finest instrument-makers from the Testore family — source [5].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Paolo_Antonio_Testore",
+     "exact_url": true,
+     "page_chars": 1650,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED François-Joseph Naderman perpetuated the family business and single-action pedal mechanism by becoming the first harp professor at the Paris Conservat",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Jean-Henri_Naderman",
+     "exact_url": true,
+     "page_chars": 3551,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED Jean-Henri Naderman was appointed the royal harp maker to Queen Marie-Antoinette in 1778 — [2][3].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Jean-Henri_Naderman",
+     "exact_url": true,
+     "page_chars": 3551,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED Acoustical studies of the instrument's narrow 10-millimeter bore have revealed that Schnitzer engineered these dimensions to slow internal sound wave ",
+     "domain": "kimballtrombone.com",
+     "url": "https://kimballtrombone.com/2016/07/27/trombone-renaissance-nuremberg/",
+     "exact_url": true,
+     "page_chars": 4199,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "It is part of the Our Lady Help of Christians Historic District, which includes several Gothic Revival buildings [3].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": true
+    },
+    {
+     "tour": "sail_loft",
+     "fact": "Another patron mentioned how they couldn't resist ordering multiple entrees to enjoy both in the restaurant and on their flight home, showcasing their love for ",
+     "domain": "andrewloves.com",
+     "url": "https://www.andrewloves.com/blog/sail-loft",
+     "exact_url": true,
+     "page_chars": 2872,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "It was built in 1742 and has served as a marketplace and meeting hall for over 270 years [2][3].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Faneuil_Hall",
+     "exact_url": true,
+     "page_chars": 8000,
+     "supported": true
+    },
+    {
+     "tour": "lascaris",
+     "fact": "This transformation reflects the broader cultural shifts in Nice, where aristocratic legacies have been repurposed for public education and enjoyment [4].",
+     "domain": "rivieraloisirs.com",
+     "url": "https://www.rivieraloisirs.com/en/activities/palais-lascaris/",
+     "exact_url": true,
+     "page_chars": 4877,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The church is part of the Our Lady Help of Christians Historic District, which includes several Gothic Revival buildings designed by architect James Murphy, bui",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": true
+    },
+    {
+     "tour": "sycamore",
+     "fact": "The menu at Little Big Diner includes a variety of ramen dishes and rice bowls, showcasing a mix of Japanese, Sichuan, and Thai flavors, all made with natural a",
+     "domain": "littlebigdiner.com",
+     "url": "https://www.littlebigdiner.com/",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED The City Council officially voted to accept Gautier's bequest in September 1904, eventually placing the instrument on permanent display inside Palais ",
+     "domain": "tarisio.com",
+     "url": "https://tarisio.com/cozio-archive/browse-the-archive/makers/maker/?Maker_ID=13996",
+     "exact_url": true,
+     "page_chars": 894,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "In terms of historical incidents, Faneuil Hall has hosted America's first Town Meeting and has been a stage for debates on crucial issues throughout its history",
+     "domain": "thefreedomtrail.org",
+     "url": "https://www.thefreedomtrail.org/trail-sites/faneuil-hall",
+     "exact_url": true,
+     "page_chars": 2781,
+     "supported": true
+    },
+    {
+     "tour": "la_maree",
+     "fact": "La Marée in Monaco is known for its exceptional seafood offerings and stunning views of Port Hercules and the Prince's Palace, making it a popular dining destin",
+     "domain": "access.sb",
+     "url": "https://www.access.sb/en/monaco/restaurants/dinner/la-maree/",
+     "exact_url": true,
+     "page_chars": 7997,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "## PATRONS  \nThe church was built with the support of Irish immigrants who were the primary patrons of the project, although specific names of donors are not pr",
+     "domain": "facebook.com",
+     "url": "https://www.facebook.com/groups/thelakenonantum/posts/10157533751176101/",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED The instrument originally resided in the collection of the Conservatoire National de Région de Nice before being transferred to the Palais Lascaris in",
+     "domain": "kimballtrombone.com",
+     "url": "https://kimballtrombone.com/2016/07/27/trombone-renaissance-nuremberg/",
+     "exact_url": true,
+     "page_chars": 4199,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED He worked out of the family's workshop under the \"Sign of the Eagle\" on Contrada Larga in Milan — source [5].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Paolo_Antonio_Testore",
+     "exact_url": true,
+     "page_chars": 1650,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "## CREATORS  \nThe church was designed by architect James Murphy, who is known for his work in ecclesiastical architecture [2].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": true
+    },
+    {
+     "tour": "sail_loft",
+     "fact": "They expressed their enthusiasm by stating they ordered multiple entrees to savor the experience [3].",
+     "domain": "andrewloves.com",
+     "url": "https://www.andrewloves.com/blog/sail-loft",
+     "exact_url": true,
+     "page_chars": 2872,
+     "supported": true
+    },
+    {
+     "tour": "sycamore",
+     "fact": "Sunday - Thursday 4:30pm - 9pm.\"}",
+     "domain": "littlebigdiner.com",
+     "url": "https://www.littlebigdiner.com/",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "— source [1]  \nCONFIRMED The instrument eventually served as the catalyst in 2013 for a multi-year research project and exhibition dedicated to historical violi",
+     "domain": "tarisio.com",
+     "url": "https://tarisio.com/cozio-archive/browse-the-archive/makers/maker/?Maker_ID=742",
+     "exact_url": true,
+     "page_chars": 2174,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED Before being permanently exhibited at Palais Lascaris in 2001, the sackbut was moved through several municipal repositories, including the Musée des B",
+     "domain": "kimballtrombone.com",
+     "url": "https://kimballtrombone.com/2016/07/27/trombone-renaissance-nuremberg/",
+     "exact_url": true,
+     "page_chars": 4199,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "This resistance led to a major preservation effort initiated by the Boston Redevelopment Authority in 1966, which ultimately saved the market and revitalized th",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Quincy_Market",
+     "exact_url": true,
+     "page_chars": 8001,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "Today, Quincy Market is known for its vibrant atmosphere, hosting over 25 local eateries and a variety of vendors, making it a popular destination for both loca",
+     "domain": "faneuilhallmarketplace.com",
+     "url": "https://faneuilhallmarketplace.com/",
+     "exact_url": true,
+     "page_chars": 1538,
+     "supported": true
+    },
+    {
+     "tour": "sycamore",
+     "fact": "One standout cocktail, the \"Scosmopolitan,\" features house-made blood-orange vodka and Aperol, which has received positive feedback from patrons [2].",
+     "domain": "bostonmagazine.com",
+     "url": "https://www.bostonmagazine.com/reviews/2013/05/28/review-sycamore-newton-centre/",
+     "exact_url": true,
+     "page_chars": 4594,
+     "supported": true
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "This path offers stunning views of the Mediterranean and features a mix of beautiful flora and historical sites, including an ancient millstone quarry [2][3].",
+     "domain": "explorenicecotedazur.com",
+     "url": "https://steveandcaroleinvence.com/cap-dail/?srsltid=AU7gw4XeJPLvaBVQ_r5HbUZdKLvQubZETlH24BFTqtKRp7VTJOX3cV4B",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "logan",
+     "fact": "Before the airport, the site was known as Jeffries Point, which was primarily a military installation before transitioning to commercial services in the late 19",
+     "domain": "airwaysmag.com",
+     "url": "https://airwaysmag.com/new-post/boston-logan-airport",
+     "exact_url": true,
+     "page_chars": 7243,
+     "supported": true
+    },
+    {
+     "tour": "sycamore",
+     "fact": "1247 Centre Street ...",
+     "domain": "littlebigdiner.com",
+     "url": "https://www.littlebigdiner.com/",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The church, along with its associated buildings, is noted for its Gothic Revival architecture and has been recognized as a historic district since it was added ",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": true
+    },
+    {
+     "tour": "sycamore",
+     "fact": "Overall, Sycamore has maintained a reputation for attentive service and a strong team ethos, ensuring a pleasant dining experience for its guests [3].",
+     "domain": "hungryonion.org",
+     "url": "https://www.hungryonion.org/t/sycamore-still-kickin-massachusetts-newton-centre/4386",
+     "exact_url": true,
+     "page_chars": 877,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "While specific juicy stories or incidents are not detailed in the sources, the church has served as a vital community hub, reflecting the struggles and resilien",
+     "domain": "facebook.com",
+     "url": "https://sholnewton.org/our-lady-help-of-christians-church",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "faneuil",
+     "fact": "The building itself has undergone several renovations, including significant restorations in the 19th and 20th centuries, ensuring its continued use as a vibran",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Faneuil_Hall",
+     "exact_url": true,
+     "page_chars": 8000,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The church continues to serve the needs of its parishioners and hosts various services [2][4].",
+     "domain": "discovermass.com",
+     "url": "https://discovermass.com/church/our-lady-help-of-christians-newton-ma/",
+     "exact_url": true,
+     "page_chars": 4343,
+     "supported": false
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "Visitors often report various experiences while cycling the Col and the surrounding plateaus, with some events being notable enough to be documented in books [1",
+     "domain": "steveandcaroleinvence.com",
+     "url": "https://steveandcaroleinvence.com/cycling-the-col-de-vence-at-sunrise/?srsltid=AU7gw4XqK8OHfIk44_RIoYsKO2e67fVp30_pQqkwiQPqbqsbtHc_092e",
+     "exact_url": true,
+     "page_chars": 0,
+     "supported": false
+    },
+    {
+     "tour": "chart_house",
+     "fact": "The restaurant is known for its stunning views of the Boston Harbor and offers a menu that features a variety of seafood options, including signature dishes lik",
+     "domain": "eatingmeals.com",
+     "url": "https://eatingmeals.com/how-old-is-the-chart-house-in-boston/",
+     "exact_url": true,
+     "page_chars": 8002,
+     "supported": false
+    },
+    {
+     "tour": "lascaris",
+     "fact": "CONFIRMED It entered the municipal collection in Nice through a bequest by the local amateur collector Antoine Gautier (1825–1904) — source [4].",
+     "domain": "kimballtrombone.com",
+     "url": "https://kimballtrombone.com/2016/07/27/trombone-renaissance-nuremberg/",
+     "exact_url": true,
+     "page_chars": 4199,
+     "supported": false
+    },
+    {
+     "tour": "logan",
+     "fact": "Before the airport, the site was known as Jeffries Point and was primarily a military installation [2][3].",
+     "domain": "airwaysmag.com",
+     "url": "https://airwaysmag.com/new-post/boston-logan-airport",
+     "exact_url": true,
+     "page_chars": 7243,
+     "supported": true
+    },
+    {
+     "tour": "our_lady",
+     "fact": "The church itself is part of a historic district that includes several Gothic Revival buildings, designed by architect James Murphy, and was added to the Nation",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts)",
+     "exact_url": true,
+     "page_chars": 7991,
+     "supported": true
+    },
+    {
+     "tour": "buttermilk",
+     "fact": "If you are looking for general information about the restaurant, it is known for bringing a taste of New Orleans to Boston and offers a variety of Southern cuis",
+     "domain": "buttermilkbourbon.com",
+     "url": "https://www.buttermilkbourbon.com/",
+     "exact_url": true,
+     "page_chars": 877,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "This effort transformed Quincy Market into a modern attraction while preserving its historic character [1][2].",
+     "domain": "en.wikipedia.org",
+     "url": "https://en.wikipedia.org/wiki/Quincy_Market",
+     "exact_url": true,
+     "page_chars": 8001,
+     "supported": false
+    },
+    {
+     "tour": "riviera_bike",
+     "fact": "While the path is generally easy to navigate, it is advised not to use it during rough sea conditions, as safety can be a concern [5].",
+     "domain": "french-riviera-blog.com",
+     "url": "https://french-riviera-blog.com/2011/10/05/cap-dail-and-the-mala-beach-coastal-path/",
+     "exact_url": true,
+     "page_chars": 5250,
+     "supported": true
+    },
+    {
+     "tour": "faneuil",
+     "fact": "It was here that America's first Town Meeting took place, and it became a vital venue for revolutionary politics, hosting protests against the Sugar Act and Sta",
+     "domain": "thefreedomtrail.org",
+     "url": "https://www.thefreedomtrail.org/trail-sites/faneuil-hall",
+     "exact_url": true,
+     "page_chars": 2781,
+     "supported": true
+    }
+   ]
+  }
+ },
+ "discovery": {
+  "gemini": {
+   "total_facts": 1431,
+   "distinct_domains": 220,
+   "wikipedia_only_facts": 39,
+   "wikipedia_only_share": 0.0273,
+   "discovery_tier_facts": 854,
+   "discovery_tier_share": 0.5968,
+   "confirmed_discoveries": 600,
+   "confirmed_discovery_share_of_discovery": 0.7026
+  },
+  "serper": {
+   "total_facts": 345,
+   "distinct_domains": 88,
+   "wikipedia_only_facts": 34,
+   "wikipedia_only_share": 0.0986,
+   "discovery_tier_facts": 251,
+   "discovery_tier_share": 0.7275,
+   "confirmed_discoveries": 155,
+   "confirmed_discovery_share_of_discovery": 0.6175
+  },
+  "per_tour_gemini": {
+   "sail_loft": {
+    "total_facts": 43,
+    "distinct_domains": [
+     "andrewloves.com",
+     "cbsnews.com",
+     "facebook.com",
+     "foodrepublic.com",
+     "myguideboston.com",
+     "northendregionalreview.com",
+     "northendwaterfront.com",
+     "reddit.com",
+     "substack.com",
+     "thebostonsailloft.com",
+     "thetakeout.com",
+     "usfoods.com",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 13,
+    "facts_backed_by_a_support_span": 19,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 36,
+    "discovery_tier_share": 0.8372
+   },
+   "buttermilk": {
+    "total_facts": 44,
+    "distinct_domains": [
+     "alamy.com",
+     "barandrestaurantexpo.com",
+     "barkanco.com",
+     "boston-discovery-guide.com",
+     "boston25news.com",
+     "caughtinsouthie.com",
+     "facebook.com",
+     "goodreads.com",
+     "homes.com",
+     "nabbonline.org",
+     "quora.com",
+     "thecharlesrealty.com",
+     "usfoods.com",
+     "wgbh.org",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 15,
+    "facts_backed_by_a_support_span": 26,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 40,
+    "discovery_tier_share": 0.9091
+   },
+   "chart_house": {
+    "total_facts": 53,
+    "distinct_domains": [
+     "aknextphase.com",
+     "bostonguide.com",
+     "celebrateboston.com",
+     "chart-house.com",
+     "emergingrevolutionarywar.org",
+     "mit.edu",
+     "nps.gov",
+     "oldnorth.com",
+     "umb.edu",
+     "waterboatmarina.com",
+     "wikimedia.org",
+     "wikipedia.org",
+     "wordpress.com",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 14,
+    "facts_backed_by_a_support_span": 38,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 29,
+    "discovery_tier_share": 0.5472
+   },
+   "sycamore": {
+    "total_facts": 93,
+    "distinct_domains": [
+     "bcheights.com",
+     "blogspot.com",
+     "bostonchefs.com",
+     "dailybostonjournal.com",
+     "edibleboston.com",
+     "facebook.com",
+     "jinnyspizza.com",
+     "maxfieldre.com",
+     "newtonma.gov",
+     "phantomgourmet.com",
+     "reddit.com",
+     "sycamorenewton.com",
+     "thefoodlens.com",
+     "tinyurbankitchen.com",
+     "tuftsdaily.com",
+     "valeriewastcoat.com",
+     "wanderlog.com",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 18,
+    "facts_backed_by_a_support_span": 64,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 73,
+    "discovery_tier_share": 0.7849
+   },
+   "la_maree": {
+    "total_facts": 40,
+    "distinct_domains": [
+     "cotemagazine.com",
+     "expedia.com",
+     "hotels.com",
+     "issuu.com",
+     "lobservateurdemonaco.com",
+     "minube.net",
+     "monaco-tribune.com",
+     "monacolife.net",
+     "monacoviews.com",
+     "news.mc",
+     "portpalace.com",
+     "russian-tour.com",
+     "seemonaco.com",
+     "yachtcharterfleet.com"
+    ],
+    "distinct_domain_count": 14,
+    "facts_backed_by_a_support_span": 37,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 37,
+    "discovery_tier_share": 0.925
+   },
+   "logan": {
+    "total_facts": 80,
+    "distinct_domains": [
+     "airport-technology.com",
+     "airwaysmag.com",
+     "arch2o.com",
+     "architecturelab.net",
+     "archive.org",
+     "britannica.com",
+     "britishaviationgroup.co.uk",
+     "caughtinsouthie.com",
+     "centerforhealthjournalism.org",
+     "commonwealthbeacon.org",
+     "facebook.com",
+     "facilitiesnet.com",
+     "fandom.com",
+     "flashbak.com",
+     "friendsofbelleislemarsh.com",
+     "hiddensacredspaces.org",
+     "hok.com",
+     "iacac.aero",
+     "kiddle.co",
+     "leventhalmap.org",
+     "massport.com",
+     "metalocus.es",
+     "ncronline.org",
+     "newenglandaviationhistory.com",
+     "nps.gov",
+     "nucorskyline.com",
+     "religionnews.com",
+     "simpleflying.com",
+     "skanska.com",
+     "stuckattheairport.com",
+     "thebostonpilot.com",
+     "tpl.org",
+     "usf.edu",
+     "wgbh.org",
+     "wikipedia.org",
+     "wordandway.org"
+    ],
+    "distinct_domain_count": 36,
+    "facts_backed_by_a_support_span": 50,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 47,
+    "discovery_tier_share": 0.5875
+   },
+   "our_lady": {
+    "total_facts": 254,
+    "distinct_domains": [
+     "alamy.com",
+     "americanancestors.org",
+     "bishop-accountability.org",
+     "blogspot.com",
+     "boston.com",
+     "boston25news.com",
+     "buildingsofnewengland.com",
+     "canningliturgicalarts.com",
+     "cbsnews.com",
+     "cedarnetwork.org",
+     "facebook.com",
+     "harvard.edu",
+     "ingvildbrown.com",
+     "irishstar.com",
+     "johncanningco.com",
+     "latimes.com",
+     "maryimmaculateoflourdesnewtonma.org",
+     "middlesexda.com",
+     "mit.edu",
+     "ncronline.org",
+     "newscentermaine.com",
+     "newtonma.gov",
+     "newwaysministry.org",
+     "patch.com",
+     "pulitzer.org",
+     "reddit.com",
+     "sholnewton.org",
+     "the-independent.com",
+     "thebostonpilot.com",
+     "universalhub.com",
+     "watertowncatholic.com",
+     "wcnc.com",
+     "wellesleyma.gov",
+     "wikipedia.org"
+    ],
+    "distinct_domain_count": 34,
+    "facts_backed_by_a_support_span": 209,
+    "wikipedia_only_facts": 10,
+    "wikipedia_only_share": 0.0394,
+    "discovery_tier_facts": 183,
+    "discovery_tier_share": 0.7205
+   },
+   "lascaris": {
+    "total_facts": 359,
+    "distinct_domains": [
+     "academia.edu",
+     "academicbassportal.com",
+     "alchetron.com",
+     "amati.com",
+     "amorimfineviolins.com",
+     "baroqueflute.com",
+     "concerto-verlag.de",
+     "departement06.fr",
+     "facebook.com",
+     "free.fr",
+     "grandsudinsolite.fr",
+     "harpcolumn.com",
+     "historicbrass.org",
+     "ibew.org.uk",
+     "jansantiques.com",
+     "liverpoolmuseums.org.uk",
+     "maestronet.com",
+     "mapy.com",
+     "marcilhacexpert.com",
+     "mogensandresen.dk",
+     "nice-premium.com",
+     "nice.fr",
+     "nicepremium.fr",
+     "oxfordmusiconline.com",
+     "researchgate.net",
+     "scribd.com",
+     "steveandcaroleinvence.com",
+     "tarisio.com",
+     "thestrad.com",
+     "weebly.com",
+     "wikipedia.org",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 32,
+    "facts_backed_by_a_support_span": 143,
+    "wikipedia_only_facts": 25,
+    "wikipedia_only_share": 0.0696,
+    "discovery_tier_facts": 86,
+    "discovery_tier_share": 0.2396
+   },
+   "riviera_bike": {
+    "total_facts": 223,
+    "distinct_domains": [
+     "alamy.com",
+     "arcgis.com",
+     "autoevolution.com",
+     "burgessyachts.com",
+     "cap-dail.fr",
+     "casapilot.com",
+     "city-life.fr",
+     "cyclingcotedazur.eu",
+     "cyclingnews.com",
+     "dangerousroads.org",
+     "dokumen.pub",
+     "epicroadrides.com",
+     "escapecollective.com",
+     "facebook.com",
+     "frenchriviera.travel",
+     "golfe-saint-tropez-information.com",
+     "hellomagazine.com",
+     "hellomonaco.com",
+     "hotelsezz.com",
+     "iconicriviera.com",
+     "inrng.com",
+     "listentotheearth.net",
+     "livingonthecotedazur.com",
+     "lomography.com",
+     "medium.com",
+     "mobilhome-saint-tropez.com",
+     "monaco-tribune.com",
+     "news.mc",
+     "ok.co.uk",
+     "outsideonline.com",
+     "pezcyclingnews.com",
+     "provence-alpes-cotedazur.com",
+     "provenceweb.fr",
+     "reddit.com",
+     "road.cc",
+     "rotavicentina.com",
+     "saintjeancapferrat-tourisme.fr",
+     "sainttropeztourisme.com",
+     "savills.com",
+     "savills.fr",
+     "secretsdhistoire.tv",
+     "seektravelride.com",
+     "seemonaco.com",
+     "seesainttropez.com",
+     "steveandcaroleinvence.com",
+     "stickybottle.com",
+     "substack.com",
+     "thepariseffect.net",
+     "vicesreserve.com",
+     "visitvar.com",
+     "vortexhunters.com",
+     "wanderlog.com",
+     "warfarehistorynetwork.com",
+     "wikipedia.org",
+     "wordpress.com",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 56,
+    "facts_backed_by_a_support_span": 105,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 215,
+    "discovery_tier_share": 0.9641
+   },
+   "faneuil": {
+    "total_facts": 242,
+    "distinct_domains": [
+     "247wallst.com",
+     "archive.org",
+     "blogspot.com",
+     "bostonteapartyship.com",
+     "broadboutique.com",
+     "cbsnews.com",
+     "celebrateboston.com",
+     "cryan.com",
+     "facebook.com",
+     "faneuilhallmarketplace.com",
+     "ghostcitytours.com",
+     "historicaldigression.com",
+     "hubhistory.com",
+     "illinoisgenweb.org",
+     "kiddle.co",
+     "masshist.org",
+     "miltonobserver.com",
+     "nationalabolitionhalloffameandmuseum.org",
+     "nepm.org",
+     "newengland.com",
+     "nightlyspirits.com",
+     "nps.gov",
+     "oldnorth.com",
+     "pbworks.com",
+     "pubcrawls.com",
+     "quincy-market.com",
+     "revolutionaryspaces.org",
+     "robertshuresculptor.com",
+     "sec.state.ma.us",
+     "thefreedomtrail.org",
+     "theguardian.com",
+     "trolleytours.com",
+     "washingtonpost.com",
+     "westlaw.com",
+     "wikipedia.org",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 36,
+    "facts_backed_by_a_support_span": 128,
+    "wikipedia_only_facts": 4,
+    "wikipedia_only_share": 0.0165,
+    "discovery_tier_facts": 108,
+    "discovery_tier_share": 0.4463
+   }
+  },
+  "per_tour_serper": {
+   "sail_loft": {
+    "total_facts": 15,
+    "distinct_domains": [
+     "andrewloves.com",
+     "facebook.com",
+     "hgfoodandtravel.substack.com",
+     "instagram.com",
+     "mapquest.com",
+     "opentable.com",
+     "restaurantji.com",
+     "thebostonsailloft.com",
+     "tripadvisor.com",
+     "usfoods.com",
+     "yelp.com"
+    ],
+    "distinct_domain_count": 11,
+    "facts_backed_by_a_support_span": 15,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 15,
+    "discovery_tier_share": 1.0
+   },
+   "buttermilk": {
+    "total_facts": 7,
+    "distinct_domains": [
+     "boston.eater.com",
+     "bostonchefs.com",
+     "buttermilkbourbon.com",
+     "instagram.com",
+     "opentable.com",
+     "reddit.com",
+     "yelp.com",
+     "youtube.com"
+    ],
+    "distinct_domain_count": 8,
+    "facts_backed_by_a_support_span": 7,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 6,
+    "discovery_tier_share": 0.8571
+   },
+   "chart_house": {
+    "total_facts": 13,
+    "distinct_domains": [
+     "chart-house.com",
+     "chickenthiefkitchens.wordpress.com",
+     "eatingmeals.com",
+     "eventective.com",
+     "opentable.com",
+     "thebostonobserver.com",
+     "touristsbook.com",
+     "tripadvisor.com",
+     "yelp.com"
+    ],
+    "distinct_domain_count": 9,
+    "facts_backed_by_a_support_span": 13,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 13,
+    "discovery_tier_share": 1.0
+   },
+   "sycamore": {
+    "total_facts": 32,
+    "distinct_domains": [
+     "bostonmagazine.com",
+     "facebook.com",
+     "hungryonion.org",
+     "littlebigdiner.com",
+     "opentable.com",
+     "phantomgourmet.com",
+     "reddit.com",
+     "sycamorenewton.com",
+     "tripadvisor.com",
+     "yelp.com"
+    ],
+    "distinct_domain_count": 10,
+    "facts_backed_by_a_support_span": 31,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 21,
+    "discovery_tier_share": 0.6562
+   },
+   "la_maree": {
+    "total_facts": 12,
+    "distinct_domains": [
+     "access.sb",
+     "cotemagazine.com",
+     "facebook.com",
+     "instagram.com",
+     "yachtcharterfleet.com"
+    ],
+    "distinct_domain_count": 5,
+    "facts_backed_by_a_support_span": 12,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 12,
+    "discovery_tier_share": 1.0
+   },
+   "logan": {
+    "total_facts": 22,
+    "distinct_domains": [
+     "airwaysmag.com",
+     "boston-bos.airports-guides.com",
+     "en.wikipedia.org",
+     "globalairportparking.com",
+     "luxyride.com",
+     "massport.com",
+     "meetboston.com",
+     "simpleflying.com"
+    ],
+    "distinct_domain_count": 8,
+    "facts_backed_by_a_support_span": 20,
+    "wikipedia_only_facts": 2,
+    "wikipedia_only_share": 0.0909,
+    "discovery_tier_facts": 8,
+    "discovery_tier_share": 0.3636
+   },
+   "our_lady": {
+    "total_facts": 49,
+    "distinct_domains": [
+     "abcnews.com",
+     "cbsnews.com",
+     "dbnews.americanancestors.org",
+     "discovermass.com",
+     "elkheritage.com",
+     "en.wikipedia.org",
+     "facebook.com",
+     "fox10tv.com",
+     "instagram.com",
+     "nbcnews.com",
+     "sholnewton.org",
+     "southbaltcatholic.org",
+     "thebostonpilot.com",
+     "walb.com",
+     "www-cdn.abcnews.com",
+     "yelp.com"
+    ],
+    "distinct_domain_count": 16,
+    "facts_backed_by_a_support_span": 47,
+    "wikipedia_only_facts": 15,
+    "wikipedia_only_share": 0.3061,
+    "discovery_tier_facts": 29,
+    "discovery_tier_share": 0.5918
+   },
+   "lascaris": {
+    "total_facts": 125,
+    "distinct_domains": [
+     "academia.edu",
+     "amorimfineviolins.com",
+     "eggerinstruments.ch",
+     "en.wikipedia.org",
+     "encyclopedia.com",
+     "explorenicecotedazur.com",
+     "facebook.com",
+     "frenchrivierapass.com",
+     "grandsudinsolite.fr",
+     "harpcolumn.com",
+     "historicbrass.org",
+     "jansantiques.com",
+     "kimballtrombone.com",
+     "metmuseum.org",
+     "orpheon-web.festesdethalie.org",
+     "researchgate.net",
+     "rivieraloisirs.com",
+     "steveandcaroleinvence.com",
+     "tarisio.com",
+     "uvm18thcenturyart.weebly.com",
+     "vdgsa.org"
+    ],
+    "distinct_domain_count": 21,
+    "facts_backed_by_a_support_span": 125,
+    "wikipedia_only_facts": 15,
+    "wikipedia_only_share": 0.12,
+    "discovery_tier_facts": 91,
+    "discovery_tier_share": 0.728
+   },
+   "riviera_bike": {
+    "total_facts": 24,
+    "distinct_domains": [
+     "explorenicecotedazur.com",
+     "flojohntravels.com",
+     "french-riviera-blog.com",
+     "getyourguide.com",
+     "instagram.com",
+     "lovevelo.co.uk",
+     "news.mc",
+     "nicecycletours.com",
+     "saint-tropez.fr",
+     "sainttropeztourisme.com",
+     "seemonaco.com",
+     "steveandcaroleinvence.com",
+     "thetimes.com",
+     "tripadvisor.com",
+     "ultimatefrance.com"
+    ],
+    "distinct_domain_count": 15,
+    "facts_backed_by_a_support_span": 24,
+    "wikipedia_only_facts": 0,
+    "wikipedia_only_share": 0.0,
+    "discovery_tier_facts": 24,
+    "discovery_tier_share": 1.0
+   },
+   "faneuil": {
+    "total_facts": 46,
+    "distinct_domains": [
+     "diamondtours.com",
+     "en.wikipedia.org",
+     "facebook.com",
+     "faneuilhallmarketplace.com",
+     "masshist.org",
+     "nationalabolitionhalloffameandmuseum.org",
+     "nps.gov",
+     "thefreedomtrail.org",
+     "traffickinginstitute.org",
+     "tripadvisor.com",
+     "trolleytours.com"
+    ],
+    "distinct_domain_count": 11,
+    "facts_backed_by_a_support_span": 46,
+    "wikipedia_only_facts": 2,
+    "wikipedia_only_share": 0.0435,
+    "discovery_tier_facts": 32,
+    "discovery_tier_share": 0.6957
+   }
+  },
+  "note": "Identical generic tier classifier for both engines. Official venue sites (e.g. thebostonsailloft.com, sycamorenewton.com) are classed discovery by the generic rule since officiality cannot be inferred per-domain; this inflates discovery_share symmetrically for both engines."
+ },
+ "cost_latency": {
+  "per_tour": {
+   "sail_loft": {
+    "serper": {
+     "questions": 6,
+     "llm_usd": 0.00217,
+     "search_usd": 0.018,
+     "total_usd": 0.02017,
+     "avg_latency_s": 13.77
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.21,
+     "llm_usd_whole_tour": 0.111,
+     "wall_s_whole_tour": 275.2
+    }
+   },
+   "buttermilk": {
+    "serper": {
+     "questions": 5,
+     "llm_usd": 0.00154,
+     "search_usd": 0.015,
+     "total_usd": 0.01654,
+     "avg_latency_s": 13.93
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.175,
+     "llm_usd_whole_tour": 0.1206,
+     "wall_s_whole_tour": 231.0
+    }
+   },
+   "chart_house": {
+    "serper": {
+     "questions": 4,
+     "llm_usd": 0.00175,
+     "search_usd": 0.012,
+     "total_usd": 0.01375,
+     "avg_latency_s": 18.17
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.14,
+     "llm_usd_whole_tour": 0.1181,
+     "wall_s_whole_tour": 298.2
+    }
+   },
+   "sycamore": {
+    "serper": {
+     "questions": 15,
+     "llm_usd": 0.00508,
+     "search_usd": 0.045,
+     "total_usd": 0.05008,
+     "avg_latency_s": 11.53
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.525,
+     "llm_usd_whole_tour": 0.2247,
+     "wall_s_whole_tour": 405.5
+    }
+   },
+   "la_maree": {
+    "serper": {
+     "questions": 4,
+     "llm_usd": 0.00151,
+     "search_usd": 0.012,
+     "total_usd": 0.01351,
+     "avg_latency_s": 8.97
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.14,
+     "llm_usd_whole_tour": 0.1213,
+     "wall_s_whole_tour": 211.5
+    }
+   },
+   "logan": {
+    "serper": {
+     "questions": 8,
+     "llm_usd": 0.0056,
+     "search_usd": 0.024,
+     "total_usd": 0.0296,
+     "avg_latency_s": 11.59
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.28,
+     "llm_usd_whole_tour": 0.498,
+     "wall_s_whole_tour": 407.8
+    }
+   },
+   "our_lady": {
+    "serper": {
+     "questions": 19,
+     "llm_usd": 0.00886,
+     "search_usd": 0.057,
+     "total_usd": 0.06586,
+     "avg_latency_s": 13.01
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.665,
+     "llm_usd_whole_tour": 0.3759,
+     "wall_s_whole_tour": 537.1
+    }
+   },
+   "lascaris": {
+    "serper": {
+     "questions": 79,
+     "llm_usd": 0.04474,
+     "search_usd": 0.237,
+     "total_usd": 0.28174,
+     "avg_latency_s": 14.22
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 2.765,
+     "llm_usd_whole_tour": 1.7802,
+     "wall_s_whole_tour": 1231.8
+    }
+   },
+   "riviera_bike": {
+    "serper": {
+     "questions": 8,
+     "llm_usd": 0.00255,
+     "search_usd": 0.024,
+     "total_usd": 0.02655,
+     "avg_latency_s": 11.14
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.28,
+     "llm_usd_whole_tour": 0.3917,
+     "wall_s_whole_tour": 702.9
+    }
+   },
+   "faneuil": {
+    "serper": {
+     "questions": 9,
+     "llm_usd": 0.00437,
+     "search_usd": 0.027,
+     "total_usd": 0.03137,
+     "avg_latency_s": 10.39
+    },
+    "gemini_baseline": {
+     "grounding_usd_research": 0.315,
+     "llm_usd_whole_tour": 0.3844,
+     "wall_s_whole_tour": 734.2
+    }
+   }
+  },
+  "overall": {
+   "serper": {
+    "questions": 157,
+    "llm_usd": 0.0782,
+    "search_usd": 0.471,
+    "total_usd": 0.5492,
+    "avg_latency_s": 13.25
+   },
+   "gemini_baseline": {
+    "grounded_requests": 157,
+    "grounding_usd_research": 5.495,
+    "llm_usd_whole_tour": 4.1259,
+    "total_usd_whole_tour": 9.6209
+   }
+  }
+ },
+ "noise_floor_563B": {
+  "story_defect_count": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 0,
+    "sycamore": 1,
+    "la_maree": 0,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 2,
+    "riviera_bike": 2,
+    "faneuil": 1
+   },
+   "mean": 0.6,
+   "max": 2,
+   "max_tour": "lascaris"
+  },
+  "named_people": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 0,
+    "sycamore": 2,
+    "la_maree": 3,
+    "logan": 2,
+    "our_lady": 2,
+    "lascaris": 0,
+    "riviera_bike": 4,
+    "faneuil": 1
+   },
+   "mean": 1.4,
+   "max": 4,
+   "max_tour": "riviera_bike"
+  },
+  "stops_delivered": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 0,
+    "sycamore": 0,
+    "la_maree": 0,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 1,
+    "riviera_bike": 1,
+    "faneuil": 1
+   },
+   "mean": 0.3,
+   "max": 1,
+   "max_tour": "lascaris"
+  },
+  "gate_deleted_total": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 2,
+    "chart_house": 0,
+    "sycamore": 1,
+    "la_maree": 3,
+    "logan": 6,
+    "our_lady": 8,
+    "lascaris": 2,
+    "riviera_bike": 4,
+    "faneuil": 2
+   },
+   "mean": 2.8,
+   "max": 8,
+   "max_tour": "our_lady"
+  },
+  "gate_235": {
+   "per_tour_abs_delta": {
+    "sail_loft": 1,
+    "buttermilk": 1,
+    "chart_house": 2,
+    "sycamore": 2,
+    "la_maree": 2,
+    "logan": 1,
+    "our_lady": 0,
+    "lascaris": 1,
+    "riviera_bike": 1,
+    "faneuil": 1
+   },
+   "mean": 1.2,
+   "max": 2,
+   "max_tour": "chart_house"
+  },
+  "gate_229": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 1,
+    "sycamore": 0,
+    "la_maree": 1,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 1,
+    "riviera_bike": 0,
+    "faneuil": 2
+   },
+   "mean": 0.5,
+   "max": 2,
+   "max_tour": "faneuil"
+  },
+  "gate_472": {
+   "per_tour_abs_delta": {
+    "sail_loft": 1,
+    "buttermilk": 1,
+    "chart_house": 1,
+    "sycamore": 3,
+    "la_maree": 2,
+    "logan": 5,
+    "our_lady": 8,
+    "lascaris": 2,
+    "riviera_bike": 5,
+    "faneuil": 5
+   },
+   "mean": 3.3,
+   "max": 8,
+   "max_tour": "our_lady"
+  },
+  "rp_hours_count": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 0,
+    "sycamore": 0,
+    "la_maree": 1,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 0,
+    "riviera_bike": 0,
+    "faneuil": 0
+   },
+   "mean": 0.1,
+   "max": 1,
+   "max_tour": "la_maree"
+  },
+  "rp_reservation_count": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 0,
+    "sycamore": 0,
+    "la_maree": 0,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 0,
+    "riviera_bike": 0,
+    "faneuil": 0
+   },
+   "mean": 0.0,
+   "max": 0,
+   "max_tour": "sail_loft"
+  },
+  "rp_price_band_count": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 0,
+    "chart_house": 0,
+    "sycamore": 0,
+    "la_maree": 0,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 0,
+    "riviera_bike": 0,
+    "faneuil": 0
+   },
+   "mean": 0.0,
+   "max": 0,
+   "max_tour": "sail_loft"
+  },
+  "rp_closed_verdict": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 1,
+    "chart_house": 0,
+    "sycamore": 1,
+    "la_maree": 0,
+    "logan": 0,
+    "our_lady": 0,
+    "lascaris": 0,
+    "riviera_bike": 0,
+    "faneuil": 0
+   },
+   "mean": 0.2,
+   "max": 1,
+   "max_tour": "buttermilk"
+  },
+  "grounded_requests": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 1,
+    "chart_house": 0,
+    "sycamore": 1,
+    "la_maree": 0,
+    "logan": 0,
+    "our_lady": 1,
+    "lascaris": 1,
+    "riviera_bike": 0,
+    "faneuil": 1
+   },
+   "mean": 0.5,
+   "max": 1,
+   "max_tour": "buttermilk"
+  },
+  "cost_llm": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0.0034590000000000037,
+    "buttermilk": 0.0002479999999999982,
+    "chart_house": 1.000000000001e-06,
+    "sycamore": 0.006815000000000002,
+    "la_maree": 0.002941000000000006,
+    "logan": 0.07372599999999999,
+    "our_lady": 0.015534999999999993,
+    "lascaris": 0.12036599999999997,
+    "riviera_bike": 0.012982999999999995,
+    "faneuil": 0.022038000000000002
+   },
+   "mean": 0.0258,
+   "max": 0.12036599999999997,
+   "max_tour": "lascaris"
+  },
+  "cost_grounding": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0.0,
+    "buttermilk": 0.03499999999999999,
+    "chart_house": 0.0,
+    "sycamore": 0.03500000000000003,
+    "la_maree": 0.0,
+    "logan": 0.0,
+    "our_lady": 0.034999999999999976,
+    "lascaris": 0.03499999999999992,
+    "riviera_bike": 0.0,
+    "faneuil": 0.034999999999999976
+   },
+   "mean": 0.0175,
+   "max": 0.03500000000000003,
+   "max_tour": "sycamore"
+  },
+  "wall_s": {
+   "per_tour_abs_delta": {
+    "sail_loft": 23.19999999999999,
+    "buttermilk": 23.0,
+    "chart_house": 27.80000000000001,
+    "sycamore": 26.69999999999999,
+    "la_maree": 6.699999999999989,
+    "logan": 19.400000000000006,
+    "our_lady": 84.29999999999998,
+    "lascaris": 2.6000000000000227,
+    "riviera_bike": 46.69999999999999,
+    "faneuil": 11.0
+   },
+   "mean": 27.14,
+   "max": 84.29999999999998,
+   "max_tour": "our_lady"
+  },
+  "chars": {
+   "per_tour_abs_delta": {
+    "sail_loft": 149,
+    "buttermilk": 504,
+    "chart_house": 10,
+    "sycamore": 386,
+    "la_maree": 464,
+    "logan": 395,
+    "our_lady": 326,
+    "lascaris": 1797,
+    "riviera_bike": 1023,
+    "faneuil": 2395
+   },
+   "mean": 744.9,
+   "max": 2395,
+   "max_tour": "faneuil"
+  },
+  "dates": {
+   "per_tour_abs_delta": {
+    "sail_loft": 0,
+    "buttermilk": 1,
+    "chart_house": 1,
+    "sycamore": 0,
+    "la_maree": 3,
+    "logan": 3,
+    "our_lady": 3,
+    "lascaris": 9,
+    "riviera_bike": 2,
+    "faneuil": 1
+   },
+   "mean": 2.3,
+   "max": 9,
+   "max_tour": "lascaris"
+  }
+ },
+ "scoring_openai_cost_usd": 1.2761
+}
