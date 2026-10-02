@@ -1,0 +1,5 @@
+[2026-10-02T17:47:53] SESSION START; cumulative=0 ($0.00); queue=['sail_loft']
+[2026-10-02T17:47:53] PAIR START 'sail_loft'; cumulative_before=0 ($0.00)
+[2026-10-02T17:48:04] PAIR DONE 'sail_loft' wall=12s run1=ok(0gr) run2=ok(0gr) cumulative_after=0 ($0.00 of $14.00)
+[2026-10-02T17:48:04] SESSION END; cumulative=0 ($0.00)
+[2026-10-02T17:57:20] PAIR DONE 'sail_loft' (validation via run_one) run1=ok(3gr) run2=ok(3gr) cumulative_after=6 ($0.21 of $14.00)

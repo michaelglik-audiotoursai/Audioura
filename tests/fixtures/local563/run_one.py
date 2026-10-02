@@ -187,6 +187,26 @@ def main():
 
     import generate_tour_text as gtt
 
+    # Compose the location string passed to the engine. We pass the request as the
+    # user's words, with the given tour_type. ONE narrow, transparent adjustment:
+    # for a restaurant tour we present it as "restaurant tour of <request>". That
+    # exact phrase ("restaurant" + "tour") is what the engine's own guard
+    # (_EXPLICIT_NON_MUSEUM_TOUR_RE in generate_tour_text.py) matches to STOP the
+    # S15 rule from forcing a named venue into the artwork/museum pipeline, where a
+    # restaurant has no catalogued works and clean-fails 'unresolvable' making ZERO
+    # Gemini calls. Verified live: a bare "Boston Sail Loft, Boston, MA" and even
+    # "... , restaurant" both clean-fail (S15 needs the "<type> tour" phrase); the
+    # working historical LOCAL-562 run used "restaurant tour of Chart House". This
+    # measures the restaurant GENERATION path (the Gemini questions this baseline
+    # exists to record), not the terse-input classifier. Venue + city are intact for
+    # step-2 Serper replay; the exact string is recorded in location_passed. No
+    # generation code is changed.
+    location_passed = request
+    signal_appended = False
+    if tour_type == "restaurant" and "restaurant tour" not in request.lower():
+        location_passed = f"restaurant tour of {request}"
+        signal_appended = True
+
     buf = io.StringIO()
     t0 = time.time()
     status = "ok"
@@ -195,7 +215,7 @@ def main():
     try:
         with contextlib.redirect_stdout(buf):
             text, _out_file, _coords = gtt.generate_tour_text(
-                request, tour_type, txt_path, stops,
+                location_passed, tour_type, txt_path, stops,
                 job_id=f"local563-{slug}-{run_label}",
             )
     except gr.BudgetExceeded as e:
@@ -206,6 +226,15 @@ def main():
         err = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
     wall = time.time() - t0
     rec.uninstall()
+
+    # A generation that returns None/empty text did not produce a tour. The engine
+    # does this on a 'clean fail' (e.g. an artwork-pipeline 'unresolvable') and
+    # returns normally rather than raising, so distinguish it from a real tour here
+    # — shipping it as 'ok' would poison the baseline with an empty measurement.
+    if status == "ok" and not (text and text.strip()):
+        status = "clean_fail"
+        if not err:
+            err = "generator returned empty/None text (clean fail — no tour produced)"
 
     log_text = buf.getvalue()
     with open(log_path, "w", encoding="utf-8") as fh:
@@ -251,6 +280,8 @@ def main():
         "slug": slug,
         "run": run_label,
         "request": request,
+        "location_passed": location_passed,
+        "restaurant_signal_appended": signal_appended,
         "tour_type": tour_type,
         "stops_requested": stops,
         "is_building_tour": is_building,
