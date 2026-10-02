@@ -190,3 +190,56 @@ almost never repeat a prompt (32/32 and 30/31 distinct) — each stop gets its o
 question — whereas the restaurant and fallback sites repeat heavily (e.g. the restaurant
 `_gemini` extractor is called 13 times with only 8 distinct prompts), because those
 prompts are templated on a small, re-visited set of venues.
+
+---
+
+## Item 4 — facts per Gemini answer (for scoring step 2)
+
+`tests/fixtures/local563/gemini_facts.json`. Each grounded response was split into
+atomic facts with `sentence_split.split_sentences` (the required deterministic
+splitter; code fences stripped first, fragments under 12 chars dropped). Every fact is
+tagged with the domains its `groundingSupports` cite and a reliability tier.
+
+**1431 atomic facts** across the 20 answers. Each `facts[]` row:
+`{tour, run, call_site, fact, cited_domains, tiers, wikipedia_only, discovery_tier}`.
+
+**Domain attribution.** When a fact's text overlaps a `groundingSupports[].text`
+span, the fact is tagged with exactly that span's source domains; when no span matches
+(the model's prose doesn't quote the support verbatim), the fact falls back to the
+answer's full source set. 301 facts carry **no** domain at all — they come from answers
+whose grounding returned empty sources (chiefly the restaurant practical extractor,
+whose sources list is often empty), and so rest on nothing citable.
+
+**Reliability tier** (from `_reliability_tiers` in `SERPER_AB_ANSWER_KEY.json`):
+`high` = Wikipedia/Wikidata, established papers/magazines, `.gov`/`.edu`;
+`medium` = Michelin / Eater / Boston Magazine / Atlas Obscura;
+`discovery` = blogs, forums, review sites, niche/community pages. A domain not on the
+high/medium allow-list is treated as **discovery** — the conservative reading, since
+an unlisted official site cannot be distinguished generically from a blog, and the key
+says a discovery fact counts only once a high-tier source corroborates it.
+
+### Per tour
+
+| tour | atomic facts | distinct domains | Wikipedia-only facts | Wiki-only share | discovery-tier facts | discovery share |
+|---|---|---|---|---|---|---|
+| sail_loft | 43 | 13 | 0 | 0.0% | 36 | 83.7% |
+| buttermilk | 44 | 15 | 0 | 0.0% | 40 | 90.9% |
+| chart_house | 53 | 14 | 0 | 0.0% | 29 | 54.7% |
+| sycamore | 93 | 18 | 0 | 0.0% | 73 | 78.5% |
+| la_maree | 40 | 14 | 0 | 0.0% | 37 | 92.5% |
+| logan | 80 | 36 | 0 | 0.0% | 47 | 58.8% |
+| our_lady | 254 | 34 | 10 | 3.9% | 183 | 72.1% |
+| lascaris | 359 | 32 | 25 | 7.0% | 86 | 24.0% |
+| riviera_bike | 223 | 56 | 0 | 0.0% | 215 | 96.4% |
+| faneuil | 242 | 36 | 4 | 1.7% | 108 | 44.6% |
+
+**Reading.** Almost nothing rests on Wikipedia *alone* — the maximum Wikipedia-only
+share is 7% (lascaris), and six tours have zero Wikipedia-only facts. That is the
+behaviour the answer key rewards: discovery over encyclopaedia. The flip side is how
+much rests on the discovery tier: riviera_bike (96%), la_maree (93%) and buttermilk
+(91%) draw nearly all their facts from blogs / forums / review / unlisted sites, which
+under the key's rule count **only once corroborated by a high-tier source**. lascaris
+is the healthiest profile — the richest answer set (359 facts) with the *lowest*
+discovery share (24%), because the Palais Lascaris museum and departement06 / nice.fr
+official pages carry most of its claims. chart_house, logan and faneuil sit in between.
+This per-tour split is the input a corroboration check (scoring step 2) would run next.
