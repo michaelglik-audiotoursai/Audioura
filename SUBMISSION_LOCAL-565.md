@@ -101,3 +101,46 @@ Unit test `tests/test_local565_serper_with_sources.py` (offline, mocked search/f
 5 tests pass: shape parity, unsourced-sentence drop, cost lands in `search` bucket, no-key
 error shape, and default provider = gemini.
 
+## Step 4 — replay: 157 recorded questions through Serper (committed)
+
+Harness `tests/fixtures/local565_replay.py`: reads all 157 lines of
+`gemini_questions.jsonl`, sets `RESEARCH_PROVIDER=serper`, installs
+`openai_cost_wrapper` + `cost_accumulator.install_executor_context_propagation()`,
+and runs each ORIGINAL prompt through `serper_with_sources` in a bounded
+`ThreadPoolExecutor` (6 workers). Each question runs in its OWN `tour_scope`, so
+its exact Serper + reader cost is captured; cumulative OpenAI (`llm`) spend is
+checked against the **$8 cap** on every completion (hard stop if reached).
+
+Output `tests/fixtures/local565/serper_answers.jsonl` — one line per question:
+`{idx, tour, run, call_site, purpose, prompt, serper{text,sources,supports,queries,error},
+latency_s, cost{llm,search,total}, running_openai_usd}`.
+
+**Replay result (all 157):**
+
+| metric | value |
+|---|---|
+| questions replayed | 157 / 157 |
+| OpenAI (llm) spend | **$0.0494** (cap $8 — never approached) |
+| Serper (search) spend | $0.4710 |
+| total cost | **$0.5204** |
+| avg latency / question | 7.3 s |
+| stopped at cap? | no |
+
+**Answer status:** 107 answered with sourced content · 34 honest "NO RELIABLE
+INFORMATION" (reader found nothing a source backs — the correct empty) · 16 "no
+sourced sentences" (reader wrote prose but every sentence lacked a `[n]` marker, so
+all dropped). The empties cluster on **lascaris** (79 questions, only 29 answered):
+that tour is dominated by obscure/likely-spurious items (e.g. a "Violes gambe by
+William Turner" at Palais Lascaris) for which Serper legitimately surfaces nothing
+reliable — itself a discovery-vs-recall signal the scorer will quantify. Answered
+questions carried 5.0 distinct-domain sources on average.
+
+Two engine robustness fixes were made during the dry run and are covered by the
+unit test: (a) `_derive_queries` now fences the request as inert data and rejects
+JSON/code-fence echoes, because restaurant-practicals prompts embed "Return ONLY
+JSON" and were hijacking the query model; (b) prompts that demand JSON use a JSON
+reader variant that returns the required object plus a `_sources` index array
+(attribution without corrupting the format), and the explicit "NO RELIABLE
+INFORMATION" sentinel is recorded distinctly from dropped-prose.
+
+
