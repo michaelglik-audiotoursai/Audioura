@@ -1,0 +1,493 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175840.txt'
+
+======================================================================
+CALL #001 | 17:58:40.226 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 1
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/buttermilk_run2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175840.txt'
+
+======================================================================
+CALL #002 | 17:58:40.227 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  total_stops_final: 1
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA' → 'restaurant  of Buttermilk & Bourbon - Back Bay, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Buttermilk & Bourbon - Back Bay, Boston, MA' → 'restaurant of Buttermilk & Bourbon - Back Bay, Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "restaurants",
+    "location": "Back Bay, Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Back Bay, Boston, MA",
+    "named_places": ["Buttermilk & Bourbon"],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Back Bay, Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=2.4s cumulative=2.4s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175840.txt'
+
+======================================================================
+CALL #003 | 17:58:42.627 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  user_request: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  total_stops: 1
+
+
+PHASE 3A: Fetching 1 candidate POI(s) for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Back Bay, Boston, MA'
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Back Bay, Boston, MA'
+  [LOCAL-290] Asking for 4 candidates (N=1 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175840.txt'
+
+======================================================================
+CALL #004 | 17:58:42.627 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  total_stops: 1
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0006 (744 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175840.txt'
+
+======================================================================
+CALL #005 | 17:58:46.109 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 1
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA.
+List exactly 4 specific, real, well-known restaurants relevant to: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTA
+  prompt_last_300_chars:  because they are famous — if it is outside Back Bay, Boston, MA, it does not belong.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Buttermilk & Bourbon",
+        "address": "2 Center Plaza, Boston, MA 02108",
+        "reason": "Opened in 2016 by Chef Jason Santos, this restaurant is known for its Southern-inspired dishes and creative cocktails, particularly the 'Buttermilk Fried Chicken'."
+    },
+    {
+        "name": "Oleana",
+        "address": "134 Hampshire St, Cambridge, MA 02139",
+        "reason": "Chef Ana Sortun, a James Beard Award winner, opened Oleana in 2001, featuring Mediterranean cui
+
+  [LOCAL-329] Captured 4 substantive selection reason(s)
+OK PHASE 3A parsed 4 candidate POI(s):
+   - Buttermilk & Bourbon @ 2 Center Plaza, Boston, MA 02108
+   - Oleana @ 134 Hampshire St, Cambridge, MA 02139
+   - The Capital Grille @ 900 Boylston St, Boston, MA 02115
+   - Tatte Bakery & Cafe @ 1288 Massachusetts Ave, Cambridge, MA 02138
+  [LOCAL-557] Restaurant request names ['Buttermilk & Bourbon'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Buttermilk & Bourbon' is already a candidate — marked user_explicit on 'Buttermilk & Bourbon'
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 4 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Buttermilk & Bourbon - Buttermilk & Bourbon is a restaurant located in Boston, Massachusetts
+   X  Excluded Oleana - Oleana is a restaurant located in Cambridge, Massachusetts
+   OK Verified The Capital Grille - The Capital Grille is a chain of upscale steakhouses
+   OK Verified Tatte Bakery & Cafe - Tatte Bakery & Cafe is a restaurant that serves bakery items and cafe-style food
+
+! PHASE 4 excluded 1 POI(s)
+   PHASE 3C: REMOVED 'Tatte Bakery & Cafe' -- address '1288 Massachusetts Ave, Cambridge, MA 02138' not in 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA'
+   PHASE 3C: 1 out-of-area stop(s) removed; 2 remain
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 1×VENUE_ONLY (not enough covered candidates to fill 1 stops)
+  [LOCAL-212] Selected: ['Buttermilk & Bourbon=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['The Capital Grille=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Buttermilk & Bourbon=2.5']
+  [LOCAL-349] Yield scores (dropped):  ['The Capital Grille=3.0']
+  [EXISTENCE-GATE] LOG_ONLY — 2/2 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Buttermilk & Bourbon' — wikipedia_search: snippet in 'Jason Santos' mentions stop+city
+    [VERIFIED] 'The Capital Grille' — wikipedia_summary: 'The Capital Grille' is a restaurant
+    [HARVEST] Summary: 0 harvested, 2 already had corpus, 0 verified_no_detail
+    [DINING-HARVEST] Summary: 0 harvested, 2 already had corpus, 0 no facts found
+    [INTERPRETIVE] 'Buttermilk & Bourbon': +1 passages (2 queries)
+    [INTERPRETIVE] 'The Capital Grille': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +2 passages, 4 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 1 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175840.txt'
+
+======================================================================
+CALL #006 | 17:59:05.243 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  stop_count: 1
+
+  [LOCAL-353] Querying OSM for dining operational details (city: Buttermilk)
+  [LOCAL-353] Buttermilk & Bourbon: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Buttermilk & Bourbon: no guide price, no OSM facts — silence
+
+Coordinates fallback: requesting coords for 1 stop(s) missing them...
+   Coords fallback OK 'Buttermilk & Bourbon': 42.3595, -71.0603
+Extracted first POI coordinates: (42.3595, -71.0603)
+
+=== Extracted POI Information ===
+1. Buttermilk & Bourbon
+   Address: 2 Center Plaza, Boston, MA 02108
+   Coordinates: 42.3595, -71.0603
+================================
+
+  [D538] 'Buttermilk & Bourbon' via serp(22)+openai: hours=Mon - 5:00 pm - 10:00 pm, Tue - 5:00 pm , reservation=reservation required, price_band=$30 and under
+  [D545] +4 story fact(s) for 'Buttermilk & Bourbon' via gemini (4 high)
+        [high] On June 17, 1972, a four-alarm fire broke out in the Hotel Vendome at 160 Commonwealth Avenue, and the southea
+        [high] In 1882, the Hotel Vendome installed an independent electrical lighting plant designed by Thomas Edison, makin
+        [high] Chef Jason Santos rose to fame on Fox’s _Hell’s Kitchen (Season 7)_ as the runner-up and later became Gordon R
+  [D538] Practicals acquired for 1/1 stop(s)
+[TIMING] phase=poi_selection elapsed=60.3s cumulative=62.7s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Buttermilk & Bourbon restaurant of Buttermilk & Bourbon - Back Bay' → 2436 chars
+  [LOCAL-47] Buttermilk & Bourbon: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 1 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 1}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=1)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Buttermilk  model=gpt-4o tokens=1141 (in=833 out=308) cost=$0.0052 latency=3.1s
+[COST_METER] FRESH | spine_generate | $0.005163 | user=None | job=local563-buttermilk-run2
+  [LOCAL-278] Spine cost folded into total: $0.0052
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 1 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/1 stops have per-stop passages (7 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Buttermilk & Bourbon' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 1/1 generated
+  [S25] Story types assigned: ['anecdote']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=6.9s cumulative=69.6s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=69.6s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=69.6s
+
+Generating description for Stop 1: Buttermilk & Bourbon by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Buttermilk & Bourbon' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Buttermilk & Bourbon', 20, ''), ('Buttermilk & Bourbon', 8, ''), ('Buttermilk & Bourbon', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14163 after=26400 (+12237 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26400)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0319 (6709 tokens, model=gpt-4o)
+Stop 1 description word count: 343 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Buttermilk & Bourbon': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001228 (input=4900, output=821)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 2: retry FAILED — keeping original (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 3 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0016 (1989 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Buttermilk & Bourbon': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 1
+    Paragraphs checked: 4
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 7
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='Chef Jason Santos' reason='No concrete link to Buttermilk & Bourbon is provided.' in: "Step into the world of Buttermilk & Bourbon, where Chef Jason Santos channels the vibrant spirit of "
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='New Orleans' reason='No concrete link between Chef Santos and Buttermilk & Bourbon.' in: "Step into the world of Buttermilk & Bourbon, where Chef Jason Santos channels the vibrant spirit of "
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='Chef Santos' reason='No concrete link between Chef Santos and Buttermilk & Bourbon is provided.' in: "Step into the world of Buttermilk & Bourbon, where Chef Jason Santos channels the vibrant spirit of "
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='Blue Team Sous Chef' reason='It does not specify a direct connection between Chef Santos and Buttermilk & Bourbon.' in: "Step into the world of Buttermilk & Bourbon, where Chef Jason Santos channels the vibrant spirit of "
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='Gordon Ramsay' reason='No concrete link to Buttermilk & Bourbon is provided.' in: "Step into the world of Buttermilk & Bourbon, where Chef Jason Santos channels the vibrant spirit of "
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='New England' reason='No specific person or entity is mentioned with a concrete link to the stop.' in: "Termilk & Bourbon first opened its doors in 2017, offering a unique dining experience that combines "
+    [LOCAL-472] UNGROUNDED entity stop='Buttermilk & Bourbon' entity='Chef Santos' reason='No concrete link to the stop is provided.' in: "Reservations are required to dine at Buttermilk & Bourbon, which is open from Tuesday to Sunday, wit"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/9)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Buttermilk & Bourbon' cut orphaned dependant of a removed introduction — subject 'quickly/restaurant': "The restaurant quickly became a beloved spot in Boston, so much so that Santos o"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 8
+    Glossed (composed): 1
+    Suppressed (already explained): 1
+    Degraded (name dropped): 2
+    Guard failures: 0
+    Known (skipped): 4
+    Triage: 692 tokens, $0.0002, 2.0s
+    Gloss: 297 tokens, $0.0001, 0.9s
+    Compose: 589 tokens, $0.0001, 0.7s
+    Total added cost: $0.0003
+    Stops affected: 1
+    Glosses applied:
+      • Blue Team Sous Chef → DEGRADED (name dropped)
+      • Arsenal Yards → "the new-build location added in 2021" [source: corpus]
+      • Hotel Vendome → SUPPRESSED (already explained)
+      • Chef Santos → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Back Bay, Boston, MA'...
+OK PHASE 5.6: 1/1 stop(s) within scope
+  [PHASE 5.6] >50% of stops were outside 'Back Bay, Boston, MA' — scope is likely a small single venue; delivering 1 verified stop(s).
+OK PHASE 5.7: Dangling-reference scrub complete (1 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Buttermilk & Bourbon' (index 54) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Buttermilk & Bourbon' — 317w → 192w after gates, 11 sentence(s) removed
+    removed: "Known for his blue hair and dynamic culinary style, Santos rose to fame on Fox’s _Hell’s Kitchen_, w"
+    removed: "His journey didn’t stop there; he later became the Blue Team Sous Chef under Gordon Ramsay and made "
+    removed: "These experiences have cemented his reputation as a culinary innovator, infusing Southern comfort fo"
+    removed: "Buttermilk & Bourbon first opened its doors in 2017, offering a unique dining experience that combin"
+    removed: "The restaurant quickly became a beloved spot in Boston, so much so that Santos opened a second locat"
+    removed: "The Back Bay location embodies the essence of Bourbon Street with its lively ambiance and enticing m"
+    removed: "Here, the legacy of the past intertwines with the present."
+    removed: "Interestingly, the location has its own historical significance."
+    removed: "This pioneering spirit resonates with Santos’ innovative approach to food."
+    removed: "Before you step inside, remember that reservations are required, and the restaurant is open from Tue"
+    removed: "Whether you’re drawn by the culinary prowess of Chef Santos or the allure of Southern comfort food, "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 1 eligible stop(s) concurrently (max_workers=1)
+
+Generating description for Stop 1: Buttermilk & Bourbon by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Buttermilk & Bourbon' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Buttermilk & Bourbon', 20, ''), ('Buttermilk & Bourbon', 8, ''), ('Buttermilk & Bourbon', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14163 after=26400 (+12237 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26400)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0343 (7222 tokens, model=gpt-4o)
+Stop 1 description word count: 302 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 3.8s for 1 stop(s) at max_workers=1
+    [LOCAL-474] regenerated and re-gated: 302w (was 192w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 1 improved, 0 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 0 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.buttermilkbourbon.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1227 chars from https://www.buttermilkbourbon.com/
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=Gn2KNZm9EqQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://boston.eater.com/2016/8/30/12711070/buttermilk-bourbon-jason-santos-back-bay (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://boston.eater.com/2016/8/30/12711070/butter
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/phantomgourmet/videos/buttermilk-bourbon-southern-eats/776897276557984/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://lifefoodwine.com/buttermilk-bourbon-back-bay-boston/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1553 chars from https://lifefoodwine.com/buttermilk-bourbon-back-b
+  [LOCAL-427] HTTP 200 from https://www.buttermilkbourbon.com/boston-menus/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.buttermilkbourbon.com/boston-menus/
+  [D512] verb discovery: query='restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA h' -> 15 new verb(s): fried, deviled, roasted, smoked, boiled, pickled, inspired, chucked, followed, cooked, grilled, wilted
+  [D512] _AGENCY_VERB widened by 15 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Buttermilk & Bourbon                       54    55     8    53
+    [LOCAL-485] index mean 54.0 over 1 stop(s), range 54-54
+    [LOCAL-485] weakest: 'Buttermilk & Bourbon' at 54
+[TIMING] phase=story_first elapsed=55.6s cumulative=125.2s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (103 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 103 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 79 words (delta: -24)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Buttermilk & Bourbon's newest location at Arsenal Yards in Watertown stands as a testament to Santos..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 48
+    Words after:  48
+    Delta: 0
+    Stops affected: 0/1
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 1/1
+    Fewer than 2 stops with content — omitting Part 4
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 1 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (1 selected == 1 delivered)
+  [D536] Listener asked for 1 stop(s), delivering 1 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: fewer than 2 delivered stops — skipped
+  [LOCAL-280] No recap — closing offer gets full 3-sentence budget
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (0.8 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 1 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (1045 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (4 line(s), 6 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 1/1 stop(s), spoken to the listener.
+  [LOCAL-556] all 1 listener-named stop(s) survived assembly with a header
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: Buttermilk & Bourbon - 343 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (3056 chars, 1/1 stops)
+  [LOCAL-540] no defects — tour is clean
+
+Total API cost: $0.0739 (11102 tokens)
+Grounding:      $0.1050 (3 requests)
+Tour total:     $0.1789
+Provenance:     1/16 factual sentences sourced, 15 unsourced (1 corpus, 0 grounded, 15 parametric)
+CACHE STORE: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA / restaurant / 1
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/buttermilk_run2.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/buttermilk_run2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+Tour-Category: restaurant
+
+Stop 1: Buttermilk & Bourbon
+
+Address: 2 Center Plaza, Boston, MA 02108
+
+Coordinates: 42.3595, -71.0603
+
+Orientation: You are about to embark on a walking journey through Buttermilk & Bourbon - Back Bay, Boston, MA. As you arrive at this singular stop, Buttermilk & Bourbon, you'll encounter the culinary realm of Chef Jason Santos, a renowned innovator whose bold twist on Sout...
+
+[TIMING] phase=packing elapsed=1.9s cumulative=127.0s
+[TIMING] phase=verification elapsed=0.0s cumulative=127.0s
+[TIMING] TOTAL wall=127.0s phases: poi_selection=60.3s, story_first=55.6s, fact_sheets=6.9s, intent=2.4s, packing=1.9s, narration=0.0s, external_lookups=0.0s, verification=0.0s

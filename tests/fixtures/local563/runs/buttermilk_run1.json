@@ -1,0 +1,111 @@
+{
+  "slug": "buttermilk",
+  "run": "run1",
+  "request": "Buttermilk & Bourbon - Back Bay, Boston, MA",
+  "location_passed": "restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA",
+  "restaurant_signal_appended": true,
+  "tour_type": "restaurant",
+  "stops_requested": 1,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 104.0,
+  "chars": 2552,
+  "gemini_calls": {
+    "total": 2,
+    "grounded_this_run": 2,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 2,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 2,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 6,
+    "cumulative_grounded_after": 11,
+    "cumulative_cost_after_usd": 0.385,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.0601921,
+    "total_tokens": 29617,
+    "cache_hit": false,
+    "grounding_cost": 0.07,
+    "grounding_requests": 2,
+    "tour_total_cost": 0.1301921,
+    "breakdown": {
+      "llm": 0.0601921,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.07
+    },
+    "provenance": {
+      "sourced": 1,
+      "unsourced": 11,
+      "total": 12,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 11
+    },
+    "score": {
+      "defects_before": {},
+      "defects_after": {},
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.039121,
+        "total_tokens": 10137
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [],
+    "defect_count": 0,
+    "defect_detail": {},
+    "named_people": 3,
+    "stops_delivered": 1,
+    "stops_requested": 1,
+    "dates": 3,
+    "chars": 2552,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 0,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 6,
+      "total": 6
+    },
+    "restaurant_practicals": {
+      "stops": [
+        {
+          "name": "Buttermilk & Bourbon",
+          "provider": "serp(24)+openai",
+          "nothing_actionable": false,
+          "hours": true,
+          "closed_days": false,
+          "reservation": true,
+          "price_band": true,
+          "raw": "hours=Mon - 5:00 pm - 10:00 pm, Tue - 5:00 pm , reservation=required, price_band=$30 and under"
+        }
+      ],
+      "stops_with_any_practical": 1,
+      "hours_count": 1,
+      "reservation_count": 1,
+      "price_band_count": 1,
+      "closed_dropped": [
+        {
+          "name": "Buttermilk & Bourbon",
+          "reason": "reported permanently closed: BarLola in Boston's Back Bay Has Closed; Buttermilk & Bourbon to Replace It Several weeks ago, we reported that a Southern-style restaurant with a wel"
+        }
+      ]
+    }
+  }
+}
