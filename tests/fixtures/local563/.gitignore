@@ -1,0 +1,5 @@
+# Generation debug byproducts written to CWD by generate_tour_text — not part of
+# the LOCAL-563 baseline artifacts. (prompt_dump_stop1.txt is written to the repo
+# root via __file__ and is reverted before each commit, not ignored here.)
+openai_simple_debug.txt
+runs/*.spawn.log
