@@ -7,3 +7,7 @@
 [2026-10-02T17:58:37] PAIR START 'buttermilk'; cumulative_before=6 ($0.21)
 [2026-10-02T18:00:47] PAIR DONE 'buttermilk' wall=130s run1=ok(2gr) run2=ok(3gr) cumulative_after=11 ($0.39 of $14.00)
 [2026-10-02T18:00:47] SESSION END; cumulative=11 ($0.39)
+[2026-10-02T18:01:13] SESSION START; cumulative=11 ($0.39); queue=['chart_house']
+[2026-10-02T18:01:13] PAIR START 'chart_house'; cumulative_before=11 ($0.39)
+[2026-10-02T18:03:58] PAIR DONE 'chart_house' wall=166s run1=ok(2gr) run2=ok(2gr) cumulative_after=15 ($0.53 of $14.00)
+[2026-10-02T18:03:58] SESSION END; cumulative=15 ($0.53)
