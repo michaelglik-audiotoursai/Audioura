@@ -28,7 +28,7 @@ is identical for all three and is excluded here.
 - Orientation: Как сориентироваться: Следует двигаться на северо-восток по набережной Quai des États-Unis, затем подняться по лестнице на холм, открывающем захватывающие виды впереди. Находясь на краю Замковой горы Ниццы, можно полюбоваться лазурными водами Средиземного моря. Здесь можно увидеть остатки древних укреплений и зелёные сады внизу.
 - Directions: Как пройти: Покидая Замковую гору Ниццы, направляйтесь вниз к Старому городу. Прогуляйтесь по очаровательным узким улочкам, пока не достигнете Rue Droite. Следуйте по этой улице, пока не дойдёте до Пале Ласкарис, красивого барочного дворца слева.
 
-**Y** — header `Stop 1:`
+**Y** — header `Остановка 1:`
 
 - Title: Замковая гора в Ницце
 - Orientation: Ориентация: двигайтесь на северо-восток по набережной США, затем поднимитесь по лестнице на холм, откуда открывается потрясающий вид на окрестности. Встаньте на краю Замковой горы в Ницце с видом на лазурные воды Средиземного моря. Посмотрите на остатки древних укреплений и пышных садов внизу.
@@ -48,7 +48,7 @@ is identical for all three and is excluded here.
 - Orientation: Как сориентироваться: Прибыв в Пале Ласкарис в сердце Старого города, можно увидеть величественный фасад этого аристократического здания XVII века. Когда-то резиденция влиятельной семьи Винтимиль-Ласкарис, сегодня он стал музеем, в котором хранится более 500 музыкальных инструментов — сокровищница звука и истории, ожидающая своего открытия.
 - Directions: Как пройти: От Пале Ласкарис двигайтесь на юг по улице Друит, пока не достигнете Площади Россетти с ее оживленными кафе. Продолжайте прямо по улице Префектуры, пока не доберетесь до Оперы Ниццы, величественного здания с красивым фасадом. Наслаждайтесь прогулкой по очаровательным улочкам Старого города Ниццы!
 
-**Y** — header `Stop 2:`
+**Y** — header `Остановка 2:`
 
 - Title: Дворец Ласкари
 - Orientation: Ориентация: Прибыв во дворец Ласкари в самом сердце Старого города, обратите внимание на величественный фасад этого аристократического здания семнадцатого века. Когда-то это была резиденция влиятельной семьи Винтимиль-Ласкари, а теперь здесь находится музей, в котором представлено более 500 музыкальных инструментов. Это сокровищница звука и истории, которая ждет своего открытия.
@@ -68,7 +68,7 @@ is identical for all three and is excluded here.
 - Orientation: Как сориентироваться: Стоя перед Оперой Ниццы, стоит уделить время, чтобы оценить её элегантный фасад, который стал свидетелем выступлений таких известных композиторов, как Берлиоз и Верди. Расположенная в самом сердце Ниццы, эта опера сыграла значительную роль в формировании культурного ландшафта города.
 - Directions: Как пройти: Направляйтесь на юг по проспекту Жан Жореса от Опера Ниццы, пока не достигнете очаровательного Старого города. Оказавшись там, прогуляйтесь по красочным улочкам, полным кафе и магазинов, пока не доберётесь до шумного Cours Saleya Market. Вы не сможете пропустить яркие торговые ряды, где продаются свежие продукты, цветы и местные товары.
 
-**Y** — header `Stop 3:`
+**Y** — header `Остановка 3:`
 
 - Title: Опера Ниццы
 - Orientation: Ориентация: Стоя перед Оперой Ниццы, уделите время тому, чтобы полюбоваться ее элегантным фасадом, на котором выступали такие известные композиторы, как Берлиоз и Верди. Этот оперный театр, расположенный в самом центре Ниццы, сыграл важную роль в формировании культурного ландшафта города.
@@ -87,14 +87,6 @@ is identical for all three and is excluded here.
 ```
 Пале Ласкарис
 
-Address: 06300 
-
-Coordinates: 43.6963, 7.2767
-
-Type/Specialty: Исторический дворец
-
-Specific Examples: Барочная архитектура, коллекция музыкальных инструментов, роскошные декорации
-
 Как сориентироваться: Прибыв в Пале Ласкарис в сердце Старого города, можно увидеть величественный фасад этого аристократического здания XVII века. Когда-то резиденция влиятельной семьи Винтимиль-Ласкарис, сегодня он стал музеем, в котором хранится более 500 музыкальных инструментов — сокровищница звука и истории, ожидающая своего открытия.
 
 Построенный в начале XVII века и позже модифицированный в XVIII веке, Пале Ласкарис был символом власти и престижа для семьи Винтимиль-Ласкарис до начала XIX века. В 1942 году город Ницца приобрел дворец, чтобы преобразовать его в музей, что позволило сохранить его богатое наследие и предложить посетителям возможность заглянуть в его роскошное прошлое. Переступив порог дворца, вы сразу же погружаетесь в сенсорное путешествие во времени. Скрип половиц под ногами отзывается шагами аристократов, когда-то бродивших по этим залам. Легкий аромат старого дерева и истории витает в воздухе, приглашая вас исследовать дальше. Роскошные барочные интерьеры Пале Ласкарис скрывают истории некогда могущественной семьи Савой, чье влияние определяло судьбу региона. Бродя по комнатам, украшенным изысканными гобеленами и роскошной мебелью, можно представить себе величие и элегантность, которые когда-то наполняли эти пространства. Эта остановка в нашем пешеходном туре по Ницце связана с нашей темой, демонстрируя пересечение искусства, истории и культуры. Пале Ласкарис служит окном в прошлое, предлагая взгляд на ушедшую эпоху, когда музыка и роскошь переплетались, создавая мир красоты и утонченности. Чуть дальше от этого богатого исторического места ждут эхо оперного прошлого, намекая на величие и драму, которые когда-то украшали этот яркий город.
@@ -102,19 +94,9 @@ Specific Examples: Барочная архитектура, коллекция �
 Как пройти: От Пале Ласкарис двигайтесь на юг по улице Друит, пока не достигнете Площади Россетти с ее оживленными кафе. Продолжайте прямо по улице Префектуры, пока не доберетесь до Оперы Ниццы, величественного здания с красивым фасадом. Наслаждайтесь прогулкой по очаровательным улочкам Старого города Ниццы!
 ```
 
-### Y — `Stop 2:`
+### Y — `Остановка 2:`
 
 ```
-Дворец Ласкари
-
-Адрес: 06300 
-
-Координаты: 43.6963, 7.2767
-
-Тип/специальность: Исторический дворец
-
-Конкретные примеры: архитектура в стиле барокко, коллекция музыкальных инструментов, декоративные украшения
-
 Ориентация: Прибыв во дворец Ласкари в самом сердце Старого города, обратите внимание на величественный фасад этого аристократического здания семнадцатого века. Когда-то это была резиденция влиятельной семьи Винтимиль-Ласкари, а теперь здесь находится музей, в котором представлено более 500 музыкальных инструментов. Это сокровищница звука и истории, которая ждет своего открытия.
 
 Дворец Ласкари, построенный в начале семнадцатого века и позже измененный в восемнадцатом веке, до начала XIX века был символом могущества и престижа семьи Винтимиль-Ласкари. В 1942 году Ницца приобрела дворец и превратила его в музей. Это решение позволило сохранить богатое наследие дворца и познакомить посетителей с его богатым прошлым. Зайдя во дворец, вы сразу же погрузитесь в чувственное путешествие во времени. Скрип деревянных полов под ногами напоминает шаги аристократов, которые когда-то бродили по этим залам. В воздухе витает слабый аромат состаренного дерева и истории, который приглашает вас к новым открытиям. В роскошных интерьерах дворца Ласкари в стиле барокко скрываются истории некогда могущественной семьи Савойи, влияние которой определило судьбу региона. Прогуливаясь по комнатам, украшенным замысловатыми гобеленами и изысканной мебелью, представьте себе величие и элегантность, которые когда-то наполняли эти помещения. Эта остановка в нашей пешеходной экскурсии по Ницце посвящена нашей теме, демонстрируя пересечение искусства, истории и культуры. Дворец Ласкари — это окно в прошлое, позволяющее заглянуть в ушедшую эпоху, когда музыка и роскошь переплетались в мир красоты и изысканности. Прямо за этим богатым историческим памятником вас ждут отголоски оперного прошлого, намекающие на величие и драматизм, которые когда-то были присущи этому оживленному городу.
@@ -126,14 +108,6 @@ Specific Examples: Барочная архитектура, коллекция �
 
 ```
 Пале Ласкарис
-
-Address: 06300 
-
-Coordinates: 43.6963, 7.2767
-
-Type/Specialty: Исторический дворец
-
-Specific Examples: Барочная архитектура, коллекция музыкальных инструментов, изысканные украшения
 
 Как сориентироваться: Прибыв в Пале Ласкарис в самом сердце Старого города, вы увидите величественный фасад этого аристократического здания XVII века. Когда-то резиденция влиятельной семьи Винтимиль-Ласкарис, теперь это музей, в котором хранится более 500 музыкальных инструментов — настоящая сокровищница звуков и истории.
 
@@ -152,7 +126,7 @@ Specific Examples: Барочная архитектура, коллекция �
 - Orientation: Orientación: Dirígete al noreste por el Quai des États-Unis, luego sube por las escaleras que llevan a la colina, ofreciendo un adelanto de las impresionantes vistas que te esperan. Colócate en el borde de la Colline du Château, con vistas a las aguas azules del mar Mediterráneo. Busca los restos de antiguas fortificaciones y los exuberantes jardines que se encuentran abajo.
 - Directions: Cómo llegar: Al dejar la Colline du Château, dirígete hacia el casco antiguo. Pasea por las encantadoras calles estrechas hasta llegar a la Rue Droite. Sigue esta calle hasta que llegues al Palais Lascaris, un hermoso palacio barroco a tu izquierda.
 
-**Y** — header `Stop 1:`
+**Y** — header `Parada 1:`
 
 - Title: Colina del Castillo de Niza
 - Orientation: Orientación: Diríjase hacia el noreste por el Quai des États-Unis y, a continuación, suba la colina por las escaleras para disfrutar de una vista previa de las impresionantes vistas que tiene por delante. Colócate en el borde de la colina del castillo de Niza, con vistas a las aguas azules del mar Mediterráneo. A continuación, busca los restos de antiguas fortificaciones y exuberantes jardines.
@@ -172,7 +146,7 @@ Specific Examples: Барочная архитектура, коллекция �
 - Orientation: Orientación: Al llegar al Palais Lascaris en el corazón del Casco Antiguo, se puede admirar la gran fachada de este edificio aristocrático del siglo XVII. Una vez residencia de la influyente familia Vintimille-Lascaris, ahora alberga un museo con más de 500 instrumentos musicales, un tesoro de sonido e historia que espera ser descubierto.
 - Directions: Cómo llegar: Desde el Palais Lascaris, dirígete hacia el sur por la Rue Droite hasta llegar a la Place Rossetti con sus bulliciosos cafés. Continúa recto por la Rue de la Préfecture hasta que llegues al Opéra de Nice, un gran edificio con una hermosa fachada. ¡Disfruta del paseo por las encantadoras calles del Casco Antiguo de Niza!
 
-**Y** — header `Stop 2:`
+**Y** — header `Parada 2:`
 
 - Title: Palacio Lascaris
 - Orientation: Orientación: Al llegar al Palais Lascaris, en el corazón del casco antiguo, busque la gran fachada de este edificio aristocrático del siglo XVII. Antiguamente la residencia de la influyente familia Vintimille-Lascaris, ahora es un museo que alberga más de 500 instrumentos musicales, un tesoro de sonido e historia que espera ser descubierto.
@@ -192,7 +166,7 @@ Specific Examples: Барочная архитектура, коллекция �
 - Orientation: Orientación: Al estar frente al Opéra de Nice, se puede apreciar su elegante fachada que ha sido testigo de las actuaciones de renombrados compositores como Berlioz y Verdi. Situada en el corazón de Niza, esta casa de ópera ha desempeñado un papel significativo en la configuración del paisaje cultural de la ciudad.
 - Directions: Cómo llegar: Dirígete hacia el sur por la Avenida Jean Jaurès desde el Opéra de Nice hasta llegar al encantador Casco Antiguo. Una vez allí, pasea por las coloridas calles llenas de cafés y tiendas hasta que llegues al bullicioso Mercado de Cours Saleya. No puedes perderte los vibrantes puestos del mercado que venden productos frescos, flores y productos locales.
 
-**Y** — header `Stop 3:`
+**Y** — header `Parada 3:`
 
 - Title: Opéra de Nice
 - Orientation: Orientación: Mientras se encuentra frente a la Ópera de Niza, tómese un momento para apreciar su elegante fachada, que ha sido testigo de las actuaciones de compositores de renombre como Berlioz y Verdi. Ubicado en el corazón de Niza, este teatro de ópera ha desempeñado un papel importante en la configuración del panorama cultural de la ciudad.
@@ -211,14 +185,6 @@ Specific Examples: Барочная архитектура, коллекция �
 ```
 Palais Lascaris
 
-Address: 06300 
-
-Coordinates: 43.6963, 7.2767
-
-Type/Specialty: Palacio histórico
-
-Specific Examples: Arquitectura barroca, colección de instrumentos musicales, decoraciones ornamentadas
-
 Orientación: Al llegar al Palais Lascaris en el corazón del Casco Antiguo, se puede admirar la gran fachada de este edificio aristocrático del siglo XVII. Una vez residencia de la influyente familia Vintimille-Lascaris, ahora alberga un museo con más de 500 instrumentos musicales, un tesoro de sonido e historia que espera ser descubierto.
 
 Construido a principios del siglo XVII y modificado posteriormente en el siglo XVIII, el Palais Lascaris fue un símbolo de poder y prestigio para la familia Vintimille-Lascaris hasta principios del siglo XIX. En 1942, la ciudad de Niza adquirió el palacio para transformarlo en un museo, una decisión que preservaría su rico patrimonio y ofrecería a los visitantes un vistazo a su opulento pasado. Al entrar en el palacio, se es recibido de inmediato en un viaje sensorial a través del tiempo. El crujir de los suelos de madera bajo los pies resuena con los pasos de los aristócratas que una vez recorrieron estos pasillos. El tenue aroma de la madera envejecida y la historia permanece en el aire, invitando a explorar más. Los lujosos interiores barrocos del Palais Lascaris ocultan historias de una poderosa familia de Saboya cuya influencia moldeó el destino de la región. Al deambular por las habitaciones adornadas con intrincadas tapicerías y muebles ornamentados, se puede imaginar la grandeza y elegancia que una vez llenaron estos espacios. Esta parada en nuestro recorrido a pie por Niza se conecta con nuestro tema al mostrar la intersección del arte, la historia y la cultura. El Palais Lascaris sirve como una ventana al pasado, ofreciendo un vistazo a una época pasada cuando la música y el lujo se entrelazaban para crear un mundo de belleza y refinamiento. Justo más allá de este rico sitio histórico, los ecos de un pasado operístico esperan, insinuando la grandeza y el drama que una vez adornaron esta vibrante ciudad.
@@ -226,19 +192,9 @@ Construido a principios del siglo XVII y modificado posteriormente en el siglo X
 Cómo llegar: Desde el Palais Lascaris, dirígete hacia el sur por la Rue Droite hasta llegar a la Place Rossetti con sus bulliciosos cafés. Continúa recto por la Rue de la Préfecture hasta que llegues al Opéra de Nice, un gran edificio con una hermosa fachada. ¡Disfruta del paseo por las encantadoras calles del Casco Antiguo de Niza!
 ```
 
-### Y — `Stop 2:`
+### Y — `Parada 2:`
 
 ```
-Palacio Lascaris
-
-Dirección: 06300 
-
-Coordenadas: 43.6963, 7.2767
-
-Tipo/especialidad: Palacio histórico
-
-Ejemplos específicos: arquitectura barroca, colección de instrumentos musicales, decoraciones ornamentales
-
 Orientación: Al llegar al Palais Lascaris, en el corazón del casco antiguo, busque la gran fachada de este edificio aristocrático del siglo XVII. Antiguamente la residencia de la influyente familia Vintimille-Lascaris, ahora es un museo que alberga más de 500 instrumentos musicales, un tesoro de sonido e historia que espera ser descubierto.
 
 Construido a principios del siglo XVII y modificado posteriormente en el siglo XVIII, el Palais Lascaris fue un símbolo de poder y prestigio para la familia Vintimille-Lascaris hasta principios del siglo XIX. En 1942, la ciudad de Niza adquirió el palacio para transformarlo en museo, una decisión que preservaría su rico patrimonio y ofrecería a los visitantes una visión de su opulento pasado. Entra en el palacio e inmediatamente te verás envuelto en un viaje sensorial a través del tiempo. El crujido de los pisos de madera bajo tus pies recuerda los pasos de los aristócratas que alguna vez deambularon por estas salas. El leve aroma de la madera envejecida y la historia perdura en el aire e invita a explorar más a fondo. Los lujosos interiores barrocos del Palais Lascaris esconden las historias de una familia Saboya que alguna vez fue poderosa y cuya influencia marcó el destino de la región. Mientras pasea por las habitaciones adornadas con intrincados tapices y muebles ornamentados, imagine la grandeza y la elegancia que alguna vez llenaron estos espacios. Esta parada de nuestro recorrido a pie por Niza se conecta con nuestro tema al mostrar la intersección del arte, la historia y la cultura. El Palais Lascaris sirve como una ventana al pasado y ofrece una visión de una época pasada en la que la música y el lujo se entrelazaban para crear un mundo de belleza y refinamiento. Un poco más allá de este rico sitio histórico, te esperan los ecos de un pasado operístico, que hacen alusión a la grandeza y el drama que alguna vez adornaron a esta vibrante ciudad.
@@ -250,14 +206,6 @@ Cómo llegar: Desde el Palais Lascaris, diríjase hacia el sur por la Rue Droite
 
 ```
 Palacio Lascaris
-
-Address: 06300 
-
-Coordinates: 43.6963, 7.2767
-
-Type/Specialty: Palacio histórico
-
-Specific Examples: Arquitectura barroca, colección de instrumentos musicales, decoraciones ornamentadas
 
 Orientación: Al llegar al Palacio Lascaris en el corazón del Casco Antiguo, se encontrará con la majestuosa fachada de este edificio aristocrático del siglo XVII. Antiguamente residencia de la influyente familia Vintimille-Lascaris, hoy se erige como un museo que alberga más de 500 instrumentos musicales, un tesoro de sonido e historia esperando ser descubierto.
 
@@ -298,6 +246,9 @@ then reuses. For reference (not blinded — this is the mechanism, not the prose
 - Colline du Château → Colline du Château
 
 ---
+
+> LEAD note: unspoken lines (address, coordinates, type) and the heading line were removed from all three full-stop blocks so the comparison is of spoken text only.
+> Y's headers and full Stop 2 were replaced with AWS's real output (translate_text + _restore_metadata_labels, as the app does). The harness had sent AWS the body without its heading and skipped label restoration, which showed an English "Stop N:" and Russian address labels the app never shows.
 
 ## Blind key (do not read until you have judged)
 
