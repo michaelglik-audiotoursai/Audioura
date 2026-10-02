@@ -271,5 +271,44 @@ Both engines still **fail the sycamore open-venue test** (Serper via venue confu
 disambiguation is the clear next weakness to fix. Default provider remains Gemini; the Serper
 path is additive and behind `RESEARCH_PROVIDER`.
 
+## Guardrails & reproduction
+
+- **No GCloud deploy.** Nothing was deployed.
+- **Default provider stays `gemini`.** `research_with_sources` routes to
+  `gemini_with_sources` for `gemini`/unset/unknown; Serper only when
+  `RESEARCH_PROVIDER=serper`. Unit test asserts the default.
+- **Gemini spend this task = $0.** The replay is Serper + gpt-4o-mini only; the
+  Gemini side is read from the already-recorded LOCAL-563 fixtures.
+- **OpenAI cap $8:** total ≈ **$1.4** (replay $0.078 + scoring $1.28 + calibration/smoke
+  ≈ $0.06). Never approached; the replay harness also hard-stops at the cap.
+- **Untouched:** DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md,
+  .continuous_dev/STATUS.md (verified with `git status`).
+- **Base:** `git merge-base --is-ancestor f5bc845 HEAD` → 0.
+- **Dependency note:** `beautifulsoup4==4.12.2` (a pinned production dep) was installed
+  locally so full-page extraction works; `_fetch_page_text` now also has a stdlib fallback.
+
+### Files added / changed
+
+- `story_leads.py` — `serper_with_sources`, `research_with_sources`, helpers, prompts;
+  `_fetch_page_text` fallback. (Default behaviour unchanged.)
+- `robust_text_extractor.py` — fixed two Python-3.9 f-string `SyntaxError`s in its test
+  helper (2 lines; unbreaks `import` for every caller).
+- `tests/test_local565_serper_with_sources.py` — 5 offline unit tests (pass).
+- `tests/fixtures/local565_replay.py` — replay harness.
+- `tests/fixtures/local565_score.py` — scorer.
+- `tests/fixtures/local565/serper_answers.jsonl` — 157 Serper answers (real page fetch).
+- `tests/fixtures/local565/score.json` — full scoring output for both engines.
+- `tests/fixtures/local563/**` — LOCAL-563 baseline fixtures (checked out onto branch).
+- `SUBMISSION_LOCAL-565.md` — this file.
+
+### Reproduce
+
+```bash
+RESEARCH_PROVIDER=serper python3 tests/fixtures/local565_replay.py   # -> serper_answers.jsonl
+python3 tests/fixtures/local565_score.py                            # -> score.json
+python3 tests/test_local565_serper_with_sources.py                  # 5 tests
+```
+
+
 
 
