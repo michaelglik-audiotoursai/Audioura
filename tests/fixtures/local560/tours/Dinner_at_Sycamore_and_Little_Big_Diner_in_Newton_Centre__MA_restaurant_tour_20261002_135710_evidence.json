@@ -1,0 +1,254 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 5,
+      "unsourced": 26,
+      "total": 31,
+      "corpus": 5,
+      "grounded": 0,
+      "parametric": 26
+    },
+    "per_stop": {
+      "Farmstead Table": {
+        "sourced": 2,
+        "unsourced": 9,
+        "total": 11
+      },
+      "Little Big Diner": {
+        "sourced": 1,
+        "unsourced": 5,
+        "total": 6
+      },
+      "Fiorella's": {
+        "sourced": 1,
+        "unsourced": 7,
+        "total": 8
+      },
+      "Sycamore": {
+        "sourced": 1,
+        "unsourced": 5,
+        "total": 6
+      }
+    },
+    "claims": [
+      {
+        "stop": "Farmstead Table",
+        "text": "The 2 km route from Farmstead Table to Sycamore offers a mix of bustling streets and quiet corners in this culinary haven.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Along this path, you'll uncover the diverse gastronomic heritage of Newton Centre, from Fiorella's humble beginnings with Chef Rémon Karian's first restaurant at 23 years old to the 2016 establishment by Brandon Gillis and Boris Nemchenok, reflecting a commitment to neighborhood dining.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Then, at Fiorella's, discover how Rémon's marinara sauce became so popular it was eventually bottled and sold in grocery stores.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "This unassuming spot in Newton Centre invites you to explore flavors that celebrate local and seasonal ingredients, with a menu shaped by Chef Chad Burns in collaboration with New England farmers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Behind Farmstead Table's charming façade lies a story of culinary passion and urban challenge.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Owner Ericka Harindranath faced a significant hurdle when the Newton Centre Pilot Plaza Project reduced local parking spaces.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Farmstead Table owner Ericka Harindranath voiced frustration with Newton City Hall over the Newton Centre Pilot Plaza Project, which reduced local parking spaces."
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Farmstead Table connects to a broader narrative of culinary innovation in Newton.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Dave Punch, a name synonymous with the area's dining scene, co-founded notable establishments like Sycamore and Little Big Diner.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "In 2016, Punch sparked what locals affectionately dubbed the 'Newton Centre ramen madness' when he opened Little Big Diner.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "When Punch opened Little Big Diner in 2016, it sparked the 'Newton Centre ramen madness' with locals waiting in freezing weather to snag a stool."
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "Farmstead Table, open every day except Tuesday, welcomes guests from 12:00 pm to 3:00 pm and again from 5:00 pm to 9:00 pm.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Farmstead Table",
+        "text": "With a mid-range price point, it offers contemporary American cuisine rich with the freshness of New England's produce.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The story of Little Big Diner begins with Chef David Punch and his culinary team at Sycamore, who were captivated by the intricate flavors -style broths and noodles.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "In the Greater Boston food scene, Little Big Diner has carved out a niche, much like the television series \"Halt and \" did during its run from June 1, 2014, to October 14, 2017.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Just as the show depicted the personal computer revolution of the 1980s, David Punch’s venture revolutionized the Newton dining landscape.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "Before Sycamore's opening in late 2012, the prevailing wisdom was that high-end dining wouldn't last here.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Before Sycamore opened in late 2012, industry insiders warned David Punch that high-end dining wouldn't survive in Newton, but Sycamore proved them wrong."
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "The diner operates with a no-reservations policy, opening its doors from 4:30 to 9:00 PM, and serves dishes that hover around the $$ price range.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Little Big Diner",
+        "text": "It’s a place where traditional Japanese culinary techniques are infused with a creative twist, offering a taste of something both comforting and new.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "Fiorella’s Cucina marks the beginning of a culinary journey that started in 2000, when Rémon Karian, just 23 years old, opened this restaurant with a vision and a modest budget.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "Rémon's dream was to create a neighborhood hub, a place where the community could gather over plates of authentic Italian cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "This was no easy task, yet Rémon's passion and commitment to quality paid off, turning Fiorella's into a beloved local fixture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "The story of Fiorella’s is not just about its founder, but also about resilience and community spirit.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "In the wider Newton area, an unexpected event tested the local culinary scene.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "In 2018, an electrical fire devastated Buttonwood, a restaurant in nearby Newton Highlands, causing significant damage and requiring months of reconstruction.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 2018, an electrical fire at Buttonwood in Newton Highlands caused significant damage, requiring months of reconstruction."
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "Yet, like Fiorella’s, Buttonwood rebuilt and continued to serve its patrons, reinforcing the tenacity and unity that defines this area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Fiorella's",
+        "text": "As you consider entering, know that this establishment offers a slice of history and a taste of passion, open Monday through Saturday from 11:30 am to 9 pm, and Sunday from 4 pm to 9 pm.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Previously with Cambridge’s Ten Tables, Punch brought his culinary expertise to Newton Centre, transforming it into a destination for those seeking a culinary experience that marries French-inspired techniques with New England ingredients.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "This restaurant quickly became one of the hottest reservations in town, offering a menu that dances between French, American, Spanish, and contemporary flavors.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Uniquely, it allows him to enjoy Saturdays and Sundays off—a rarity in the restaurant industry.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "David Punch designed a staffing model for Sycamore and Little Big Diner allowing him to take Saturdays and Sundays off, which was rare in the restaurant industry."
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Here, Punch's ability to adapt and innovate shines through in cramped quarters, proving that great food transcends space.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Open from Tuesday to Saturday, 4:30 pm to 9:30 pm, Sycamore invites diners to experience a menu that reflects a vibrant community pulse.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sycamore",
+        "text": "Reservations are recommended for this much-loved spot, offering a dining experience that is both satisfying and deeply connected to the traditions and rhythms of Newton Centre.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

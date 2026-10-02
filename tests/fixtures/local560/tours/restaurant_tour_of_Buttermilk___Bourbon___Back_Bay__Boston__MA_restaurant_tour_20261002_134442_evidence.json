@@ -1,0 +1,125 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 3,
+      "unsourced": 11,
+      "total": 14,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 11
+    },
+    "per_stop": {
+      "The Capital Grille": {
+        "sourced": 2,
+        "unsourced": 6,
+        "total": 8
+      },
+      "Stephanie's On Newbury": {
+        "sourced": 1,
+        "unsourced": 5,
+        "total": 6
+      }
+    },
+    "claims": [
+      {
+        "stop": "The Capital Grille",
+        "text": "The route spans from The Capital Grille to Stephanie's On Newbury, a mere 414 meters apart in this urban landscape.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "In the bustling Back Bay, a tapestry of culinary tales unfolds, from the classic American steakhouse elegance of The Capital Grille to the innovative coastal delights at Stephanie's On Newbury.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "Stephanie Sokolove's dream brought forth the award-winning comfort food at her restaurant, while the neighborhood's culinary diversity invites you to savor the essence of this vibrant culinary hub.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "In the upcoming stops, you will learn about Stephanie's merger with her sister's restaurant portfolio in 2018 at Stephanie's On Newbury and the lawsuit filed by the Restaurant Opportunities Centers United at The Capital Grille.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "Entering The Capital Grille means immersing yourself in a slice of Boston's political and social history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "But it's not just the past that makes The Capital Grille significant; its parent company, Darden Restaurants, faced a major federal class-action lawsuit in early 2012.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In early 2012, The Capital Grille’s parent company (Darden Restaurants) was hit with a major federal class-action lawsuit organized by the Restaurant Opportunities Centers (ROC) United, alleging racia"
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "Organized by the Restaurant Opportunities Centers (ROC) United, the lawsuit alleged racial steering and wage theft, bringing to light the challenges within the restaurant industry.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In early 2012, The Capital Grille’s parent company (Darden Restaurants) was hit with a major federal class-action lawsuit organized by the Restaurant Opportunities Centers (ROC) United, alleging racia"
+      },
+      {
+        "stop": "The Capital Grille",
+        "text": "The Capital Grille is open Monday and Tuesday from 11:30 am to 9:00 pm, offering a blend of history and high-end dining.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stephanie's On Newbury",
+        "text": "As you meander along Newbury Street, the vibrant pulse of Boston's Back Bay, you'll find yourself at the corner of Newbury and Exeter.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stephanie's On Newbury",
+        "text": "Stephanie's On Newbury was opened by Stephanie Sokolove in 1994, and it quickly became a pioneer in the upscale comfort food scene.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Stephanie Sokolove opened Stephanie’s on Newbury in 1994, practically inventing the upscale 'comfort food + see-and-be-seen brunch patio' trend on Newbury Street."
+      },
+      {
+        "stop": "Stephanie's On Newbury",
+        "text": "In 2018, Stephanie embarked on a new chapter by merging her restaurant portfolio with that of her sister, Kathy Sidell, under Sidell Hospitality.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stephanie's On Newbury",
+        "text": "It marked a significant moment in Boston's dining scene, bringing together two sisters with a shared vision and distinct expertise.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stephanie's On Newbury",
+        "text": "Their collaboration ensured that both Stephanie's On Newbury and Kathy's ventures could thrive, offering a diverse array of dining experiences across the city.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stephanie's On Newbury",
+        "text": "Open on Mondays and Tuesdays from 11 AM to 10 PM, the restaurant offers dishes priced between $31 and $50, featuring contemporary American comfort food that delights locals and visitors alike.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
