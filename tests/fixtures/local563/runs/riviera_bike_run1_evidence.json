@@ -1,0 +1,308 @@
+{
+  "landmarks": {
+    "Cap d'Ail Coastal Path": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 9,
+      "unsourced": 29,
+      "total": 38,
+      "corpus": 9,
+      "grounded": 0,
+      "parametric": 29
+    },
+    "per_stop": {
+      "Cap d'Ail Coastal Path": {
+        "sourced": 1,
+        "unsourced": 10,
+        "total": 11
+      },
+      "Col de Vence": {
+        "sourced": 3,
+        "unsourced": 7,
+        "total": 10
+      },
+      "Cannes Bike Path": {
+        "sourced": 1,
+        "unsourced": 4,
+        "total": 5
+      },
+      "Mont Boron": {
+        "sourced": 4,
+        "unsourced": 8,
+        "total": 12
+      }
+    },
+    "claims": [
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "Starting at the Cap d'Ail Coastal Path and concluding at Mont Boron, spanning approximately 69 km of coastal and hillside landscapes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "Col de Vence showcases a chapel designed by Henri Matisse, while Mont Boron shelters historical fortifications dating back to the 16th century, built to defend against Turkish and French invasions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "From Nice Ville train station, head southwest on Avenue Jean Médecin, then take Tram Line 2 towards Port Lympia and get off at the Cap d'Ail stop.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "During the mid-20th century, the Villa The Rock, perched above this path, became a focal point of intrigue involving actress Greta Garbo and the couple George and Valentina Schlee.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "Garbo, known for her reclusive nature, reportedly visited the villa often, entangled in a complex relationship with the Schlees.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "George Schlee, a prominent figure in Garbo's life, tragically died of a heart attack in 1964 while in Paris with her.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "The aftermath of his passing was peculiar; Valentina Schlee supposedly conducted an exorcism at the villa, a dramatic response to her grief and the spectral presence she felt lingered in the home.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "The path also bears witness to tales from the years preceding the 1917 Bolshevik Revolution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "Mathilde Kschessinska, a renowned Russian ballerina and mistress to Tsar Nicholas II, found refuge near Mala Beach, just a stone's throw from where you stand.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "Known for her lavish lifestyle, Kschessinska was infamous for gambling away fortunes at the Monte Carlo Casino.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Before the 1917 Bolshevik Revolution, Mathilde Kschessinska, mistress to Tsar Nicholas II, settled near Mala Beach and was known for gambling away fortunes at the Monte Carlo Casino."
+      },
+      {
+        "stop": "Cap d'Ail Coastal Path",
+        "text": "Her financial woes were so severe that Grand Duke Andrei Vladimirovich purchased Villa Alam to save her from her creditors, an act of both loyalty and desperation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "The Col de Vence, rising majestically above, is steeped in both history and enigma.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "Since the end of the 14th century, this pass has served as a crucial boundary between the County of Nice, under the Duke of Savoy, and the Republic of Genoa.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "It was not until the disputed French plebiscite of 1860 that the area, once an exclave of the Principality of Monaco, was annexed to France, reshaping its political landscape once more.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "The Col de Vence is not just a historical waypoint; it is a modern proving ground for elite cyclists, including WorldTour riders like Tadej Pogačar and Geraint Thomas.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The Col de Vence is used by top WorldTour riders from Monaco and Nice, including Tadej Pogačar and Geraint Thomas, as a proving ground."
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "Adding to its lore, the Col de Vence is a focal point for those intrigued by the paranormal.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "Dubbed the French 'Skinwalker Ranch,' the area is renowned for reports of UFO sightings and unexplained phenomena.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "Local folklore groups such as the Association Col de Vence have documented strange occurrences, including mysterious battery drains on electronic devices and compass anomalies.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Local folklore groups, including the Association Col de Vence, have officially cataloged decades of bizarre reports such as battery drains on electronics and compass anomalies on the Col de Vence."
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "While the tales may seem otherworldly, they lend an air of mystery to the already formidable landscape.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "As you reach the upper plateau, the geological area known as the Village des Idoles awaits.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Towards the upper plateau of the Col de Vence, riders pass through a geological area known as the Village des Idoles, where the temperature on the road can feel 10–15°C hotter than at the coast."
+      },
+      {
+        "stop": "Col de Vence",
+        "text": "Here, the temperature can be strikingly warmer, a natural curiosity that enhances the Col de Vence’s mystique.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cannes Bike Path",
+        "text": "In May 2023, this path saw a flurry of activity when Thierry Frémaux, the General Delegate of the Cannes Film Festival, made headlines for riding an electric bicycle on the pedestrian sidewalk in front of the iconic Carlton Hotel, a historic luxury hotel in Cannes, during the festival.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In May 2023, Thierry Frémaux, the General Delegate of the Cannes Film Festival, was involved in a cycling scandal for riding an electric bicycle on the pedestrian sidewalk in front of the Carlton Hote"
+      },
+      {
+        "stop": "Cannes Bike Path",
+        "text": "Frémaux’s choice of transport — a simple electric bike — might seem mundane, but in this context, it underscored the ongoing clash between the glamour of the festival and the everyday rhythms of Cannes life.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cannes Bike Path",
+        "text": "Adding to the dynamic atmosphere, Cannes Mayor David Lisnard initiated stringent measures to declutter the waterfront path along the Croisette.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cannes Bike Path",
+        "text": "The campaign wasn't just about maintaining order; it was a statement about preserving the character of Cannes amidst its rapid modern transformations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cannes Bike Path",
+        "text": "On Sundays, the city takes a different approach by closing off parts of the Boulevard du Midi to motor traffic, gifting these roads to cyclists, runners, and rollerbladers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "Mont Boron, with its rich tapestry of history, offers a striking contrast to the contemporary glamour of the stops you've already seen, like the Cannes Bike Path.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "One such structure is Le Château de l'Anglais, begun in 1858 by Robert Smith.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1858, Robert Smith, an eccentric English former British East India Company officer, began building Le Château de l'Anglais on Mont Boron, directing construction through a high-powered telescope fro"
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "Smith, an eccentric former officer of the British East India Company, undertook the ambitious project of building this unique pink castle.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1858, Robert Smith, an eccentric English former British East India Company officer, began building Le Château de l'Anglais on Mont Boron, directing construction through a high-powered telescope fro"
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "What makes his endeavor particularly fascinating is that he directed the construction remotely, using a high-powered telescope from the Hôtel Le Royal.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "Further enriching Mont Boron's narrative is the Villa Le Roc Fleuri, known locally as the \"Bond Villa.\" This Art Deco house, built in 1930, became home to Sean Connery in the 1970s and 1980s.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "Connery, along with his wife Micheline Roquebrune, an artist from Nice, brought a touch of cinematic glamour to the area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "The villa's association with Connery, who filmed scenes for the Bond film \"Never Say Never Again\" nearby, cements its place in pop culture.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Sean Connery lived at Villa Le Roc Fleuri on Mont Boron and filmed scenes for the 1983 Bond film Never Say Never Again in Villefranche harbor."
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "The villa was also once home to Edwidge Fenech, a French-Italian actress and producer, adding another layer of star-studded history to the location.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "The stories embedded in Mont Boron are not just of grandeur but also of deep historical significance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "In 1966, construction workers unearthed evidence of one of Europe's oldest human settlements at Terra Amata.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1966, construction workers at Terra Amata on Mont Boron discovered one of Europe's oldest human settlements, with evidence of Homo heidelbergensis cannibalism."
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "This discovery, which included signs of Homo heidelbergensis, offers a rare glimpse into prehistoric life and situates Mont Boron as a significant archaeological landmark.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Mont Boron",
+        "text": "As you prepare to descend, the entire Riviera unfolds below, promising more discoveries that weave together the history, culture, and natural beauty of this enchanting region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

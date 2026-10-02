@@ -31,3 +31,7 @@
 [2026-10-02T18:19:00] PAIR START 'lascaris'; cumulative_before=61 ($2.14)
 [2026-10-02T18:29:18] PAIR DONE 'lascaris' wall=618s run1=ok(39gr) run2=ok(40gr) cumulative_after=140 ($4.90 of $14.00)
 [2026-10-02T18:29:18] SESSION END; cumulative=140 ($4.90)
+[2026-10-02T18:29:27] SESSION START; cumulative=140 ($4.90); queue=['riviera_bike']
+[2026-10-02T18:29:27] PAIR START 'riviera_bike'; cumulative_before=140 ($4.90)
+[2026-10-02T18:35:43] PAIR DONE 'riviera_bike' wall=376s run1=ok(4gr) run2=ok(4gr) cumulative_after=148 ($5.18 of $14.00)
+[2026-10-02T18:35:43] SESSION END; cumulative=148 ($5.18)

@@ -1,0 +1,102 @@
+{
+  "slug": "riviera_bike",
+  "run": "run2",
+  "request": "French Riviera biking tour",
+  "location_passed": "French Riviera biking tour",
+  "restaurant_signal_appended": false,
+  "tour_type": "walking",
+  "stops_requested": 4,
+  "is_building_tour": false,
+  "status": "ok",
+  "error": null,
+  "wall_s": 328.1,
+  "chars": 9684,
+  "gemini_calls": {
+    "total": 4,
+    "grounded_this_run": 4,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 4,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 4,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 140,
+    "cumulative_grounded_after": 148,
+    "cumulative_cost_after_usd": 5.18,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.20234829999999998,
+    "total_tokens": 100813,
+    "cache_hit": false,
+    "grounding_cost": 0.14,
+    "grounding_requests": 4,
+    "tour_total_cost": 0.3423483,
+    "breakdown": {
+      "llm": 0.20234829999999998,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.14
+    },
+    "provenance": {
+      "sourced": 5,
+      "unsourced": 32,
+      "total": 37,
+      "corpus": 5,
+      "grounded": 0,
+      "parametric": 32
+    },
+    "score": {
+      "defects_before": {
+        "dangling_reference": "1 dangling pronoun reference(s), e.g. 'He believed that completing the climb in under 31 minutes wa'"
+      },
+      "defects_after": {
+        "thin": "3/4 stops delivered",
+        "offsite_entity": "1 place(s) framed as part of the tour but not a stop/venue, e.g. \"Cap Ferrat Coastal Path\" in: That's 4 stops and 89 kilometres \u2014 Cap Ferrat Coastal Path"
+      },
+      "removed": [
+        "dangling_reference"
+      ],
+      "remaining": [
+        "offsite_entity"
+      ],
+      "retried": true,
+      "clean_after": false,
+      "retry_cost": {
+        "total_cost": 0.0061675,
+        "total_tokens": 1297
+      },
+      "cost_without_retry": {
+        "total_cost": 0.234387,
+        "total_tokens": 39724
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": false,
+    "defects": [
+      "offsite_entity",
+      "thin"
+    ],
+    "defect_count": 2,
+    "defect_detail": {
+      "thin": "3/4 stops delivered",
+      "offsite_entity": "1 place(s) framed as part of the tour but not a stop/venue, e.g. \"Cap Ferrat Coastal Path\" in: That's 4 stops and 89 kilometres \u2014 Cap Ferrat Coastal Path"
+    },
+    "named_people": 3,
+    "stops_delivered": 3,
+    "stops_requested": 4,
+    "dates": 9,
+    "chars": 9684,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 4,
+      "local229_contradicted_groups_blocked": 1,
+      "local472_specificity_removals": 17,
+      "total": 22
+    }
+  }
+}
