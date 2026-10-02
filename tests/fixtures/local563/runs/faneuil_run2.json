@@ -1,0 +1,98 @@
+{
+  "slug": "faneuil",
+  "run": "run2",
+  "request": "Faneuil Hall Marketplace, Boston MA",
+  "location_passed": "Faneuil Hall Marketplace, Boston MA",
+  "restaurant_signal_appended": false,
+  "tour_type": "walking",
+  "stops_requested": 4,
+  "is_building_tour": false,
+  "status": "ok",
+  "error": null,
+  "wall_s": 372.6,
+  "chars": 7631,
+  "gemini_calls": {
+    "total": 4,
+    "grounded_this_run": 4,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 4,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 4,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 148,
+    "cumulative_grounded_after": 157,
+    "cumulative_cost_after_usd": 5.495,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.18117500000000006,
+    "total_tokens": 92263,
+    "cache_hit": false,
+    "grounding_cost": 0.14,
+    "grounding_requests": 4,
+    "tour_total_cost": 0.3211750000000001,
+    "breakdown": {
+      "llm": 0.18117500000000006,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.14
+    },
+    "provenance": {
+      "sourced": 2,
+      "unsourced": 27,
+      "total": 29,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 27
+    },
+    "score": {
+      "defects_before": {
+        "thin": "3/4 stops delivered",
+        "fabricated_attribution": "1 attribution(s); unverified attribution: \"built in 1742 by Peter Faneuil\" (no source confirms it)"
+      },
+      "defects_after": {
+        "thin": "3/4 stops delivered"
+      },
+      "removed": [
+        "fabricated_attribution"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0036225000000000007,
+        "total_tokens": 762
+      },
+      "cost_without_retry": {
+        "total_cost": 0.20989,
+        "total_tokens": 35558
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "thin"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "thin": "3/4 stops delivered"
+    },
+    "named_people": 4,
+    "stops_delivered": 3,
+    "stops_requested": 4,
+    "dates": 10,
+    "chars": 7631,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 3,
+      "local229_contradicted_groups_blocked": 4,
+      "local472_specificity_removals": 6,
+      "total": 13
+    }
+  }
+}

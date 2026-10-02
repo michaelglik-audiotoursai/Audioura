@@ -35,3 +35,7 @@
 [2026-10-02T18:29:27] PAIR START 'riviera_bike'; cumulative_before=140 ($4.90)
 [2026-10-02T18:35:43] PAIR DONE 'riviera_bike' wall=376s run1=ok(4gr) run2=ok(4gr) cumulative_after=148 ($5.18 of $14.00)
 [2026-10-02T18:35:43] SESSION END; cumulative=148 ($5.18)
+[2026-10-02T18:35:51] SESSION START; cumulative=148 ($5.18); queue=['faneuil']
+[2026-10-02T18:35:51] PAIR START 'faneuil'; cumulative_before=148 ($5.18)
+[2026-10-02T18:42:06] PAIR DONE 'faneuil' wall=375s run1=ok(5gr) run2=ok(4gr) cumulative_after=157 ($5.50 of $14.00)
+[2026-10-02T18:42:06] SESSION END; cumulative=157 ($5.50)

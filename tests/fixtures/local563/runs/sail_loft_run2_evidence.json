@@ -1,0 +1,78 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 2,
+      "unsourced": 6,
+      "total": 8,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 6
+    },
+    "per_stop": {
+      "Boston Sail Loft": {
+        "sourced": 2,
+        "unsourced": 6,
+        "total": 8
+      }
+    },
+    "claims": [
+      {
+        "stop": "Boston Sail Loft",
+        "text": "As you arrive at this renowned seafood restaurant located in the North End Waterfront, established in 1984, you'll be immersed in the legacy of New England's maritime traditions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Boston Sail Loft, since 1984, has been a go-to spot for classic New England seafood, offering fantastic Boston Harbor views.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Boston Sail Loft, perched along Atlantic Avenue since 1984, is a beloved staple of Boston's North End waterfront.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "One of the culinary highlights here is the clam chowder, which the Boston Sail Loft has famously infused with fresh dill.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The Boston Sail Loft introduced clam chowder infused with fresh dill, sparking friendly rivalries and winning Best of Boston awards."
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Upon entering, the Boston Sail Loft exudes a cozy ambiance reminiscent of a nautical dive-bar-meets-seafood-joint.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The Boston Sail Loft opened in 1984 as a nautical dive-bar-meets-seafood-joint with a 'first come, first served' policy."
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Situated in a prime location, the Boston Sail Loft not only serves delectable food but also provides breathtaking views of Boston Harbor, creating an ideal setting to relax and savor a traditional New England meal.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Boston Sail Loft is open from 11:30 am to 2:00 am on Monday and Tuesday.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "They offer their famed clam chowder for $6.50 a cup or $7.25 a bowl, with lobster rolls also available.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

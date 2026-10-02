@@ -1,0 +1,273 @@
+{
+  "landmarks": {
+    "Faneuil Hall": {
+      "status": "VERIFIED",
+      "canonical_name": "Faneuil Hall",
+      "qid": "Q49137",
+      "type": "",
+      "coordinates": "42.360000, -71.056111"
+    },
+    "Quincy Market": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "North Market": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "South Market": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "The Great Hall": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "The Bell in Hand Tavern": {
+      "status": "VERIFIED",
+      "canonical_name": "Bell in Hand Tavern",
+      "qid": "Q111913854",
+      "type": "",
+      "coordinates": "42.361700, -71.057100"
+    },
+    "Historic Faneuil Hall Marketplace": {
+      "status": "VERIFIED",
+      "canonical_name": "Faneuil Hall",
+      "qid": "Q49137",
+      "type": "",
+      "coordinates": "42.360000, -71.056111"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 2,
+      "unsourced": 27,
+      "total": 29,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 27
+    },
+    "per_stop": {
+      "Faneuil Hall": {
+        "sourced": 2,
+        "unsourced": 13,
+        "total": 15
+      },
+      "Quincy Market": {
+        "sourced": 0,
+        "unsourced": 8,
+        "total": 8
+      },
+      "North Market": {
+        "sourced": 0,
+        "unsourced": 6,
+        "total": 6
+      }
+    },
+    "claims": [
+      {
+        "stop": "Faneuil Hall",
+        "text": "The route spans a mere 190 meters from Faneuil Hall to North Market, encompassing a historic tapestry of commerce and rebellion.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Faneuil Hall, established in 1742, was a hub for dissent against Royal oppression and the birthplace of America's first retail specialty carts program in 1976.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "At Quincy Market, learn how Quincy utilized a loophole in eminent domain laws in the 1820s.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Then, discover the establishment of Durgin-Park in 1827 at North Market, known for its hearty New England fare and no-nonsense service.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Faneuil Hall, often called the \"Cradle of Liberty,\" opened its doors in 1742, a generous gift from Boston's wealthiest merchant, Peter Faneuil.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Designed by artist John Smibert, this building was intended as both a marketplace and a meeting hall, quickly becoming the heart of Boston's civic life.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Its Great Hall has hosted numerous significant events that echo through American history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "One such episode occurred on January 8, 1776.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "British General John Burgoyne, known for his role in the Revolutionary War, was staging a play at Faneuil Hall when a real-life British sergeant interrupted the performance.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On January 8, 1776, during a performance of a play by British General John Burgoyne at Faneuil Hall, a real British sergeant interrupted, causing panic as the audience realized it was not part of the "
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "This moment underscored the tension and unpredictability of life in a city under British occupation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Jumping forward to May 1854, the Great Hall became a battleground for justice.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "A mob gathered in an attempt to rescue Anthony Burns, an escaped enslaved man.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In May 1854, a mob at Faneuil Hall attempted to rescue Anthony Burns, an escaped enslaved man, resulting in the death of U.S. Deputy Marshal James Batchelder."
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "The ensuing chaos resulted in the tragic death of U.S. This incident highlighted the deep divisions in America during a time when the country was inching closer to civil war.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Faneuil Hall's history is punctuated by such dramatic episodes, but it is also a place where everyday business thrived.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Today, it stands as a National Historic Landmark and continues to be a vibrant part of Boston's cultural landscape, blending history with commerce.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Its iconic dome and colonnade reflect a time when Boston was expanding rapidly, echoing the city's ambition to blend functionality with grandeur.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "It was a pivotal expansion of Faneuil Hall, driven by Quincy's determination to accommodate Boston's growing needs.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "The market's transformation in 1976 was significant, as it moved away from its roots as a wholesale meat market, notorious for its rat infestations and perilous conditions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "This change marked the birth of what is now the Faneuil Hall Marketplace, a festival marketplace that draws both locals and tourists.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "The renewed space houses over 100 restaurants and shops, making it a vibrant hub of activity.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "One notable episode in Quincy Market's history was the 1974 theft of the 80-pound gilded copper grasshopper weathervane from Faneuil Hall.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Quincy Market remains a cornerstone of the city's rich history, continually evolving while preserving the legacy of its past.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Just ahead, discover how the surrounding markets echo Boston's mercantile past, inviting further exploration into this bustling area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "This blend of old and new typifies Boston's approach to preserving its rich history while embracing contemporary culture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "North Market has been a hub of commerce since the early 1800s, playing a crucial role in Boston's development as a commercial center.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "Built in 1826, it has witnessed the city’s evolution while maintaining its foundational purpose as a marketplace.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "In 1976, the Faneuil Hall Marketplace, which includes North Market, underwent a significant renovation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "This eatery became a Boston institution over the years, cementing its place in the city's culinary landscape.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "In the 1970s, the renovation of North Market was part of a broader effort to rejuvenate the Faneuil Hall area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
