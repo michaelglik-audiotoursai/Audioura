@@ -1227,7 +1227,7 @@ def _named_in_request(name, request_text):
 
 
 def named_restaurant_stops(intent, tour_category, request_text=''):
-    """[LOCAL-556] Every restaurant the request names, in request order.
+    """[LOCAL-557] Every restaurant the request names, in request order.
 
     Two sources: the intent's `named_places` (2026-10-01, "Restaurant Tour Of
     Buttermilk & Bourbon - Back Bay, Boston, MA" came back DISTRICT "Back Bay" with
@@ -1243,10 +1243,17 @@ def named_restaurant_stops(intent, tour_category, request_text=''):
     out = []
     for n in list(raw) + [named_venue_stop(intent, tour_category, request_text)]:
         n = (n or '').strip() if isinstance(n, str) else ''
+        # "chart house restaurant tour" -> the model returned "Chart House Restaurant":
+        # the category word belongs to "restaurant tour", not to the name. Measured
+        # 2026-10-01: retrieval for "Chart House Restaurant Boston" found 423 chars,
+        # "Chart House restaurant" 14,923 -- a medium-tier stop instead of a rich one.
+        _w = n.split()
+        if len(_w) > 1 and _norm_place(_w[-1]) in (tour_category, tour_category + 's'):
+            n = ' '.join(_w[:-1])
         if len(n) < 3:
             continue
         if not _named_in_request(n, request_text):
-            print(f"  [LOCAL-556] named place '{n}' is not in the request — refused")
+            print(f"  [LOCAL-557] named place '{n}' is not in the request — refused")
             continue
         nn = _norm_place(n)
         if any(nn == _norm_place(o) or nn in _norm_place(o) or _norm_place(o) in nn for o in out):
@@ -1256,7 +1263,7 @@ def named_restaurant_stops(intent, tour_category, request_text=''):
 
 
 def named_venue_stop(intent, tour_category, request_text=''):
-    """[LOCAL-556] The one restaurant a restaurant request names, or None.
+    """[LOCAL-557] The one restaurant a restaurant request names, or None.
 
     2026-10-01, Michael on Preview: "restaurant tour of Boston Sail Loft, Boston, MA",
     1 stop -> he got Union Oyster House. Intent returned
@@ -7933,7 +7940,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # harmless.
         _named_venues = named_restaurant_stops(intent, tour_category, user_request)
         if _named_venues:
-            print(f"  [LOCAL-556] Restaurant request names {_named_venues} "
+            print(f"  [LOCAL-557] Restaurant request names {_named_venues} "
                   f"— the listener's stops, not a theme")
         # Inserted at index 0 one by one, so reverse to keep the request's order.
         poi_list, _wp_inserted = _apply_named_waypoints(

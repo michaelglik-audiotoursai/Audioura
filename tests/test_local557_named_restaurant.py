@@ -1,4 +1,4 @@
-"""[LOCAL-556] A restaurant request that names ONE restaurant gets that restaurant.
+"""[LOCAL-557] A restaurant request that names ONE restaurant gets that restaurant.
 
 2026-10-01, Preview: "restaurant tour of Boston Sail Loft, Boston, MA", 1 stop,
 delivered Union Oyster House. Intent read "Sail Loft" as a theme ("sailing
@@ -90,3 +90,10 @@ def test_several_named_keep_request_order():
 
 def test_other_categories_ignore_named_places():
     assert named_restaurant_stops(BB_INTENT, "walking", BB_REQ) == []
+
+
+def test_category_word_is_not_part_of_the_name():
+    req = "chart house restaurant tour, Boston, MA"
+    i = {"named_places": ["Chart House Restaurant"], "scope_precision": None,
+         "geographic_scope": None, "location": "Boston, MA"}
+    assert named_restaurant_stops(i, "restaurant", req) == ["Chart House"]
