@@ -23,3 +23,7 @@
 [2026-10-02T18:09:54] PAIR START 'logan'; cumulative_before=34 ($1.19)
 [2026-10-02T18:13:30] PAIR DONE 'logan' wall=216s run1=ok(4gr) run2=ok(4gr) cumulative_after=42 ($1.47 of $14.00)
 [2026-10-02T18:13:30] SESSION END; cumulative=42 ($1.47)
+[2026-10-02T18:13:39] SESSION START; cumulative=42 ($1.47); queue=['our_lady']
+[2026-10-02T18:13:39] PAIR START 'our_lady'; cumulative_before=42 ($1.47)
+[2026-10-02T18:18:52] PAIR DONE 'our_lady' wall=313s run1=ok(10gr) run2=ok(9gr) cumulative_after=61 ($2.14 of $14.00)
+[2026-10-02T18:18:52] SESSION END; cumulative=61 ($2.14)

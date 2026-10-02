@@ -1,0 +1,313 @@
+{
+  "landmarks": {
+    "Nave": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Portico": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Chancel": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Ambo": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 7,
+      "unsourced": 30,
+      "total": 37,
+      "corpus": 7,
+      "grounded": 0,
+      "parametric": 30
+    },
+    "per_stop": {
+      "Nave": {
+        "sourced": 4,
+        "unsourced": 8,
+        "total": 12
+      },
+      "Portico": {
+        "sourced": 1,
+        "unsourced": 4,
+        "total": 5
+      },
+      "Chancel": {
+        "sourced": 1,
+        "unsourced": 9,
+        "total": 10
+      },
+      "Ambo": {
+        "sourced": 1,
+        "unsourced": 9,
+        "total": 10
+      }
+    },
+    "claims": [
+      {
+        "stop": "Nave",
+        "text": "From the Newton Centre T station, head southeast on Washington Street for about 0.5 miles.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "One such moment occurred in December 2002, when Rev. Walter H. Cuenin took a bold stand against Cardinal Bernard Law.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In early December 2002, Rev. Walter H. Cuenin planned an archdiocesan priests’ meeting at Our Lady’s to push back against Cardinal Bernard Law’s fundraising efforts, leading to Cardinal Law banning al"
+      },
+      {
+        "stop": "Nave",
+        "text": "In response to the Cardinal's fundraising efforts amidst a brewing scandal, Father Cuenin organized an archdiocesan priests' meeting right here in this nave.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "This act was not just a gathering but a statement, leading to Cardinal Law banning all official archdiocesan activities from this church.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In early December 2002, Rev. Walter H. Cuenin planned an archdiocesan priests’ meeting at Our Lady’s to push back against Cardinal Bernard Law’s fundraising efforts, leading to Cardinal Law banning al"
+      },
+      {
+        "stop": "Nave",
+        "text": "Just days later, on December 8, 2002, over 850 parishioners filled this very nave.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "They came together to support Father Cuenin, who delivered a poignant homily against Cardinal Law.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On December 8, 2002, more than 850 parishioners packed the nave of Our Lady’s, giving Father Cuenin multiple standing ovations as he delivered a homily against Cardinal Bernard Law."
+      },
+      {
+        "stop": "Nave",
+        "text": "The scene was one of unity and resolve, as the congregation rose to give Father Cuenin multiple standing ovations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "This powerful demonstration of support contributed to a larger movement within the church, as Rev. Cuenin, along with 58 other priests, spearheaded an open letter demanding Cardinal Law's resignation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "The impact was swift and decisive—Cardinal Law resigned days after the letter was released.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "On June 25, 2023, the church held a Mass of Peace and vigil in memory of Bruno and Gilda D’Amore, who were tragically murdered in their home.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On June 25, 2023, Bruno and Gilda D’Amore were discovered murdered in their home, leading to a Mass of Peace and vigil at Our Lady’s attended by hundreds."
+      },
+      {
+        "stop": "Nave",
+        "text": "On June 25, 2023, seventy-three-year-old Gilda D’Amore was killed alongside her husband, Bruno D’Amore, and her ninety-seven-year-old mother, Lucia Arpino, after suffering blunt force trauma and multiple stab wounds during a home break-in on Broadway Street in Newton, Massachusetts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Forty-one-year-old Christopher Ferguson was arrested and charged with their murders, burglary, and assault.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "The Portico of Christians Catholic Church in Newton, Massachusetts, invites you to consider its role not just as an architectural feature, but as a historical witness to the life and events of the parish.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "Cuenin, then the parish priest, courageously spoke out against Cardinal Bernard Law, the archbishop of boston from 1984, criticizing his handling of the crisis.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "However, Father Cuenin's actions resonated deeply with the community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "In a remarkable show of support, more than 850 parishioners gathered at the church, giving Father Cuenin standing ovations and embracing him as a sign of solidarity.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "1995, Mother Teresa made an unexpected visit to the church, drawing spontaneous crowds eager to see or receive a blessing from the revered humanitarian.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In June 1995, Mother Teresa made an unexpected visit to Our Lady Help of Christians Parish, drawing spontaneous crowds hoping to see or receive a blessing from her."
+      },
+      {
+        "stop": "Chancel",
+        "text": "This is the heart of Our Lady Help of Christians Catholic Church in Newton, MA, where the spiritual and historical converge.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "The Chancel holds a special significance in the life of the church, not only as a space for liturgical functions but as a witness to pivotal episodes in the community's history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "One such moment occurred in September 2005 when Father Walter H. Cuenin announced his resignation from his position here.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In September 2005, Father Walter H. Cuenin announced his resignation at Our Lady Help of Christians after the Archdiocese claimed financial improprieties, which the parish's Finance Council disputed."
+      },
+      {
+        "stop": "Chancel",
+        "text": "The Archdiocese had accused him of financial improprieties, a charge that was met with skepticism by the parish's own Finance Council.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "This episode sent ripples through the community, highlighting the complex relationship between the parish and the Archdiocese, and sparking discussions about transparency and trust in church governance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "Neighbor Christopher Ferguson was arrested and charged with their murders after investigators connected him to the scene through bloody footprints, fingerprints, and DNA.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "This tragedy struck at the core of the community, leading to a deeply emotional memorial service and a Mass of Peace held within these walls.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "The event underscored the Chancel’s role not only as a place of celebration but also as a sanctuary for mourning and healing.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "As you reflect upon these stories, consider the Chancel not just as an architectural feature but as a living narrative of the parish's trials and triumphs.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chancel",
+        "text": "Beyond this space, the Ambo awaits, holding yet another chapter in the church's storied history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "Positioned prominently in the chancel area you visited earlier, the Ambo stands as a focal point for sermons and readings, its presence both commanding and inviting.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "Father Cuenin used his pulpit to openly criticize Cardinal Bernard Law and the Archdiocese of Boston, addressing issues that had shaken the community.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In December 2002, Father Walter H. Cuenin used his pulpit at Our Lady Help of Christians in Newton, Massachusetts, to openly criticize Cardinal Bernard Law and the Archdiocese of Boston, receiving two"
+      },
+      {
+        "stop": "Ambo",
+        "text": "His bold stance earned him two standing ovations from a congregation of over 850 parishioners.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "This moment underscored the church's role as a platform for social justice and activism, significantly impacting both the local community and the broader Catholic Church.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "The Ambo has also been a stage for dramatic and unexpected turns.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "Allegations of financial improprieties leveled by the Archdiocese of Boston led to his sudden departure.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "This event left the parish in a turbulent state, highlighting the Ambo's role as not just a place for spiritual guidance but also for communal reflection and challenge.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "The Ambo, a modest yet significant fixture, has thus borne witness to both triumph and tribulation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "In a larger context, the Catholic Church, which includes an estimated 1.28 to 1.41 billion baptized members worldwide as of 2026, has been a cornerstone in addressing social issues and spiritual guidance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ambo",
+        "text": "As you contemplate these narratives, consider how the Ambo’s role in this church mirrors the evolving role of Catholicism itself.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

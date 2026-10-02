@@ -1,0 +1,257 @@
+{
+  "landmarks": {
+    "Nave": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Altar": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Portico": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Stained Glass Windows": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 6,
+      "unsourced": 23,
+      "total": 29,
+      "corpus": 6,
+      "grounded": 0,
+      "parametric": 23
+    },
+    "per_stop": {
+      "Altar": {
+        "sourced": 2,
+        "unsourced": 10,
+        "total": 12
+      },
+      "Nave": {
+        "sourced": 1,
+        "unsourced": 2,
+        "total": 3
+      },
+      "Portico": {
+        "sourced": 2,
+        "unsourced": 7,
+        "total": 9
+      },
+      "Stained Glass Windows": {
+        "sourced": 1,
+        "unsourced": 4,
+        "total": 5
+      }
+    },
+    "claims": [
+      {
+        "stop": "Altar",
+        "text": "From the Altar, crafted by local artisans in dedication, to the Stained Glass Windows designed by Jean Bazaine, your path weaves through the architectural elegance and religious history of the church.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "Its origins are evident in the Portico area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "The hidden stories of parishioners, such as the altar seen by fifteen in 1879, merge with the modern touch of Monsignor Jess in 1970, creating a tapestry that intertwines past and present within the church's walls.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "As you progress on this tour, you will learn about a profound act of solidarity that took place at Altar in 1997 and the micro-donations from local households that financed the intricate Stained Glass Windows.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "The altar itself, a remarkable work designed by local artisans Eric Boeglin and Deacon Jim, serves as the focal point of the church.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "In 1997, this very altar became a stage for a profound act of solidarity.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "Father Walter H. Cuenin, alongside around 500 parishioners, ventured from this church to the Adams Street Synagogue.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1997, Father Cuenin led around 500 parishioners from Our Lady Help of Christians Parish to the Adams Street Synagogue in solidarity after it was desecrated with anti-Semitic graffiti."
+      },
+      {
+        "stop": "Altar",
+        "text": "The synagogue had been desecrated with anti-Semitic graffiti, and Father Cuenin led his congregation in a moving demonstration of support and unity, showing that the bonds of faith and humanity transcend religious divisions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "In September 2005, Father Cuenin was forced to resign after an audit uncovered $75,000 to $85,000 in 'non-conforming' expenditures.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In September 2005, Father Cuenin was forced to resign from Our Lady Help of Christians Parish after an audit uncovered $75,000 to $85,000 in 'non-conforming' expenditures."
+      },
+      {
+        "stop": "Altar",
+        "text": "The church's name, Our Lady Help of Christians, draws on a rich historical tapestry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "This title for the Blessed Virgin Mary was first described by John Chrysostom in AD 345 and is associated with significant historical events.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "One such moment was the Christian victory over the Ottoman Empire in 1571, attributed to the intercessory prayers to Mary under this title.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "8, 2002, more than 850 parishioners filled this very nave.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On Sunday, December 8, 2002, more than 850 parishioners packed the nave of Our Lady Help of Christians, where Father Cuenin delivered a homily condemning Cardinal Law, resulting in two standing ovatio"
+      },
+      {
+        "stop": "Nave",
+        "text": "Openly condemning Cardinal Bernard Law, he challenged the archdiocese's fundraising approach and its handling of the clergy abuse scandal.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Their absence was first noted when they failed to attend Mass here for their 50th wedding anniversary.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "As you step out of the nave, which you visited just moments ago, you're now facing the Portico of Our Lady Help of Christians Catholic Church in Newton, Massachusetts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "The portico stands as a silent witness to significant events that unfolded within this community, particularly during the tumultuous days of December 2002.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "During this period, H. Cuenin, a priest during the abuse scandal, took a stand against the archdiocesan leadership amid the Boston clergy sexual abuse scandal.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In December 2002, Father Walter H. Cuenin organized a meeting at Our Lady's in Newton to challenge an archdiocesan fundraising campaign and address the leadership crisis during the Boston clergy sexua"
+      },
+      {
+        "stop": "Portico",
+        "text": "Cardinal Bernard Law, who was then the Archbishop of Boston, issued a decree barring and the parish from hosting any official archdiocesan gatherings.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Cardinal Bernard Law issued a decree in December 2002 barring Father Walter H. Cuenin and Our Lady's parish from hosting official archdiocesan gatherings."
+      },
+      {
+        "stop": "Portico",
+        "text": "On December 8, 2002, the tension reached a palpable peak.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "Over 850 parishioners gathered in the church, filling the space you just walked through—the nave.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "The outpouring of support was overwhelming; Father Cuenin received two standing ovations from the parishioners, a clear testament to the community's solidarity and support for his leadership.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "This moment of collective defiance played a role in the eventual resignation of Cardinal Law, marking a significant shift in the archdiocese's leadership.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Portico",
+        "text": "Standing here, the portico may seem just a part of the church's exterior, but it holds the weight of these historical episodes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "The church, designed by James Murphy and dedicated in 1881, initially hosted its congregation in its unfinished basement, a humble beginning that underscores the deep community ties forged here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "The windows depict scenes and figures central to Catholic heritage, such as Our Lady of Perpetual Help, an important Marian devotion.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "Below her image are figures like Saint Alphonsus Liguori, who founded the Congregation of the Most Holy Redeemer, reflecting themes of redemption and hope that resonated deeply with the parish's immigrant roots.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "In the late 20th and early 21st centuries, conservationists from John Canning & Co. embarked on a major preservation effort to restore the church's original Marian color scheme.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stained Glass Windows",
+        "text": "Our Lady Help of Christians was established to serve newly arrived Irish immigrant laborers in Nonantum, providing a spiritual and cultural haven.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The parish of Our Lady Help of Christians was established to serve newly arrived Irish immigrant laborers in Nonantum."
+      }
+    ]
+  }
+}

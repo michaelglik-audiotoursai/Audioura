@@ -1,0 +1,98 @@
+{
+  "slug": "our_lady",
+  "run": "run2",
+  "request": "Our Lady Help of Christians Catholic Church, Newton MA",
+  "location_passed": "Our Lady Help of Christians Catholic Church, Newton MA",
+  "restaurant_signal_appended": false,
+  "tour_type": "museum",
+  "stops_requested": 4,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 310.7,
+  "chars": 10189,
+  "gemini_calls": {
+    "total": 10,
+    "grounded_this_run": 9,
+    "ungrounded_this_run": 1,
+    "pipeline_grounding_requests": 9,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 9,
+        "ungrounded": 1
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 42,
+    "cumulative_grounded_after": 61,
+    "cumulative_cost_after_usd": 2.135,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.19571405000000003,
+    "total_tokens": 105438,
+    "cache_hit": false,
+    "grounding_cost": 0.31500000000000006,
+    "grounding_requests": 9,
+    "tour_total_cost": 0.51071405,
+    "breakdown": {
+      "llm": 0.19571405000000003,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.31500000000000006
+    },
+    "provenance": {
+      "sourced": 6,
+      "unsourced": 23,
+      "total": 29,
+      "corpus": 6,
+      "grounded": 0,
+      "parametric": 23
+    },
+    "score": {
+      "defects_before": {
+        "fabricated_attribution": "1 attribution(s); unverified attribution: \"Founded in 1790 by the Society of Jesus\" (no source confirms it)",
+        "unsourced_person_event": "1 unsourced person-event(s); \"James Murphy\" placed here in 1881 with no source: \"The church, designed by James Murphy and dedicated in 1881, initially hosted its congregation in its unfinished basement\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "1 unsourced person-event(s); \"James Murphy\" placed here in 1881 with no source: \"The church, designed by James Murphy and dedicated in 1881, initially hosted its congregation in its unfinished basement\""
+      },
+      "removed": [
+        "fabricated_attribution"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.003765,
+        "total_tokens": 792
+      },
+      "cost_without_retry": {
+        "total_cost": 0.204808,
+        "total_tokens": 39453
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "unsourced_person_event"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "unsourced_person_event": "1 unsourced person-event(s); \"James Murphy\" placed here in 1881 with no source: \"The church, designed by James Murphy and dedicated in 1881, initially hosted its congregation in its unfinished basement\""
+    },
+    "named_people": 8,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 15,
+    "chars": 10189,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 2,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 22,
+      "total": 24
+    }
+  }
+}
