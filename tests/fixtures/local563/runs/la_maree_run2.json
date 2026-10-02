@@ -1,0 +1,115 @@
+{
+  "slug": "la_maree",
+  "run": "run2",
+  "request": "La Mar\u00e9e restaurant, Monaco",
+  "location_passed": "restaurant tour of La Mar\u00e9e restaurant, Monaco",
+  "restaurant_signal_appended": true,
+  "tour_type": "restaurant",
+  "stops_requested": 1,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 109.1,
+  "chars": 2132,
+  "gemini_calls": {
+    "total": 2,
+    "grounded_this_run": 2,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 2,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 2,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 30,
+    "cumulative_grounded_after": 34,
+    "cumulative_cost_after_usd": 1.19,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.059186899999999994,
+    "total_tokens": 29128,
+    "cache_hit": false,
+    "grounding_cost": 0.07,
+    "grounding_requests": 2,
+    "tour_total_cost": 0.1291869,
+    "breakdown": {
+      "llm": 0.059186899999999994,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.07
+    },
+    "provenance": {
+      "sourced": 2,
+      "unsourced": 8,
+      "total": 10,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 8
+    },
+    "score": {
+      "defects_before": {},
+      "defects_after": {},
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.038859,
+        "total_tokens": 9728
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": false,
+    "defects": [
+      "distance"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "distance": "kilometre figure on a building tour: 12 kilometers"
+    },
+    "named_people": 3,
+    "stops_delivered": 1,
+    "stops_requested": 1,
+    "dates": 4,
+    "chars": 2132,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 3,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 6,
+      "total": 9
+    },
+    "restaurant_practicals": {
+      "stops": [
+        {
+          "name": "La Mar\u00e9e",
+          "provider": "serp(29)+openai+known_corpus",
+          "nothing_actionable": true,
+          "hours": false,
+          "closed_days": false,
+          "reservation": false,
+          "price_band": false,
+          "raw": "nothing actionable"
+        }
+      ],
+      "stops_with_any_practical": 0,
+      "hours_count": 0,
+      "reservation_count": 0,
+      "price_band_count": 0,
+      "closed_dropped": [
+        {
+          "name": "La Mar\u00e9e",
+          "reason": "recorded in known_closed_venues.json: Port Palace Hotel acquired by Madar Group in 2020; the 7-year management lease expired April 2020 and extension talks failed; staff were locked out an"
+        }
+      ]
+    }
+  }
+}

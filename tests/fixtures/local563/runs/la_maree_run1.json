@@ -1,0 +1,121 @@
+{
+  "slug": "la_maree",
+  "run": "run1",
+  "request": "La Mar\u00e9e restaurant, Monaco",
+  "location_passed": "restaurant tour of La Mar\u00e9e restaurant, Monaco",
+  "restaurant_signal_appended": true,
+  "tour_type": "restaurant",
+  "stops_requested": 1,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 102.4,
+  "chars": 1668,
+  "gemini_calls": {
+    "total": 2,
+    "grounded_this_run": 2,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 2,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 2,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 30,
+    "cumulative_grounded_after": 34,
+    "cumulative_cost_after_usd": 1.19,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.0621276,
+    "total_tokens": 28485,
+    "cache_hit": false,
+    "grounding_cost": 0.07,
+    "grounding_requests": 2,
+    "tour_total_cost": 0.1321276,
+    "breakdown": {
+      "llm": 0.0621276,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.07
+    },
+    "provenance": {
+      "sourced": 0,
+      "unsourced": 8,
+      "total": 8,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 8
+    },
+    "score": {
+      "defects_before": {
+        "fabricated_attribution": "1 attribution(s); unverified attribution: \"Established in 2013 by Mehdi Douss\" (no source confirms it)"
+      },
+      "defects_after": {
+        "no_story": "no named people anywhere in the tour"
+      },
+      "removed": [
+        "fabricated_attribution"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.004655,
+        "total_tokens": 980
+      },
+      "cost_without_retry": {
+        "total_cost": 0.037851,
+        "total_tokens": 9014
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "no_story"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "no_story": "no named people anywhere in the tour"
+    },
+    "named_people": 0,
+    "stops_delivered": 1,
+    "stops_requested": 1,
+    "dates": 1,
+    "chars": 1668,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 1,
+      "local229_contradicted_groups_blocked": 1,
+      "local472_specificity_removals": 3,
+      "total": 5
+    },
+    "restaurant_practicals": {
+      "stops": [
+        {
+          "name": "La Mar\u00e9e",
+          "provider": "serp(29)+openai+known_corpus",
+          "nothing_actionable": false,
+          "hours": true,
+          "closed_days": false,
+          "reservation": false,
+          "price_band": false,
+          "raw": "hours=8:00-"
+        }
+      ],
+      "stops_with_any_practical": 1,
+      "hours_count": 1,
+      "reservation_count": 0,
+      "price_band_count": 0,
+      "closed_dropped": [
+        {
+          "name": "La Mar\u00e9e",
+          "reason": "recorded in known_closed_venues.json: Port Palace Hotel acquired by Madar Group in 2020; the 7-year management lease expired April 2020 and extension talks failed; staff were locked out an"
+        }
+      ]
+    }
+  }
+}
