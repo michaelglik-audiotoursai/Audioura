@@ -37,7 +37,8 @@ top of +21 on either system."*
 | 24 | iOS | 2.3.2 | `92dac9e` | **uploaded to TestFlight** (first upload via the App Store Connect API key, delivery `bde945f9`) — carries **LOCAL-477** (Add Stop no longer pops to Listen) and **LOCAL-478** (original audio loads; stale iOS container paths heal after a TestFlight update) | 2026-09-15 |
 | 25 | iOS | 2.3.2 | `1673643` | **uploaded to TestFlight** — build 24 shipped without `--dart-define=GATEWAY_API_KEY`, so `X-API-Key` was empty and every gateway call 401'd ("couldn't connect securely"). 25 is the first iOS build made with `build_ios_release.sh`; key verified present in the compiled binary. Delivery `1dca7f30` | 2026-09-16 |
 | 26 | iOS | 2.3.2 | `705bd8f` | **uploaded to TestFlight** (delivery `d2b21824`) — carries **LOCAL-482**: the stop editor's audio player now loads its HTML from the audio's own directory with a relative `src`, matching the Listen/news players, so WKWebView's read grant covers the file. **First build intended for external testers.** | 2026-09-16 |
-| 27 | — | — | — | **NEXT** | — |
+| 27 | iOS | 2.3.2 | `9e24304` | **uploaded to TestFlight** — first build after D593: LOCAL-557 named restaurants, LOCAL-554 title case, user-chosen stops UI, share-by-code UI (ST-3/4; the server side is not deployed yet). GATEWAY_API_KEY fingerprint-checked and present in the binary. **Not distributed to testers**: Michael tests on-device first. | 2026-10-01 |
+| 28 | — | — | — | **NEXT** | — |
 
 ## Why 20 and 21 differ across platforms
 
