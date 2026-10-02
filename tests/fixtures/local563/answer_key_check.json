@@ -1,0 +1,597 @@
+{
+ "sail_loft": {
+  "must": {
+   "opened": {
+    "value": "1984",
+    "method": "phrase_probe",
+    "probes": [
+     "1984"
+    ],
+    "matched_probes": [
+     "1984"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "reservations": {
+    "value": "no reservations (first come, first served)",
+    "method": "phrase_probe",
+    "probes": [
+     "reservations",
+     "first",
+     "served"
+    ],
+    "matched_probes": [
+     "reservations",
+     "first",
+     "served"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "address": {
+    "value": "80 Atlantic Avenue, Boston, MA 02110",
+    "method": "phrase_probe",
+    "probes": [
+     "atlantic avenue",
+     "boston",
+     "atlantic",
+     "avenue"
+    ],
+    "matched_probes": [
+     "atlantic avenue",
+     "boston",
+     "atlantic",
+     "avenue"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "status": {
+    "value": "open",
+    "method": "operating_inference",
+    "probes": [],
+    "matched_probes": [
+     "open (operating)"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   }
+  },
+  "must_not": {},
+  "unverified": {},
+  "sources": [
+   "http://thebostonsailloft.com/ (official: 'Since 1984', 'first come, first serve basis (no reservations)')"
+  ],
+  "d538_closed_verdicts": [],
+  "keyed_venue_got_closed_verdict": false
+ },
+ "buttermilk": {
+  "must": {
+   "chef": {
+    "value": "Jason Santos",
+    "method": "phrase_probe",
+    "probes": [
+     "jason santos",
+     "jason",
+     "santos"
+    ],
+    "matched_probes": [
+     "jason santos",
+     "jason",
+     "santos"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "opened": {
+    "value": "February 2017",
+    "method": "phrase_probe",
+    "probes": [
+     "2017",
+     "february"
+    ],
+    "matched_probes": [
+     "2017"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": false
+   },
+   "address": {
+    "value": "160 Commonwealth Ave, Back Bay",
+    "method": "phrase_probe",
+    "probes": [
+     "commonwealth ave",
+     "back bay",
+     "commonwealth"
+    ],
+    "matched_probes": [
+     "commonwealth ave",
+     "back bay",
+     "commonwealth"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "status": {
+    "value": "open",
+    "method": "operating_inference",
+    "probes": [],
+    "matched_probes": [],
+    "stated": false,
+    "in_tour_text": false,
+    "in_gemini_answer": false
+   }
+  },
+  "must_not": {},
+  "unverified": {},
+  "sources": [
+   "https://www.bostonglobe.com/lifestyle/names/2017/02/23/santos-ready-serve-buttermilk-bourbon-back-bay/NFduXcc56abIEFMmF8Ys2H/story.html",
+   "https://www.bostonmagazine.com/restaurants/2017/02/13/buttermilk-bourbon-jason-santos-first-look-photos/"
+  ],
+  "d538_closed_verdicts": [
+   {
+    "run": "run1",
+    "name": "Buttermilk & Bourbon"
+   }
+  ],
+  "keyed_venue_got_closed_verdict": true
+ },
+ "chart_house": {
+  "must": {
+   "building": {
+    "value": "Gardiner Building, built 1763 (rebuilt 1812), oldest surviving structure on Long Wharf",
+    "method": "phrase_probe",
+    "probes": [
+     "1763",
+     "1812",
+     "gardiner building",
+     "long wharf",
+     "gardiner",
+     "building",
+     "built",
+     "rebuilt",
+     "oldest",
+     "surviving",
+     "structure",
+     "wharf"
+    ],
+    "matched_probes": [
+     "1763",
+     "gardiner building",
+     "long wharf",
+     "gardiner",
+     "building",
+     "built",
+     "oldest",
+     "surviving",
+     "structure",
+     "wharf"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "history": {
+    "value": "once John Hancock's counting house",
+    "method": "phrase_probe",
+    "probes": [
+     "john hancock",
+     "hancock",
+     "counting",
+     "house"
+    ],
+    "matched_probes": [
+     "john hancock",
+     "hancock",
+     "counting",
+     "house"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "address": {
+    "value": "60 Long Wharf",
+    "method": "phrase_probe",
+    "probes": [
+     "long wharf",
+     "wharf"
+    ],
+    "matched_probes": [
+     "long wharf",
+     "wharf"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "status": {
+    "value": "open",
+    "method": "operating_inference",
+    "probes": [],
+    "matched_probes": [],
+    "stated": false,
+    "in_tour_text": false,
+    "in_gemini_answer": false
+   }
+  },
+  "must_not": {},
+  "unverified": {},
+  "sources": [
+   "https://en.wikipedia.org/wiki/Long_Wharf_(Boston)"
+  ],
+  "d538_closed_verdicts": [
+   {
+    "run": "run1",
+    "name": "Chart House"
+   },
+   {
+    "run": "run2",
+    "name": "Chart House"
+   }
+  ],
+  "keyed_venue_got_closed_verdict": true
+ },
+ "sycamore": {
+  "must": {
+   "status": {
+    "value": "OPEN (a 'permanently closed' verdict is an automatic FAIL: the D544 bug)",
+    "method": "phrase_probe",
+    "probes": [
+     "open",
+     "fail",
+     "permanently",
+     "closed",
+     "verdict",
+     "automatic"
+    ],
+    "matched_probes": [
+     "open",
+     "permanently",
+     "closed"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "address": {
+    "value": "755 Beacon Street, Newton MA 02459",
+    "method": "phrase_probe",
+    "probes": [
+     "beacon street",
+     "newton ma",
+     "beacon",
+     "street",
+     "newton"
+    ],
+    "matched_probes": [
+     "beacon street",
+     "beacon",
+     "street",
+     "newton"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "opened": {
+    "value": "late 2012",
+    "method": "phrase_probe",
+    "probes": [
+     "2012"
+    ],
+    "matched_probes": [
+     "2012"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "chef_owner": {
+    "value": "David Punch",
+    "method": "phrase_probe",
+    "probes": [
+     "david punch",
+     "david",
+     "punch"
+    ],
+    "matched_probes": [
+     "david punch",
+     "david",
+     "punch"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "hours": {
+    "value": "dinner Tue-Sat from 4:30pm",
+    "method": "phrase_probe",
+    "probes": [
+     "dinner"
+    ],
+    "matched_probes": [
+     "dinner"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "reservations": {
+    "value": "phone 617.244.4445 or OpenTable",
+    "method": "phrase_probe",
+    "probes": [
+     "opentable",
+     "phone"
+    ],
+    "matched_probes": [
+     "opentable",
+     "phone"
+    ],
+    "stated": true,
+    "in_tour_text": false,
+    "in_gemini_answer": true
+   }
+  },
+  "must_not": {},
+  "unverified": {},
+  "sources": [
+   "https://www.sycamorenewton.com/ (official)"
+  ],
+  "d538_closed_verdicts": [
+   {
+    "run": "run1",
+    "name": "The Local"
+   }
+  ],
+  "keyed_venue_got_closed_verdict": false
+ },
+ "la_maree": {
+  "must": {
+   "status": {
+    "value": "CLOSED permanently, 30 September 2020 (lease dispute after Port Palace Hotel sale)",
+    "method": "phrase_probe",
+    "probes": [
+     "2020",
+     "closed",
+     "september",
+     "port palace hotel",
+     "permanently",
+     "lease",
+     "dispute",
+     "after",
+     "palace",
+     "hotel"
+    ],
+    "matched_probes": [
+     "2020",
+     "closed",
+     "september",
+     "port palace hotel",
+     "permanently",
+     "lease",
+     "dispute",
+     "after",
+     "palace",
+     "hotel"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   }
+  },
+  "must_not": {
+   "status": {
+    "value": "open",
+    "probes": [],
+    "matched_probes": [],
+    "appeared": false
+   }
+  },
+  "unverified": {},
+  "sources": [
+   "https://foursquare.com/mareemonaco ('Now Closed')",
+   "https://monaco-hebdo.com/economie/restaurant-la-maree-repris/"
+  ],
+  "d538_closed_verdicts": [],
+  "keyed_venue_got_closed_verdict": false
+ },
+ "logan": {
+  "must": {
+   "named_for": {
+    "value": "Major General Edward Lawrence Logan (Spanish-American War officer from South Boston)",
+    "method": "phrase_probe",
+    "probes": [
+     "major general edward lawrence logan",
+     "spanish",
+     "american war",
+     "south boston",
+     "major",
+     "general",
+     "edward",
+     "lawrence",
+     "logan",
+     "american",
+     "officer",
+     "south",
+     "boston"
+    ],
+    "matched_probes": [
+     "major general edward lawrence logan",
+     "spanish",
+     "american war",
+     "south boston",
+     "major",
+     "general",
+     "edward",
+     "lawrence",
+     "logan",
+     "american",
+     "south",
+     "boston"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "opened": {
+    "value": "September 8, 1923 as 'Boston Airport' at Jeffries Point",
+    "method": "phrase_probe",
+    "probes": [
+     "1923",
+     "september",
+     "boston airport",
+     "jeffries point",
+     "boston",
+     "airport",
+     "jeffries",
+     "point"
+    ],
+    "matched_probes": [
+     "1923",
+     "september",
+     "boston airport",
+     "jeffries point",
+     "boston",
+     "airport",
+     "jeffries",
+     "point"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "renamed": {
+    "value": "General Edward Lawrence Logan International Airport, by act of the legislature, April 29, 1954",
+    "method": "phrase_probe",
+    "probes": [
+     "1954",
+     "general edward lawrence logan international airport",
+     "april",
+     "general",
+     "edward",
+     "lawrence",
+     "logan",
+     "international",
+     "airport",
+     "legislature"
+    ],
+    "matched_probes": [
+     "april",
+     "general",
+     "edward",
+     "lawrence",
+     "logan",
+     "international",
+     "airport",
+     "legislature"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   },
+   "dedication": {
+    "value": "dedicated 8 Sep 1923; Mayor James Michael Curley attended and started a plane race to Boston Light",
+    "method": "phrase_probe",
+    "probes": [
+     "1923",
+     "mayor james michael curley",
+     "boston light",
+     "dedicated",
+     "mayor",
+     "james",
+     "michael",
+     "curley",
+     "attended",
+     "started",
+     "plane",
+     "boston",
+     "light"
+    ],
+    "matched_probes": [
+     "1923",
+     "mayor james michael curley",
+     "dedicated",
+     "mayor",
+     "james",
+     "michael",
+     "curley",
+     "plane",
+     "boston",
+     "light"
+    ],
+    "stated": true,
+    "in_tour_text": true,
+    "in_gemini_answer": true
+   }
+  },
+  "must_not": {},
+  "unverified": {
+   "Governor Channing Cox": {
+    "note": "no source found (Wikipedia, Boston Globe 2023, Airways Magazine checked); may appear only with a cited source",
+    "distinctive_probe": "channing",
+    "appeared_in_answers": [
+     "run1:venue_parts.py:default_ask_grounded:371",
+     "run1:venue_parts.py:default_ask_grounded:371",
+     "run2:venue_parts.py:default_ask_grounded:371"
+    ],
+    "appeared": true,
+    "appeared_in_tour_text": true,
+    "backed_by_grounding_support_span": false,
+    "support_span_sources": [],
+    "answer_domains_when_appeared": [
+     "airport-technology.com",
+     "airwaysmag.com",
+     "arch2o.com",
+     "architecturelab.net",
+     "archive.org",
+     "britannica.com",
+     "britishaviationgroup.co.uk",
+     "caughtinsouthie.com",
+     "centerforhealthjournalism.org",
+     "commonwealthbeacon.org",
+     "facebook.com",
+     "facilitiesnet.com",
+     "fandom.com",
+     "flashbak.com",
+     "friendsofbelleislemarsh.com",
+     "hiddensacredspaces.org",
+     "hok.com",
+     "iacac.aero",
+     "kiddle.co",
+     "leventhalmap.org",
+     "massport.com",
+     "metalocus.es",
+     "ncronline.org",
+     "newenglandaviationhistory.com",
+     "nps.gov",
+     "nucorskyline.com",
+     "religionnews.com",
+     "simpleflying.com",
+     "skanska.com",
+     "stuckattheairport.com",
+     "thebostonpilot.com",
+     "tpl.org",
+     "usf.edu",
+     "wgbh.org",
+     "wikipedia.org",
+     "wordandway.org"
+    ]
+   }
+  },
+  "sources": [
+   "https://en.wikipedia.org/wiki/Logan_International_Airport",
+   "https://www.bostonglobe.com/2023/10/12/metro/logan-airport-100-years-of-history/ (Curley at the 1923 dedication; NOT in Wikipedia)"
+  ],
+  "d538_closed_verdicts": [],
+  "keyed_venue_got_closed_verdict": false
+ }
+}

@@ -1,0 +1,763 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182930.txt'
+
+======================================================================
+CALL #001 | 18:29:30.393 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: French Riviera biking tour
+  tour_type: walking
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/riviera_bike_run2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182930.txt'
+
+======================================================================
+CALL #002 | 18:29:30.393 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: French Riviera biking tour
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'French Riviera biking tour' → 'French Riviera biking'
+  [LOCAL-46] Stripped transport words: 'French Riviera biking' → 'French Riviera'
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "landmarks",
+    "location": "French Riviera",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "French Riviera",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "bike",
+    "country_scope": "France"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=bike, country_scope=France (keyword=bike, intent=bike)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: French Riviera
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.6s cumulative=1.6s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: BIKE
+Using walking template for French Riviera biking tour - walking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182930.txt'
+
+======================================================================
+CALL #003 | 18:29:31.974 | GENERATING_PROMPT
+======================================================================
+  location: French Riviera biking tour
+  user_request: French Riviera biking tour
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for French Riviera biking tour...
+  [S17] no scope_constraint (precision='CITY', scope='French Riviera')
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182930.txt'
+
+======================================================================
+CALL #004 | 18:29:31.975 | PHASE_3A_REQUEST
+======================================================================
+  location: French Riviera biking tour
+  total_stops: 4
+  poi_type_hint: landmarks
+
+PHASE 3A API call cost: $0.0005 (611 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182930.txt'
+
+======================================================================
+CALL #005 | 18:29:36.057 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for French Riviera biking tour.
+List exactly 7 specific, real, well-known landmarks relevant to: French Riviera biking tour.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A BIKING TOUR:
+Stops should be reachable via bike paths, roads, or trails suitabl
+  prompt_last_300_chars:  cycling routes.
+- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Promenade des Anglais", "address": "Prom. des Anglais, 06000 Nice, France", "reason": "Famous waterfront promenade in Nice, ideal for scenic biking along the Mediterranean coast."},
+    {"name": "Castle Hill (Colline du Château)", "address": "Rue des Ponchettes, 06300 Nice, France", "reason": "Offers panoramic views of Nice and the coastline, accessible via bike paths."},
+    {"name": "Villefranche-sur-Mer", "address": "Villefranche-sur-Mer, 06230, France", "reason": "Charming co
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'Promenade des Anglais'
+   ! [LOCAL-329] Hollow reason for 'Castle Hill (Colline du Château)': 'Offers panoramic views of Nice and the coastline, accessible via bike paths.'
+   ! [LOCAL-329] Hollow reason for 'Villefranche-sur-Mer': 'Charming coastal town with picturesque views, reachable via scenic coastal roads'
+   ! [LOCAL-329] Hollow reason for 'Cap Ferrat': 'Known for its beautiful coastal paths and stunning villas, perfect for biking.'
+   ! [LOCAL-329] Hollow reason for 'Menton': 'Known as the 'Pearl of France', offers beautiful coastal paths and gardens, idea'
+  [LOCAL-329] Substance filter: 4 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 2 substantive selection reason(s)
+OK PHASE 3A parsed 2 candidate POI(s):
+   - Eze Village @ Eze, 06360, France
+   - Monaco @ Monaco, 98000, Monaco
+  [area_resolver] Parsed: city='French Riviera', neighborhood=''
+  [area_resolver] Resolved as region: French Riviera → Q182822
+  [area_resolver] City resolved: French Riviera → Q182822 (43.3200, 6.6650)
+  [area_resolver] Entity is a region — using wider radius: 15.0km
+  [area_resolver] Resolved: center=(43.3200, 6.6650), radius=15.0km, lang=fr
+  [area_cache] HIT for Q182822: 7 landmarks (tier=medium)
+  [verify_landmarks] 0/2 stops verified against 7 discovered landmarks (tier: medium)
+  [WALK-D1] Verified 0 stops, tier=medium
+
+PHASE 4.5: Validating AI knowledge for French Riviera biking tour...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+
+Part C: Fetching 2 replacement POI(s), attempt 1/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'Promenade des Anglais'
+   Part C attempt 1: AI returned 1 usable candidate(s)
+   Part C attempt 1: 1 survived; total now 3
+
+Part C: Fetching 1 replacement POI(s), attempt 2/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'Promenade des Anglais'
+   Part C attempt 2: AI returned 0 usable candidate(s)
+   Part C attempt 2: 0 survived; total now 3
+  [EXISTENCE-GATE] LOG_ONLY — 3/3 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Eze Village' — stop_corpus(geographic): 'Vieux Village de Roquebrune-Cap-Martin' at 'French Riv
+    [VERIFIED] 'Monaco' — stop_corpus(geographic): 'Jardin Exotique de Monaco' at 'French Riviera cycling 
+    [VERIFIED] 'Cap Ferrat Coastal Path' — stop_corpus(geographic): "Cap d'Antibes Coastal Path" at 'French Riviera walking
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Monaco': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +1 passages, 6 queries issued, 0 attributions dropped
+
+  [LOCAL-290] REPLENISHMENT: need 1 more stops (have 3/4)
+  [EXISTENCE-GATE] LOG_ONLY — 3/4 stops verified (75%), 1 would be dropped
+    [UNVERIFIED] 'Palace of Festivals and Congresses' — no evidence
+    [VERIFIED] 'Saint-Tropez Citadel' — venue_corpus canonical_title(geo): 'Place des Lices (Saint-Tropez)' at 'French R
+    [VERIFIED] 'Port de Nice' — venue_corpus canonical_title(geo): 'Port Grimaud' at 'French Riviera walking are
+    [VERIFIED] 'Villa Rothschild' — stop_corpus(geographic): 'Villa Ephrussi de Rothschild' at "Biking tour in Frenc
+    [HARVEST] 'Saint-Tropez Citadel': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Port de Nice': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 1 already had corpus, 2 verified_no_detail
+    [INTERPRETIVE] 'Saint-Tropez Citadel': +4 passages (2 queries)
+    [INTERPRETIVE] 'Villa Rothschild': +3 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +7 passages, 6 queries issued, 0 attributions dropped
+    [LOCAL-290] REPLENISHED: 'Saint-Tropez Citadel' — venue_corpus canonical_title(geo): 'Place des Lices (Saint-T
+    [LOCAL-290] Round 1: +1 verified, total now 4/4
+  [LOCAL-290] Replenishment SUCCESS: 4/4 stops
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182930.txt'
+
+======================================================================
+CALL #006 | 18:30:28.203 | PHASE_3B_REQUEST
+======================================================================
+  location: French Riviera biking tour
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0008 (1024 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: French, hint: auto)
+  [LOCAL-355] Eze Village: no practical facts in OSM
+  [LOCAL-355] Monaco: no practical facts in OSM
+  [LOCAL-355] Cap Ferrat Coastal Path: no practical facts in OSM
+  [LOCAL-355] Saint-Tropez Citadel: no practical facts in OSM
+   GEO-CHECK: all 4 stops within cycling distance (max leg 72.25 km, total 89.01 km, limit 120 km)
+Extracted first POI coordinates: (43.7102, 7.3545)
+
+=== Extracted POI Information ===
+1. Eze Village
+   Address: Eze, 06360, France
+   Coordinates: 43.7102, 7.3545
+   Directions: From Nice, take the train to Eze-sur-Mer station, then bike uphill on D6098 for ...
+2. Monaco
+   Address: Monaco, 98000, Monaco
+   Coordinates: 43.7384, 7.4246
+   Directions: From Eze Village, bike down the D37 and follow signs to Monaco via the scenic co...
+3. Cap Ferrat Coastal Path
+   Address: Sentier du Littoral, 06230 Saint-Jean-Cap-Ferrat, France
+   Coordinates: 43.6875, 7.3174
+   Directions: From Monaco, take Avenue de la Costa and follow the coastal road to Saint-Jean-C...
+4. Saint-Tropez Citadel
+   Address: Rue du Général Allard, 83990 Saint-Tropez, France
+   Coordinates: 43.2672, 6.6345
+   Directions: From Cap Ferrat, bike along the coast to Saint-Tropez via D93, enjoying the vibr...
+================================
+
+  [D556] +5 story fact(s) for 'Eze Village' via gemini (4 high)
+  [D556] +5 story fact(s) for 'Monaco' via gemini (5 high)
+  [D556] +7 story fact(s) for 'Cap Ferrat Coastal Path' via gemini (7 high)
+  [D556] +4 story fact(s) for 'Saint-Tropez Citadel' via gemini (4 high)
+[TIMING] phase=poi_selection elapsed=200.4s cumulative=202.0s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Eze Village French Riviera' → 4858 chars
+  [LOCAL-47] Eze Village: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Monaco French Riviera' → 28814 chars
+  [LOCAL-47] Monaco: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Cap Ferrat Coastal Path French Riviera' → 18034 chars
+  [LOCAL-47] Cap Ferrat Coastal Path: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Saint-Tropez Citadel French Riviera' → 18723 chars
+  [LOCAL-47] Saint-Tropez Citadel: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=French Riviera biking tour model=gpt-4o tokens=1494 (in=855 out=639) cost=$0.0085 latency=5.5s
+[COST_METER] FRESH | spine_generate | $0.008528 | user=None | job=local563-riviera_bike-run2
+  [LOCAL-278] Spine cost folded into total: $0.0085
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (13 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Eze Village' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Monaco' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Cap Ferrat Coastal Path' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Saint-Tropez Citadel' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=16.5s cumulative=218.6s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=218.6s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=218.6s
+
+Generating description for Stop 1: Eze Village by , ...
+
+Generating description for Stop 2: Monaco by , ...
+
+Generating description for Stop 3: Cap Ferrat Coastal Path by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Cap Ferrat Coastal Path' matched_work=False medium='' work_identity_chars=0
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Monaco' matched_work=False medium='' work_identity_chars=0
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Eze Village' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 4: Saint-Tropez Citadel by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Saint-Tropez Citadel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cap Ferrat Coastal Path', 14, ''), ('Cap Ferrat Coastal Path', 13, ''), ('Cap Ferrat Coastal Path', 13, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13194 after=23578 (+10384 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23578)
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Monaco', 6, ''), ('Monaco', 6, ''), ('Monaco', 4, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14425 after=24251 (+9826 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24251)
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Eze Village', 11, ''), ('Eze Village', 10, ''), ('Eze Village', 7, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14188 after=24152 (+9964 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24152)
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Saint-Tropez Citadel', 13, ''), ('Saint-Tropez Citadel', 12, ''), ('Saint-Tropez Citadel', 8, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=12651 after=23010 (+10359 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23010)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0287 (6040 tokens, model=gpt-4o)
+Stop 2 description word count: 256 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0286 (6029 tokens, model=gpt-4o)
+Stop 1 description word count: 283 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0281 (5908 tokens, model=gpt-4o)
+Stop 4 description word count: 278 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0285 (5993 tokens, model=gpt-4o)
+Stop 3 description word count: 309 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Eze Village': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✓ PASS stop='Monaco': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Cap Ferrat Coastal Path': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Saint-Tropez Citadel': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.000638 (input=2833, output=355)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 2: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 3: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 3 para 4: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE, R2_QUESTION)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 4: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 12 paragraphs retried, 8 fixed/improved, 4 kept original
+  [LOCAL-192] Retry cost: $0.0049 (6083 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 2 'Monaco': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] Stop 1 'Eze Village': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-261] R3 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Eze Village': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Monaco': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 4 sentences deleted, 1 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 14
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 16
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Eze Village' conf=high reason='Generic scene-setting applicable to any historic villa.': "Each corner of the cobbled streets unveils a new narrative, blending past and present in the heart of the French Riviera"
+    [LOCAL-472] UNGROUNDED entity stop='Eze Village' entity='Lieuwe Westra' reason='It does not specify a concrete link between Lieuwe Westra and Èze Village.' in: "Èze, a commune in the Alpes-Maritimes department, is a place where history and cycling intersect in "
+    [LOCAL-472] UNGROUNDED entity stop='Eze Village' entity='Geraint Thomas' reason='No concrete link to Eze Village is provided.' in: "The village is a favorite training ground for cycling stars like Tadej Pogačar, Geraint Thomas, and "
+    [LOCAL-472] UNGROUNDED entity stop='Eze Village' entity='Remco Evenepoel' reason='No concrete link to Eze Village is provided.' in: "The village is a favorite training ground for cycling stars like Tadej Pogačar, Geraint Thomas, and "
+    [LOCAL-472] UNGROUNDED entity stop='Monaco' entity='In May' reason='No concrete link to Monaco is established.' in: "Beneath the surface of glamour and fortune, Monaco has its share of dramatic tales involving the cyc"
+    [LOCAL-472] UNGROUNDED entity stop='Monaco' entity='Chris Froome' reason='No concrete link to Monaco is established.' in: "Beneath the surface of glamour and fortune, Monaco has its share of dramatic tales involving the cyc"
+    [LOCAL-472] UNGROUNDED entity stop='Monaco' entity='Peter Sagan' reason='No concrete link to Monaco is established.' in: "Beneath the surface of glamour and fortune, Monaco has its share of dramatic tales involving the cyc"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='Sentier des Douaniers' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The Cap Ferrat Coastal Path is a remarkable connection between the natural and historical. Created d"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='King Leopold' reason='It does not specify that King Leopold stayed or lived at this stop.' in: "One such story is that of King Leopold II of Belgium and his young companion, Blanche Zélia Joséphin"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='Blanche Zélia Joséphine Delacroix' reason='No concrete link to the Cap Ferrat Coastal Path is provided.' in: "One such story is that of King Leopold II of Belgium and his young companion, Blanche Zélia Joséphin"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='Caroline Lacroix' reason='No concrete link to the Cap Ferrat Coastal Path is provided.' in: "One such story is that of King Leopold II of Belgium and his young companion, Blanche Zélia Joséphin"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='As Leopold' reason='No concrete link to the Cap Ferrat Coastal Path is provided.' in: "One such story is that of King Leopold II of Belgium and his young companion, Blanche Zélia Joséphin"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='King Leopold II of' reason='No concrete link to the Cap Ferrat Coastal Path is provided.' in: "One such story is that of King Leopold II of Belgium and his young companion, Blanche Zélia Joséphin"
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='Somerset Maugham' reason='No specific link to Cap Ferrat is provided.' in: "Continuing on, your earlier stops in Eze Village and Monaco each showcased different aspects of the "
+    [LOCAL-472] UNGROUNDED entity stop='Cap Ferrat Coastal Path' entity='Historic Monument' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The path now stretches toward the horizon, where a historic lighthouse stands sentinel. Classified a"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Tropez Citadel' entity='Operation Dragoon' reason='It does not specify a direct link between Operation Dragoon and the Citadel.' in: "On August 15, 1944, amid the cacophony of war, the Citadel witnessed a pivotal moment during Operati"
+    [LOCAL-472] UNGROUNDED entity stop='Saint-Tropez Citadel' entity='François Allard' reason='It does not specify that Allard lived or stayed at the Citadel.' in: "The Citadel has witnessed cultural mingling tales. In 1835, General Jean-François Allard brought his"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/38)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 14
+    Glossed (composed): 3
+    Suppressed (already explained): 2
+    Degraded (name dropped): 8
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1993 tokens, $0.0004, 5.5s
+    Gloss: 1320 tokens, $0.0003, 4.6s
+    Compose: 2167 tokens, $0.0003, 3.2s
+    Total added cost: $0.0011
+    Stops affected: 4
+    Glosses applied:
+      • Lieuwe Westra → DEGRADED (name dropped)
+      • Geraint Thomas → DEGRADED (name dropped)
+      • Remco Evenepoel → "the cyclist who won in 2022" [source: model]
+      • Charles → SUPPRESSED (already explained)
+      • Peter Sagan → DEGRADED (name dropped)
+      • Sentier des Douaniers → "the coastal walking trail in France" [source: model]
+      • Caroline Lacroix → DEGRADED (name dropped)
+      • King Henri → DEGRADED (name dropped)
+      • King Henri IV commissioned the construction of this massive hexagonal keep to subdue the rebellious → DEGRADED (name dropped)
+      • Operation Dragoon → "the code name for the Allied invasion" [source: model]
+      • General Jean → SUPPRESSED (already explained)
+      • Princess Bannu Pan Deï → DEGRADED (name dropped)
+      • Princess Bannu → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 4 'Saint-Tropez Citadel': claim='1835 (in context: "In 1835, General Jean-François Allard bro' contradicted_by='useum. Paul Signac arrived in 1892 and attracted many artists in his wake.' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=4 claim='1835 (in context: "In 1835, General Jean-François ' evidence='useum. Paul Signac arrived in 1892 and attracted m' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 4
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 4
+    Stops affected: 2
+    [1] DELETED: 'This achievement' in: This achievement highlighted both the physical challenges and the unpredictable 
+    [1] DELETED: 'This presence' in: This presence surprises and inspires amateur cyclists who share the same roads.
+    [4] DELETED: 'This fortress' in: This fortress, with its thick stone walls, served as a constant reminder of the 
+    [4] DELETED: 'This act' in: This act marked Saint-Tropez as the first town on the French Riviera to be liber
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Cap Ferrat Coastal Path' (index 35) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Eze Village': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Monaco': the longest run (5 sentences, Monaco) has agency=0 stakes=1 — someone is described, but nothing is risked, ref
+    stop 3 'Cap Ferrat Coastal Path': the longest run (3 sentences, The Cap Ferrat Coastal Path) has agency=0 stakes=0 — someone is described, but n
+    stop 4 'Saint-Tropez Citadel': the longest run (4 sentences, The Citadel) has agency=0 stakes=0 — someone is described, but nothing is risked
+    [LOCAL-487] cap=1: retrying only the weakest — stop 4 'Saint-Tropez Citadel' (index 22)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Eze Village' — 256w → 143w after gates, 8 sentence(s) removed
+    removed: "This achievement highlighted both the physical challenges and the unpredictable weather conditions c"
+    removed: "His ability to hold off his competitor, Lieuwe Westra, by just eight seconds underscores the intense"
+    removed: "Beyond its cycling legacy, Èze is a place where modernity and tradition coexist."
+    removed: "The village is a favorite training ground for cycling stars like Tadej Pogačar, Geraint Thomas, and "
+    removed: "This presence surprises and inspires amateur cyclists who share the same roads."
+    removed: "The village's allure extends beyond cycling; U2's frontman Bono owns a villa in nearby Èze-sur-Mer, "
+    removed: "As you explore Èze's winding paths, the panoramic views and the historical richness of this village "
+    removed: "Each turn of the cobbled streets reveals a new story, weaving together past and present in the heart"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Monaco' — 235w → 161w after gates, 5 sentence(s) removed
+    removed: "Yet, beneath the surface of glamour and fortune, Monaco has its share of dramatic tales involving th"
+    removed: "In May 2017, Chris Froome, a renowned cyclist, was deliberately rammed by a driver while cycling nea"
+    removed: "These incidents underscore Monaco's complex tapestry, where the serenity of the Azure Coast mingles "
+    removed: "As you gaze upon the opulent surroundings, it's worth remembering that beyond the glitz lies a narra"
+    removed: "The next leg of your journey promises a more serene exploration as the coastal trail reveals the Riv"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Cap Ferrat Coastal Path' — 309w → 245w after gates, 8 sentence(s) removed
+    removed: "Today, this path offers a peaceful journey through breathtaking landscapes, punctuated by fascinatin"
+    removed: "One such story is that of King Leopold II of Belgium and his young companion, Blanche Zélia Joséphin"
+    removed: "This episode highlights the personal and political dramas that have unfolded here, adding layers to "
+    removed: "Further along the path, the influence of the arts emerges at Villa Santo Sospir, where the artist Je"
+    removed: "Cocteau covered the villa with frescoes inspired by pagan and mythological themes, transforming the "
+    removed: "He lived and worked there for over a decade, intertwining the villa's identity with his artistic leg"
+    removed: "As you continue, recall your earlier stops in Eze Village and Monaco, each revealing a facet of the "
+    removed: "Here on Cap Ferrat, the path leads you past the grand villas of the wealthy, once retreats for figur"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Saint-Tropez Citadel' — 266w → 136w after gates, 11 sentence(s) removed
+    removed: "Between 1602 and 1607, King Henri IV commissioned the construction of this massive hexagonal keep."
+    removed: "The reason?"
+    removed: "To subdue the rebellious Tropezians who were notorious for dodging royal taxes."
+    removed: "This fortress, with its thick stone walls, was a constant reminder of the king's watchful eye."
+    removed: "Imagine the clatter of armor and the echo of commands as soldiers patrolled these grounds, a far cry"
+    removed: "Fast forward to August 15, 1944: amid the cacophony of war, the Citadel witnessed a pivotal moment d"
+    removed: "As Allied forces advanced, the German garrison stationed here raised the white flag."
+    removed: "This act marked Saint-Tropez as the first town on the French Riviera to be liberated, a turning poin"
+    removed: "Beyond its military past, the Citadel has borne witness to curious tales of cultural mingling."
+    removed: "In 1835, General Jean-François Allard returned to Saint-Tropez with his royal Punjabi bride, Princes"
+    removed: "Their arrival scandalized the local society, a vivid illustration of the cultural intersections that"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Eze Village by , ...
+
+Generating description for Stop 2: Monaco by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Monaco' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Monaco', 6, ''), ('Monaco', 6, ''), ('Monaco', 4, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14425 after=24251 (+9826 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24251)
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Eze Village' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Eze Village', 11, ''), ('Eze Village', 10, ''), ('Eze Village', 7, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14188 after=24152 (+9964 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24152)
+
+Generating description for Stop 3: Cap Ferrat Coastal Path by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Cap Ferrat Coastal Path' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cap Ferrat Coastal Path', 14, ''), ('Cap Ferrat Coastal Path', 13, ''), ('Cap Ferrat Coastal Path', 13, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13194 after=23578 (+10384 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23578)
+
+Generating description for Stop 4: Saint-Tropez Citadel by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Saint-Tropez Citadel' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Saint-Tropez Citadel', 13, ''), ('Saint-Tropez Citadel', 12, ''), ('Saint-Tropez Citadel', 8, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=12651 after=23010 (+10359 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23010)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0307 (6454 tokens, model=gpt-4o)
+Stop 1 description word count: 266 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0308 (6489 tokens, model=gpt-4o)
+Stop 4 description word count: 279 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0306 (6448 tokens, model=gpt-4o)
+Stop 2 description word count: 286 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0306 (6441 tokens, model=gpt-4o)
+Stop 3 description word count: 302 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.3s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 234w (was 143w)
+    [LOCAL-474] regenerated and re-gated: 265w (was 161w)
+    [LOCAL-474] regenerated and re-gated: 284w (was 245w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/frenchrivieratraveltips/posts/907761758283095/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.backroads.com/trips/BFRI-9/provence-french-riviera-bike-tour (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.backroads.com/trips/BFRI-9/provence-fr
+  [LOCAL-427] HTTP 200 from https://trektravel.com/tour/cycling/french-riviera-provence/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1436 chars from https://trektravel.com/tour/cycling/french-riviera
+  [LOCAL-427] HTTP 200 from https://marlameridith.com/pedaling-through-provence-french-riviera-with-backroads/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1396 chars from https://marlameridith.com/pedaling-through-provenc
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=50RBrrsHrG8 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.france-bike.com/en/biking-destinations/france/bike-tours-french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.france-bike.com/en/biking-destinations
+  [LOCAL-427] HTTP 200 from https://www.tripsite.com/bike/tours/french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1487 chars from https://www.tripsite.com/bike/tours/french-riviera
+  [D512] verb discovery: query='French Riviera biking tour construction process how it was built' -> 5 new verb(s): relaxed, unplugged, opted, guided, developed
+  [D512] _AGENCY_VERB widened by 5 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Eze Village                                32    24     8    60
+     2  Monaco                                     32    12     6    42
+     3  Cap Ferrat Coastal Path                    24    42    13    77
+     4  Saint-Tropez Citadel                       22    25     8     0
+    [LOCAL-485] index mean 27.5 over 4 stop(s), range 22-32
+    [LOCAL-485] weakest: 'Saint-Tropez Citadel' at 22
+[TIMING] phase=story_first elapsed=94.3s cumulative=312.9s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (99 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 99 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 99 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 2 orientation R10: 1 sentence(s) deleted
+    Stop 3 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation R10: 1 sentence(s) deleted
+    Stop 4 orientation R7: 2 sentence(s) deleted
+    Stop 4 orientation: COLLAPSED — using fallback
+  [LOCAL-246] Orientation gating summary:
+    Words before: 222
+    Words after:  66
+    Delta: -156
+    Stops affected: 4/4
+    Deletions (7):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "Here, the panoramic vista of the French Riviera unfolds like a living postcard, offering glimpses of..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you pedal into Èze Village, the scent of jasmine floats in the air, mingling with the crisp sea b..."
+      [Stop 2][R10_UNFULFILLED_PROMISE] "Arriving in Monaco from the enchanting Eze Village you stopped at a moment ago, you'll find yourself..."
+      [Stop 3][R7_HALLUCINATED_SENSORY] "The path, known as Sentier des Douaniers, hugs the coastline, offering views of the sparkling Medite..."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "As you stand here on the Cap Ferrat Coastal Path, the sea unfolds before you, whispering stories of ..."
+      [Stop 4][R7_HALLUCINATED_SENSORY] "Pause at the main gate, where the rough-hewn stones whisper of centuries past, and take in the panor..."
+      [Stop 4][R7_HALLUCINATED_SENSORY] "As you glide up to the Saint-Tropez Citadel, your bike tour shifts gears from the azure vistas of th..."
+  [LOCAL-246] ⚠️  WARNING: Orientation collapsed to 30% of original — listener may not know where to stand
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 3.8s, $0.0089, 1302 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Eze Village] (dated_event): In 1989, the Paris–Nice race, a prestigious event in the cycling calendar, saw F...
+      [Monaco] (dated_event): In May 2023, the renowned cyclist Peter Sagan found himself at the center of an ...
+      [Cap Ferrat Coastal Path] (cause): The path's origin as a customs route gives it a unique historical significance, ...
+      [Saint-Tropez Citadel] (dated_event): On August 15, 1944, amid the cacophony of war, the Citadel witnessed a pivotal m...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0034 (564 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (48 words):
+      "In the upcoming stops, you will learn about Laurent Fignon's crash in 1989 at Eze Village and the unexpected incident involving Peter Sagan in May 2023 in Monaco. These stories will be complemented by the historical significance of the Cap Ferrat Coastal Path as a former customs route."
+      Stops referenced: 3
+    Part 4 total cost: $0.0034
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Once you leave Eze Village, pedal down the scenic Moyenne Co...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you pedal away from Monaco, ride along the stunning coast...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: Start your ride from the Cap Ferrat Coastal Path and pedal w...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.8s, $0.0025, 432 tokens
+  [LOCAL-280] Recap built: 35 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Cap Ferrat Coastal Path] (cause): "The path's origin as a customs route gives it a unique historical significance, ..."
+      → composed: "Cap Ferrat Coastal Path, known for its historical significance as a former customs route"
+    [Eze Village] (dated_event): "In 1989, the Paris–Nice race, a prestigious event in the cycling calendar, saw F..."
+      → composed: "Eze Village, where French cycling legend Laurent Fignon crashed during the Paris–Nice race"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops and 89 kilometres — Cap Ferrat Coastal Path, known for its historical significance as a former customs route and Eze Village, where French cycling legend Laurent Fignon crashed during the Paris–Nice race."
+  [LOCAL-273] Part 1 (similar): Port Grimaud (4.4 km, verified in stop_corpus)
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (1793 chars of corpus checked)
+  [LOCAL-47] Capped 'French Riviera' from 4 to ≤2 occurrences
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 3
+    Verified: 0
+    Dropped: 3
+    AUDIT: admission | Open year-round, free access | (no source) | DROPPED — no source content
+    AUDIT: admission | Open year-round, free access | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily, free access | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 3 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a cycling journey through the French Riviera. The route spans from the me..."
+  [2] "Èze Village is a remarkable stop o biking tour, not just for its mesmerizing views, but also for its..."
+  [3] "That's 4 stops and 89 kilometres — Cap Ferrat Coastal Path, known for its historical significance as..."
+
+=== Word Count Statistics ===
+Stop 1: Eze Village - 283 words
+Stop 2: Monaco - 256 words
+Stop 3: Cap Ferrat Coastal Path - 309 words
+Stop 4: Saint-Tropez Citadel - 278 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (9696 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['dangling_reference']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'He believed that completing the climb in under 31 minutes wa'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 2) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1297 tokens, $0.006168 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference'] -> ['offsite_entity', 'thin']
+  [LOCAL-540] retry removed: ['dangling_reference']
+  [LOCAL-540] retry did NOT remove: ['offsite_entity'] — shipping with defect recorded (D577)
+
+Total API cost: $0.2406 (41021 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.3806
+Provenance:     5/37 factual sentences sourced, 32 unsourced (5 corpus, 0 grounded, 32 parametric)
+CACHE STORE: French Riviera biking tour / walking / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/riviera_bike_run2.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/riviera_bike_run2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: French Riviera biking tour - Cycling Tour
+Tour-Category: biking
+
+Stop 1: Eze Village
+
+Address: Eze, 06360, France
+
+Coordinates: 43.7102, 7.3545
+
+Type/Specialty: Charming medieval village
+
+Specific Examples: Narrow cobblestone streets, stunning views of the Mediterranean, exotic gardens.
+
+Orientation: You are about to embark on a cycling journey through the French Riviera. The route spans from the medieval heights of Eze Village to the coastal Saint-Tropez Citadel,...
+
+[TIMING] phase=packing elapsed=15.3s cumulative=328.1s
+[TIMING] phase=verification elapsed=0.0s cumulative=328.1s
+[TIMING] TOTAL wall=328.1s phases: poi_selection=200.4s, story_first=94.3s, fact_sheets=16.5s, packing=15.3s, intent=1.6s, narration=0.0s, external_lookups=0.0s, verification=0.0s

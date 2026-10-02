@@ -1,0 +1,362 @@
+{
+  "landmarks": {
+    "Faneuil Hall": {
+      "status": "VERIFIED",
+      "canonical_name": "Faneuil Hall",
+      "qid": "Q49137",
+      "type": "",
+      "coordinates": "42.360000, -71.056111"
+    },
+    "Quincy Market": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "North Market": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "The Great Hall": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Sam Adams Statue": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Boston's Historic Faneuil Hall Marketplace": {
+      "status": "VERIFIED",
+      "canonical_name": "Boston City Hall",
+      "qid": "Q250773",
+      "type": "",
+      "coordinates": "42.360278, -71.058056"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 6,
+      "unsourced": 36,
+      "total": 42,
+      "corpus": 6,
+      "grounded": 0,
+      "parametric": 36
+    },
+    "per_stop": {
+      "Faneuil Hall": {
+        "sourced": 2,
+        "unsourced": 15,
+        "total": 17
+      },
+      "The Great Hall": {
+        "sourced": 1,
+        "unsourced": 9,
+        "total": 10
+      },
+      "Quincy Market": {
+        "sourced": 3,
+        "unsourced": 7,
+        "total": 10
+      },
+      "North Market": {
+        "sourced": 0,
+        "unsourced": 5,
+        "total": 5
+      }
+    },
+    "claims": [
+      {
+        "stop": "Faneuil Hall",
+        "text": "Your path spans just 93 meters, leading from Faneuil Hall to North Market.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Built as a center of commerce in 1741, Faneuil Hall is where the Sons of Liberty proclaimed their dissent against Royal oppression.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Built in 1742 by Boston's wealthy merchant Peter Faneuil, this marketplace stands as a testament to endurance and transformation, serving as both a center of commerce and a hub for public dissent against Royal oppression.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "America's first retail specialty carts program began here in 1976, weaving the past and present into a living tapestry of Boston's story.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "You may notice the vibrant energy of the marketplace as you approach.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Constructed in 1742 and designed by artist John Smibert, Faneuil Hall was gifted to the city by Peter Faneuil, one of Boston's wealthiest merchants.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "This historic building served as a marketplace and meeting hall, earning the nickname \"the Cradle of Liberty\" for its role in hosting pivotal discussions and events in American history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "The very presence of the grasshopper weathervane, initially a practical feature, became a symbol of vigilance during the American Revolution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "It was cleverly used as a shibboleth to identify British spies—those who couldn't name it as a grasshopper were quickly identified as outsiders.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Faneuil Hall's walls bore witness to fiery debates and speeches, such as the one delivered by Wendell Phillips in 1837.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "His words, echoing through the Great Hall, marked his entry into the abolitionist movement, amplifying his voice as a strong advocate for civil rights.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Another dramatic episode unfolded here on May 26, 1854.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "A riot erupted in response to the capture of Anthony Burns, an escaped enslaved man, under the Fugitive Slave Act.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On May 26, 1854, a riot erupted at Faneuil Hall over the capture of escaped enslaved man Anthony Burns, leading to the death of federal deputy marshal James Batchelder."
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "This tumultuous event led to the tragic death of federal deputy marshal James Batchelder.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On May 26, 1854, a riot erupted at Faneuil Hall over the capture of escaped enslaved man Anthony Burns, leading to the death of federal deputy marshal James Batchelder."
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "The riot underscored the hall’s role as a focal point for critical debates on civil rights and the deep divisions that defined American society at the time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Today, Faneuil Hall remains a National Historic Landmark and a part of Boston National Historical Park.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Faneuil Hall",
+        "text": "Its Great Hall continues to serve as a venue for civic events, reminding us of the tales of liberty that have been etched into its history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "The Great Hall is a site of immense historical significance, where pivotal events have unfolded within its storied walls.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "One such event took place in May 1854, during what is known as the Anthony Burns Crisis.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "Anthony Burns was a fugitive slave who had escaped from Virginia to Boston, only to be captured under the Fugitive Slave Act.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "In response, abolitionists packed the Great Hall to overflowing, their voices rising in fervent protest against Burns' capture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "The intense meeting became chaotic, reflecting the deep divisions in American society over slavery.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "This episode culminated in a violent attack on the Boston courthouse, where Deputy U.S. Marshal James Batchelder was fatally stabbed.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In May 1854, during the Anthony Burns Crisis, abolitionists packed the Great Hall in Boston to discuss Burns' capture, leading to a chaotic meeting and a subsequent attack on the Boston courthouse whe"
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "The event underscored the volatile pre-Civil War climate and highlighted Boston's role as a center of abolitionist activity.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "Another dramatic moment in the Great Hall's timeline occurred on January 8, 1776.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "British General John Burgoyne, amidst the tensions of the Revolutionary War, transformed the space into a theater for his play, \"The Blockade of Boston.\" The performance was abruptly interrupted by the announcement of a real attack, plunging the hall into chaos.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Great Hall",
+        "text": "This unexpected turn of events mirrored the unpredictable nature of the Revolutionary period and showcased Boston's central role in colonial resistance against British rule.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "It was the city's first major civic undertaking after it officially became a city in 1822.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Josiah Quincy, understanding the need for a larger marketplace, spearheaded this project to replace the overcrowded Faneuil Hall market.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "The central building of Quincy Market, with its grand two-story structure, is flanked by the taller North and South Markets.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "These buildings have become iconic, each housing multiple storefronts and contributing to the market's designation as a National Historic Landmark.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "In the 1820s, Mayor Quincy used eminent domain to acquire land from Nathan Spear for this project.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In the 1820s, Mayor Josiah Quincy used eminent domain to seize land from Nathan Spear, resulting in the asymmetrical widths of South Market Street and North Market Street."
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "This decision led to the asymmetrical widths of South Market Street and North Market Street, a unique characteristic you'll notice as you explore the area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "One of the market's more recent stories involves John Kerry, who co-founded Kilvert & Forbes Bakeshop here in 1976.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1976, John Kerry co-founded Kilvert & Forbes Bakeshop in Quincy Market, selling cookies and muffins before his political career."
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Before his political career took off, Kerry was selling cookies and muffins in Quincy Market.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1976, John Kerry co-founded Kilvert & Forbes Bakeshop in Quincy Market, selling cookies and muffins before his political career."
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Today, Quincy Market serves as a vibrant festival marketplace, blending its rich history with modern commerce.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Quincy Market",
+        "text": "Just ahead, the North Market awaits, ready to reveal more stories from its storied past amidst its contemporary facade.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "This market, along with Quincy Market, which you visited earlier, is part of the Faneuil Hall Marketplace complex, a cornerstone of Boston's rich mercantile history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "Mayor Josiah Quincy, known for his forward-thinking urban planning, was forced to redraw the blueprints for the marketplace.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "In a more recent chapter, North Market became a focal point for civic engagement when, in 1991, a federal court case cemented its role as a site for public discourse.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "This decision reinforced the marketplace's enduring legacy as a venue for free expression—a legacy that echoes the \"Cradle of Liberty\" moniker often associated with the nearby Faneuil Hall you explored earlier.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "North Market",
+        "text": "In every corner, the market's layered history reveals much about Boston's spirit—a city where the past continuously shapes the present.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

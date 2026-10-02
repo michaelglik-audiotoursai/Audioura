@@ -1,0 +1,247 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 0,
+      "unsourced": 30,
+      "total": 30,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 30
+    },
+    "per_stop": {
+      "Terminal A Main Concourse": {
+        "sourced": 0,
+        "unsourced": 12,
+        "total": 12
+      },
+      "Air Traffic Control Tower Base": {
+        "sourced": 0,
+        "unsourced": 5,
+        "total": 5
+      },
+      "Panoramic Runway Viewing Windows": {
+        "sourced": 0,
+        "unsourced": 3,
+        "total": 3
+      },
+      "Terminal E Modernization Great Hall Atrium": {
+        "sourced": 0,
+        "unsourced": 10,
+        "total": 10
+      }
+    },
+    "claims": [
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "From the historic Terminal A Main Concourse, where St Mary's Cathedral was dedicated, to the modern Terminal E Modernization Great Hall Atrium, witness the evolution of aviation infrastructure.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "Gustave Eiffel's Air Traffic Control Tower Base stands as a testament to the airport's rich history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "Delve into the impact of connectivity and technology as seen in the transformation from the 18th-century marketplace by John Smibert to the bustling Faneuil Hall gifted by Peter Faneuil in 1742.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "At the upcoming stops, you will discover the link between the airport's growth and the Air Traffic Control Tower Base, which overlooks Logan International Airport.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "Additionally, you will learn about the community resistance in 1969 at the Panoramic Runway Viewing Windows.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "From the Airport T station, take the escalator up to the main terminal level.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "In March 1922, Boston Mayor James Michael Curley approached Massachusetts Governor Channing H. Cox with a vision for a dedicated aviation field on the tidal mudflats of Jeffries Point in East Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "This initiative was crucial in supporting civil commerce and national air defense, laying the groundwork for what would become Logan International Airport.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "Another fascinating episode in the airport's history involves Amelia Earhart.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "In 1928, she departed from Boston Airport for Newfoundland aboard the Friendship, ahead of her historic transatlantic flight.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "This moment marked a pivotal achievement in aviation history and cemented Boston's role as a key player in the development of international air travel.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A Main Concourse",
+        "text": "The Terminal A Main Concourse not only embodies sustainable design but also echoes the innovative spirit of early aviation pioneers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Air Traffic Control Tower Base",
+        "text": "As you approach the Air Traffic Control Tower Base, you'll find yourself standing in the shadow of a monumental structure that has overseen the rhythms of Logan International Airport since its construction in 1973.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Air Traffic Control Tower Base",
+        "text": "Look up to see the Brutalist concrete design, a signature of architects Perry, Dean, Stahl & Rogers, marking a pivotal evolution in airport architecture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Air Traffic Control Tower Base",
+        "text": "The tower's history is intertwined with the growth of Logan International Airport, which spans over 2,384 acres and handles more than 43.5 million passengers annually.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Air Traffic Control Tower Base",
+        "text": "On April 23, 1969, the Massachusetts Port Authority cleared to extend Runway 15R/33L, resulting in the removal of dozens of historic mature trees.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Air Traffic Control Tower Base",
+        "text": "This stop connects to the broader theme of the tour, highlighting Logan Airport as a hub of innovation and history, where the skies above are navigated with precision and care.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Panoramic Runway Viewing Windows",
+        "text": "Here, the runways stretch over a landscape that once housed Wood Island Park.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Panoramic Runway Viewing Windows",
+        "text": "The transformation of this land set the stage for community resistance in 1969, as neighborhood mothers boldly blocked dump trucks with baby carriages.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Panoramic Runway Viewing Windows",
+        "text": "Charles Lindbergh and Amelia Earhart once soared above this very site, leaving their mark on the annals of history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "Terminal E's modernization, led by architect Luis Vidal and AECOM, transforms Logan into a major transatlantic gateway.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "Originally known as Jeffery Field, Boston Airport officially opened on September 8, 1923, primarily serving the U.S. Army Air Service and the Massachusetts National Guard.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "A significant historical event linked to this airport occurred on July 22, 1927, when the pioneering aviator Charles Lindbergh landed the Spirit of St. Louis here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "After his historic solo transatlantic flight, Lindbergh embarked on a national tour to promote aviation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "His arrival at Logan was met by tens of thousands who gathered to see the man who had crossed the Atlantic nonstop.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "This event marked a milestone in aviation history and highlighted the airport's emerging role in connecting America to the world.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "The transformation of Terminal E reflects a commitment to innovation and progress, echoing the spirit of those early days of aviation.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "The modernization project has expanded Logan's capacity and enhanced the passenger experience, aligning with the airport's legacy of connecting Boston to the global community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "This stop, like the Panoramic Runway Viewing Windows you visited earlier, opens a window into the world of aviation, reminding us of the strides made since the days of Lindbergh.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal E Modernization Great Hall Atrium",
+        "text": "Here, the spirit of exploration and connectivity continues to define Boston Logan International Airport.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

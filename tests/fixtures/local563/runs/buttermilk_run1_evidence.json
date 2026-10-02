@@ -1,0 +1,106 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 11,
+      "total": 12,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 11
+    },
+    "per_stop": {
+      "Buttermilk & Bourbon": {
+        "sourced": 1,
+        "unsourced": 11,
+        "total": 12
+      }
+    },
+    "claims": [
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Immerse yourself in the single stop, Buttermilk & Bourbon, where celebrity blue-haired Chef Jason Santos has blended Southern cuisine traditions with innovative reinvention since debuting the restaurant in 2017.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Discover how Chef Jason Santos's culinary exploration led to the creation of this vibrant culinary destination, which expanded to a new-build location in Watertown's Arsenal Yards four years later.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "This New Orleans-inspired restaurant is the creation of Chef Jason Santos, a notable figure in the culinary world who brings his electric blue hair and vibrant culinary flair to Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Buttermilk & Bourbon offers more than just dining; it provides an experience rich in Southern hospitality with a touch of modern mishap.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Chef Jason Santos, the celebrity chef known for his blue hair, born on March 1, 1976, has made a name for himself not only for his culinary skills but also for his appearances on television.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "He was a runner-up on Season 7 of \" the Kitchen\" and later served as Gordon Ramsay's sous-chef for several seasons.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "His deep connection to New Orleans cuisine is evident in every dish, particularly in his creation featuring a whole roasted pig head—an attention-grabbing spectacle that often steals the show in the dining room.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "The site at 160 Commonwealth Avenue was once the location of the Hotel Vendome, where a tragic disaster in 1972 resulted in the loss of nine firefighters.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On June 17, 1972, the Hotel Vendome at 160 Commonwealth Avenue was the site of the deadliest disaster in the history of the Boston Fire Department when a structural collapse killed nine firefighters."
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "The history of the site adds a layer of depth to the modern charm of the lively restaurant, Buttermilk & Bourbon.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Whether sampling the tapas-style Southern comfort food or simply soaking in the vibrant atmosphere, Buttermilk & Bourbon offers a culinary journey worth experiencing.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Operating hours are Monday and Tuesday from 5:00 pm to 10:00 pm, with reservations required.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "With prices under $30, it provides an accessible yet upscale dining experience that transports you straight to the heart of New Orleans.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

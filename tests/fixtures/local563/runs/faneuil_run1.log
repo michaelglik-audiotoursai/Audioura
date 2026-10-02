@@ -1,0 +1,752 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_183552.txt'
+
+======================================================================
+CALL #001 | 18:35:52.277 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  tour_type: walking
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/faneuil_run1.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_183552.txt'
+
+======================================================================
+CALL #002 | 18:35:52.278 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "landmarks",
+    "location": "Boston MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Faneuil Hall Marketplace, Boston MA",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Boston MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.5s cumulative=1.5s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Faneuil Hall Marketplace, Boston MA - walking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_183552.txt'
+
+======================================================================
+CALL #003 | 18:35:53.755 | GENERATING_PROMPT
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  user_request: Faneuil Hall Marketplace, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Faneuil Hall Marketplace, Boston MA...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Faneuil Hall Marketplace, Boston MA'
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_183552.txt'
+
+======================================================================
+CALL #004 | 18:35:53.755 | PHASE_3A_REQUEST
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  total_stops: 4
+  poi_type_hint: landmarks
+
+PHASE 3A API call cost: $0.0006 (706 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_183552.txt'
+
+======================================================================
+CALL #005 | 18:35:57.984 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Faneuil Hall Marketplace, Boston MA.
+List exactly 7 specific, real, well-known landmarks relevant to: Faneuil Hall Marketplace, Boston MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Faneuil Hall Marketplace, Boston MA.
+- D
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Faneuil Hall", "address": "4 S Market St, Boston, MA 02109", "reason": "Built in 1742, it served as a marketplace and a meeting hall for revolutionary discussions."},
+    {"name": "Quincy Market", "address": "200 Quincy Market, Boston, MA 02109", "reason": "Opened in 1826, it is a historic market complex known for its food stalls and shops."},
+    {"name": "North Market", "address": "200 North Market, Boston, MA 02109", "reason": "Part of the Faneuil Hall Marketplace, it features
+
+   ! [LOCAL-329] Hollow reason for 'South Market': 'Houses various retail shops and restaurants, contributing to the marketplace's v'
+  [LOCAL-329] Substance filter: 1 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 6 substantive selection reason(s)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Faneuil Hall @ 4 S Market St, Boston, MA 02109
+   - Quincy Market @ 200 Quincy Market, Boston, MA 02109
+   - North Market @ 200 North Market, Boston, MA 02109
+   - The Great Hall @ 4 S Market St, Boston, MA 02109
+   - Sam Adams Statue @ 4 S Market St, Boston, MA 02109
+   - Boston's Historic Faneuil Hall Marketplace @ 1 Faneuil Hall Marketplace, Boston, MA 02109
+  [area_resolver] Parsed: city='Boston MA', neighborhood='Faneuil Hall Marketplace'
+  [area_resolver] City resolved: Boston MA → Q100 (42.3603, -71.0578)
+  [area_resolver] Neighborhood 'Faneuil Hall Marketplace' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3603, -71.0578), radius=2.0km, lang=en
+  [area_cache] HIT for Q100: 46 landmarks (tier=rich)
+  [verify_landmarks] 2/6 stops verified against 46 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 2 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Faneuil Hall Marketplace, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 4×VENUE_ONLY (not enough covered candidates to fill 4 stops)
+  [LOCAL-212] Selected: ['Faneuil Hall=VENUE_ONLY', 'Quincy Market=VENUE_ONLY', 'North Market=VENUE_ONLY', 'The Great Hall=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Sam Adams Statue=VENUE_ONLY', "Boston's Historic Faneuil Hall Marketplace=VENUE_ONLY"]
+  [LOCAL-349] Yield scores (selected): ['Faneuil Hall=11.0', 'Quincy Market=7.0', 'North Market=0.0', 'The Great Hall=0.0']
+  [LOCAL-349] Yield scores (dropped):  ['Sam Adams Statue=0.0', "Boston's Historic Faneuil Hall Marketplace=0.0"]
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Faneuil Hall' — venue_corpus canonical_title(geo): 'Faneuil Hall' at 'Faneuil Hall walking area'
+    [VERIFIED] 'Quincy Market' — venue_corpus canonical_title(geo): 'Quincy Market' at 'Faneuil Hall walking area
+    [VERIFIED] 'North Market' — wikipedia_en_summary: 'North Market' exists and mentions region
+    [VERIFIED] 'The Great Hall' — wikipedia_en_summary: 'The Great Hall' exists and mentions region
+    [VERIFIED] 'Sam Adams Statue' — stop_corpus(geographic): 'Samuel Adams Statue' at 'Faneuil Hall Marketplace, Bos
+    [VERIFIED] "Boston's Historic Faneuil Hall Marketplace" — venue_corpus canonical_title(geo): 'Faneuil Hall' at 'Faneuil Hall walking area'
+    [HARVEST] 'North Market': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'The Great Hall': verified_no_detail (name match only, no facts in source)
+    [HARVEST] "Boston's Historic Faneuil Hall Marketplace": verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 3 verified_no_detail
+    [INTERPRETIVE] 'Faneuil Hall': +2 passages (2 queries)
+    [INTERPRETIVE] 'Quincy Market': +1 passages (2 queries)
+    [INTERPRETIVE] 'North Market': +6 passages (2 queries)
+    [INTERPRETIVE] 'The Great Hall': +4 passages (2 queries)
+    [INTERPRETIVE] 'Sam Adams Statue': +3 passages (2 queries)
+    [INTERPRETIVE] "Boston's Historic Faneuil Hall Marketplace": +6 passages (2 queries)
+    [INTERPRETIVE] Summary: 6 stops enriched, +22 passages, 12 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 1 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_183552.txt'
+
+======================================================================
+CALL #006 | 18:36:24.344 | PHASE_3B_REQUEST
+======================================================================
+  location: Faneuil Hall Marketplace, Boston MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0008 (1005 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Boston, hint: auto)
+  [LOCAL-355] Faneuil Hall: no practical facts in OSM
+  [LOCAL-355] Quincy Market: no practical facts in OSM
+  [LOCAL-355] North Market: no practical facts in OSM
+  [LOCAL-355] The Great Hall: no practical facts in OSM
+   Coords cluster detected: 2 stops share '42.3605, -71.0570', refetching...
+   Cluster refetch OK 'Faneuil Hall': 42.3605, -71.0547
+   Cluster refetch OK 'The Great Hall': 42.3595, -71.0560
+   GEO-CHECK: all 4 stops within walking distance (max leg 0.20 km, total 0.26 km, limit 12 km)
+Extracted first POI coordinates: (42.3605, -71.0547)
+
+=== Extracted POI Information ===
+1. Faneuil Hall
+   Address: 4 S Market St, Boston, MA 02109
+   Coordinates: 42.3605, -71.0547
+   Directions: From Government Center T station, walk south on Court St towards Washington St, ...
+2. Quincy Market
+   Address: 200 Quincy Market, Boston, MA 02109
+   Coordinates: 42.3605, -71.0545
+   Directions: Exit Faneuil Hall and head east towards the Quincy Market colonnade. Walk straig...
+3. North Market
+   Address: 200 North Market, Boston, MA 02109
+   Coordinates: 42.3605, -71.0540
+   Directions: From Quincy Market, continue walking east and enter North Market through the arc...
+4. The Great Hall
+   Address: 4 S Market St, Boston, MA 02109
+   Coordinates: 42.3595, -71.0560
+   Directions: Exit North Market and head back towards Quincy Market, then turn left and walk t...
+================================
+
+  [D556] +5 story fact(s) for 'Faneuil Hall' via gemini (5 high)
+  [D556] +5 story fact(s) for 'Quincy Market' via gemini (5 high)
+  [D556] +4 story fact(s) for 'North Market' via gemini (4 high)
+  [D556] +5 story fact(s) for 'The Great Hall' via gemini (5 high)
+  [D559] coord CORRECTED 'Faneuil Hall' -> 42.359706, -71.055068 (by_address + model agree within 93 m)
+  [D559] coord CORRECTED 'Quincy Market' -> 42.360208, -71.054913 (by_name + model agree within 47 m)
+  [D559] coord CORRECTED 'North Market' -> 42.360526, -71.054942 (by_name + by_address agree within 51 m)
+  [D559] coord CORRECTED 'The Great Hall' -> 42.359706, -71.055068 (by_address + model agree within 80 m)
+  [D559] Coordinates established for 4/4 stop(s); the rest keep the model's value and are marked low confidence
+  [ROUTE-ORDER] Computed route for 4 stops with coords (0 without): 0.09km total
+  [D558] Route re-ordered after replenishment: Faneuil Hall -> The Great Hall -> Quincy Market -> North Market
+  [D558] Cleared 2 stale direction(s) — their preceding stop changed
+[TIMING] phase=poi_selection elapsed=235.4s cumulative=236.9s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Faneuil Hall Faneuil Hall Marketplace' → 51980 chars
+  [LOCAL-47] Faneuil Hall: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'The Great Hall Faneuil Hall Marketplace' → 63844 chars
+  [LOCAL-47] The Great Hall: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Quincy Market Faneuil Hall Marketplace' → 63844 chars
+  [LOCAL-47] Quincy Market: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'North Market Faneuil Hall Marketplace' → 51980 chars
+  [LOCAL-47] North Market: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Faneuil Hall Marketplace, Bost model=gpt-4o tokens=1465 (in=855 out=610) cost=$0.0082 latency=5.8s
+[COST_METER] FRESH | spine_generate | $0.008238 | user=None | job=local563-faneuil-run1
+  [LOCAL-278] Spine cost folded into total: $0.0082
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (39 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Faneuil Hall' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='The Great Hall' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Quincy Market' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='North Market' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=15.2s cumulative=252.1s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=252.1s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=252.1s
+
+Generating description for Stop 1: Faneuil Hall by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Faneuil Hall' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 2: The Great Hall by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='The Great Hall' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 3: Quincy Market by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Quincy Market' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 4: North Market by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='North Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12170 after=25187 (+13017 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25187)
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Great Hall', 13, ''), ('The Great Hall', 12, ''), ('The Great Hall', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14634 after=25613 (+10979 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25613)
+  [LOCAL-411] Stop 3 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Quincy Market', 16, ''), ('Quincy Market', 12, ''), ('Quincy Market', 8, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=14421 after=27104 (+12683 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27104)
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('North Market', 12, ''), ('North Market', 12, ''), ('North Market', 10, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=14412 after=25257 (+10845 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25257)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0299 (6295 tokens, model=gpt-4o)
+Stop 2 description word count: 290 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0294 (6194 tokens, model=gpt-4o)
+Stop 4 description word count: 268 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0305 (6429 tokens, model=gpt-4o)
+Stop 1 description word count: 327 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0320 (6740 tokens, model=gpt-4o)
+Stop 3 description word count: 325 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Faneuil Hall': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+    ✓ PASS stop='The Great Hall': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✗ FAIL stop='Quincy Market': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='North Market': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.001731 (input=7082, output=1115)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 5: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 8 paragraphs retried, 7 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0028 (3485 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 4 'North Market': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 3 'Quincy Market': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'North Market': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 16
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 9
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Faneuil Hall' conf=high reason='Generic scene-setting without unique claims.': "Today, as you stand under the grasshopper weathervane, consider the layers of history woven into this site."
+    [LOCAL-472] REMOVED transferable paragraph stop='North Market' conf=high reason='Generic description applicable to any historic church.': "Standing amidst the bustling activity, the market's layered history unfolds, showcasing its architectural quirks and rol"
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='John Smibert' reason='It does not specify how Smibert is directly related to Faneuil Hall.' in: "Faneuil Hall, designed by artist John Smibert and opened in 1742, is a cornerstone of Boston’s histo"
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='Elijah Lovejoy' reason='It does not specify a direct link between Lovejoy and Faneuil Hall.' in: "In 1837, Faneuil Hall became a pivotal stage for the abolitionist movement. Wendell Phillips, a Bost"
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='On May' reason='It does not specify how Anthony Burns or James Batchelder is directly linked to Faneuil Hall.' in: "On May 26, 1854, Faneuil Hall once again became the backdrop for a dramatic episode in the struggle "
+    [LOCAL-472] UNGROUNDED entity stop='Faneuil Hall' entity='British Crown' reason='It does not specify a concrete link to the British Crown.' in: "The building's historical significance extends to the American Revolution. During this period, the g"
+    [LOCAL-472] UNGROUNDED entity stop='The Great Hall' entity='Civil War America' reason='It mentions events but does not specify a direct link to the Great Hall.' in: "The Great Hall, where you now stand, was part of Peter Faneuil's 1740 offer to build a marketplace a"
+    [LOCAL-472] UNGROUNDED entity stop='The Great Hall' entity='On January' reason='No concrete link between Burgoyne and the Great Hall is established.' in: "On January 8, 1776, British General John Burgoyne repurposed the Great Hall as a theater, staging hi"
+    [LOCAL-472] UNGROUNDED entity stop='The Great Hall' entity='British General John Burgoyne' reason='It does not specify that Burgoyne stayed or performed at the Great Hall.' in: "On January 8, 1776, British General John Burgoyne repurposed the Great Hall as a theater, staging hi"
+    [LOCAL-472] UNGROUNDED entity stop='Quincy Market' entity='Nathan Spear' reason='It does not specify how Nathan Spear is directly related to Quincy Market.' in: "In 1826, as Boston was rapidly expanding, Mayor Josiah Quincy championed the creation of this market"
+    [LOCAL-472] UNGROUNDED entity stop='Quincy Market' entity='Thomas Wentworth Higginson' reason='It does not specify Higginson's direct actions at Quincy Market.' in: "In 1854, the Anthony Burns Riot brought Quincy Market into the national spotlight. Abolitionists led"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/47)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 18
+    Glossed (composed): 7
+    Suppressed (already explained): 1
+    Degraded (name dropped): 4
+    Guard failures: 0
+    Known (skipped): 6
+    Triage: 2116 tokens, $0.0005, 7.6s
+    Gloss: 1346 tokens, $0.0003, 5.5s
+    Compose: 1936 tokens, $0.0003, 2.7s
+    Total added cost: $0.0012
+    Stops affected: 4
+    Glosses applied:
+      • On May → DEGRADED (name dropped)
+      • Fugitive Slave Act → "the 1850 law mandating enslaved returns" [source: model]
+      • James Batchelder → SUPPRESSED (already explained)
+      • British Crown → DEGRADED (name dropped)
+      • Anthony Burns Crisis → "a significant event in May 1854" [source: model]
+      • Marshal James Batchelder → "a U.S. Marshal killed in 1854" [source: model]
+      • War America → "the period before the Civil War" [source: model]
+      • On January → DEGRADED (name dropped)
+      • British General John Burgoyne → "known for his role in the Revolutionary War" [source: model]
+      • Anthony Burns Riot → "the response to a fugitive's arrest" [source: model]
+      • Thomas Wentworth Higginson → "a prominent leader against slavery" [source: model]
+      • Liberty → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 2 'The Great Hall': claim='1740 (in context: "now stand, was part of Peter Faneuil's 17' contradicted_by='Opened in 1742, the building was designed by artist John Smibert as a marketplac' → DROPPED
+  [LOCAL-229] BLOCKED Stop 4 'North Market': claim='1820s (in context: "Market was influenced by a curious episo' contradicted_by='Since 1976, Quincy Market has been the Faneuil Hall Marketplace, a festival mark' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 2 group(s) blocked, 2 stop(s) affected
+  [LOCAL-229] Block log (2 entries):
+    stop=2 claim='1740 (in context: "now stand, was part of Peter Fa' evidence='Opened in 1742, the building was designed by artis' action=DROPPED
+    stop=4 claim='1820s (in context: "Market was influenced by a cur' evidence='Since 1976, Quincy Market has been the Faneuil Hal' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Faneuil Hall Marketplace, Boston MA'...
+   OK 'The Great Hall' — inside 'Faneuil Hall Marketplace, Boston MA': The address 4 S Market St, Boston, MA 02109 is within the bounds of Faneuil Hall Marketplace, Boston MA. (conf=high)
+   OK 'Quincy Market' — inside 'Faneuil Hall Marketplace, Boston MA': Address confirmed against OpenStreetMap (conf=high)
+   OK 'North Market' — inside 'Faneuil Hall Marketplace, Boston MA': The address provided, 200 North Market, Boston, MA 02109, is within the bounds of Faneuil Hall Marketplace, Boston MA. (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 5
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 5
+    Stops affected: 4
+    [1] DELETED: 'This incident' in: This incident highlighted the deep divisions in American society at the time and
+    [1] DELETED: 'This simple' in: This simple yet effective method of subterfuge highlights the hall’s strategic i
+    [2] DELETED: 'This incident' in: This incident underscored the volatile climate of pre-Civil War America, the per
+    [3] DELETED: 'This quirky' in: This quirky tradition proved that sometimes, personality is the best seasoning.
+    [4] DELETED: 'This ruling' in: This ruling allowed for protests and political dissent to continue, underscoring
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Faneuil Hall' (index 43) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Faneuil Hall': the longest run (3 sentences, Wendell Phillips) has agency=0 stakes=0 — someone is described, but nothing is r
+    stop 2 'The Great Hall': the longest run (3 sentences, Boston) has agency=0 stakes=0 — someone is described, but nothing is risked, ref
+    stop 3 'Quincy Market': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'North Market': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'The Great Hall' (index 34)
+  [D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: For example, in May 1854, the hall was packed with abolitionists during the Anthony Burns Crisis, a 
+  [D534] Stop 4 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: Durgin-Park, a restaurant that operated in the North Market building from 1827 until 2019, was known
+
+  [LOCAL-474] PHASE 5.17: retry 'Faneuil Hall' — 327w → 214w after gates, 9 sentence(s) removed
+    removed: "His words resonated through the Great Hall, transforming it into a beacon for liberty and justice."
+    removed: "Fast forward to May 26, 1854, when Faneuil Hall was again the backdrop for a dramatic episode in the"
+    removed: "A riot erupted over the capture of Anthony Burns, an escaped enslaved man, under the Fugitive Slave "
+    removed: "The tension reached a boiling point, resulting in the tragic death of federal deputy marshal James B"
+    removed: "This incident underscored the deep divisions in American society at the time and highlighted the hal"
+    removed: "During this period, the grasshopper weathervane atop Faneuil Hall served a unique purpose: it was us"
+    removed: "This simple yet effective method of subterfuge highlights the hall’s strategic importance in revolut"
+    removed: "Today, as you stand under the vigilant gaze of the grasshopper weathervane, consider the layers of h"
+    removed: "As you step inside, the echoes of past debates and declarations still linger, inviting you to explor"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'The Great Hall' — 263w → 171w after gates, 10 sentence(s) removed
+    removed: "The Great Hall, where you now stand, was part of Peter Faneuil's 1740 offer to build a marketplace a"
+    removed: "It has since hosted a myriad of significant events."
+    removed: "For example, in May 1854, the hall was packed with abolitionists during the Anthony Burns Crisis."
+    removed: "Marshal James Batchelder was fatally stabbed."
+    removed: "This incident underscored the volatile climate of pre-Civil War America and the strong abolitionist "
+    removed: "Another notable event occurred on January 8, 1776, when British General John Burgoyne repurposed the"
+    removed: "This event illustrates the tensions and unpredictable nature of the Revolutionary period, with Bosto"
+    removed: "As you absorb the atmosphere, imagine the sounds of fervent speeches and the echoes of history that "
+    removed: "The Great Hall has been a crucible for ideas and actions that shaped the nation."
+    removed: "From debates over slavery to theatrical performances interrupted by war, the hall reflects Boston's "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Quincy Market' — 288w → 233w after gates, 5 sentence(s) removed
+    removed: "One of the market's most intriguing tales involves Durgin-Park, a restaurant that operated in the No"
+    removed: "Known for its deliberately rude service, it became a beloved institution over the years."
+    removed: "This quirky tradition drew countless diners who relished the experience as much as the food, proving"
+    removed: "Abolitionists led by Thomas Wentworth Higginson clashed with federal marshals here, resulting in the"
+    removed: "This event underscored the market's role not just as a commercial center, but as a stage for social "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'North Market' — 251w → 140w after gates, 7 sentence(s) removed
+    removed: "You've already seen Faneuil Hall and Quincy Market, which anchor this historic district."
+    removed: "North Market was influenced by a curious episode in the 1820s."
+    removed: "A property owner refused to sell his land, forcing Mayor Josiah Quincy to redraw the blueprints for "
+    removed: "This led to the characteristic awkward asymmetry you see today, a physical reminder of how individua"
+    removed: "This ruling allowed for protests and political dissent to continue, underscoring the marketplace's r"
+    removed: "As you stand amidst the bustling activity, consider the market's layered history, from its architect"
+    removed: "North Market's tales of resilience and community engagement reveal the enduring spirit of Boston, wh"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Faneuil Hall by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Faneuil Hall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, ''), ('Faneuil Hall', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12170 after=25187 (+13017 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25187)
+
+Generating description for Stop 2: The Great Hall by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='The Great Hall' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Great Hall', 13, ''), ('The Great Hall', 12, ''), ('The Great Hall', 8, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14634 after=25613 (+10979 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25613)
+
+Generating description for Stop 3: Quincy Market by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Quincy Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Quincy Market', 16, ''), ('Quincy Market', 12, ''), ('Quincy Market', 8, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=14421 after=27104 (+12683 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27104)
+
+Generating description for Stop 4: North Market by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='North Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('North Market', 12, ''), ('North Market', 12, ''), ('North Market', 10, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=14412 after=25257 (+10845 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25257)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0331 (6960 tokens, model=gpt-4o)
+Stop 2 description word count: 280 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0327 (6885 tokens, model=gpt-4o)
+Stop 1 description word count: 317 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0322 (6778 tokens, model=gpt-4o)
+Stop 4 description word count: 245 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0343 (7217 tokens, model=gpt-4o)
+Stop 3 description word count: 279 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.4s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 291w (was 214w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=True
+    [LOCAL-474] regenerated and re-gated: 280w (was 171w)
+    [LOCAL-474] regenerated and re-gated: 279w (was 233w)
+    [LOCAL-474] regenerated and re-gated: 222w (was 140w)
+      [TRAGEDY-CONTEXT] stop='Faneuil Hall' cut (circumstances not documented): In a spontaneous moment, Phillips rose to condemn the mob murder of Elijah Lovej
+  [TRAGEDY-CONTEXT] recovered 0, removed 1 sentence(s)
+      [PERSON-CAP] stop 4: 'market' already carries two stops — cut: The story of North Market's unique shape begins in the 1820s, a time when Boston
+      [PERSON-CAP] stop 4: 'market' already carries two stops — cut: A determined property owner on the North Market side refused to sell his land, a
+      [PERSON-CAP] stop 4: 'market' already carries two stops — cut: The court ruled in favor of the activists, declaring North Market a designated p
+      [PERSON-CAP] stop 4: 'market' already carries two stops — cut: As you wander through North Market, the echoes of history blend with the vibrant
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 3: Quincy Market, named for Mayor Josiah Quincy, was built during a time of rapid expansion i
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 4 improved, 0 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 2 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://faneuilhallmarketplace.com/about/history-of-faneuil-hall (attempt 1)
+  [LOCAL-459] R5: Fetched 2015 chars from https://faneuilhallmarketplace.com/about/history-o
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Faneuil_Hall (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Faneuil_Hall
+  [LOCAL-427] HTTP 200 from https://www.masshist.org/beehiveblog/2025/01/behind-the-scenes-of-faneuil-hall-marketplace/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1954 chars from https://www.masshist.org/beehiveblog/2025/01/behin
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/DomesticGoddess603/posts/faneuil-hall-has-followed-me-through-nearly-every-version-of-my-life-i-spent-tim/1737755301263914/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.nps.gov/bost/learn/historyculture/fh.htm (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.nps.gov/bost/learn/historyculture/fh.h
+  [LOCAL-427] HTTP 200 from https://faneuilhallmarketplace.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1416 chars from https://faneuilhallmarketplace.com/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/CBSBoston/posts/a-descendant-of-the-original-quincy-market-landowner-explained-why-the-roads-aro/1350971457068189/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.structuremag.org/article/from-past-to-present/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1990 chars from https://www.structuremag.org/article/from-past-to-
+  [D512] verb discovery: query='Faneuil Hall Marketplace, Boston MA construction process how it ' -> 7 new verb(s): expanded, operated, mixed, united, processed, colonnade, lined
+  [D512] _AGENCY_VERB widened by 7 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Faneuil Hall                               51    63     6    65
+     2  The Great Hall                             60    59     8    60
+     3  Quincy Market                              37    31     8    65
+     4  North Market                               36    30     8    30
+    [LOCAL-485] index mean 46.0 over 4 stop(s), range 36-60
+    [LOCAL-485] weakest: 'North Market' at 36
+[TIMING] phase=story_first elapsed=100.8s cumulative=353.0s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (107 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 107 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 1 expanded, 0 deleted, cost=$0.0010
+  [LOCAL-244] Prolog after gates: 107 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 183
+    Words after:  183
+    Delta: 0
+    Stops affected: 0/4
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.4s, $0.0088, 1315 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Faneuil Hall] (dated_event): This historic building served as a marketplace and meeting hall, earning the nic...
+      [The Great Hall] (dated_event): In response, abolitionists packed the Great Hall to overflowing, their voices ri...
+      [Quincy Market] (cause): In the 1820s, Mayor Quincy used eminent domain to acquire land from Nathan Spear...
+      [North Market] (dated_event): Activists from CEASE, a group advocating for free speech, challenged the market'...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0030 (524 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (29 words):
+      "As you continue the tour, you'll learn about Mayor Quincy's use of eminent domain at Quincy Market and the fervent abolitionist protests at The Great Hall against Burns' capture."
+      Stops referenced: 3
+    Part 4 total cost: $0.0030
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave Faneuil Hall, walk towards Congress Street and ...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [T4] Transition to Stop 3: As you exit The Great Hall, walk towards Congress Street and...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: False
+  [T4] Transition to Stop 4: As you exit Quincy Market, head north towards the North Mark...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.6s, $0.0024, 421 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Quincy Market] (cause): "In the 1820s, Mayor Quincy used eminent domain to acquire land from Nathan Spear..."
+      → composed: "Quincy Market, land acquired by Mayor Quincy from Nathan Spear"
+    [Faneuil Hall] (dated_event): "This historic building served as a marketplace and meeting hall, earning the nic..."
+      → composed: "Faneuil Hall, known as "the Cradle of Liberty" for its historical role"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Quincy Market, land acquired by Mayor Quincy from Nathan Spear and Faneuil Hall, known as "the Cradle of Liberty" for its historical role."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (0.4 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 3 (1826/alexander parris) — next sentence refers back to it ("It was the city's first major civic unde...")
+  [D533] 0 repeated fact(s) removed, 1 kept
+  [D533] ROLE MISMATCH REPAIRED: 'Quincy Market' + 1826 — corpus says birth, tour says 'designed'
+      removed: Just beyond these walls, Quincy Market, part of the marketplace complex designed by Alexander Parris in 1826, 
+  [D533] ROLE MISMATCH FOUND: 'Alexander Parris' + 1826 — corpus says birth, tour says 'designed'
+      removed: Just beyond these walls, Quincy Market, part of the marketplace complex designed by Alexander Parris in 1826, 
+  [D533] ROLE MISMATCH REPAIRED: 'Alexander Parris' + 1826 — corpus says birth, tour says 'completed'
+      removed: Notice the classical design of the buildings around you, a testament to the architectural vision of Alexander 
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 5
+    Verified: 0
+    Dropped: 5
+    AUDIT: hours | Open daily from 10 AM to 9 PM | (no source) | DROPPED — no source content
+    AUDIT: admission | free admission | (no source) | DROPPED — no source content
+    AUDIT: admission | free admission for public events | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily from 10 AM to 9 PM | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily from 10 AM to 9 PM | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 5 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Faneuil Hall Marketplace, Boston MA."
+  [2] "As you step into North Market, note the contrast between its historic brick facades and the vibrant ..."
+
+=== Word Count Statistics ===
+Stop 1: Faneuil Hall - 327 words
+Stop 2: The Great Hall - 290 words
+Stop 3: Quincy Market - 325 words
+Stop 4: North Market - 268 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (10026 chars, 4/4 stops)
+  [LOCAL-540] no defects — tour is clean
+
+Total API cost: $0.2796 (38254 tokens)
+Grounding:      $0.1750 (5 requests)
+Tour total:     $0.4546
+Provenance:     6/42 factual sentences sourced, 36 unsourced (6 corpus, 0 grounded, 36 parametric)
+CACHE STORE: Faneuil Hall Marketplace, Boston MA / walking / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/faneuil_run1.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/faneuil_run1_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Faneuil Hall Marketplace, Boston MA - Walking Tour
+Tour-Category: walking
+
+Stop 1: Faneuil Hall
+
+Address: 4 S Market St, Boston, MA 02109
+
+Coordinates: 42.359706, -71.055068
+
+Type/Specialty: Historic Marketplace
+
+Specific Examples: Faneuil Hall itself, street performers, local artisans
+
+Orientation: You are about to embark on a walking journey through Faneuil Hall Marketplace, Boston MA. Your path spans just 93 meters, leading from Faneuil Hall to North Market. Bu...
+
+[TIMING] phase=packing elapsed=8.7s cumulative=361.6s
+[TIMING] phase=verification elapsed=0.0s cumulative=361.6s
+[TIMING] TOTAL wall=361.6s phases: poi_selection=235.4s, story_first=100.8s, fact_sheets=15.2s, packing=8.7s, intent=1.5s, narration=0.0s, verification=0.0s, external_lookups=0.0s

@@ -1,0 +1,98 @@
+{
+  "slug": "logan",
+  "run": "run1",
+  "request": "Boston Logan International Airport, Boston MA",
+  "location_passed": "Boston Logan International Airport, Boston MA",
+  "restaurant_signal_appended": false,
+  "tour_type": "facility",
+  "stops_requested": 4,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 194.2,
+  "chars": 9330,
+  "gemini_calls": {
+    "total": 6,
+    "grounded_this_run": 4,
+    "ungrounded_this_run": 2,
+    "pipeline_grounding_requests": 4,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 4,
+        "ungrounded": 2
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 34,
+    "cumulative_grounded_after": 42,
+    "cumulative_cost_after_usd": 1.47,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.2858482,
+    "total_tokens": 130845,
+    "cache_hit": false,
+    "grounding_cost": 0.14,
+    "grounding_requests": 4,
+    "tour_total_cost": 0.4258482,
+    "breakdown": {
+      "llm": 0.2858482,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.14
+    },
+    "provenance": {
+      "sourced": 0,
+      "unsourced": 26,
+      "total": 26,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 26
+    },
+    "score": {
+      "defects_before": {
+        "fabricated_attribution": "1 attribution(s); unverified attribution: \"Constructed in 1887 by Gustave Eiffel\" (no source confirms it)",
+        "unsourced_person_event": "3 unsourced person-event(s); \"Logan\" placed here in 1943 with no source: \"In 1943, the Massachusetts state legislature chose to honor General Logan, a South Boston native and World War I command\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "3 unsourced person-event(s); \"Logan\" placed here in 1943 with no source: \"In 1943, the Massachusetts state legislature chose to honor General Logan, a South Boston native and World War I command\""
+      },
+      "removed": [
+        "fabricated_attribution"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.00321,
+        "total_tokens": 675
+      },
+      "cost_without_retry": {
+        "total_cost": 0.160796,
+        "total_tokens": 24244
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "unsourced_person_event"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "unsourced_person_event": "3 unsourced person-event(s); \"Logan\" placed here in 1943 with no source: \"In 1943, the Massachusetts state legislature chose to honor General Logan, a South Boston native and World War I command\""
+    },
+    "named_people": 5,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 12,
+    "chars": 9330,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 0,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 13,
+      "total": 13
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 10,
+      "total": 11,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 10
+    },
+    "per_stop": {
+      "Chart House": {
+        "sourced": 1,
+        "unsourced": 10,
+        "total": 11
+      }
+    },
+    "claims": [
+      {
+        "stop": "Chart House",
+        "text": "The chefs at Chart House in Boston draw inspiration from the sea, echoing the restaurant's roots that stretch back to its inception in Aspen in 1961.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "By 1974, Chart House had spread its influence from Southern California to the East Coast, creating a network of 28 locations nationwide.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "Experience the dedication to traditional seafood cuisine intertwined with the profound impact of Boston Harbor on every dish.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "The colonial-era building, once the bustling office of John Hancock, a name synonymous with American independence can be found here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "The Chart House in Boston is not just a restaurant; it's a slice history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "In June 1768, a Boston mob rioted at Long Wharf after customs agents seized Hancock's sloop, the Liberty, accusing him of smuggling.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In June 1768, a Boston mob rioted at Long Wharf after customs agents seized Hancock's sloop, the Liberty, for smuggling."
+      },
+      {
+        "stop": "Chart House",
+        "text": "In 1973, the founders of the Chart House restored the colonial brick arches and beams, preserving the building's historical integrity while transforming it into a vibrant dining space.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "This Boston location, however, offers a unique blend of history and culinary artistry, where chefs craft dishes that celebrate New England's rich maritime tradition.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "The menu features classic seafood and Prime Rib, with prices ranging from $36 to $50.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "While the restaurant is open from 4:30 PM to 6 PM from Sunday to Thursday, it remains closed on Mondays and Tuesdays, so reservations are recommended to ensure a table.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Chart House",
+        "text": "As you dine, perhaps consider their signature Clam Chowder, a dish that not only delights the palate but also pays homage to Boston's storied past, blending flavors that echo the city's enduring connection to the sea.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

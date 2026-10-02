@@ -1,0 +1,497 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175444.txt'
+
+======================================================================
+CALL #001 | 17:54:44.069 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 1
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/sail_loft_run2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175444.txt'
+
+======================================================================
+CALL #002 | 17:54:44.070 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  total_stops_final: 1
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Boston Sail Loft, Boston, MA' → 'restaurant  of Boston Sail Loft, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Boston Sail Loft, Boston, MA' → 'restaurant of Boston Sail Loft, Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "restaurants",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston Sail Loft, Boston, MA",
+    "named_places": ["Boston Sail Loft"],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.3s cumulative=1.3s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Boston Sail Loft, Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175444.txt'
+
+======================================================================
+CALL #003 | 17:54:45.369 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  user_request: restaurant tour of Boston Sail Loft, Boston, MA
+  total_stops: 1
+
+
+PHASE 3A: Fetching 1 candidate POI(s) for restaurant tour of Boston Sail Loft, Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Boston Sail Loft, Boston, MA'
+  [S17] no scope_constraint (precision='BUILDING', scope='Boston Sail Loft, Boston, MA')
+  [LOCAL-290] Asking for 4 candidates (N=1 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175444.txt'
+
+======================================================================
+CALL #004 | 17:54:45.369 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  total_stops: 1
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0005 (685 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175444.txt'
+
+======================================================================
+CALL #005 | 17:54:49.518 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 1
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Boston Sail Loft, Boston, MA.
+List exactly 4 specific, real, well-known restaurants relevant to: restaurant tour of Boston Sail Loft, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every sto
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Legal Sea Foods",
+        "address": "270 Northern Ave, Boston, MA 02210",
+        "reason": "Founded in 1950, Legal Sea Foods is famous for its clam chowder, which has been served to U.S. Presidents and is a staple in New England cuisine."
+    },
+    {
+        "name": "The Barking Crab",
+        "address": "88 Sleeper St, Boston, MA 02210",
+        "reason": "Established in 1994, this seafood shack is known for its casual atmosphere and signature dish, the 'Barking Crab
+
+  [LOCAL-329] Captured 4 substantive selection reason(s)
+OK PHASE 3A parsed 4 candidate POI(s):
+   - Legal Sea Foods @ 270 Northern Ave, Boston, MA 02210
+   - The Barking Crab @ 88 Sleeper St, Boston, MA 02210
+   - Row 34 @ 383 Congress St, Boston, MA 02210
+   - Yvonne's @ 100 Tremont St, Boston, MA 02108
+  [LOCAL-557] Restaurant request names ['Boston Sail Loft'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Boston Sail Loft' was NOT among the candidates — INSERTED as a user-explicit stop
+  [LOCAL-547] 1 requested stop(s) were missing from every fill path and were inserted: ['Boston Sail Loft']
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Boston Sail Loft, Boston, MA...
+❌ Generic name detected: Row 34
+OK Knowledge validation passed: Knowledge validation passed with 4 valid locations (excluded 1 generic, 0 fictional)
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 5 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Boston Sail Loft - Boston Sail Loft is a restaurant located in Boston, Massachusetts
+   OK Verified Legal Sea Foods - Legal Sea Foods is a well-known chain of seafood restaurants
+   OK Verified The Barking Crab - The Barking Crab is a well-known seafood restaurant in Boston, Massachusetts
+   OK Verified Row 34 - Row 34 is a seafood restaurant located in Boston, Massachusetts
+   OK Verified Yvonne's - Yvonne's is a restaurant located in Boston, Massachusetts
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 5 stops pass location guard
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 1×VENUE_ONLY (not enough covered candidates to fill 1 stops)
+  [LOCAL-212] Selected: ['Boston Sail Loft=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Legal Sea Foods=VENUE_ONLY', 'The Barking Crab=VENUE_ONLY', "Yvonne's=VENUE_ONLY", 'Row 34=EMPTY']
+  [LOCAL-349] Yield scores (selected): ['Boston Sail Loft=4.0']
+  [LOCAL-349] Yield scores (dropped):  ['Legal Sea Foods=5.0', 'The Barking Crab=5.0', "Yvonne's=1.5", 'Row 34=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 5/5 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Boston Sail Loft' — nominatim_osm: 'Boston Sail Loft' found in boston (Commercial Wharf, boston) [ca
+    [VERIFIED] 'Legal Sea Foods' — wikipedia_summary: 'Legal Sea Foods' is a restaurant
+    [VERIFIED] 'The Barking Crab' — nominatim_osm: 'The Barking Crab' found in boston(88 Sleeper Street, boston) [ca
+    [VERIFIED] "Yvonne's" — nominatim_osm: 'Yvonne's' found in boston(2 Winter Place, boston) [category=amen
+    [VERIFIED] 'Row 34' — nominatim_osm: 'Row 34' found in boston(383 Congress Street, boston) [category=a
+    [HARVEST] 'Row 34': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 1 verified_no_detail
+    [DINING-HARVEST] 'Row 34': no facts found (stop will be thin)
+    [DINING-HARVEST] Summary: 0 harvested, 4 already had corpus, 1 no facts found
+    [INTERPRETIVE] 'Legal Sea Foods': +1 passages (2 queries)
+    [INTERPRETIVE] 'Row 34': +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +3 passages, 10 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 1 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_175444.txt'
+
+======================================================================
+CALL #006 | 17:55:16.749 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  stop_count: 1
+
+  [LOCAL-353] Querying OSM for dining operational details (city: Boston)
+  [LOCAL-353] Boston Sail Loft: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Boston Sail Loft: no guide price, no OSM facts — silence
+
+Coordinates fallback: requesting coords for 1 stop(s) missing them...
+   Coords fallback OK 'Boston Sail Loft': 42.3545, -71.0505
+Extracted first POI coordinates: (42.3545, -71.0505)
+
+=== Extracted POI Information ===
+1. Boston Sail Loft
+   Coordinates: 42.3545, -71.0505
+================================
+
+  [D538] 'Boston Sail Loft' via serp(26)+openai: hours=Mon - 11:30 am - 2:00 am, Tue - 11:30 am, reservation=no reservations, price_band=Clam Chowder Cup $6.50; Bowl $7.25; Lobs
+  [D545] +6 story fact(s) for 'Boston Sail Loft' via gemini (6 high)
+        [high] The Boston Sail Loft opened in 1984 on Atlantic Avenue.
+        [high] The back section of the Boston Sail Loft is partially cantilevered on wooden pilings suspended over Boston Har
+        [high] The building of the Boston Sail Loft served Boston’s 19th-century maritime trade as a sail loft.
+  [D538] Practicals acquired for 1/1 stop(s)
+[TIMING] phase=poi_selection elapsed=101.0s cumulative=102.3s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Boston Sail Loft restaurant of Boston Sail Loft' → 42763 chars
+  [LOCAL-47] Boston Sail Loft: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 1 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 1}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=1)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Boston Sail model=gpt-4o tokens=1121 (in=819 out=302) cost=$0.0051 latency=3.0s
+[COST_METER] FRESH | spine_generate | $0.005068 | user=None | job=local563-sail_loft-run2
+  [LOCAL-278] Spine cost folded into total: $0.0051
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 1 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/1 stops have per-stop passages (5 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Boston Sail Loft' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 1/1 generated
+  [S25] Story types assigned: ['anecdote']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=7.2s cumulative=109.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=109.5s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=109.5s
+
+Generating description for Stop 1: Boston Sail Loft by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Boston Sail Loft' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Sail Loft', 13, ''), ('Boston Sail Loft', 13, ''), ('Boston Sail Loft', 9, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=13985 after=24669 (+10684 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24669)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0293 (6172 tokens, model=gpt-4o)
+Stop 1 description word count: 305 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Boston Sail Loft': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.000871 (input=3626, output=546)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 3 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0011 (1330 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 1
+    Paragraphs checked: 4
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 3
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Boston Sail Loft' entity='North End' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The Boston Sail Loft, perched along Atlantic Avenue since 1984, is a beloved staple of Boston's Nort"
+    [LOCAL-472] UNGROUNDED entity stop='Boston Sail Loft' entity='Boston Harbor' reason='No specific entity is mentioned with a concrete link to the stop.' in: "Upon entering, the Boston Sail Loft exudes a cozy ambiance reminiscent of a nautical dive-bar-meets-"
+    [LOCAL-472] UNGROUNDED entity stop='Boston Sail Loft' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Upon entering, the Boston Sail Loft exudes a cozy ambiance reminiscent of a nautical dive-bar-meets-"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/11)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 2
+    Glossed (composed): 0
+    Suppressed (already explained): 1
+    Degraded (name dropped): 0
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 397 tokens, $0.0001, 1.3s
+    Gloss: 0 tokens, $0.0000, 0.0s
+    Compose: 481 tokens, $0.0001, 0.4s
+    Total added cost: $0.0002
+    Stops affected: 0
+    Glosses applied:
+      • North End → SUPPRESSED (already explained)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Boston Sail Loft, Boston, MA'...
+OK PHASE 5.6: 1/1 stop(s) within scope
+  [PHASE 5.6] >50% of stops were outside 'Boston Sail Loft, Boston, MA' — scope is likely a small single venue; delivering 1 verified stop(s).
+OK PHASE 5.7: Dangling-reference scrub complete (1 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [1] DELETED: 'This particular twist' in: This particular twist sparked friendly rivalries among local seafood joints and 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Boston Sail Loft' (index 59) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 1 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Boston Sail Loft': the longest run (3 sentences, The Boston Sail Loft) has agency=0 stakes=1 — someone is described, but nothing 
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Boston Sail Loft' — 273w → 217w after gates, 7 sentence(s) removed
+    removed: "Known for its classic New England seafood, this restaurant has carved out a niche with its unique ch"
+    removed: "This particular twist sparked friendly rivalries among local seafood joints and even earned the rest"
+    removed: "When you step inside, the ambiance is warm and inviting, capturing the essence of a nautical dive-ba"
+    removed: "Here, there's no need for reservations, as the restaurant operates on a 'first come, first served' p"
+    removed: "With its prime location, the Boston Sail Loft not only offers delicious food but also stunning views"
+    removed: "For those planning a visit, the Boston Sail Loft is open from 11:30 am to 2:00 am, Monday and Tuesda"
+    removed: "It's a place where history, flavor, and Boston's maritime spirit converge, promising an experience s"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 1 eligible stop(s) concurrently (max_workers=1)
+
+Generating description for Stop 1: Boston Sail Loft by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Boston Sail Loft' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Sail Loft', 13, ''), ('Boston Sail Loft', 13, ''), ('Boston Sail Loft', 9, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=13985 after=24669 (+10684 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24669)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0323 (6804 tokens, model=gpt-4o)
+Stop 1 description word count: 302 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 4.5s for 1 stop(s) at max_workers=1
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 0 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.andrewloves.com/blog/sail-loft (attempt 1)
+  [LOCAL-459] R5: Fetched 1032 chars from https://www.andrewloves.com/blog/sail-loft
+  [LOCAL-427] HTTP 200 from https://www.thebostonsailloft.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 568 chars from https://www.thebostonsailloft.com/
+  [LOCAL-427] HTTP 200 from https://www.tiktok.com/@phatvick/video/7346078732450385183 (attempt 1)
+  [LOCAL-459] R5: Fetched 2644 chars from https://www.tiktok.com/@phatvick/video/73460787324
+  [LOCAL-427] HTTP 200 from https://www.usfoods.com/tools-tips-and-ideas/articles-and-publications/articles/road-trip-the-boston-sail-loft (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.usfoods.com/tools-tips-and-ideas/artic
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/NextInsuranceUSA/videos/last-but-certainly-not-least-on-our-nexteats-new-england-clam-chowder-tour-is-th/1088513179476662/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.thebostonsailloft.com/location/boston-sail-loft/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1121 chars from https://www.thebostonsailloft.com/location/boston-
+  [D512] verb discovery: query='restaurant tour of Boston Sail Loft, Boston, MA how the dish is ' -> 4 new verb(s): review, visited, ordered, established
+  [D512] _AGENCY_VERB widened by 4 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Boston Sail Loft                           59    12     6     0
+    [LOCAL-485] index mean 59.0 over 1 stop(s), range 59-59
+    [LOCAL-485] weakest: 'Boston Sail Loft' at 59
+[TIMING] phase=story_first elapsed=37.7s cumulative=147.2s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (88 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 88 words
+  [LOCAL-244] Prolog R9: 1 sentence(s) deleted
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 64 words (delta: -24)
+  [LOCAL-244] Prolog deletions (1):
+    [R9_GENERIC] "The culinary narrative here intertwines seamlessly with the coastal heritage of the community, honor..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 1 orientation: COLLAPSED — using fallback
+  [LOCAL-246] Orientation gating summary:
+    Words before: 47
+    Words after:  7
+    Delta: -40
+    Stops affected: 1/1
+    Deletions (2):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "The unmistakable sound of waves lapping against the wooden pilings beneath the restaurant creates a ..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you approach the Boston Sail Loft, the salty sea air mingles with the scent of fresh seafood, inv..."
+  [LOCAL-246] ⚠️  WARNING: Orientation collapsed to 15% of original — listener may not know where to stand
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 1/1
+    Fewer than 2 stops with content — omitting Part 4
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 1 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (1 selected == 1 delivered)
+  [D536] Listener asked for 1 stop(s), delivering 1 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: fewer than 2 delivered stops — skipped
+  [LOCAL-280] No recap — closing offer gets full 3-sentence budget
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=370 'restaurant tour, Boston, MA -  Tour' (0.6 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 1 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (750 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (4 line(s), 6 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 1/1 stop(s), spoken to the listener.
+  [LOCAL-556] all 1 listener-named stop(s) survived assembly with a header
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+
+=== Word Count Statistics ===
+Stop 1: Boston Sail Loft - 305 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (2068 chars, 1/1 stops)
+  [LOCAL-540] defects seen: ['no_story']
+  [LOCAL-540]   no_story [advisory]: no named people anywhere in the tour
+
+Total API cost: $0.0362 (9144 tokens)
+Grounding:      $0.1050 (3 requests)
+Tour total:     $0.1412
+Provenance:     2/8 factual sentences sourced, 6 unsourced (2 corpus, 0 grounded, 6 parametric)
+CACHE STORE: restaurant tour of Boston Sail Loft, Boston, MA / restaurant / 1
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/sail_loft_run2.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/sail_loft_run2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Boston Sail Loft, Boston, MA
+Tour-Category: restaurant
+
+Stop 1: Boston Sail Loft
+
+Coordinates: 42.3545, -71.0505
+
+Orientation: You are about to embark on a walking journey through Boston Sail Loft, Boston, MA. As you arrive at this renowned seafood restaurant located in the North End Waterfront, established in 1984, you'll be immersed in the legacy of New England's maritime traditions. The Boston Sail Loft, since 1984, has been a go-to spot for ...
+
+[TIMING] phase=packing elapsed=2.0s cumulative=149.2s
+[TIMING] phase=verification elapsed=0.0s cumulative=149.2s
+[TIMING] TOTAL wall=149.2s phases: poi_selection=101.0s, story_first=37.7s, fact_sheets=7.2s, packing=2.0s, intent=1.3s, narration=0.0s, external_lookups=0.0s, verification=0.0s

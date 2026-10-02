@@ -1,0 +1,45 @@
+{
+ "de_duplicated_count_per_call_site": {
+  "restaurant_practicals.py:_gemini:153": {
+   "purpose": "restaurant practicals",
+   "total_calls": 13,
+   "distinct_prompts": 8
+  },
+  "restaurant_practicals.py:venue_still_operating:328": {
+   "purpose": "restaurant practicals",
+   "total_calls": 9,
+   "distinct_prompts": 6
+  },
+  "stop_knowledge_fallback.py:_gemini_facts:233": {
+   "purpose": "stop facts",
+   "total_calls": 36,
+   "distinct_prompts": 25
+  },
+  "venue_parts.py:default_ask_grounded:371": {
+   "purpose": "stop facts",
+   "total_calls": 20,
+   "distinct_prompts": 17
+  },
+  "generate_tour_text.py:_generate_tour_text_impl:12106": {
+   "purpose": "story leads",
+   "total_calls": 8,
+   "distinct_prompts": 4
+  },
+  "stop_knowledge_fallback.py:_gemini_facts:251": {
+   "purpose": "stop facts",
+   "total_calls": 8,
+   "distinct_prompts": 4
+  },
+  "story_production_loop.py:run_for_stop:263": {
+   "purpose": "D545 story facts",
+   "total_calls": 32,
+   "distinct_prompts": 32
+  },
+  "story_production_loop.py:run_for_stop:302": {
+   "purpose": "D545 story facts",
+   "total_calls": 31,
+   "distinct_prompts": 30
+  }
+ },
+ "total_grounded_calls": 157
+}

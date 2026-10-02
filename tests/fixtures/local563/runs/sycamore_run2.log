@@ -1,0 +1,592 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180410.txt'
+
+======================================================================
+CALL #001 | 18:04:10.449 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  tour_type: restaurant
+  total_stops_parameter: 2
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/sycamore_run2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180410.txt'
+
+======================================================================
+CALL #002 | 18:04:10.449 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  total_stops_final: 2
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA' → 'restaurant  of Dinner at Sycamore and Little Big Diner in Newton Centre, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Dinner at Sycamore and Little Big Diner in Newton Centre, MA' → 'restaurant of Dinner at Sycamore and Little Big Diner in Newton Centre, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "restaurants",
+    "location": "Newton Centre, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Newton Centre, MA",
+    "named_places": ["Sycamore", "Little Big Diner"],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Newton Centre, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=2.9s cumulative=2.9s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180410.txt'
+
+======================================================================
+CALL #003 | 18:04:13.376 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  user_request: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Newton Centre, MA'
+  [S17] no scope_constraint (precision='CITY', scope='Newton Centre, MA')
+  [LOCAL-290] Asking for 5 candidates (N=2 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180410.txt'
+
+======================================================================
+CALL #004 | 18:04:13.377 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  total_stops: 2
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0006 (744 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180410.txt'
+
+======================================================================
+CALL #005 | 18:04:16.977 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 2
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA.
+List exactly 5 specific, real, well-known restaurants relevant to: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRI
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Sycamore",
+        "address": "755 Washington St, Newton, MA 02460",
+        "reason": "Opened in 2012, Sycamore is known for its seasonal New American cuisine and has received accolades for its craft cocktails and wood-fired dishes."
+    },
+    {
+        "name": "Little Big Diner",
+        "address": "837 Washington St, Newton, MA 02460",
+        "reason": "Established in 2015, this diner is celebrated for its modern twist on classic diner fare, particularly its house-m
+
+  [LOCAL-329] Captured 5 substantive selection reason(s)
+OK PHASE 3A parsed 5 candidate POI(s):
+   - Sycamore @ 755 Washington St, Newton, MA 02460
+   - Little Big Diner @ 837 Washington St, Newton, MA 02460
+   - The Cottage @ 6 Langley Rd, Newton, MA 02459
+   - Oleana @ 134 Hampshire St, Cambridge, MA 02139
+   - Blue Ginger @ 583 Washington St, Wellesley, MA 02482
+  [LOCAL-557] Restaurant request names ['Sycamore', 'Little Big Diner'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Little Big Diner' is already a candidate — marked user_explicit on 'Little Big Diner'
+  [LOCAL-547] Requested stop 'Sycamore' is already a candidate — marked user_explicit on 'Sycamore'
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 5 POI(s) against type 'restaurants' (parallel)...
+   X  Excluded Sycamore - There are many establishments named 'Sycamore', please provide more specific details for accurate verification
+   OK Verified Little Big Diner - Little Big Diner is a restaurant located in Massachusetts
+   X  Excluded The Cottage - There are many establishments named 'The Cottage', please provide more specific information for accurate verification
+   X  Excluded Oleana - There are multiple restaurants named Oleana, please provide more specific details for accurate verification
+   OK Verified Blue Ginger - Blue Ginger is a restaurant located in Wellesley, Massachusetts
+
+! PHASE 4 excluded 3 POI(s)
+   PHASE 3C: REMOVED 'Blue Ginger' -- address '583 Washington St, Wellesley, MA 02482' not in 'restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA'
+   PHASE 3C: 1 out-of-area stop(s) removed; 1 remain
+
+Part C: Fetching 1 replacement POI(s), attempt 1/2...
+   Part C attempt 1: AI returned 1 usable candidate(s)
+   PHASE 4: Verifying 1 POI(s) against type 'restaurants' (parallel)...
+   OK Verified The Capital Grille - The Capital Grille is a chain of upscale steakhouses
+   Part C attempt 1: 0 survived; total now 1
+
+Part C: Fetching 1 replacement POI(s), attempt 2/2...
+   Part C attempt 2: AI returned 1 usable candidate(s)
+   PHASE 4: Verifying 1 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Sullivan's Steakhouse - Sullivan's Steakhouse is a well-known chain of restaurants
+   Part C attempt 2: 1 survived; total now 2
+  [EXISTENCE-GATE] LOG_ONLY — 1/2 stops verified (50%), 1 would be dropped
+    [UNVERIFIED] 'Little Big Diner' — no evidence
+    [VERIFIED] "Sullivan's Steakhouse" — wikipedia_search: snippet in 'Downtown Omaha' mentions stop+city
+    [HARVEST] "Sullivan's Steakhouse": verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 1 verified_no_detail
+    [DINING-HARVEST] "Sullivan's Steakhouse": +5 passages from ['https://www.facebook.com/groups/restaurantwarriors2/posts/3155899761224145/', 'https://www.fsrmagazine.com/industry-news/dividend-restaurant-group-to-grow-overseas-with-eddie-merlots-and-sullivans-steakhouse/', "https://www.linkedin.com/company/sullivan's-steakhouse", 'https://www.midtownmag.com/sullivans-more-than-a-raleigh-steakhouse/', 'https://www.yelp.com/search?find_desc=Sullivan%27s+Steakhouse&find_loc=Morristown%2C+NJ+07960']
+    [DINING-HARVEST] Summary: 1 harvested, 0 already had corpus, 0 no facts found
+    [INTERPRETIVE] "Sullivan's Steakhouse": +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +2 passages, 2 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180410.txt'
+
+======================================================================
+CALL #006 | 18:04:34.899 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0006 (724 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-353] Querying OSM for dining operational details (city: Dinner)
+  [LOCAL-353] Little Big Diner: no sourceable facts in OSM — omitted
+  [LOCAL-353] Sullivan's Steakhouse: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Little Big Diner: no guide price, no OSM facts — silence
+  [LOCAL-354] Sullivan's Steakhouse: no guide price, no OSM facts — silence
+Extracted first POI coordinates: (42.3512, -71.2091)
+
+=== Extracted POI Information ===
+1. Little Big Diner
+   Address: 837 Washington St, Newton, MA 02460
+   Coordinates: 42.3512, -71.2091
+   Directions: From the Newton Centre T station, head southwest on Washington St toward Beacon ...
+2. Sullivan's Steakhouse
+   Address: 1 Wells Ave, Newton, MA 02459
+   Coordinates: 42.3517, -71.2214
+   Directions: From Little Big Diner, head northeast on Washington St toward Beacon St, turn ri...
+================================
+
+  [D538] 'Little Big Diner' via serp(23)+openai+gemini: hours=Mon - 4:30 pm - 9:00 pm, Tue - 4:30 pm -, reservation=no reservations, price_band=around $12-$20 per dish
+  [D538] 'Sullivan's Steakhouse' via serp(20)+openai: nothing actionable
+  [D538] ⚠️  DROPPED 'Sullivan's Steakhouse' — reported permanently closed: There is no record of Sullivan's Steakhouse operating in Newton Centre, Massachusetts.
+  [D538] 1 restaurant(s) dropped as closed; 1 remain
+  [D545] Replenish round 1: need 1, proposed 3
+  [D545]   ADDED 'Sycamore' — known for its seasonal menu and cozy atmosphere, offering a 
+  [D546]     practicals: hours=Tuesday-Saturday 16:30-21:30, closed_days=Sunday, Monday, reservation=We prefer you make your reservatio, price_band=$$$, cuisine=French, American, Spanish, Contemp
+  [D545] +5 story fact(s) for 'Little Big Diner' via gemini (5 high)
+        [high] Chef David Punch and Alison Hearn opened Little Big Diner in 2016, which became an immediate sensation with a 
+        [high] Newton Centre diners clashed with Little Big Diner's no-reservations policy, leading to wait times over two ho
+        [high] Chef David Punch left Ten Tables in Harvard Square to open Sycamore in late 2012, which was considered a risk 
+  [D545] +4 story fact(s) for 'Sycamore' via gemini (4 high)
+        [high] In late 2012, David Punch abruptly vanished from the kitchen of Ten Tables in Cambridge, causing confusion amo
+        [high] In 2016, David Punch and Alison Hearn opened Little Big Diner in Newton Centre, a 675-square-foot restaurant t
+        [high] Sycamore's 'The Board' featured a single animal served in four distinct preparations, causing chaos in the kit
+  [D538] Practicals acquired for 2/2 stop(s)
+[TIMING] phase=poi_selection elapsed=112.9s cumulative=115.8s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Little Big Diner restaurant of Dinner at Sycamore and Little Big Diner in Newton Centre' → 93439 chars
+  [LOCAL-47] Little Big Diner: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Sycamore restaurant of Dinner at Sycamore and Little Big Diner in Newton Centre' → 93439 chars
+  [LOCAL-47] Sycamore: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 2 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 2}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=2)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Dinner at S model=gpt-4o tokens=1234 (in=845 out=389) cost=$0.0060 latency=3.6s
+[COST_METER] FRESH | spine_generate | $0.006003 | user=None | job=local563-sycamore-run2
+  [LOCAL-278] Spine cost folded into total: $0.0060
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/2 stops have per-stop passages (2 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Little Big Diner' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Sycamore' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['anecdote', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=9.9s cumulative=125.7s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=125.7s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=125.7s
+
+Generating description for Stop 1: Little Big Diner by , ...
+
+Generating description for Stop 2: Sycamore by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Sycamore' matched_work=False medium='' work_identity_chars=0
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Little Big Diner' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sycamore', 11, ''), ('Sycamore', 6, ''), ('Sycamore', 4, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14904 after=21503 (+6599 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21503)
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Little Big Diner', 13, ''), ('Little Big Diner', 13, ''), ('Little Big Diner', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14318 after=23862 (+9544 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23862)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0255 (5377 tokens, model=gpt-4o)
+Stop 2 description word count: 276 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0282 (5926 tokens, model=gpt-4o)
+Stop 1 description word count: 304 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Little Big Diner': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Sycamore': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.001175 (input=4844, output=748)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 3: retry FAILED — keeping original (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 2 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0015 (1856 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Little Big Diner': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 2
+    Paragraphs checked: 8
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 7
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Little Big Diner' conf=high reason='Generic scene-setting applicable to any historic church.': "The warmth and buzz of Little Big Diner continue to draw patrons, lured by the promise of a flavorful journey that trans"
+    [LOCAL-472] REMOVED transferable paragraph stop='Sycamore' conf=high reason='Generic claims applicable to any restaurant.': "The restaurant opens its doors from Tuesday to Saturday, welcoming guests between 4:30 PM and 9:30 PM. Reservations are "
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Newton Centre' reason='No concrete link to Newton Centre is provided.' in: "Opened in 2016 by Chef David Punch and Alison Hearn, Little Big Diner quickly became a sensation in "
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Ten Tables' reason='No concrete link between Ten Tables and Little Big Diner is provided.' in: "Opened in 2016 by Chef David Punch and Alison Hearn, Little Big Diner quickly became a sensation in "
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Chef David Punch' reason='No concrete link to Sycamore is provided.' in: "Chef David Punch's culinary artistry shines at Sycamore. His departure from Ten Tables in Cambridge "
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Ten Tables' reason='It does not specify a concrete link between Ten Tables and Sycamore.' in: "Chef David Punch's culinary artistry shines at Sycamore. His departure from Ten Tables in Cambridge "
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Newton Centre' reason='It does not specify how Chef David Punch relates to Newton Centre.' in: "Chef David Punch's culinary artistry shines at Sycamore. His departure from Ten Tables in Cambridge "
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='New England' reason='No concrete link to New England is provided.' in: "Sycamore's menu is a celebration of seasonal and locally-sourced ingredients, reflecting New England"
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='David Punch' reason='It does not specify how David Punch is connected to Sycamore.' in: "As you enter, the aromas and textures beckon you to savor the region’s bounty. David Punch’s culinar"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/20)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Sycamore' cut orphaned dependant of a removed introduction — subject 'balance/commitment/life/work': "The commitment to work-life balance is reflected in his management style at Syca"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 12
+    Glossed (composed): 2
+    Suppressed (already explained): 1
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 4
+    Triage: 1166 tokens, $0.0003, 3.2s
+    Gloss: 678 tokens, $0.0001, 2.1s
+    Compose: 1050 tokens, $0.0002, 1.6s
+    Total added cost: $0.0006
+    Stops affected: 2
+    Glosses applied:
+      • Chef David Punch → DEGRADED (name dropped)
+      • Alison Hearn → DEGRADED (name dropped)
+      • Ten Tables → "a restaurant in newton centre" [source: model]
+      • Chef David Punch → DEGRADED (name dropped)
+      • Ten Tables → SUPPRESSED (already explained)
+      • Punch → DEGRADED (name dropped)
+      • Lydia Reichert → DEGRADED (name dropped)
+      • David Punch → "the executive chef and owner of sycamore" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [2] DELETED: 'This dish' in: This dish, while a delight for diners, can turn the kitchen into a whirlwind of 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Little Big Diner' (index 42) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Little Big Diner': the longest run (3 sentences, Little Big Diner) has agency=1 stakes=0 — someone is described, but nothing is r
+    stop 2 'Sycamore': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Sycamore' (index 20)
+  [D534] Stop 2 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: Its strict no-reservations policy, however, stirred quite a bit of tension among Newton Centre diner
+
+  [LOCAL-474] PHASE 5.17: retry 'Little Big Diner' — 290w → 213w after gates, 5 sentence(s) removed
+    removed: "Opened in 2016 by Chef David Punch and Alison Hearn, Little Big Diner quickly became a sensation in "
+    removed: "Its strict no-reservations policy, however, stirred quite a bit of tension among Newton Centre diner"
+    removed: "The success of Little Big Diner even paved the way for the launch of Jinny's Pizzeria, marking anoth"
+    removed: "The diner’s reputation is such that it has become a beloved fixture in the area, embodying the creat"
+    removed: "The warmth and buzz of Little Big Diner continue to draw patrons, lured by the promise of a flavorfu"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Sycamore' — 276w → 147w after gates, 11 sentence(s) removed
+    removed: "Sycamore is more than just a restaurant; it’s the canvas of Chef David Punch, who made headlines in "
+    removed: "This unexpected move puzzled food critics but delighted Newton Centre residents who gained a culinar"
+    removed: "Punch’s dedication to a balanced life is evident in the way he runs Sycamore."
+    removed: "By taking weekends off to avoid burnout, he has cultivated strong partnerships with his staff, inclu"
+    removed: "This approach ensures that Sycamore remains a haven for both its team and its patrons."
+    removed: "This dish, while a delight for diners, can turn the kitchen into a whirlwind of activity whenever mu"
+    removed: "The restaurant opens its doors from Tuesday to Saturday, welcoming guests between 4:30 PM and 9:30 P"
+    removed: "Reservations are recommended for this intimate experience, which can be made by calling 617.244.4445"
+    removed: "With a price range of $$$, Sycamore promises a dining adventure that intertwines the warmth of a nei"
+    removed: "As you step inside, the aromas and textures invite you to indulge in a narrative of the region’s bou"
+    removed: "The legacy of David Punch’s culinary journey is alive in every dish, making Sycamore an essential st"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=2)
+
+Generating description for Stop 1: Little Big Diner by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Little Big Diner' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Little Big Diner', 13, ''), ('Little Big Diner', 13, ''), ('Little Big Diner', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14318 after=23862 (+9544 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23862)
+
+Generating description for Stop 2: Sycamore by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Sycamore' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sycamore', 11, ''), ('Sycamore', 6, ''), ('Sycamore', 4, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14904 after=21503 (+6599 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21503)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0302 (6359 tokens, model=gpt-4o)
+Stop 1 description word count: 292 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0301 (6340 tokens, model=gpt-4o)
+Stop 2 description word count: 348 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.3s for 2 stop(s) at max_workers=2
+    [LOCAL-474] regenerated and re-gated: 292w (was 213w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 2: His departure from Ten Tables in Cambridge in late 2012 surprised many, but Newton Centre 
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 1 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.edibleboston.com/blog/qa-chef-david-punch-sycamore-and-little-big-diner (attempt 1)
+  [LOCAL-459] R5: Fetched 1220 chars from https://www.edibleboston.com/blog/qa-chef-david-pu
+  [LOCAL-427] HTTP 200 from https://tinyurbankitchen.com/little-big-diner-newton-a-first-look/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://tinyurbankitchen.com/little-big-diner-newt
+  [LOCAL-427] HTTP 200 from https://www.littlebigdiner.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1975 chars from https://www.littlebigdiner.com/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/100070770346550/videos/the-family-wanted-to-have-a-ramen-night-im-not-picky-im-down-for-whatever-i-star/3475750455922276/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.bostonmagazine.com/reviews/2016/09/25/little-big-diner-newton-review/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1900 chars from https://www.bostonmagazine.com/reviews/2016/09/25/
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=cRKNHmZWrJE (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.phantomgourmet.com/restaurant/little-big-diner/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1245 chars from https://www.phantomgourmet.com/restaurant/little-b
+  [D512] verb discovery: query='restaurant tour of Dinner at Sycamore and Little Big Diner in Ne' -> 7 new verb(s): packed, grilled, liked, inspired, helmed, toasted, fried
+  [D512] _AGENCY_VERB widened by 7 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Little Big Diner                           35    34    14    45
+     2  Sycamore                                   20     0     0    38
+    [LOCAL-485] index mean 27.5 over 2 stop(s), range 20-35
+    [LOCAL-485] weakest: 'Sycamore' at 20
+[TIMING] phase=story_first elapsed=58.2s cumulative=183.9s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (99 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 99 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 99 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 92
+    Words after:  92
+    Delta: 0
+    Stops affected: 0/2
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 2/2
+    [LOCAL-276] Intrigue ranking completed: 2.2s, $0.0054, 845 tokens
+    [LOCAL-276] Ranked 2 stops:
+      [Little Big Diner] (reversal): This tiny yet mighty kitchen became not just a place of work but a launching pad...
+      [Sycamore] (mystery): One of its standout offerings is ‘The Board,’ which features a single animal pre...
+    [LOCAL-276] 2 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0029 (463 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (38 words):
+      "At Little Big Diner, you will learn about Jinny's Pizzeria, inspired by the success and culinary experiments of this tiny yet mighty kitchen. At Sycamore, don't miss 'The Board,' featuring a single animal prepared in four distinct ways."
+      Stops referenced: 2
+    Part 4 total cost: $0.0029
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+    Stop 2 'Sycamore': removed duplicate sentence: "One of its standout offerings is ‘The Board,’ which features a single animal pre..."
+  [LOCAL-286] Deduplication: 1 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 2 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+  [D536] Listener asked for 2 stop(s), delivering 2 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave Little Big Diner, head east on Langley Road. Co...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: D177 FAILED for 'Sycamore': fact not in delivered text
+    Fact: "One of its standout offerings is ‘The Board,’ which features a single animal pre..."
+  [LOCAL-280] Recap composition: 0.5s, $0.0021, 380 tokens
+  [LOCAL-280] Recap built: 15 words, 1 composed clauses (1 D177 rejected, 0 navigation rejected)
+    [Little Big Diner] (reversal): "This tiny yet mighty kitchen became not just a place of work but a launching pad..."
+      → composed: "Little Big Diner, a launching pad for Jinny's Pizzeria and others"
+    D177 verified: all 1 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 2 stops — Little Big Diner, a launching pad for Jinny's Pizzeria and others."
+  [LOCAL-273] No coordinates for last stop — closing offer skipped
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (217 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (9 line(s), 12 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 2/2 stop(s), spoken to the listener.
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: Little Big Diner - 304 words
+Stop 2: Sycamore - 276 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (4955 chars, 2/2 stops)
+  [LOCAL-540] no defects — tour is clean
+
+Total API cost: $0.1017 (19204 tokens)
+Grounding:      $0.2800 (8 requests)
+Tour total:     $0.3817
+Provenance:     2/21 factual sentences sourced, 19 unsourced (2 corpus, 0 grounded, 19 parametric)
+CACHE STORE: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA / restaurant / 2
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/sycamore_run2.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/sycamore_run2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+Tour-Category: restaurant
+
+Stop 1: Little Big Diner
+
+Address: 837 Washington St, Newton, MA 02460
+
+Coordinates: 42.3512, -71.2091
+
+Type/Specialty: Diner
+
+Specific Examples: Classic breakfast dishes, gourmet burgers, homemade pastries
+
+Orientation: You are about to embark on a walking journey through Dinner at Sycamore and Little Big Diner in Newton Centre, MA. This culinary exploration...
+
+[TIMING] phase=packing elapsed=5.6s cumulative=189.4s
+[TIMING] phase=verification elapsed=0.0s cumulative=189.4s
+[TIMING] TOTAL wall=189.4s phases: poi_selection=112.9s, story_first=58.2s, fact_sheets=9.9s, packing=5.6s, intent=2.9s, narration=0.0s, external_lookups=0.0s, verification=0.0s

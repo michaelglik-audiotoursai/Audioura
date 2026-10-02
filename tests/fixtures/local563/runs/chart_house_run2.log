@@ -1,0 +1,500 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180115.txt'
+
+======================================================================
+CALL #001 | 18:01:15.599 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 1
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/chart_house_run2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180115.txt'
+
+======================================================================
+CALL #002 | 18:01:15.599 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  total_stops_final: 1
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Chart House, Boston, MA' → 'restaurant  of Chart House, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Chart House, Boston, MA' → 'restaurant of Chart House, Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "restaurants",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Chart House, Boston, MA",
+    "named_places": ["Chart House"],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+  [venue promotion] scope 'Chart House, Boston, MA' promoted to venue_name (interior preposition + institutional noun)
+  [S15] venue_name='Chart House' overridden — location contains explicit non-museum phrase
+[TIMING] phase=intent elapsed=2.3s cumulative=2.3s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Chart House, Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180115.txt'
+
+======================================================================
+CALL #003 | 18:01:17.854 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  user_request: restaurant tour of Chart House, Boston, MA
+  total_stops: 1
+
+
+PHASE 3A: Fetching 1 candidate POI(s) for restaurant tour of Chart House, Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Chart House, Boston, MA'
+  [S17] no scope_constraint (precision='BUILDING', scope='Chart House, Boston, MA')
+  [LOCAL-290] Asking for 4 candidates (N=1 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180115.txt'
+
+======================================================================
+CALL #004 | 18:01:17.854 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  total_stops: 1
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0005 (666 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180115.txt'
+
+======================================================================
+CALL #005 | 18:01:20.874 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 1
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Chart House, Boston, MA.
+List exactly 4 specific, real, well-known restaurants relevant to: restaurant tour of Chart House, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every stop MUST be 
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Legal Sea Foods",
+        "address": "255 State St, Boston, MA 02109",
+        "reason": "Founded in 1950, Legal Sea Foods is famous for its clam chowder, which has been served to U.S. Presidents and is a staple of New England cuisine."
+    },
+    {
+        "name": "Union Oyster House",
+        "address": "41 Union St, Boston, MA 02108",
+        "reason": "Established in 1826, it is the oldest continuously operating restaurant in the United States and is known for its lo
+
+  [LOCAL-329] Captured 4 substantive selection reason(s)
+OK PHASE 3A parsed 4 candidate POI(s):
+   - Legal Sea Foods @ 255 State St, Boston, MA 02109
+   - Union Oyster House @ 41 Union St, Boston, MA 02108
+   - The Capital Grille @ 900 Boylston St, Boston, MA 02115
+   - Mamma Maria @ 3 North Sq, Boston, MA 02113
+  [LOCAL-557] Restaurant request names ['Chart House'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Chart House' was NOT among the candidates — INSERTED as a user-explicit stop
+  [LOCAL-547] 1 requested stop(s) were missing from every fill path and were inserted: ['Chart House']
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Chart House, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 5 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Chart House - Chart House is a chain of upscale seafood restaurants
+   OK Verified Legal Sea Foods - Legal Sea Foods is a well-known chain of seafood restaurants
+   OK Verified Union Oyster House - Union Oyster House is a historic restaurant in Boston, Massachusetts
+   OK Verified The Capital Grille - The Capital Grille is a chain of upscale steakhouses
+   OK Verified Mamma Maria - Mamma Maria is a restaurant located in Boston's North End
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 5 stops pass location guard
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 1×VENUE_ONLY (not enough covered candidates to fill 1 stops)
+  [LOCAL-212] Selected: ['Chart House=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Union Oyster House=VENUE_ONLY', 'Legal Sea Foods=VENUE_ONLY', 'The Capital Grille=VENUE_ONLY', 'Mamma Maria=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Chart House=6.5']
+  [LOCAL-349] Yield scores (dropped):  ['Union Oyster House=8.0', 'Legal Sea Foods=5.0', 'The Capital Grille=3.0', 'Mamma Maria=2.0']
+  [EXISTENCE-GATE] LOG_ONLY — 4/5 stops verified (80%), 1 would be dropped
+    [VERIFIED] 'Chart House' — wikipedia_summary: 'Chart House' is dining+city
+    [VERIFIED] 'Union Oyster House' — wikipedia_summary: 'Union Oyster House' is dining+city
+    [VERIFIED] 'Legal Sea Foods' — wikipedia_summary: 'Legal Sea Foods' is a restaurant
+    [VERIFIED] 'The Capital Grille' — wikipedia_summary: 'The Capital Grille' is dining+city
+    [UNVERIFIED] 'Mamma Maria' — no evidence
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 0 verified_no_detail
+    [DINING-HARVEST] Summary: 0 harvested, 4 already had corpus, 0 no facts found
+    [INTERPRETIVE] 'Union Oyster House': +1 passages (2 queries)
+    [INTERPRETIVE] 'Legal Sea Foods': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +2 passages, 8 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 1 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180115.txt'
+
+======================================================================
+CALL #006 | 18:01:50.947 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Chart House, Boston, MA
+  stop_count: 1
+
+  [LOCAL-353] Querying OSM for dining operational details (city: Chart)
+  [LOCAL-353] Chart House: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Chart House: no guide price, no OSM facts — silence
+
+Coordinates fallback: requesting coords for 1 stop(s) missing them...
+   Coords fallback OK 'Chart House': 42.3601, -71.0524
+Extracted first POI coordinates: (42.3601, -71.0524)
+
+=== Extracted POI Information ===
+1. Chart House
+   Coordinates: 42.3601, -71.0524
+================================
+
+  [D538] 'Chart House' via serp(31)+openai+gemini: hours=Lunch: 7 days a week 11:30am - 3:00pm, D, reservation=reservations accepted; accepts walk-ins, price_band=entrees around $29–$55, $36 to $50
+  [D538] ⚠️  DROPPED 'Chart House' — reported permanently closed: Chart House, a riverfront staple in Weehawken, New Jersey, has closed as of May 14. A Mastro's Steakhouse is planned for the site. [https://www.northj
+  [D541] ⚠️  ALL 1 restaurant(s) were rejected as closed. Refusing to empty the tour — a check that rejects everything is more likely broken than the city is. Keeping all stops, flagged:
+        UNVERIFIED: Chart House
+  [D545] +5 story fact(s) for 'Chart House' via gemini (5 high)
+        [high] John Hancock used the Gardiner Building as his counting house and maritime trading office, where he reportedly
+        [high] On October 1, 1768, British warships anchored in Boston Harbor, and the 14th and 29th Regiments of the British
+        [high] In 1768, British customs collectors seized John Hancock's sloop Liberty at Long Wharf, accusing him of smuggli
+  [D538] Practicals acquired for 1/1 stop(s)
+[TIMING] phase=poi_selection elapsed=62.4s cumulative=64.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Chart House restaurant of Chart House' → 423 chars
+  [LOCAL-47] Chart House: tier=medium, facts=3
+  [LOCAL-37] Three-class retrieval: 1 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'medium': 1}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=1)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Chart House model=gpt-4o tokens=1141 (in=815 out=326) cost=$0.0053 latency=3.4s
+[COST_METER] FRESH | spine_generate | $0.005298 | user=None | job=local563-chart_house-run2
+  [LOCAL-278] Spine cost folded into total: $0.0053
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 1 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/1 stops have per-stop passages (8 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Chart House' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 1/1 generated
+  [S25] Story types assigned: ['anecdote']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=7.6s cumulative=72.3s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=72.3s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=72.3s
+
+Generating description for Stop 1: Chart House by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Chart House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Chart House', 12, ''), ('Chart House', 8, ''), ('Chart House', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14238 after=25908 (+11670 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25908)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0306 (6447 tokens, model=gpt-4o)
+Stop 1 description word count: 309 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Chart House': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001148 (input=4683, output=742)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 2 paragraphs retried, 1 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0009 (1075 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Chart House': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Chart House': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 1
+    Paragraphs checked: 4
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 5
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Chart House' conf=high reason='Generic operational hours apply to many similar establishments.': "The Chart House is open for lunch from 11:30 am to 3:00 pm daily and for dinner from 3:00 pm to 10:00 pm Sunday through "
+    [LOCAL-472] REMOVED transferable paragraph stop='Chart House' conf=high reason='Generic description of dining experience.': "The anticipation builds as diners prepare to dive into classic dishes like New England clam chowder, a recipe perfected "
+    [LOCAL-472] UNGROUNDED entity stop='Chart House' entity='On October' reason='No specific person or entity is linked to the stop.' in: "On October 1, 1768, this very location witnessed a significant historical event when British warship"
+    [LOCAL-472] UNGROUNDED entity stop='Chart House' entity='Boston Harbor' reason='No specific link to the stop is established.' in: "On October 1, 1768, this very location witnessed a significant historical event when British warship"
+    [LOCAL-472] UNGROUNDED entity stop='Chart House' entity='Long Wharf' reason='No specific person or entity is linked to Long Wharf.' in: "On October 1, 1768, this very location witnessed a significant historical event when British warship"
+    [LOCAL-472] UNGROUNDED entity stop='Chart House' entity='Gardiner Building' reason='No concrete link between Gardiner Building and the historical event is established.' in: "On October 1, 1768, this very location witnessed a significant historical event when British warship"
+    [LOCAL-472] UNGROUNDED entity stop='Chart House' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The anticipation builds as diners prepare to dive into classic dishes like New England clam chowder,"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/8)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 7
+    Glossed (composed): 2
+    Suppressed (already explained): 1
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 3
+    Triage: 656 tokens, $0.0002, 1.4s
+    Gloss: 253 tokens, $0.0001, 1.0s
+    Compose: 642 tokens, $0.0001, 1.2s
+    Total added cost: $0.0003
+    Stops affected: 1
+    Glosses applied:
+      • Landry → SUPPRESSED (already explained)
+      • British Army → "the land warfare force of the united kingdom" [source: model]
+      • Gardiner Building → DEGRADED (name dropped)
+      • Hancock → "the office of thomas hancock" [source: corpus]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Chart House, Boston, MA'...
+OK PHASE 5.6: 1/1 stop(s) within scope
+  [PHASE 5.6] >50% of stops were outside 'Chart House, Boston, MA' — scope is likely a small single venue; delivering 1 verified stop(s).
+OK PHASE 5.7: Dangling-reference scrub complete (1 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [1] DELETED: 'This military' in: This military presence was a direct response to the colonial unrest exacerbated 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Chart House' (index 36) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 1 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Chart House': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Chart House' — 309w → 150w after gates, 7 sentence(s) removed
+    removed: "The 14th and 29th Regiments of the British Army disembarked at Long Wharf, marching past the Gardine"
+    removed: "This military presence was a direct response to the colonial unrest exacerbated by incidents like th"
+    removed: "Today, as you stand outside the Chart House, you can almost hear echoes of the past mingling with th"
+    removed: "The restaurant offers a menu rich in seafood, a nod to its maritime roots, with entrees priced betwe"
+    removed: "Open for lunch seven days a week from 11:30 am to 3:00 pm, and for dinner from 3:00 pm to 10:00 pm S"
+    removed: "The anticipation builds as diners prepare to dive into classic dishes like New England clam chowder,"
+    removed: "This is not just a meal; it's an experience that connects you to the historical and cultural tapestr"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 1 eligible stop(s) concurrently (max_workers=1)
+
+Generating description for Stop 1: Chart House by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Chart House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Chart House', 12, ''), ('Chart House', 8, ''), ('Chart House', 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14238 after=25908 (+11670 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25908)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0335 (7044 tokens, model=gpt-4o)
+Stop 1 description word count: 327 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.5s for 1 stop(s) at max_workers=1
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 0 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.chart-house.com/location/chart-house-boston-ma/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.chart-house.com/location/chart-house-b
+  [LOCAL-427] HTTP 200 from https://chickenthiefkitchens.wordpress.com/travel-wanderings-the-food-side-shows/chart-house-boston-ma-iconic-seafood-history-atmosphere-views/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1511 chars from https://chickenthiefkitchens.wordpress.com/travel-
+  [LOCAL-427] Timeout from https://www.opentable.com/r/chart-house-restaurant-boston — retrying in 2.0s
+  [LOCAL-427] Timeout from https://www.opentable.com/r/chart-house-restaurant-boston — budget exhausted (2 attempts)
+  [LOCAL-427] HTTP 200 from https://www.chart-house.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.chart-house.com/
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DWIIx2xkhVU/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/capecodrestaurantsgroup/posts/983695952871815/?locale=zh_CN&hl=en (attempt 1)
+  [D512] verb discovery: query='restaurant tour of Chart House, Boston, MA how the dish is prepa' -> 11 new verb(s): roasted, grilled, cooked, prepared, whipped, cooled, dried, redefined, elevated, tailored, review
+  [D512] _AGENCY_VERB widened by 11 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Chart House                                36    24     0    45
+    [LOCAL-485] index mean 36.0 over 1 stop(s), range 36-36
+    [LOCAL-485] weakest: 'Chart House' at 36
+[TIMING] phase=story_first elapsed=88.6s cumulative=160.9s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (101 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 101 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 101 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 49
+    Words after:  20
+    Delta: -29
+    Stops affected: 1/1
+    Deletions (1):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you approach the historic Long Wharf in Boston, the salty breeze from the Atlantic Ocean greets y..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 1/1
+    Fewer than 2 stops with content — omitting Part 4
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 1 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (1 selected == 1 delivered)
+  [D536] Listener asked for 1 stop(s), delivering 1 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: fewer than 2 delivered stops — skipped
+  [LOCAL-280] No recap — closing offer gets full 3-sentence budget
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (0.2 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 1 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (1253 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (4 line(s), 6 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 1/1 stop(s), spoken to the listener.
+  [LOCAL-556] all 1 listener-named stop(s) survived assembly with a header
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: Chart House - 309 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (2015 chars, 1/1 stops)
+  [LOCAL-540] defects seen: ['no_story']
+  [LOCAL-540]   no_story [advisory]: no named people anywhere in the tour
+
+Total API cost: $0.0377 (9816 tokens)
+Grounding:      $0.0700 (2 requests)
+Tour total:     $0.1077
+Provenance:     2/12 factual sentences sourced, 10 unsourced (2 corpus, 0 grounded, 10 parametric)
+CACHE STORE: restaurant tour of Chart House, Boston, MA / restaurant / 1
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/chart_house_run2.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/chart_house_run2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Chart House, Boston, MA
+Tour-Category: restaurant
+
+Stop 1: Chart House
+
+Coordinates: 42.3601, -71.0524
+
+Orientation: You are about to embark on a walking journey through Chart House, Boston, MA. As you explore this single location, you will immerse yourself in the rich maritime history of Boston, intertwined with the innovative culinary creations of chefs honoring traditional seafood dishes with a modern twist. Chart House, an American seafood r...
+
+[TIMING] phase=packing elapsed=2.2s cumulative=163.0s
+[TIMING] phase=verification elapsed=0.0s cumulative=163.0s
+[TIMING] TOTAL wall=163.0s phases: story_first=88.6s, poi_selection=62.4s, fact_sheets=7.6s, intent=2.3s, packing=2.2s, narration=0.0s, external_lookups=0.0s, verification=0.0s

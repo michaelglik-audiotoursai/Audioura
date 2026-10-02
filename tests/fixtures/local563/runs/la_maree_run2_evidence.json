@@ -1,0 +1,92 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 2,
+      "unsourced": 8,
+      "total": 10,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 8
+    },
+    "per_stop": {
+      "La Marée": {
+        "sourced": 2,
+        "unsourced": 8,
+        "total": 10
+      }
+    },
+    "claims": [
+      {
+        "stop": "La Marée",
+        "text": "As you arrive at this singular stop, you will immerse yourself in the fusion of Monaco's maritime heritage and contemporary culinary artistry, woven together by Chef Ivan Vukadin's journey from Croatia to mastering seafood cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "Inspired by techniques passed down through generations and Monaco's cosmopolitan influence, every dish at La Marée narrates a tale of tradition meeting modernity in a harmonious blend of flavors.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "Established in 2013 with a concept from Russia, La Marée Monaco stands as a culinary beacon, embodying a legacy that traces back to the esteemed establishments like the Ritz and La Tour d'Argent, where Chef Ivan honed his craft before shaping the gastronomic culture of Russian cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "La Marée, established in 2013, is a Mediterranean flagship of a luxury restaurant chain originating from Moscow and Saint Petersburg.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "La Marée in Monaco was the Mediterranean flagship of a luxury restaurant chain originating in Moscow and Saint Petersburg."
+      },
+      {
+        "stop": "La Marée",
+        "text": "In autumn 2020, a lease dispute between the operators, SARL and the new business asset owners, Madar Group, led to a dramatic episode.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "9, 2020, 26 staff members, accompanied by a court bailiff, found themselves barred from entering La Marée.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On October 9, 2020, 26 staff members of La Marée, accompanied by a court bailiff, were barred entry to the restaurant due to a lease dispute."
+      },
+      {
+        "stop": "La Marée",
+        "text": "The situation underscored the restaurant's significance not just as a dining venue, but as a player in Monaco's social and economic spheres.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "La Marée offers a seafood-centric menu that ensures a memorable dining experience.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "Booking ahead is recommended, especially during high-profile events like the Grand Prix, to secure a spot in this sought-after dining destination.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "Musée Matisse (Nice) is 12 kilometers from here — we can build a walking tour there.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

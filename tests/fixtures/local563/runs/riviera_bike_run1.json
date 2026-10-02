@@ -1,0 +1,87 @@
+{
+  "slug": "riviera_bike",
+  "run": "run1",
+  "request": "French Riviera biking tour",
+  "location_passed": "French Riviera biking tour",
+  "restaurant_signal_appended": false,
+  "tour_type": "walking",
+  "stops_requested": 4,
+  "is_building_tour": false,
+  "status": "ok",
+  "error": null,
+  "wall_s": 374.8,
+  "chars": 10707,
+  "gemini_calls": {
+    "total": 4,
+    "grounded_this_run": 4,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 4,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 4,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 140,
+    "cumulative_grounded_after": 148,
+    "cumulative_cost_after_usd": 5.18,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.18936524999999998,
+    "total_tokens": 99639,
+    "cache_hit": false,
+    "grounding_cost": 0.14,
+    "grounding_requests": 4,
+    "tour_total_cost": 0.32936525,
+    "breakdown": {
+      "llm": 0.18936524999999998,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.14
+    },
+    "provenance": {
+      "sourced": 9,
+      "unsourced": 29,
+      "total": 38,
+      "corpus": 9,
+      "grounded": 0,
+      "parametric": 29
+    },
+    "score": {
+      "defects_before": {},
+      "defects_after": {},
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.228236,
+        "total_tokens": 37241
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [],
+    "defect_count": 0,
+    "defect_detail": {},
+    "named_people": 7,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 7,
+    "chars": 10707,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 5,
+      "local229_contradicted_groups_blocked": 1,
+      "local472_specificity_removals": 13,
+      "total": 19
+    }
+  }
+}

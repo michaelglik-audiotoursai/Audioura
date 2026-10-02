@@ -1,0 +1,87 @@
+{
+  "slug": "faneuil",
+  "run": "run1",
+  "request": "Faneuil Hall Marketplace, Boston MA",
+  "location_passed": "Faneuil Hall Marketplace, Boston MA",
+  "restaurant_signal_appended": false,
+  "tour_type": "walking",
+  "stops_requested": 4,
+  "is_building_tour": false,
+  "status": "ok",
+  "error": null,
+  "wall_s": 361.6,
+  "chars": 10026,
+  "gemini_calls": {
+    "total": 5,
+    "grounded_this_run": 5,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 5,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 5,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 148,
+    "cumulative_grounded_after": 157,
+    "cumulative_cost_after_usd": 5.495,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.20321285000000003,
+    "total_tokens": 104652,
+    "cache_hit": false,
+    "grounding_cost": 0.17500000000000002,
+    "grounding_requests": 5,
+    "tour_total_cost": 0.37821285000000004,
+    "breakdown": {
+      "llm": 0.20321285000000003,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.17500000000000002
+    },
+    "provenance": {
+      "sourced": 6,
+      "unsourced": 36,
+      "total": 42,
+      "corpus": 6,
+      "grounded": 0,
+      "parametric": 36
+    },
+    "score": {
+      "defects_before": {},
+      "defects_after": {},
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.27964,
+        "total_tokens": 38254
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [],
+    "defect_count": 0,
+    "defect_detail": {},
+    "named_people": 5,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 11,
+    "chars": 10026,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 2,
+      "local229_contradicted_groups_blocked": 2,
+      "local472_specificity_removals": 11,
+      "total": 15
+    }
+  }
+}

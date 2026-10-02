@@ -1,0 +1,300 @@
+{
+  "landmarks": {
+    "Eze Village": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Monaco": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 5,
+      "unsourced": 32,
+      "total": 37,
+      "corpus": 5,
+      "grounded": 0,
+      "parametric": 32
+    },
+    "per_stop": {
+      "Eze Village": {
+        "sourced": 2,
+        "unsourced": 13,
+        "total": 15
+      },
+      "Monaco": {
+        "sourced": 3,
+        "unsourced": 15,
+        "total": 18
+      },
+      "Saint-Tropez Citadel": {
+        "sourced": 0,
+        "unsourced": 4,
+        "total": 4
+      }
+    },
+    "claims": [
+      {
+        "stop": "Eze Village",
+        "text": "The route spans from the medieval heights of Eze Village to the coastal Saint-Tropez Citadel, covering approximately 89 km of diverse terrain.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "This journey unveils the Riviera's dual identity: from the fairytale views of Èze perched over 400m above sea level to Monaco's royal beginnings under Prince Charles III Grimaldi.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "The opulent villas of Saint-Jean-Cap-Ferrat draw a luxurious contrast to the historic Citadelle of Saint-Tropez, erected in the early 1600s for coastal defense, attracting artists like Paul Signac in a tale of protection and artistic inspiration.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "In the upcoming stops, you will learn about Laurent Fignon's crash in 1989 at Eze Village and the unexpected incident involving Peter Sagan in May 2023 in Monaco.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "These stories will be complemented by the historical significance of the Cap Ferrat Coastal Path as a former customs route.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "From Nice, take the train to Eze-sur-Mer station, then bike uphill on D6098 for about 4 km to reach Eze Village.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "The narrow, cobblestone streets wind upwards, leading to breathtaking views at over 400 meters above sea level.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "Èze Village is a remarkable stop o biking tour, not just for its mesmerizing views, but also for its rich history and connection to the world of cycling.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "In 1989, the Paris–Nice race, a prestigious event in the cycling calendar, saw French cycling legend Laurent Fignon crash on the descent near Èze.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1989, French cycling legend Laurent Fignon crashed on the descent near Èze during the Paris–Nice race but managed to win the overall victory by fractions of a second."
+      },
+      {
+        "stop": "Eze Village",
+        "text": "Despite this setback, Fignon's determination led him to secure the overall victory by just fractions of a second.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "In more recent times, the 2012 Paris–Nice race added another chapter to Èze's cycling legacy.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "British cyclist Bradley Wiggins faced dense sea fog during the climb past Èze.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 2012, Bradley Wiggins held off Lieuwe Westra by eight seconds to win the Paris–Nice race, despite dense sea fog during the climb past Èze."
+      },
+      {
+        "stop": "Eze Village",
+        "text": "In a display of skill and resilience, Wiggins managed to hold off his competitor, Lieuwe Westra, by a mere eight seconds, clinching the victory.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "These stories of triumph and endurance echo through the winding streets, where modern-day cycling stars like Tadej Pogačar, Geraint Thomas, and Remco Evenepoel frequently train.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Eze Village",
+        "text": "The village itself, first populated around 200 BC near Mount Bastide, offers a journey through time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "The best viewing position here is at the iconic Casino de Monte-Carlo, where you can take in the opulent architecture and the bustling life around the square.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "Step into Monaco, a principality that stands as a semi-enclave within, enveloped by France on three sides and overlooking the shimmering Mediterranean.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "The casino's gilded halls have witnessed fortunes made and lost, encapsulating the sense of drama that Monaco is known for.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "In May 2023, the renowned cyclist Peter Sagan found himself at the center of an unexpected incident in Monaco.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "While attempting to park a scooter, Sagan was caught by the police in an intoxicated state.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In May 2023, Peter Sagan was caught by Monaco police trying to park a scooter while heavily intoxicated, resulting in a three-month suspended prison sentence and a suspended driving license."
+      },
+      {
+        "stop": "Monaco",
+        "text": "This episode adds to Monaco's tapestry of high-profile stories, underscoring how even the most celebrated individuals can find themselves entwined with the principality’s legal net.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "In the late 1990s and early 2000s, Lance Armstrong famously used the nearby Col de la Madone as a performance benchmark.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Lance Armstrong used the Col de la Madone as a performance benchmark during the late 1990s and early 2000s, believing a climb under 31 minutes indicated readiness to win the Tour de France."
+      },
+      {
+        "stop": "Monaco",
+        "text": "Completing the climb in under 31 minutes was considered an indication of readiness to win the Tour de France.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Lance Armstrong used the Col de la Madone as a performance benchmark during the late 1990s and early 2000s, believing a climb under 31 minutes indicated readiness to win the Tour de France."
+      },
+      {
+        "stop": "Monaco",
+        "text": "This climb has become a symbol of ambition and endurance, resonating with the aspirations that Monaco embodies.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "The Cap Ferrat Coastal Path has more than just scenic beauty; it is woven with tales of intrigue and history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "In the 18th and 19th centuries, this path was a lifeline for French customs officers tasked with patrolling against Mediterranean smugglers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "Nearby, a glimpse of Villa Les Cèdres offers another chapter of Cap Ferrat's storied history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "In 1900, King Leopold II of Belgium purchased this grand villa to house his young companion, Blanche Zélia Joséphine Delacroix, known as Caroline Lacroix.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "Their relationship, and eventual marriage in 1909, caused quite an uproar, both diplomatically and within the royal family.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "As Leopold lay on his deathbed, he sought to secure Caroline’s inheritance through a religious ceremony, ensuring her place in history and tying her fate to this breathtaking locale.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "Further along, the presence of Villa Santo Sospir sheds light on the artistic flair of the region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "In 1950, the villa became a canvas for artist Jean Cocteau.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Monaco",
+        "text": "Over a decade, Cocteau adorned its walls with frescoes inspired by pagan and mythological themes, transforming the villa into a living gallery.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Saint-Tropez Citadel",
+        "text": "On August 15, 1944, amid the cacophony of war, the Citadel witnessed a pivotal moment during Operation Dragoon, the code name for the Allied invasion.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Saint-Tropez Citadel",
+        "text": "Allied forces advanced, prompting the German garrison stationed here to raise the white flag.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Saint-Tropez Citadel",
+        "text": "The Citadel has witnessed cultural mingling tales.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Saint-Tropez Citadel",
+        "text": "Today, within these ancient walls, the Citadel houses a maritime museum, showcasing the town's transition from a fortified stronghold to a cultural haven.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

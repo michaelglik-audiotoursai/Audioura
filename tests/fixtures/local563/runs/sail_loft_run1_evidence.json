@@ -1,0 +1,85 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 0,
+      "unsourced": 9,
+      "total": 9,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 9
+    },
+    "per_stop": {
+      "Boston Sail Loft": {
+        "sourced": 0,
+        "unsourced": 9,
+        "total": 9
+      }
+    },
+    "claims": [
+      {
+        "stop": "Boston Sail Loft",
+        "text": "In this single stop tour, you will experience the maritime charm and culinary excellence of a renowned seafood restaurant nestled in the North End Waterfront since 1984.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The Boston Sail Loft weaves New England's seafood traditions with family-owned resilience, offering a culinary experience rooted in personal storytelling.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Founded in 1984 on Atlantic Avenue near Long Wharf, this spot serves as a go-to destination for classic New England seafood delights, accompanied by breathtaking views of the Boston Harbor.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Since its establishment in 1984, the Boston Sail Loft has become a cherished fixture in the North End Waterfront, offering an inviting slice of classic New England seafood.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The chowder's acclaim extended far beyond Boston, sweeping regional awards and even making appearances on national morning shows.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Meals are priced at $30 and under, offering an accessible delight for anyone craving the taste of the sea.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The venue operates from 11:30 am to 2:00 am on Mondays and Tuesdays, ideal for a midday meal or a late-night bite.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "Stepping inside the Sail Loft, you can savor the legendary clam chowder, a dish that has consistently drawn locals and visitors back.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Sail Loft",
+        "text": "The flavors of the ocean blend with the rich history of Boston's waterfront, creating a timeless and unforgettable dining experience.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

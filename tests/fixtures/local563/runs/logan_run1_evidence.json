@@ -1,0 +1,219 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 0,
+      "unsourced": 26,
+      "total": 26,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 26
+    },
+    "per_stop": {
+      "Terminal A": {
+        "sourced": 0,
+        "unsourced": 12,
+        "total": 12
+      },
+      "boarding gate desk": {
+        "sourced": 0,
+        "unsourced": 3,
+        "total": 3
+      },
+      "air traffic control tower cabin": {
+        "sourced": 0,
+        "unsourced": 7,
+        "total": 7
+      },
+      "terminal entrance vestibule": {
+        "sourced": 0,
+        "unsourced": 4,
+        "total": 4
+      }
+    },
+    "claims": [
+      {
+        "stop": "Terminal A",
+        "text": "From Terminal A to the terminal entrance vestibule, you'll traverse the interconnected spaces where human movement converges.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "Reconstructed and reopened in 2005, it became the world’s first airport terminal to receive LEED (Leadership in Energy and Environmental Design) certification.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "This accolade, awarded by the U.S. Green Building Council, recognizes the terminal's commitment to sustainable architecture, including energy efficiency and reduced carbon footprint.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "The history of Terminal A is deeply intertwined with the airport's evolution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "Originally, this site housed the Eastern Airlines shuttle hub, designed in the late 1960s by Yamasaki & Associates, the same firm that crafted the iconic World Trade Center towers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "Although that terminal was eventually demolished, its legacy of architectural excellence lives on through the new Terminal A. Boston Logan International Airport, named after Major General Edward Lawrence Logan, occupies a significant place in both local and aviation history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "In 1943, the Massachusetts state legislature chose to honor General Logan, a South Boston native and World War I commander of the 101st Infantry Regiment, by renaming the airport after him.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "His contributions as a municipal judge and state legislator further cemented his status as a prominent figure in Massachusetts' history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "Terminal A's reconstruction marked a turning point: it addressed post-9/11 security needs, making it a model for integrating safety into airport design.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "Today, Boston Logan International Airport sprawls over 2,384 acres and serves as a major hub with six runways and four passenger terminals.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "In 2024, the airport achieved a record by handling 43.5 million passengers, underscoring its role as a crucial gateway for domestic and international travel.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Terminal A",
+        "text": "The vibrant atmosphere at Terminal A is a reminder of the complex coordination and infrastructure that underpin modern air travel, ensuring that each flight departs smoothly and safely.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "boarding gate desk",
+        "text": "On September 11, 2001, hijackers boarded Flights 11 and 175 here, setting off events that reshaped global security and air travel protocols.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "boarding gate desk",
+        "text": "This unassuming locale also witnessed the signing of Chapter 404 of the Acts of 1922, when Massachusetts Governor Channing H. Cox authorized leasing state-owned tidal flats in East Boston to construct an airfield, laying the groundwork for what would become this bustling airport.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "boarding gate desk",
+        "text": "The gate agents today are unsung heroes, managing last-minute changes that ripple through the airport, yet their decisions swiftly travel across terminals like the one you explored at Terminal A earlier.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "The view from this vantage point is a testament to the airport's extensive operations, guiding more than 1,200 flights daily.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "This air traffic control tower, designed Dean, Stahl & Rogers, stands as a remarkable feat of engineering and architecture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "Completed in 1973, its twin cylindrical concrete pylons are an innovative departure from the single-shaft towers typically favored by the FAA at the time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "This unique design is not just for aesthetic value; it speaks to the vision of Mayor James Michael Curley and aviation advocates who were determined to secure Boston's place on national airmail routes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "Their efforts helped ensure that the airport remained a vital hub for both civilian and military aviation, including bases for the U.S. And the Massachusetts National Guard.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "The tower also connects to the airport's historical expansion efforts, which were managed by Massport, the authority overseeing transportation facilities, since 1959.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "air traffic control tower cabin",
+        "text": "With its distinctive design and historical significance, the tower is more than just a control center; it is a symbol of Boston's enduring commitment to aviation excellence.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "terminal entrance vestibule",
+        "text": "As you arrive at the Terminal Entrance Vestibule of Boston Logan International Airport, step slightly to the side to allow a full view of the bustling threshold.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "terminal entrance vestibule",
+        "text": "Once adjacent to the site of the 1969 Maverick Mothers protest—an event where determined local women stood their ground to protect their community from encroachment—this vestibule now symbolizes the resolve that has long characterized this area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "terminal entrance vestibule",
+        "text": "Established as Jeffery Field in 1923, Logan's historical roots trace back to its inception as a small airfield demanded by local civic leaders to ensure Boston's place in commercial commerce and airmail networks.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "terminal entrance vestibule",
+        "text": "Meanwhile, the station plays a role similar to Washington's Union Station, which burns brightly as a beacon of travel, powered since 1907 by Daniel Burnham's design.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

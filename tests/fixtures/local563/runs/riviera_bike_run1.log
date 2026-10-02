@@ -1,0 +1,745 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182928.txt'
+
+======================================================================
+CALL #001 | 18:29:28.538 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: French Riviera biking tour
+  tour_type: walking
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/riviera_bike_run1.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182928.txt'
+
+======================================================================
+CALL #002 | 18:29:28.538 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: French Riviera biking tour
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'French Riviera biking tour' → 'French Riviera biking'
+  [LOCAL-46] Stripped transport words: 'French Riviera biking' → 'French Riviera'
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "biking locations",
+    "location": "French Riviera",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "French Riviera",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "bike",
+    "country_scope": "France"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=bike, country_scope=France (keyword=bike, intent=bike)
+✅ Intent Analysis Results:
+   POI Type: biking locations
+   Location: French Riviera
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.5s cumulative=1.5s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: BIKE
+Using walking template for French Riviera biking tour - walking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182928.txt'
+
+======================================================================
+CALL #003 | 18:29:30.035 | GENERATING_PROMPT
+======================================================================
+  location: French Riviera biking tour
+  user_request: French Riviera biking tour
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for French Riviera biking tour...
+  [S17] no scope_constraint (precision='CITY', scope='French Riviera')
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182928.txt'
+
+======================================================================
+CALL #004 | 18:29:30.035 | PHASE_3A_REQUEST
+======================================================================
+  location: French Riviera biking tour
+  total_stops: 4
+  poi_type_hint: biking locations
+
+PHASE 3A API call cost: $0.0005 (623 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182928.txt'
+
+======================================================================
+CALL #005 | 18:29:34.046 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for French Riviera biking tour.
+List exactly 7 specific, real, well-known biking locations relevant to: French Riviera biking tour.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A BIKING TOUR:
+Stops should be reachable via bike paths, roads, or trails 
+  prompt_last_300_chars:  cycling routes.
+- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Promenade des Anglais", "address": "Prom. des Anglais, 06000 Nice, France", "reason": "A famous seaside promenade in Nice, ideal for cycling along the Mediterranean coast."},
+    {"name": "Parc Phoenix", "address": "405 Prom. des Anglais, 06200 Nice, France", "reason": "A large park with beautiful gardens and paths, perfect for a scenic bike ride."},
+    {"name": "Cap d'Ail Coastal Path", "address": "Avenue du 11 Novembre, 06320 Cap d'Ail, France", "reason": "A stunning coastal p
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'Promenade des Anglais'
+   ! [LOCAL-329] Hollow reason for 'Parc Phoenix': 'A large park with beautiful gardens and paths, perfect for a scenic bike ride.'
+   ! [LOCAL-329] Hollow reason for 'Monaco Grand Prix Circuit': 'The famous Formula 1 race circuit that cyclists can explore outside of race days'
+   ! [LOCAL-329] Hollow reason for 'La Turbie': 'A charming village with scenic views and cycling routes leading to the Trophée d'
+   ! [LOCAL-329] Hollow reason for 'Menton Beaches': 'Beautiful beaches in Menton accessible via bike paths along the coast.'
+   ! [LOCAL-329] Hollow reason for 'Côte d'Azur Bike Path': 'A dedicated bike path along the stunning coastline between Nice and Èze.'
+  [LOCAL-329] Substance filter: 5 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 1 substantive selection reason(s)
+OK PHASE 3A parsed 1 candidate POI(s):
+   - Cap d'Ail Coastal Path @ Avenue du 11 Novembre, 06320 Cap d'Ail, France
+  [area_resolver] Parsed: city='French Riviera', neighborhood=''
+  [area_resolver] Resolved as region: French Riviera → Q182822
+  [area_resolver] City resolved: French Riviera → Q182822 (43.3200, 6.6650)
+  [area_resolver] Entity is a region — using wider radius: 15.0km
+  [area_resolver] Resolved: center=(43.3200, 6.6650), radius=15.0km, lang=fr
+  [area_cache] HIT for Q182822: 7 landmarks (tier=medium)
+  [verify_landmarks] 0/1 stops verified against 7 discovered landmarks (tier: medium)
+  [WALK-D1] Verified 0 stops, tier=medium
+
+PHASE 4.5: Validating AI knowledge for French Riviera biking tour...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+
+Part C: Fetching 3 replacement POI(s), attempt 1/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'Promenade des Anglais'
+   Part C attempt 1: AI returned 2 usable candidate(s)
+   Part C attempt 1: 2 survived; total now 3
+
+Part C: Fetching 1 replacement POI(s), attempt 2/2...
+   ! [LOCAL-22] Rejected corrupted name from Part C: 'Nice Promenade des Anglais'
+   Part C attempt 2: AI returned 0 usable candidate(s)
+   Part C attempt 2: 0 survived; total now 3
+  [EXISTENCE-GATE] LOG_ONLY — 2/3 stops verified (67%), 1 would be dropped
+    [VERIFIED] "Cap d'Ail Coastal Path" — stop_corpus(geographic): "Cap d'Antibes Coastal Path" at 'French Riviera walking
+    [VERIFIED] 'Col de Vence' — stop_corpus(geographic): 'Saint-Paul-de-Vence' at 'French Riviera cycling tour, 
+    [UNVERIFIED] 'Cannes Bike Path' — no evidence
+    [HARVEST] Summary: 0 harvested, 2 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 4 queries issued, 0 attributions dropped
+
+  [LOCAL-290] REPLENISHMENT: need 1 more stops (have 3/4)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Mont Boron' — stop_corpus(geographic): 'Mont Boron' at 'French Riviera walking area' (5 passag
+    [VERIFIED] 'Île Sainte-Marguerite' — stop_corpus(geographic): 'Île Sainte-Marguerite' at 'French Riviera cycling tour
+    [VERIFIED] 'Route de la Turbie' — stop_corpus(geographic): 'La Turbie' at 'French Riviera cycling tour, France' (1
+    [VERIFIED] 'Les Gorges du Loup' — wikipedia_fr_summary: 'Les Gorges du Loup' exists and mentions region
+    [HARVEST] 'Les Gorges du Loup': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'Route de la Turbie': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +1 passages, 8 queries issued, 0 attributions dropped
+    [LOCAL-290] REPLENISHED: 'Mont Boron' — stop_corpus(geographic): 'Mont Boron' at 'French Riviera wal
+    [LOCAL-290] Round 1: +1 verified, total now 4/4
+  [LOCAL-290] Replenishment SUCCESS: 4/4 stops
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+  [LOCAL-329] Persisted 1 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_182928.txt'
+
+======================================================================
+CALL #006 | 18:30:13.902 | PHASE_3B_REQUEST
+======================================================================
+  location: French Riviera biking tour
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0009 (1064 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: French, hint: auto)
+  [LOCAL-355] Cap d'Ail Coastal Path: no practical facts in OSM
+  [LOCAL-355] Col de Vence: no practical facts in OSM
+  [LOCAL-355] Cannes Bike Path: no practical facts in OSM
+  [LOCAL-355] Mont Boron: no practical facts in OSM
+   GEO-CHECK: all 4 stops within cycling distance (max leg 27.83 km, total 69.41 km, limit 120 km)
+Extracted first POI coordinates: (43.7499, 7.4271)
+
+=== Extracted POI Information ===
+1. Cap d'Ail Coastal Path
+   Address: Avenue du 11 Novembre, 06320 Cap d'Ail, France
+   Coordinates: 43.7499, 7.4271
+   Directions: From Nice Ville train station, head southwest on Avenue Jean Médecin, then take ...
+2. Col de Vence
+   Address: Col de Vence, 06140 Vence, France
+   Coordinates: 43.6656, 7.1149
+   Directions: From Cap d'Ail Coastal Path, head northeast on Avenue du 11 Novembre, then turn ...
+3. Cannes Bike Path
+   Address: Boulevard de la Croisette, 06400 Cannes, France
+   Coordinates: 43.5528, 7.0174
+   Directions: From Col de Vence, take D2210 south towards Cannes, then follow signs for Boulev...
+4. Mont Boron
+   Address: Mont Boron, 06300 Nice, France
+   Coordinates: 43.6880, 7.3083
+   Directions: From Cannes Bike Path, head east on Boulevard de la Croisette, then take the D60...
+================================
+
+  [D556] +7 story fact(s) for 'Cap d'Ail Coastal Path' via gemini (5 high)
+  [D556] +5 story fact(s) for 'Col de Vence' via gemini (5 high)
+  [D556] +4 story fact(s) for 'Cannes Bike Path' via gemini (4 high)
+  [D556] +5 story fact(s) for 'Mont Boron' via gemini (4 high)
+[TIMING] phase=poi_selection elapsed=224.8s cumulative=226.3s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Cap d'Ail Coastal Path French Riviera' → 18034 chars
+  [LOCAL-47] Cap d'Ail Coastal Path: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Col de Vence French Riviera' → 18874 chars
+  [LOCAL-47] Col de Vence: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Cannes Bike Path French Riviera' → 29592 chars
+  [LOCAL-47] Cannes Bike Path: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Mont Boron French Riviera' → 502 chars
+  [LOCAL-47] Mont Boron: tier=rich, facts=6
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=French Riviera biking tour model=gpt-4o tokens=1489 (in=857 out=632) cost=$0.0085 latency=8.8s
+[COST_METER] FRESH | spine_generate | $0.008463 | user=None | job=local563-riviera_bike-run1
+  [LOCAL-278] Spine cost folded into total: $0.0085
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (8 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Cap d'Ail Coastal Path' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Col de Vence' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Cannes Bike Path' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Mont Boron' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=24.1s cumulative=250.3s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=250.3s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=250.3s
+
+Generating description for Stop 1: Cap d'Ail Coastal Path by , ...
+
+Generating description for Stop 2: Col de Vence by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Col de Vence' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 3: Cannes Bike Path by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Cannes Bike Path' matched_work=False medium='' work_identity_chars=0
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Cap d'Ail Coastal Path' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 4: Mont Boron by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Mont Boron' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Col de Vence', 7, ''), ('Col de Vence', 5, ''), ('Col de Vence', 5, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12843 after=22317 (+9474 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22317)
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cannes Bike Path', 8, ''), ('Cannes Bike Path', 6, ''), ('Cannes Bike Path', 6, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12748 after=22158 (+9410 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22158)
+  [LOCAL-411] Stop 1 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [("Cap d'Ail Coastal Path", 9, ''), ("Cap d'Ail Coastal Path", 8, ''), ("Cap d'Ail Coastal Path", 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14561 after=24150 (+9589 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24150)
+  [LOCAL-411] Stop 4 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Mont Boron', 16, ''), ('Mont Boron', 16, ''), ('Mont Boron', 13, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=12649 after=23060 (+10411 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23060)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0262 (5512 tokens, model=gpt-4o)
+Stop 3 description word count: 319 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0267 (5612 tokens, model=gpt-4o)
+Stop 2 description word count: 274 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0284 (5986 tokens, model=gpt-4o)
+Stop 1 description word count: 273 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 4 API call cost: $0.0278 (5848 tokens, model=gpt-4o)
+Stop 4 description word count: 257 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Cap d'Ail Coastal Path': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✓ PASS stop='Col de Vence': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✓ PASS stop='Cannes Bike Path': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Mont Boron': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002017 (input=8099, output=1337)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 2: retry IMPROVED (5→2 errors)
+  [LOCAL-192] Stop 1 para 3: retry FAILED — keeping original (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R3_SUGGESTIVE_EXPLORATION, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 4 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 11 paragraphs retried, 7 fixed/improved, 4 kept original
+  [LOCAL-192] Retry cost: $0.0042 (5204 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Cap d'Ail Coastal Path': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 2 'Col de Vence': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] Stop 2 'Col de Vence': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-261] R3 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Cap d'Ail Coastal Path': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Col de Vence': 2 sentence(s) deleted, 2 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Cannes Bike Path': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Mont Boron': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 5 sentences deleted, 2 paragraphs emptied, 4 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 13
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 11
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Cap d'Ail Coastal Path' conf=high reason='Generic description of coastal cliffs applies to any viewpoint.': "From this vantage point, you can admire how the dramatic cliffs rise ahead, hinting at further changes in the landscape."
+    [LOCAL-472] REMOVED transferable paragraph stop='Mont Boron' conf=high reason='Generic scene-setting applicable to any historic church.': "As you crest the hill, the Riviera unfolds below you, offering a new perspective."
+    [LOCAL-472] UNGROUNDED entity stop='Cap d'Ail Coastal Path' entity='Château de Malet' reason='It does not specify how Churchill's connection to Château de Malet relates to the coastal path.' in: "The Cap d'Ail Coastal Path holds a rich history. In the early 20th century, it attracted Sir Winston"
+    [LOCAL-472] UNGROUNDED entity stop='Cap d'Ail Coastal Path' entity='Monte Carlo Casino' reason='It mentions Kschessinska's gambling but lacks a direct link to the Cap d'Ail Coastal Path.' in: "Near where you stand, the history of the region intertwines with intriguing personal stories. Before"
+    [LOCAL-472] UNGROUNDED entity stop='Col de Vence' entity='Geraint Thomas' reason='No concrete link to Col de Vence is provided.' in: "The Col de Vence stands as a beacon for both cycling enthusiasts and those intrigued by the unexplai"
+    [LOCAL-472] UNGROUNDED entity stop='Col de Vence' entity='World Championship' reason='No concrete link between the World Championship and Col de Vence is established.' in: "The Col de Vence stands as a beacon for both cycling enthusiasts and those intrigued by the unexplai"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='In May' reason='It does not specify how Frémaux is concretely linked to the Cannes Bike Path.' in: "The Cannes Bike Path is more than just a scenic route; it’s a stage for both local life and internat"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='Thierry Frémaux' reason='No concrete link to the Cannes Bike Path is established.' in: "The Cannes Bike Path is more than just a scenic route; it’s a stage for both local life and internat"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='General Delegate' reason='It does not specify a concrete link between Frémaux and the Cannes Bike Path.' in: "The Cannes Bike Path is more than just a scenic route; it’s a stage for both local life and internat"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='Cannes Film Festival' reason='It does not specify how Thierry Frémaux is concretely linked to the Cannes Bike Path.' in: "The Cannes Bike Path is more than just a scenic route; it’s a stage for both local life and internat"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='Cannes Mayor David Lisnard' reason='No concrete link to the Cannes Bike Path is provided.' in: "Adding to the dynamic atmosphere, Cannes Mayor David Lisnard initiated stringent measures to declutt"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='On Sundays' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "On Sundays, the city takes a different approach by closing off parts of the Boulevard du Midi to mot"
+    [LOCAL-472] UNGROUNDED entity stop='Cannes Bike Path' entity='Boulevard du Midi' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "On Sundays, the city takes a different approach by closing off parts of the Boulevard du Midi to mot"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/32)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Cannes Bike Path' cut orphaned dependant of a removed introduction — subject 'bike/cannes/path': "The Cannes Bike Path is more than just a scenic route; it’s a stage for both loc"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 17
+    Glossed (composed): 4
+    Suppressed (already explained): 1
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 7
+    Triage: 2143 tokens, $0.0005, 5.6s
+    Gloss: 1184 tokens, $0.0003, 4.0s
+    Compose: 1343 tokens, $0.0002, 1.5s
+    Total added cost: $0.0010
+    Stops affected: 4
+    Glosses applied:
+      • Château de Malet → DEGRADED (name dropped)
+      • Mala Beach → DEGRADED (name dropped)
+      • World Championship → DEGRADED (name dropped)
+      • General Delegate → SUPPRESSED (already explained)
+      • Carlton Hotel → "a historic luxury hotel in Cannes" [source: model]
+      • Lisnard → DEGRADED (name dropped)
+      • Philibert de Savoie → "the duke of savoy from 1553 to 1580" [source: model]
+      • Terra Amata → "an archaeological site near nice" [source: model]
+      • Homo → DEGRADED (name dropped)
+      • Micheline Roquebrune → "a french artist and sean connery's widow" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 4 'Mont Boron': claim='1553 (in context: "ibert de Savoie, the duke of savoy from 1' contradicted_by='Construit entre 1557 et 1560 sous le règne d'Emmanuel-Philibert de Savoie, le fo' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=4 claim='1553 (in context: "ibert de Savoie, the duke of sa' evidence='Construit entre 1557 et 1560 sous le règne d'Emman' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [2] DELETED: 'These phenomena' in: These phenomena have fueled local folklore for decades, drawing visitors keen on
+    [4] DELETED: 'This discovery' in: This discovery situates Mont Boron as a significant archaeological landmark, add
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 4 'Mont Boron' (index 42) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Cap d'Ail Coastal Path': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Col de Vence': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Cannes Bike Path': the longest run (3 sentences, Cannes Film Festival) has agency=0 stakes=0 — someone is described, but nothing 
+    stop 4 'Mont Boron': the longest run (3 sentences, Mont Boron) has agency=1 stakes=0 — someone is described, but nothing is risked,
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Cannes Bike Path' (index 21)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Cap d'Ail Coastal Path' — 247w → 78w after gates, 12 sentence(s) removed
+    removed: "The Cap d'Ail Coastal Path is more than just a scenic route; it is a place rich in stories from the "
+    removed: "In the early 20th century, this area was a haven for those seeking inspiration and escape."
+    removed: "The tranquil beauty of the Mediterranean landscape drew Sir Winston Churchill to Château de Malet, p"
+    removed: "During turbulent political seasons, Churchill retreated here to paint the vibrant Mediterranean land"
+    removed: "Not far from where you stand, the history of the region intertwines with intriguing personal stories"
+    removed: "Before the 1917 Bolshevik Revolution, Mathilde Kschessinska, the mistress of Tsar Nicholas II, made "
+    removed: "Known for her extravagant lifestyle, Kschessinska often gambled fortunes away at the Monte Carlo Cas"
+    removed: "Her financial troubles led Grand Duke Andrei Vladimirovich to purchase Villa Alam to rescue her from"
+    removed: "In June 2013, André Muhlberger, former head of Monaco’s national police, was found dead in his car a"
+    removed: "These stories add a layer of intrigue to the stunning visual experience of the Cap d'Ail Coastal Pat"
+    removed: "As you pedal along this path, notice how the dramatic cliffs rise ahead, hinting at further changes "
+    removed: "The path not only offers breathtaking views but also connects you to a tapestry of history, art, and"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Col de Vence' — 274w → 130w after gates, 8 sentence(s) removed
+    removed: "The serpentine roads have seen their share of action, notably during the Ironman 70.3 World Champion"
+    removed: "However, the Col de Vence is not just known for its physical challenges; it is equally famous for it"
+    removed: "Dubbed the French 'Skinwalker Ranch,' this location brims with stories of the paranormal."
+    removed: "These phenomena have fueled local folklore for decades, drawing visitors keen on catching a glimpse "
+    removed: "As you continue your ride, you might notice an unusual warmth as you approach the area known as the "
+    removed: "Here, the temperature can feel 10 to 15°C hotter than at the coast, a curious effect that adds yet a"
+    removed: "The Col de Vence is more than a mere waypoint; it is a landscape rich with stories, from athletic tr"
+    removed: "Beyond the summit lies a descent into another world, where the whispers of history echo amid ancient"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Cannes Bike Path' — 319w → 266w after gates, 6 sentence(s) removed
+    removed: "The Cannes Bike Path is more than just a scenic route; it’s a stage for both local life and internat"
+    removed: "In May 2023, this path saw a flurry of activity when Thierry Frémaux, the General Delegate of the Ca"
+    removed: "Lisnard’s campaign wasn't just about maintaining order; it was a statement about preserving the char"
+    removed: "As you pedal along, consider the path's role as both a local fixture and an international symbol."
+    removed: "Beneath the glitz of the Cannes Film Festival lies a history of fishermen’s villages, with the path "
+    removed: "As you glide past the bustling promenade, the path winds towards a secret hidden in the hills, invit"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Mont Boron' — 257w → 113w after gates, 13 sentence(s) removed
+    removed: "While you may have marveled at the coastal beauty of Cap d'Ail or the artistic allure of Cannes, her"
+    removed: "The Fort du Mont-Alban, constructed between 1557 and 1560 under the reign of Emmanuel-Philibert de S"
+    removed: "Its presence still echoes the militaristic foresight of its time, contrasting with today's serene su"
+    removed: "The area also harbors secrets from a more distant past."
+    removed: "In 1966, construction workers at Terra Amata on Mont Boron unearthed one of Europe's oldest human se"
+    removed: "The site revealed evidence of Homo heidelbergensis, including signs of cannibalism, offering a rare "
+    removed: "This discovery situates Mont Boron as a significant archaeological landmark, adding another layer to"
+    removed: "Art and celebrity have also left their mark on Mont Boron."
+    removed: "In the 1970s and 1980s, Villa Roc Fleuri, an Art Deco masterpiece, was home to Sean Connery and his "
+    removed: "Connery filmed scenes for the Bond film "Never Say Never Again" in nearby Villefranche harbor, cemen"
+    removed: "This residence, with its storied past, speaks to the allure that Mont Boron has held for artists and"
+    removed: "As you crest the hill, the Riviera unfolds below you, offering a new perspective."
+    removed: "The descent promises more discoveries, each turn revealing another facet of this enchanting region's"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Cap d'Ail Coastal Path by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Cap d'Ail Coastal Path' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [("Cap d'Ail Coastal Path", 9, ''), ("Cap d'Ail Coastal Path", 8, ''), ("Cap d'Ail Coastal Path", 8, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14561 after=24150 (+9589 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24150)
+
+Generating description for Stop 2: Col de Vence by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Col de Vence' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Col de Vence', 7, ''), ('Col de Vence', 5, ''), ('Col de Vence', 5, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12843 after=22317 (+9474 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22317)
+
+Generating description for Stop 3: Cannes Bike Path by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Cannes Bike Path' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cannes Bike Path', 8, ''), ('Cannes Bike Path', 6, ''), ('Cannes Bike Path', 6, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12748 after=22158 (+9410 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22158)
+
+Generating description for Stop 4: Mont Boron by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Mont Boron' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Mont Boron', 16, ''), ('Mont Boron', 16, ''), ('Mont Boron', 13, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=12649 after=23060 (+10411 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23060)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-563/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0284 (5987 tokens, model=gpt-4o)
+Stop 3 description word count: 256 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0306 (6444 tokens, model=gpt-4o)
+Stop 4 description word count: 295 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0312 (6558 tokens, model=gpt-4o)
+Stop 1 description word count: 282 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0289 (6089 tokens, model=gpt-4o)
+Stop 2 description word count: 288 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 10.6s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 259w (was 78w)
+    [LOCAL-474] regenerated and re-gated: 287w (was 130w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 276w (was 113w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/frenchrivieratraveltips/posts/907761758283095/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://marlameridith.com/pedaling-through-provence-french-riviera-with-backroads/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1478 chars from https://marlameridith.com/pedaling-through-provenc
+  [LOCAL-427] HTTP 200 from https://ciclismoclassico.com/tours/french-alps-to-french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1844 chars from https://ciclismoclassico.com/tours/french-alps-to-
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=50RBrrsHrG8 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.france-bike.com/en/biking-destinations/france/bike-tours-french-riviera/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.france-bike.com/en/biking-destinations
+  [LOCAL-427] HTTP 200 from https://www.backroads.com/trips/BFRI-9/provence-french-riviera-bike-tour (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.backroads.com/trips/BFRI-9/provence-fr
+  [D512] verb discovery: query='French Riviera biking tour construction process how it was built' -> 4 new verb(s): opted, tapenade, guided, unplugged
+  [D512] _AGENCY_VERB widened by 4 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Cap d'Ail Coastal Path                     30    48     0    77
+     2  Col de Vence                               52    12    12    53
+     3  Cannes Bike Path                           21    21     0    53
+     4  Mont Boron                                 49    42     0    65
+    [LOCAL-485] index mean 38.0 over 4 stop(s), range 21-52
+    [LOCAL-485] weakest: 'Cannes Bike Path' at 21
+[TIMING] phase=story_first elapsed=112.5s cumulative=362.8s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (90 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 90 words
+  [LOCAL-244] Prolog R9: 1 sentence(s) deleted
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 64 words (delta: -26)
+  [LOCAL-244] Prolog deletions (1):
+    [R9_GENERIC] "These sites hold the tales of forgotten artists and wartime defenses, illustrating the enduring spir..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 1 orientation: COLLAPSED — using fallback
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 4 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 206
+    Words after:  96
+    Delta: -110
+    Stops affected: 3/4
+    Deletions (4):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you cycle along the Cap d'Ail Coastal Path, the scent of salty sea air greets you, mingling with ..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "This path, hugging the rugged coastline, offers panoramic views of the azure Mediterranean, creating..."
+      [Stop 2][R7_HALLUCINATED_SENSORY] "As you pedal up the winding roads of the Col de Vence, the landscape shifts dramatically from the az..."
+      [Stop 4][R7_HALLUCINATED_SENSORY] "The Mediterranean sparkles to one side, while the lush greenery of the surrounding forest park envel..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 3.8s, $0.0097, 1434 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Cap d'Ail Coastal Path] (mystery): The aftermath of his passing was peculiar; Valentina Schlee supposedly conducted...
+      [Col de Vence] (dated_event_with_consequence): It was not until the disputed French plebiscite of 1860 that the area, once an e...
+      [Cannes Bike Path] (cause): What should have been a leisurely ride turned into a public spectacle, highlight...
+      [Mont Boron] (mystery): What makes his endeavor particularly fascinating is that he directed the constru...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0032 (563 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (31 words):
+      "As you continue your tour, you'll learn about Valentina Schlee's exorcism at the villa on the Cap d'Ail Coastal Path and the remote construction oversight using a telescope at Mont Boron."
+      Stops referenced: 2
+    Part 4 total cost: $0.0032
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Hey there cyclist! From the Cap d'Ail Coastal Path, start pe...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: Head south from Col de Vence and pedal down the winding D2 r...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: Start your ride from the Cannes Bike Path and pedal east alo...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.0s, $0.0026, 440 tokens
+  [LOCAL-280] Recap built: 32 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Cap d'Ail Coastal Path] (mystery): "The aftermath of his passing was peculiar; Valentina Schlee supposedly conducted..."
+      → composed: "Cap d'Ail Coastal Path, Valentina Schlee performed an exorcism after his passing"
+    [Mont Boron] (mystery): "What makes his endeavor particularly fascinating is that he directed the constru..."
+      → composed: "Mont Boron, he oversaw construction using a telescope from Hôtel Le Royal"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops and 69 kilometres — Cap d'Ail Coastal Path, Valentina Schlee performed an exorcism after his passing and Mont Boron, he oversaw construction using a telescope from Hôtel Le Royal."
+  [LOCAL-273] Part 1 (similar): Place Masséna (3.2 km, verified in stop_corpus)
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=17 'restaurants tour in old city of Nice, France - Restaurant Tour' (3.2 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+REPETITION WARN: Stop 2 and Stop 4 share near-identical sentence (sim=0.73)
+  [S27] 1 repetition pair(s) found (log only, no rewrite)
+  [S29] Sentence not found in Stop 4 block — skipping
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (1051 chars of corpus checked)
+  [LOCAL-47] Capped 'French Riviera' from 4 to ≤2 occurrences
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 3
+    Verified: 0
+    Dropped: 3
+    AUDIT: admission | Open year-round, free access, best visited in the morning or late afternoon | (no source) | DROPPED — no source content
+    AUDIT: admission | Open year-round, free access, best enjoyed during morning or late afternoon to avoid crowds | (no source) | DROPPED — no source content
+    AUDIT: admission | Open year-round, free access, can be busy during weekends | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 3 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+
+=== Word Count Statistics ===
+Stop 1: Cap d'Ail Coastal Path - 273 words
+Stop 2: Col de Vence - 274 words
+Stop 3: Cannes Bike Path - 319 words
+Stop 4: Mont Boron - 257 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (10707 chars, 4/4 stops)
+  [LOCAL-540] no defects — tour is clean
+
+Total API cost: $0.2282 (37241 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.3682
+Provenance:     9/38 factual sentences sourced, 29 unsourced (9 corpus, 0 grounded, 29 parametric)
+CACHE STORE: French Riviera biking tour / walking / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/riviera_bike_run1.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/riviera_bike_run1_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: French Riviera biking tour - Cycling Tour
+Tour-Category: biking
+
+Stop 1: Cap d'Ail Coastal Path
+
+Address: Avenue du 11 Novembre, 06320 Cap d'Ail, France
+
+Coordinates: 43.7499, 7.4271
+
+Type/Specialty: Scenic Coastal Path
+
+Specific Examples: Stunning sea views, rocky cliffs, and lush Mediterranean vegetation.
+
+Orientation: You are about to embark on a cycling journey through the French Riviera. Starting at the Cap d'Ail Coastal Path and concluding at Mont Boron, spa...
+
+[TIMING] phase=packing elapsed=12.0s cumulative=374.8s
+[TIMING] phase=verification elapsed=0.0s cumulative=374.8s
+[TIMING] TOTAL wall=374.8s phases: poi_selection=224.8s, story_first=112.5s, fact_sheets=24.1s, packing=12.0s, intent=1.5s, narration=0.0s, external_lookups=0.0s, verification=0.0s

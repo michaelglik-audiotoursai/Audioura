@@ -1,0 +1,134 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 15,
+      "total": 16,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 15
+    },
+    "per_stop": {
+      "Buttermilk & Bourbon": {
+        "sourced": 1,
+        "unsourced": 15,
+        "total": 16
+      }
+    },
+    "claims": [
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "As you arrive at this singular stop, Buttermilk & Bourbon, you'll encounter the culinary realm of Chef Jason Santos, a renowned innovator whose bold twist on Southern cuisine has captivated diners since the restaurant's 2017 inception.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "As you step towards Buttermilk & Bourbon in Boston’s Back Bay, the tantalizing aroma of Southern spices mingled with the sweet, smoky scent of bourbon greets you.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "This culinary haven, with its vibrant energy and inviting atmosphere, draws diners into the rich, flavorful world of New Orleans-inspired cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Opened in 2017, Buttermilk & Bourbon is the brainchild of Jason Santos, a renowned Boston-based chef and restaurateur.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Santos first captured national attention as the runner-up on Season 7 of Fox’s _Hell’s Kitchen_, where his blue hair and dynamic culinary style made him a standout.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "His journey continued as he became the Blue Team Sous Chef under Gordon Ramsay and later appeared as a kitchen expert on Paramount's _Bar Rescue_.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "These experiences have shaped his reputation as a creative force in the culinary world, seamlessly blending Southern comfort food with inventive flair.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "At Buttermilk & Bourbon, guests can indulge in a menu that reflects Santos’ passion for Southern cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "The restaurant offers a variety of dishes, such as crispy fried chicken and fluffy biscuits, all accentuated by the distinct flavors of Bourbon Street cocktails.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "The ambiance mimics the lively spirit of New Orleans, making it a popular spot for both locals and visitors alike.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "The location of Buttermilk & Bourbon also carries a historical note, as it sits near the site of the former Hotel Vendome.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "This iconic hotel was the first in Boston to be fully lit by electric light, thanks to an independent electrical lighting plant designed by Thomas Edison in 1882.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1882, the Hotel Vendome installed an independent electrical lighting plant designed by Thomas Edison, making it the first commercial hotel in Boston to be completely lit by electric light."
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "However, it was also the site of a tragic event on June 17, 1972, when a four-alarm fire led to the collapse of the building’s southeast corner, resulting in the loss of nine Boston firefighters.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "This poignant history adds a layer of depth to the vibrant surroundings of Buttermilk & Bourbon.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "To experience Chef Jason Santos’ culinary magic, reservations are required, and the restaurant welcomes diners from Tuesday to Sunday, with meals typically priced under $30.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Buttermilk & Bourbon",
+        "text": "Whether you’re seeking the warmth of Southern hospitality or the excitement of innovative cuisine, Buttermilk & Bourbon promises a memorable dining adventure.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

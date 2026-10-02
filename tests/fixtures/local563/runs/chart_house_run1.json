@@ -1,0 +1,119 @@
+{
+  "slug": "chart_house",
+  "run": "run1",
+  "request": "Chart House, Boston, MA",
+  "location_passed": "restaurant tour of Chart House, Boston, MA",
+  "restaurant_signal_appended": true,
+  "tour_type": "restaurant",
+  "stops_requested": 1,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 135.2,
+  "chars": 2025,
+  "gemini_calls": {
+    "total": 2,
+    "grounded_this_run": 2,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 2,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 2,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 11,
+    "cumulative_grounded_after": 15,
+    "cumulative_cost_after_usd": 0.525,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.05905889999999999,
+    "total_tokens": 32026,
+    "cache_hit": false,
+    "grounding_cost": 0.07,
+    "grounding_requests": 2,
+    "tour_total_cost": 0.1290589,
+    "breakdown": {
+      "llm": 0.05905889999999999,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.07
+    },
+    "provenance": {
+      "sourced": 1,
+      "unsourced": 10,
+      "total": 11,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 10
+    },
+    "score": {
+      "defects_before": {
+        "no_story": "no named people anywhere in the tour"
+      },
+      "defects_after": {
+        "no_story": "no named people anywhere in the tour"
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.03735,
+        "total_tokens": 9445
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "no_story"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "no_story": "no named people anywhere in the tour"
+    },
+    "named_people": 0,
+    "stops_delivered": 1,
+    "stops_requested": 1,
+    "dates": 4,
+    "chars": 2025,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 0,
+      "local229_contradicted_groups_blocked": 1,
+      "local472_specificity_removals": 6,
+      "total": 7
+    },
+    "restaurant_practicals": {
+      "stops": [
+        {
+          "name": "Chart House",
+          "provider": "serp(31)+openai+gemini",
+          "nothing_actionable": false,
+          "hours": true,
+          "closed_days": true,
+          "reservation": true,
+          "price_band": true,
+          "raw": "hours=Sunday - Thursday 4:30PM - 6PM, closed_days=Monday, Tuesday, reservation=Make Reservations, price_band=$36 to $50"
+        }
+      ],
+      "stops_with_any_practical": 1,
+      "hours_count": 1,
+      "reservation_count": 1,
+      "price_band_count": 1,
+      "closed_dropped": [
+        {
+          "name": "Chart House",
+          "reason": "reported permanently closed: Chart House, a riverfront staple in Weehawken, New Jersey, has closed as of May 14. A Mastro's Steakhouse is planned for the site. [https://www.northj"
+        }
+      ]
+    }
+  }
+}

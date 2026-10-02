@@ -1,0 +1,98 @@
+{
+  "slug": "our_lady",
+  "run": "run1",
+  "request": "Our Lady Help of Christians Catholic Church, Newton MA",
+  "location_passed": "Our Lady Help of Christians Catholic Church, Newton MA",
+  "restaurant_signal_appended": false,
+  "tour_type": "museum",
+  "stops_requested": 4,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 226.4,
+  "chars": 9863,
+  "gemini_calls": {
+    "total": 12,
+    "grounded_this_run": 10,
+    "ungrounded_this_run": 2,
+    "pipeline_grounding_requests": 10,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 10,
+        "ungrounded": 2
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 42,
+    "cumulative_grounded_after": 60,
+    "cumulative_cost_after_usd": 2.1,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.18017905,
+    "total_tokens": 89354,
+    "cache_hit": false,
+    "grounding_cost": 0.35000000000000003,
+    "grounding_requests": 10,
+    "tour_total_cost": 0.5301790500000001,
+    "breakdown": {
+      "llm": 0.18017905,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.35000000000000003
+    },
+    "provenance": {
+      "sourced": 7,
+      "unsourced": 30,
+      "total": 37,
+      "corpus": 7,
+      "grounded": 0,
+      "parametric": 30
+    },
+    "score": {
+      "defects_before": {
+        "fabricated_attribution": "1 attribution(s); unverified attribution: \"Founded in 1790 by the Society of Jesus\" (no source confirms it)",
+        "unsourced_person_event": "4 unsourced person-event(s); \"Bruno\" placed here in June with no source: \"On June 25, 2023, the church held a Mass of Peace and vigil in memory of Bruno and Gilda D\u2019Amore, who were tragically mu\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "4 unsourced person-event(s); \"Bruno\" placed here in June with no source: \"On June 25, 2023, the church held a Mass of Peace and vigil in memory of Bruno and Gilda D\u2019Amore, who were tragically mu\""
+      },
+      "removed": [
+        "fabricated_attribution"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0036875000000000002,
+        "total_tokens": 776
+      },
+      "cost_without_retry": {
+        "total_cost": 0.212342,
+        "total_tokens": 35204
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "unsourced_person_event"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "unsourced_person_event": "4 unsourced person-event(s); \"Bruno\" placed here in June with no source: \"On June 25, 2023, the church held a Mass of Peace and vigil in memory of Bruno and Gilda D\u2019Amore, who were tragically mu\""
+    },
+    "named_people": 6,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 12,
+    "chars": 9863,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 2,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 14,
+      "total": 16
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 0,
+      "unsourced": 8,
+      "total": 8,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 8
+    },
+    "per_stop": {
+      "La Marée": {
+        "sourced": 0,
+        "unsourced": 8,
+        "total": 8
+      }
+    },
+    "claims": [
+      {
+        "stop": "La Marée",
+        "text": "As you arrive at this single stop, you will be immersed in the culinary excellence of La Marée, where Mediterranean seafood tradition is intricately woven with the innovative vision of its dedicated chef.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "La Marée Monaco, established in 2013 with a concept imported from Russia, has evolved under passionate leadership, including culinary influences from upscale Monaco restaurants like La Cremailler and La Régalade.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "La Marée quickly became a sought-after destination for both its exquisite seafood and its strategic location.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "Known for supplying top-tier seafood, the restaurant brings a passion for the ocean's offerings to Monaco, where each dish reflects this legacy.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "During the Monaco Grand Prix, one of the most prestigious events in the racing world, the restaurant gains heightened attention.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "La Marée becomes a sought-after viewing spot, with tables commanding prices in the tens of thousands of euros.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "La Marée offers a seafood-centric menu that draws from the freshest catches, honoring the Mediterranean's bounty.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "La Marée",
+        "text": "The journey from a small fishing village to the heart of Monaco's elite dining unfolds with every taste.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
