@@ -1,0 +1,362 @@
+{
+  "landmarks": {
+    "Violes gambe by William Turner (Londres, 1652)": {
+      "status": "VERIFIED",
+      "canonical_title": "Violes gambe by William Turner (Londres, 1652)",
+      "snippet": "nti (Bologna, 1717), Gagliano (Naples, 1697), Johann Schorn (Salzburg, 1699) and Johann Ott (Füssen, 1727);\nseveral violas da gamba including that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Harpe by Naderman (Paris, 1780)": {
+      "status": "VERIFIED",
+      "canonical_title": "Harpe by Naderman (Paris, 1780)",
+      "snippet": "du XVIIIe siècle au XXe siècle issues en grande partie de la collection Fondation Gisèle Tissier-Grandpierre-Institut de France, des facteurs Erard, Naderman,…\n\nCabinet des stucs dit « des caryatides »\n\nL’intérêt de cette petite salle, parfois désignée sous l’appellation de boudoir, vient de l’élégante déc",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)": {
+      "status": "VERIFIED",
+      "canonical_title": "Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)",
+      "snippet": "a, au conservatoire de Nice et aujourd'hui au palais Lascaris.\n\n\n=== Pièces importantes ===\n\nParmi les pièces les plus importantes se trouvent :\n\nune sacqueboute ténor d'Anton Schnitzer (Nuremberg, 1581)\ndes violes d'amour  de Joannes Florenus Guidanti (Bologne, 1717), de Gagliano (Naples, 1697), de Johann Sch",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Basse de violon by Paolo Antonio Testore (Milan, 1696)": {
+      "status": "VERIFIED",
+      "canonical_title": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+      "snippet": "chorn (Salzburg, 1699) and Johann Ott (Füssen, 1727);\nseveral violas da gamba including that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler (Ancona, 1618), one by René Voboam (Paris, c. 1650) a",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Guitar by Antonio de Torres (Almeria, 1884)": {
+      "status": "VERIFIED",
+      "canonical_title": "Guitar by Antonio de Torres (Almeria, 1884)",
+      "snippet": "chorn (Salzburg, 1699) and Johann Ott (Füssen, 1727);\nseveral violas da gamba including that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler (Ancona, 1618), one by René Voboam (Paris, c. 1650) a",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Guitare baroque by Giovanni Tesler (Ancona, 1618)": {
+      "status": "VERIFIED",
+      "canonical_title": "Guitare baroque by Giovanni Tesler (Ancona, 1618)",
+      "snippet": "à rehauts d’or, dans la grande tradition décorative baroque romaine, inaugurée au palais Farnèse avec les Carrache. Les attributions de ce plafond à Giovanni Battista Carlone, de Gênes, ou à son compatriote Giovani Battista Merano ont été remises en cause, amis l’on s’accorde pour reconnaître l’œuvre d’art",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Guitare baroque by René Voboam (Paris, 1650)": {
+      "status": "VERIFIED",
+      "canonical_title": "Guitare baroque by René Voboam (Paris, 1650)",
+      "snippet": "ons soigneusement reliées et alignées de toutes les revues musicales d'Europe voisinaient avec les éditions rares, les vitrines [exposant] les gongs, guitares hawaïennes, trompettes marines, archiluths, quintons, hautbois d'amour, œuvres de Maggini ou de Guarniéri, les quatre grands pupitres de chêne et le",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Raquel": {
+      "status": "VERIFIED",
+      "canonical_title": "Raquel",
+      "snippet": "ules Chéret de Nice. Les personnages peuvent être identifiés car leur nom est inscrit en haut de chacun des panneaux : Jesabel, Etan, Efer, Asalel et Raquel. Ce sont des œuvres de qualité, rares et énigmatiques. Datant de la fin du XVIe siècle, ce sont les cuirs dorés historiés les plus anciens conservés",
+      "method": "canonical_title_match",
+      "qid": "Q119617332"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 38,
+      "total": 39,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 38
+    },
+    "per_stop": {
+      "Violes gambe by William Turner (Londres, 1652)": {
+        "sourced": 0,
+        "unsourced": 14,
+        "total": 14
+      },
+      "Harpe by Naderman (Paris, 1780)": {
+        "sourced": 0,
+        "unsourced": 14,
+        "total": 14
+      },
+      "Basse de violon by Paolo Antonio Testore (Milan, 1696)": {
+        "sourced": 1,
+        "unsourced": 10,
+        "total": 11
+      }
+    },
+    "claims": [
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "You are about to explore the Palais Lascaris in Nice, a museum housing a collection of historic musical instruments.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Encounter Violes gambe by William Turner, Harpe by Naderman, Sacqueboute ténor by Anton Schnitzer, and Basse de violon by Paolo Antonio Testore.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "These diverse works showcase the evolution of musical instruments from the Renaissance to the Enlightenment.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Discover the diverse origins of instrument makers with William Turner's Violes gambe from Londres, 1652, and the historical significance of Anton Schnitzer's Sacqueboute ténor crafted in Nuremberg, 1581, as you journey through the upcoming stops.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Your first stop is Violes gambe by William Turner (Londres, 1652).",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Standing before the Violes gambe by William Turner, crafted in 1652, note its authentic form and rich wood tones.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Positioned here, the viol's intricate detailing comes alive, and its historical journey vividly echoes in the halls of the Palais Lascaris.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "The Violes gambe by William Turner is a rare example of 17th-century craftsmanship, remarkable for retaining its original structure even as many of its contemporaries were altered or converted into cellos.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Crafted in London in 1652, this bass viola da gamba, with its six bowed strings and twelve sympathetic strings, illustrates the elaborate musical architecture of the time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Gautier's decision ensured that this instrument would find its home in the Palais Lascaris, contributing to one of France's most significant musical instrument collections.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "William Turner, primarily recognized for his painting, delved into instrument making during a tumultuous period in England.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "Operating in Aldgate, London, from around 1647 to 1656, Turner's viols became notable for their craftsmanship, which offered solace and continuity during the English Civil War.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "The Palais Lascaris, itself dating back to the first half of the 17th century, provides the perfect backdrop for Turner's work.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Violes gambe by William Turner (Londres, 1652)",
+        "text": "As France's second most important collection of musical instruments after the Musée de la Musique in Paris, it highlights the transformation of musical expression as it journeyed from England to continental Europe.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "Stand directly in front of the Naderman harp, crafted in Paris in 1780, and observe the intricate woodworking details that reveal the craftsmanship of Jean-Henri Naderman.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "This vantage point allows you to appreciate the fine carvings and gilded touches that reflect both the luxury and precision of 18th-century French musical instruments.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "In 2007, a harp by Jean-Henri Naderman, crafted in Paris in 1780, was discovered in the attic of the Château de Busset in Allier, France.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "This unexpected find led to its acquisition by the Palais Lascaris, where it joined an eclectic collection of historical instruments, now cataloged under the inventory number PL.2007.9.1.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "The French aristocracy highly sought after his harps for their aesthetic and acoustic qualities.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "François Joseph Naderman, Jean-Henri's son, established the harp studio at the Paris Conservatory in 1825, perpetuating the family's legacy in the world of music.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "This harp, with its elegant design and careful construction, illustrates the blend of tradition and innovation that defined the Naderman lineage.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "The harp's presence at the Palais Lascaris adds a layer of historical depth to this former aristocratic residence, which was converted into a museum housing one of Nice's most notable collections.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "This transition from private aristocratic life to a public cultural institution mirrors the broader societal shifts of the Enlightenment era, where art and music became more accessible to a wider audience, embodying the period’s delicate balance between reason and emotion.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "This tenor sackbut, crafted in 1581 by Anton Schnitzer the Elder in Nuremberg, stands as a remarkable relic from the Renaissance era.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "Schnitzer, a master of brass instrument-making during that period, engraved the date, 1581, on the bell garland, a decision that has preserved this sackbut’s legacy for generations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "An intriguing aspect of Schnitzer’s work was his attention to functional and aesthetic detail, ensuring these instruments met high standards both acoustically and visually.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "The instrument's design features an inner bore measuring between 10.0 and 10.5 millimeters with a bell diameter of approximately 100 millimeters, elements that were crucial in its continued use and survival.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Harpe by Naderman (Paris, 1780)",
+        "text": "Historically, the sackbut played a crucial role in the Renaissance quest for harmony, closely paralleling developments in architectural design.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "Stand just before the basse de violon by Paolo Antonio Testore, labeled Milan, 1696.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "The basse de violon now before you was initially attributed to Paolo Antonio Testore and dated 1696.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "However, the date presented a chronological inconsistency with Paolo Antonio's life, as he was born around 1700.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "Delving into its origins, scholars reassessed the instrument and concluded that it was more likely crafted by Paolo Antonio's father, Carlo Giuseppe Testore.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "Carlo Giuseppe founded the Testore workshop in Milan and was a pupil of the renowned maker Giovanni Grancino.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "The Testore workshop, therefore, became a cradle of exceptional instrument making during the late 17th century.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "This reevaluation clarified the instrument's origins and spotlighted its historical significance as a product of the Milanese craftsmanship of the time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "Furthermore, it embodies the Baroque era's shift towards emotional depth and complexity in music, allowing musicians to explore greater expression.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "This instrument became part of the Palais Lascaris collection through the 1904 bequest of Antoine Gautier, a 19th-century amateur musician and collector.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The instrument entered the public collection of the City of Nice as part of the 1904 bequest of 19th-century amateur musician and collector Antoine Gautier."
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "His bequest laid the foundation for what would eventually become a dedicated music museum within the palace, with the permanent exhibition opening to the public in 2011.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+        "text": "Sources: This tour draws on information from www.nice.fr and the Wikipedia article on the museum.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

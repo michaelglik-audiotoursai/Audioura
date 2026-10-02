@@ -1,0 +1,104 @@
+{
+  "slug": "lascaris",
+  "run": "run2",
+  "request": "Palais Lascaris, Nice, France",
+  "location_passed": "Palais Lascaris, Nice, France",
+  "restaurant_signal_appended": false,
+  "tour_type": "museum",
+  "stops_requested": 4,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 614.6,
+  "chars": 9666,
+  "gemini_calls": {
+    "total": 40,
+    "grounded_this_run": 40,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 40,
+    "by_site": {
+      "story_leads._gemini": {
+        "grounded": 4,
+        "ungrounded": 0
+      },
+      "story_leads.gemini_with_sources": {
+        "grounded": 36,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 61,
+    "cumulative_grounded_after": 140,
+    "cumulative_cost_after_usd": 4.9,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.9502735999999999,
+    "total_tokens": 369313,
+    "cache_hit": false,
+    "grounding_cost": 1.4000000000000001,
+    "grounding_requests": 40,
+    "tour_total_cost": 2.3502736,
+    "breakdown": {
+      "llm": 0.9502735999999999,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 1.4000000000000001
+    },
+    "provenance": {
+      "sourced": 1,
+      "unsourced": 38,
+      "total": 39,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 38
+    },
+    "score": {
+      "defects_before": {
+        "dangling_reference": "3 dangling pronoun reference(s), e.g. 'His harps were highly sought after by the French aristocracy'"
+      },
+      "defects_after": {
+        "thin": "3/4 stops delivered",
+        "dangling_reference": "2 dangling pronoun reference(s), e.g. 'His contributions helped to innovate harp playing techniques'"
+      },
+      "removed": [],
+      "remaining": [
+        "dangling_reference"
+      ],
+      "retried": true,
+      "clean_after": false,
+      "retry_cost": {
+        "total_cost": 0.005967500000000001,
+        "total_tokens": 1256
+      },
+      "cost_without_retry": {
+        "total_cost": 0.595239,
+        "total_tokens": 45497
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": false,
+    "defects": [
+      "dangling_reference",
+      "thin"
+    ],
+    "defect_count": 2,
+    "defect_detail": {
+      "thin": "3/4 stops delivered",
+      "dangling_reference": "2 dangling pronoun reference(s), e.g. 'His contributions helped to innovate harp playing techniques'"
+    },
+    "named_people": 3,
+    "stops_delivered": 3,
+    "stops_requested": 4,
+    "dates": 28,
+    "chars": 9666,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 0,
+      "local229_contradicted_groups_blocked": 3,
+      "local472_specificity_removals": 3,
+      "total": 6
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "slug": "lascaris",
+  "run": "run1",
+  "request": "Palais Lascaris, Nice, France",
+  "location_passed": "Palais Lascaris, Nice, France",
+  "restaurant_signal_appended": false,
+  "tour_type": "museum",
+  "stops_requested": 4,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 617.2,
+  "chars": 7869,
+  "gemini_calls": {
+    "total": 39,
+    "grounded_this_run": 39,
+    "ungrounded_this_run": 0,
+    "pipeline_grounding_requests": 39,
+    "by_site": {
+      "story_leads._gemini": {
+        "grounded": 4,
+        "ungrounded": 0
+      },
+      "story_leads.gemini_with_sources": {
+        "grounded": 35,
+        "ungrounded": 0
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 61,
+    "cumulative_grounded_after": 140,
+    "cumulative_cost_after_usd": 4.9,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.8299083000000003,
+    "total_tokens": 334374,
+    "cache_hit": false,
+    "grounding_cost": 1.3650000000000002,
+    "grounding_requests": 39,
+    "tour_total_cost": 2.1949083000000007,
+    "breakdown": {
+      "llm": 0.8299083000000003,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 1.3650000000000002
+    },
+    "provenance": {
+      "sourced": 4,
+      "unsourced": 29,
+      "total": 33,
+      "corpus": 4,
+      "grounded": 0,
+      "parametric": 29
+    },
+    "score": {
+      "defects_before": {},
+      "defects_after": {},
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.533669,
+        "total_tokens": 48674
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [],
+    "defect_count": 0,
+    "defect_detail": {},
+    "named_people": 3,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 19,
+    "chars": 7869,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 1,
+      "local229_contradicted_groups_blocked": 2,
+      "local472_specificity_removals": 4,
+      "total": 7
+    }
+  }
+}
