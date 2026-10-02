@@ -189,3 +189,68 @@ already on the cheap model. The gpt-3.5-turbo checkers that the ticket targets a
 absolute cost ($0.047 total) and most are extraction (unprovable) or fail recall (1577, 1083).
 The dominant spend is the WRITER `generate_tour_text.py:14129` (gpt-4o, $2.165), explicitly out of
 scope.
+
+---
+
+## §5 — The change: central CHECK_LLM_MODEL / WRITE_LLM_MODEL
+
+New module **`llm_models.py`** with two central knobs and three resolvers:
+
+- `check_model(site_default=None, site_env=None)` → **CHECK_LLM_MODEL** (default `gpt-4o-mini`).
+  Resolution order: site-specific env (e.g. `GLOSS_TRIAGE_MODEL`) → `CHECK_LLM_MODEL` →
+  `site_default` → `gpt-4o-mini`.
+- `write_model(site_default=None, site_env=None)` → **WRITE_LLM_MODEL** (default `gpt-4o`).
+  Same order with the writer knob. WRITER models are **not reduced** in this task; gpt-3.5-turbo
+  writer fallbacks pass `site_default="gpt-3.5-turbo"`, so their behaviour is unchanged when no
+  env is set.
+- `held_model(pinned, site_env=None)` → keeps a checker on its **current** model and deliberately
+  **bypasses** the central knob. Used for the verdict scope gates that FAILED recall, so a global
+  `CHECK_LLM_MODEL=gpt-4o-mini` cannot silently degrade them.
+
+### Call sites changed (bare `gpt-3.5-turbo` / `TOUR_LLM_MODEL` fallbacks replaced)
+
+**Checkers → `check_model()` (now default gpt-4o-mini):**
+`fact_extractor.py:76`; `generate_tour_text.py` lines 632, 990, 7756, 8274, 8774, 9285, 9415,
+9572, 9976, 10098, 18589 (intent / fact-ranking / coordinate / artwork & restaurant & stop
+listings — all extraction/listing checkers that emit valid JSON on both models). The two PASS
+verdict gates `unglossed_reference_gate.py:690` and `unsupported_claim_gate.py:452` are wired to
+`check_model(site_env=...)` so they honour the central knob while keeping their gpt-4o-mini
+default.
+
+**Writers → `write_model(site_default="gpt-3.5-turbo")` (behaviour unchanged):**
+`generate_tour_text.py` lines 2050 (recap), 15439 (style rewrite), 18054 (prolog), 18732
+(preview); `directions_generator.py` lines 188 & 340 (walking/room directions).
+
+**Held on current model (NOT switched — failed recall) → `held_model("gpt-3.5-turbo", site_env=...)`:**
+`generate_tour_text.py:1075` is-restaurant verify (recall 50%, env `IS_RESTAURANT_MODEL`);
+`generate_tour_text.py:1570` geography scope (recall 75%, env `GEO_SCOPE_MODEL`);
+`generate_tour_text.py:2914` inside-venue scope (same gate family, untested on the recorded set,
+env `VENUE_SCOPE_MODEL`). These keep gpt-3.5-turbo and ignore the central knob by design.
+
+Not touched: the `_tour_llm_cost` helper (`generate_tour_text.py:211`, model is passed in), and the
+gate resolvers already defaulting gpt-4o-mini (`STOP_SPECIFICITY_MODEL`, `GLOSS_MODEL`), which were
+already on the cheap model.
+
+### Why the two scope gates were held (Michael's rule)
+- is-restaurant (`#1083`): on the recorded set, OLD flagged "Sycamore" as an ambiguous name
+  (`matches:false`); gpt-4o-mini said `matches:true`. Recall 50% on 2 cases — fails 100%.
+- geography (`#1577`): OLD correctly ruled "Saltie Girl" out of scope; gpt-4o-mini trusted a
+  plausible but **explicitly UNVERIFIED** address and ruled it in. Recall 75% — fails 100%.
+Both are kept on their current model and given their own env override.
+
+### Offline replay test
+`tests/test_local560_checker_replay.py` runs entirely offline from
+`recordings/*.jsonl` + `replay_mini.jsonl`. For every SWITCHED verdict-emitting checker site
+(`unglossed_reference_gate.py:690`, `unsupported_claim_gate.py:452`) it asserts recall == 100% on
+the recorded discrepancy cases, and **fails if a switched site misses a recorded discrepancy**.
+Verified with a negative control: corrupting one replayed GLOSS_NEEDED verdict makes the test fail
+(exit 1); the fixture is restored byte-for-byte afterwards. Sites that were not switched
+(specificity, story_gate, the held scope gates) are excluded with reasons documented in the test.
+
+### Defaults preserved (verified)
+With all env unset: checkers resolve to `gpt-4o-mini`, writers to `gpt-3.5-turbo` (unchanged),
+held scope gates to `gpt-3.5-turbo` (and stay there even if `CHECK_LLM_MODEL` is set).
+
+### Suites green
+- `tests/test_local560_checker_replay.py`: 4 passed.
+- Storied suites `python3 -m pytest $(ls tests/test_*.py | grep -E "d536|479|480|481|485|d571|d577|547|local55|554|gcs|ks1|user_stops") -q`: **170 passed**.

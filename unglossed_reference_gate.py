@@ -34,6 +34,8 @@ import sys
 import json
 import time
 from typing import Dict, List, Optional, Tuple
+# [LOCAL-560] central checker-model setting
+from llm_models import check_model as _check_model
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
 
@@ -638,7 +640,7 @@ def triage_references(references: List[Dict], api_key: str,
         return [], 0, 0.0, 0.0
 
     if not model:
-        model = os.environ.get('GLOSS_TRIAGE_MODEL', 'gpt-4o-mini')
+        model = _check_model(site_env='GLOSS_TRIAGE_MODEL')
 
     # Build the batch prompt
     refs_block = "\n".join(

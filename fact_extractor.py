@@ -10,6 +10,8 @@ import re
 from typing import Optional
 
 import requests
+# [LOCAL-560] checker-model central setting (fact extraction -> CHECK_LLM_MODEL)
+from llm_models import check_model as _check_model
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +82,7 @@ def generate_fact_sheet(
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-3.5-turbo",
+                "model": _check_model(),
                 "messages": [
                     {"role": "system", "content": "You return ONLY valid JSON. No markdown, no commentary."},
                     {"role": "user", "content": prompt},

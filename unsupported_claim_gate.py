@@ -28,6 +28,8 @@ import os
 import re
 import sys
 from typing import Dict, List, Optional, Tuple
+# [LOCAL-560] central checker-model setting
+from llm_models import check_model as _check_model
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
 
@@ -397,7 +399,7 @@ def _escalate_batch(sentences_with_indices: List[Tuple[int, str]],
     import json
 
     if not model:
-        model = os.environ.get('ESCALATION_MODEL', 'gpt-4o-mini')
+        model = _check_model(site_env='ESCALATION_MODEL')
 
     if not sentences_with_indices or not corpus_passages:
         return {}, 0, 0.0
