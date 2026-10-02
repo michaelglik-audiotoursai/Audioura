@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 132.17720222473145,
+  "chars": 5525,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "index": 56,
+      "historic": 28,
+      "detail": 20,
+      "social": 57,
+      "text": "Le Lézard aux plumes d’or, created in 1971 by Joan Miró, unfolds in an illustrated book with 40 color lithographs printed on publisher’s vellum. This work was commissioned by Louis Broder, who specialized in producing limited editions that required the close cooperation of artists and printers. The collaboration with Miró emphasized a harmony of image and poetry, advancing Broder's aim to revolutionize the book as an integrated work of art. Later donated this remarkable piece to the MFA, enriching the museum's collection with this vivid expression of the livre d'artiste tradition. In this context, Fridman's donation complements the museum's holdings, illustrating how the fusion of visual art and text propels the exhibition's thesis on the transformative potential of collaborative bookmaking.",
+      "orientation": "You are about to explore the \"Picasso, Miro, Dali: Unbound\" exhibition at the MFA in Boston. This collection showcases the groundbreaking art form of the livre d'artiste, revolutionizing the book as an artistic medium. Featuring deeply collaborative ventures, this exhibition delves into the intersection of images, words, and typography. Within the Lois B. and Michael K. Torf Gallery, you will encounter three extraordinary works by Spanish artists: \"Le Lézard aux plumes d’or,\" \"Au Soleil du Plafond,\" and \"Moses and Monotheism.\" Immerse yourself in the transformation of the human experience through imagination and belief as you engage with these innovative creations. At Le Lézard aux plumes d’or, you'll find a vivid expression of the livre d'artiste tradition. Later, at Moses and Monotheism, Freud's provocative work challenges prevailing religious narratives. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). From this vantage point, you can see the interplay of vivid colors in Joan Miró's lithographs, allowing the mythical and natural themes to converge in bold and fantastical imagery."
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "index": 39,
+      "historic": 0,
+      "detail": 15,
+      "social": 42,
+      "text": "Gris dedicated his artistic prowess to creating the 11 lithographs for this livre d'artiste, transforming Reverdy's evocative text into a vivid visual language. The renowned publisher, Éditions Verve, in collaboration with Mourlot Frères, a famous lithographic printing company, utilized their expertise to bring this book to life, ensuring the seamless integration of image and text—a revolutionary concept for its time. Reverdy's poetry, paired with Gris's artwork, challenges the viewer to reflect on the synthesis of visual art and literary expression. In doing so, this work becomes more than a collection of images and words; it becomes an immersive experience that advances the exhibition's thesis on the transformative potential of the artist's book. This exhibition, currently housed in a gallery named for patron Torf, brings to public view a rare piece, often sequestered in archives, thus engaging the contemporary audience with an exploration into historical artistic innovation. This collaboration between image and text reshapes not just the spaces they occupy, but also the perceptions and beliefs of its viewers.",
+      "orientation": "Look for Au Soleil du Plafond in the galleries."
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "index": 38,
+      "historic": 35,
+      "detail": 37,
+      "social": 60,
+      "text": "In a collaborative venture that epitomizes the fusion of text and illustration, Salvador Dalí created a set of ten drypoints and lithographs on sheepskin in 1974 for Sigmund Freud’s \"Moses and Monotheism.\" Dalí’s decision to work on sheepskin was not merely an artistic choice but a symbolic one, enhancing Freud's exploration of the primal roots of monotheism. By opting for this material, Dalí intended to foster a tactile connection to ancient traditions, making Freud's complex theories more palpable to the observer. Freud, the father of psychoanalysis, had authored this provocative work in 1939, suggesting that Moses was born into an Egyptian household, a notion that challenged prevailing religious narratives and caused considerable controversy. Such works push the boundaries of artistic expression, influencing how we perceive the intersections of art, history, and belief.\n\nThat's 3 stops — Le Lézard aux plumes d’or enriched the MFA collection with a vivid livre d'artiste and Au Soleil du Plafond reshapes perceptions and beliefs through image-text collaboration. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "As you stand in front of the display for \"Moses and Monotheism,\" take a moment to appreciate the unique perspective from which Dalí's illustrations leap into view, offering an unexpected surreal twist to Freud's daring theories on religious transformation. From this angle, the delicate interplay between text and image invites deeper insight into the artistic collaboration."
+    }
+  ]
+}

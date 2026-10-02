@@ -1,0 +1,32 @@
+=== CLEAN RUN 1 ===
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate...
+  [LOCAL-479] orgs detected=4 grounded=3 ungrounded=1 sentences_dropped=1
+    [LOCAL-479] field=description stop='Moses and Monotheism' org='The Hogarth Press' — ungrounded
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 1 improved, 0 kept original
+GENERATED 5523 chars in 156.1s -> TOUR_MFA_RELEASE_20260818_1621.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   48    12    27    72
+ 2  Au Soleil du Plafond                           32     0     7    45
+ 3  Moses and Monotheism                           34    24    29    30
+    MEAN                                           38    12    21    49
+  stops with detail == 0 (no object named): 0 of 3
+=== CLEAN RUN 2 ===
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate...
+  [LOCAL-479] orgs detected=1 grounded=1 ungrounded=0 sentences_dropped=0
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+GENERATED 5433 chars in 150.5s -> TOUR_MFA_RELEASE_20260818_1624.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   35    12    18    60
+ 2  Au Soleil du Plafond                           44     0    14     0
+ 3  Moses and Monotheism                           44    12    29    53
+    MEAN                                           41     8    20    38
+  stops with detail == 0 (no object named): 0 of 3
+=== CLEAN RUN 3 ===
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate...
+  [LOCAL-479] orgs detected=3 grounded=2 ungrounded=1 sentences_dropped=2
+    [LOCAL-479] field=description stop='Au Soleil du Plafond' org='Éditions Verve' — ungrounded
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 3 improved, 0 kept original
+GENERATED 5168 chars in 155.1s -> TOUR_MFA_RELEASE_20260818_1627.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   32    12     7    53
+ 2  Moses and Monotheism                           22    34     7     0
+ 3  Au Soleil du Plafond                           53    24    14    77
+    MEAN                                           36    23     9    43
+  stops with detail == 0 (no object named): 0 of 3

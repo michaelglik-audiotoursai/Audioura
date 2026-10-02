@@ -3,6 +3,9 @@
 Test Boston Globe authentication with real authenticated URL
 """
 
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 import logging
 from boston_globe_diagnostic import BostonGlobeDiagnostic
 

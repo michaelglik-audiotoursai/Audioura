@@ -2,7 +2,9 @@
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_known_working_newsletter():
     """Test with a known working Guy Raz newsletter from previous commits"""
     

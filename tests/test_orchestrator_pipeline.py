@@ -15,7 +15,7 @@ def test_orchestrator_pipeline():
     input_file = "step_4_after_guy_raz_specific_cleaning.txt"
     
     if not os.path.exists(input_file):
-        print(f"ERROR: {input_file} not found. Run test_cleaning_pipeline.py first.")
+        print(f"ERROR: {input_file} not found. Run run_cleaning_pipeline.py first.")
         return
     
     with open(input_file, 'r', encoding='utf-8') as f:

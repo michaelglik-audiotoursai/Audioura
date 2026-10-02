@@ -1,0 +1,502 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+==============================================================================
+MICHAEL'S CHAIN — stop 2: Moses and Monotheism
+==============================================================================
+
+==============================================================================
+ROUTINE 0 — interrogation_matrix — the starting point
+==============================================================================
+  credit_line OVERRIDDEN to: 'The convergence of narrative and imagery in this exhibit'
+
+  canonical_title    Moses and Monotheism                                 STRUCTURAL
+  english_title      Moses and Monotheism                                 STRUCTURAL
+  artist             Salvador Dalí                                        CLAIMED
+  publisher          The Hogarth Press                                    CLAIMED
+  printed_by                                                              ABSENT
+  medium             Picasso, Miro, Dali: Unbound                         STRUCTURAL
+  venue              Museum of Fine Arts, Boston                          STRUCTURAL
+  credit_line        The convergence of narrative and imagery in this e   DERIVED
+
+==============================================================================
+ROUTINE 1 — Request_to_AI — MAKE A QUERY OUT OF THE MATRIX
+==============================================================================
+  THE QUERY:
+
+    What story can be told to visitors of Picasso, Miro, Dali: Unbound +
+    Museum of Fine Arts, Boston : regarding Moses and Monotheism about The
+    convergence of narrative and imagery in this exhibit in connection with
+    Salvador Dalí and The Hogarth Press?
+
+  terms in it that nothing has verified: Salvador Dalí, The Hogarth Press
+
+==============================================================================
+ROUTINE 2 — CALL AI WITH THAT QUERY — the answer is the story
+==============================================================================
+  11 sentences, 2391 chars
+
+    The exhibition "Picasso, Miró, Dali: Unbound" at the Museum of Fine Arts,
+    Boston, offers a rich tapestry of narratives and imagery that can be woven
+    together to create an engaging story for visitors, particularly in
+    connection with Salvador Dalí and his interactions with literature and
+    psychoanalysis, such as Freud's "Moses and Monotheism."
+
+    Salvador Dalí, known for his surreal and dreamlike imagery, was deeply
+    influenced by psychoanalysis and the works of Sigmund Freud. Freud's
+    "Moses and Monotheism" explores the psychological underpinnings of
+    religious belief and the development of monotheism, themes that resonate
+    with Dalí's exploration of the subconscious mind and the symbolic nature
+    of his art. Dalí's fascination with Freud's theories can be seen in his
+    use of dream imagery and symbolic motifs, which often delve into the
+    complexities of human psychology and spirituality.
+
+    The convergence of narrative and imagery in this exhibit can be
+    highlighted by examining how Dalí's work reflects the tension between the
+    conscious and unconscious mind, much like Freud's analysis of Moses as a
+    figure representing the struggle between old and new belief systems.
+    Dalí's surreal landscapes and figures can be interpreted as visual
+    narratives that challenge viewers to question their perceptions of reality
+    and explore the deeper meanings hidden within the subconscious.
+
+    Additionally, the connection to The Hogarth Press, founded by Leonard and
+    Virginia Woolf, provides an intriguing literary context. The Hogarth Press
+    was instrumental in publishing works that explored modernist themes and
+    psychoanalytic ideas, including Freud's writings. This connection
+    underscores the interdisciplinary nature of the exhibit, where art,
+    literature, and psychoanalysis intersect.
+
+    Visitors can be guided to appreciate how Dalí's art serves as a visual
+    counterpart to the literary and psychoanalytic explorations of figures
+    like Freud and the modernist movement championed by The Hogarth Press. By
+    examining the symbolic and narrative elements in Dalí's work, visitors can
+    gain a deeper understanding of how art can serve as a powerful medium for
+    exploring complex themes of identity, belief, and the human psyche. This
+    narrative thread enriches the experience of the exhibit, inviting visitors
+    to reflect on the ways in which art and literature can illuminate the
+    mysteries of the human condition.
+
+==============================================================================
+ROUTINE 3 — Validate_Story — IS IT TRUE TO THE SOURCES
+==============================================================================
+  checked against: the stop text itself (this chain retrieves nothing,
+  so there is no independent corpus to check against)
+
+  VERDICT: REJECTED
+
+  [GROUNDED]
+      The exhibition "Picasso, Miró, Dali: Unbound" at the Museum of Fine
+      Arts, Boston, offers a rich tapestry of narratives and imagery that can
+      be woven together to create an engaging story for visitors, particularly
+      in connection with Salvador Dalí and his interactions with literature
+      and psychoanalysis, such as Freud's "Moses and Monotheism."
+
+      Salvador Dalí, known for his surreal and dreamlike imagery, was deeply
+      influenced by psychoanalysis and the works of Sigmund Freud.
+  [GROUNDED]
+      Freud's "Moses and Monotheism" explores the psychological underpinnings
+      of religious belief and the development of monotheism, themes that
+      resonate with Dalí's exploration of the subconscious mind and the
+      symbolic nature of his art.
+  [GROUNDED]
+      Dalí's fascination with Freud's theories can be seen in his use of dream
+      imagery and symbolic motifs, which often delve into the complexities of
+      human psychology and spirituality.
+  [GROUNDED]
+      The convergence of narrative and imagery in this exhibit can be
+      highlighted by examining how Dalí's work reflects the tension between
+      the conscious and unconscious mind, much like Freud's analysis of Moses
+      as a figure representing the struggle between old and new belief
+      systems.
+  [GROUNDED]
+      Dalí's surreal landscapes and figures can be interpreted as visual
+      narratives that challenge viewers to question their perceptions of
+      reality and explore the deeper meanings hidden within the subconscious.
+  [UNSUPPORTED_ENTITY]
+      Additionally, the connection to The Hogarth Press, founded by Leonard
+      and Virginia Woolf, provides an intriguing literary context.
+  [GROUNDED]
+      The Hogarth Press was instrumental in publishing works that explored
+      modernist themes and psychoanalytic ideas, including Freud's writings.
+  [GROUNDED]
+      This connection underscores the interdisciplinary nature of the exhibit,
+      where art, literature, and psychoanalysis intersect.
+  [GROUNDED]
+      Visitors can be guided to appreciate how Dalí's art serves as a visual
+      counterpart to the literary and psychoanalytic explorations of figures
+      like Freud and the modernist movement championed by The Hogarth Press.
+  [GROUNDED]
+      By examining the symbolic and narrative elements in Dalí's work,
+      visitors can gain a deeper understanding of how art can serve as a
+      powerful medium for exploring complex themes of identity, belief, and
+      the human psyche.
+  [GROUNDED]
+      This narrative thread enriches the experience of the exhibit, inviting
+      visitors to reflect on the ways in which art and literature can
+      illuminate the mysteries of the human condition.
+
+==============================================================================
+ROUTINE 4 — Structure_AI_output — >5 SENTENCES? SUMMARIZE TO 3
+==============================================================================
+  sentence count: 11
+  rule: >5 -> summarize to 3 · <3 -> substitute credit_line and re-ask · 3-5 -> accept
+
+  status          OK
+  sentences       2
+  credit_line     'The convergence of narrative and imagery in this exhibit'
+  substitutions   ['The convergence of narrative and imagery in this exhibit']
+  AI calls made   1
+
+==============================================================================
+THE STORY
+==============================================================================
+
+  The exhibition "Picasso, Miró, Dali: Unbound" at the Museum of Fine Arts,
+  Boston, intricately weaves narratives and imagery, particularly highlighting
+  Salvador Dalí's engagement with literature and psychoanalysis, such as
+  Freud's "Moses and Monotheism." Dalí, influenced by Freud, uses surreal
+  imagery to explore the subconscious, reflecting the tension between
+  conscious and unconscious minds, much like Freud's analysis of religious
+  belief. The exhibit also connects to The Hogarth Press, emphasizing the
+  intersection of art, literature, and psychoanalysis, inviting visitors to
+  explore complex themes of identity and belief through Dalí's symbolic and
+  narrative art.
+
+
+
+==============================================================================
+WHAT THIS RUN EXPOSES — four defects, in order of severity
+==============================================================================
+
+1. ROUTINE 4 RAN EVEN THOUGH ROUTINE 3 SAID REJECTED.
+
+   Your rule is "if VALID and has more sentences than 5, summarize into 3".
+   Validate_Story returned REJECTED. Structure_AI_output summarized anyway and
+   returned status OK. The two routines are not wired together at all --
+   `structure_ai_output` never receives the validation verdict and cannot act on
+   it. The chain has no valid/invalid branch.
+
+2. THE SENTENCE COUNT WAS WRONG, AND IT DRIVES EVERY RULE YOU WROTE.
+
+   Routine 4 reported "sentences 2" for a summary that is plainly three.
+   `split_sentences` could not split after a sentence ending in a quotation mark:
+
+       Freud's "Moses and Monotheism." He did it in 1974.   -> counted as ONE
+
+   The character before the space is `"`, not `.`. Museum stops are full of quoted
+   titles, so this miscounts constantly. It feeds your ">5 summarize" rule, your
+   "<3 substitute" rule, shape_check's "exactly 3 or 4 sentences", and
+   evaluate_story's sentence score. FIXED 2026-08-14; 50/61 regression unchanged.
+
+   Consequence here: two sentences should have triggered a credit_line
+   substitution under your own rule. It returned OK instead.
+
+   Still broken, pre-existing, NOT introduced by the fix: "Mr. Smith went to
+   Washington." splits into two. Abbreviations are unhandled.
+
+3. VALIDATION IS CIRCULAR IN THIS CHAIN.
+
+   This chain retrieves nothing, so the only text the answer can be checked
+   against is the stop text the query was built FROM. The one sentence flagged
+   UNSUPPORTED_ENTITY -- Leonard and Virginia Woolf founding The Hogarth Press --
+   is the only genuinely new fact in the answer, and it happens to be true.
+
+   So as wired, this validator penalises exactly the thing worth having and passes
+   ten sentences that restate the stop back to itself. It is not a truth check
+   here; it is a paraphrase detector running backwards.
+
+4. THE OUTPUT IS STILL NOT A STORY.
+
+   Nobody does anything. There is no date, no decision, no refusal, no
+   consequence, and nothing about the physical object in the case. It is a
+   curator's wall-text summary of a theme. Note the AI was never ASKED for a
+   story: Request_to_AI produces "What story can be told to visitors of ...",
+   which is a question about what is POSSIBLE, and the model answered that
+   question correctly -- it described what a story could be built from rather
+   than telling one.
+
+==============================================================================
+ROUTINE 2, SAME QUERY, DIFFERENT MODEL — gemini-3-flash-preview
+==============================================================================
+
+Michael, 2026-08-14: "before we change the query, can you get the query
+results from Gemini on the very same question?" The query below is byte-
+identical to the one GPT-4o was given above. Nothing else was changed.
+
+  30 sentences, 3831 chars
+
+    To tell the story of **Salvador Dalí, The Hogarth Press, and Freud’s
+    *Moses and Monotheism*** within the context of the MFA Boston’s *Unbound*
+    exhibit, you must weave a tale of three "exiles" meeting at the crossroads
+    of a crumbling Europe.
+
+    This is a story about how the subconscious mind was finally "unbound" from
+    the printed page.
+
+    ***
+
+    ### The Story: The Cracked Snail and the Prophet
+
+    **1. The Meeting of the Giants (London, 1938)**
+    Imagine it is July 1938. London is sweltering, and the shadow of World War
+    II is lengthening. Two men are sitting in a room in Maresfield Gardens.
+    One is **Sigmund Freud**, the father of psychoanalysis, who has just fled
+    Nazi-occupied Vienna. The other is **Salvador Dalí**, the flamboyant
+    prince of Surrealism, who has spent his entire career trying to paint the
+    inside of Freud’s dreams.
+
+    Dalí is nervous. He considers Freud his "spiritual father." During this
+    meeting, Dalí sketches Freud. He notices Freud’s skull and later remarks
+    that it looks like a "snail shell"—hard on the outside, but containing a
+    soft, vulnerable center. This sketch is the "imagery" that begins our
+    convergence.
+
+    **2. The Narrative: *Moses and Monotheism***
+    At that very moment, Freud is finishing his final, most controversial
+    book: ***Moses and Monotheism***. In this narrative, Freud performs a
+    "psychoanalysis of history." He argues that Moses was not Jewish, but an
+    Egyptian nobleman who was murdered by his followers—a trauma that Freud
+    believed shaped the Jewish psyche forever.
+
+    It is a story of a "murdered father," a theme that Dalí—who had a
+    notoriously volatile relationship with his own father—was obsessed with.
+
+    **3. The Vessel: The Hogarth Press**
+    Enter **The Hogarth Press**, the avant-garde publishing house founded by
+    **Virginia and Leonard Woolf**. The Woolfs were the bridge between radical
+    literature and radical science. They were the primary English publishers
+    of Freud.
+
+    When The Hogarth Press published *Moses and Monotheism* in 1939, they
+    weren't just printing a history book; they were releasing a psychological
+    bomb. The Hogarth Press provided the *narrative* framework—the physical,
+    printed word—that allowed these dangerous, "unbound" ideas to circulate in
+    the English-speaking world.
+
+    **4. The Convergence in the Exhibit**
+    As you walk through *Picasso, Miro, Dali: Unbound*, look at Dalí’s prints.
+    You are seeing the visual manifestation of the "Hogarth-Freud" era.
+
+    *   **The Narrative:** Freud’s *Moses* tells us that our identity is built
+    on hidden traumas and ancient myths.
+    *   **The Imagery:** Dalí’s etchings and lithographs show us bodies that
+    are drawers (hiding secrets), landscapes that melt (the instability of
+    memory), and religious icons distorted by desire.
+
+    **5. Why "Unbound"?**
+    The exhibit is called *Unbound* because, for Dalí, the book was never just
+    a container for text. Influenced by the intellectual freedom fostered by
+    The Hogarth Press and the psychological depth of Freud’s *Moses*, Dalí
+    treated the page as a laboratory.
+
+    In this gallery, the "narrative" of Freud’s Moses (the search for the
+    father, the origin of belief) and the "imagery" of Dalí’s hand (the
+    double-images, the paranoiac-critical method) collide. Dalí doesn't just
+    illustrate a story; he "unbinds" it, letting the subconscious spill out of
+    the margins and into the room.
+
+    ***
+
+    ### Summary for Visitors:
+    "When you look at Dalí’s work here, remember that he was the visual
+    architect for the ideas published by The Hogarth Press. While the Woolfs
+    were printing Freud’s theory that Moses was a hidden, murdered Egyptian,
+    Dalí was painting the 'hidden' parts of the human soul. They were both
+    working to prove the same thing: that what we see on the surface—whether
+    in a book or a human face—is only a fraction of the truth. These prints
+    are the evidence of that explosion of the mind."
+
+==============================================================================
+ROUTINE 3 ON THE GEMINI ANSWER — validated the same way
+==============================================================================
+
+  VERDICT: REJECTED
+  25 of 30 sentences GROUNDED
+
+  [UNSUPPORTED_ENTITY]
+      The Meeting of the Giants (London, 1938)**
+      Imagine it is July 1938.
+        findings: [{'kind': 'year', 'value': '1938', 'why': 'not in source
+        material'}]
+  [UNSUPPORTED_ENTITY]
+      London is sweltering, and the shadow of World War II is lengthening.
+        findings: [{'kind': 'person', 'value': 'World War', 'why': 'not in
+        source material'}]
+  [UNSUPPORTED_ENTITY]
+      Two men are sitting in a room in Maresfield Gardens.
+        findings: [{'kind': 'person', 'value': 'Maresfield Gardens', 'why':
+        'not in source material'}]
+  [UNSUPPORTED_ENTITY]
+      The Vessel: The Hogarth Press**
+      Enter **The Hogarth Press**, the avant-garde publishing house founded by
+      **Virginia and Leonard Woolf**.
+        findings: [{'kind': 'person', 'value': 'Leonard Woolf', 'why': 'not in
+        source material'}]
+  [UNSUPPORTED_ENTITY]
+      When The Hogarth Press published *Moses and Monotheism* in 1939, they
+      weren't just printing a history book; they were releasing a
+      psychological bomb.
+        findings: [{'kind': 'organization', 'value': 'When The Hogarth Press',
+        'why': 'not in source material'}, {'kind': 'year', 'value': '1939',
+        'why': 'not in source material'}]
+
+
+==============================================================================
+MICHAEL WAS RIGHT: THE VALIDATOR IS THE PROBLEM
+==============================================================================
+
+His words, 2026-08-14: "I have a feeling that it is our validator that is
+misbehaving." It is. Two separate ways.
+
+--- 1. IT REJECTS THE TRUE SPECIFICS AND PASSES THE VAGUE FILLER -------------
+
+Of Gemini's 30 sentences it flagged 5. Every one of the five carries real,
+checkable, and — as far as LEAD can tell by hand — TRUE content:
+
+    July 1938 . . . . . . . . . . . the Dali-Freud meeting. True.
+    the shadow of World War II  . . True.
+    Maresfield Gardens  . . . . . . Freud's London house. True.
+    Virginia and Leonard Woolf
+      founded the Hogarth Press . . True.
+    Hogarth published Moses and
+      Monotheism in 1939  . . . . . True.
+
+The 25 it PASSED include every sentence that says nothing checkable. This is
+not a coincidence, it is the mechanism: the validator asks "does this
+capitalized token appear in the source text?", so a sentence with no new names
+and no new years cannot fail. THE VAGUER THE SENTENCE, THE SAFER IT IS.
+
+That is also why GPT-4o's bland answer passed 10 of 11 sentences and this one
+passes 25 of 30 while being far more informative. The gradient points at
+exactly the output Michael rejected as "not a story at all".
+
+--- 2. IT CANNOT SEE INVENTED PLACES, NUMBERS, OR REVERSALS ------------------
+
+Probe, corpus = the stop text, which contains "1974" but not "Barcelona":
+
+    GROUNDED   In 1974, Salvador Dali illustrated the work in Barcelona.
+    GROUNDED   In 1974, Salvador Dali illustrated the work on the surface of
+               the moon.
+    GROUNDED   In 1974, Salvador Dali illustrated the work using 47 copper
+               plates.
+    GROUNDED   In 1974, Salvador Dali refused to illustrate the work.
+
+An invented city, an absurd location, an invented count of plates, and a
+REVERSED FACT all pass. It checks person-like capitalised names and years.
+Places, numbers, materials, quantities and negation are unchecked.
+
+So "TRUE_TO_SOURCES" means: contains no unfamiliar name or year. It does not
+mean the sentence is true, and it never did.
+
+It CAN fail — proven, it caught Napoleon Bonaparte, an invented 1802, and
+Leonard Woolf. The failure is not that it never fires. It is WHAT it fires on.
+
+--- 3. TWO PARSING BUGS VISIBLE IN THE OUTPUT ABOVE --------------------------
+
+    "World War"           classified as kind='person'
+    "Maresfield Gardens"  classified as kind='person'
+    "When The Hogarth Press"  classified as kind='organization' — the leading
+                              "When" was swallowed into the entity name
+
+--- WHAT THIS DOES NOT SAY ---------------------------------------------------
+
+It does NOT say Gemini's answer is true. Two runs of that model disagreed on
+who took Dali to Freud (Stefan Zweig in one, Leonard Woolf in the other), and
+`story_leads.verify` cannot confirm either. A validator that checked the right
+things would still have work to do on this text. The finding is only that THIS
+validator is not doing that work, and that its verdict has been read all day as
+though it were.
+
+
+==============================================================================
+SECTION 1 OF GEMINI'S STORY, CLAIM BY CLAIM
+==============================================================================
+
+Michael, 2026-08-14: "I liked Gemini stories. So I wonder what is wrong with
+them and want to go one-by-one. So what could not we validate the first story?"
+
+Two different questions, and they give opposite answers.
+
+--- WHAT OUR VALIDATOR SAID (corpus = the stop text) -------------------------
+
+verdict REJECTED. It flagged three sentences:
+
+    [UNSUPPORTED]  Imagine it is July 1938.
+                     -> year '1938' not in source material
+    [UNSUPPORTED]  London is sweltering, and the shadow of World War II is
+                   lengthening.
+                     -> person 'World War' not in source material
+    [UNSUPPORTED]  Two men are sitting in a room in Maresfield Gardens.
+                     -> person 'Maresfield Gardens' not in source material
+
+and passed six, including every one of these:
+
+    [GROUNDED]     ...who has just fled Nazi-occupied Vienna.
+    [GROUNDED]     Dali is nervous.
+    [GROUNDED]     He considers Freud his "spiritual father."
+    [GROUNDED]     During this meeting, Dali sketches Freud.
+    [GROUNDED]     He notices Freud's skull and later remarks that it looks
+                   like a "snail shell" - hard on the outside, but containing
+                   a soft, vulnerable center.
+
+None of those six is in the stop text either. They passed because they contain
+no capitalised token and no year that the checker did not already recognise.
+
+--- WHAT THE SOURCES SAY (independent check, story_leads.verify) -------------
+
+CONFIRMED, with a carrier sentence quoted from a source:
+
+  July 1938, Dali met Freud in London
+      "Salvador Dali was a passionate admirer of Sigmund Freud and finally met
+       him in London on July 19th 1938."
+  Freud fled Nazi-occupied Vienna for London
+      "In 1938, Sigmund Freud, the father of psychoanalysis, fled Nazi-occupied
+       Vienna for London, accompanied by his devoted daughter, Anna Freud."
+  Maresfield Gardens
+      "...died in this house at 20 Maresfield Gardens in Hampstead."
+  Dali sketched Freud during the meeting
+      "During the visit, Dali sketched Freud, and the resulting artwork
+       Portrait of Sigmund Freud..."
+  Dali compared Freud's cranium to a snail
+      "That Freud reminded him of a snail thus becomes enormously significant."
+
+NOT CONFIRMED:
+
+  "London is sweltering"              atmosphere, not a claim anyone can check
+  "Dali is nervous"                   an interior state; UNVERIFIED
+  "his spiritual father"              see the false positive below
+  "hard on the outside, but
+   containing a soft, vulnerable
+   center"                            Gemini's GLOSS on the snail remark. The
+                                      sources support "snail". They do not
+                                      support the shell-and-vulnerability
+                                      reading.
+
+--- SO WHAT IS ACTUALLY WRONG WITH IT ---------------------------------------
+
+Almost nothing factual. Five of the section's claims are confirmable from
+sources, and the three our validator rejected are all TRUE. What is wrong is
+narrower than it looked:
+
+  1. Atmospheric invention is written in the same voice as fact. "London is
+     sweltering" and "Dali is nervous" are indistinguishable in tone from
+     "he met Freud on July 19th 1938". A listener cannot tell which is which.
+  2. One real remark is embellished into an interpretation ("soft, vulnerable
+     center") that no source makes.
+  3. Our validator flags the true specifics and passes the invention. It is
+     backwards on this passage, exactly as Michael suspected.
+
+--- A THIRD FALSE POSITIVE IN verify(), FOUND WHILE DOING THIS ---------------
+
+  CONFIRMED   "Dali called Freud his spiritual father"
+  evidence    "He is named after his father, Salvador Dali Cusi."
+
+That is Dali's ACTUAL father. The word doing all the work in the claim --
+"spiritual" -- is absent from the carrier. The check requires half the content
+words, and "Freud" + "father" is already half.
+
+Measured before changing anything: raising the bar to two-thirds removes this
+false positive and costs three of the five true confirmations above (the Dali
+sketch, Maresfield Gardens, and the snail all fall below the new bar). That is
+a worse instrument, so it was NOT landed. Recorded as an open weakness: the
+rule needs to require the claim's DISTINGUISHING word, not a fraction of its
+words. Counting is still not reading.

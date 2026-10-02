@@ -1,0 +1,21 @@
+{
+  "Castle Hill": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Place Masséna": {
+    "status": "VERIFIED",
+    "canonical_name": "Place Masséna",
+    "qid": "Q3389982",
+    "type": "",
+    "coordinates": "43.697300, 7.270100"
+  },
+  "Colline du Château Waterfall": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Vieux Nice": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  }
+}

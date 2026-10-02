@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 217.54987001419067,
+  "chars": 6500,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró",
+      "index": 82,
+      "historic": 21,
+      "detail": 41,
+      "social": 60,
+      "text": "In 1971, Louis Broder published Le Lézard aux plumes d’or in Paris. This publication marked a significant collaboration with the renowned artist Joan Miró, who illustrated the book with forty vibrant lithographs. Broder's decision to publish this work brought Miró's unique fusion of poetry and art to a wider audience, ensuring its place in the world of illustrated books. Each lithograph, crafted on publisher's vellum, showcases Miró's ability to transform the ordinary into the extraordinary, with imagery that evokes a sense of wonder and surrealism. The creation process involved not only Miró's artistic vision but also the precise printing expertise of Mourlot, a renowned printer based in Paris. Boris Fridman later donated this remarkable work to the Museum of Fine Arts, Boston. His contribution enriches the museum's collection of surrealist-era printed works, offering visitors a glimpse into the dynamic world of 20th-century art. This work exemplifies the exhibition's thesis that artists revolutionized the book as an art form through deeply collaborative ventures. As you explore this vibrant book, consider not only the artistry of Miró but also the collaborative effort that brought this masterpiece into being.",
+      "orientation": "You are about to explore the \"Picasso, Miro, Dali: Unbound\" exhibition at MFA in Boston, featuring extraordinary works by Spanish artists. The exhibition premise centers on the livre d'artiste, a revolutionary art form that transformed the book through deeply collaborative ventures. Rarely on view, these works explore the intersection of images, words, and typography, offering unique insights into artistic expression. Within the Lois B. and Michael K. Torf Gallery, you will encounter \"Le Lézard aux plumes d’or,\" \"Moses and Monotheism,\" and \"Au Soleil du Plafond,\" each encapsulating the theme of transformation and transcendence in artistic creation. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). Stand near the exquisite display of Joan Miró's *Le Lézard aux plumes d’or (The Lizard with Golden Feathers)* in the Linde Family Gallery. From this vantage point, you can appreciate the full vibrancy and intricacy of the lithographs, capturing the delicate interplay of color and form that Miró is renowned for."
+    },
+    {
+      "stop": "Moses and Monotheism by Salvador Dalí",
+      "index": 57,
+      "historic": 44,
+      "detail": 43,
+      "social": 38,
+      "text": "In 1974, Salvador Dalí set out to illustrate Sigmund Freud's book \"Moses and Monotheism,\" a foundational text published in 1939. Dalí's action of interpreting Freud's work through his unique artistic vision resulted in a series of illustrations created with drypoints and lithographs on sheepskin. The Hogarth Press published Freud’s text in 1939, establishing a platform that would later allow Dalí to interpret the psychoanalytic narrative visually. Freud, the founder of psychoanalysis, explored the origins of religious belief, suggesting that Moses was an Egyptian, a controversial claim at the time. Dalí's illustrations, executed on sheepskin, connect to ancient traditions and create a tactile experience that reinforces the historical depth of Freud's theories. This set of ten illustrations exemplifies the exhibition's thesis that books can be revolutionized as art through collaboration, where Dalí's partnership with Freud and the support of The Hogarth Press advanced the book form in unprecedented ways. The Torf Gallery, the setting for this exhibit, reminds viewers of the enduring impact of artistic collaboration and the continued relevance of Freud's ideas. Here, the dialogue between past and present speaks to transformations both in art and cultural thought, urging us to consider the ongoing ascent of such dialogues in contemporary art.",
+      "orientation": "Stand slightly to the left of \"Moses and Monotheism\" by Salvador Dalí to capture the interplay between text and image. From this angle, the texture of the sheepskin and the bold strokes of Dalí's illustrations become vivid, offering insight into the fusion of psychoanalysis and surrealism at this exhibit."
+    },
+    {
+      "stop": "Au Soleil du Plafond by Juan Gris",
+      "index": 69,
+      "historic": 35,
+      "detail": 29,
+      "social": 77,
+      "text": "In 1916, publisher contracted with Pierre Reverdy to produce the poetry collection \"Au Soleil du Plafond,\" with designs by the artist Juan Gris. Gris, however, died in 1927, having completed only half of the intended work. The Louis Broder commissioned Mourlot Frères, a renowned French lithography workshop, to bring these lithographs to life on Arches wove paper, ensuring the work's material quality matched its artistic ambition. Gris's lithographs exhibit his distinctive Cubist style, capturing the complex interplay between geometric form and vibrant color, despite being crafted decades after his initial involvement.As you contemplate this work, reflect on how Reverdy's evocative poetry and Gris's visual compositions synthesize into a harmonious whole, showcasing the potential of collaborative art to transcend the boundaries between text and image. The project's eventual publication highlights not just Gris's pivotal role in the Cubist movement but also the enduring legacy of artistic partnership in shaping modern visual culture.\n\nThat's 3 stops — Le Lézard aux plumes d’or showcases Miró's surreal lithographs on vellum and Freud theorized Moses's Egyptian origins in Moses and Monotheism. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "\"Au Soleil du Plafond,\" a collaboration between the artist Juan Gris and poet Pierre Reverdy, presents an intriguing narrative of artistic partnership and posthumous revival. Despite its roots in the early 20th century, the piece was only realized decades later, epitomizing the transformative potential of the artist's book as an art form."
+    }
+  ]
+}

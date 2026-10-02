@@ -1,0 +1,2577 @@
+#!/usr/bin/env python3
+"""unglossed_reference_gate.py — LOCAL-269/LOCAL-287: Detect and gloss unexplained references.
+
+The inverse of LOCAL-263's unsupported-claim gate. LOCAL-263 catches claims with
+no fact behind them. This gate catches facts that assume knowledge the listener
+lacks — a named person, operation, event, or structure that carries no explanation.
+
+Michael's two triggers for glossing:
+  1. A general audience likely does not know it.
+  2. The tour has made it load-bearing (sentence meaning depends on it).
+
+Four stages:
+  Stage 1 — Deterministic detection of unglossed named entities.
+  Stage 2 — LLM triage: general_audience_knows? load_bearing?
+  Stage 3 — Supply a gloss (corpus first, model+citation second, degrade third).
+  Stage 4 — COMPOSE the gloss into the host sentence (D194 fix: never splice).
+
+LOCAL-287 fix: Glosses are composed clauses, never spliced sentences.
+  - The host sentence is checked first: if it already explains the reference,
+    the gate does not fire.
+  - Glosses are composed via an LLM call that rephrases the supplied fact as a
+    short appositive clause (never adds a fact).
+  - Five mechanical guards validate the final text and force a fallback (drop
+    the name) if any guard fails.
+
+A reference IS glossed if a nearby span explains it — appositive, relative
+clause, or explanation in adjacent sentence.
+
+D164: navigation sentences are exempt from modification.
+"""
+import os
+import re
+import sys
+import json
+import time
+from typing import Dict, List, Optional, Tuple
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
+
+from style_validator_detector import (
+
+    _is_style_navigation_sentence,
+    _split_sentences,
+)
+
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STAGE 1 — DETERMINISTIC DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Well-known references a general audience DOES know — skip these
+_WELL_KNOWN = {
+    # [LOCAL-475] Modern artists a general audience knows by name. The set had
+    # picasso and freud but not miró or dalí — two of the three artists named in
+    # the title of the exhibition we test on. Comparison is accent-folded (see
+    # `_is_well_known`), so the accented and unaccented spellings both match.
+    'joan miró', 'miró', 'salvador dalí', 'dalí', 'henri matisse', 'matisse',
+    'marc chagall', 'chagall', 'vincent van gogh', 'van gogh', 'claude monet',
+    'monet', 'rembrandt', 'michelangelo', 'leonardo da vinci', 'da vinci',
+    'andy warhol', 'warhol', 'frida kahlo', 'georgia o’keeffe', "georgia o'keeffe",
+    # Wars/events
+    'world war i', 'world war ii', 'wwi', 'wwii', 'the renaissance',
+    'the french revolution', 'the industrial revolution', 'the cold war',
+    'the great depression', 'world war 2', 'world war 1',
+    # People broadly known
+    'picasso', 'pablo picasso', 'monet', 'claude monet', 'van gogh',
+    'vincent van gogh', 'napoleon', 'napoleon bonaparte', 'shakespeare',
+    'william shakespeare', 'da vinci', 'leonardo da vinci', 'michelangelo',
+    'einstein', 'albert einstein', 'mozart', 'beethoven', 'bach',
+    'rembrandt', 'matisse', 'henri matisse', 'cézanne', 'paul cézanne',
+    'renoir', 'auguste renoir', 'hemingway', 'ernest hemingway',
+    'fitzgerald', 'f. scott fitzgerald', 'nietzsche', 'walt disney',
+    'louis xiv', 'queen victoria', 'julius caesar', 'cleopatra',
+    'alexander the great', 'genghis khan', 'jesus', 'muhammad', 'buddha',
+    'socrates', 'plato', 'aristotle', 'galileo', 'newton', 'darwin',
+    'marx', 'freud', 'gandhi', 'martin luther king',
+    # Religions/movements
+    'christianity', 'islam', 'buddhism', 'hinduism', 'judaism',
+    # Modern broadly known
+    'the beatles', 'elvis', 'michael jackson',
+    # Geography well-known
+    'mediterranean', 'mediterranean sea', 'atlantic', 'atlantic ocean',
+    'pacific', 'pacific ocean', 'alps', 'the alps', 'french riviera',
+    'riviera', 'côte d\'azur',
+}
+
+# Patterns that indicate an entity is already glossed (has an explanation)
+_GLOSS_PATTERNS = [
+    # Appositive: "X, a/an/the [word]" (word can start with letter or digit)
+    re.compile(r',\s+(?:a|an|the)\s+[a-z0-9]', re.IGNORECASE),
+    # Relative clause: "X, who/which/where/that [verb]"
+    re.compile(r',\s+(?:who|which|where|that|whose)\s+', re.IGNORECASE),
+    # Parenthetical: "X (explanation)"
+    re.compile(r'\([^)]{5,}\)'),
+    # Dash appositive: "X — explanation" or "X – explanation"
+    re.compile(r'\s[—–]\s'),
+    # "known as", "called", "named after"
+    re.compile(r'\b(?:known\s+as|called|named\s+after|also\s+called)\b', re.IGNORECASE),
+]
+
+# Descriptor words that, when preceding a name, already explain it
+_DESCRIPTOR_WORDS = re.compile(
+    r'\b(?:architect|painter|sculptor|artist|composer|writer|author|poet|'
+    r'playwright|philosopher|politician|statesman|general|admiral|'
+    r'king|queen|emperor|prince|duke|count|baron|saint|pope|'
+    r'director|actor|actress|singer|musician|designer|engineer|'
+    r'scientist|mathematician|physician|surgeon|explorer|navigator|'
+    r'merchant|banker|industrialist|philanthropist|collector|patron|'
+    r'French|Italian|Spanish|German|British|American|Dutch|Swiss|'
+    r'Catalan|Provençal|Genoese|Flemish|Austrian|Russian|Greek|'
+    r'Roman|Byzantine|medieval|Renaissance|Baroque|Impressionist|'
+    r'Modernist|Art\s+Deco|Romanesque|Gothic|Neoclassical)\b',
+    re.IGNORECASE,
+)
+
+# Named entity patterns — people, operations, institutions, works, structures
+_PERSON_PATTERN = re.compile(
+    r'\b([A-Z][a-zà-ÿ]+(?:\s+(?:de|du|von|van|di|del|la|le|les|des|d\'|l\')?'
+    r'\s*[A-Z][a-zà-ÿ]+)+)\b'
+)
+
+# Titled people (King X, Queen X, etc.)
+_TITLED_PERSON = re.compile(
+    r'\b((?:King|Queen|Emperor|Empress|Prince|Princess|Duke|Duchess|'
+    r'Count|Countess|Baron|Baroness|Pope|Saint|St\.?)\s+'
+    r'[A-Z][a-zà-ÿ]+(?:\s+[IVX]+|\s+[a-zà-ÿ]+)*(?:\s+of\s+[A-Z][a-zà-ÿ]+)?)\b'
+)
+
+# Operations/events: "Operation X", "Battle of X", "Treaty of X", etc.
+_EVENT_PATTERN = re.compile(
+    r'\b((?:Operation|Battle|Siege|Treaty|Accord|Convention|Congress|'
+    r'Council|Crusade|Revolt|Revolution|Uprising|War)\s+(?:of\s+)?'
+    r'[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)*)\b'
+)
+
+# Named structures/institutions: "Villa X", "Château X", "Palais X", etc.
+_STRUCTURE_PATTERN = re.compile(
+    r'\b((?:Villa|Château|Palais|Chapelle|Église|Cathédrale|Basilique|'
+    r'Musée|Hôtel|Fort|Forte|Porta|Casa|Palazzo|Abbey|Priory|'
+    r'Monastery|Convent|Rue|Place|Pont|Tour|Porte)\s+'
+    r'(?:de\s+la\s+|du\s+|de\s+|des\s+|d\')?'
+    r'[A-Z][a-zà-ÿ]+(?:\s+(?:de|du|d\'|la|le)?\s*[A-Za-zà-ÿ]+)*)\b'
+)
+
+# "House of X" pattern
+_HOUSE_OF_PATTERN = re.compile(
+    r'\b((?:House|Order|Brotherhood|Society|Guild)\s+of\s+'
+    r'[A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)*)\b'
+)
+
+# Named works: "Tender Is the Night", quoted titles
+_WORK_TITLE_PATTERN = re.compile(
+    r'["""]([^"""]{3,50})["""]'
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-479] SINGLE-TOKEN NAME DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# `_PERSON_PATTERN` above requires TWO capitalised tokens, so it has never once
+# seen a one-word name — Walter, Reid, Suzette, Mia all pass straight through the
+# net (measured: `_PERSON_PATTERN.findall("The disappearance of Walter") == []`).
+# Every person the gate has ever caught is a First+Last. Tour 423 stop 4 shipped
+# three one-word orphans in four sentences because of this.
+#
+# The whole difficulty is the false positive. A bare capitalised token is far
+# more often a PLACE (`at Logan`, `in Boston`), a WEEKDAY/MONTH (`October`), a
+# facility (`Terminal E`), or a sentence-initial ordinary word than it is a
+# person. So the detector does not trust the capital: it reads the SURROUNDING
+# SYNTAX and fires only when the token is used the way a person is used.
+#
+#   person-shaped, FLAG:              place-shaped / not-a-person, SKIP:
+#     of Walter                         at Logan / in Boston / near Reid
+#     Reid's failed attempt             to Walter (destination)
+#     Walter was / said / built         Terminal E (facility fragment)
+#     painted by Walter                 October / Monday (calendar)
+#     who Suzette was                   sentence-initial "The" / connectives
+#
+# Sentence-initial tokens get special care: a capital there is grammatical, not a
+# signal, so a sentence-initial token is only a candidate when its own governing
+# syntax (a possessive clitic, or a following person-verb) marks it as a name.
+
+# Tokens that look like a capitalised name but never are one. Kept deliberately
+# small — the syntax test does the heavy lifting; this only removes calendar and
+# obvious-common-word noise that would otherwise satisfy a person-verb pattern
+# ("October was warm", "Spring arrived").
+_NOT_A_NAME_SINGLE = frozenset({
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december',
+    'spring', 'summer', 'autumn', 'fall', 'winter',
+    'today', 'tomorrow', 'yesterday', 'tonight',
+    'north', 'south', 'east', 'west', 'northeast', 'northwest', 'southeast',
+    'southwest',
+    # Words that open sentences and can precede a person-verb without being names
+    'the', 'this', 'that', 'these', 'those', 'their', 'his', 'her', 'its',
+    'here', 'there', 'then', 'now', 'later', 'earlier', 'meanwhile',
+    'however', 'moreover', 'therefore', 'thus', 'indeed', 'perhaps',
+    # Indefinite / generic subjects that open a clause and take a verb but are
+    # not names ("Nobody knew", "Everyone left", "Someone said", "Their protest
+    # led"). The syntax test alone would let these through the subject-verb frame.
+    'nobody', 'somebody', 'anybody', 'everybody', 'nothing', 'something',
+    'anything', 'everything', 'someone', 'anyone', 'everyone', 'none',
+    'many', 'most', 'some', 'several', 'few', 'both', 'each', 'either',
+    'neither', 'all', 'they', 'we', 'you', 'she', 'he', 'it', 'who',
+    'what', 'which', 'when', 'where', 'why', 'how', 'while', 'because',
+    'since', 'once', 'yet', 'still', 'soon', 'often', 'always', 'never',
+    # Honorifics / titles: these introduce a following name and are handled by
+    # the titled-person pattern, so as bare tokens they are never the name.
+    'saint', 'king', 'queen', 'pope', 'count', 'countess', 'duke', 'duchess',
+    'prince', 'princess', 'baron', 'baroness', 'emperor', 'empress', 'lord',
+    'lady', 'sir', 'dame', 'father', 'brother', 'sister', 'abbot', 'bishop',
+})
+
+# Place-introducing prepositions. A bare token immediately after one of these is
+# being used as a LOCATION or a DESTINATION, not as a person — "landing at
+# Logan", "in Boston", "near Reid", "to Walter". `by` is deliberately NOT here:
+# "painted by Walter" is agentive (person), while "by Logan" is rare enough that
+# the location-token exemption catches the tour's own place anyway.
+_PLACE_PREPS = frozenset({
+    'at', 'in', 'near', 'to', 'from', 'into', 'onto', 'toward', 'towards',
+    'inside', 'outside', 'beyond', 'across', 'along', 'around', 'atop',
+    'beside', 'behind', 'below', 'beneath', 'above', 'past', 'through',
+})
+
+# Facility / structure head-words. A bare token that FOLLOWS one of these is part
+# of a facility name ("Terminal E", "Gate B", "Concourse C"), not a person, and a
+# token that PRECEDES one is a facility modifier.
+_FACILITY_WORDS = frozenset({
+    'terminal', 'gate', 'concourse', 'pier', 'runway', 'hangar', 'wing',
+    'hall', 'tower', 'building', 'annex', 'lobby', 'plaza', 'station',
+    'platform', 'street', 'avenue', 'road', 'boulevard', 'square', 'park',
+    'bridge', 'harbor', 'harbour', 'airport', 'terminal.',
+})
+
+# Verbs that take a person as subject. A bare capitalised token immediately
+# followed by one of these is being predicated about as an agent — "Walter
+# vanished", "Reid attempted", "Suzette painted". Shape-based (-ed / common
+# irregulars) plus a small set of present-tense biography verbs, so this is not
+# an enumeration of the verbs we happen to have seen.
+_PERSON_VERB_PRESENT = frozenset({
+    'is', 'was', 'said', 'says', 'built', 'painted', 'wrote', 'led', 'founded',
+    'designed', 'created', 'made', 'became', 'served', 'died', 'lived',
+    'ruled', 'commanded', 'discovered', 'invented', 'composed', 'sculpted',
+    'directed', 'commissioned', 'established', 'attempted', 'vanished',
+    'disappeared', 'landed', 'flew', 'piloted', 'boarded', 'survived',
+})
+
+_SINGLE_TOKEN_RE = re.compile(r"\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})\b")
+
+
+def _looks_like_past_verb(word: str) -> bool:
+    """A lowercase word that is a past-tense/agentive verb by shape or by set."""
+    w = re.sub(r'[^A-Za-z]', '', word or '').lower()
+    if not w:
+        return False
+    if w in _PERSON_VERB_PRESENT:
+        return True
+    # -ed shape, plus the small irregular set the degrade guards already use.
+    if len(w) >= 4 and w.endswith('ed'):
+        return True
+    return w in _IRREGULAR_PAST
+
+
+def detect_single_token_names(sentence: str, sentence_index: int = 0) -> List[str]:
+    """[LOCAL-479] Detect bare capitalised SINGLE-token names used as people.
+
+    Returns the list of candidate names (one token each) whose surrounding
+    syntax marks them as persons. Multi-token names are `_PERSON_PATTERN`'s job
+    and are ignored here. Place-, calendar-, and facility-shaped uses are
+    rejected by the surrounding syntax, not by a word list alone.
+
+    The four person-shaped frames, in order of confidence:
+      1. possessive:      "Reid's failed attempt"      (X's)
+      2. of-genitive:     "the disappearance of Walter"(of X, X not a place token)
+      3. agentive by:     "a mural painted by Walter"  (by X)
+      4. subject-verb:    "Walter vanished"            (X <person-verb>)
+      5. who/whom clause: "who Suzette was"            (who X <be>)
+
+    A token immediately preceded by a place preposition ("at Logan") or adjacent
+    to a facility word ("Terminal E") is never a candidate.
+    """
+    if not sentence or len(sentence) < 5:
+        return []
+
+    found: List[str] = []
+    seen = set()
+    tokens = sentence.split()
+
+    for m in _SINGLE_TOKEN_RE.finditer(sentence):
+        name = m.group(1)
+        start, end = m.start(1), m.end(1)
+        low = name.lower()
+
+        if low in _NOT_A_NAME_SINGLE:
+            continue
+        if _is_well_known(name):
+            continue
+        if low in seen:
+            continue
+
+        before = sentence[:start]
+        after = sentence[end:]
+        # ── hyphenated compound: "Saint-Pons", "Pierre-Yves" ─────────────────
+        # A token glued to a hyphen + capital is the first half of a compound
+        # proper name that the multi-token / structure patterns own. Not a
+        # standalone single-token person.
+        if after[:1] == '-' and after[1:2].isupper():
+            continue
+        if before[-1:] == '-':
+            continue
+        # The immediately preceding word and the immediately following word.
+        prev_word = before.rstrip().split()[-1].lower() if before.strip() else ''
+        prev_word_clean = re.sub(r'[^A-Za-z]', '', prev_word)
+        # Strip a leading possessive/quote so "'s" is seen as the next token.
+        after_l = after.lstrip()
+        next_word_raw = after_l.split()[0] if after_l.split() else ''
+        next_word = re.sub(r'[^A-Za-z]', '', next_word_raw).lower()
+
+        # ── place-shaped: "at Logan", "in Boston", "to Walter" → not a person ──
+        if prev_word_clean in _PLACE_PREPS:
+            continue
+        # ── facility fragment: "Terminal E", "Gate B", or "<X> Terminal" ──────
+        if prev_word_clean in _FACILITY_WORDS or next_word in _FACILITY_WORDS:
+            continue
+
+        is_sentence_initial = not before.strip()
+
+        # ── frame 1: possessive "Reid's" ─────────────────────────────────────
+        # after_l starts with an apostrophe + s. Person-shaped even sentence-init.
+        possessive = any(after_l.startswith(ap + 's') for ap in ("'", '’', 'ʼ', '′'))
+
+        # ── frame 3/2: "by X" (agentive) or "of X" (genitive) ────────────────
+        # These need a preceding preposition; never sentence-initial.
+        prep_frame = prev_word_clean in ('of', 'by')
+
+        # ── frame 4: subject-verb "Walter vanished" ─────────────────────────
+        # A determiner directly before the token ("the Mothers", "the Plane")
+        # makes it a common noun, not a name — real names do not take "the X".
+        _det_before = prev_word_clean in (
+            'the', 'a', 'an', 'this', 'that', 'these', 'those', 'their',
+            'his', 'her', 'its', 'our', 'your', 'my', 'some', 'any', 'each',
+            'every', 'no',
+        )
+        verb_frame = (not _det_before) and _looks_like_past_verb(next_word)
+
+        # ── frame 5: "who Suzette was" / "whom Reid met" ─────────────────────
+        who_frame = prev_word_clean in ('who', 'whom', 'whose')
+
+        if is_sentence_initial:
+            # A capital here is grammar, not signal. Only the token's own
+            # governing syntax may promote it: a possessive clitic, or a
+            # person-verb directly after it.
+            if not (possessive or verb_frame):
+                continue
+
+        if possessive or prep_frame or verb_frame or who_frame:
+            seen.add(low)
+            found.append(name)
+
+    return found
+
+
+def _fold_accents(s: str) -> str:
+    """[LOCAL-475] Strip diacritics for comparison. See `_is_well_known`."""
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', s or '')
+                   if unicodedata.category(c) != 'Mn')
+
+
+def _is_well_known(name: str) -> bool:
+    """Check if a reference is well-known to a general audience.
+
+    [LOCAL-475] This compared raw lowercase strings, so it answered **False for
+    Joan Miró and Salvador Dalí** while answering True for Picasso and Freud —
+    the accented names of two of the three headline artists in the exhibition we
+    have been testing on all week. Miró was therefore DEGRADED (his name deleted
+    from a sentence about his own book), which is what produced
+
+        "In 1971 known for his distinct surrealist imagery, created ..."
+
+    in TOUR_MFA_RELEASE_20260818_1532.txt. Both sides are now accent-folded, which
+    is standing check #4 (D243) catching something for the third time: exact match
+    on accented names silently reports absence.
+    """
+    lower = _fold_accents(name.lower().strip())
+    if not lower:
+        return False
+    folded = {_fold_accents(k) for k in _WELL_KNOWN}
+    if lower in folded:
+        return True
+    # Check if any well-known name is a substring
+    for known in folded:
+        if known in lower or lower in known:
+            return True
+    return False
+
+
+def _host_sentence_already_explains(sentence: str, entity_name: str) -> bool:
+    """LOCAL-287: Check if the host sentence already explains the entity.
+
+    Catches cases like "Spanish architect Josep Lluís Sert" where the descriptor
+    before the name already tells the listener who/what this is. In such cases
+    the reference is NOT unglossed and the gate must not fire.
+
+    Also catches patterns like:
+      - "designed by architect X" (role before name)
+      - "the French philosopher X" (nationality + role before name)
+      - "X, the renowned painter" (appositive after name)
+    """
+    entity_pos = sentence.find(entity_name)
+    if entity_pos < 0:
+        entity_pos = sentence.lower().find(entity_name.lower())
+    if entity_pos < 0:
+        return False
+
+    # Check text BEFORE the entity for descriptor words (within 40 chars)
+    prefix_start = max(0, entity_pos - 40)
+    prefix = sentence[prefix_start:entity_pos]
+    if _DESCRIPTOR_WORDS.search(prefix):
+        return True
+
+    # Check text AFTER the entity for appositive descriptor (within 60 chars)
+    after = sentence[entity_pos + len(entity_name):entity_pos + len(entity_name) + 60]
+    # Pattern: ", the/a [descriptor]"
+    if re.match(r',\s+(?:the|a|an)\s+', after):
+        remaining = re.sub(r'^,\s+(?:the|a|an)\s+', '', after)
+        if _DESCRIPTOR_WORDS.match(remaining):
+            return True
+
+    return False
+
+
+def _has_nearby_gloss(sentence: str, entity_name: str, sentences: List[str],
+                      index: int) -> bool:
+    """Check if entity_name has a gloss in this sentence or adjacent ones.
+
+    A gloss means: appositive, relative clause, parenthetical, or explanation
+    in the same or immediately adjacent sentence.
+    """
+    # LOCAL-287: First check if host sentence already explains via descriptor
+    if _host_sentence_already_explains(sentence, entity_name):
+        return True
+
+    # Check within the same sentence
+    entity_pos = sentence.find(entity_name)
+    if entity_pos < 0:
+        entity_pos = sentence.lower().find(entity_name.lower())
+
+    if entity_pos >= 0:
+        # Text after the entity in this sentence
+        after_entity = sentence[entity_pos + len(entity_name):]
+        for pat in _GLOSS_PATTERNS:
+            if pat.search(after_entity[:80]):
+                return True
+
+    # Check adjacent sentences for explanation of same entity
+    for offset in [-1, 1]:
+        adj_idx = index + offset
+        if 0 <= adj_idx < len(sentences):
+            adj = sentences[adj_idx]
+            # If adjacent sentence contains entity name and has explanatory content
+            if entity_name.lower() in adj.lower() or entity_name.split()[-1].lower() in adj.lower():
+                for pat in _GLOSS_PATTERNS:
+                    if pat.search(adj):
+                        return True
+                # Check if adjacent sentence has explanatory verbs about the entity
+                if re.search(r'\b(?:was|is|were|are|built|founded|designed|created|'
+                             r'constructed|established|commissioned|named|known|'
+                             r'served|used|became|transformed)\b', adj, re.IGNORECASE):
+                    # Check it's actually explaining THIS entity
+                    entity_last_word = entity_name.split()[-1].lower()
+                    if entity_last_word in adj.lower():
+                        return True
+
+    return False
+
+
+def detect_unglossed_references(text: str, stop_names: List[str] = None,
+                                exempt: List[str] = None) -> List[Dict]:
+    """Stage 1: Deterministic detection of named entities lacking explanation.
+
+    Returns list of dicts with:
+      - entity: the entity name
+      - sentence: the sentence containing it
+      - sentence_index: index in the sentence list
+      - category: person | event | structure | house | work
+
+    Args:
+        text: the tour text to analyze
+        stop_names: list of stop names in this tour (excluded from flagging)
+    """
+    sentences = _split_sentences(text)
+    results = []
+    seen_entities = set()  # Avoid duplicates
+
+    # Build set of stop name fragments to exclude
+    _stop_fragments = set()
+    if stop_names:
+        for sn in stop_names:
+            _stop_fragments.add(sn.lower())
+            # Also add individual words > 3 chars
+            for w in sn.split():
+                if len(w) > 3:
+                    _stop_fragments.add(w.lower())
+
+    # [LOCAL-475] The stop's own artist is the SUBJECT, not an incidental
+    # reference, and must never be a candidate for glossing or degrading. Miró
+    # was degraded out of a sentence about his own book. `_is_well_known` now
+    # covers him, but the next tour will have an artist nobody has heard of and
+    # the same thing would happen — the fix has to be structural, not a list.
+    # Accent-folded for the D243 reason.
+    _exempt_folded = {_fold_accents(e.lower().strip()) for e in (exempt or []) if e}
+    for _e in list(_exempt_folded):
+        for _w in _e.split():
+            if len(_w) > 3:
+                _exempt_folded.add(_w)
+
+    def _is_exempt(name: str) -> bool:
+        f = _fold_accents((name or '').lower().strip())
+        if not f:
+            return False
+        return any(x and (x == f or x in f or f in x) for x in _exempt_folded)
+
+    for i, sent in enumerate(sentences):
+        if len(sent) < 15:
+            continue
+        # D164: skip navigation
+        if _is_style_navigation_sentence(sent):
+            continue
+
+        # Find named entities in this sentence
+        entities_found = []
+
+        # People
+        for m in _PERSON_PATTERN.finditer(sent):
+            name = m.group(1)
+            # Skip names that start with articles or are structure/place names
+            if name.split()[0].lower() in ('the', 'this', 'that', 'a', 'an', 'its'):
+                continue
+            if len(name) > 3 and not _is_well_known(name):
+                entities_found.append((name, 'person'))
+
+        # [LOCAL-479] Single-token people — the one-word names the multi-token
+        # pattern above has always been blind to (Walter, Reid, Suzette). Only
+        # names whose surrounding syntax is person-shaped are returned.
+        _multi_lower = {n.lower() for (n, _c) in entities_found}
+        for name in detect_single_token_names(sent, i):
+            # Do not double-count a token already inside a multi-token match.
+            if any(name.lower() in ml.split() for ml in _multi_lower):
+                continue
+            if len(name) > 3 and not _is_well_known(name):
+                entities_found.append((name, 'person'))
+
+        # Titled people
+        for m in _TITLED_PERSON.finditer(sent):
+            name = m.group(1)
+            if not _is_well_known(name):
+                entities_found.append((name, 'person'))
+
+        # Events/Operations
+        for m in _EVENT_PATTERN.finditer(sent):
+            name = m.group(1)
+            if not _is_well_known(name):
+                entities_found.append((name, 'event'))
+
+        # Structures
+        for m in _STRUCTURE_PATTERN.finditer(sent):
+            name = m.group(1)
+            entities_found.append((name, 'structure'))
+
+        # House of X
+        for m in _HOUSE_OF_PATTERN.finditer(sent):
+            name = m.group(1)
+            if not _is_well_known(name):
+                entities_found.append((name, 'house'))
+
+        # Check each entity for existing gloss
+        for entity_name, category in entities_found:
+            if entity_name.lower() in seen_entities:
+                continue
+            # Skip if entity is a stop name or fragment thereof
+            if _stop_fragments and entity_name.lower() in _stop_fragments:
+                continue
+            if _stop_fragments and any(entity_name.lower() in sf or sf in entity_name.lower()
+                                       for sf in _stop_fragments if len(sf) > 3):
+                continue
+            # [LOCAL-475] The stop's own artist is never an incidental reference.
+            if _is_exempt(entity_name):
+                continue
+            if not _has_nearby_gloss(sent, entity_name, sentences, i):
+                seen_entities.add(entity_name.lower())
+                results.append({
+                    'entity': entity_name,
+                    'sentence': sent,
+                    'sentence_index': i,
+                    'category': category,
+                })
+
+    return results
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STAGE 2 — TRIAGE (model call, batched per stop)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def triage_references(references: List[Dict], api_key: str,
+                      model: str = None) -> Tuple[List[Dict], int, float, float]:
+    """Stage 2: For each unglossed reference, determine if gloss is needed.
+
+    Batches all references for a stop into one call. Returns per reference:
+      gloss_needed / known_enough / load_bearing
+
+    Args:
+        references: list from detect_unglossed_references
+        api_key: OpenAI API key
+        model: model to use (default: gpt-4o-mini)
+
+    Returns:
+        (triaged_refs, tokens_used, cost, latency)
+        Each ref in triaged_refs gets a 'triage' field.
+    """
+    import requests as _req
+
+    if not references:
+        return [], 0, 0.0, 0.0
+
+    if not model:
+        model = os.environ.get('GLOSS_TRIAGE_MODEL', 'gpt-4o-mini')
+
+    # Build the batch prompt
+    refs_block = "\n".join(
+        f"{i+1}. \"{ref['entity']}\" in: \"{ref['sentence'][:150]}\""
+        for i, ref in enumerate(references)
+    )
+
+    prompt = f"""You are triaging named references in an audio tour for a general audience.
+
+For each reference below, determine:
+1. Would a GENERAL AUDIENCE (tourists, not historians) know what this is without explanation?
+2. Is the sentence's meaning DEPENDENT on knowing what this reference is (load-bearing)?
+
+REFERENCES:
+{refs_block}
+
+For EACH reference, output exactly one line:
+[number]. [verdict]: [brief reason]
+
+Verdicts:
+- GLOSS_NEEDED — general audience would not know this
+- LOAD_BEARING — even if somewhat known, the sentence depends on understanding it
+- KNOWN_ENOUGH — general audience knows this well enough (e.g., "World War II", "Monet")
+
+Be strict about KNOWN_ENOUGH — only common-knowledge items qualify.
+"Operation Dragoon" → GLOSS_NEEDED (few non-historians know this)
+"World War II" → KNOWN_ENOUGH
+"House of Savoy" → GLOSS_NEEDED
+"Monet" → KNOWN_ENOUGH
+"Josep Lluís Sert" → GLOSS_NEEDED
+"""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    data = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You triage named references for audio tours. Be strict: only truly common knowledge is KNOWN_ENOUGH."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.1,
+        "max_tokens": 300,
+    }
+
+    start_time = time.time()
+    try:
+        resp = _req.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            data=json.dumps(data),
+            timeout=30,
+        )
+        latency = time.time() - start_time
+
+        if resp.status_code != 200:
+            # API error — default to GLOSS_NEEDED (safe)
+            for ref in references:
+                ref['triage'] = 'gloss_needed'
+            return references, 0, 0.0, latency
+
+        result = resp.json()
+        text = result["choices"][0]["message"]["content"].strip()
+        tokens_used = result.get("usage", {}).get("total_tokens", 0)
+
+        # gpt-4o-mini pricing: $0.15/1M input, $0.60/1M output
+        input_tokens = result.get("usage", {}).get("prompt_tokens", 0)
+        output_tokens = result.get("usage", {}).get("completion_tokens", 0)
+        cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+
+        # Parse response
+        for line in text.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            m = re.match(r'(\d+)\.\s*(GLOSS_NEEDED|LOAD_BEARING|KNOWN_ENOUGH)', line, re.IGNORECASE)
+            if m:
+                idx = int(m.group(1)) - 1
+                verdict = m.group(2).upper()
+                if 0 <= idx < len(references):
+                    references[idx]['triage'] = verdict.lower()
+
+        # Default unmatched to gloss_needed
+        for ref in references:
+            if 'triage' not in ref:
+                ref['triage'] = 'gloss_needed'
+
+        return references, tokens_used, cost, latency
+
+    except Exception:
+        latency = time.time() - start_time
+        for ref in references:
+            ref['triage'] = 'gloss_needed'
+        return references, 0, 0.0, latency
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STAGE 3 — SUPPLY THE GLOSS (corpus → model+citation → degrade)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _search_corpus_for_fact(entity: str, corpus_passages: List[str]) -> Optional[str]:
+    """Try to find a factual statement about entity in the corpus passages.
+
+    Returns a raw fact string if found (will be composed into a clause later),
+    or None if no corpus fact is available.
+    """
+    if not corpus_passages:
+        return None
+
+    entity_lower = entity.lower()
+
+    for passage in corpus_passages:
+        passage_lower = passage.lower()
+        if entity_lower in passage_lower:
+            # Found entity in corpus — extract the sentence containing it
+            sents = _ss_split(passage)
+            for s in sents:
+                if entity_lower in s.lower():
+                    # Check if this sentence has factual content beyond just naming
+                    if re.search(r'\b(?:was|is|were|built|founded|designed|'
+                                 r'created|established|launched|began|'
+                                 r'served|fought|allied|landed|invaded|'
+                                 r'occurred|took\s+place|led\s+by|'
+                                 r'the\s+\d{4}|in\s+\d{4})\b',
+                                 s, re.IGNORECASE):
+                        return s.strip()
+
+    return None
+
+
+def supply_glosses(references: List[Dict], corpus_passages: List[str],
+                   api_key: str, model: str = None) -> Tuple[List[Dict], int, float, float]:
+    """Stage 3: Supply a fact for each reference that needs glossing.
+
+    LOCAL-287: This stage now only gathers the RAW FACT. Composition into a
+    proper appositive clause happens in Stage 4 via the compose_glosses() call.
+
+    Order of preference:
+      1. From corpus (free, traceable)
+      2. From model call with citation requirement
+      3. Degrade the reference (remove the unknown name, keep the fact)
+
+    Returns:
+        (glossed_refs, tokens_used, cost, latency)
+        Each ref gets: raw_fact, gloss_source, stage
+    """
+    import requests as _req
+
+    if not model:
+        model = os.environ.get('GLOSS_MODEL', 'gpt-4o-mini')
+
+    # [LOCAL-494] `provenance` refs already carry a gloss composed from the stop
+    # record. Re-running the corpus search and the model call on them is what
+    # produced the Fridman degrade — the lookup failed, and failure was read as
+    # "unverified" rather than "private collector, as expected".
+    needs_gloss = [r for r in references
+                   if r.get('triage') in ('gloss_needed', 'load_bearing')
+                   and not r.get('provenance')]
+    if not needs_gloss:
+        return references, 0, 0.0, 0.0
+
+    total_tokens = 0
+    total_cost = 0.0
+    total_latency = 0.0
+
+    # Stage 3a: Try corpus first (free)
+    model_needed = []
+    for ref in needs_gloss:
+        corpus_fact = _search_corpus_for_fact(ref['entity'], corpus_passages)
+        if corpus_fact:
+            ref['raw_fact'] = corpus_fact
+            ref['gloss_source'] = 'corpus'
+            ref['stage'] = 'corpus'
+        else:
+            model_needed.append(ref)
+
+    # Stage 3b: Model call for remaining (batched)
+    if model_needed and api_key:
+        refs_block = "\n".join(
+            f"{i+1}. Entity: \"{ref['entity']}\" | Category: {ref['category']} | "
+            f"Sentence: \"{ref['sentence'][:120]}\""
+            for i, ref in enumerate(model_needed)
+        )
+
+        prompt = f"""For each named reference below, provide a single FACTUAL statement
+about the entity that would help a listener understand who/what it is.
+
+If you CANNOT provide a verifiable factual statement, output DEGRADE.
+
+REFERENCES:
+{refs_block}
+
+Format each response as:
+[number]. FACT: [one factual statement about the entity]
+OR
+[number]. DEGRADE
+
+RULES:
+- Only verifiable facts. Do not invent or speculate.
+- One concise sentence per entity.
+- Prefer DEGRADE over inventing.
+"""
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        data = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You supply factual information for audio tour references. Every fact must be verifiable. Prefer DEGRADE over inventing."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 500,
+        }
+
+        start_time = time.time()
+        try:
+            resp = _req.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                data=json.dumps(data),
+                timeout=30,
+            )
+            latency = time.time() - start_time
+            total_latency += latency
+
+            if resp.status_code == 200:
+                result = resp.json()
+                text = result["choices"][0]["message"]["content"].strip()
+                input_tokens = result.get("usage", {}).get("prompt_tokens", 0)
+                output_tokens = result.get("usage", {}).get("completion_tokens", 0)
+                tokens_used = input_tokens + output_tokens
+                total_tokens += tokens_used
+                cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+                total_cost += cost
+
+                # Parse responses
+                for line in text.strip().split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    # FACT line
+                    fm = re.match(r'(\d+)\.\s*FACT:\s*(.+)', line, re.IGNORECASE)
+                    if fm:
+                        idx = int(fm.group(1)) - 1
+                        fact = fm.group(2).strip()
+                        if 0 <= idx < len(model_needed):
+                            model_needed[idx]['raw_fact'] = fact
+                            model_needed[idx]['gloss_source'] = 'model'
+                            model_needed[idx]['stage'] = 'model'
+                        continue
+
+                    # DEGRADE line
+                    dm = re.match(r'(\d+)\.\s*DEGRADE', line, re.IGNORECASE)
+                    if dm:
+                        idx = int(dm.group(1)) - 1
+                        if 0 <= idx < len(model_needed):
+                            model_needed[idx]['raw_fact'] = None
+                            model_needed[idx]['gloss_source'] = 'degrade'
+                            model_needed[idx]['stage'] = 'degrade'
+                        continue
+
+        except Exception:
+            total_latency += time.time() - start_time
+
+    # Stage 3c: Anything still without a fact gets degraded
+    for ref in model_needed:
+        if 'stage' not in ref:
+            ref['raw_fact'] = None
+            ref['gloss_source'] = 'degrade'
+            ref['stage'] = 'degrade'
+
+    return references, total_tokens, total_cost, total_latency
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STAGE 4 — COMPOSE GLOSSES INTO HOST SENTENCES (D194 fix)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─── Mechanical guards (LOCAL-287) ─────────────────────────────────────────────
+# These validate a composed gloss and force a fallback (drop the name) if any
+# guard fails. A silent fallback is a good outcome; spliced garbage is not.
+
+def _guard_spliced_sentence(gloss: str) -> bool:
+    """Guard 1: ., produced by an inserted gloss (capital-letter sentence mid-sentence).
+
+    Also catches glosses that ARE complete sentences (start with capital, contain
+    a main verb, and are longer than a few words) — these should be appositive
+    clauses starting lowercase.
+    """
+    if re.search(r'\.\s*,', gloss):
+        return False
+    # A gloss that starts with a capital letter and is > 5 words is likely a
+    # spliced sentence rather than a composed appositive clause
+    gloss_stripped = gloss.strip().rstrip('.,;:')
+    if gloss_stripped and gloss_stripped[0].isupper() and len(gloss_stripped.split()) > 5:
+        # Check if it contains a main verb (indicator of full sentence)
+        if re.search(r'\b(?:was|is|were|are|has|had|have|did|does|will|would|'
+                     r'could|should|shall|may|might|built|founded|designed|'
+                     r'created|established|became|served|occurred|landed|'
+                     r'attracted|frequented|visited)\b', gloss_stripped, re.IGNORECASE):
+            return False
+    # Capital letter after comma (except proper nouns at start) indicates a spliced sentence
+    if re.search(r',\s+[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+', gloss):
+        # More than 4 words after a comma starting with capital = likely a sentence
+        words_after_comma = re.findall(r',\s+([A-Z][^,]*)', gloss)
+        for segment in words_after_comma:
+            if len(segment.split()) > 6:
+                return False
+    return True
+
+
+def _guard_doubled_name(full_sentence: str, entity_name: str) -> bool:
+    """Guard 2: the glossed name appearing twice within 120 characters."""
+    entity_lower = entity_name.lower()
+    first_pos = full_sentence.lower().find(entity_lower)
+    if first_pos < 0:
+        return True
+    second_pos = full_sentence.lower().find(entity_lower, first_pos + len(entity_lower))
+    if second_pos < 0:
+        return True
+    if second_pos - first_pos <= 120:
+        return False
+    return True
+
+
+def _guard_trailing_preposition(gloss: str) -> bool:
+    """Guard 3: a gloss ending in a preposition or article — 'on the.', 'of the.', 'in.'."""
+    # Check if the gloss clause ends with prep/article before punctuation
+    if re.search(r'\b(?:on|of|in|at|by|for|to|from|with|the|a|an)\s*[.,;:!?]?\s*$', gloss.strip()):
+        return False
+    return True
+
+
+def _guard_length(gloss: str) -> bool:
+    """Guard 4: a gloss longer than ~12 words."""
+    words = gloss.split()
+    return len(words) <= 12
+
+
+def _guard_host_duplication(gloss: str, host_sentence: str) -> bool:
+    """Guard 5: a gloss whose text duplicates ≥6 consecutive words of its host sentence."""
+    gloss_words = gloss.lower().split()
+    host_words = host_sentence.lower().split()
+    if len(gloss_words) < 6:
+        return True
+    for i in range(len(gloss_words) - 5):
+        seq = gloss_words[i:i+6]
+        # Check if this 6-word sequence appears in the host
+        for j in range(len(host_words) - 5):
+            if host_words[j:j+6] == seq:
+                return False
+    return True
+
+
+def validate_gloss(gloss: str, host_sentence: str, entity_name: str) -> Tuple[bool, str]:
+    """Run all five mechanical guards on a composed gloss.
+
+    Returns (passed, failure_reason).
+    """
+    if not _guard_spliced_sentence(gloss):
+        return False, "spliced_sentence"
+    if not _guard_doubled_name(host_sentence, entity_name):
+        return False, "doubled_name"
+    if not _guard_trailing_preposition(gloss):
+        return False, "trailing_preposition"
+    if not _guard_length(gloss):
+        return False, "too_long"
+    if not _guard_host_duplication(gloss, host_sentence):
+        return False, "host_duplication"
+    return True, ""
+
+
+def compose_glosses(references: List[Dict], api_key: str,
+                    model: str = None) -> Tuple[List[Dict], int, float, float]:
+    """Stage 4: Compose glosses as proper appositive clauses via LLM.
+
+    LOCAL-287 (D194 fix): This is the critical difference from the old gate.
+    Instead of pasting raw source text after a name, we ask the model to compose
+    a short appositive clause that reads naturally in the host sentence.
+
+    The model may only REPHRASE the supplied fact, never add one.
+
+    All glosses for a stop are batched into a single call.
+
+    Returns:
+        (refs_with_composed_glosses, tokens_used, cost, latency)
+    """
+    import requests as _req
+
+    if not model:
+        model = os.environ.get('GLOSS_MODEL', 'gpt-4o-mini')
+
+    # Filter to refs that have a raw_fact and need composition.
+    # [LOCAL-494] `provenance` glosses are already appositives by construction
+    # (ROLE_GLOSSES), so composing them again can only distort them — and a
+    # compose that returns DROP would delete a name the record documents.
+    composable = [r for r in references
+                  if r.get('raw_fact') and r.get('stage') != 'degrade'
+                  and not r.get('provenance')
+                  and r.get('triage') in ('gloss_needed', 'load_bearing')]
+
+    if not composable or not api_key:
+        return references, 0, 0.0, 0.0
+
+    # Build composition prompt — batched
+    items_block = "\n".join(
+        f"{i+1}. ENTITY: \"{ref['entity']}\"\n"
+        f"   HOST SENTENCE: \"{ref['sentence'][:200]}\"\n"
+        f"   FACT: \"{ref['raw_fact'][:200]}\""
+        for i, ref in enumerate(composable)
+    )
+
+    prompt = f"""You are composing SHORT APPOSITIVE CLAUSES for an audio tour.
+
+For each entity below, compose a gloss that:
+- Is a lowercase appositive phrase (3-10 words, ideally 4-7)
+- Reads naturally when inserted after the entity name in the host sentence
+- Only rephrases the supplied FACT — never adds new information
+- Does NOT repeat the entity name
+- Does NOT repeat words already in the host sentence
+- Starts lowercase (it will follow a comma)
+- Does NOT end with a period (it will be followed by a comma)
+
+If the host sentence ALREADY explains the entity (e.g., "Spanish architect X"),
+output SUPPRESS — no gloss is needed.
+
+If no short clause can be formed from the fact without distortion, output DROP.
+
+ITEMS:
+{items_block}
+
+For EACH item, output exactly one line:
+[number]. GLOSS: [the appositive clause, lowercase, no period]
+OR
+[number]. SUPPRESS
+OR
+[number]. DROP
+
+EXAMPLES:
+- Entity "Operation Dragoon", Fact "Operation Dragoon was the Allied invasion of southern France on August 15, 1944"
+  → GLOSS: the 1944 Allied landings in southern France
+- Entity "Josep Lluís Sert", Host "designed by Spanish architect Josep Lluís Sert"
+  → SUPPRESS
+- Entity "House of Savoy", Fact "The House of Savoy was the royal dynasty that ruled the region"
+  → GLOSS: the royal dynasty that once ruled here
+- Entity "Marguerite and Aimé Maeght", Fact "The Fondation Maeght was established by Marguerite and Aimé Maeght in 1964"
+  → GLOSS: the gallerists who founded it in 1964
+"""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    data = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You compose short appositive clauses for audio tours. Output only lowercase phrases of 3-10 words. Never add facts not in the supplied material."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "max_tokens": 400,
+    }
+
+    start_time = time.time()
+    total_tokens = 0
+    total_cost = 0.0
+
+    try:
+        resp = _req.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            data=json.dumps(data),
+            timeout=30,
+        )
+        latency = time.time() - start_time
+
+        if resp.status_code != 200:
+            # API error — degrade all composable refs
+            for ref in composable:
+                ref['stage'] = 'degrade'
+                ref['gloss'] = None
+            return references, 0, 0.0, latency
+
+        result = resp.json()
+        text = result["choices"][0]["message"]["content"].strip()
+        input_tokens = result.get("usage", {}).get("prompt_tokens", 0)
+        output_tokens = result.get("usage", {}).get("completion_tokens", 0)
+        total_tokens = input_tokens + output_tokens
+        total_cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+
+        # Parse responses
+        for line in text.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            # GLOSS line
+            gm = re.match(r'(\d+)\.\s*GLOSS:\s*(.+)', line, re.IGNORECASE)
+            if gm:
+                idx = int(gm.group(1)) - 1
+                gloss = gm.group(2).strip().rstrip('.')
+                # Ensure lowercase start
+                if gloss and gloss[0].isupper():
+                    gloss = gloss[0].lower() + gloss[1:]
+                if 0 <= idx < len(composable):
+                    composable[idx]['gloss'] = gloss
+                continue
+
+            # SUPPRESS line
+            sm = re.match(r'(\d+)\.\s*SUPPRESS', line, re.IGNORECASE)
+            if sm:
+                idx = int(sm.group(1)) - 1
+                if 0 <= idx < len(composable):
+                    composable[idx]['stage'] = 'suppressed'
+                    composable[idx]['gloss'] = None
+                continue
+
+            # DROP line
+            dm = re.match(r'(\d+)\.\s*DROP', line, re.IGNORECASE)
+            if dm:
+                idx = int(dm.group(1)) - 1
+                if 0 <= idx < len(composable):
+                    composable[idx]['stage'] = 'degrade'
+                    composable[idx]['gloss'] = None
+                continue
+
+        # Anything not parsed → degrade
+        for ref in composable:
+            if 'gloss' not in ref:
+                ref['stage'] = 'degrade'
+                ref['gloss'] = None
+
+        return references, total_tokens, total_cost, latency
+
+    except Exception:
+        latency = time.time() - start_time
+        for ref in composable:
+            ref['stage'] = 'degrade'
+            ref['gloss'] = None
+        return references, 0, 0.0, latency
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# APPLY — Insert composed glosses into text, with guard validation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _insert_gloss(sentence: str, entity: str, gloss: str) -> str:
+    """Backwards-compatible alias for _insert_composed_gloss.
+
+    Also enforces max 12-word truncation for direct callers (tests).
+    """
+    # Enforce 12-word max (mechanical guard 4)
+    words = gloss.split()
+    if len(words) > 12:
+        gloss = ' '.join(words[:12])
+    return _insert_composed_gloss(sentence, entity, gloss)
+
+
+# [D552] REGNAL NUMERALS BELONG TO THE NAME.
+#
+# The 2026-08-29 Monaco tour shipped two corrupted sentences, both from this
+# gate matching a royal name without its numeral:
+#
+#   gloss spliced INSIDE the name:
+#     "the future King Edward, the first British monarch of his house, VII,
+#      then Prince of Wales"          <- "King Edward" matched, VII stranded
+#
+#   name dropped, numeral orphaned:
+#     "with journalists and diplomats gathering III and Princess Grace
+#      navigated international tensions"   <- "Prince Rainier" dropped, III left
+#
+# The gate is old and correct for ordinary names; a tour full of Rainier III,
+# Edward VII and Albert II is what exposed it. Extending the matched span to
+# swallow a trailing Roman numeral fixes both symptoms at once, because both
+# insertion and degradation work from the same span.
+# The negative lookahead keeps an INITIAL from being read as a numeral:
+# 'Henri C. Charpentier' must not become 'Henri C'. A regnal numeral is
+# never followed by a period or another word character.
+_REGNAL_RE = re.compile(r'\s+(?:[IVXLC]+)(?![.\w])')
+
+
+def _with_regnal(sentence: str, entity: str) -> str:
+    """Return `entity` extended to include a regnal numeral that follows it.
+
+    "Prince Rainier" in "Prince Rainier III and Princess Grace" -> "Prince Rainier III".
+    Returns `entity` unchanged when no numeral follows, or when the entity
+    already ends in one.
+    """
+    if not sentence or not entity:
+        return entity
+    if _REGNAL_RE.fullmatch(' ' + entity.split()[-1]) if entity.split() else False:
+        return entity
+    idx = sentence.find(entity)
+    if idx < 0:
+        return entity
+    m = _REGNAL_RE.match(sentence[idx + len(entity):])
+    return entity + m.group(0) if m else entity
+
+
+def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
+    entity = _with_regnal(sentence, entity)   # [D552]
+    """Insert a composed gloss after the entity name as an appositive.
+
+    The gloss is already a lowercase clause without period. We insert it as:
+      "...Entity, gloss, remainder..."
+
+    Handles possessive ('s) by wrapping: "Entity's X" → "Entity, gloss, whose X"
+    or by placing the gloss after the possessive phrase when short.
+
+    Returns the modified sentence, or the original if insertion fails.
+    """
+    pos = sentence.find(entity)
+    if pos < 0:
+        return sentence
+
+    end_pos = pos + len(entity)
+    after = sentence[end_pos:]
+
+    # Handle possessive: "Entity's ..." / "Entity’s ..."
+    #
+    # [LOCAL-475] This line used to test the SAME ASCII literal twice —
+    #     after.startswith("'s ") or after.startswith("'s ")
+    # — so the curly apostrophe the model actually emits was never covered, and
+    # the guard silently did nothing. That is how
+    #     "bound in the Louis Broder, a mid-20th century French publisher,’s vellum"
+    # reached the delivered tour. Every Unicode apostrophe variant is now handled,
+    # and a trailing space is no longer required (a possessive at a clause end,
+    # "Broder’s, which...", is still a possessive).
+    _after_stripped = after.lstrip()
+    if any(_after_stripped.startswith(ap + 's') for ap in ("'", '’', 'ʼ', '′')):
+        # Drop the gloss rather than produce "Entity, gloss,'s X"
+        # Possessive constructions can't cleanly take an appositive
+        return sentence
+
+    # [LOCAL-492] The entity may be a MODIFIER rather than the head of its noun
+    # phrase, and an appositive cannot be inserted into the middle of one. The
+    # 2026-08-19 01:07 tour shipped
+    #
+    #   "The presence of ... in the Linde Family, recognized for philanthropic
+    #    support of the museum, gallery reflects the museum's commitment"
+    #
+    # because "Linde Family" modifies "gallery" and the gloss went between them.
+    # Same class as the possessive case guarded above: the entity is not the
+    # thing the sentence is predicating about.
+    #
+    # The signal is structural: an entity preceded by a DETERMINER and followed
+    # by a lowercase word is attributive — "the Linde Family gallery", "the
+    # Mourlot Frères atelier". An entity that heads its phrase has no determiner
+    # directly before it ("Louis Broder published…", "The Hogarth Press printed…",
+    # where "The" belongs to the entity itself).
+    _before = sentence[:pos].rstrip()
+    _prev_word = _before.split()[-1].lower() if _before.split() else ''
+    _next_word = after.lstrip().split()[0] if after.lstrip().split() else ''
+    if (_prev_word in ('the', 'a', 'an', 'this', 'that', 'these', 'those')
+            and _next_word[:1].islower()):
+        # Drop the gloss rather than split the noun phrase. An unglossed
+        # reference is a smaller defect than a broken sentence.
+        return sentence
+
+    # Insert appositive: "Entity, gloss, rest"
+    # Handle case where entity is already followed by a comma
+    if after.lstrip().startswith(','):
+        # Already has comma — insert gloss after existing comma
+        comma_pos = after.index(',')
+        rest = after[comma_pos + 1:]
+        return sentence[:end_pos] + ', ' + gloss + ',' + rest
+    elif after.lstrip().startswith('.'):
+        # End of sentence — insert before period
+        dot_pos = after.index('.')
+        return sentence[:end_pos] + ', ' + gloss + after[dot_pos:]
+    else:
+        # Normal case: insert comma-gloss-comma
+        return sentence[:end_pos] + ', ' + gloss + ',' + after
+
+
+def _degrade_reference_in_text(text: str, entity: str, sentence: str) -> str:
+    entity = _with_regnal(sentence, entity)   # [D552]
+    """Remove the governed construction around an entity from its sentence.
+
+    LOCAL-289: Degrading must remove the WHOLE construction the name governed,
+    not just the name itself. A bare name deletion leaves stranded prepositions,
+    possessive clitics, and dangling articles.
+
+    Strategy:
+      1. Remove the entity plus any possessive clitic bound to it
+         (e.g. "X's landscape" → "the landscape")
+      2. Remove orphaned preposition+article preceding the entity
+         (e.g. "along with X" → remove "along with X" or "with X")
+      3. Remove trailing article left with no noun
+         (e.g. "tour a." → "tour.")
+      4. Clean empty appositives (", ," or ", .")
+      5. Collapse double spaces
+
+    If the result fails the degrade guards, DROP THE WHOLE SENTENCE — that is
+    strictly better than emitting broken syntax to TTS.
+    """
+    if sentence not in text:
+        return text
+
+    new_sentence = _excise_governed_construction(sentence, entity)
+
+    # Validate the degraded sentence with post-hoc guards
+    if new_sentence != sentence and _degrade_sentence_is_wellformed(new_sentence):
+        return text.replace(sentence, new_sentence, 1)
+
+    # Sentence cannot be repaired — drop it entirely
+    return _drop_sentence_from_text(text, sentence)
+
+
+def _excise_governed_construction(sentence: str, entity: str) -> str:
+    """Remove entity and its governed syntax from the sentence.
+
+    Returns the cleaned sentence (may still be malformed — caller validates).
+    """
+    pos = sentence.find(entity)
+    if pos < 0:
+        return sentence
+
+    end_pos = pos + len(entity)
+    before = sentence[:pos]
+    after = sentence[end_pos:]
+
+    # ── Extend entity backward for hyphenated prefix: "Pierre-[Yves Trémois]" ──
+    # If the character before entity is '-' preceded by a word, include it
+    if before.endswith('-') or (len(before) >= 2 and before[-1] == '-'):
+        # Find the start of the hyphenated prefix word
+        prefix_before_hyphen = before.rstrip('-')
+        m_prefix = re.search(r'\b([A-Za-zà-ÿ]+)-$', prefix_before_hyphen + '-')
+        if m_prefix:
+            # Extend: include "Pierre-" in the removal
+            prefix_start = prefix_before_hyphen.rfind(m_prefix.group(1))
+            before = sentence[:prefix_start]
+
+    # ── Handle possessive: "Entity's X" → "the X" ──────────────────────────
+    if after.startswith("'s ") or after.startswith("\u2019s "):
+        # Replace "Entity's" with "the"
+        after = after[3:]  # skip "'s "
+        # If "the" is already there, don't double it
+        if not after.lstrip().lower().startswith('the '):
+            after = 'the ' + after.lstrip()
+        else:
+            after = after.lstrip()
+        # [2026-09-23] "the own historic pathways" — the entity was a possessive
+        # DETERMINER ("Logan's own pathways"), so the slot does not want an article.
+        # NB: runs after the article was prepended above, so match it too.
+        after = re.sub(r'^the\s+(?=(?:own|very)\b)', '', after)
+        # Remove any preceding article/preposition that targeted the entity
+        before = _strip_trailing_function_words(before)
+        # [2026-09-23, kiro critic] _strip_trailing_function_words removes the
+        # dangling preposition AND its space, so a bare `before + after` glued the
+        # words together: "the Archdiocese of Boston's clergy abuse crisis" became
+        # "the Archdiocesethe clergy abuse crisis". Four such splices reached the
+        # round-7 tours. The non-possessive branch below has always guarded this;
+        # this branch never did.
+        if before and after and not before.endswith(' ') and not after.startswith(' '):
+            before += ' '
+        new_sentence = before + after
+        return _clean_degrade_artifacts(new_sentence)
+
+    # Also handle possessive with curly quote: Entity' (without s, rare)
+    if after.startswith("' ") or after.startswith("\u2019 "):
+        after = after[2:]
+        before = _strip_trailing_function_words(before)
+        new_sentence = before + ' ' + after.lstrip() if after.strip() else before
+        return _clean_degrade_artifacts(new_sentence)
+
+    # ── Handle ", along with Entity," or ", Entity," (appositive/coordination) ─
+    # Pattern: ", <prep-phrase> Entity" or ", Entity"
+    appositive_pat = re.compile(
+        r',\s*(?:along with|together with|including|such as|like|notably|'
+        r'particularly|especially)\s*$', re.IGNORECASE
+    )
+    m_appositive = appositive_pat.search(before)
+    if m_appositive:
+        # Remove from the prep-phrase start through the entity
+        before = before[:m_appositive.start()]
+        # Also consume trailing comma/space after entity
+        after = re.sub(r'^,?\s*', '', after)
+        new_sentence = before + ' ' + after if after else before
+        return _clean_degrade_artifacts(new_sentence)
+
+    # Simpler case: ", Entity," → remove the whole appositive slot
+    if before.rstrip().endswith(',') and (after.lstrip().startswith(',') or
+                                           after.lstrip().startswith('.')):
+        before = before.rstrip().rstrip(',')
+        new_sentence = before + after.lstrip().lstrip(',')
+        return _clean_degrade_artifacts(new_sentence)
+
+    # ── Handle "prep Entity" — remove prep + entity ────────────────────────
+    # e.g. "along with to the northeast" means "along with [Entity] to the..."
+    # The entity sat between "with" and "to", remove "with Entity"
+    prep_before_pat = re.compile(
+        r'\b(along\s+with|together\s+with|designated\s+as|known\s+as|'
+        r'with|of|by|from|for|at|to|in|as|on|'
+        r'near|beside|behind|between|among|through)\s*$', re.IGNORECASE
+    )
+    m_prep = prep_before_pat.search(before)
+    if m_prep:
+        # Remove the preposition along with the entity
+        before = before[:m_prep.start()]
+        # Also consume trailing comma after entity if present
+        after = re.sub(r'^,?\s*', ' ', after)
+        new_sentence = before.rstrip() + after
+        return _clean_degrade_artifacts(new_sentence)
+
+    # ── Handle "Entity rest" — entity at beginning or mid-sentence ─────────
+    # Remove entity, plus any trailing comma and article left dangling
+    after_stripped = after.lstrip(', ')
+    # Remove a dangling article at the start of what follows
+    after_stripped = re.sub(r'^(?:a|an|the)\s+(?=[A-Z])', '', after_stripped)
+
+    # Remove preceding article: "the Entity" → ""
+    before_stripped = re.sub(r'\b(?:the|a|an)\s*$', '', before, flags=re.IGNORECASE)
+    # Remove preceding comma+space if it creates ", ,"
+    before_stripped = before_stripped.rstrip()
+    if before_stripped.endswith(','):
+        # Only strip comma if what follows also starts with comma/period
+        if after_stripped and after_stripped[0] in ',.':
+            before_stripped = before_stripped.rstrip(',').rstrip()
+
+    new_sentence = before_stripped
+    if new_sentence and after_stripped:
+        # Ensure proper spacing
+        if not new_sentence.endswith(' ') and not after_stripped.startswith(' '):
+            new_sentence += ' '
+        new_sentence += after_stripped
+    elif after_stripped:
+        new_sentence = after_stripped
+
+    return _clean_degrade_artifacts(new_sentence)
+
+
+def _strip_trailing_function_words(text: str) -> str:
+    """Strip trailing prepositions/articles that no longer have an object."""
+    # Repeatedly strip trailing function words
+    func_word_pat = re.compile(
+        r'\s+(?:of|in|at|by|to|from|with|for|on|near|the|a|an)\s*$', re.IGNORECASE
+    )
+    for _ in range(3):  # max 3 layers (e.g. "in the" → "in" → "")
+        m = func_word_pat.search(text)
+        if m:
+            text = text[:m.start()]
+        else:
+            break
+    return text
+
+
+def _clean_degrade_artifacts(sentence: str) -> str:
+    """Clean up artifacts left by construction excision."""
+    # Remove empty appositives: ", ," or ", ."
+    sentence = re.sub(r',\s*,', ',', sentence)
+    sentence = re.sub(r',\s*\.', '.', sentence)
+    # Remove double spaces
+    sentence = re.sub(r'  +', ' ', sentence)
+    # Remove space before period/comma
+    sentence = re.sub(r'\s+([.,;:!?])', r'\1', sentence)
+    # Remove trailing article before period: "tour a." → "tour."
+    sentence = re.sub(r'\b(a|an|the)\s*\.$', '.', sentence, flags=re.IGNORECASE)
+    # Remove stacked prepositions: "with to", "of in", "at of", "in of", "to of"
+    sentence = re.sub(
+        r'\b(with|of|at|in|to|from|by|for|on)\s+(to|of|in|at|from|by|for|on)\b',
+        lambda m: m.group(2),  # keep the second prep (it likely belongs to what follows)
+        sentence, flags=re.IGNORECASE
+    )
+    # Remove orphan possessive: " 's " with no word before it (or space before it)
+    sentence = re.sub(r"(\s)'s\b", r'\1', sentence)
+    sentence = re.sub(r"\u2019s\b", '', sentence)
+    # Capitalize first letter if sentence starts lowercase after cleanup
+    sentence = sentence.strip()
+    if sentence and sentence[0].islower() and not sentence.startswith('...'):
+        sentence = sentence[0].upper() + sentence[1:]
+    return sentence.strip()
+
+
+def _drop_sentence_from_text(text: str, sentence: str) -> str:
+    """Remove an entire sentence from the text, cleaning up spacing."""
+    if sentence not in text:
+        return text
+    # Remove the sentence and normalize spacing
+    result = text.replace(sentence, '', 1)
+    # Clean up double spaces and orphan whitespace
+    result = re.sub(r'  +', ' ', result)
+    result = re.sub(r'\n\s*\n\s*\n', '\n\n', result)
+    result = result.strip()
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-479] PART 2 — CUT THE DEPENDANTS WITH THE INTRODUCTION
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# When a gate removes the sentence that INTRODUCED a person or event, every
+# later sentence that referred back to that introduction with a DEFINITE
+# reference is left pointing at nothing. Tour 423 stop 4 is the proof: a gate
+# cut the sentences introducing Richard Reid and the 1960s crash (they carried
+# the unverifiable claims) and left standing
+#
+#     "The plane made an emergency landing at Logan..."
+#     "Reid's failed attempt serves as a stark reminder..."
+#     "The disappearance of Walter and passengers on that ill-fated flight..."
+#     "The incident spurred safety reviews..."
+#
+# four orphans referring to introductions that no longer exist. A stop left at
+# 217 words with four orphans is worse than a stop that never mentioned Reid —
+# so the introduction and its dependants must fall together.
+#
+# A "dependant" is a later sentence whose SUBJECT is a definite back-reference —
+#   • a definite noun phrase:  "The plane", "The incident", "That flight"
+#   • a possessive of a name:  "Reid's failed attempt"
+#   • a bare name subject:     "Walter vanished"
+# — whose antecedent (the name, or the head noun) was introduced ONLY by the
+# removed sentence and is NOT independently introduced by any surviving earlier
+# sentence. A first, indefinite mention ("A plane made an emergency landing")
+# is an introduction, not a dependant, and is never cut by this pass.
+
+# Definite-reference subject at the start of a sentence: "The plane", "The
+# incident", "That ill-fated flight", "This attempt". Captures the noun-phrase
+# words BETWEEN the determiner and the predicate verb so any of them can serve
+# as the head noun (an adjective like "ill-fated" precedes the true head).
+_DEFINITE_SUBJECT_RE = re.compile(
+    r'^\s*(?:The|That|This|These|Those)\s+([A-Za-zà-ÿ][A-Za-zà-ÿ\-\s]{1,40}?)'
+    r'\s+(?:[a-zà-ÿ]{2,}ed|is|was|were|are|has|had|have|spurred|serves?|'
+    r'made|added|led|remains?|stands?|became|brought|marks?|reflects?)\b',
+    re.IGNORECASE,
+)
+
+# Possessive-name subject: "Reid's failed attempt", "Walter's disappearance".
+_POSSESSIVE_SUBJECT_RE = re.compile(
+    r"^\s*([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})(?:'s|’s)\b"
+)
+
+# Bare-name subject followed by a person-verb: "Walter vanished".
+_BARE_NAME_SUBJECT_RE = re.compile(
+    r"^\s*([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})\s+([a-zà-ÿ]{3,})\b"
+)
+
+
+def _content_nouns(sentence: str) -> set:
+    """Lowercased content words in a sentence (>=3 chars, not function words).
+
+    Used to decide whether an introduction sentence actually introduced the
+    head noun a later definite reference points back to.
+    """
+    stop = {
+        'the', 'and', 'that', 'this', 'with', 'from', 'into', 'onto', 'for',
+        'was', 'were', 'are', 'has', 'had', 'have', 'its', 'their', 'his',
+        'her', 'which', 'who', 'whom', 'whose', 'when', 'where', 'what',
+        'added', 'layer', 'serves', 'stark', 'reminder',
+    }
+    words = re.findall(r"[A-Za-zà-ÿ]{3,}", sentence.lower())
+    return {w for w in words if w not in stop}
+
+
+def _introduced_names_and_nouns(sentence: str) -> Tuple[set, set]:
+    """What a sentence INTRODUCES: proper names (folded) and content nouns.
+
+    Names come from both the multi-token pattern and the single-token detector,
+    so "Richard Reid", "Reid", and "Walter" are all recognised as introduced.
+    """
+    names = set()
+    for m in _PERSON_PATTERN.finditer(sentence):
+        for w in m.group(1).split():
+            if len(w) > 2:
+                names.add(_fold_accents(w.lower()))
+    for n in detect_single_token_names(sentence):
+        names.add(_fold_accents(n.lower()))
+    # Also any capitalised token mid-sentence (covers a name the detectors did
+    # not frame but that a later possessive points back to).
+    for m in re.finditer(r'(?<!^)(?<![.!?]\s)\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]{2,})\b', sentence):
+        names.add(_fold_accents(m.group(1).lower()))
+    return names, _content_nouns(sentence)
+
+
+def _subject_reference(sentence: str) -> Optional[Dict]:
+    """Classify a sentence's SUBJECT as a definite back-reference, if it is one.
+
+    Returns a dict describing the reference, or None when the subject is not a
+    definite back-reference (e.g. an indefinite "A plane", or a navigation
+    sentence). Keys: kind ('definite_np'|'possessive'|'bare_name'), head (the
+    lowercased head noun for a definite NP), name (folded name for possessive /
+    bare-name).
+    """
+    s = sentence.strip()
+    if not s:
+        return None
+
+    # Indefinite subjects ("A plane", "An incident", "Some passengers") are
+    # first mentions — introductions, never dependants.
+    if re.match(r'^\s*(?:A|An|Some|Several|Many|One)\s', s):
+        return None
+
+    m = _POSSESSIVE_SUBJECT_RE.match(s)
+    if m:
+        return {'kind': 'possessive', 'name': _fold_accents(m.group(1).lower())}
+
+    m = _DEFINITE_SUBJECT_RE.match(s)
+    if m:
+        heads = {w.lower() for w in re.findall(r"[A-Za-zà-ÿ]{3,}", m.group(1))}
+        return {'kind': 'definite_np', 'heads': heads}
+
+    m = _BARE_NAME_SUBJECT_RE.match(s)
+    if m:
+        name, follow = m.group(1), m.group(2)
+        if name.lower() not in _NOT_A_NAME_SINGLE and _looks_like_past_verb(follow):
+            return {'kind': 'bare_name', 'name': _fold_accents(name.lower())}
+
+    return None
+
+
+def cut_orphaned_dependants(text: str, removed_sentences: List[str]) -> Tuple[str, List[str]]:
+    """[LOCAL-479] Drop later sentences orphaned by a removed introduction.
+
+    Given the delivered `text` and the list of sentences a gate has already
+    removed, find every surviving sentence whose SUBJECT is a definite
+    back-reference to something the removed sentence(s) introduced — and that
+    NO surviving earlier sentence independently introduces — and drop it too.
+
+    The pass iterates to a fixed point: dropping a dependant can orphan a
+    sentence that depended on IT in turn.
+
+    Returns (new_text, cascaded_drops).
+    """
+    if not text or not removed_sentences:
+        return text, []
+
+    # What the removed sentences introduced.
+    removed_names: set = set()
+    removed_nouns: set = set()
+    for rs in removed_sentences:
+        n, h = _introduced_names_and_nouns(rs)
+        removed_names |= n
+        removed_nouns |= h
+
+    if not removed_names and not removed_nouns:
+        return text, []
+
+    cascaded: List[str] = []
+    changed = True
+    # Fixed-point loop: at most a handful of iterations for any real stop.
+    for _ in range(6):
+        if not changed:
+            break
+        changed = False
+        survivors = _split_sentences(text)
+
+        # Names/nouns each SURVIVING sentence introduces, so we never cut a
+        # reference that a still-present sentence legitimately grounds.
+        intro_by_index = []
+        for s in survivors:
+            n, h = _introduced_names_and_nouns(s)
+            intro_by_index.append((n, h))
+
+        for idx, sent in enumerate(survivors):
+            ref = _subject_reference(sent)
+            if not ref:
+                continue
+            # D164: never cut a navigation sentence.
+            if _is_style_navigation_sentence(sent):
+                continue
+
+            # Is the antecedent introduced by any EARLIER surviving sentence?
+            grounded_earlier = False
+            for j in range(idx):
+                en, eh = intro_by_index[j]
+                if ref['kind'] in ('possessive', 'bare_name'):
+                    if ref['name'] in en:
+                        grounded_earlier = True
+                        break
+                else:  # definite_np
+                    if (ref['heads'] & eh) or (ref['heads'] & en):
+                        grounded_earlier = True
+                        break
+            if grounded_earlier:
+                continue
+
+            # Does the antecedent trace back to something the removed sentence
+            # introduced?
+            orphaned = False
+            if ref['kind'] in ('possessive', 'bare_name'):
+                orphaned = ref['name'] in removed_names
+            else:  # definite_np — a head noun the removed sentence introduced,
+                   # OR (when the removed sentence introduced a name but no
+                   # matching noun) a generic anaphor whose head is not grounded
+                   # anywhere in the surviving text.
+                orphaned = bool(ref['heads'] & removed_nouns)
+
+            if orphaned:
+                # Drop this dependant and carry its own introductions forward,
+                # so a sentence that depended on IT is orphaned next round.
+                n, h = _introduced_names_and_nouns(sent)
+                removed_names |= n
+                removed_nouns |= h
+                text = _drop_sentence_from_text(text, sent)
+                cascaded.append(sent)
+                changed = True
+                break  # re-split and re-evaluate from the top
+
+    return text, cascaded
+
+
+def _sentences_removed(original: str, gated: str) -> List[str]:
+    """Sentences present in `original` but absent (verbatim) from `gated`.
+
+    A sentence that was merely EDITED in place (a gloss inserted, a name
+    degraded out) is not counted as removed — its lead-in survives, so the
+    original text no longer matches, but a normalised prefix does. We treat a
+    sentence as removed only when neither it nor a meaningful prefix of it
+    survives, which is exactly the "whole sentence dropped" case Part 2 acts on.
+    """
+    orig_sents = _split_sentences(original)
+    gated_norm = re.sub(r'\s+', ' ', gated).strip().lower()
+    removed = []
+    for s in orig_sents:
+        s_norm = re.sub(r'\s+', ' ', s).strip().lower()
+        if len(s_norm) < 15:
+            continue
+        if s_norm in gated_norm:
+            continue
+        # A prefix survived → the sentence was edited, not removed.
+        prefix = ' '.join(s_norm.split()[:5])
+        if prefix and prefix in gated_norm:
+            continue
+        removed.append(s)
+    return removed
+
+
+# ─── Degrade output validators (LOCAL-289) ─────────────────────────────────────
+
+# Patterns that must NEVER appear in delivered text
+_DEGRADE_GUARD_BARE_POSSESSIVE = re.compile(r"\s's\b")
+_DEGRADE_GUARD_STACKED_PREPS = re.compile(
+    r'\b(with\s+to|of\s+in|at\s+of|in\s+of|to\s+of|of\s+to|'
+    r'with\s+of|from\s+to\s+to|at\s+to|in\s+to|of\s+at|from\s+of|'
+    r'as\s+of|on\s+it\s+marks|designated\s+as\s+of|known\s+as\s+of)\b',
+    re.IGNORECASE
+)
+_DEGRADE_GUARD_SENTENCE_ENDING_FUNC = re.compile(
+    r'\b(a|an|the|of|in|at|to|with|from|and)\.$'
+)
+_DEGRADE_GUARD_EMPTY_APPOSITIVE = re.compile(r',\s*[,.]')
+_DEGRADE_GUARD_DOUBLE_SPACE = re.compile(r'  ')
+_DEGRADE_GUARD_ORPHAN_HYPHEN = re.compile(r'\b[A-Z][a-zà-ÿ]+-\s')  # "Pierre- " with no continuation
+_DEGRADE_GUARD_ORPHAN_ADJECTIVE = re.compile(
+    r'\bthe\s+nearby\s+(?:forms|has|is|was|were|are|had|have)\b', re.IGNORECASE
+)  # "the nearby forms" — adjective without noun object
+# [2026-09-23, LOCAL-530] "They authorized of Public Works to lease this land" —
+# the tour said "the Department of Public Works", and this gate excised the head
+# noun "Department" as an unglossed reference, leaving the verb "authorized"
+# abutting "of" with its object gone. The seven guards above passed it, exactly as
+# LOCAL-475 defect C passed a subjectless sentence: dropping a word from the middle
+# of a sentence is precisely the operation this gate performs. The signature is a
+# transitive verb that governs a direct OBJECT ("authorized [a body]") welded onto
+# "of" — restricted to verbs of official action on an institution so it never fires
+# on the legitimate "-ed of" idioms (comprised/composed/consisted/deprived/accused/
+# approved of). Fail-safe: when this fires the degraded sentence is judged
+# ill-formed and dropped whole, which is better than voicing broken syntax to TTS.
+_DEGRADE_GUARD_OBJECT_DROPPED = re.compile(
+    r'\b(?:authoriz|authorised|engag|establish|appoint|commission|task|direct|'
+    r'instruct|order|permit|enabl|allow|assign|designat|elect|nominat|'
+    r'compel|urg|request|requir|forbid|forbad|prohibit|mandat)'
+    r'(?:ed|es|e)?\s+of\s+[A-Z]'
+)
+
+
+_DEGRADE_OPENER = re.compile(
+    r'^\s*(?:In|On|During|By|After|Before|Since|Around|Throughout|At)\b',
+    re.IGNORECASE)
+
+# Verbs that need a subject in front of them. If the clause after the first comma
+# opens with one of these and nothing before the comma could be that subject, the
+# subject has been deleted.
+_DEGRADE_ORPHAN_VERB = re.compile(
+    r'^\s*(?:created|published|printed|produced|made|designed|wrote|painted|'
+    r'illustrated|commissioned|founded|established|donated|gave|built|'
+    r'completed|began|started|collaborated|worked|met)\b', re.IGNORECASE)
+
+
+def _degrade_has_lost_its_subject(sentence: str) -> bool:
+    """[LOCAL-475] Did degrading delete the sentence's subject?
+
+    The delivered tour contained
+
+        "In 1971 known for his distinct surrealist imagery, created
+         'Le Lézard aux plumes d'or,' an illustrated book."
+
+    because the gate dropped "Joan Miró" from between "1971" and "known". Seven
+    guards passed it. The signature is specific and cheap to test for: the
+    sentence opens with a temporal or prepositional phrase, the clause after the
+    first comma starts with a bare past-tense verb, and there is no capitalised
+    word before that comma that could be the subject.
+    """
+    s = (sentence or '').strip()
+    if ',' not in s:
+        return False
+    head, _, tail = s.partition(',')
+
+    # [LOCAL-492] Both halves of this test used to be WORD LISTS, and the
+    # 2026-08-19 01:01 tour shipped
+    #
+    #   "Later recognizing the value of this collaboration, gifted the piece to
+    #    the Museum of Fine Arts, Boston."
+    #
+    # after the gate dropped "Boris Fridman". Neither list matched: `Later` was
+    # not among the ten openers, `gifted` not among the twenty-one verbs. Adding
+    # two words would fix this sentence and not the next one — D476's lesson,
+    # that patterns are enumerable and the model's phrasings are not.
+    #
+    # Both are now structural:
+    #   opener — the head is adverbial/participial if it contains no candidate
+    #            subject at all, which is the thing actually being tested;
+    #   verb   — a past-tense verb is one ending in -ed, plus the short closed
+    #            set of irregulars that cannot be recognised by shape.
+    if not _tail_starts_with_past_verb(tail):
+        return False
+
+    # A head that OPENS with a determiner is a noun phrase, and therefore has a
+    # subject even when that subject is lowercase: "The edition, printed on
+    # vellum, runs to eighty copies" is well-formed. Without this the guard
+    # deletes ordinary sentences, which is worse than the defect it prevents —
+    # every gate in this chain is one over-eager rule away from being the thing
+    # that damages the tour (D475).
+    tokens = head.split()
+    if tokens and _DEGRADE_DETERMINER.match(tokens[0]):
+        return False
+    # Otherwise a subject would be a capitalised token (a name) after the first
+    # word, or a personal/relative pronoun anywhere in the head.
+    #
+    # KNOWN MISS, left deliberately: a capitalised PLACE reads as a subject, so
+    #     "In 1938 while visiting London, sketched the portrait."
+    # is not caught. Separating people from places needs NER, and the alternative
+    # — a list of place names — is the enumeration this rewrite exists to escape.
+    # The miss fails SAFE: the guard declines to flag, so nothing is deleted and
+    # the sentence survives to the later validators. A false positive here would
+    # delete a well-formed sentence, which is the more expensive error.
+    if any(t[:1].isupper() for t in tokens[1:] if t[:1].isalpha()):
+        return False
+    if _DEGRADE_SUBJECT_PRONOUN.search(head):
+        return False
+    return True
+
+
+_DEGRADE_DETERMINER = re.compile(
+    r'^(?:the|a|an|this|that|these|those|its|his|her|their|our|your|my|'
+    r'each|every|both|several|many|few|some|any|no)$', re.IGNORECASE)
+
+
+# Irregular past tenses that do not end in -ed. Deliberately short: the -ed test
+# below carries the general case, and this exists only for shapes it cannot see.
+_IRREGULAR_PAST = frozenset({
+    'gave', 'made', 'wrote', 'began', 'built', 'met', 'sold', 'bought', 'sent',
+    'left', 'took', 'brought', 'became', 'won', 'lost', 'held', 'kept', 'led',
+    'ran', 'saw', 'sat', 'set', 'put', 'paid', 'told', 'taught', 'sought',
+    'chose', 'drew', 'came', 'went', 'grew', 'knew', 'threw', 'spent', 'lent',
+})
+
+_DEGRADE_SUBJECT_PRONOUN = re.compile(
+    r'\b(?:he|she|they|it|who|which|i|we|you)\b', re.IGNORECASE)
+
+
+def _tail_starts_with_past_verb(tail: str) -> bool:
+    """Does the clause after the comma open with a bare past-tense verb?
+
+    Shape-based (-ed) plus a closed irregular set, rather than a list of the
+    verbs we happen to have seen. `-ed` also matches adjectives ("tired"), which
+    is acceptable here: this test only fires once the head has been shown to
+    contain no subject at all, and a subjectless clause opening with an adjective
+    is equally broken.
+    """
+    words = (tail or '').strip().split()
+    if not words:
+        return False
+    first = re.sub(r'[^A-Za-z]', '', words[0]).lower()
+    if len(first) < 3:
+        return False
+    return first.endswith('ed') or first in _IRREGULAR_PAST
+
+
+def _degrade_sentence_is_wellformed(sentence: str) -> bool:
+    """Check that a degraded sentence passes all five degrade guards.
+
+    Returns True if well-formed, False if any guard fires.
+    """
+    if len(sentence.strip()) < 15:
+        return False
+    if _degrade_has_lost_its_subject(sentence):   # [LOCAL-475]
+        return False
+    if _DEGRADE_GUARD_BARE_POSSESSIVE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_STACKED_PREPS.search(sentence):
+        return False
+    if _DEGRADE_GUARD_SENTENCE_ENDING_FUNC.search(sentence):
+        return False
+    if _DEGRADE_GUARD_EMPTY_APPOSITIVE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_DOUBLE_SPACE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_ORPHAN_HYPHEN.search(sentence):
+        return False
+    if _DEGRADE_GUARD_ORPHAN_ADJECTIVE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_OBJECT_DROPPED.search(sentence):   # [LOCAL-530]
+        return False
+    return True
+
+
+def validate_degrade_output(full_text: str) -> List[Dict]:
+    """Run all five degrade guards over the FULL assembled tour text.
+
+    LOCAL-289: Guards run on every sentence, not just the one modified.
+    Returns list of violations (empty = clean).
+
+    Each violation: {sentence, guard, pattern_matched}
+    """
+    violations = []
+    sentences = _split_sentences(full_text)
+
+    for sent in sentences:
+        sent_stripped = sent.strip()
+        if not sent_stripped:
+            continue
+
+        # Guard 1: Bare possessive — "'s" with no preceding word
+        if _DEGRADE_GUARD_BARE_POSSESSIVE.search(sent_stripped):
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'bare_possessive',
+                'pattern_matched': _DEGRADE_GUARD_BARE_POSSESSIVE.search(sent_stripped).group(),
+            })
+
+        # Guard 2: Stacked prepositions
+        m = _DEGRADE_GUARD_STACKED_PREPS.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'stacked_prepositions',
+                'pattern_matched': m.group(),
+            })
+
+        # Guard 3: Sentence ending in article/preposition
+        if _DEGRADE_GUARD_SENTENCE_ENDING_FUNC.search(sent_stripped):
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'sentence_ending_function_word',
+                'pattern_matched': _DEGRADE_GUARD_SENTENCE_ENDING_FUNC.search(sent_stripped).group(),
+            })
+
+        # Guard 4: Empty appositive
+        if _DEGRADE_GUARD_EMPTY_APPOSITIVE.search(sent_stripped):
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'empty_appositive',
+                'pattern_matched': _DEGRADE_GUARD_EMPTY_APPOSITIVE.search(sent_stripped).group(),
+            })
+
+        # Guard 6: Orphan hyphen (e.g., "Pierre- envisioned")
+        m = _DEGRADE_GUARD_ORPHAN_HYPHEN.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'orphan_hyphen',
+                'pattern_matched': m.group(),
+            })
+
+        # Guard 7: Object dropped — transitive verb welded onto "of" [LOCAL-530]
+        m = _DEGRADE_GUARD_OBJECT_DROPPED.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'object_dropped',
+                'pattern_matched': m.group(),
+            })
+
+    # Guard 5: Double space (check full text, not per-sentence)
+    for m in _DEGRADE_GUARD_DOUBLE_SPACE.finditer(full_text):
+        # Get surrounding context
+        start = max(0, m.start() - 30)
+        end = min(len(full_text), m.end() + 30)
+        violations.append({
+            'sentence': full_text[start:end],
+            'guard': 'double_space',
+            'pattern_matched': '  ',
+        })
+
+    return violations
+
+
+def validate_and_repair_full_text(full_text: str) -> Tuple[str, List[Dict]]:
+    """Run degrade guards over full text and DROP sentences that fail.
+
+    LOCAL-289: This is the final safety net. Any sentence with a guard violation
+    is removed from the text entirely. This catches violations from ALL sources,
+    not just the current degrade pass.
+
+    Returns (repaired_text, dropped_sentences_log).
+    """
+    dropped = []
+    sentences = _split_sentences(full_text)
+
+    for sent in sentences:
+        sent_stripped = sent.strip()
+        if not sent_stripped or len(sent_stripped) < 10:
+            continue
+
+        if not _degrade_sentence_is_wellformed(sent_stripped):
+            # Drop this sentence
+            full_text = _drop_sentence_from_text(full_text, sent_stripped)
+            dropped.append({
+                'sentence': sent_stripped[:200],
+                'reason': 'degrade_guard_violation',
+            })
+
+    return full_text, dropped
+
+
+def apply_glosses_to_text(text: str, glossed_refs: List[Dict]) -> Tuple[str, List[Dict]]:
+    """Apply composed glosses to the tour text with mechanical guard validation.
+
+    LOCAL-287: Every gloss is validated against the 5 mechanical guards AFTER
+    insertion. If any guard fails, the gloss is rejected and the name is dropped
+    (or left unchanged if dropping would damage the sentence).
+
+    Returns:
+        (modified_text, guard_failures_log)
+    """
+    if not glossed_refs:
+        return text, []
+
+    guard_failures = []
+
+    for ref in glossed_refs:
+        if ref.get('triage') == 'known_enough':
+            continue
+        if ref.get('stage') == 'suppressed':
+            continue
+
+        entity = ref['entity']
+        original_sent = ref['sentence']
+
+        if ref.get('stage') == 'degrade' or not ref.get('gloss'):
+            # [LOCAL-494] A name the museum's own record documents is never
+            # deleted. Unexplained is a lesser failure than absent: the donor's
+            # act is why the object is in the room, so degrading them removes
+            # the "because" along with the name. Leave the sentence intact.
+            if ref.get('provenance'):
+                ref['stage'] = 'provenance_kept'
+                continue
+            # Degrade: remove the name
+            text = _degrade_reference_in_text(text, entity, original_sent)
+            continue
+
+        gloss = ref['gloss']
+
+        # Compose the new sentence
+        new_sent = _insert_composed_gloss(original_sent, entity, gloss)
+
+        # Validate with mechanical guards
+        # Guard 2 (doubled name) uses new_sent to check the result
+        # Guard 5 (host_duplication) uses original_sent to avoid circular match
+        passed, failure_reason = validate_gloss(gloss, original_sent, entity)
+        if passed:
+            # Also check guard 2 on the composed result
+            if not _guard_doubled_name(new_sent, entity):
+                passed = False
+                failure_reason = "doubled_name"
+
+        if not passed:
+            # Guard failed — fall back to dropping the name
+            guard_failures.append({
+                'entity': entity,
+                'gloss': gloss,
+                'reason': failure_reason,
+            })
+            # [LOCAL-494] ...unless the record itself names them. A malformed
+            # gloss is a reason to drop the GLOSS, not the person.
+            if ref.get('provenance'):
+                ref['stage'] = 'provenance_kept'
+                ref['guard_failure'] = failure_reason
+                continue
+            text = _degrade_reference_in_text(text, entity, original_sent)
+            ref['stage'] = 'guard_failed'
+            ref['guard_failure'] = failure_reason
+        else:
+            # Guard passed — apply the gloss
+            if original_sent in text:
+                text = text.replace(original_sent, new_sent, 1)
+
+    return text, guard_failures
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN GATE — apply to a stop description
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def apply_unglossed_reference_gate(
+    description: str,
+    corpus_passages: List[str] = None,
+    api_key: str = None,
+    model: str = None,
+    stop_names: List[str] = None,
+    exempt: List[str] = None,
+    stop_record: Dict = None,
+    stop_name: str = None,
+) -> Tuple[str, Dict]:
+    """Apply the unglossed-reference gate to a stop description.
+
+    Four stages: detect → triage → supply fact → compose gloss → apply.
+
+    LOCAL-287: Stage 4 now COMPOSES glosses via LLM rather than splicing raw text.
+    Mechanical guards validate the output and fall back to dropping the name.
+
+    Args:
+        description: the stop's description text
+        corpus_passages: the stop's corpus passages
+        api_key: OpenAI API key (required for triage + gloss)
+        model: LLM model
+        stop_names: names of all stops in this tour (excluded from flagging)
+
+    Returns:
+        (new_description, stats_dict)
+    """
+    stats = {
+        'references_detected': 0,
+        'references_glossed': 0,
+        'references_degraded': 0,
+        'references_suppressed': 0,
+        'references_known': 0,
+        'references_guard_failed': 0,
+        'references_provenance': 0,   # [LOCAL-494] glossed from the stop record
+        'references_provenance_kept': 0,  # named but unexplained — never deleted
+        'references_dependants_cut': 0,   # [LOCAL-479] orphaned dependants removed
+        'triage_tokens': 0,
+        'triage_cost': 0.0,
+        'triage_latency': 0.0,
+        'gloss_tokens': 0,
+        'gloss_cost': 0.0,
+        'gloss_latency': 0.0,
+        'compose_tokens': 0,
+        'compose_cost': 0.0,
+        'compose_latency': 0.0,
+        'glossed_list': [],  # For reporting
+        'guard_failures': [],
+    }
+
+    if not description or not description.strip():
+        return description, stats
+
+    # Stage 1: Detect
+    refs = detect_unglossed_references(description, stop_names=stop_names,
+                                       exempt=exempt)
+    stats['references_detected'] = len(refs)
+
+    if not refs:
+        return description, stats
+
+    if not api_key:
+        # No API key — cannot triage or gloss, return as-is
+        return description, stats
+
+    # Stage 2: Triage
+    refs, triage_tokens, triage_cost, triage_latency = triage_references(
+        refs, api_key, model
+    )
+    stats['triage_tokens'] = triage_tokens
+    stats['triage_cost'] = triage_cost
+    stats['triage_latency'] = triage_latency
+
+    # Filter to only those needing gloss
+    needs_gloss = [r for r in refs if r.get('triage') in ('gloss_needed', 'load_bearing')]
+    known = [r for r in refs if r.get('triage') == 'known_enough']
+    stats['references_known'] = len(known)
+
+    if not needs_gloss:
+        return description, stats
+
+    # [LOCAL-494] Stage 2b: glosses that need no search, because the stop's own
+    # record already states the role. Boris Fridman was degraded out of the
+    # 2026-08-19 release tour after a corpus search and a model call both failed
+    # to find him — while `credit_line='Gift of Boris Fridman'` sat in the stop
+    # record the whole time. The museum's record is not a claim awaiting
+    # verification; it IS the verification.
+    #
+    # Runs BEFORE stages 3 and 4, so a provenance name costs nothing and cannot
+    # be degraded by a failed lookup. `provenance` also survives onto the ref as
+    # the never-delete marker read by apply_glosses_to_text.
+    if stop_record:
+        try:
+            from provenance_gloss import provenance_gloss_for
+            for ref in needs_gloss:
+                p_gloss = provenance_gloss_for(ref['entity'], stop_record)
+                if p_gloss:
+                    ref['gloss'] = p_gloss
+                    ref['raw_fact'] = p_gloss
+                    ref['gloss_source'] = 'provenance'
+                    ref['stage'] = 'provenance'
+                    ref['provenance'] = True
+                    stats['references_provenance'] += 1
+        except Exception as _prov_err:  # never fatal — the old path still works
+            print(f"    [LOCAL-494] provenance gloss unavailable "
+                  f"(non-fatal): {_prov_err}")
+
+    # Only entities with no documented role still need the paid lookup.
+    needs_gloss = [r for r in needs_gloss if not r.get('provenance')]
+    if not needs_gloss:
+        new_description, guard_failures = apply_glosses_to_text(description, refs)
+        stats['guard_failures'] = guard_failures
+        new_description, dropped = validate_and_repair_full_text(new_description)
+        stats['sentences_dropped_by_guard'] = len(dropped)
+        stats['dropped_sentences'] = dropped
+        for ref in refs:
+            if ref.get('provenance'):
+                stats['references_glossed'] += 1
+                stats['glossed_list'].append({
+                    'entity': ref['entity'], 'gloss': ref.get('gloss', ''),
+                    'source': 'provenance', 'stage': ref.get('stage', 'provenance'),
+                })
+        return new_description, stats
+
+    # Stage 3: Supply facts (corpus or model)
+    refs, gloss_tokens, gloss_cost, gloss_latency = supply_glosses(
+        refs, corpus_passages or [], api_key, model
+    )
+    stats['gloss_tokens'] = gloss_tokens
+    stats['gloss_cost'] = gloss_cost
+    stats['gloss_latency'] = gloss_latency
+
+    # Stage 4: Compose glosses as proper appositive clauses (D194 fix)
+    refs, compose_tokens, compose_cost, compose_latency = compose_glosses(
+        refs, api_key, model
+    )
+    stats['compose_tokens'] = compose_tokens
+    stats['compose_cost'] = compose_cost
+    stats['compose_latency'] = compose_latency
+
+    # Apply composed glosses with guard validation
+    new_description, guard_failures = apply_glosses_to_text(description, refs)
+    stats['guard_failures'] = guard_failures
+
+    # LOCAL-289: Run degrade guards over the FULL assembled text as final safety net.
+    # Any sentence with a violation is dropped entirely.
+    new_description, dropped_sentences = validate_and_repair_full_text(new_description)
+    stats['sentences_dropped_by_guard'] = len(dropped_sentences)
+    stats['dropped_sentences'] = dropped_sentences
+
+    # [LOCAL-479] PART 2: cut the dependants with the introduction. Every
+    # sentence the gate has just removed (degraded to nothing, or dropped by a
+    # guard) may have introduced a person or event that a LATER sentence refers
+    # back to with a definite reference. Those later sentences are now orphaned
+    # and must fall with the introduction — otherwise the gate manufactures the
+    # exact orphan it exists to prevent (tour 423 stop 4, four orphans / 217 words).
+    _removed = _sentences_removed(description, new_description)
+    if _removed:
+        new_description, _cascaded = cut_orphaned_dependants(new_description, _removed)
+        stats['dependants_cut'] = _cascaded
+        stats['references_dependants_cut'] = len(_cascaded)
+        for _c in _cascaded:
+            _sr = _subject_reference(_c) or {}
+            if _sr.get('name'):
+                _ent = _sr['name']
+            elif _sr.get('heads'):
+                _ent = '/'.join(sorted(_sr['heads']))
+            else:
+                _ent = _c[:40]
+            print(f"  [LOCAL-479] stop='{(stop_name or '?')[:40]}' cut orphaned "
+                  f"dependant of a removed introduction — subject '{_ent}': "
+                  f"\"{_c[:80]}\"")
+
+    # Count results
+    for ref in refs:
+        if ref.get('triage') == 'known_enough':
+            continue
+        if ref.get('stage') == 'suppressed':
+            stats['references_suppressed'] += 1
+            stats['glossed_list'].append({
+                'entity': ref['entity'],
+                'action': 'suppressed',
+                'reason': 'host sentence already explains',
+            })
+        elif ref.get('stage') == 'guard_failed':
+            stats['references_guard_failed'] += 1
+            stats['references_degraded'] += 1
+            stats['glossed_list'].append({
+                'entity': ref['entity'],
+                'action': 'guard_failed',
+                'gloss_attempted': ref.get('gloss', ''),
+                'reason': ref.get('guard_failure', ''),
+            })
+        elif ref.get('stage') == 'provenance_kept':
+            # [LOCAL-494] Named in the record, no usable gloss — kept anyway.
+            # Counted separately from 'glossed' so the log never claims an
+            # explanation that is not in the text.
+            stats['references_provenance_kept'] += 1
+            stats['glossed_list'].append({
+                'entity': ref['entity'],
+                'action': 'kept_unglossed',
+                'reason': ref.get('guard_failure', 'no usable gloss'),
+                'source': 'provenance',
+            })
+        elif ref.get('stage') == 'degrade':
+            stats['references_degraded'] += 1
+            stats['glossed_list'].append({
+                'entity': ref['entity'],
+                'action': 'degraded',
+                'source': 'degrade',
+            })
+        elif ref.get('gloss'):
+            stats['references_glossed'] += 1
+            stats['glossed_list'].append({
+                'entity': ref['entity'],
+                'gloss': ref['gloss'],
+                'source': ref.get('gloss_source', 'unknown'),
+                'stage': ref.get('stage', 'unknown'),
+            })
+
+    return new_description, stats
+
+
+def _venue_fragments(venue_name: str) -> List[str]:
+    """[LOCAL-496] The venue's own name, and the pieces of it a detector can see.
+
+    "Fine Arts" was DEGRADED out of "The Museum of Fine Arts, Boston" on the
+    2026-08-19 11:51 run, and that one deletion cost the tour a whole sentence
+    and its donor — see the cascade documented on `apply_gate_to_stop_descriptions`.
+    `_PROPER_SPAN`-style detection sees the internal capitalised span, so the
+    exemption has to cover the fragments, not only the full string.
+    """
+    if not venue_name or not isinstance(venue_name, str):
+        return []
+    out = {venue_name.strip()}
+    # Drop a trailing city ("..., Boston, MA") and re-offer the head.
+    head = re.split(r'\s*,\s*', venue_name.strip())[0]
+    if head:
+        out.add(head)
+    # Internal capitalised spans: "Museum of Fine Arts" -> "Fine Arts", "Museum".
+    for m in re.finditer(r'\b([A-ZÀ-ÖØ-Þ][\wÀ-ÿ]+(?:\s+[A-ZÀ-ÖØ-Þ][\wÀ-ÿ]+)*)', venue_name):
+        span = m.group(1).strip()
+        if len(span) >= 4:
+            out.add(span)
+    return [o for o in out if o]
+
+
+def apply_gate_to_stop_descriptions(
+    poi_list: List[Dict],
+    stop_corpus_data: Dict = None,
+    api_key: str = None,
+    model: str = None,
+    venue_name: str = None,
+) -> Dict:
+    """Apply the unglossed-reference gate to all stops in a tour.
+
+    [LOCAL-496] `venue_name` exists because of a two-gate cascade measured on the
+    2026-08-19 11:51 run, which is how Michael's Fridman objection survived the
+    LOCAL-494 fix:
+
+      :454  this gate degraded "Fine Arts" — a FRAGMENT OF THE VENUE'S OWN NAME —
+            turning "The Museum of Fine Arts, Boston" into "The Museum Boston"
+      :476  LOCAL-479's organisation grounding gate then looked for an
+            organisation called "The Museum Boston", found it nowhere in the
+            corpus (it exists nowhere on earth), declared it ungrounded and
+            DROPPED THE WHOLE SENTENCE — which was
+            "...proudly hosts this piece, thanks to the generosity of Boris
+            Fridman, who donated..."
+      :537  the LOCAL-476 retry then FORBADE that relationship, so the
+            regeneration could not put him back either.
+
+    One wrong deletion, three gates deep, and the donor is gone from the stop
+    permanently. The second and third gates behaved correctly on the input they
+    were given; the defect is entirely at :454. Same class as LOCAL-475 (the
+    stop's own artist) and LOCAL-494 (the documented donor): **the gate deleting
+    something that is the subject or the setting, not an incidental reference.**
+
+    Args:
+        poi_list: list of POI dicts with 'description' and 'name' keys
+        stop_corpus_data: dict mapping stop_name → {passages: [...]}
+        api_key: OpenAI API key
+        model: LLM model
+        venue_name: the tour's venue, exempted along with its fragments
+
+    Returns:
+        Summary dict with per-stop and total stats.
+    """
+    _venue_exempt = _venue_fragments(venue_name)
+    total_stats = {
+        'total_detected': 0,
+        'total_glossed': 0,
+        'total_degraded': 0,
+        'total_suppressed': 0,
+        'total_known': 0,
+        'total_guard_failed': 0,
+        'total_sentences_dropped': 0,
+        'triage_tokens': 0,
+        'triage_cost': 0.0,
+        'triage_latency': 0.0,
+        'gloss_tokens': 0,
+        'gloss_cost': 0.0,
+        'gloss_latency': 0.0,
+        'compose_tokens': 0,
+        'compose_cost': 0.0,
+        'compose_latency': 0.0,
+        'total_cost': 0.0,
+        'total_tokens': 0,
+        'total_latency': 0.0,
+        'stops_affected': 0,
+        'all_glosses': [],
+        'guard_failures': [],
+        'dropped_sentences': [],
+        'per_stop': [],
+    }
+
+    # Collect all stop names for exclusion
+    all_stop_names = [poi.get('name', '') for poi in poi_list if poi.get('name')]
+
+    for si, poi in enumerate(poi_list):
+        desc = poi.get('description', '')
+        if not desc or desc.startswith('['):
+            continue
+
+        stop_name = poi.get('name', f'Stop {si + 1}')
+
+        # Get corpus passages
+        passages = []
+        if stop_corpus_data and stop_name in stop_corpus_data:
+            sc_entry = stop_corpus_data[stop_name]
+            if sc_entry and sc_entry.get('passages'):
+                passages = sc_entry['passages']
+
+        # [LOCAL-475] The stop's own artist (and any collaborator named on the
+        # stop record) is the subject of the stop, not an incidental reference.
+        # Miró was DEGRADED out of a sentence about his own book on the
+        # 2026-08-18 release run, leaving "In 1971 known for his distinct
+        # surrealist imagery, created ...".
+        _exempt = [poi.get(f) for f in ('artist', 'collaborator', 'writer')
+                   if poi.get(f)]
+        # [LOCAL-496] ...and the venue itself. The listener is standing in it.
+        _exempt += _venue_exempt
+        new_desc, stats = apply_unglossed_reference_gate(
+            desc, corpus_passages=passages, api_key=api_key, model=model,
+            stop_names=all_stop_names, exempt=_exempt,
+            # [LOCAL-494] the stop's own record — credit_line, publisher,
+            # printed_by — so a documented donor is glossed from provenance
+            # instead of being degraded when the open web has never heard of
+            # them, which is the normal case for a private collector.
+            stop_record=poi,
+            stop_name=stop_name,
+        )
+
+        if (stats['references_glossed'] > 0 or stats['references_degraded'] > 0
+                or stats.get('references_dependants_cut', 0) > 0):
+            poi_list[si]['description'] = new_desc
+            total_stats['stops_affected'] += 1
+
+        total_stats['total_detected'] += stats['references_detected']
+        total_stats['total_glossed'] += stats['references_glossed']
+        total_stats['total_degraded'] += stats['references_degraded']
+        total_stats['total_suppressed'] += stats['references_suppressed']
+        total_stats['total_known'] += stats['references_known']
+        total_stats['total_guard_failed'] += stats['references_guard_failed']
+        total_stats['triage_tokens'] += stats['triage_tokens']
+        total_stats['triage_cost'] += stats['triage_cost']
+        total_stats['triage_latency'] += stats['triage_latency']
+        total_stats['gloss_tokens'] += stats['gloss_tokens']
+        total_stats['gloss_cost'] += stats['gloss_cost']
+        total_stats['gloss_latency'] += stats['gloss_latency']
+        total_stats['compose_tokens'] += stats['compose_tokens']
+        total_stats['compose_cost'] += stats['compose_cost']
+        total_stats['compose_latency'] += stats['compose_latency']
+        total_stats['all_glosses'].extend(stats['glossed_list'])
+        total_stats['guard_failures'].extend(stats['guard_failures'])
+        total_stats['total_sentences_dropped'] += stats.get('sentences_dropped_by_guard', 0)
+        total_stats['dropped_sentences'].extend(stats.get('dropped_sentences', []))
+
+        total_stats['per_stop'].append({
+            'stop_name': stop_name,
+            'detected': stats['references_detected'],
+            'glossed': stats['references_glossed'],
+            'degraded': stats['references_degraded'],
+            'suppressed': stats['references_suppressed'],
+            'known': stats['references_known'],
+            'guard_failed': stats['references_guard_failed'],
+        })
+
+    total_stats['total_cost'] = (total_stats['triage_cost'] +
+                                  total_stats['gloss_cost'] +
+                                  total_stats['compose_cost'])
+    total_stats['total_tokens'] = (total_stats['triage_tokens'] +
+                                    total_stats['gloss_tokens'] +
+                                    total_stats['compose_tokens'])
+    total_stats['total_latency'] = (total_stats['triage_latency'] +
+                                     total_stats['gloss_latency'] +
+                                     total_stats['compose_latency'])
+
+    return total_stats
+
+
+# ── A pronoun whose person lives at another stop ────────────────────────────
+# The kiro critic on a 6-stop church tour, 2026-09-23:
+#
+#   "She was there for a final vows ceremony for the sisters of the Missionaries
+#    of Charity."   — Stop 6, Narthex
+#
+# No "she" is introduced anywhere in that stop. The antecedent is Mother Teresa,
+# named at Stop 3. Each stop is heard on its own, minutes apart and standing
+# somewhere else, so a pronoun reaching back to another stop reaches nothing.
+#
+# LOCAL-479 cuts a dependant whose introduction was REMOVED. This is the sibling
+# case: the introduction was never removed, it is simply in a different stop.
+
+_LEAD_PRONOUN = re.compile(
+    r'^\s*(?:And\s+|But\s+|Then\s+)?(He|She|They|His|Her|Their|Him)\b')
+_PERSON_NEAR = re.compile(r'\b(?:Mr|Mrs|Ms|Dr|Fr|Rev|Father|Cardinal|Mother|Sister|'
+                          r'Saint|Pope|Bishop|Archbishop|Governor|Mayor|Captain)\.?\s+'
+                          r'[A-Z][\w\'’-]+|\b[A-Z][\w\'’-]+\s+[A-Z][\w\'’-]+\b')
+
+
+def cut_orphaned_pronouns(text):
+    """Drop a sentence opening on a pronoun with no person named before it here.
+
+    Returns (clean_text, removed). Conservative: only the sentence-initial case,
+    and only when NO person is named earlier in this stop's own text.
+    """
+    sents = _ss_split(text or '')
+    out, removed, seen_person = [], [], False
+    for s in sents:
+        if _PERSON_NEAR.search(s):
+            out.append(s)
+            seen_person = True
+            continue
+        if not seen_person and _LEAD_PRONOUN.match(s):
+            removed.append(s)
+            continue
+        out.append(s)
+    return ' '.join(out).strip(), removed

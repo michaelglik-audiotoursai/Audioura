@@ -8,12 +8,20 @@ import 'voice_methods.dart';
 import 'debug_log_viewer_screen.dart';
 import 'tour_map_screen.dart';
 import '../widgets/swipe_feedback_widget.dart';
+import '../config/endpoints.dart';
+import '../services/webview_console_logger.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
   final String tourTitle;
   final String? tourId;
   final String? jobId;
+  /// Stored track that produced this tour ('beta'|'storied'); null/unknown ⇒
+  /// Stable. Display-only; drives the provenance label. See wdvrdaxxmb.
+  final String? track;
+  /// Build number stored on the tour record; null when the tour predates the
+  /// field. Rendered as "(vNNN)" when present, omitted when absent.
+  final int? buildNumber;
 
   const TourPlayerScreen({
     super.key,
@@ -21,6 +29,8 @@ class TourPlayerScreen extends StatefulWidget {
     required this.tourTitle,
     this.tourId,
     this.jobId,
+    this.track,
+    this.buildNumber,
   });
 
   @override
@@ -30,6 +40,10 @@ class TourPlayerScreen extends StatefulWidget {
 class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   InAppWebViewController? _controller;
   int _currentStopIndex = 0;
+
+  // LOCAL-483: forward the tour player WebView's JS console into the debug log.
+  final WebViewConsoleLogger _consoleLogger =
+      WebViewConsoleLogger(source: 'tour-player');
 
   @override
   void initState() {
@@ -41,6 +55,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   @override
   void dispose() {
     disposeVoice();
+    _consoleLogger.flush();
     super.dispose();
   }
 
@@ -79,6 +94,10 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
         backgroundColor: const Color(0xFF2c3e50),
         foregroundColor: Colors.white,
         actions: [
+          // Track/release provenance is intentionally NOT shown here — a
+          // visible "Stable"/"Preview" mark confuses testers. Provenance is
+          // available on demand via the "Version" item in the ⋮ menu on the
+          // tour list. See wdvrdaxxmb.
           IconButton(
             icon: Icon(Icons.help_outline),
             onPressed: _showTourHelpDialog,
@@ -110,6 +129,9 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       allowsInlineMediaPlayback: true,
                       allowsAirPlayForMediaPlayback: true,
                     ),
+                    onConsoleMessage: (controller, consoleMessage) {
+                      _consoleLogger.onConsoleMessage(consoleMessage);
+                    },
                     onWebViewCreated: (InAppWebViewController controller) async {
                       _controller = controller;
                       webController = controller;
@@ -202,7 +224,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       } catch (e) {
                         await DebugLogHelper.addDebugLog('SWIPE: Failed to inject stop listener: $e');
                       }
-                
+
                       // Auto-start tour playback
                       await Future.delayed(Duration(milliseconds: 2000)); // Wait longer for page to fully load
                       try {

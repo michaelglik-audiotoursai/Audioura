@@ -56,14 +56,38 @@ class PracticalFactsResult:
 _HOURS_PATTERN = re.compile(
     r'(?:open|hours?|ouvert|ouverture)'
     r'[^.]{0,80}'
-    r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm|h)\s*[-–to]+\s*\d{1,2}(?::\d{2})?\s*(?:am|pm|h))',
+    r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm|h)?\s*[-–to,]+\s*\d{1,2}(?::\d{2})?\s*(?:am|pm|h)?)',
+    re.IGNORECASE
+)
+
+# [LOCAL-353] 24h colon format: "12:00-13:45" without am/pm/h suffix
+_HOURS_24H_PATTERN = re.compile(
+    r'(?:open|monday|tuesday|wednesday|thursday|friday|saturday|sunday|'
+    r'mo|tu|we|th|fr|sa|su)'
+    r'[^.]{0,80}'
+    r'\d{1,2}:\d{2}\s*[-–,]\s*\d{1,2}:\d{2}',
+    re.IGNORECASE
+)
+
+# [LOCAL-353] Payment patterns for dining stops
+_PAYMENT_PATTERN = re.compile(
+    r'(?:cash\s+only|card\s+(?:payments?\s+)?only|no\s+credit\s+cards?|'
+    r'accepts?\s+(?:only\s+)?cash)',
+    re.IGNORECASE
+)
+
+# [LOCAL-353] Reservation patterns for dining stops
+_RESERVATION_PATTERN = re.compile(
+    r'(?:reservations?\s+(?:required|recommended|accepted|not\s+(?:needed|required))|'
+    r'no\s+reservations?)',
     re.IGNORECASE
 )
 
 _CLOSED_DAY_PATTERN = re.compile(
     r'(?:'
     r'closed?\s+(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?|'
-    r'ferm[eé]\s+(?:le\s+)?(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)'
+    r'ferm[eé]\s+(?:le\s+)?(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)|'
+    r'(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s*[-–]\s*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))?\s+off'
     r')',
     re.IGNORECASE
 )
@@ -76,6 +100,13 @@ _ADMISSION_PATTERN = re.compile(
     r'(?:€|\$|£)\s*\d+(?:\.\d{2})?(?:\s*(?:per\s+person|adult|full\s+(?:price|rate)))?|'
     r'\d+\s*(?:€|EUR|dollars?)'
     r')',
+    re.IGNORECASE
+)
+
+# [LOCAL-354] Price band pattern: "An average dinner or lunch would cost under €50"
+_PRICE_BAND_PATTERN = re.compile(
+    r'(?:average\s+)?(?:dinner|lunch|meal)\s+(?:or\s+(?:dinner|lunch)\s+)?'
+    r'(?:would\s+)?cost\s+(?:under|less\s+than|about|around)\s*€\s*\d+',
     re.IGNORECASE
 )
 
@@ -138,9 +169,33 @@ def _parse_info_text_into_claims(info_text: str) -> List[PracticalClaim]:
                 claim_type='hours',
                 value=sentence,
             ))
+        # [LOCAL-353] 24h colon format: "Monday-Friday 12:00-13:45, 19:00-21:00"
+        elif _HOURS_24H_PATTERN.search(sentence):
+            claims.append(PracticalClaim(
+                claim_type='hours',
+                value=sentence,
+            ))
+        # [LOCAL-354] Price band claims: "An average dinner or lunch would cost under €50"
+        elif _PRICE_BAND_PATTERN.search(sentence):
+            claims.append(PracticalClaim(
+                claim_type='price_band',
+                value=sentence,
+            ))
         elif _ADMISSION_PATTERN.search(sentence):
             claims.append(PracticalClaim(
                 claim_type='admission',
+                value=sentence,
+            ))
+        # [LOCAL-353] Payment claims (cash only, etc.)
+        elif _PAYMENT_PATTERN.search(sentence):
+            claims.append(PracticalClaim(
+                claim_type='payment',
+                value=sentence,
+            ))
+        # [LOCAL-353] Reservation claims
+        elif _RESERVATION_PATTERN.search(sentence):
+            claims.append(PracticalClaim(
+                claim_type='reservation',
                 value=sentence,
             ))
         elif re.search(r'(?:free|gratuit)', sentence, re.IGNORECASE):
@@ -151,6 +206,12 @@ def _parse_info_text_into_claims(info_text: str) -> List[PracticalClaim]:
             ))
         # If a sentence contains hours-like text but wasn't caught above
         elif re.search(r'\d{1,2}(?:am|pm|h)', sentence, re.IGNORECASE):
+            claims.append(PracticalClaim(
+                claim_type='hours',
+                value=sentence,
+            ))
+        # [LOCAL-353] 24h colon times as standalone (e.g. "12:00-21:00")
+        elif re.search(r'\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}', sentence):
             claims.append(PracticalClaim(
                 claim_type='hours',
                 value=sentence,
@@ -183,6 +244,13 @@ def verify_claim_against_source(claim: PracticalClaim, source_text: str) -> bool
         return _verify_hours(claim_lower, source_lower)
     elif claim.claim_type == 'admission':
         return _verify_admission(claim_lower, source_lower)
+    elif claim.claim_type == 'payment':
+        return _verify_payment(claim_lower, source_lower)
+    elif claim.claim_type == 'reservation':
+        return _verify_reservation(claim_lower, source_lower)
+    # [LOCAL-354] Price band verification
+    elif claim.claim_type == 'price_band':
+        return _verify_price_band(claim_lower, source_lower)
     else:
         # Unknown claim type — cannot verify
         return False
@@ -211,11 +279,18 @@ def _verify_closed_day(claim_lower: str, source_lower: str) -> bool:
         'dimanche': 'sunday',
     }
 
+    # [LOCAL-353] Map full day names to OSM abbreviations
+    _day_to_abbr = {
+        'monday': 'mo', 'tuesday': 'tu', 'wednesday': 'we',
+        'thursday': 'th', 'friday': 'fr', 'saturday': 'sa', 'sunday': 'su',
+    }
+
     # The source must mention the same day in a closure context
     _other_lang = _day_map.get(day, '')
+    _day_abbr = _day_to_abbr.get(day, '')
 
-    # Check if source mentions this day + closed/fermé
-    _closure_indicators = ['ferm', 'closed', 'closure', 'relâche', 'repos', 'except']
+    # Check if source mentions this day + closed/fermé/off
+    _closure_indicators = ['ferm', 'closed', 'closure', 'relâche', 'repos', 'except', 'off']
     for indicator in _closure_indicators:
         if indicator in source_lower:
             # The source mentions closure — check if same day is referenced nearby
@@ -223,6 +298,10 @@ def _verify_closed_day(claim_lower: str, source_lower: str) -> bool:
             for m in re.finditer(re.escape(indicator), source_lower):
                 _window = source_lower[max(0, m.start()-100):m.end()+100]
                 if day in _window or _other_lang in _window:
+                    return True
+                # [LOCAL-353] Also check OSM abbreviation (e.g., "sa-su off")
+                # Must be word-bounded to avoid matching inside words (e.g. "mo" in "moins")
+                if _day_abbr and re.search(rf'(?<![a-z]){_day_abbr}(?![a-z])', _window):
                     return True
 
     return False
@@ -237,7 +316,11 @@ def _verify_hours(claim_lower: str, source_lower: str) -> bool:
     """
     # Extract times from the claim (e.g., "10am", "6pm", "10h", "17h")
     _times = re.findall(r'\d{1,2}(?::\d{2})?\s*(?:am|pm|h\d{0,2})', claim_lower)
-    if not _times:
+
+    # [LOCAL-353] Also extract 24h colon format times (e.g., "12:00", "19:00")
+    _times_24h = re.findall(r'\d{1,2}:\d{2}', claim_lower)
+
+    if not _times and not _times_24h:
         # Try "open daily" type claims
         if 'daily' in claim_lower or 'tous les jours' in claim_lower:
             return ('daily' in source_lower or 'tous les jours' in source_lower
@@ -246,6 +329,8 @@ def _verify_hours(claim_lower: str, source_lower: str) -> bool:
 
     # At least one time value from the claim must appear in the source
     verified_count = 0
+
+    # Check am/pm/h format times
     for time_str in _times:
         # Normalize: "10am" -> check for "10" near am/h/open context
         _num = re.search(r'\d{1,2}', time_str)
@@ -260,6 +345,11 @@ def _verify_hours(claim_lower: str, source_lower: str) -> bool:
             if _hour_contexts:
                 verified_count += 1
 
+    # [LOCAL-353] Check 24h colon format times (e.g., "12:00" in source)
+    for time_str in _times_24h:
+        if time_str in source_lower:
+            verified_count += 1
+
     # Require at least one time value to be verified
     return verified_count >= 1
 
@@ -273,8 +363,8 @@ def _verify_admission(claim_lower: str, source_lower: str) -> bool:
     """
     # "Free" claims
     if re.search(r'\bfree\b|gratuit|libre', claim_lower):
-        # Source must say free/gratuit/libre...
-        _has_free = bool(re.search(r'gratuit|libre|free', source_lower))
+        # Source must say free/gratuit/libre OR use OSM fee=no tag format...
+        _has_free = bool(re.search(r'gratuit|libre|free|fee\s*=\s*no', source_lower))
         if not _has_free:
             return False
         # ...BUT if the source also contains a specific GENERAL ENTRY price,
@@ -316,6 +406,100 @@ def _verify_admission(claim_lower: str, source_lower: str) -> bool:
         return False
 
     return False
+
+
+# [LOCAL-353] Payment verification
+def _verify_payment(claim_lower: str, source_lower: str) -> bool:
+    """Verify a payment claim against the source.
+
+    'Cash only' verifies if source contains payment:cash = yes AND
+    payment:credit_cards = no (or similar evidence of card rejection).
+    """
+    if 'cash only' in claim_lower or 'cash' in claim_lower:
+        # Source must have evidence of cash-only: payment:cash + no cards
+        has_cash_yes = ('payment:cash = yes' in source_lower or
+                        'cash = yes' in source_lower or
+                        'espèces' in source_lower)
+        has_no_cards = ('credit_cards = no' in source_lower or
+                        'debit_cards = no' in source_lower or
+                        'no credit' in source_lower or
+                        'pas de carte' in source_lower)
+        return has_cash_yes and has_no_cards
+
+    if 'card' in claim_lower and 'only' in claim_lower:
+        # Card only: source must show cash = no
+        return 'payment:cash = no' in source_lower or 'cash = no' in source_lower
+
+    return False
+
+
+# [LOCAL-353] Reservation verification
+def _verify_reservation(claim_lower: str, source_lower: str) -> bool:
+    """Verify a reservation claim against the source.
+
+    Checks if the source contains a matching reservation tag value.
+    """
+    if 'required' in claim_lower:
+        return 'reservation = required' in source_lower or 'reservation=required' in source_lower
+    if 'recommended' in claim_lower:
+        return 'reservation = recommended' in source_lower or 'reservation=recommended' in source_lower
+    if 'accepted' in claim_lower:
+        return ('reservation = yes' in source_lower or 'reservation=yes' in source_lower or
+                'reservation = accepted' in source_lower)
+    if 'no reservation' in claim_lower:
+        return 'reservation = no' in source_lower or 'reservation=no' in source_lower
+
+    return False
+
+
+# [LOCAL-354] Price band verification
+def _verify_price_band(claim_lower: str, source_lower: str) -> bool:
+    """Verify a price band claim against the guide source text.
+
+    The claim says "cost under €X". The source must contain:
+    1. A guide name (Le Fooding, Gault&Millau, Michelin)
+    2. A price range whose high end is BELOW the claimed threshold
+    3. The word "threshold" with the claimed amount (from our source_text_for_gate)
+
+    This prevents fabricated price claims from passing.
+    """
+    # Extract the threshold from the claim: "under €50" → 50
+    threshold_match = re.search(r'under\s*€\s*(\d+)', claim_lower)
+    if not threshold_match:
+        return False
+    claimed_threshold = int(threshold_match.group(1))
+
+    # Source must identify itself as a guide
+    has_guide_provenance = any(
+        guide in source_lower
+        for guide in ('le fooding', 'gault&millau', 'gault millau', 'michelin')
+    )
+    if not has_guide_provenance:
+        return False
+
+    # Source must contain a price range with numbers
+    # Look for "range: €X-Y" or "X to Y" or "€X-Y"
+    range_match = re.search(
+        r'(?:range|price|carte|indicative)[^€\d]{0,30}€?\s*(\d+)\s*[-–to]+\s*€?\s*(\d+)',
+        source_lower
+    )
+    if not range_match:
+        return False
+
+    source_high = float(range_match.group(2))
+
+    # The claimed threshold must be ABOVE the source's high end
+    # (conservative: "under €50" is valid if guide says high=43)
+    if claimed_threshold <= source_high:
+        return False
+
+    # Source must explicitly state this threshold
+    # (prevents someone from claiming "under €100" for a €43 restaurant)
+    threshold_in_source = f"threshold: under €{claimed_threshold}" in source_lower
+    if not threshold_in_source:
+        return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------

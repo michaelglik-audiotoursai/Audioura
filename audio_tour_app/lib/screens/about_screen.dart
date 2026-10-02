@@ -33,6 +33,7 @@ class _AboutScreenState extends State<AboutScreen> {
   final TextEditingController _apiKeyController = TextEditingController();
   String _currentServerIp = '192.168.0.218';
   String _serverMode = 'cloud';
+  String _cloudTrack = 'beta';
   bool _usePathPrefixes = false;
   String _selectedMode = 'Tours';
 
@@ -85,6 +86,7 @@ class _AboutScreenState extends State<AboutScreen> {
       // Load saved server IP and cloud settings
       final savedIp = prefs.getString('server_ip') ?? '192.168.0.218';
       final savedServerMode = prefs.getString('server_mode') ?? 'cloud';
+      final savedCloudTrack = prefs.getString('cloud_track') ?? 'beta';
       final savedCloudBaseUrl = prefs.getString('cloud_base_url') ?? '';
       final savedUsePathPrefixes = prefs.getBool('cloud_use_path_prefixes') ?? false;
       final savedApiKey = prefs.getString('gateway_api_key') ?? '';
@@ -122,6 +124,7 @@ class _AboutScreenState extends State<AboutScreen> {
         _currentServerIp = savedIp;
         _serverIpController.text = savedIp;
         _serverMode = savedServerMode;
+        _cloudTrack = savedCloudTrack;
         _cloudBaseUrlController.text = savedCloudBaseUrl;
         _usePathPrefixes = savedUsePathPrefixes;
         _apiKeyController.text = savedApiKey;
@@ -189,8 +192,10 @@ class _AboutScreenState extends State<AboutScreen> {
                     ],
                   ),
                   const SizedBox(height: 15),
-                  _buildInfoRow('Version', _appVersion),
-                  _buildInfoRow('Build', _buildNumber),
+                  // Version/Build intentionally NOT shown on-screen (Michael
+                  // 2026-09-01). They are recorded in the debug log instead —
+                  // see _syncUserToDatabase (DB test) which logs app + services
+                  // versions alongside the connection result.
                   _buildInfoRow('User ID', _userId),
                   const SizedBox(height: 10),
                   // Server mode toggle
@@ -245,11 +250,38 @@ class _AboutScreenState extends State<AboutScreen> {
                     ],
                   ),
                   // Cloud mode — no fields needed (values baked in via --dart-define)
-                  if (_serverMode == 'cloud') const Padding(
-                    padding: EdgeInsets.only(top: 8),
+                  // Labels are Stable/Preview (Michael 2026-09-01); the pref
+                  // value stays 'beta'/'storied' (DB/API contract, backward compat).
+                  if (_serverMode == 'cloud') Padding(
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '✅ Cloud mode active — connected to api.audioura.com',
-                      style: TextStyle(fontSize: 12, color: Colors.green),
+                      _cloudTrack == 'storied'
+                          ? '✅ Cloud mode active — connected to Preview'
+                          : '✅ Cloud mode active — connected to Stable',
+                      style: TextStyle(fontSize: 12, color: _cloudTrack == 'storied' ? Colors.purple : Colors.green),
+                    ),
+                  ),
+                  // Stable vs Preview comparison track — cloud mode only.
+                  if (_serverMode == 'cloud') Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      children: [
+                        const Text('Track:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(width: 10),
+                        ChoiceChip(
+                          label: const Text('Stable'),
+                          selected: _cloudTrack == 'beta',
+                          selectedColor: Colors.green.shade100,
+                          onSelected: (_) => _setCloudTrack('beta'),
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Preview'),
+                          selected: _cloudTrack == 'storied',
+                          selectedColor: Colors.purple.shade100,
+                          onSelected: (_) => _setCloudTrack('storied'),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -484,9 +516,45 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
+  /// Logs the services (backend) version from the active track's /health
+  /// endpoint. The gateway exposes it as `code_sha` (the git commit count of
+  /// the branch the running service was built from). Best-effort and never
+  /// throws — a network failure or an 'unknown'/missing value is logged as
+  /// such and does not affect the DB test. Reads whichever track (Stable/
+  /// Preview) is currently selected. See wdvrdaxxmb / wdvrdaxyud.
+  Future<void> _logServicesVersion() async {
+    try {
+      final uri = await Endpoints.url(Service.orchestrator, '/health');
+      final resp = await http
+          .get(uri, headers: await Endpoints.apiHeaders(Service.orchestrator))
+          .timeout(const Duration(seconds: 10));
+      if (resp.statusCode == 200) {
+        String codeSha = 'unknown';
+        try {
+          final body = jsonDecode(resp.body);
+          final v = body['code_sha'];
+          if (v != null && v.toString().isNotEmpty) codeSha = v.toString();
+        } catch (_) {}
+        final track = _cloudTrack == 'storied' ? 'Preview' : 'Stable';
+        await DebugLogHelper.addDebugLog('DB_TEST: Services version ($track): $codeSha');
+      } else {
+        await DebugLogHelper.addDebugLog('DB_TEST: Services version unavailable (health HTTP ${resp.statusCode})');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('DB_TEST: Services version lookup failed: $e');
+    }
+  }
+
   Future<void> _syncUserToDatabase() async {
     try {
       await DebugLogHelper.addDebugLog('Starting user sync: $_userId');
+      // 3.2 Audioura (app) version — always recorded in the log for the DB
+      // connectivity check, per Michael 2026-09-01.
+      await DebugLogHelper.addDebugLog('DB_TEST: Audioura version: $_appVersion+$_buildNumber');
+      // 3.3 Services version — read from the active track's /health (code_sha).
+      // Best-effort: never blocks the sync. Shows 'unknown' until Services
+      // populates code_sha (tracked separately, wdvrdaxyud).
+      await _logServicesVersion();
       
       final prefs = await SharedPreferences.getInstance();
       String? userId = prefs.getString('user_id');
@@ -529,8 +597,11 @@ class _AboutScreenState extends State<AboutScreen> {
         }),
       );
       
+      // 3.1 Success/failure connecting to the database.
       await DebugLogHelper.addDebugLog('Sync response: ${response.statusCode}');
       await DebugLogHelper.addDebugLog('Sync body: ${response.body}');
+      final dbOk = response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 409;
+      await DebugLogHelper.addDebugLog('DB_TEST: Database connection ${dbOk ? 'SUCCESS' : 'FAILURE'} (HTTP ${response.statusCode})');
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -601,6 +672,19 @@ class _AboutScreenState extends State<AboutScreen> {
       SnackBar(
         content: Text('Switched to ${mode == 'cloud' ? 'Cloud' : 'Local WiFi'} mode'),
         backgroundColor: mode == 'cloud' ? Colors.green : Colors.blue,
+      ),
+    );
+  }
+
+  Future<void> _setCloudTrack(String track) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cloud_track', track);
+    setState(() { _cloudTrack = track; });
+    await DebugLogHelper.addDebugLog('ABOUT: Cloud track set to: $track');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Comparing against ${track == 'storied' ? 'Preview' : 'Stable'}'),
+        backgroundColor: track == 'storied' ? Colors.purple : Colors.green,
       ),
     );
   }

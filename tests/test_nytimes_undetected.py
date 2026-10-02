@@ -5,7 +5,9 @@ Test NY Times Undetected Chrome Authentication
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_nytimes_article_reprocessing():
     """Test reprocessing NY Times article with authentication"""
     

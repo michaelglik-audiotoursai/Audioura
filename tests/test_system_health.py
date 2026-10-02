@@ -8,6 +8,10 @@ import json
 import psycopg2
 from datetime import datetime
 
+import pytest
+
+
+@pytest.mark.service
 def test_service_health():
     """Test all service endpoints for basic health"""
     print("=== SERVICE HEALTH CHECK ===")
@@ -86,6 +90,8 @@ def test_database_connectivity():
         print(f"  Database: ERROR - {e}")
         return False
 
+
+@pytest.mark.service
 def test_audio_generation():
     """Test audio generation pipeline"""
     print("\n=== AUDIO GENERATION TEST ===")
@@ -169,6 +175,8 @@ def test_recent_articles():
         print(f"  ERROR: {e}")
         return False
 
+
+@pytest.mark.service
 def test_newsletter_pattern_recognition():
     """Test pattern recognition capabilities"""
     print("\n=== PATTERN RECOGNITION TEST ===")

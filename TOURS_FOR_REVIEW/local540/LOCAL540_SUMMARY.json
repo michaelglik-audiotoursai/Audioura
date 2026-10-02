@@ -1,0 +1,47 @@
+{
+  "location": "Boston Logan International Airport, Boston MA",
+  "tour_type": "facility",
+  "stops": 4,
+  "wall_s": 190.1,
+  "chars": 8540,
+  "score": {
+    "defects_before": {
+      "fabricated_attribution": "1 attribution(s); unverified attribution: \"constructed in 1887 by Gustave Eiffel\" (no source confirms it)"
+    },
+    "defects_after": {},
+    "removed": [
+      "fabricated_attribution"
+    ],
+    "remaining": [],
+    "retried": true,
+    "clean_after": true,
+    "retry_cost": {
+      "total_cost": 0.0037500000000000003,
+      "total_tokens": 789
+    },
+    "cost_without_retry": {
+      "total_cost": 0.16988,
+      "total_tokens": 25680
+    }
+  },
+  "cost": {
+    "with_retry": {
+      "openai_usd": 0.17363,
+      "openai_tokens": 26469,
+      "grounding_usd": 0.14,
+      "grounding_requests": 4,
+      "tour_total_usd": 0.31363
+    },
+    "retry_alone": {
+      "openai_usd": 0.00375,
+      "openai_tokens": 789
+    },
+    "without_retry": {
+      "openai_usd": 0.16988,
+      "openai_tokens": 25680,
+      "grounding_usd": 0.14,
+      "grounding_requests": 4,
+      "tour_total_usd": 0.30988
+    }
+  }
+}

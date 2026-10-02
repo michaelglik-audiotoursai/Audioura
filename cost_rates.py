@@ -26,6 +26,10 @@ _log = logging.getLogger(__name__)
 
 LLM_RATES = {
     # model-family -> {input_per_1m, output_per_1m}
+    "gpt-4o": {
+        "input_per_1m": 2.50,
+        "output_per_1m": 10.00,
+    },
     "gpt-4o-mini": {
         "input_per_1m": 0.15,
         "output_per_1m": 0.60,
@@ -44,7 +48,39 @@ GPT4O_MINI_COST_PER_1K_TOKENS = 0.000285  # ~($0.15*0.7 + $0.60*0.3) / 1000
 # --- Search (Serper) ---
 SERPER_COST_PER_QUERY = 0.001
 
-# --- TTS ---
+# --- Grounding (Gemini + Grounding with Google Search) ---
+# [LOCAL-533]
+# Source: https://ai.google.dev/gemini-api/docs/pricing
+# Read: 2026-09-23
+# Grounding with Google Search is billed PER REQUEST, independent of token count:
+# after a small free daily allowance, requests are billed at $35 per 1,000
+# grounding requests = $0.035 per request. This is a separate billing channel
+# from the OpenAI token cost the pipeline already sums in "Total API cost", and
+# from the Serper query cost above. Counted (not estimated) via
+# story_leads.get_grounding_requests(); one increment per grounded request issued.
+GROUNDING_COST_PER_REQUEST = 0.035
+
+
+def grounding_cost(num_requests: int) -> float:
+    """Cost in USD of `num_requests` grounded Google-Search Gemini requests.
+
+    Grounding bills per request, not per token — so this is a flat multiply.
+    A tour that issues zero grounded requests (e.g. a cache hit) costs $0.00.
+    """
+    return num_requests * GROUNDING_COST_PER_REQUEST
+
+# --- TTS (AWS Polly) ---
+# Source: https://aws.amazon.com/polly/pricing/
+# Read: 2026-08-06
+# Standard voices: $4.00 per 1M characters
+# Neural voices: $16.00 per 1M characters
+# Neural voices used: Joanna, Matthew, Amy, Brian (see polly_tts_service.py:124,136)
+POLLY_STANDARD_COST_PER_1M_CHARS = 4.00
+POLLY_NEURAL_COST_PER_1M_CHARS = 16.00
+POLLY_STANDARD_COST_PER_CHAR = POLLY_STANDARD_COST_PER_1M_CHARS / 1_000_000  # $0.000004
+POLLY_NEURAL_COST_PER_CHAR = POLLY_NEURAL_COST_PER_1M_CHARS / 1_000_000  # $0.000016
+
+# Legacy single-rate constant — kept for existing callers (uses standard rate)
 POLLY_COST_PER_1M_CHARS = 4.00
 POLLY_COST_PER_CHAR = POLLY_COST_PER_1M_CHARS / 1_000_000  # $0.000004
 
@@ -66,9 +102,12 @@ def _resolve_model_rates(model: str) -> dict:
         return LLM_RATES[model]
 
     # Try substring match (e.g. "gpt-4o-mini-2024-07-18" contains "gpt-4o-mini")
-    for key in LLM_RATES:
-        if key in model:
-            return LLM_RATES[key]
+    # Use longest match to avoid "gpt-4o" matching "gpt-4o-mini-2024-07-18"
+    _matches = [(key, LLM_RATES[key]) for key in LLM_RATES if key in model]
+    if _matches:
+        # Return the longest matching key (most specific)
+        _matches.sort(key=lambda x: len(x[0]), reverse=True)
+        return _matches[0][1]
 
     # Unknown model: warn and use the MOST EXPENSIVE known rate to avoid overcharging users
     _most_expensive = max(
@@ -107,12 +146,19 @@ def llm_cost(
 
     if total_tokens is not None:
         # Deprecated path: caller cannot supply split counts
+        # [LOCAL-278] Identify the caller so it can be fixed independently
+        import traceback
+        _caller_frame = traceback.extract_stack(limit=3)
+        _caller_info = f"{_caller_frame[0].filename}:{_caller_frame[0].lineno}" if _caller_frame else "unknown"
         if not hasattr(llm_cost, "_deprecated_warned"):
+            llm_cost._deprecated_warned = set()
+        if _caller_info not in llm_cost._deprecated_warned:
+            llm_cost._deprecated_warned.add(_caller_info)
             _log.warning(
-                "[LOCAL-197] llm_cost() called with total_tokens (deprecated). "
+                f"[LOCAL-197] llm_cost() called with total_tokens (deprecated) "
+                f"by {_caller_info}. "
                 "Caller should supply input_tokens and output_tokens separately."
             )
-            llm_cost._deprecated_warned = True
         # Assume 70% input, 30% output (conservative — output is more expensive)
         input_tokens = int(total_tokens * 0.7)
         output_tokens = total_tokens - input_tokens
@@ -124,8 +170,19 @@ def search_cost(num_queries: int) -> float:
     return num_queries * SERPER_COST_PER_QUERY
 
 
-def tts_cost(char_count: int) -> float:
-    return char_count * POLLY_COST_PER_CHAR
+def tts_cost(char_count: int, engine: str = "standard") -> float:
+    """Compute TTS cost from character count and engine type.
+
+    Args:
+        char_count: Number of characters submitted to Polly.
+        engine: 'neural' or 'standard'. Defaults to 'standard'.
+
+    Returns:
+        Cost in USD.
+    """
+    if engine == "neural":
+        return char_count * POLLY_NEURAL_COST_PER_CHAR
+    return char_count * POLLY_STANDARD_COST_PER_CHAR
 
 
 DEPLOYED_TRANSLATION_PASSES = 1

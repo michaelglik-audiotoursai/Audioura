@@ -1,21 +1,35 @@
 Step-by-Step Audio Guided Tour: French Riviera cycling tour, France - Cycling Tour
-Tour-Category: walking
+Tour-Category: biking
 
-Stop 1: Cap d'Antibes
+Stop 1: Old Town of Menton
 
-Address: Cap d'Antibes, 06160 Antibes, France
+Address: 06500 Menton, France
 
-Coordinates: 43.5410, 7.1253
+Coordinates: 43.7754, 7.5048
 
-Orientation: Stand at the edge of the rocky promontory at Cap d'Antibes, feeling the cool breeze off the Mediterranean Sea as it dances through the fragrant pine trees. Look out towards the azure waters, where the untouched natural beauty of the cape meets the opulent villas that line the coast.
+Type/Specialty: Historic district
 
-You are about to embark on a journey through the hidden chapters of the French Riviera, where the secrets of opulence and intrigue lie beneath the sunlit shores of Cap d'Antibes. As you stand on the rocky promontory, the untouched natural beauty contrasts with the opulent villas that line the coast, each whispering tales of past extravagance. From the grandeur of 19th-century mansions to the stories of artists and aristocrats who once sought refuge in this picturesque haven, each stop on this tour unveils a different facet of this glamorous tapestry. Brace yourself for a narrative woven from the whispers of the past, where every corner holds a piece of history waiting to be discovered.
+Specific Examples: Colorful buildings, narrow streets, local shops
 
-At the Cap d'Antibes, the rich history of this stunning location unfolds. In January 1888, Claude Monet, the renowned artist, sought inspiration along the sun-kissed shores of the French Riviera. Staying at the Château de la Pinède, he absorbed the vibrant colors and unique light that would influence his iconic Impressionist works. The "Tire-Poil" coastal path winds along the cape, offering breathtaking views of the sea and surrounding landscapes. The trail passes the imposing walls of the Château de la Garoupe and the Château de la Croë, each guarding centuries of stories within their stone walls. The gentle waves lap against the rocks as you gaze west towards the serene Îles de Lérins and east to the majestic peaks of the Mercantour. At the highest point of the cape stands the Garoupe lighthouse, a beacon overlooking the Gulf of Juan and the Bay of Angels. Nearby, the ancient chapel of Notre Dame de Bon Port stands as a testament to the enduring spiritual significance of this place. As you continue along the path, you'll come across the Abri de l'Olivette, a sheltered harbor where traditional local boats rest peacefully against the rugged coastline. The Cap d'Antibes encapsulates a harmonious blend of natural wonder and human ingenuity, where history whispers through the rocky cliffs and elegant estates. Feel the curiosity stir within you as you imagine the hidden stories waiting to be uncovered in the secluded coves that dot this picturesque landscape.
+Orientation: You are about to embark on a cycling journey through France. The tour will take you from the coastal Old Town of Menton to the hillside Eze Village, spanning approximately 13 kilometers. The French Riviera's colors and histories unfold along the route, with architecture ranging from medieval walls to Baroque facades. The Old Town of Menton's integration into France after the disputed French plebiscite of 1860 contrasts with Eze Village's strategic importance and cultural richness, connecting the two stops on the upcoming tour. Your first stop is Old Town of Menton. Head east on Promenade du Soleil, then turn left onto Rue Partouneaux. You'll notice the vibrant colors of the buildings lining the streets. Stop at the foot of the cobbled stairway leading up to the Basilica of Saint-Michel-Archange, a striking example of Baroque architecture that dominates the skyline. Look up to appreciate its intricate façade and imagine the historical layers that have shaped this town.
 
+The Old Town of Menton, known in the local dialect as Mentan, is a place where history and culture intertwine. Since the end of the 14th century, this town has stood on the border between the County of Nice, under the Duke of Savoy, and the Republic of Genoa, creating a unique blend of influences. Walking through its narrow, winding streets, echoes of footsteps resonate against centuries-old walls. The town was once an exclave of the Principality of Monaco until the disputed French plebiscite of 1860 integrated it into France. The name "Menton" might trace back to Mons Ottonis, linked to Otton II, the count of Ventimiglia from 1162-1200. This stop on your cycling tour of the French Riviera is a living testament to the region's layered history and the vibrant pulse of its community.
 
+Directions: Start your ride from the Old Town of Menton and pedal eastward along the stunning coastal road. Enjoy the scenic views as you cycle past the picturesque towns of Roquebrune-Cap-Martin and Beausoleil before reaching Eze Village. Look out for the medieval architecture and charming cobblestone streets as you arrive at your destination.
 
+Stop 2: Eze Village
 
+Address: 06360 Èze, France
 
-From Cap d'Antibes to Cap d'Antibes — a collection that spans more ground than these stops alone.
+Coordinates: 43.7272, 7.3619
+
+Type/Specialty: Medieval hilltop village
+
+Specific Examples: Panoramic views, cobblestone streets, exotic gardens
+
+Orientation: As you cycle along the winding roads of the French Riviera, Eze Village emerges from the landscape like a sentinel of history.
+
+Eze Village, a commune dating back to 200 BC, stands as a timeless guardian overlooking the Mediterranean. Its name first appeared in the maritime section of the Antonine Itinerary as Avisionis portus, a crucial navigational point in antiquity. In 2018, the village was home to 2,225 inhabitants, known as Ezasques, who continue to uphold its rich heritage. The texture of weathered stone underfoot echoes centuries of footsteps, each marking the passage of time from Roman settlers to modern-day wanderers. The exotic garden at the summit of Eze offers a view that once served as a lookout for sentinels, ever vigilant against invaders. The connection to the Old Town of Menton becomes palpable here, as both share a history of strategic importance and cultural richness along this storied coastline. Eze Village embodies the theme of this French Riviera cycling tour: the seamless blend of natural beauty and historical depth. Here, the ancient and the present coexist, inviting reflection on the narratives etched into its stones.
+
+That's 2 stops and 13 kilometres — Old Town of Menton, once a Monaco exclave, joined France after 1860 plebiscite and Eze Village, founded in 200 BC, watches over the Mediterranean. Closing: There is also a tour of Musée Matisse (Nice) nearby; if you would like to eat nearby we can build you a restaurant tour, and the Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.
 

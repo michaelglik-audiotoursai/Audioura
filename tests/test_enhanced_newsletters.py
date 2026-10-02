@@ -4,7 +4,9 @@ Test enhanced newsletter processing with MailChimp and Boston Globe
 """
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_newsletter(url, name):
     print(f"\n=== Testing {name} ===")
     print(f"URL: {url}")

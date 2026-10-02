@@ -86,6 +86,54 @@ class VenueEntity:
     works: List[Dict] = field(default_factory=list)  # [{qid, label_en, label_local}]
 
 
+def _normalise_venue_name(venue_string: str) -> List[str]:
+    """Generate lookup variants from a venue string with parentheticals/qualifiers.
+
+    LOCAL-258: A parenthetical gloss (English name, alternate name, disambiguator)
+    must not defeat lookup. Returns a list of search strings to try in order:
+      1. Full string as-is (may work if Wikidata indexes the full form)
+      2. Pre-parenthetical head (e.g. "Musee des Arts Asiatiques")
+      3. Parenthetical content alone (e.g. "Asian Art Museum")
+
+    Trailing place qualifiers (", Nice, France") are stripped consistently —
+    they are handled as a city hint, not part of the venue search key.
+    """
+    # Strip trailing comma-separated place qualifiers (city, country)
+    # These arrive as city hints via the caller; keeping them in the search
+    # string confuses Wikidata.
+    _stripped = re.sub(r',\s*[^,()]+$', '', venue_string).strip()
+    # If that removed something that looks like country, try once more for city
+    if _stripped != venue_string:
+        _stripped = re.sub(r',\s*[^,()]+$', '', _stripped).strip()
+
+    variants = []
+
+    # Check for parenthetical content
+    paren_match = re.match(r'^(.+?)\s*\((.+?)\)\s*$', _stripped)
+    if paren_match:
+        head = paren_match.group(1).strip()
+        paren_content = paren_match.group(2).strip()
+        # 1. Full string (might match a Wikidata alias)
+        variants.append(_stripped)
+        # 2. Pre-parenthetical head (most likely the official/local name)
+        if head:
+            variants.append(head)
+        # 3. Parenthetical content (often the English name)
+        if paren_content and paren_content != head:
+            variants.append(paren_content)
+    else:
+        variants.append(_stripped)
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for v in variants:
+        if v and v not in seen:
+            seen.add(v)
+            deduped.append(v)
+    return deduped
+
+
 def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     """Resolve a venue string to a Wikidata entity.
     
@@ -96,44 +144,77 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     Returns:
         VenueEntity with structured data, or None if unresolvable.
     """
+    # LOCAL-258: Extract city from trailing comma-separated segments if not provided.
+    # E.g. "Musee des Arts Asiatiques (Asian Art Museum), Nice, France" → city="Nice"
+    if not city and "," in venue_string:
+        _parts = [p.strip() for p in venue_string.split(",")]
+        if len(_parts) >= 2:
+            # Heuristic: second segment is likely the city; skip country-looking words
+            _COUNTRY_WORDS = {'france', 'italy', 'usa', 'uk', 'spain', 'germany',
+                              'netherlands', 'belgium', 'switzerland', 'japan', 'china'}
+            for _seg in _parts[1:]:
+                if _seg.lower() not in _COUNTRY_WORDS and len(_seg) > 1:
+                    city = _seg
+                    break
+
+    # LOCAL-258: Normalise venue name — strip parentheticals and trailing qualifiers,
+    # then try each variant in order until we get candidates.
+    _name_variants = _normalise_venue_name(venue_string)
+    print(f"  [venue_resolver] Name variants: {_name_variants}")
+
     # Step 1: Search Wikidata for candidates — city-qualified FIRST, then bare
     # Wikipedia naming conventions: "X in City", "X (City)", "X, City"
     candidates = []
-    
-    if city:
-        # Try city-qualified queries first (Wikipedia disambiguation conventions)
-        for _qual_query in [
-            f"{venue_string} in {city}",
-            f"{venue_string} ({city})",
-            f"{venue_string} {city}",
-        ]:
-            candidates = _search_entities(_qual_query)
-            if candidates:
-                print(f"  [venue_resolver] City-qualified search hit: '{_qual_query}' → {len(candidates)} candidates")
-                break
-    
+
+    # Try each normalised variant with the full search cascade
+    for _variant in _name_variants:
+        if city:
+            # Try city-qualified queries first (Wikipedia disambiguation conventions)
+            for _qual_query in [
+                f"{_variant} in {city}",
+                f"{_variant} ({city})",
+                f"{_variant} {city}",
+            ]:
+                candidates = _search_entities(_qual_query)
+                if candidates:
+                    print(f"  [venue_resolver] City-qualified search hit: '{_qual_query}' → {len(candidates)} candidates")
+                    break
+
+        if not candidates:
+            candidates = _search_entities(_variant)
+
+        if candidates:
+            break  # Found candidates with this variant
+
     if not candidates:
-        candidates = _search_entities(venue_string)
-    
-    if not candidates:
-        # Try with city appended (different from above — just simple append)
-        candidates = _search_entities(f"{venue_string} {city}")
+        # Fallback: try with city appended to each variant
+        for _variant in _name_variants:
+            if city:
+                candidates = _search_entities(f"{_variant} {city}")
+                if candidates:
+                    break
     
     if not candidates:
         # Try shorter variants: strip common prefixes/honorifics
-        _shorter = re.sub(r'(?i)^(mus[ée]+e?\s*(national|nationale|municipal|municipale|d[eu]\s*)?)', 'Musée ', venue_string).strip()
-        if _shorter != venue_string:
-            candidates = _search_entities(_shorter)
+        for _variant in _name_variants:
+            _shorter = re.sub(r'(?i)^(mus[ée]+e?\s*(national|nationale|municipal|municipale|d[eu]\s*)?)', 'Musée ', _variant).strip()
+            if _shorter != _variant:
+                candidates = _search_entities(_shorter)
+                if candidates:
+                    break
     
     if not candidates:
         # Try just the distinctive name words (e.g. "Marc Chagall" from "Musée national Marc Chagall")
-        _words = venue_string.split()
-        _distinctive = [w for w in _words if w.lower() not in
-                       ('musée', 'musee', 'museum', 'national', 'nationale', 'gallery',
-                        'galleria', 'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les')]
-        if _distinctive:
-            _short_query = f"musée {' '.join(_distinctive)}"
-            candidates = _search_entities(_short_query)
+        for _variant in _name_variants:
+            _words = _variant.split()
+            _distinctive = [w for w in _words if w.lower() not in
+                           ('musée', 'musee', 'museum', 'national', 'nationale', 'gallery',
+                            'galleria', 'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les')]
+            if _distinctive:
+                _short_query = f"musée {' '.join(_distinctive)}"
+                candidates = _search_entities(_short_query)
+                if candidates:
+                    break
     
     if not candidates:
         print(f"  [venue_resolver] No Wikidata candidates for '{venue_string}'")
@@ -202,14 +283,16 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
 def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
     """Fetch canonical works for a venue via SPARQL (P195/P276).
     
-    Returns list of {qid, label_en, label_local, aliases} for each work.
+    Returns list of {qid, label_en, label_local, aliases, creator, creator_qid} for each work.
     Gets labels in BOTH English and the local language for cross-language matching.
+    Includes P170 (creator) for exhibition-scoped filtering (LOCAL-362).
     """
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
+      OPTIONAL {{ ?work wdt:P170 ?creator. }}
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
@@ -231,20 +314,39 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
         results = data.get("results", {}).get("bindings", [])
         
         works = []
+        _seen_qids = set()
         for r in results:
             work_uri = r.get("work", {}).get("value", "")
             work_qid = work_uri.split("/")[-1] if work_uri else ""
             label = r.get("workLabel", {}).get("value", "")
             label_en = r.get("workLabel_en", {}).get("value", "") or label
             alt_label = r.get("workAltLabel", {}).get("value", "")
+            creator_label = r.get("creatorLabel", {}).get("value", "")
+            creator_uri = r.get("creator", {}).get("value", "")
+            creator_qid = creator_uri.split("/")[-1] if creator_uri else ""
             
+            # Deduplicate: same work may appear multiple times with different creators
+            # (works with multiple creators) — keep first occurrence but merge creator info
             if work_qid and label and not label.startswith("Q"):  # Skip unresolved QIDs
-                works.append({
+                if work_qid in _seen_qids:
+                    # Merge creator into existing entry
+                    for existing in works:
+                        if existing['qid'] == work_qid and creator_label:
+                            if creator_label not in existing.get('creators', []):
+                                existing.setdefault('creators', []).append(creator_label)
+                            break
+                    continue
+                _seen_qids.add(work_qid)
+                entry = {
                     "qid": work_qid,
                     "label_en": label_en,
                     "label_local": label,
                     "aliases": [a.strip() for a in alt_label.split(",") if a.strip()] if alt_label else [],
-                })
+                    "creator": creator_label if creator_label and not creator_label.startswith("Q") else "",
+                    "creator_qid": creator_qid if creator_label and not creator_label.startswith("Q") else "",
+                    "creators": [creator_label] if creator_label and not creator_label.startswith("Q") else [],
+                }
+                works.append(entry)
         
         print(f"  [venue_resolver] SPARQL: {len(works)} works found for {venue_qid}")
         return works
@@ -438,8 +540,17 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
     Returns:
         List of (qid, label) tuples on success (may be empty for no results).
         None on network/API failure (LOCAL-230: distinguishable from empty).
+
+    [LOCAL-445-C] Dead-host rule: short-circuits if Wikidata is already cold.
     """
     global _network_failure_count
+    try:
+        from dead_host_breaker import is_host_cold, mark_host_cold
+        if is_host_cold('https://www.wikidata.org'):
+            return None
+    except ImportError:
+        pass
+
     try:
         resp = requests.get(
             _WIKIDATA_API,
@@ -453,6 +564,15 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
             headers={"User-Agent": _USER_AGENT},
             timeout=10,
         )
+        if resp.status_code == 429:
+            try:
+                from dead_host_breaker import mark_host_cold
+                mark_host_cold('https://www.wikidata.org', reason=f'HTTP 429 on _search_entities')
+            except ImportError:
+                pass
+            logger.error(f"[LOCAL-230] _search_entities failed: HTTP 429 for query '{query}'")
+            _network_failure_count += 1
+            return None
         if resp.status_code != 200:
             logger.error(f"[LOCAL-230] _search_entities failed: HTTP {resp.status_code} for query '{query}'")
             _network_failure_count += 1
@@ -461,6 +581,15 @@ def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
         data = resp.json()
         results = [(r["id"], r.get("label", "")) for r in data.get("search", [])]
         return results
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        try:
+            from dead_host_breaker import mark_host_cold
+            mark_host_cold('https://www.wikidata.org', reason=f'timeout/connection error: {e}')
+        except ImportError:
+            pass
+        logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
+        _network_failure_count += 1
+        return None
     except Exception as e:
         logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
         _network_failure_count += 1
@@ -813,6 +942,9 @@ def _infer_artist_from_name(venue_name: str) -> str:
     E.g. "musée Marc-Chagall" → "Marc Chagall"
          "Musée Matisse" → "Matisse"
     Returns empty string if no artist name can be inferred (e.g. "Uffizi Gallery").
+    
+    LOCAL-362: Reject candidates that are clearly NOT artist names — e.g. residual
+    geographic words or institutional fragments like "Fine Boston".
     """
     # Strip common institutional words
     _STRIP_WORDS = {
@@ -822,11 +954,36 @@ def _infer_artist_from_name(venue_name: str) -> str:
         'moderne', 'modern', 'contemporain', 'contemporary', 'beaux',
     }
     
+    # LOCAL-362: Words that should never appear in an inferred artist name.
+    # These are geographic, institutional, or descriptive words that indicate
+    # the venue name is NOT an artist-named museum.
+    _REJECT_WORDS = {
+        # Geographic
+        'boston', 'new', 'york', 'paris', 'london', 'nice', 'rome', 'berlin',
+        'chicago', 'los', 'angeles', 'san', 'francisco', 'washington',
+        'philadelphia', 'houston', 'dallas', 'atlanta', 'denver', 'seattle',
+        'miami', 'orleans', 'diego', 'francisco', 'antonio', 'jose',
+        # US states
+        'massachusetts', 'california', 'texas', 'florida', 'virginia',
+        # Institutional/descriptive remnants
+        'fine', 'applied', 'decorative', 'natural', 'history', 'science',
+        'american', 'european', 'asian', 'african', 'ancient', 'medieval',
+        'folk', 'craft', 'design', 'photography', 'film', 'children',
+        'heritage', 'memorial', 'institute', 'institution', 'society',
+        'university', 'college', 'school', 'academy', 'library',
+        'city', 'state', 'county', 'district', 'region', 'province',
+    }
+    
     words = re.sub(r'[-–]', ' ', venue_name).split()
     name_words = [w for w in words if w.lower().rstrip("'") not in _STRIP_WORDS and len(w) > 1]
     
     if not name_words:
         return ""
+    
+    # LOCAL-362: Reject if ANY remaining word is in the reject list
+    for w in name_words:
+        if w.lower() in _REJECT_WORDS:
+            return ""
     
     # Check if remaining words look like a person name (capitalized, 1-3 words)
     name_candidate = " ".join(name_words)

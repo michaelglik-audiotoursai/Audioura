@@ -9,12 +9,36 @@ import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
+import '../utils/tour_path_healer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
 import 'tour_map_screen.dart';
+
+/// LOCAL-484 — build the subtitle line shown under each tour on the Listen
+/// (My Tours) list.
+///
+/// The count segment ("N stops • ") is only emitted when the tour actually
+/// stored a stop count. Previously the widget used `tour['stops'] ?? '10'`,
+/// which asserted a fabricated "10 stops" for any tour that never stored a
+/// count. An absent number is honest; a wrong one is not — so when the count
+/// is unknown we show only the created date.
+///
+/// Kept as a top-level pure function so the "no count → no '10 stops'"
+/// behaviour is unit-testable without the widget (AC #3).
+String tourSubtitleLine(Map<String, dynamic> tour) {
+  final created =
+      DateTime.parse(tour['created']).toLocal().toString().split(' ')[0];
+
+  final rawStops = tour['stops'];
+  final stops = rawStops?.toString().trim() ?? '';
+  if (stops.isEmpty) {
+    return 'Created: $created';
+  }
+  return '$stops stops • Created: $created';
+}
 
 class MyToursScreen extends StatefulWidget {
   const MyToursScreen({super.key});
@@ -658,9 +682,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
       try {
         final tour = Map<String, dynamic>.from(json.decode(raw) as Map);
         final oldPath = tour['path'] as String? ?? '';
-        final idx = oldPath.indexOf('/tours/');
-        if (idx != -1 && !oldPath.startsWith(docsDir)) {
-          tour['path'] = docsDir + oldPath.substring(idx);
+        // LOCAL-478: shared rule — same healing the stop editor now uses.
+        final newPath = healTourPath(oldPath, docsDir);
+        if (newPath != oldPath) {
+          tour['path'] = newPath;
           healedRaw.add(json.encode(tour));
           anyHealed = true;
         } else {
@@ -1354,7 +1379,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${tour['stops'] ?? '10'} stops • Created: ${DateTime.parse(tour['created']).toLocal().toString().split(' ')[0]}'),
+                        Text(tourSubtitleLine(tour)),
                         if (tour['original_request'] != null && tour['original_request'] != tour['title'])
                           Text(
                             'Original: ${tour['original_request']}',
@@ -1362,6 +1387,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        // Track/release provenance is intentionally NOT shown as
+                        // a chip here — a visible "Stable"/"Preview" label on the
+                        // list confuses testers. It's available on demand via the
+                        // "Version" item in the ⋮ menu instead. See wdvrdaxxmb.
                       ],
                     ),
                     trailing: Row(
@@ -1391,6 +1420,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               case 'edit': _editTour(tour); break;
                               case 'delete': _deleteTour(index); break;
                               case 'report': _reportTour(tour); break;
+                              case 'version': _showVersionDialog(tour); break;
                             }
                           },
                           itemBuilder: (context) => [
@@ -1399,6 +1429,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
                             const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'), dense: true)),
                             const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.flag_outlined, color: Colors.grey), title: Text('Report'), dense: true)),
+                            const PopupMenuItem(value: 'version', child: ListTile(leading: Icon(Icons.info_outline, color: Colors.blueGrey), title: Text('Version'), dense: true)),
                           ],
                         ),
                         const Icon(Icons.play_arrow, color: Color(0xFF3498db)),
@@ -1410,6 +1441,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                       await prefs.setString('current_tour_id', tour['title']);
                       await prefs.setString('current_tour_path', tour['path']);
                       await prefs.setInt('current_stop', 0);
+                      await prefs.setString('current_tour_type', tour['type'] ?? '');
                       
                       Navigator.push(
                         context,
@@ -1417,6 +1449,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
                           builder: (context) => TourPlayerScreen(
                             tourPath: tour['path'],
                             tourTitle: tour['title'],
+                            track: tour['track'] as String?,
+                            buildNumber: tour['build_number'] is int
+                                ? tour['build_number'] as int
+                                : (tour['build_number'] is String
+                                    ? int.tryParse(tour['build_number'])
+                                    : null),
                           ),
                         ),
                       );
@@ -1445,6 +1483,75 @@ class _MyToursScreenState extends State<MyToursScreen> {
     return title;
   }
   
+  /// Version/provenance details for a tour, shown on demand from the ⋮ menu
+  /// (NOT as a chip on the list — a visible Stable/Preview label confuses
+  /// testers). Shows generation date, release (track + build number when
+  /// present), and services version once the tour record carries it. See
+  /// wdvrdaxxmb.
+  void _showVersionDialog(Map<String, dynamic> tour) {
+    // Generation date
+    String generated = 'Unknown';
+    final created = tour['created'];
+    if (created is String && created.isNotEmpty) {
+      try {
+        generated = DateTime.parse(created).toLocal().toString().split('.').first;
+      } catch (_) {
+        generated = created;
+      }
+    }
+
+    // Release = track label (+ build number when the record has one).
+    final track = tour['track'] as String?;
+    final rawBuild = tour['build_number'];
+    final buildNumber = rawBuild is int
+        ? rawBuild
+        : (rawBuild is String ? int.tryParse(rawBuild) : null);
+    final release = Endpoints.trackLabel(track, buildNumber: buildNumber);
+
+    // Services version — only present once the services side stores it on the
+    // tour record. Absent for now; show a placeholder until then.
+    final rawSvc = tour['services_version'];
+    final servicesVersion =
+        (rawSvc != null && rawSvc.toString().isNotEmpty) ? rawSvc.toString() : 'Not available yet';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Version'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _versionRow('Generated', generated),
+            const SizedBox(height: 8),
+            _versionRow('Release', release),
+            const SizedBox(height: 8),
+            _versionRow('Services version', servicesVersion),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _versionRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
+        Expanded(child: Text(value)),
+      ],
+    );
+  }
+
   Color _getTypeColor(String type) {
     switch (type) {
       case 'News and Politics':

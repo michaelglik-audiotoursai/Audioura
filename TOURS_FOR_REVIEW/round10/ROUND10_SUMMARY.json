@@ -1,0 +1,46 @@
+[
+  {
+    "name": "CHURCH_1",
+    "ok": true,
+    "wall_s": 250.5,
+    "chars": 10020,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 12,
+      "named_people": 8,
+      "chars": 10020
+    },
+    "cost": {
+      "total_api_cost_usd": 0.268155,
+      "total_tokens": 37470,
+      "grounding_cost_usd": 0.35,
+      "grounding_requests": 10,
+      "tour_total_cost_usd": 0.618155,
+      "cache_hit": false
+    }
+  },
+  {
+    "name": "LOGAN_1",
+    "ok": true,
+    "wall_s": 171.6,
+    "chars": 9609,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 12,
+      "named_people": 6,
+      "chars": 9609
+    },
+    "cost": {
+      "total_api_cost_usd": 0.168277,
+      "total_tokens": 27955,
+      "grounding_cost_usd": 0.14,
+      "grounding_requests": 4,
+      "tour_total_cost_usd": 0.308277,
+      "cache_hit": false
+    }
+  }
+]

@@ -11,6 +11,17 @@ import os
 import sys
 import re
 
+try:  # [2026-09-18] abbreviation-safe sentence splitting — a bare
+    # (?<=[.!?])\s+ cuts 'St. Mary' in two, and a gate then drops one half:
+    # CHURCH_tour_3 shipped 'Founded in 1868 by St.' with the name gone.
+    from sentence_split import split_sentences as _ss_split
+except Exception:  # pragma: no cover
+    import re as _ss_re
+    def _ss_split(t):
+        return _ss_re.split(r'(?<=[.!?])\s+', t or '')
+
+
+
 
 def load_tour(path):
     """Load tour text from file."""
@@ -95,7 +106,7 @@ def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
                     common_proper.add(w)
 
     # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
-    _sentences_in_claim = re.split(r'[.!?]\s+', claim_text)
+    _sentences_in_claim = _ss_split(claim_text)
     _claim_proper_nouns = set()
     for sent in _sentences_in_claim:
         words = sent.split()
@@ -204,10 +215,32 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
           f"{sum(in_range)}/{len(word_counts)} in range; counts={word_counts[:5]}")
 
     # 8. Total length reasonable (not truncated or bloated)
+    #
+    # [LOCAL-555] The floor scales with the stop count, because a flat 1000 words
+    # CONTRADICTED the per-stop rule directly above it. That rule blesses a first/last
+    # stop at 150 words and a middle stop at 200 — so a 3-stop tour whose every stop is
+    # in range can total 500 words and still be rejected here for being "truncated".
+    #
+    # Found on 2026-09-24 on Michael's own 3-stop restaurant tour: every stop generated
+    # and sat inside the per-stop range, and the tour was destroyed at 918 words — 8%
+    # under a floor written for tours twice its size. User-chosen stops make short
+    # tours ordinary rather than exceptional, so the floor has to know how many stops
+    # it is judging.
+    #
+    # Capped at the original 1000 so nothing gets LOOSER than it was: a 6-stop tour
+    # still faces the same floor it always did. Truncation is still caught, by the
+    # per-stop rule and by a stop count that falls short of the request.
     total_words = len(tour_text.split())
-    check("Total length reasonable (1000-8000 words)",
-          1000 <= total_words <= 8000,
-          f"total={total_words} words")
+    _n = len(stops) if stops else 0
+    if _n >= 2:
+        _floor = min(1000, 150 + 150 + 200 * max(0, _n - 2))
+    elif _n == 1:
+        _floor = 150
+    else:
+        _floor = 1000
+    check(f"Total length reasonable ({_floor}-8000 words for {_n} stop(s))",
+          _floor <= total_words <= 8000,
+          f"total={total_words} words, floor={_floor}")
 
     # -------- [BLOCKER 3] Factual integrity checks --------
     # These are RELEASE-GATING: any factual failure → exit 1 regardless of style score.
@@ -309,7 +342,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                             if l.strip() and not _STRUCT_RE.match(l.strip())]
             _content_text = ' '.join(_content_lines)
             # Split into sentences
-            _sentences = re.split(r'(?<=[.!?])\s+', _content_text)
+            _sentences = _ss_split(_content_text)
             for sent in _sentences:
                 _adj_matches = _UNEARNED_ADJ_RE.findall(sent)
                 if _adj_matches:
@@ -332,8 +365,20 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         _name_part = re.sub(r'^Stop\s+\d+:\s*', '', _header).strip()
         _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
         _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
-        # A real artwork name should be 1-8 words, start with uppercase
-        if _name_part and (len(_name_part.split()) > 15 or not _name_part[0].isupper()):
+        # [LOCAL-554] Capitalisation is NOT evidence about the world, and this is a
+        # FACTUAL check -- a failure here destroys the whole tour.
+        #
+        # On 2026-09-24 Michael typed three real Newton restaurants in lower case.
+        # All three stops generated (233/268/241 words) and the tour was discarded
+        # because one title began with a lower-case letter:
+        #     FAIL: D3(d) -- 1 suspicious title(s): ['little big diner in newton center']
+        # Little Big Diner is a real restaurant at 1247 Centre St with 625+ reviews.
+        #
+        # LOCAL-554 title-cases listener-typed stops upstream, so this should no longer
+        # fire -- but case must never again be able to fail a tour on its own, because
+        # the property is cosmetic and the verdict is factual. The length test stays:
+        # a 15+ word "title" really is a sentence masquerading as an entity.
+        if _name_part and len(_name_part.split()) > 15:
             _ungrounded.append(_name_part[:50])
     check("D3(d) Grounding assertion (titles look like real entities)",
           len(_ungrounded) == 0,
@@ -583,7 +628,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     _claim_sentences = []
     # B1 FIX: Also split on paragraph breaks — \n\n separates distinct thoughts
     for _paragraph in re.split(r'\n\n+', _combined_prolog_epilog):
-        for sent in re.split(r'[.!?]\s+', _paragraph):
+        for sent in _ss_split(_paragraph):
             sent = sent.strip()
             if not sent or len(sent) < 20:
                 continue

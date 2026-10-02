@@ -2,6 +2,9 @@
 """
 Test Boston Globe Authentication in Container
 """
+
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
 from browser_automation_login import extract_content_with_login
 
 def test_boston_globe_auth():

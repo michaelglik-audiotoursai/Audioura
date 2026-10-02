@@ -1,0 +1,896 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260812_125642.txt'
+
+======================================================================
+CALL #001 | 12:56:42.372 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  tour_type: contained
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-440/tours/local440_mfa_unbound.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260812_125642.txt'
+
+======================================================================
+CALL #002 | 12:56:42.373 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": "contained Picasso, Miro, Dali: Unbound exhibition",
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Boston, MA
+   Requirements: contained Picasso, Miro, Dali: Unbound exhibition
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+
+Detected tour category: MUSEUM
+Using museum template for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA - contained
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260812_125642.txt'
+
+======================================================================
+CALL #003 | 12:56:44.822 | GENERATING_PROMPT
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  user_request: contained Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA...
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q1565911 (Museum of Fine Arts, Houston)
+    URL: http://www.mfah.org/
+    Coords: 29.725605, -95.390539
+    Language: en
+  [venue_resolver] SPARQL: 147 works found for Q1565911
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-362] Scoped request detected (requirements='contained Picasso, Miro, Dali: Unbound exhibition') — early deterministic bypass suppressed
+
+  [LOCAL-362] SCOPED REQUEST DETECTED:
+    Requirements: contained Picasso, Miro, Dali: Unbound exhibition
+    POI type: museum exhibits
+    Artists extracted: ['Picasso', 'Miro', 'Dali']
+    → Deterministic bypass will be SUPPRESSED (venue-wide fill is wrong for scoped requests)
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+
+  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══
+  [LOCAL-364] Exhibition search term: 'Picasso, Miro, Dali: Unbound'
+  [LOCAL-364] Venue URL: http://www.mfa.org/
+  [LOCAL-364] Searching for exhibition 'Picasso, Miro, Dali: Unbound' on http://www.mfa.org
+  [LOCAL-429] Cloudflare challenge on http://www.mfa.org/exhibitions — retries will not help, trying Wayback Machine
+  [LOCAL-430] Wayback snapshot timestamp: 20260729153204 (age: 14 days)
+  [LOCAL-429] ✓ Wayback Machine success: http://www.mfa.org/exhibitions (7904 chars)
+  [LOCAL-364] Found exhibition listing: http://www.mfa.org/exhibitions (7904 chars)
+  [LOCAL-425] Searching: Picasso, Miro, Dali: Unbound site:www.mfa.org
+  [LOCAL-425] Search hit: https://www.mfa.org/exhibition/picasso-miro-dali-unbound — Picasso, Miró, Dalí: Unbound
+  [LOCAL-429] No match in Wayback listing — web search found: https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-429] Cloudflare challenge on https://www.mfa.org/exhibition/picasso-miro-dali-unbound — retries will not help, trying Wayback Machine
+  [LOCAL-430] Wayback snapshot timestamp: 20260812064828 (age: 0 days)
+  [LOCAL-429] ✓ Wayback Machine success: https://www.mfa.org/exhibition/picasso-miro-dali-unbound (8215 chars)
+  [LOCAL-429] Direct exhibition detail page via web search (8215 chars)
+  [LOCAL-364] Matched exhibition: 'Picasso, Miro, Dali: Unbound' (score: 1.00)
+  [LOCAL-364] Exhibition URL: https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-427] Cache HIT: https://www.mfa.org/exhibition/picasso-miro-dali-unbound (8215 chars)
+  [LOCAL-430] ARCHIVED SOURCE — snapshot 20260812064828, age 0 days
+  [LOCAL-364] No closing date found — assuming exhibition is current
+  [LOCAL-368] Line-pattern extraction found no works — trying LLM prose extraction
+  [LOCAL-368] ✓ PROSE LLM PATH: 3 works extracted from prose
+    Source: https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by Joan Miró (1971)
+    - Moses and Monotheism by Salvador Dalí (1974)
+    - Au Soleil du Plafond by Juan Gris (1955)
+  [LOCAL-364] Result: ExhibitionChecklistResult(path=prose_llm, works=3, title='Picasso, Miro, Dali: Unbound', url='https://www.mfa.org/exhibition/picasso-miro-dali-unbound', ARCHIVED (snapshot: 20260812064828))
+  [LOCAL-430] 📦 ARCHIVED SOURCE — venue's own words via web.archive.org (snapshot: 20260812064828, age: 0 days)
+    Original URL: https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    Content URL: https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-364/368] ✓ PROSE_LLM PATH: 3 works from exhibition page
+    Source: https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+    Shape: prose_llm_extraction
+    Stops from exhibition prose_llm:
+      - Le Lézard aux plumes d’or (The Lizard with Golden Feathers) (by Joan Miró)
+      - Moses and Monotheism (by Salvador Dalí)
+      - Au Soleil du Plafond (by Juan Gris)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+   - Moses and Monotheism
+   - Au Soleil du Plafond
+  [D1/LOCAL-372] SKIP D1v2 — stops sourced from exhibition prose_llm (D1v2 checks the PERMANENT collection; a temporary show is not in it)
+  [D1/LOCAL-372] 3 exhibition stop(s) grounded against the venue page
+
+  [LOCAL-370] R4 replenishment SUPPRESSED (exhibition-scoped request)
+    Scope: contained Picasso, Miro, Dali: Unbound exhibition
+    Honest stop count: 3 (no venue-wide backfill — D275)
+  [R4] Target reached: 3/3 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition prose_llm (already grounded against venue page by LOCAL-372)
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260812_125642.txt'
+
+======================================================================
+CALL #004 | 12:57:06.950 | PHASE_3B_REQUEST
+======================================================================
+  location: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0005 (585 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+  [LOCAL-355] Querying OSM for venue facts (city: Miro, hint: museum)
+  [LOCAL-355] Le Lézard aux plumes d’or (The Lizard with Golden Feathers): no practical facts in OSM
+  [LOCAL-355] Moses and Monotheism: no practical facts in OSM
+  [LOCAL-355] Au Soleil du Plafond: no practical facts in OSM
+   Coords cluster detected: 3 stops share '42.3394, -71.0942', refetching...
+   Cluster refetch OK 'Le Lézard aux plumes d’or (The Lizard with Golden Feathers)': 42.3391, -71.0898
+   Cluster refetch OK 'Moses and Monotheism': 42.3394, -71.0897
+   Cluster refetch OK 'Au Soleil du Plafond': 42.3395, -71.0895
+Extracted first POI coordinates: (42.3391, -71.0898)
+  [D4] Museum single-coordinate: all stops set to (42.3391, -71.0898) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+   Address: Avenue of the Arts, 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3391, -71.0898
+   Directions: Head northeast on Huntington Ave, the museum will be on your right after passing...
+2. Moses and Monotheism
+   Address: Avenue of the Arts, 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3391, -71.0898
+   Directions: Continue straight on Huntington Ave, the exhibit entrance is on the left near th...
+3. Au Soleil du Plafond
+   Address: Avenue of the Arts, 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3391, -71.0898
+   Directions: Walk ahead and take a right turn, the exhibit is on the right with a distinctive...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 1/1 corpus pages for 'Museum of Fine Arts, Boston'
+    page[0] score=250 url=https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [§3-adapter] No elements extracted from 1 pages
+  [LOCAL-369] Exhibition prose yielded no story elements
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Museum of Fine Arts, Boston model=gpt-4o tokens=1182 (in=674 out=508) cost=$0.0068 latency=10.4s
+[COST_METER] FRESH | spine_generate | $0.006765 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0068
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 0/3 stops have per-stop passages (0 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Moses and Monotheism' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Au Soleil du Plafond' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 3 EMPTY, 0 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=exhibition source='Bold, experimental, extravagant, and unbound, both literally and in the creative'
+  [LOCAL-392] beat='Louis Broder' source_work='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' -> stop 1
+  [LOCAL-392] beat='Mourlot Frères' source_work='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' -> stop 1
+  [LOCAL-392] beat='Juan Gris' source_work='Au Soleil du Plafond' -> stop 3
+  [LOCAL-392] beat='Pierre Reverdy' source_work='Au Soleil du Plafond' -> stop 3
+  [LOCAL-392] beat='Dalí' source_work='Moses and Monotheism' -> stop 2
+  [LOCAL-392] beat='Freud' source_work='Moses and Monotheism' -> stop 2
+  [LOCAL-392] beat='Torf' -> exhibition_wide (no single work match)
+  [LOCAL-392] beat='Boris Fridman' source_work='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' -> stop 1
+
+  [LOCAL-383] Extracted 10 story beats, 8 named people: Boris Fridman, Dalí, Freud, Juan Gris, Louis Broder, Mourlot Frères
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+    [LOCAL-419] Enriched stop 1 from checklist: publisher='Louis Broder' credit_line='Gift of Boris Fridman' medium='Illustrated book with 40 color lithograp'
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 25 domains, budget=20.0s, pool=10
+  [SQ-S2] Wikidata P856 check failed for campaignoutsider.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for bidsquare.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for parkwestgallery.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for composition.gallery: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for amazon.fr: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for fnac.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for choicecontemporary.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for babelio.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artfocusnow.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for milkmagazine.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for dosde.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for fridmangallery.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for revue-textimage.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for researchgate.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for lecoindesarts.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for emuseum.toledomuseum.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for millon.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for christies.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artandobject.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for masterworksfineart.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for coleccionbbva.com: The read operation timed out
+  [LOCAL-441] P856 budget-expired for phillips.com → tier3
+  [LOCAL-441] P856 budget-expired for dtrmodern.com → tier3
+  [LOCAL-441] P856 budget-expired for mfa.org → tier3
+  [LOCAL-441] P856 budget-expired for wdartgallery-modern.com → tier3
+  [LOCAL-441] Batch complete: 20.0s, 0 tier1, 25 tier3, 4 budget-expired
+      [credit_line] Published by Louis Broder. Gift of Boris Fridman
+    Stop 1 'Le Lézard aux plumes d’or (The Lizard with Golden ': queries=9 serp_results=55 snippets=56
+      → Published by Louis Broder. Gift of Boris Fridman
+      → Joan Miró Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, this color lithograph is hand signed by Joa
+    [LOCAL-419] Enriched stop 2 from checklist: publisher='' credit_line='' medium='Illustrations'
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 17 domains, budget=20.0s, pool=10
+  [SQ-S2] Wikidata P856 check failed for archive.org: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for dtrmodern.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for phillips.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for mfa.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wdartgallery-modern.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for tandfonline.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for supersummary.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for jamescrane.substack.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for cambridge.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ebay.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for collections.museumofthebible.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for davidbarnettgallery.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for jewishreviewofbooks.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for thecrimson.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for euppublishing.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for amazon.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for sothebys.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for lockportstreetgallery.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for 88invisiblemirrors.blog: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for daliparis.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for thedali.org: The read operation timed out
+  [LOCAL-441] Batch complete: 16.2s, 0 tier1, 17 tier3, 0 budget-expired
+    Stop 2 'Moses and Monotheism': queries=4 serp_results=24 snippets=24
+      → Salvador Dalí. ,. Moise et Monotheisme, Moses and Monotheism, ca. 1975 ; High auction record. £13.5m, Sotheby's, 2011 ; 
+      → Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with 
+    [LOCAL-419] Enriched stop 3 from checklist: publisher='' credit_line='' medium=''
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 18 domains, budget=20.0s, pool=10
+  [SQ-S2] Wikidata P856 check failed for bonhams.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for prufrocksdilemma.wordpress.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for shs.cairn.info: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for abebooks.co.uk: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for scribd.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for araderbooks.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for icanvas.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for musee-lam.fr: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for onlineonly.christies.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for baumanrarebooks.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for dma.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for tretyakovgallerymagazine.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for etsy.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for fourarts.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for patronmagazine.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artemlegrand.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for antiquesandthearts.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for galerialaaurora.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.2s, 0 tier1, 18 tier3, 0 budget-expired
+    Stop 3 'Au Soleil du Plafond': queries=4 serp_results=30 snippets=30
+      → Title: Au Soleil du Plafond; Designer: Designed by Juan Gris (Spanish, Madrid 1887–1927 Boulogne-sur-Seine); Author: Wri
+      → Au soleil du plafond was José Victoriano González-Pérez (pseud. Juan Gris, 1887–1927) final body of work, as he died of 
+
+  [LOCAL-410] SERP search complete: 17 queries, 109 results, 110 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 110 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Le Lézard aux plumes d’or (The Lizard with Golden : serp_results=55 elements_extracted=- beats_injected=- (measured post-generation)
+    Moses and Monotheism: serp_results=24 elements_extracted=- beats_injected=- (measured post-generation)
+    Au Soleil du Plafond: serp_results=30 elements_extracted=- beats_injected=- (measured post-generation)
+
+  [LOCAL-440] Story-first pipeline — processing 3 stops...
+
+  [LOCAL-440] Story-first pipeline for 'Le Lézard aux plumes d’or (The Lizard with Golden '
+    Step 1: anchor_facts — artist='Joan Miró', entities=['Joan Miró', 'Boris Fridman', 'Louis Broder']
+  [LOCAL-441] Batch P856 check: 8 domains, budget=10s, pool=10
+  [SQ-S2] Wikidata P856 check failed for goldenglobes.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for ebsco.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for berkeleyside.org: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for gofundme.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for primafootballclub.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for tandemantiguedades.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for mutualart.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for dignitymemorial.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 8 tier3, 0 budget-expired
+  [LOCAL-440] Story-seeking: 4 queries, 28 results, 10.6s
+    Step 2: 4 queries → 28 results, 62 unique candidates
+    [LOCAL-440] Candidate 1 not a story: The text provides historical information about Broder and Miró but lacks a narra
+    [LOCAL-440] Candidate 2 not a story: The text lacks a clear narrative arc with a named person, real actions, and a re
+    [LOCAL-440] Candidate 3 not a story: The text provides information about the Lézard series and its commissioning but 
+    [LOCAL-440] Candidate 4 not a story: The text provides factual information about Miró's collaboration but lacks a nar
+    [LOCAL-440] Candidate 5 not a story: The text does not present a named person with real actions and lacks a narrative
+    [LOCAL-440] Candidate 6 not a story: The text lacks a named person, real actions, and an arc; it is purely factual an
+    [LOCAL-423] Entity disambiguation: excluded 6 snippets for 'Fridman' (wrong entity)
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    [LOCAL-440] Candidate 8 not a story: The text does not present a named person, real actions, or an arc; it is primari
+    [LOCAL-440] Candidate 9 not a story: The text provides factual information about the artwork but lacks a narrative ar
+    [LOCAL-440] Candidate 10 not a story: The text does not contain a named person, real actions, or an arc; it is purely 
+    [LOCAL-440] Candidate 11 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 12 not a story: The text does not present a named person, real actions, or an arc; it is primari
+    [LOCAL-440] Candidate 13 not a story: The text provides information about the artwork but lacks a named person, real a
+    [LOCAL-440] Candidate 14 not a story: The text provides factual information about the artwork and the artist but lacks
+    [LOCAL-440] Candidate 15 not a story: The text provides factual information about the artwork but lacks a narrative ar
+    [LOCAL-423] Entity disambiguation: excluded 6 snippets for 'Fridman' (wrong entity)
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    [LOCAL-440] Candidate 17 not a story: The text provides factual information about a person's death and service but lac
+    [LOCAL-440] Candidate 18 not a story: The text lacks a named person with a clear arc of setup, struggle, and resolutio
+    [LOCAL-440] Candidate 19 not a story: The text lacks a named person, real actions with a clear arc, and does not prese
+    [LOCAL-423] Entity disambiguation: excluded 6 snippets for 'Fridman' (wrong entity)
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    [LOCAL-440] Candidate 21 not a story: The text does not present a named person, real actions, or a narrative arc; it f
+    [LOCAL-440] Candidate 22 not a story: The text provides information about the artwork but lacks a narrative arc with a
+    [LOCAL-440] Candidate 23 not a story: The text does not present a named person, real actions, or an arc; it primarily 
+    [LOCAL-440] Candidate 24 not a story: The text lacks a named person, real actions, and an arc; it primarily provides f
+    [LOCAL-440] Candidate 25 not a story: The text does not present a named person, real actions, or an arc; it is purely 
+    [LOCAL-440] Candidate 26 not a story: The text provides factual information about the artwork and the artist but lacks
+    [LOCAL-440] Candidate 27 not a story: The text provides factual information about the artwork but lacks a named person
+    [LOCAL-440] Candidate 28 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 29 not a story: The text provides factual information about the artwork but lacks a named person
+    [LOCAL-440] Candidate 30 not a story: The text does not present a named person, real actions, or an arc; it only descr
+    [LOCAL-440] Candidate 31 not a story: The text provides factual information about the artwork but lacks a named person
+    [LOCAL-440] Candidate 32 not a story: The text does not present a named person, real actions, or a narrative arc; it l
+    [LOCAL-440] Candidate 33 not a story: The text provides information about the artwork but lacks a narrative arc with a
+    [LOCAL-440] Candidate 34 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 35 not a story: The text does not present a named person, real actions, or a narrative arc; it m
+    [LOCAL-440] Candidate 36 not a story: The text provides factual information about the artwork but lacks a narrative ar
+    [LOCAL-440] Candidate 37 not a story: The text lacks a named person, real actions, and an arc; it primarily describes 
+    [LOCAL-440] Candidate 38 not a story: The text provides factual information about the artwork but lacks a named person
+    [LOCAL-440] Candidate 39 not a story: The text lacks a named person, real actions, and an arc; it is primarily descrip
+    [LOCAL-440] Candidate 40 not a story: The text lacks a named person, real actions, and an arc; it is primarily descrip
+    [LOCAL-440] Candidate 41 not a story: The text lacks a named person, real actions, and an arc; it primarily provides f
+    [LOCAL-440] Candidate 42 not a story: The text provides factual information about an artwork but lacks a named person,
+    [LOCAL-440] Candidate 43 not a story: The text lacks a named person, real actions, and an arc; it only provides factua
+    [LOCAL-440] Candidate 44 not a story: The text does not present a named person, real actions, or a narrative arc; it m
+    [LOCAL-440] Candidate 45 not a story: The text does not present a named person, real actions with a narrative arc, or 
+    [LOCAL-440] Candidate 46 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 47 not a story: The text provides information about the gallery but lacks a named person, real a
+    [LOCAL-440] Candidate 48 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 49 not a story: The text does not present a named person, real actions, or an arc; it is a descr
+    [LOCAL-440] Candidate 50 not a story: The text does not contain a named person, real actions, or an arc; it is purely 
+    [LOCAL-440] Candidate 51 not a story: The text does not present a named person, real actions, or an arc; it is descrip
+    [LOCAL-440] Candidate 52 not a story: The text does not contain a named person, real actions, or an arc; it is primari
+    [LOCAL-440] Candidate 53 not a story: The text does not present a named person with real actions or an arc; it describ
+    [LOCAL-440] Candidate 54 not a story: The text provides information about Joan Miró but lacks a narrative arc with a n
+    [LOCAL-440] Candidate 55 not a story: The text does not present a named person, real actions, or a narrative arc; it f
+    [LOCAL-440] Candidate 56 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 57 not a story: The text does not contain a named person, real actions, or an arc; it is purely 
+    [LOCAL-440] Candidate 58 not a story: The text lacks a named person, real actions, and an arc; it is primarily informa
+    [LOCAL-440] Candidate 59 not a story: The text lacks a named person, real actions, and an arc; it is purely informatio
+    [LOCAL-440] Candidate 60 not a story: The text lacks a named person, real actions, and an arc; it consists of factual 
+    [LOCAL-440] Candidate 61 not a story: The text lacks a named person, real actions, and an arc; it is purely informatio
+    [LOCAL-440] Candidate 62 not a story: The text does not present a named person, real actions, or a clear narrative arc
+  [LOCAL-440] Evaluation: 62 candidates → 3 verified stories
+    Step 4: 3 stories ready for packer (88.6s, $0.0040)
+    Stop 1 'Le Lézard aux plumes d’or (The Lizard wi': verified_stories=3 elapsed=88.6s cost=$0.0040
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+
+  [LOCAL-440] Story-first pipeline for 'Moses and Monotheism'
+    Step 1: anchor_facts — artist='Salvador Dalí', entities=['Salvador Dalí']
+  [LOCAL-441] Batch P856 check: 8 domains, budget=10s, pool=10
+  [SQ-S2] Wikidata P856 check failed for evafogelman.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for library.oapen.org: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for modernamuseet.se: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for brill.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for marizamorin.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for vksart.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for belkin.ubc.ca: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for studocu.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 8 tier3, 0 budget-expired
+  [LOCAL-440] Story-seeking: 2 queries, 12 results, 10.1s
+    Step 2: 2 queries → 12 results, 35 unique candidates
+    [LOCAL-440] Candidate 1 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 2 not a story: The text provides factual information about Dali's work but lacks a named person
+    [LOCAL-440] Candidate 3 not a story: The text does not present a named person with a clear arc of setup, struggle, an
+    [LOCAL-440] Candidate 4 not a story: The text does not present a named person with real actions or a clear narrative 
+    [LOCAL-440] Candidate 5 not a story: The text does not present a narrative with a clear arc of setup, struggle, and r
+    [LOCAL-440] Candidate 6 not a story: The text does not present a named person, real actions, or a narrative arc. It a
+    [LOCAL-440] Candidate 7 not a story: The text lacks a named person, real actions, and an arc; it primarily provides i
+    [LOCAL-440] Candidate 8 not a story: The text lacks a named person, real actions, and an arc; it simply states a fact
+    [LOCAL-440] Candidate 9 not a story: The text does not present a named person with a clear arc of setup, struggle, an
+    [LOCAL-440] Candidate 10 not a story: The text lists titles and authors without a narrative arc, named person, or real
+    [LOCAL-440] Candidate 11 not a story: The text does not present a narrative with a named person, real actions, or a cl
+    [LOCAL-440] Candidate 12 not a story: The text does not present a narrative with a named person, real actions, or an a
+    [LOCAL-440] Candidate 13 not a story: The text lacks a named person, real actions, and an arc. It consists of factual 
+    [LOCAL-440] Candidate 14 not a story: The text does not present a named person, real actions, or an arc; it merely des
+    [LOCAL-440] Candidate 15 not a story: The text does not present a named person with real actions or an arc; it merely 
+    [LOCAL-440] Candidate 16 not a story: The text does not contain a named person, real actions, or an arc; it merely pro
+    [LOCAL-440] Candidate 17 not a story: The text lacks a named person, real actions, and an arc; it is primarily a descr
+    [LOCAL-440] Candidate 18 not a story: The text does not present a named person, real actions, or a narrative arc; it m
+    [LOCAL-440] Candidate 19 not a story: The text lacks a named person, real actions, and an arc; it is primarily descrip
+    [LOCAL-440] Candidate 20 not a story: The text provides factual information about the artwork and its creator but lack
+    [LOCAL-440] Candidate 21 not a story: The text provides factual information about a book but lacks a narrative arc wit
+    [LOCAL-440] Candidate 22 not a story: The text does not present a named person with a clear arc of setup, struggle, an
+    [LOCAL-440] Candidate 23 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 24 not a story: The text does not contain a named person, real actions, or an arc; it is merely 
+    [LOCAL-440] Candidate 25 not a story: The text does not present a named person engaging in real actions with a narrati
+    [LOCAL-440] Candidate 26 not a story: The text does not present a named person engaging in real actions with a narrati
+    [LOCAL-440] Candidate 27 not a story: The text does not present a clear narrative arc with a named person, real action
+    [LOCAL-440] Candidate 28 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 29 not a story: The text does not present a named person, real actions, or a clear narrative arc
+    [LOCAL-440] Candidate 30 not a story: The text does not contain a named person, real actions, or an arc; it is purely 
+    [LOCAL-440] Candidate 31 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+    [LOCAL-440] Candidate 32 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 33 not a story: The text does not present a named person, real actions, or a clear narrative arc
+    [LOCAL-440] Candidate 34 not a story: The text does not contain a named person, real actions, or an arc; it is purely 
+    [LOCAL-440] Candidate 35 not a story: The text does not present a named person, real actions, or a narrative arc; it d
+  [LOCAL-440] Evaluation: 35 candidates → 0 verified stories
+    Step 4: 0 stories ready for packer (56.3s, $0.0020)
+    Stop 2 'Moses and Monotheism': verified_stories=0 elapsed=56.3s cost=$0.0020
+
+  [LOCAL-440] Story-first pipeline for 'Au Soleil du Plafond'
+    Step 1: anchor_facts — artist='Juan Gris', entities=['Juan Gris']
+  [LOCAL-441] Batch P856 check: 2 domains, budget=10s, pool=10
+  [SQ-S2] Wikidata P856 check failed for dokumen.pub: HTTP Error 502: Bad Gateway
+  [SQ-S2] Wikidata P856 check failed for academicdestressor.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 2 tier3, 0 budget-expired
+  [LOCAL-440] Story-seeking: 2 queries, 12 results, 9.4s
+    Step 2: 2 queries → 12 results, 40 unique candidates
+    [LOCAL-440] Candidate 1 not a story: The text provides factual information about the artwork and its exhibitions but 
+    [LOCAL-440] Candidate 2 not a story: The text does not contain a named person, real actions, or a narrative arc. It a
+    [LOCAL-440] Candidate 3 not a story: The text does not present a named person, real actions, or a narrative arc. It c
+    [LOCAL-440] Candidate 4 not a story: The text lacks a named person, real actions, and an arc; it is fragmented and do
+    [LOCAL-440] Candidate 5 not a story: The text lacks a named person, real actions, and a clear narrative arc. It consi
+    [LOCAL-440] Candidate 6 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 7 not a story: The text provides factual information about a book and an artwork but lacks a na
+    [LOCAL-440] Candidate 8 not a story: The text lacks a named person, real actions, and an arc; it is primarily descrip
+    [LOCAL-440] Candidate 9 not a story: The text lacks a named person, real actions, and an arc; it is more of a descrip
+    [LOCAL-440] Candidate 10 not a story: The text does not present a named person with real actions or a narrative arc; i
+    [LOCAL-440] Candidate 11 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 12 not a story: The text does not present a named person or a clear narrative arc; it describes 
+    [LOCAL-440] Candidate 13 not a story: The text does not present a narrative with a named person, real actions, or a cl
+    [LOCAL-440] Candidate 14 not a story: The text provides factual information about the artist and his work but lacks a 
+    [LOCAL-440] Candidate 15 not a story: The text lacks a named person, real actions, and an arc; it is primarily descrip
+    [LOCAL-440] Candidate 16 not a story: The text does not contain a named person with a narrative arc; it simply describ
+    [LOCAL-440] Candidate 17 not a story: The text provides factual information about the artwork and its creators but lac
+    [LOCAL-440] Candidate 18 not a story: The text provides factual information about the artwork but lacks a named person
+    [LOCAL-440] Candidate 19 not a story: The text does not contain a named person, real actions, or an arc; it is simply 
+    [LOCAL-440] Candidate 20 not a story: The text lacks a named person, real actions, and an arc; it is primarily a descr
+    [LOCAL-440] Candidate 21 not a story: The text lacks a named person with a clear narrative arc; it primarily provides 
+    [LOCAL-440] Candidate 22 not a story: The text lacks a named person, real actions, and an arc; it appears to be a list
+    [LOCAL-440] Candidate 23 not a story: The text does not present a named person, real actions, or an arc; it is primari
+    [LOCAL-440] Candidate 24 not a story: The text does not contain a named person, real actions, or an arc; it is primari
+    [LOCAL-440] Candidate 25 not a story: The text does not present a named person, real actions, or a narrative arc; it m
+    [LOCAL-440] Candidate 26 not a story: The text provides factual information about a book but lacks a named person, rea
+    [LOCAL-440] Candidate 27 not a story: The text lacks a named person, real actions, and an arc; it appears to be a frag
+    [LOCAL-440] Candidate 28 not a story: The text lacks a clear narrative arc with a named person performing real actions
+    [LOCAL-440] Candidate 29 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 30 not a story: The text does not present a named person, real actions, or an arc; it merely sta
+    [LOCAL-440] Candidate 31 not a story: The text does not present a named person, real actions, or a narrative arc; it i
+    [LOCAL-440] Candidate 32 not a story: The text does not present a named person, real actions, or a clear narrative arc
+    [LOCAL-440] Candidate 33 not a story: The text does not present a named person, real actions, or a clear narrative arc
+    [LOCAL-440] Candidate 34 not a story: The text lacks a named person with a clear arc involving setup, struggle, and re
+    [LOCAL-440] Candidate 35 not a story: The text provides factual information about the artwork but lacks a narrative ar
+    [LOCAL-440] Candidate 36 not a story: The text does not contain a named person, real actions, or an arc; it only provi
+    [LOCAL-440] Candidate 37 not a story: The text does not contain a named person, real actions, or an arc; it is a direc
+    [LOCAL-440] Candidate 38 not a story: The text does not present a named person with real actions or a narrative arc; i
+    [LOCAL-440] Candidate 39 not a story: The text lacks a named person, real actions, and an arc; it is primarily factual
+    [LOCAL-440] Candidate 40 not a story: The text lacks a named person, real actions, and an arc; it is primarily a list 
+  [LOCAL-440] Evaluation: 40 candidates → 0 verified stories
+    Step 4: 0 stories ready for packer (63.0s, $0.0020)
+    Stop 3 'Au Soleil du Plafond': verified_stories=0 elapsed=63.0s cost=$0.0020
+
+  [LOCAL-440] Story-first complete: total_elapsed=207.9s, total_cost=$0.0080
+  [LOCAL-440] Verified stories found: 3 across 3 stops
+
+Generating description for Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers) by , ...
+
+Generating description for Stop 2: Moses and Monotheism by , ...
+
+Generating description for Stop 3: Au Soleil du Plafond by , ...
+  [LOCAL-381] stop='Moses and Monotheism' matched_work=True medium='Illustrations' work_identity_chars=269
+  [LOCAL-383] Stop 2 beats: Dalí, Freud, Torf
+  [LOCAL-411] Stop 2 snippet ranking: input=24 bio_rejected=0 tier3_demoted=21 cap=5 output=5 usable=5 (t1t2=3, t3=2)
+    Top scores: [('Moses and Monotheism', 7, 'tier1'), ('Moses and Monotheism by Salvador Dalí on artnet', 5, 'tier2'), ("Salvador Dalí - Moses and Monotheism - Sotheby's", 4, 'tier3')]
+  [LOCAL-407] Stop 2: 2 candidate specifics extracted: ['edition/number: set of 10', 'material: on sheepskin']
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10938 after=23566 (+12628 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23566)
+  [LOCAL-381] stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' matched_work=True medium='Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum' work_identity_chars=413
+  [LOCAL-383] Stop 1 beats: Louis Broder, Mourlot Frères, Boris Fridman
+  [LOCAL-411] Stop 1 snippet ranking: input=59 bio_rejected=0 tier3_demoted=42 cap=5 output=5 usable=5 (t1t2=4, t3=0)
+    Top scores: [('Exhibition Checklist — Le Lézard aux plumes d’or (', 10, ''), ('Joan Miró. Cover front from Le Lézard aux plumes d', 10, 'tier1'), ('Joan Miró. Plate (folio 20) from Le Lézard aux plu', 10, 'tier1')]
+  [LOCAL-407] Stop 1: 3 candidate specifics extracted: ['material: publisher’s vellum', 'plate count: 40 color lithographs', 'publisher/printer: Louis Broder']
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-417] Stop 1: SUPPRESSED 1 required names (no snippet evidence): ['Mourlot Frères']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11401 after=24470 (+13069 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24470)
+  [LOCAL-380] Recovered collaborator from page prose: 'Pierre Reverdy'
+  [LOCAL-381] stop='Au Soleil du Plafond' matched_work=True medium='' work_identity_chars=1720
+  [LOCAL-383] Stop 3 beats: Juan Gris, Pierre Reverdy
+  [LOCAL-411] Stop 3 snippet ranking: input=30 bio_rejected=0 tier3_demoted=24 cap=5 output=5 usable=5 (t1t2=4, t3=1)
+    Top scores: [('Designed by Juan Gris - Au Soleil du Plafond', 10, 'tier1'), ('LES RECUEILS ILLUSTRÉS DE PIERRE REVERDY', 7, 'tier2'), ('Au soleil du plafond by Juan Gris on artnet', 5, 'tier2')]
+  [LOCAL-407] Stop 3: 3 candidate specifics extracted: ['plate count: 11 lithograph', 'publisher/printer: Éditions Verve', 'publisher/printer: Mourlot Frères']
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12030 after=24987 (+12957 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24987)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-440/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0297 (6248 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/3)
+Stop 3 API call cost: $0.0310 (6527 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Au Soleil du Plafond' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Éditions Verve, renowned for its dedication to high-quality art publications, chose to work with Juan Gris to leverage his unique style in lithography. Gris's collaboration with Pierre Reverdy, known for his surrealist poetry, allowed for a seamless integration of text and image—a defining feature o"
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0316 (6662 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Louis Broder, the publisher behind this exquisite piece, was known for his dedication to the livre d'artiste, a form that merges text and art into a singular artistic expression. By commissioning Miró, Broder sought to elevate the book into an art form where the collaboration between artist, poet, a"
+  [LOCAL-417] Stop 1: retrying (attempt 1, temp=0.90)...
+Stop 2 API call cost: $0.0319 (6718 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/3)
+Stop 2 API call cost: $0.0340 (7152 tokens, model=gpt-4o)
+Stop 2 description word count: 177 words
+  [LOCAL-407] Stop 2 snippet-specifics audit:
+    offered: 2
+    used:    1 — ['material: on sheepskin']
+    ignored: 1 — ['edition/number: set of 10']
+Stop 3 API call cost: $0.0313 (6590 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Au Soleil du Plafond' or significant word)"]
+  [LOCAL-417]   verbatim: 'Juan Gris, known for his pioneering role in Cubism, worked closely with poet Pierre Reverdy, a leading figure in the Symbolist movement. Their collaboration resulted in a fusion of visual and linguistic artistry, captured across 11 lithographs. These lithographs, commissioned by Éditions Verve, were'
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 1 API call cost: $0.0318 (6692 tokens, model=gpt-4o)
+Stop 1 description word count: 293 words
+  [LOCAL-407] Stop 1 snippet-specifics audit:
+    offered: 3
+    used:    3 — ['material: publisher’s vellum', 'plate count: 40 color lithographs', 'publisher/printer: Louis Broder']
+    ignored: 0 — []
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0315 (6631 tokens, model=gpt-4o)
+Stop 3 description word count: 209 words
+  [LOCAL-407] Stop 3 snippet-specifics audit:
+    offered: 3
+    used:    2 — ['plate count: 11 lithograph', 'publisher/printer: Éditions Verve']
+    ignored: 1 — ['publisher/printer: Mourlot Frères']
+  [LOCAL-388] PRE-GATE stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' beats_assigned=3 beats_in_output=3 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Moses and Monotheism' beats_assigned=3 beats_in_output=3 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Au Soleil du Plafond' beats_assigned=2 beats_in_output=2 dropped=[]
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Moses and Monotheism': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Au Soleil du Plafond': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001383 (input=5717, output=875)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    [LOCAL-427] Venue page text injected as verification source (venue source, 8215 chars from https://www.mfa.org/exhibition/picasso-miro-dali-unbound)
+    [LOCAL-423] Entity disambiguation: excluded 3 snippets for 'Fridman' (wrong entity)
+      • Boris Fridman-Mintz PhD Instituto Nacional de Antropología e: Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+      • FRIDMAN GALLERY: Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+      • Fridman Gallery | Artists, Art for Sale, and Contact Info - : Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    ✗ FAIL stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)': claims=4, sourced=1, unsourced=3, contradicted=0
+      → UNSOURCED: 'Mourlot Frères, the Parisian printer' (person_descriptor) — no snippet contains this assertion
+      → UNSOURCED: 'the Parisian printer' (location_descriptor) — no snippet contains this assertion
+      → UNSOURCED: 'in 2024' (year) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='in 1971' ← https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+      disambiguation: excluded 3 snippets
+        • 'Boris Fridman-Mintz PhD Instituto Nacional de Antr': Wrong person: Boris Fridman-Mintz is a Mexican linguist, not the collector
+        • 'FRIDMAN GALLERY': Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+        • 'Fridman Gallery | Artists, Art for Sale, and Conta': Wrong entity: Fridman Gallery (NYC, 2013) is unrelated to collector Boris Fridman
+    ✓ PASS stop='Moses and Monotheism': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='1974' ← https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+        claim='in 1939' ← https://www.daliparis.com/en/gallery-item/dream-moses-monoth
+    ✓ PASS stop='Au Soleil du Plafond': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='1955' ← https://www.mfa.org/exhibition/picasso-miro-dali-unbound
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 2 sentence(s) from 'Le Lézard aux plumes d’or (The Lizard with Golden Feathers)':
+      ✗ "This work is a shining example of the collaborative artistry that defines the livre d'artiste tradit"
+      ✗ "Through his gift, the museum further enhanced its status as one of the world's most visited art inst"
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 1 paragraphs retried, 1 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0004 (498 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'Moses and Monotheism': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 1
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=1, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 1
+    Deletion rate: 5.0% (1/20)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 4
+    Glossed (composed): 0
+    Suppressed (already explained): 2
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1055 tokens, $0.0002, 3.9s
+    Gloss: 593 tokens, $0.0001, 2.0s
+    Compose: 982 tokens, $0.0002, 1.4s
+    Total added cost: $0.0005
+    Stops affected: 1
+    Glosses applied:
+      • Fine Arts → SUPPRESSED (already explained)
+      • Salvador Dalí → SUPPRESSED (already explained)
+      • Boston Athenæum → DEGRADED (name dropped)
+
+  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...
+  [LOCAL-390] person 'Pierre Reverdy' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Juan Gris' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Salvador Dalí' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Boris Fridman' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Mourlot Frères' pre-grounded (story beat source) — keeping
+  [LOCAL-390] person 'Sigmund Freud' pre-grounded (story beat source) — keeping
+  [LOCAL-385] Prose entity grounding gate summary:
+    Persons detected: 8
+    Persons grounded: 8
+    Persons ungrounded: 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-385] PHASE 5.159: Form-claim gate (scans all prose fields)...
+  [LOCAL-385] Form-claim gate summary:
+    Claims detected: 0
+    Claims kept (compatible): 0
+    Claims removed: 0
+    Metaphor-exempt (kept): 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-389] PHASE 5.160: Numeric-claim gate (scans all prose fields)...
+  [LOCAL-389] Numeric-claim gate summary:
+    Claims detected: 0
+    Grounded (identity block): 0
+    Grounded (page text): 0
+    Ungrounded (dropped): 0
+    Sentences dropped: 0
+    Stops affected: 0
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] coherence reject: '"Au Soleil du Plafond," crafted by the Spanish artist Juan Gris in collaboration' — 'Juan Gris' died in 1887, cannot have collaboration with in 1955
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 27
+    Relations rejected: 1
+    Sentences removed: 1
+    Stops affected: 1
+    [LOCAL-402] coherence reject: '"Au Soleil du Plafond," crafted by the Spanish artist Juan Gris in collaboration' — 'Juan Gris' died in 1887, cannot have collaboration with in 1955
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Museum of Fine Arts, Boston'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [2] DELETED: 'This set' in: This set of ten illustrations was created on sheepskin, a material that echoes t
+    [3] DELETED: 'This undertaking' in: This undertaking reinforces the Museum of Fine Arts’ storied history of acquirin
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-382] Thesis block injected into prolog (919 chars)
+  [R2] Prolog saved for Stop 1 (103 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 103 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 103 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 145
+    Words after:  145
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.3s, $0.0081, 1185 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Le Lézard aux plumes d’or (The Lizard with Golden Feathers)] (mystery): The lithographs, masterfully printed on publisher’s vellum, transform the pages ...
+      [Moses and Monotheism] (cause): Freud, the father of psychoanalysis, authored the text in 1939, suggesting that ...
+      [Au Soleil du Plafond] (mystery): Reverdy's manuscript, lithographed to match Gris's designs, explores the porous ...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0035 (583 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (40 words):
+      "At Le Lézard aux plumes d’or, you will see lithographs printed on publisher’s vellum transforming an ordinary lizard into a surreal creation. Moses and Monotheism presents Freud's 1939 theory suggesting Moses was an Egyptian priest, reshaping perceptions of monotheistic origins."
+      Stops referenced: 2
+    Part 4 total cost: $0.0035
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Museum of Fine Arts, Boston — next is Moses...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in Museum of Fine Arts, Boston: Au Soleil du...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.4s, $0.0028, 470 tokens
+  [LOCAL-280] Recap built: 26 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Le Lézard aux plumes d’or (The Lizard with Golden Feathers)] (mystery): "The lithographs, masterfully printed on publisher’s vellum, transform the pages ..."
+      → composed: "Le Lézard aux plumes d’or showcases lithographs on publisher’s vellum"
+    [Au Soleil du Plafond] (mystery): "Reverdy's manuscript, lithographed to match Gris's designs, explores the porous ..."
+      → composed: "Au Soleil du Plafond lithographs Reverdy's manuscript to match Gris's designs"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Le Lézard aux plumes d’or showcases lithographs on publisher’s vellum and Au Soleil du Plafond lithographs Reverdy's manuscript to match Gris's designs."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [LOCAL-275] Part 2: Treat Page only (no tour verified), anchored to (42.3391, -71.0898)
+  [LOCAL-275] Part 2 (news): news_orchestrator_service.py confirmed
+  [LOCAL-275] Closing offer: 2 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 4: PARTS_OUT_OF_ORDER — Part 4 appears before Part 3 (sentence 3 vs 6).
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+  [LOCAL-391] Final assembly scrub: replaced 1 unfilled role(s)
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='Le Lézard aux plumes d’or (The Lizard with Golden Feathers)' beats_assigned=3 beats_in_output=2 dropped=['Mourlot Frères'] causes=[Mourlot Frères=never_written]
+    stop='Moses and Monotheism' beats_assigned=3 beats_in_output=3 dropped=[]
+    stop='Au Soleil du Plafond' beats_assigned=2 beats_in_output=2 dropped=[]
+
+=== Word Count Statistics ===
+Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers) - 293 words
+Stop 2: Moses and Monotheism - 177 words
+Stop 3: Au Soleil du Plafond - 209 words
+===========================
+
+
+Total API cost: $0.1173 (26234 tokens)
+CACHE STORE: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA / contained / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-440/tours/local440_mfa_unbound.txt
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA - Museum Tour
+Tour-Category: museum
+
+Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+
+Address: Avenue of the Arts, 465 Huntington Ave, Boston, MA 02115
+
+Coordinates: 42.3391, -71.0898
+
+Orientation: The Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, invites you to explore the extraordinary world of livre d'artiste, where images, words, and typography intersect in groundbreaking ...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Le Lézard aux plumes d’or (The Lizard with Golden : serp_results=55 snippets_injected=56 beats_in_delivered_text=0
+    Moses and Monotheism: serp_results=24 snippets_injected=24 beats_in_delivered_text=0
+    Au Soleil du Plafond: serp_results=30 snippets_injected=30 beats_in_delivered_text=0
+========================================================================

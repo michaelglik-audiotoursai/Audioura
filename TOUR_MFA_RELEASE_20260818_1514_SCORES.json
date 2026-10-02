@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 147.01700496673584,
+  "chars": 4928,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "index": 43,
+      "historic": 12,
+      "detail": 13,
+      "social": 57,
+      "text": "\"Le Lézard aux plumes d’or,\" created in 1971, is a vivid exploration of color and form, comprising 40 color lithographs, including a striking cover. The collaboration between Joan Miró and Louis Broder, the publisher dedicated to the livre d'artiste, was pivotal. The involvement of Boris Fridman, who donated this piece to the museum, further enriches its story. Fridman’s gift significantly expanded the MFA’s collection of Surrealist-era printed works, highlighting the critical importance of collaboration in advancing the book as an art form. This work exemplifies the exhibition’s thesis, illustrating how the combined efforts of artist, publisher, and Mourlot Frères transform a book into a complete artistic expression.",
+      "orientation": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA immerses you in the extraordinary works by Spanish artists. The art form showcased here is the livre d'artiste, a revolutionary fusion of images, words, and typography that transformed the book into an art form. These deeply collaborative ventures, rarely on view, delve into the intersection of art and literature. Within this captivating realm, you will encounter Le Lézard aux plumes d’or, Au Soleil du Plafond, and Moses and Monotheism, each a testament to the exploration of transformation and illumination through art and belief. At Le Lézard aux plumes d’or, discover the enriching involvement of Boris Fridman in the piece. Then, at Moses and Monotheism, learn about Freud's controversial proposal that Moses was Egyptian, challenging traditional religious narratives. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). As you enter the exhibition space at the Museum of Fine Arts, Boston, allow your eyes to be drawn to the illustrated book \"Le Lézard aux plumes d’or (The Lizard with Golden Feathers)\" by Joan Miró. Stand close enough to examine its vibrant lithographs, where each color and line seems to leap off the Louis Broder’s vellum, a testament to the meticulous printing by Mourlot Frères. This proximity reveals the texture and interplay of images and text, a signature of Miró’s surreal vision."
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "index": 21,
+      "historic": 0,
+      "detail": 20,
+      "social": 15,
+      "text": "Éditions Verve published this work with exquisite care, using Arches paper to enhance the visual impact of the lithographs. The Museum of Fine Arts exhibition honors the legacy of Gris and Reverdy and the impact of artistic partnerships on modern art.",
+      "orientation": "Stand directly in front of \"Au Soleil du Plafond\" to fully appreciate the intricate interplay of text and imagery. From this vantage point, the detailed lithographs and handwritten script become part of a unified artistic expression, illuminating the collaborative genius of Juan Gris and Pierre Reverdy."
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "index": 44,
+      "historic": 0,
+      "detail": 6,
+      "social": 45,
+      "text": "This exhibit is a striking example of how Dalí, the surrealist illustrator, brought Freud’s controversial ideas to life through his distinctive artistic lens. Freud challenged conventional religious narratives by proposing that Moses was an Egyptian, causing a stir in theological and psychological circles. By doing so, Freud laid the groundwork for Dalí to visualize these complex themes through his art. Dalí’s decision to partner with Freud resulted in a visual narrative that not only complements Freud's text but also enhances its psychological depth, thus advancing the exhibition’s thesis of artists transforming books into multidimensional artworks. The Hogarth Press, known for its groundbreaking publications, printed this work, ensuring that the collaboration reached an audience ready for bold interpretations. What remains is an extraordinary testament to the potential of creative partnerships in redefining how we experience textual and visual storytelling.\n\nThat's 3 stops — Le Lézard aux plumes d’or showcases Boris Fridman's donation and Au Soleil du Plafond celebrates Gris and Reverdy's artistic partnership legacy. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "This spot reveals the deliberate fusion of text and image, drawing you into the provocative intersection that Dalí and Freud crafted together."
+    }
+  ]
+}

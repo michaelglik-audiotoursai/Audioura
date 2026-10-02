@@ -7,7 +7,9 @@ import requests
 import json
 import secrets
 from dh_service_simple import DH_PRIME, DH_GENERATOR, derive_aes_key
+import pytest
 
+@pytest.mark.service
 def test_mobile_public_key_protocol():
     """Test complete mobile public key protocol"""
     print("=== TESTING MOBILE PUBLIC KEY PROTOCOL ===")

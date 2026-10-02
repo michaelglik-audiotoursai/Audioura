@@ -1,0 +1,42 @@
+[
+  {
+    "work": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+    "old": "13.1",
+    "new": "2.1",
+    "by": "accept",
+    "index": 60,
+    "kind": "inert",
+    "examined_old": 16,
+    "examined_new": 1
+  },
+  {
+    "work": "Au Soleil du Plafond",
+    "old": "2.1",
+    "new": "2.1",
+    "by": "accept",
+    "index": 62,
+    "kind": "eventful",
+    "examined_old": 12,
+    "examined_new": 1
+  },
+  {
+    "work": "Moses and Monotheism",
+    "old": null,
+    "new": "1.1",
+    "by": "accept",
+    "index": 63,
+    "kind": "inert",
+    "examined_old": 9,
+    "examined_new": 1
+  },
+  {
+    "work": "Moses and Monotheism (production, today)",
+    "old": null,
+    "new": "Salvador Dalí",
+    "by": "accept",
+    "index": 51,
+    "kind": "inert",
+    "examined_old": 4,
+    "examined_new": 1
+  }
+]

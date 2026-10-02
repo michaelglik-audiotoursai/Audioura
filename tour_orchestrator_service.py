@@ -11,7 +11,7 @@ import requests
 import traceback
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 import flask
 from flask import Flask, request, jsonify, send_file as _send_file, make_response
 import inspect as _inspect
@@ -44,6 +44,13 @@ def _compat_send_file(path_or_file, **kwargs):
 
 
 send_file = _compat_send_file
+
+# [GCS-KS1] Env kill switch for user-chosen stops (D591). Default OFF: unless
+# USER_STOPS_ENABLED=true, a request's user-chosen stops are neutralized right at
+# this HTTP boundary so the tour is generated the normal way. Local Docker sets
+# the flag true (docker-compose-beta-local.yml et al.) so the Mac Mini keeps the
+# feature. See user_stops_flag.py for the contract.
+from user_stops_flag import neutralize_if_disabled as _neutralize_user_stops
 
 # ARCHITECTURAL NOTE: Directory Cleanup Policy
 # - ZIP files are the PRIMARY storage format in database
@@ -196,6 +203,62 @@ def sanitize_input(input_text):
         sanitized = sanitized[:200].strip()
     
     return sanitized
+
+
+# [LOCAL-525] Ceiling on user-chosen stops — mirrors the total_stops 1..50 range.
+_MAX_USER_STOPS = 50
+
+
+def validate_stops(raw):
+    """Validate and sanitize a user-supplied ``stops`` list (LOCAL-525).
+
+    Promotes the engine's forced_stops path (LOCAL-357) to a product input at the
+    orchestrator boundary. Each name is run through ``sanitize_input`` for the same
+    filesystem/injection safety every other user string gets.
+
+    Contract:
+      * ``None`` / missing → ``(None, None)``. Normal generation, unchanged.
+      * Non-empty list of non-empty strings → ``(clean_list, None)``, order kept.
+      * Anything else → ``(None, error_message)``. Rejected, never silently ignored.
+
+    Returns:
+        tuple(clean_stops_or_None, error_message_or_None)
+    """
+    if raw is None:
+        return None, None
+
+    if not isinstance(raw, list):
+        return None, (
+            "'stops' must be a list of stop names (strings). "
+            f"Received {type(raw).__name__}."
+        )
+
+    if len(raw) == 0:
+        return None, (
+            "'stops' was provided but is empty. Omit 'stops' for automatic stop "
+            "selection, or provide at least one stop name."
+        )
+
+    if len(raw) > _MAX_USER_STOPS:
+        return None, (
+            f"'stops' has {len(raw)} entries; the maximum is {_MAX_USER_STOPS}."
+        )
+
+    clean = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, str):
+            return None, (
+                f"'stops' entry #{i + 1} must be a string, got {type(item).__name__}."
+            )
+        name = sanitize_input(item)
+        if not name:
+            return None, (
+                f"'stops' entry #{i + 1} is blank after sanitization. Every stop "
+                "name must contain usable text."
+            )
+        clean.append(name)
+
+    return clean, None
 # Log all incoming requests
 @app.before_request
 def log_request_info():
@@ -235,7 +298,8 @@ def _graceful_shutdown(signum, frame):
 signal.signal(signal.SIGTERM, _graceful_shutdown)
 
 
-def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string, language):
+def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string,
+                        language, stops=None):
     """Enqueue a tour generation task to Cloud Tasks.
     The task will HTTP-push to tour-worker's /run-job endpoint."""
     try:
@@ -253,7 +317,16 @@ def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, reque
             "total_stops": total_stops,
             "user_id": user_id,
             "request_string": request_string,
-            "language": language
+            "language": language,
+            # [LOCAL-547, 2026-09-24] Carry the listener's chosen stops onto the CLOUD
+            # path too. This function did not take them, so `stops` reached the local
+            # thread worker (which passes them to orchestrate_tour_async) and was
+            # silently dropped the moment Cloud Tasks was the transport. The feature
+            # would therefore have worked on the Mac Mini and failed in production --
+            # the worst shape of bug, because local testing proves nothing about it.
+            # Omitted entirely when absent, so the worker's payload is unchanged for
+            # ordinary requests.
+            **({"stops": stops} if stops else {})
         })
 
         task = {
@@ -508,6 +581,22 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         """)
         has_tour_content = cur.fetchone() is not None
         print(f"tour_content column exists: {has_tour_content}")
+
+        # Track B: self-healing add, same pattern as audio_tour/lat/number_requested
+        # above — guarantees this INSERT works on any Postgres (Cloud SQL, Mac
+        # Mini local dev, a fresh checkout) regardless of whether migration/sql/007
+        # has been run against it yet.
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'track'
+        """)
+        has_track = cur.fetchone() is not None
+        if not has_track:
+            print(f"Adding track column...")
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN track VARCHAR(16) NOT NULL DEFAULT 'beta'")
+            conn.commit()
+            print("Added track column")
         
         # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
         # lower(tour_name) WHERE original_tour_id IS NULL.
@@ -556,32 +645,41 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             _is_test_mode = is_test
         else:
             _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+        # Track B: which deployment produced this row — 'beta' (default, current
+        # production) or 'storied' (the comparison track). Set per-deployment via
+        # env var, NOT per-request — Beta and Storied are separate Cloud Run
+        # services (TRACK_B_STORIED_VS_BETA.md), each always writing their own
+        # value. Distinct from storied_mode above, which is Track A's story-
+        # pipeline quality flag and can vary per-request within either track.
+        _track = os.getenv('TOUR_TRACK', 'beta').lower()
+        if _track not in ('beta', 'storied'):
+            _track = 'beta'
         if has_audio_tour and has_lat and has_number_requested and has_tour_content:
             cur.execute(
                 """
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode)
+                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track)
             )
         elif has_audio_tour and has_lat and has_number_requested:
             cur.execute(
                 """
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode)
+                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode, _track)
             )
         else:
             # Fallback if columns don't exist
             cur.execute(
                 """
-                INSERT INTO audio_tours (tour_name, request_string, is_test)
-                VALUES (%s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, is_test, track)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (tour_name, request_string, _is_test_mode)
+                (tour_name, request_string, _is_test_mode, _track)
             )
         print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
         
@@ -638,7 +736,7 @@ def link_stop_metrics_to_tour(tour_id, job_id):
         return -1
 
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -667,6 +765,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # [S81] Forward persona for direct-pass cases (skips DB lookup in tour-generator)
         if persona:
             generate_data["persona"] = persona
+        # [LOCAL-525] Forward user-chosen stops (validated at the orchestrator
+        # boundary). The tour-generator re-validates and passes them to the engine
+        # as forced_stops. Absent → omitted → normal generation, unchanged.
+        if stops:
+            generate_data["stops"] = stops
         
         print(f"Calling tour text generator API: {datetime.now().isoformat()}")
         print(f"Request data: {generate_data}")
@@ -691,10 +794,59 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         coordinates = None
         poll_count = 0
         tour_file = None
+        _consecutive_poll_failures_1 = 0
+        # [LOCAL-547, 2026-09-23] Was 6, commented "~1 minute of unreachable generator".
+        # The arithmetic never matched the comment -- each failure costs a 30s timeout
+        # plus a 10s sleep, so 6 failures is ~4 minutes, not 1 -- and more importantly
+        # the thing being measured is NOT reachability. The status endpoint is trivial;
+        # what makes it time out is the generator's own event loop being saturated by
+        # the generation it is being asked about. Busy is not dead.
+        #
+        # Measured tonight on a REAL request: Museum of Fine Arts, Boston (145 canonical
+        # titles, 689,968 chars of corpus) starved the status endpoint for 200s+ and the
+        # orchestrator killed a job the generator was still successfully working on --
+        # the tour text was being written while the caller was told it had failed. Any
+        # large museum hits this, so it is a production defect and not a test artifact.
+        #
+        # Raised to cover observed generation time. The loop is still bounded: the
+        # absolute ceiling below stops it hanging forever if the generator really is
+        # dead, which is what the original guard was for.
+        _MAX_CONSECUTIVE_POLL_FAILURES = 30
+        _POLL_LOOP_DEADLINE = datetime.now() + timedelta(minutes=20)
+        _POLL_TIMEOUT = 30  # seconds; status endpoint is trivial, this measures event-loop busy-ness
+        _poll_failure_start_1 = None
         while True:
             poll_count += 1
+            if datetime.now() > _POLL_LOOP_DEADLINE:
+                raise Exception(
+                    f"Text-generation exceeded the {20}-minute ceiling after "
+                    f"{poll_count} polls — giving up. The generator may still be "
+                    f"running; check its logs before assuming the tour was lost."
+                )
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
-            status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=10)
+            try:
+                status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=_POLL_TIMEOUT)
+            except (requests.Timeout, requests.ConnectionError) as poll_err:
+                _consecutive_poll_failures_1 += 1
+                if _poll_failure_start_1 is None:
+                    _poll_failure_start_1 = datetime.now()
+                print(
+                    f"[POLL-RESILIENCE] Text-gen status poll #{poll_count} failed "
+                    f"({type(poll_err).__name__}), consecutive failures: "
+                    f"{_consecutive_poll_failures_1}/{_MAX_CONSECUTIVE_POLL_FAILURES}"
+                )
+                if _consecutive_poll_failures_1 >= _MAX_CONSECUTIVE_POLL_FAILURES:
+                    elapsed = (datetime.now() - _poll_failure_start_1).total_seconds()
+                    raise Exception(
+                        f"Text-generation status polling failed: "
+                        f"{_consecutive_poll_failures_1} consecutive poll failures "
+                        f"over {elapsed:.0f}s. Last error: {poll_err}"
+                    )
+                time.sleep(10)
+                continue
+            # Successful network round-trip — reset consecutive failure counter
+            _consecutive_poll_failures_1 = 0
+            _poll_failure_start_1 = None
             print(f"Status response: {status_response.status_code}")
             
             if status_response.status_code == 200:
@@ -736,6 +888,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             modernized_data = {"tour_file": tour_file}
             print(f"Using tour_file for modernized service: {tour_file}")
         
+        # [LOCAL-323] Forward user_id and job_id for TTS cost attribution
+        if user_id:
+            modernized_data["user_id"] = user_id
+        modernized_data["job_id"] = job_id
+
         print(f"Calling MODERNIZED service: {datetime.now().isoformat()}")
         modernized_response = _authenticated_request("POST", f"{MODERNIZED_URL}/process",
             headers={"Content-Type": "application/json"},
@@ -752,8 +909,32 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         # Wait for modernized processing to complete
         ACTIVE_JOBS[job_id]["progress"] = "Waiting for modernized processing..."
+        _consecutive_poll_failures_2 = 0
+        _poll_failure_start_2 = None
         while True:
-            modernized_status_response = _authenticated_request("GET", f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=10)
+            try:
+                modernized_status_response = _authenticated_request("GET", f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=_POLL_TIMEOUT)
+            except (requests.Timeout, requests.ConnectionError) as poll_err:
+                _consecutive_poll_failures_2 += 1
+                if _poll_failure_start_2 is None:
+                    _poll_failure_start_2 = datetime.now()
+                print(
+                    f"[POLL-RESILIENCE] Modernized status poll failed "
+                    f"({type(poll_err).__name__}), consecutive failures: "
+                    f"{_consecutive_poll_failures_2}/{_MAX_CONSECUTIVE_POLL_FAILURES}"
+                )
+                if _consecutive_poll_failures_2 >= _MAX_CONSECUTIVE_POLL_FAILURES:
+                    elapsed = (datetime.now() - _poll_failure_start_2).total_seconds()
+                    raise Exception(
+                        f"Modernized-service status polling failed: "
+                        f"{_consecutive_poll_failures_2} consecutive poll failures "
+                        f"over {elapsed:.0f}s. Last error: {poll_err}"
+                    )
+                time.sleep(5)
+                continue
+            # Successful network round-trip — reset consecutive failure counter
+            _consecutive_poll_failures_2 = 0
+            _poll_failure_start_2 = None
             
             if modernized_status_response.status_code == 200:
                 modernized_status_data = modernized_status_response.json()
@@ -945,6 +1126,90 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as zip_error:
                 print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
         
+        # [LOCAL-306] Score the final tour before delivery.
+        # Gates NOTHING — a catastrophic score still delivers unchanged.
+        # No LLM calls, no network. Pure rule-based scoring.
+        _score_row_id = None
+        _tour_score = None
+        _per_stop_data = None
+        if tour_content:
+            try:
+                from tour_scoring_service import score_tour_text, ensure_tour_scores_table
+                ensure_tour_scores_table()
+                _n_req = int(total_stops) if total_stops else (ACTIVE_JOBS[job_id].get("actual_stops") or 0)
+                _tour_score, _score_row_id, _scoring_ms = score_tour_text(
+                    tour_content,
+                    n_requested=_n_req,
+                    tour_id=None,  # backfilled after store_audio_tour
+                    tour_name=tour_name,
+                )
+                # Extract per-stop data for guardrails diagnosis
+                if _tour_score:
+                    _per_stop_data = [
+                        {"classification": sa.classification}
+                        for sa in _tour_score.stops
+                    ]
+            except Exception as scoring_err:
+                # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
+                print(f"[SCORING] Non-fatal error during in-flight scoring: {scoring_err}")
+                traceback.print_exc()
+
+        # [LOCAL-307] Quality guardrails: diagnose shortfalls, decide retry or message.
+        # When QUALITY_GUARDRAILS_ENABLED=false (default): logs what it WOULD do,
+        # takes no action. When enabled: retries PIPELINE_LOST once, messages UNAVAILABLE.
+        _guardrail_user_message = None
+        _is_retry = ACTIVE_JOBS[job_id].get("_guardrail_retry", False)
+        if _tour_score and _per_stop_data:
+            try:
+                from quality_guardrails import (
+                    evaluate_tour, format_guardrail_log, select_better_tour
+                )
+                _guardrail_decision = evaluate_tour(_tour_score, _per_stop_data, is_retry=_is_retry)
+                print(format_guardrail_log(_guardrail_decision))
+
+                if _guardrail_decision.action == 'message' and _guardrail_decision.user_message:
+                    # Attach the message to the job for the client to read
+                    _guardrail_user_message = _guardrail_decision.user_message
+                    ACTIVE_JOBS[job_id]["quality_message"] = _guardrail_user_message
+                    print(f"[GUARDRAILS] User message attached: {_guardrail_user_message}")
+
+                elif _guardrail_decision.action == 'disabled_would_message' and _guardrail_decision.user_message:
+                    # Log what would happen; attach nothing
+                    ACTIVE_JOBS[job_id]["_guardrail_would_message"] = _guardrail_decision.user_message
+
+                # Note: 'retry' action is NOT implemented as an actual re-generation
+                # call here because it would require re-invoking the full pipeline
+                # (text generation + TTS + ZIP packaging). The retry mechanism is
+                # designed to be triggered by setting _guardrail_retry=True on the
+                # job and re-invoking orchestrate_tour_async. This is gated OFF
+                # by default and documented as the intended trigger point.
+                # When enabled, the orchestrator would:
+                #   1. Save original tour_content and score
+                #   2. Re-invoke text generation
+                #   3. Score the retry
+                #   4. select_better_tour() → deliver the winner
+                # This is the mechanism; activation requires QUALITY_GUARDRAILS_ENABLED=true.
+
+                if _guardrail_decision.action in ('disabled_would_retry', 'retry'):
+                    ACTIVE_JOBS[job_id]["_guardrail_retry_candidate"] = True
+                    ACTIVE_JOBS[job_id]["_guardrail_original_score"] = _guardrail_decision.diagnosis.score
+
+            except Exception as guardrail_err:
+                # Guardrail failure MUST NOT block delivery
+                print(f"[GUARDRAILS] Non-fatal error: {guardrail_err}")
+                traceback.print_exc()
+
+        # [LOCAL-312] Update per-user quality index (private, for review solicitation).
+        # This runs for generated tours only (not edits). The user_id here is secret_id.
+        if _tour_score and user_id:
+            try:
+                from user_quality_index import update_user_index, ensure_user_quality_index_table
+                ensure_user_quality_index_table()
+                update_user_index(user_id, _tour_score.total_score)
+            except Exception as idx_err:
+                # Index update must NOT block delivery
+                print(f"[USER_INDEX] Non-fatal error: {idx_err}")
+
         # Store in database with tour content
         store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
         
@@ -1073,6 +1338,14 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[LOCAL-128] No stop_metrics rows found for job_id={job_id_1} (i-con may not have run)")
             else:
                 print(f"[LOCAL-128] stop_metrics tour_id update failed (non-fatal)")
+
+        # [LOCAL-306] Backfill tour_id on the score row now that we know it.
+        if english_tour_id and _score_row_id:
+            try:
+                from tour_scoring_service import update_tour_id_on_score
+                update_tour_id_on_score(_score_row_id, english_tour_id)
+            except Exception as _bf_err:
+                print(f"[SCORING] Non-fatal: could not backfill tour_id on score: {_bf_err}")
 
         if language != 'en':
             pass  # translation block below handles non-English
@@ -1426,6 +1699,38 @@ def generate_complete_tour():
     request_string = sanitize_input(data.get('request_string'))
     language = data.get('language', 'en')  # Default to English
     persona = sanitize_input(data.get('persona'))  # [S81] Direct-pass persona (optional)
+
+    # [LOCAL-525] Optional user-chosen stops. Validated/sanitized here; forwarded
+    # to the tour-generator as 'stops' and ultimately to the engine's forced_stops
+    # path. Malformed → 400 with a clear message. Absent → normal generation.
+    # [LOCAL-547, 2026-09-24] Accept the field the MOBILE APP actually sends.
+    # LOCAL-525 gave the service a `stops` list; LOCAL-523 gave the app its stop
+    # editor. They were built against different names and never integrated:
+    #     app  ->  tourData['user_stops'] = stopTitlesForGeneration(_userStops)
+    #     here ->  data.get('stops')
+    # so a listener could build their stop list, press Generate, and the names
+    # never left the phone. Nothing server-side referenced `user_stops` at all --
+    # it appeared only in user_stops_validate.py and its unit test.
+    #
+    # Worse, `stops` is already taken on the app side for the stop COUNT
+    # ("'stops': _stopCountController.text"), so simply renaming in the app would
+    # collide. Accepting both here is the compatible fix and needs no new build,
+    # which matters because the install on Michael's phone is already made.
+    _raw_stops = data.get('stops')
+    _stops_field_present = 'stops' if _raw_stops is not None else None
+    if _raw_stops is None:
+        _raw_stops = data.get('user_stops')
+        if _raw_stops is not None:
+            _stops_field_present = 'user_stops'
+    # [GCS-KS1] Kill switch (D591). When USER_STOPS_ENABLED is not 'true', the
+    # user-chosen stops are dropped here — the request then behaves exactly as if
+    # the app had sent no stops at all, and validate_stops(None) yields (None, None)
+    # so the normal automatic selection runs. Logged once, with the count, when a
+    # field was actually present, so we can see whether any installed app still
+    # sends it. When the flag is on, _raw_stops passes through unchanged.
+    _raw_stops = _neutralize_user_stops(
+        _raw_stops, request_id=user_id, field=_stops_field_present)
+    stops, _stops_error = validate_stops(_raw_stops)
     
     # [LOCAL-103] Accept is_test from request — gated by server-side allow-flag
     # Trust boundary: is_test is only honored when the server is already in test mode
@@ -1458,9 +1763,22 @@ def generate_complete_tour():
     supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
     if language not in supported_languages:
         return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
+
+    # [LOCAL-525] Reject malformed user-chosen stops with a clear message.
+    if _stops_error is not None:
+        return jsonify({"error": _stops_error}), 400
     
-    if not location or not tour_type:
-        return jsonify({"error": "location and tour_type are required"}), 400
+    # [LOCAL-474] location is required; tour_type is NOT.
+    # An absent/empty tour_type means "classify it" — the downstream category
+    # classifier in generate_tour_text.py infers the category from the request
+    # text (exactly as it does for a wrong-but-nonempty type). The app sends
+    # tour_type='' whenever it recognises no category keyword (e.g. restaurant
+    # tours, which have no parser branch), and that request must be honoured,
+    # not rejected. See tour_request_parser.dart:111 and D538–D556.
+    if not location:
+        return jsonify({"error": "location is required"}), 400
+    if not tour_type:
+        print(f"[LOCAL-474] Empty tour_type — deferring category to downstream classifier")
     
     # Reject new requests during graceful shutdown
     if _SHUTTING_DOWN:
@@ -1474,6 +1792,12 @@ def generate_complete_tour():
             return jsonify({"error": "total_stops must be between 1 and 50"}), 400
     except ValueError:
         return jsonify({"error": "total_stops must be a valid integer"}), 400
+
+    # [LOCAL-525] A user-chosen stop list dictates the tour size. The engine sets
+    # total_stops = len(forced_stops), so meter/clamp against the list length, not
+    # the (possibly default) total_stops the client happened to send.
+    if stops is not None:
+        total_stops = len(stops)
     
     # Entitlements check: verify user hasn't exceeded their plan limits. FAIL-CLOSED.
     # Reject missing/anonymous user_id (matches news path — consistent policy).
@@ -1500,6 +1824,24 @@ def generate_complete_tour():
     # Clamp stops to plan maximum
     total_stops = quota['clamped_stops']
     print(f"[QUOTA] Allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}, stops_clamped={total_stops}")
+
+    # [LOCAL-525] A user-chosen stop list is a promise: "generate EXACTLY these
+    # stops." If the plan would clamp the count below the list length, silently
+    # dropping stops is exactly the "not reliably honoured" failure that motivated
+    # this feature. Reject with a clear, actionable message instead.
+    if stops is not None and len(stops) > total_stops:
+        print(f"[QUOTA] Stops list ({len(stops)}) exceeds plan max ({total_stops}) — rejecting")
+        return jsonify({
+            "allowed": False,
+            "error": "stops_exceed_plan",
+            "message": (
+                f"You provided {len(stops)} stops, but your plan allows at most "
+                f"{total_stops}. Remove some stops or upgrade your plan."
+            ),
+            "provided_stops": len(stops),
+            "max_stops": total_stops,
+            "upgrade": True,
+        }), 429
 
     # Generate job ID FIRST (needed for usage recording)
     job_id = str(uuid.uuid4())
@@ -1545,6 +1887,7 @@ def generate_complete_tour():
         "language": language,
         "persona": persona,  # [S81] Pass persona for downstream generation
         "is_test": is_test_override,  # [LOCAL-103] Track test flag
+        "stops": stops,  # [LOCAL-525] User-chosen stops (None → normal generation)
         "created_at": datetime.now().isoformat()
     }
     
@@ -1564,17 +1907,26 @@ def generate_complete_tour():
         print(f"User tracking skipped - user_id empty: {not user_id}, request_string empty: {not request_string}")
     
     # === GENERATION MODE DISPATCH ===
-    if GENERATION_MODE == 'cloud_tasks':
+    # [LOCAL-525] The Cloud Tasks enqueue path (_create_job_in_db /
+    # _enqueue_cloud_task / tour-worker) does not yet carry the user's stop list.
+    # Rather than silently drop it — the exact "not reliably honoured" failure this
+    # feature fixes — a request WITH stops runs in thread mode, which forwards them
+    # end-to-end. Requests without stops keep the configured mode unchanged.
+    _use_cloud_tasks = (GENERATION_MODE == 'cloud_tasks') and (stops is None)
+    if GENERATION_MODE == 'cloud_tasks' and stops is not None:
+        print(f"[LOCAL-525] Stops provided — using thread mode so the stop list is honoured (job {job_id})")
+    if _use_cloud_tasks:
         # Part B: Enqueue to Cloud Tasks — worker does generation synchronously
         # Job state lives in Cloud SQL (job_status table), readable by any instance
         _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language)
-        enqueued = _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string, language)
+        enqueued = _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id,
+                                       request_string, language, stops)
         if not enqueued:
             # Fallback: if Cloud Tasks enqueue fails, fall back to thread
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
             thread = threading.Thread(
                 target=orchestrate_tour_async,
-                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override)
+                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops)
             )
             thread.daemon = True
             thread.start()
@@ -1586,7 +1938,7 @@ def generate_complete_tour():
         sys.stdout.flush()
         thread = threading.Thread(
             target=orchestrate_tour_async,
-            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override)
+            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops)
         )
         thread.daemon = True
         thread.start()
@@ -1635,6 +1987,11 @@ def get_job_status(job_id):
                 response["actual_stops"] = job["actual_stops"]
             if "stop_count_warning" in job:
                 response["stop_count_warning"] = job["stop_count_warning"]
+            # [LOCAL-307] Surface quality guardrail message to the client.
+            # This is the honest user-facing message explaining why a tour is
+            # shorter or thinner than requested (UNAVAILABLE diagnosis).
+            if "quality_message" in job:
+                response["quality_message"] = job["quality_message"]
             if "share_id" in job:
                 response["share_id"] = job["share_id"]
                 response["share_url"] = job.get("share_url", "")

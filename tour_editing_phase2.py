@@ -34,6 +34,183 @@ POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
 MAX_AUDIO_SIZE_MB = int(os.getenv('CUSTOM_AUDIO_MAX_SIZE_MB', 5))
 MAX_AUDIO_SIZE = MAX_AUDIO_SIZE_MB * 1024 * 1024  # Convert to bytes
 
+# Storage mode: 'volume' (shared filesystem, local dev) or 'cloud' (Cloud Run,
+# ephemeral /tmp, tours live in Postgres BYTEA and/or Cloudflare R2).
+STORAGE_MODE = os.getenv('TOUR_STORAGE_MODE', 'volume')
+
+# ---------------------------------------------------------------------------
+# TTS nav-field stripping (GCS-SAN1 Fault 2)
+# ---------------------------------------------------------------------------
+# An edited stop must be SPOKEN like a generated one: the metadata header
+# (Address/Coordinates/etc.) belongs in the .txt for the mobile app to parse,
+# but must NOT be read aloud by Polly. The generation pipeline already does
+# this before calling /synthesize; the editing service did not, so Polly spoke
+# the header. We duplicate the regex + helper here (rather than importing
+# tour_generation_modernized, which builds a Flask app and a job store at
+# import time). KEEP THIS IN SYNC WITH:
+#   - tour_generation_modernized.py  (_NAV_LABEL_RE / _strip_nav_fields_for_tts)
+#   - translation-service/translation_service.py (mirrors the same convention)
+# Only the TTS input is stripped; the .txt files keep every line unchanged.
+_NAV_LABEL_RE = re.compile(
+    r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
+    re.IGNORECASE | re.MULTILINE
+)
+
+
+def _strip_nav_fields_for_tts(text):
+    """Remove structured metadata lines before sending to Polly.
+    Keeps: stop name, Orientation, and all narrative paragraphs.
+    Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details.
+    The .txt files are written from the original text and remain unchanged."""
+    lines = text.split('\n')
+    return '\n'.join(l for l in lines if not _NAV_LABEL_RE.match(l))
+
+
+# ---------------------------------------------------------------------------
+# Blob storage (Cloudflare R2) — GCS-5 gaps 3 & 4
+# ---------------------------------------------------------------------------
+# In cloud mode, R2-migrated tours have audio_tour=NULL and tour_blob_uri set
+# (migration/migrate_blobs_to_r2.py). We must read the source ZIP from R2, and
+# persist edited ZIPs to R2 so /tour/<new_uuid>/download works from any Cloud
+# Run instance (ephemeral, multi-instance). Pattern mirrors
+# map_delivery_service.py:_get_blob_storage.
+_blob_storage = None
+
+
+def _get_blob_storage():
+    """Return an R2BlobStorage when BLOB_STORAGE_TYPE=r2, else None (BYTEA path)."""
+    global _blob_storage
+    if _blob_storage is None:
+        blob_type = os.getenv('BLOB_STORAGE_TYPE', 'database')
+        if blob_type == 'r2':
+            from blobstorage import R2BlobStorage
+            _blob_storage = R2BlobStorage()
+        else:
+            _blob_storage = False  # sentinel: "checked, not configured"
+    return _blob_storage or None
+
+
+# R2 key prefix for edited tours. Edits are NEVER written over a production
+# tour object (tours/<id>.zip); they get their own namespace keyed by the
+# source tour id and the new UUID (LEAD decision: never overwrite in place).
+EDIT_BLOB_PREFIX = "tours/edits"
+
+
+def _edit_blob_key(source_tour_id, new_tour_id):
+    return f"{EDIT_BLOB_PREFIX}/{source_tour_id}/{new_tour_id}.zip"
+
+
+# ---------------------------------------------------------------------------
+# Service-to-service auth (GCS-5E) — private Cloud Run calls need an identity token
+# ---------------------------------------------------------------------------
+# polly-tts is a PRIVATE Cloud Run service: its IAM grants roles/run.invoker only
+# to the compute SA that tour-editing also runs as. An unauthenticated
+# POST /synthesize therefore returns 403 and the edited stop silently gets no
+# MP3 (LEAD verification, GCS-5E). Every outbound call from this service to a
+# private https:// Cloud Run service must carry a Google-signed identity token
+# whose audience is the target service's base URL.
+#
+# This mirrors the orchestrator's proven pattern
+# (tour_orchestrator_service.py _get_auth_headers / _authenticated_request):
+# fetch the token from the GCE metadata server, audience = scheme://netloc. On
+# local dev there is no metadata server, so no token is sent and behaviour is
+# unchanged (local Polly stubs do not require auth).
+#
+# _identity_token_fn is an injection seam for tests: a test can set it to a
+# callable(audience)->token to exercise the token path without a real metadata
+# server. Production leaves it None and uses the metadata server.
+_identity_token_fn = None
+METADATA_IDENTITY_URL = (
+    "http://metadata.google.internal/computeMetadata/v1/"
+    "instance/service-accounts/default/identity"
+)
+
+
+def _get_identity_token(audience):
+    """Return a Google-signed identity token for `audience`, or None locally.
+
+    Order:
+      1. An injected token function (tests) — always consulted first.
+      2. The GCE/Cloud Run metadata server.
+    Any failure (no metadata server on local dev, network error) returns None,
+    so the caller sends no Authorization header and local behaviour is unchanged.
+    """
+    if _identity_token_fn is not None:
+        try:
+            return _identity_token_fn(audience)
+        except Exception as e:
+            print(f"[AUTH] injected token function failed for {audience}: {e}")
+            return None
+    # Test-only seam: a local end-to-end harness can set LOCAL_IDENTITY_TOKEN to
+    # exercise the token path without a metadata server. Production NEVER sets
+    # this, so default behaviour is unchanged. (The metadata server below is the
+    # real production source.)
+    local_tok = os.getenv('LOCAL_IDENTITY_TOKEN')
+    if local_tok:
+        return local_tok
+    try:
+        resp = requests.get(
+            METADATA_IDENTITY_URL,
+            params={"audience": audience},
+            headers={"Metadata-Flavor": "Google"},
+            timeout=5,
+        )
+        if resp.status_code == 200 and resp.text:
+            return resp.text
+        print(f"[AUTH] metadata identity endpoint returned {resp.status_code} for {audience}")
+    except Exception as e:
+        # Expected on local dev (no metadata server) — send no token, no auth.
+        print(f"[AUTH] no identity token for {audience} (local dev?): {e}")
+    return None
+
+
+def _auth_headers_for(url):
+    """Authorization header dict for a Cloud Run service-to-service call.
+
+    Only https:// targets are treated as (potentially private) Cloud Run
+    services. For non-https (local Docker/dev) we never attempt auth — UNLESS
+    the test-only LOCAL_IDENTITY_TOKEN seam is set, which lets a local E2E
+    harness point POLLY_TTS_URL at an http auth-requiring stub and still attach
+    the token. Production never sets LOCAL_IDENTITY_TOKEN, so its non-https
+    calls remain unauthenticated exactly as before.
+    """
+    from urllib.parse import urlparse
+    if not url.startswith("https://") and not os.getenv("LOCAL_IDENTITY_TOKEN"):
+        return {}
+    parsed = urlparse(url)
+    audience = f"{parsed.scheme}://{parsed.netloc}"
+    token = _get_identity_token(audience)
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
+def _authenticated_request(method, url, **kwargs):
+    """requests.request wrapper that adds an identity token for private Cloud Run."""
+    headers = dict(kwargs.get("headers") or {})
+    headers.update(_auth_headers_for(url))
+    kwargs["headers"] = headers
+    return requests.request(method, url, **kwargs)
+
+
+class AudioGenerationError(Exception):
+    """Raised when a stop that NEEDED text-to-speech audio failed to get it.
+
+    The save must not report success and must not persist an R2 object or a
+    tour_edit_blobs row for such a save (GCS-5E). Carries the stop number and the
+    upstream Polly status so the endpoint can build an AUDIO_GENERATION_FAILED
+    error response and log the failure.
+    """
+    def __init__(self, stop_number, status=None, body_snippet=""):
+        self.stop_number = stop_number
+        self.status = status
+        self.body_snippet = body_snippet
+        msg = f"TTS audio generation failed for stop {stop_number}"
+        if status is not None:
+            msg += f" (upstream status {status})"
+        super().__init__(msg)
+
+
 # Language -> AWS Polly voice. Identical to translation_service.py VOICE_MAP.
 VOICE_MAP = {
     'en': 'Joanna', 'es': 'Lucia', 'fr': 'Celine',
@@ -42,13 +219,32 @@ VOICE_MAP = {
 
 comprehend_client = boto3.client('comprehend', region_name='us-east-1')
 
+
+def _detect_dominant_language_raw(text):
+    """Call the dominant-language detector and return its raw response.
+
+    Normally this is AWS Comprehend. A local end-to-end harness may set
+    LOCAL_LANGUAGE_STUB_URL to a plain HTTP endpoint that accepts
+    {"text": ...} and returns Comprehend's {"Languages": [...]} shape, so the
+    container can be verified deterministically without AWS (same idea as the
+    POLLY_TTS_URL / LOCAL_IDENTITY_TOKEN test seams). Production NEVER sets it,
+    so the Comprehend path is unchanged.
+    """
+    stub_url = os.getenv('LOCAL_LANGUAGE_STUB_URL')
+    if stub_url:
+        resp = requests.post(stub_url, json={'text': text}, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    return comprehend_client.detect_dominant_language(Text=text)
+
+
 def _detect_text_language(text):
     """Return dominant ISO language code of text, or None if too short / undetectable."""
     cleaned = (text or '').strip()
     if len(cleaned) < 25:
         return None
     try:
-        resp = comprehend_client.detect_dominant_language(Text=cleaned[:4900])
+        resp = _detect_dominant_language_raw(cleaned[:4900])
         langs = resp.get('Languages', [])
         if not langs:
             return None
@@ -56,6 +252,46 @@ def _detect_text_language(text):
     except Exception as e:
         print(f"[LANG] detection failed: {e}")
         return None  # fail open — do not block the save on a detector error
+
+
+def _narration_for_language_detection(text):
+    """Return just the narration body to feed the language gate (GCS-LANG1).
+
+    A saved stop blob is a mixed-script document: a stop-name line, a Latin
+    metadata header (Coordinates:/Address:/Type/Specialty:/Specific Examples:/
+    Operational Details:), an Orientation: line and then the narrative
+    paragraphs. Running Comprehend over the whole blob lets the Latin header and
+    Latin place names (e.g. 'Avenue Auguste Vérola') drag detection to a
+    neighbouring language (a ru narration was reported as 'cv', Chuvash), which
+    falsely trips LANGUAGE_MISMATCH.
+
+    We judge the narrative, not the scaffolding, by removing:
+      - the structured nav header, via the existing GCS-SAN1
+        _strip_nav_fields_for_tts helper; and
+      - a single leading stop-name line — the first non-blank line, when it is
+        NOT itself an Orientation:/nav line. Stop names are frequently Latin
+        place names even inside a ru/zh/… tour, so this line is exactly the kind
+        of cross-script noise that misleads the detector.
+
+    The Orientation: line and every narrative paragraph are kept. This function
+    does NOT change the saved .txt or the TTS input; it only produces the string
+    handed to _detect_text_language.
+    """
+    stripped = _strip_nav_fields_for_tts(text or '')
+    lines = stripped.split('\n')
+    # Drop a single leading stop-name line: the first non-blank line, provided
+    # it is not an Orientation: line (or a nav line that survived stripping).
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+        if line.strip().lower().startswith('orientation:'):
+            break  # first content line is Orientation: — nothing to drop
+        if _NAV_LABEL_RE.match(line):
+            break  # defensive: leave nav lines to the strip step
+        del lines[i]
+        break
+    return '\n'.join(lines).strip()
+
 
 def clean_markdown_formatting(text):
     """Remove markdown formatting characters that interfere with TTS"""
@@ -115,6 +351,51 @@ def sanitize_user_input(text):
     
     return text
 
+def sanitize_narration_text(text):
+    r"""Sanitize saved stop *narration* (prose) — NOT a filename.
+
+    GCS-SAN1: the old path ran sanitize_user_input() over every saved stop,
+    which mangled prose: it replaced ':' '/' etc. with '_' (turning
+    'Coordinates:' into 'Coordinates_'), collapsed all newlines into a single
+    line, deleted apostrophes/quotes and stripped SQL keywords. None of that
+    protects anything here — every DB call in this service is parameterised
+    (%s), so string-stripping is not what prevents injection — and all of it
+    destroys the text the user typed and the voice reads.
+
+    LEAD decision: keep ONLY what is genuinely needed for narration —
+      - control-character removal (but PRESERVE newlines/tabs so structure and
+        the nav header survive for the .txt),
+      - markdown cleanup for TTS,
+      - XSS stripping (<script>, javascript:, on*=),
+      - the 10,000-char DoS cap.
+    Dropped for the narration path: the SQL block, the filename regex
+    [<>:"/\\|?*] -> '_', and the r'\s+' -> ' ' whitespace collapse.
+
+    If a filesystem-safe string is ever needed for a *filename*, derive it
+    separately at the point of use (e.g. via sanitize_user_input); do not
+    reshape the narration text.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+
+    # Remove control characters EXCEPT tab (\x09), newline (\x0A) and carriage
+    # return (\x0D) so line breaks (and the nav header) are preserved.
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+
+    # Clean markdown formatting for better TTS and display
+    text = clean_markdown_formatting(text)
+
+    # Remove script tags and javascript (XSS) — the ONLY injection stripping
+    # that is meaningful for text later rendered/spoken.
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'on\w+\s*=', '', text, flags=re.IGNORECASE)
+
+    # Limit length to prevent DoS
+    text = text[:10000]
+
+    return text
+
 def get_db_connection():
     return psycopg2.connect(
         host=os.getenv('DB_HOST', 'postgres-2'),
@@ -125,43 +406,212 @@ def get_db_connection():
     )
 
 
+# ---------------------------------------------------------------------------
+# Durable edit-blob mapping (GCS-5 gap 4)
+# ---------------------------------------------------------------------------
+# The save creates a brand-new UUID tour and returns /tour/<new_uuid>/download.
+# In cloud mode the new ZIP lives only in this instance's /tmp and the numeric
+# resolve path can never match a UUID. We persist the edited ZIP to R2 and
+# record new_tour_id -> (r2 key, source id) in an ADDITIVE table so any instance
+# can serve the download. A table (not key-naming alone) is used because the
+# download request carries only the bare UUID; without a lookup we cannot
+# reconstruct tours/edits/<source_id>/<uuid>.zip (the source id is unknown).
+# This table is created on demand and is NOT one of the production tour tables;
+# no existing row/blob/column is ever modified.
+#
+# The CREATE TABLE IF NOT EXISTS runs once per process (guarded by
+# _edit_map_table_ready), not on every resolve/download lookup.
+_edit_map_table_ready = False
+
+
+def _ensure_edit_map_table(cur):
+    global _edit_map_table_ready
+    if _edit_map_table_ready:
+        return
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tour_edit_blobs (
+            new_tour_id     TEXT PRIMARY KEY,
+            source_tour_id  TEXT,
+            blob_uri        TEXT NOT NULL,
+            created_at      TIMESTAMPTZ DEFAULT now()
+        )
+    """)
+    # Commit the DDL now. get_db_connection() connections are not autocommit,
+    # so without this the CREATE is rolled back when the (read-only) caller
+    # closes its connection, and a later INSERT on a different connection fails
+    # with "relation tour_edit_blobs does not exist".
+    cur.connection.commit()
+    _edit_map_table_ready = True
+
+
+def _record_edit_blob(new_tour_id, source_tour_id, blob_uri):
+    """Durably record new_tour_id -> R2 key. Best-effort; caller handles errors."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_edit_map_table(cur)
+        cur.execute("""
+            INSERT INTO tour_edit_blobs (new_tour_id, source_tour_id, blob_uri)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (new_tour_id) DO UPDATE
+                SET blob_uri = EXCLUDED.blob_uri,
+                    source_tour_id = EXCLUDED.source_tour_id
+        """, (str(new_tour_id), str(source_tour_id) if source_tour_id is not None else None, blob_uri))
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
+def _lookup_edit_blob(new_tour_id):
+    """Return (blob_uri, source_tour_id) for an edited tour UUID, or (None, None)."""
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        _ensure_edit_map_table(cur)
+        cur.execute(
+            "SELECT blob_uri, source_tour_id FROM tour_edit_blobs WHERE new_tour_id = %s",
+            (str(new_tour_id),))
+        row = cur.fetchone()
+        cur.close()
+        return (row[0], row[1]) if row else (None, None)
+    except Exception as e:
+        print(f"Cloud mode: edit-blob lookup failed for {new_tour_id}: {e}")
+        return (None, None)
+    finally:
+        conn.close()
+
+
+def _get_source_content_language(source_tour_id):
+    """Return audio_tours.content_language for the given source tour, or None.
+
+    GCS-5R B3: the app does not send content_language. For a numeric id we read
+    audio_tours.content_language directly; for an edited UUID we resolve the
+    source tour via tour_edit_blobs.source_tour_id first. Used only as a default
+    when the request omits content_language (an explicit request value wins).
+    """
+    if source_tour_id is None:
+        return None
+    resolved_id = str(source_tour_id)
+    # An edited UUID isn't in audio_tours; map it back to its source numeric id.
+    if not resolved_id.isdigit():
+        _blob_uri, mapped_src = _lookup_edit_blob(resolved_id)
+        if mapped_src:
+            resolved_id = str(mapped_src)
+    if not resolved_id.isdigit():
+        return None
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT content_language FROM audio_tours WHERE id = %s",
+            (int(resolved_id),))
+        row = cur.fetchone()
+        cur.close()
+        if row and row[0]:
+            return str(row[0]).strip().lower()
+        return None
+    except Exception as e:
+        print(f"[LANG] source content_language lookup failed for {source_tour_id}: {e}")
+        return None
+    finally:
+        conn.close()
+
+
 def _resolve_tour_from_db(tour_identifier):
-    """Cloud mode: Extract tour ZIP from database to /tmp/ directory.
-    Returns a Path to the extracted directory, or None if not found.
+    """Cloud mode: Extract a tour ZIP to a /tmp/ directory. Returns a Path or None.
+
+    Sources, in order:
+        1. An edited tour we previously produced (tour_edit_blobs -> R2 key).
+        2. A row in audio_tours, reading the ZIP from R2 (tour_blob_uri) when the
+           BYTEA column is NULL (R2-migrated tours), else from BYTEA.
     """
     import tempfile
+
+    # 1) Edited tour served from its own R2 object (gap 4). The download UUID
+    #    won't exist in audio_tours, so check the edit map first.
+    try:
+        edit_key, _edit_src = _lookup_edit_blob(tour_identifier)
+    except Exception:
+        edit_key = None
+    if edit_key:
+        storage = _get_blob_storage()
+        if not storage:
+            # Edit key exists but storage is unavailable: do NOT fall through to
+            # an ILIKE name match on a UUID (smaller-defect fix). Fail cleanly.
+            print(f"Cloud mode: edit key {edit_key} found for {tour_identifier} "
+                  f"but blob storage is unavailable — returning None")
+            return None
+        try:
+            zip_data = storage.download(edit_key)
+            tmp_dir = tempfile.mkdtemp(prefix=f"touredit_{str(tour_identifier)[:8]}_")
+            tmp_path = Path(tmp_dir)
+            with zipfile.ZipFile(io.BytesIO(bytes(zip_data)), 'r') as zf:
+                zf.extractall(tmp_path)
+            print(f"Cloud mode: served edited tour {tour_identifier} from R2 {edit_key}")
+            return tmp_path
+        except Exception as e:
+            print(f"Cloud mode: failed to read edited tour {tour_identifier} from R2 {edit_key}: {e}")
+            return None
+
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
-        # Try numeric ID first
+
+        # gap 3: R2-migrated tours have audio_tour=NULL and tour_blob_uri set.
+        # Match on either column so those tours are found (mirrors
+        # map_delivery_service dual-read selects).
         if tour_identifier.isdigit():
-            cur.execute("SELECT id, tour_name, audio_tour FROM audio_tours WHERE id = %s AND audio_tour IS NOT NULL", (int(tour_identifier),))
+            cur.execute(
+                "SELECT id, tour_name, audio_tour, tour_blob_uri FROM audio_tours "
+                "WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)",
+                (int(tour_identifier),))
         else:
-            # Try by name match
-            cur.execute("SELECT id, tour_name, audio_tour FROM audio_tours WHERE tour_name ILIKE %s AND audio_tour IS NOT NULL ORDER BY id DESC LIMIT 1", (f'%{tour_identifier}%',))
-        
+            cur.execute(
+                "SELECT id, tour_name, audio_tour, tour_blob_uri FROM audio_tours "
+                "WHERE tour_name ILIKE %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL) "
+                "ORDER BY id DESC LIMIT 1",
+                (f'%{tour_identifier}%',))
+
         result = cur.fetchone()
         cur.close()
         conn.close()
-        
+
         if not result:
             print(f"Cloud mode: Tour '{tour_identifier}' not found in database")
             return None
-        
-        tour_id_db, tour_name, zip_data = result
-        
+
+        tour_id_db, tour_name, zip_data, tour_blob_uri = result
+
+        # Prefer R2 when the BYTEA is NULL (post-migration), fall back to BYTEA.
+        if not zip_data and tour_blob_uri:
+            storage = _get_blob_storage()
+            if not storage:
+                print(f"Cloud mode: tour {tour_id_db} has tour_blob_uri={tour_blob_uri} "
+                      f"but BLOB_STORAGE_TYPE is not 'r2' — cannot read")
+                return None
+            try:
+                zip_data = storage.download(tour_blob_uri)
+                print(f"Cloud mode: read tour {tour_id_db} from R2 {tour_blob_uri}")
+            except Exception as r2_err:
+                print(f"Cloud mode: R2 read failed for tour {tour_id_db} ({tour_blob_uri}): {r2_err}")
+                return None
+
+        if not zip_data:
+            print(f"Cloud mode: Tour '{tour_identifier}' has no ZIP data (BYTEA and R2 both empty)")
+            return None
+
         # Extract ZIP to /tmp/
         tmp_dir = tempfile.mkdtemp(prefix=f"tour_{tour_id_db}_")
         tmp_path = Path(tmp_dir)
-        
+
         zip_buffer = zipfile.ZipFile(io.BytesIO(bytes(zip_data)), 'r')
         zip_buffer.extractall(tmp_path)
         zip_buffer.close()
-        
+
         print(f"Cloud mode: Extracted tour {tour_id_db} to {tmp_path} ({len(list(tmp_path.iterdir()))} files)")
         return tmp_path
-        
+
     except Exception as e:
         print(f"Cloud mode: Error extracting tour '{tour_identifier}' from DB: {e}")
         return None
@@ -768,22 +1218,44 @@ def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, 
     
     # Generate new TTS audio (flag=true or no existing audio)
     try:
-        tts_response = requests.post(f"{POLLY_TTS_URL}/synthesize", json={
-            "text": text_content,
-            "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
-            "format": "mp3"
-        }, timeout=30)
-        
+        # GCS-SAN1 Fault 2: strip the nav/metadata header from the TTS input so
+        # Polly speaks the stop like a generated one. The .txt on disk keeps
+        # every line; only this synthesise payload has the nav lines removed.
+        tts_text = _strip_nav_fields_for_tts(text_content)
+        tts_response = _authenticated_request(
+            "POST",
+            f"{POLLY_TTS_URL}/synthesize",
+            json={
+                "text": tts_text,
+                "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
+                "format": "mp3",
+            },
+            timeout=30,
+        )
+
         if tts_response.status_code == 200:
             audio_file = tour_path / f"audio_{stop_number}.mp3"
             with open(audio_file, 'wb') as f:
                 f.write(tts_response.content)
             print(f"Generated TTS audio for stop {stop_number}")
             return "tts_generated", []
-        return "error", []
+        # Non-200: this stop NEEDED audio and did not get it. Log the upstream
+        # status + a body snippet, then fail loudly so the save cannot report
+        # success with a missing MP3 (GCS-5E).
+        body_snippet = ""
+        try:
+            body_snippet = (tts_response.text or "")[:200]
+        except Exception:
+            body_snippet = "<unreadable response body>"
+        print(f"[TTS] Polly /synthesize failed for stop {stop_number}: "
+              f"status={tts_response.status_code} body={body_snippet!r}")
+        raise AudioGenerationError(stop_number, status=tts_response.status_code,
+                                   body_snippet=body_snippet)
+    except AudioGenerationError:
+        raise
     except Exception as e:
         print(f"Audio generation failed for stop {stop_number}: {e}")
-        return "error", []
+        raise AudioGenerationError(stop_number, status=None, body_snippet=str(e)[:200])
 
 def create_clean_html(tour_path, final_stops):
     """Create clean HTML focused on audio controls"""
@@ -876,6 +1348,11 @@ def create_clean_html(tour_path, final_stops):
                 
                 // Update currentStopIndex when manually played
                 audioElement.addEventListener('play', function() {
+                    audioElements.forEach(function(otherAudio, otherIndex) {
+                        if (otherIndex !== i && otherAudio && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
                     currentStopIndex = i;
                 });
             }
@@ -1063,7 +1540,8 @@ def create_complete_tour_with_preservation(original_tour_path, final_stops_data,
     
     return {
         'new_tour_id': new_uuid,
-        'tour_path': new_tour_path
+        'tour_path': new_tour_path,
+        'zip_path': zip_path
     }
 
 def create_complete_tour(original_tour_path, final_stops_data, tour_id=None):
@@ -1168,14 +1646,40 @@ def create_complete_tour(original_tour_path, final_stops_data, tour_id=None):
     
     return {
         'new_tour_id': new_uuid,
-        'tour_path': new_tour_path
+        'tour_path': new_tour_path,
+        'zip_path': zip_path
     }
 
 @app.route('/tour/<tour_id>/bulk-save', methods=['POST'])
 def bulk_save_stops(tour_id):
     """REQ-020: Bulk save with audio generation flag coordination"""
-    data = request.json
-    content_language = (data.get('content_language') or 'en').strip().lower()
+    return _bulk_save_core(tour_id, request.json or {})
+
+
+def _bulk_save_core(tour_id, data):
+    """Core bulk-save logic. `data` is the parsed request body so the same code
+    serves both /bulk-save, /update-multiple-stops and /update-stop.
+
+    GCS-5R B3: Michael's tour is Russian but the app sends no content_language.
+    When the request omits it, default to the SOURCE tour's
+    audio_tours.content_language (numeric id, or edited UUID via
+    tour_edit_blobs.source_tour_id) instead of blindly 'en'. An explicit request
+    value always wins.
+    """
+    explicit_language = data.get('content_language')
+    if explicit_language:
+        content_language = str(explicit_language).strip().lower()
+        print(f"[LANG] using explicit request content_language={content_language}")
+    else:
+        source_language = _get_source_content_language(tour_id)
+        if source_language:
+            content_language = source_language
+            print(f"[LANG] no content_language in request; using source tour "
+                  f"{tour_id} content_language={content_language}")
+        else:
+            content_language = 'en'
+            print(f"[LANG] no content_language in request and none on source tour "
+                  f"{tour_id}; defaulting to 'en'")
     stops = data.get('stops', [])
     
     print(f"\n==== REQ-022/023 DEBUG: RECEIVED REQUEST ====")
@@ -1238,7 +1742,10 @@ def bulk_save_stops(tour_id):
         # Process each stop with flag coordination
         for stop_data in stops:
             stop_number = stop_data.get('stop_number')
-            text = sanitize_user_input(stop_data.get('text', ''))
+            # GCS-SAN1: narration prose must NOT be filename-sanitised. Use the
+            # narration-safe cleaner so colons, apostrophes and newlines survive
+            # (sanitize_user_input remains for genuine path-safe token needs).
+            text = sanitize_narration_text(stop_data.get('text', ''))
             action = str(stop_data.get('action', '')).lower()
             generate_flag = stop_data.get('generate_audio_from_text', True)  # Default true
             
@@ -1378,7 +1885,15 @@ def bulk_save_stops(tour_id):
                     and not stop_data.get('custom_audio_data')
                     and not stop_data.get('audio_parts')
                     and not stop_data.get('has_custom_audio')):
-                detected = _detect_text_language(stop_data['text_content'])
+                # GCS-LANG1: judge the narration, not the whole stop blob. The
+                # blob carries a Latin nav header and often Latin place names,
+                # which drag Comprehend to a neighbouring language and falsely
+                # trip LANGUAGE_MISMATCH. Detect on the stripped narration body
+                # (nav header + leading stop-name line removed). If that body is
+                # empty or too short to classify, _detect_text_language returns
+                # None and we do NOT reject — same as before.
+                narration = _narration_for_language_detection(stop_data['text_content'])
+                detected = _detect_text_language(narration)
                 if detected is not None and detected != content_language:
                     sn = stop_data['stop_number']
                     print(f"[LANG_VALIDATE] LANGUAGE_MISMATCH stop={sn} expected={content_language} detected={detected}")
@@ -1397,6 +1912,26 @@ def bulk_save_stops(tour_id):
         print(f"PRESERVE: Creating new tour with {len(final_stops_data)} total stops")
         try:
             new_tour_info = create_complete_tour_with_preservation(tour_path, final_stops_data, tour_id, original_stops_dict, content_language=content_language)
+        except AudioGenerationError as audio_e:
+            # GCS-5E: a stop that needed TTS did not get audio. Fail the save —
+            # we are still BEFORE the R2 upload / tour_edit_blobs insert, so no
+            # object and no mapping row are created. Report the stop and the
+            # upstream Polly status so the client (and logs) know why.
+            print(f"[AUDIO_GENERATION_FAILED] stop={audio_e.stop_number} "
+                  f"upstream_status={audio_e.status} body={audio_e.body_snippet!r} "
+                  f"-> failing save, no R2 object or mapping row created")
+            status_code = 502 if audio_e.status in (403, 401, 500, 502, 503, 504) else 500
+            return jsonify({
+                "status": "error",
+                "message": (f"Audio could not be generated for stop {audio_e.stop_number}. "
+                            f"The text-to-speech service returned "
+                            f"{audio_e.status if audio_e.status is not None else 'an error'}."),
+                "error_code": "AUDIO_GENERATION_FAILED",
+                "stop_number": audio_e.stop_number,
+                "upstream_status": audio_e.status,
+                "recoverable": True,
+                "suggested_action": "Please try again in a few moments"
+            }), status_code
         except Exception as tour_e:
             error_str = str(tour_e)
             # Check if it's a JSON error from audio conversion
@@ -1413,7 +1948,44 @@ def bulk_save_stops(tour_id):
                     pass
             # Regular error handling
             return jsonify({"status": "error", "message": str(tour_e)}), 500
-        
+
+        # GAP 4: Persist the edited ZIP durably so /tour/<new_uuid>/download
+        # works from any (ephemeral, multi-instance) Cloud Run instance.
+        # Never overwrites a production tour object — new key namespace only.
+        if STORAGE_MODE == 'cloud':
+            storage = _get_blob_storage()
+            if not storage:
+                return jsonify({
+                    "status": "error",
+                    "message": "Editing storage is not configured on the server. "
+                               "Please try again later or contact support.",
+                    "error_code": "BLOB_STORAGE_UNAVAILABLE",
+                    "recoverable": True,
+                    "suggested_action": "Please try again in a few moments"
+                }), 500
+            try:
+                zip_path = new_tour_info['zip_path']
+                with open(zip_path, 'rb') as zf:
+                    zip_bytes = zf.read()
+                edit_key = _edit_blob_key(tour_id, new_tour_info['new_tour_id'])
+                storage.upload(edit_key, zip_bytes)
+                _record_edit_blob(new_tour_info['new_tour_id'], tour_id, edit_key)
+                print(f"GAP4: stored edited tour {new_tour_info['new_tour_id']} at R2 {edit_key} "
+                      f"({len(zip_bytes)} bytes)")
+            except Exception as persist_e:
+                print(f"GAP4: failed to persist edited tour to R2: {persist_e}")
+                return jsonify({
+                    "status": "error",
+                    "message": "The edited tour could not be saved to cloud storage. "
+                               "Please try again.",
+                    "error_code": "EDIT_PERSIST_FAILED",
+                    "recoverable": True,
+                    "suggested_action": "Please try again in a few moments"
+                }), 500
+            finally:
+                # /tmp build dir is ephemeral; clean it up now that it's in R2.
+                cleanup_tmp_tour_path(new_tour_info.get('tour_path'))
+
         # REQ-024: Proper success message with descriptive content
         custom_audio_count = sum(1 for stop in response_stops if stop.get('audio_source') == 'user_recorded')
         tts_count = len(response_stops) - custom_audio_count
@@ -1437,6 +2009,8 @@ def bulk_save_stops(tour_id):
         for stop in response_stops:
             print(f"Response stop {stop['stop_number']}: audio_source={stop['audio_source']}, has_custom_audio={stop.get('has_custom_audio', False)}")
         
+        # Clean up the extracted SOURCE tour /tmp dir (cloud mode); no-op on volume.
+        cleanup_tmp_tour_path(tour_path)
         return jsonify(response)
         
     except Exception as e:
@@ -1534,7 +2108,38 @@ def get_edit_info(tour_id):
 
 @app.route('/tour/<tour_id>/download', methods=['GET'])
 def download_tour_with_flags(tour_id):
-    """REQ-020: Enhanced download with flag information"""
+    """REQ-020: Enhanced download with flag information.
+
+    GAP 4: In cloud mode an edited tour is stored as its own R2 object keyed by
+    the returned UUID. Serve that ZIP directly from R2 (works from any Cloud Run
+    instance) instead of relying on a local /app/tours ZIP cache that only ever
+    existed on the instance that built it.
+    """
+    # Fast path: file download of an edited tour straight from R2 bytes.
+    wants_json = request.headers.get('Accept') == 'application/json'
+    if not wants_json and STORAGE_MODE == 'cloud':
+        edit_key, _edit_src = _lookup_edit_blob(tour_id)
+        if edit_key:
+            storage = _get_blob_storage()
+            if storage:
+                try:
+                    zip_bytes = storage.download(edit_key)
+                    return send_file(
+                        io.BytesIO(zip_bytes),
+                        mimetype='application/zip',
+                        as_attachment=True,
+                        download_name=f"{tour_id}.zip",
+                    )
+                except Exception as e:
+                    print(f"GAP4: download from R2 {edit_key} failed: {e}")
+                    return jsonify({
+                        "status": "error",
+                        "message": f"Tour with ID '{tour_id}' could not be downloaded",
+                        "error_code": "TOUR_NOT_FOUND",
+                        "recoverable": False,
+                        "suggested_action": "Please verify the tour ID and try again, or contact support"
+                    }), 404
+
     tour_path = resolve_tour_to_directory(tour_id)
     if not tour_path:
         # REQ-024: Proper not found error response
@@ -1547,37 +2152,57 @@ def download_tour_with_flags(tour_id):
         }), 404
     
     # Check if this is a JSON request (mobile app) or file download request
-    if request.headers.get('Accept') == 'application/json':
-        # Return JSON with flag information
-        stops = []
-        text_files = sorted(tour_path.glob("audio_*.txt"), key=lambda x: int(x.stem.split('_')[1]))
-        
-        for text_file in text_files:
-            stop_number = int(text_file.stem.split('_')[1])
-            try:
-                with open(text_file, 'r', encoding='utf-8') as f:
-                    text_content = f.read().strip()
-                
-                # Check audio source
-                audio_source = "tts_generated"
-                if has_custom_audio(tour_id, stop_number):
-                    audio_source = "user_recorded"
-                
-                stops.append({
-                    "stop_number": stop_number,
-                    "text": text_content,
-                    "generate_audio_from_text": audio_source == "tts_generated",
-                    "audio_source": audio_source
-                })
-            except Exception as e:
-                print(f"Error reading {text_file}: {e}")
-        
-        return jsonify({
-            "tour_id": tour_id,
-            "stops": stops
-        })
+    if wants_json:
+        try:
+            # Return JSON with flag information
+            stops = []
+            text_files = sorted(tour_path.glob("audio_*.txt"), key=lambda x: int(x.stem.split('_')[1]))
+            
+            for text_file in text_files:
+                stop_number = int(text_file.stem.split('_')[1])
+                try:
+                    with open(text_file, 'r', encoding='utf-8') as f:
+                        text_content = f.read().strip()
+                    
+                    # Check audio source
+                    audio_source = "tts_generated"
+                    if has_custom_audio(tour_id, stop_number):
+                        audio_source = "user_recorded"
+                    
+                    stops.append({
+                        "stop_number": stop_number,
+                        "text": text_content,
+                        "generate_audio_from_text": audio_source == "tts_generated",
+                        "audio_source": audio_source
+                    })
+                except Exception as e:
+                    print(f"Error reading {text_file}: {e}")
+            
+            return jsonify({
+                "tour_id": tour_id,
+                "stops": stops
+            })
+        finally:
+            cleanup_tmp_tour_path(tour_path)
     
-    # File download (existing functionality)
+    # File download. Build the ZIP next to the resolved dir. In cloud mode
+    # tour_path is under /tmp (ephemeral) so we must NOT use TOURS_DIR, which
+    # may not exist and would leak across instances.
+    if STORAGE_MODE == 'cloud':
+        try:
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in tour_path.rglob('*'):
+                    if file_path.is_file():
+                        arcname = file_path.relative_to(tour_path)
+                        zipf.write(file_path, arcname)
+            buf.seek(0)
+            return send_file(buf, mimetype='application/zip',
+                             as_attachment=True, download_name=f"{tour_path.name}.zip")
+        finally:
+            cleanup_tmp_tour_path(tour_path)
+
+    # Volume mode (local dev): keep the shared-filesystem ZIP cache behaviour.
     zip_path = Path(TOURS_DIR) / f"{tour_path.name}.zip"
     if not zip_path.exists():
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -1707,6 +2332,85 @@ def promote_custom_tour(tour_id):
                 'message': f'A tour named "{custom_name}" already exists. Please choose a different name.'
             }), 409
         print(f"[PROMOTE] Created audio_tours id={new_id} name={custom_name!r} lang={content_language} derived_from={derived_from_tour_id}")
+
+        # [LOCAL-306] Score the edited tour and record the delta.
+        # Gates NOTHING — this is observation only.
+        # [LOCAL-312] If edit scores below threshold: record internally, NO message
+        # to the author. "We should know about this" but never tell them.
+        if tour_content and derived_from_tour_id:
+            try:
+                from tour_scoring_service import (
+                    score_edited_tour, ensure_tour_scores_table,
+                    get_latest_score_for_tour,
+                )
+                ensure_tour_scores_table()
+
+                # Fetch original tour_content for delta comparison
+                cur.execute(
+                    "SELECT tour_content, stops_count FROM audio_tours WHERE id = %s",
+                    (derived_from_tour_id,)
+                )
+                orig_row = cur.fetchone()
+                if orig_row and orig_row[0]:
+                    original_content = orig_row[0]
+                    _n_req = orig_row[1] or stops_count or 0
+
+                    # Find the original score row for linking
+                    orig_score_id = get_latest_score_for_tour(derived_from_tour_id)
+
+                    _edit_score, _edit_row_id, _delta, _edit_ms = score_edited_tour(
+                        original_content,
+                        tour_content,
+                        n_requested=_n_req,
+                        tour_id=new_id,
+                        tour_name=custom_name,
+                        original_score_id=orig_score_id,
+                    )
+
+                    # [LOCAL-312] Record internally if below threshold.
+                    # NEVER message the author — this is the author asymmetry rule.
+                    if _edit_score:
+                        from quality_guardrails import MESSAGE_THRESHOLD
+                        if _edit_score.total_score < MESSAGE_THRESHOLD:
+                            # Look up the author's secret_id from tour_requests
+                            _author_secret_id = None
+                            try:
+                                cur2 = conn.cursor()
+                                cur2.execute(
+                                    "SELECT secret_id FROM tour_requests WHERE tour_id = %s LIMIT 1",
+                                    (str(derived_from_tour_id),)
+                                )
+                                _author_row = cur2.fetchone()
+                                if _author_row:
+                                    _author_secret_id = _author_row[0]
+                                cur2.close()
+                            except Exception:
+                                pass
+
+                            from user_quality_index import (
+                                record_author_edit_score,
+                                ensure_author_edit_scores_table,
+                            )
+                            ensure_author_edit_scores_table()
+                            record_author_edit_score(
+                                secret_id=_author_secret_id or "unknown",
+                                tour_id=new_id,
+                                score=_edit_score.total_score,
+                                delta=_delta,
+                            )
+                            print(
+                                f"[LOCAL-312] Author edit below threshold "
+                                f"({_edit_score.total_score:.1f} < {MESSAGE_THRESHOLD}): "
+                                f"recorded internally, NO message to author."
+                            )
+                else:
+                    print(f"[SCORING] No original tour_content for derived_from_tour_id={derived_from_tour_id}")
+            except Exception as scoring_err:
+                # Scoring failure MUST NOT block delivery
+                print(f"[SCORING] Non-fatal error during edit scoring: {scoring_err}")
+                import traceback
+                traceback.print_exc()
+
         return jsonify({'status': 'created', 'tour_id': new_id}), 201
 
     except Exception as e:
@@ -1721,52 +2425,67 @@ def promote_custom_tour(tour_id):
 
 @app.route('/tour/<tour_id>/update-stop', methods=['POST'])
 def update_single_stop(tour_id):
-    """Shim: single-stop update delegated to bulk-save via internal request.
+    """Single-stop edit (app: edit_stop_screen -> TourEditingService.updateStop).
 
-    The app's edit_stop_screen calls this for individual stop text edits.
-    Translates the single-stop format into bulk-save format.
-    Returns synchronously (no job_id), so the app skips job polling.
+    GCS-5R B1: storied already registered a LOCAL-153 shim for this rule that
+    delegated to /bulk-save via an internal test-client request. That shim is
+    REPLACED here (not duplicated) so exactly one handler owns this rule — a
+    second def on the same rule makes Flask raise
+    "View function mapping is overwriting an existing endpoint function" at
+    import and the container never starts.
+
+    The app sends {stop_number, new_text} and expects a result that MAY carry a
+    'job_id'. We process synchronously (no async job queue exists here) and
+    reuse the same preservation/persistence path as Save All by folding the one
+    edited stop into a bulk save. We deliberately return NO 'job_id' so the app
+    skips polling and refreshes immediately; we DO return new_tour_id +
+    download_url so the app can pull the updated ZIP.
+
+    NOTE ON COLLISION: map_delivery_service.py also defines
+    /tour/<tour_id>/update-stop, but it is NOT exposed through the gateway
+    (gateway_routes.yaml maps only /tour/<id>/resolve to map-delivery), and that
+    handler is a non-persisting stub. Routing this path to tour-editing in the
+    gateway is therefore additive and non-conflicting.
     """
     data = request.json or {}
     stop_number = data.get('stop_number')
-    new_text = data.get('new_text')
-
-    if not stop_number or not new_text:
+    new_text = data.get('new_text', data.get('text', ''))
+    if stop_number is None:
         return jsonify({
-            "status": "error",
-            "message": "stop_number and new_text are required",
-            "error_code": "VALIDATION_FAILED",
-            "recoverable": True,
-            "suggested_action": "Please provide stop_number and new_text fields"
+            "status": "error", "message": "stop_number is required",
+            "error_code": "VALIDATION_FAILED", "recoverable": True,
+            "suggested_action": "Provide a stop_number and try again"
+        }), 400
+    # GCS-5R2 item 2: GCS-5R dropped the old `if not new_text` guard, so an empty
+    # or whitespace-only new_text now folds into a synthesised stop and can yield
+    # a zero-length audio file (Michael saw "0 length" audio in the editor).
+    # Reject it before we build a bulk-save payload. `new_text` may not be a str
+    # if the caller sends a non-string, so coerce defensively.
+    if not isinstance(new_text, str) or not new_text.strip():
+        return jsonify({
+            "status": "error", "message": "new_text is required and cannot be empty",
+            "error_code": "VALIDATION_FAILED", "recoverable": True,
+            "suggested_action": "Provide non-empty new_text and try again"
         }), 400
 
-    # Delegate to bulk-save using internal test client
-    import json as _json
-    bulk_payload = _json.dumps({
+    # Fold into the bulk-save request shape (single modified stop). bulk_save
+    # merges/preserves all other existing stops from the source tour.
+    synthesized = {
         "stops": [{
             "stop_number": stop_number,
             "text": new_text,
             "original_text": "",
             "action": "modify",
-            "generate_audio_from_text": True,
+            "generate_audio_from_text": data.get("generate_audio_from_text", True),
             "has_custom_audio": False,
-            "audio_source": "tts_generated"
-        }]
-    })
-
-    with app.test_client() as client:
-        resp = client.post(
-            f"/tour/{tour_id}/bulk-save",
-            data=bulk_payload,
-            content_type="application/json"
-        )
-
-    # Return the bulk-save response directly
-    return app.response_class(
-        response=resp.data,
-        status=resp.status_code,
-        mimetype="application/json"
-    )
+            "audio_source": "tts_generated",
+        }],
+    }
+    # Preserve an explicit content_language if the caller sent one; otherwise
+    # _bulk_save_core resolves it from the source tour (B3).
+    if data.get("content_language"):
+        synthesized["content_language"] = data["content_language"]
+    return _bulk_save_core(tour_id, synthesized)
 
 
 @app.route('/tour/<tour_id>/job-status/<job_id>', methods=['GET'])
@@ -1802,6 +2521,12 @@ def health_check():
 
 
 if __name__ == '__main__':
-    os.makedirs(TOURS_DIR, exist_ok=True)
-    print(f"Starting Phase 2 Tour Editing Service v{SERVICE_VERSION}")
-    app.run(host='0.0.0.0', port=5022, debug=False)
+    try:
+        os.makedirs(TOURS_DIR, exist_ok=True)
+    except OSError as e:
+        # Cloud Run root FS may be read-only outside /tmp; not fatal in cloud mode.
+        print(f"[startup] could not create {TOURS_DIR}: {e}")
+    port = int(os.getenv('PORT', '5022'))
+    print(f"Starting Phase 2 Tour Editing Service v{SERVICE_VERSION} on port {port} "
+          f"(storage_mode={STORAGE_MODE}, blob={os.getenv('BLOB_STORAGE_TYPE', 'database')})")
+    app.run(host='0.0.0.0', port=port, debug=False)

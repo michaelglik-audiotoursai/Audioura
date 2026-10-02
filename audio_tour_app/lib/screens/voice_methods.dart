@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:async';
 import '../services/voice_control_service.dart';
+import '../services/navigation_service.dart';
 import 'debug_log_viewer_screen.dart';
 import 'tour_player_screen.dart';
 
 mixin VoiceMethods<T extends StatefulWidget> on State<T> {
   final VoiceControlService voiceService = VoiceControlService();
+  final NavigationService _navigationService = NavigationService();
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _ttsInitialized = false;
   int currentStop = 0;
   int totalStops = 10;
   InAppWebViewController? webController;
@@ -17,6 +22,78 @@ mixin VoiceMethods<T extends StatefulWidget> on State<T> {
     await voiceService.requestMicPermissionOnFirstLaunch();
     await voiceService.initialize();
     voiceService.onVoiceCommand = handleVoiceCommand;
+    await _initTts();
+  }
+
+  Future<void> _initTts() async {
+    if (_ttsInitialized) return;
+    try {
+      await _flutterTts.setLanguage('en-US');
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+      _ttsInitialized = true;
+      await DebugLogHelper.addDebugLog('NAV: TTS initialized');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('NAV: TTS init error: $e');
+    }
+  }
+
+  /// Speak a navigation message: duck tour audio → speak → restore.
+  /// Uses the same pause pattern as pause_for_listening.
+  Future<void> _speakNavigation(String text) async {
+    try {
+      await DebugLogHelper.addDebugLog('NAV: Speaking: "$text"');
+      // Duck: pause tour audio
+      if (webController != null) {
+        await webController!.evaluateJavascript(source: '''
+          if (typeof window.pauseAllAudio === 'function') {
+            window.pauseAllAudio();
+          } else {
+            document.querySelectorAll('audio').forEach(a => a.pause());
+          }
+        ''');
+      }
+
+      // Speak via device TTS
+      final completer = Completer<void>();
+      _flutterTts.setCompletionHandler(() {
+        if (!completer.isCompleted) completer.complete();
+      });
+      _flutterTts.setErrorHandler((msg) {
+        if (!completer.isCompleted) completer.complete();
+      });
+      await _flutterTts.speak(text);
+      await completer.future.timeout(const Duration(seconds: 10), onTimeout: () {});
+
+      // Restore: resume tour audio
+      if (webController != null) {
+        await webController!.evaluateJavascript(source: 'window.playAudio()');
+      }
+      await DebugLogHelper.addDebugLog('NAV: Speech complete, audio resumed');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('NAV: _speakNavigation error: $e');
+      // Best-effort resume
+      if (webController != null) {
+        try {
+          await webController!.evaluateJavascript(source: 'window.playAudio()');
+        } catch (_) {}
+      }
+    }
+  }
+
+  /// Returns true if the current tour is a museum/exhibit (indoor) tour.
+  /// Navigation services are meaningless indoors.
+  Future<bool> _isMuseumTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tourType = prefs.getString('current_tour_type') ?? '';
+    return tourType == 'museum' || tourType == 'museum_tour' || tourType == 'exhibit';
+  }
+
+  /// Get the tour path for the currently playing tour.
+  Future<String> _getCurrentTourPath() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('current_tour_path') ?? '';
   }
 
   Future<void> getTourInfo() async {
@@ -187,6 +264,30 @@ mixin VoiceMethods<T extends StatefulWidget> on State<T> {
         } catch (e) {
           await DebugLogHelper.addDebugLog('VOICE: Go to stop error: $e');
         }
+        break;
+      case 'find_water':
+        await DebugLogHelper.addDebugLog('NAV: Water request received');
+        if (await _isMuseumTour()) {
+          await DebugLogHelper.addDebugLog('NAV: Museum tour — water command ignored');
+          break;
+        }
+        await _handleServiceLookup('water');
+        break;
+      case 'find_toilet':
+        await DebugLogHelper.addDebugLog('NAV: Toilet request received');
+        if (await _isMuseumTour()) {
+          await DebugLogHelper.addDebugLog('NAV: Museum tour — toilet command ignored');
+          break;
+        }
+        await _handleServiceLookup('toilet');
+        break;
+      case 'next_stop_distance':
+        await DebugLogHelper.addDebugLog('NAV: Next-stop distance request received');
+        if (await _isMuseumTour()) {
+          await DebugLogHelper.addDebugLog('NAV: Museum tour — distance command ignored');
+          break;
+        }
+        await _handleNextStopDistance();
         break;
       case 'pause_for_listening':
         await DebugLogHelper.addDebugLog('VOICE: Pausing audio for voice recognition');
@@ -429,6 +530,65 @@ mixin VoiceMethods<T extends StatefulWidget> on State<T> {
   }
 
   void disposeVoice() {
+    _flutterTts.stop();
     voiceService.dispose();
+  }
+
+  /// Handle water or toilet lookup — three states spoken distinctly (D162).
+  Future<void> _handleServiceLookup(String type) async {
+    final result = await _navigationService.findNearbyService(type);
+    String spoken;
+    switch (result.state) {
+      case ServiceLookupState.found:
+        if (type == 'water') {
+          final desc = result.description ??
+              '${result.distanceMetres ?? 200} metres ahead${result.landmark != null ? ', near ${result.landmark}' : ''}';
+          spoken = 'Water — there\'s $desc.';
+        } else {
+          final desc = result.description ??
+              '${result.distanceMetres ?? 200} metres ahead${result.landmark != null ? ', near ${result.landmark}' : ''}';
+          spoken = 'Toilet — there\'s one $desc.';
+        }
+        break;
+      case ServiceLookupState.noneFound:
+        spoken = type == 'water'
+            ? 'I checked nearby but couldn\'t find a water source on this stretch.'
+            : 'I checked nearby but couldn\'t find a toilet on this stretch.';
+        break;
+      case ServiceLookupState.couldNotSearch:
+        spoken = type == 'water'
+            ? 'I can\'t search for water right now — location or network unavailable.'
+            : 'I can\'t search for toilets right now — location or network unavailable.';
+        break;
+    }
+    await _speakNavigation(spoken);
+  }
+
+  /// Handle next-stop distance — three states spoken distinctly (D162).
+  Future<void> _handleNextStopDistance() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentStopIdx = prefs.getInt('current_stop') ?? 0;
+    final nextStopIdx = currentStopIdx + 1; // audio files are 1-based
+    final tourPath = await _getCurrentTourPath();
+
+    if (tourPath.isEmpty) {
+      await _speakNavigation('I can\'t check the distance right now — tour path unavailable.');
+      return;
+    }
+
+    final result = await _navigationService.getNextStopDistance(nextStopIdx + 1, tourPath);
+    String spoken;
+    switch (result.state) {
+      case ServiceLookupState.found:
+        spoken = 'The next stop is ${result.distanceDescription}.';
+        break;
+      case ServiceLookupState.noneFound:
+        spoken = 'I don\'t have location data for the next stop.';
+        break;
+      case ServiceLookupState.couldNotSearch:
+        spoken = 'I can\'t check the distance right now — location unavailable.';
+        break;
+    }
+    await _speakNavigation(spoken);
   }
 }

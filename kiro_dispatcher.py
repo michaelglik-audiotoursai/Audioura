@@ -83,23 +83,94 @@ def last_status_for(task_filename):
     return last
 
 
+# An infrastructure failure means the task never RAN. Distinct from a task that
+# ran and failed, which should not be retried blindly.
+_SETUP_FAILURE = "worktree_setup_failed"
+_MAX_SETUP_RETRIES = 3
+
+
+def _setup_failure_count(task_filename):
+    if not LOG_FILE.exists():
+        return 0
+    n = 0
+    for line in LOG_FILE.read_text().splitlines():
+        m = STATUS_LINE_RE.match(line)
+        if m and m.group(2) == task_filename and m.group(1) == "FAILED" \
+                and _SETUP_FAILURE in line:
+            n += 1
+    return n
+
+
 def already_claimed(task_filename):
     """
     Claimed = currently in flight or already ran to a terminal state.
     ABANDONED (reboot recovery) is deliberately NOT claimed -- it should be
     picked up again fresh.
+
+    [2026-09-23] Nor is a FAILED whose reason is worktree_setup_failed. Four
+    correctly-allowlisted tasks were permanently unrunnable after I killed a runaway
+    dispatch mid-checkout: the kill left FAILED records, and a FAILED record blocked
+    them forever. But `git worktree add` failing means the session never started --
+    no model was called, no work was attempted, nothing was learned. Retrying it is
+    not the retry-loop this guard exists to prevent.
+
+    Capped at _MAX_SETUP_RETRIES so a genuinely broken worktree setup cannot loop;
+    reap_orphans.sh quarantines at three deaths on the same principle.
     """
-    status, _ = last_status_for(task_filename)
+    status, line = last_status_for(task_filename)
+    if status == "FAILED" and line and _SETUP_FAILURE in line:
+        return _setup_failure_count(task_filename) >= _MAX_SETUP_RETRIES
     return status in ("STARTED", "COMPLETED", "FAILED", "TIMEOUT")
+
+
+ALLOWLIST_FILE = WATCH_DIR / ".continuous_dev" / "RELEASED.txt"
+
+
+def released_ids():
+    """Task IDs a human (or LEAD) has explicitly approved for dispatch.
+
+    [2026-09-23] Why this exists. Clearing the PAUSE sentinel released 35 task
+    files in one tick -- 97 kiro processes, against an intended FOUR. The extra 34
+    were untracked files that had appeared at the repo root since 16:15, duplicating
+    work already completed and merged the same afternoon (LOCAL-3513 "critique the
+    round-5 tours" repeats LOCAL-3493/513). 35 worktrees at ~280MB is ~10GB against
+    7.9GB free: it would have filled the disk and re-wedged Docker, as happened
+    earlier the same day. Killed mid-checkout, so nothing was lost.
+
+    The glob is the whole problem -- it treats "a file exists at the repo root" as
+    "a human wants this run, and wants to pay for it". Those are different claims.
+    CLAUDE.md has carried "a dispatcher-side fix (allowlist, or only claiming files
+    it created) is still outstanding" since 2026-08-31; this is it.
+
+    An ABSENT allowlist file means dispatch nothing. That is deliberate: the failure
+    mode of this dispatcher is spending money, so it must fail closed.
+    """
+    if not ALLOWLIST_FILE.is_file():
+        return set()
+    ids = set()
+    for line in ALLOWLIST_FILE.read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            ids.add(line)
+    return ids
 
 
 def find_task_files():
     if not WATCH_DIR.is_dir():
         return []
-    matches = []
+    allowed = released_ids()
+    matches, skipped = [], 0
     for p in sorted(WATCH_DIR.glob("new_kiro_session_is_required_*.md")):
-        if TASK_FILE_RE.match(p.name):
-            matches.append(p)
+        m = TASK_FILE_RE.match(p.name)
+        if not m:
+            continue
+        if m.group(1) not in allowed:
+            skipped += 1
+            continue
+        matches.append(p)
+    if skipped:
+        print(f"[allowlist] skipped {skipped} task file(s) not in "
+              f"{ALLOWLIST_FILE.name}; {len(matches)} allowed")
     return matches
 
 
@@ -159,12 +230,42 @@ def check_worker_liveness():
             continue
         pid = int(pid_m.group(1))
         if not pid_is_alive(pid):
+            # [D352] The dispatcher_pid is a bookkeeping wrapper; the kiro-cli
+            # agent is the actual work, and it SURVIVES the wrapper's death.
+            # Testing the wrapper alone marked LOCAL-415 abandoned at 14:22
+            # while its agent was mid-generation, re-dispatched it, and ran a
+            # duplicate concurrently with LOCAL-417 -- ~35 minutes of live
+            # OpenAI and Serper calls spent reproducing work already in hand.
+            if worker_process_alive(task_path.name):
+                continue
             locked_append(
                 f"- ABANDONED | task={task_path.name} | at={now_iso()} | "
                 f"reason=worker_died | dead_pid={pid}"
             )
             abandoned.append(task_path.name)
     return abandoned
+
+
+def worker_process_alive(task_filename):
+    """
+    [D352] True if a kiro-cli agent for this task is still running.
+
+    The agent is forked detached and outlives its dispatcher, so liveness must
+    be asked of the agent. Matched on the task id (e.g. "LOCAL-415") because
+    the task text is embedded in the agent's command line.
+    """
+    m = TASK_FILE_RE.match(task_filename)
+    task_id = m.group(1) if m else task_filename
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", task_id],
+            capture_output=True, text=True, timeout=10,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        # Cannot prove it is dead -> do not abandon. Re-dispatching live work
+        # is far more expensive than leaving a dead task undetected one tick.
+        return True
 
 
 def render_status(candidates, launched, paused, reboot_recovered, liveness_abandoned=None):
@@ -332,6 +433,55 @@ def validate_base_branch(base, cwd):
     return True, None
 
 
+def resolve_base_sha(base, cwd):
+    """Return the sha the base branch points at right now, or '' if unknown."""
+    r = subprocess.run(
+        ["git", "rev-parse", "--short", base],
+        cwd=str(cwd), capture_output=True, text=True,
+    )
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def base_preamble(base, base_sha):
+    """
+    Prepended to every dispatched prompt.
+
+    [LOCAL-418 review, D358] LOCAL-418 branched from `origin/storied` and so did
+    its work on a tree **18 commits stale** -- it never saw the 410-415 chain,
+    and it re-created `run_mfa_unbound_eval.py` from scratch because the
+    committed one did not exist at its base. The task file said "branch off
+    `storied`", the agent resolved that to `origin/storied`, and nothing
+    complained.
+
+    `origin/storied` is stale BY DESIGN: local `storied` is held unpushed behind
+    Michael's iPhone field-test gate, so the remote falls further behind every
+    day. An agent that branches from origin is silently working in the past.
+
+    The worktree the agent is handed is ALREADY on the correct commit, so the
+    right move is always to branch from HEAD.
+    """
+    return (
+        "# BASE — read before your first git command\n"
+        "\n"
+        f"Your worktree is already checked out at the correct base: **{base} = {base_sha}**.\n"
+        "\n"
+        "Create your branch from **HEAD**:\n"
+        "\n"
+        "    git checkout -b <branch-name>\n"
+        "\n"
+        "**Never branch from `origin/anything`.** `origin/storied` is many commits\n"
+        "behind local `storied` — local is held unpushed behind a field-test gate.\n"
+        "Branching from origin silently puts your work on a stale tree, and every\n"
+        "live run you make there measures old code (D358).\n"
+        "\n"
+        f"Verify before you commit: `git merge-base --is-ancestor {base_sha} HEAD`\n"
+        "must exit 0. If it does not, you are on the wrong base — fix it first.\n"
+        "\n"
+        "---\n"
+        "\n"
+    )
+
+
 def setup_worktree(task_id, branch, base):
     """
     Isolates one task's work in its own git worktree + branch, checked out
@@ -360,10 +510,58 @@ def setup_worktree(task_id, branch, base):
     else:
         cmd = ["git", "worktree", "add", "-b", branch, str(path), base]
     subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, check=True)
+
+    # [LOCAL-412 review] Link .env into the worktree.
+    # .env is gitignored, so `git worktree add` never brings it across and every
+    # task landed in a tree with no OPENAI_API_KEY / SERP_API_KEY. Tasks then
+    # honestly reported "SERP_API_KEY not available" and downgraded a live
+    # acceptance run to an offline simulation -- which is exactly the evidence
+    # the live-artifact gate exists to prevent. A symlink (not a copy) keeps one
+    # source of truth and stops secrets proliferating into ~30 worktrees.
+    env_src = WATCH_DIR / ".env"
+    env_dst = path / ".env"
+    if env_src.exists() and not env_dst.exists():
+        try:
+            env_dst.symlink_to(env_src)
+        except OSError as e:
+            print(f"[dispatcher] WARNING: could not link .env into {path}: {e}")
+
     return path
 
 
+def export_dotenv_into_environ():
+    """[LOCAL-442 review] Export .env into this process's environment.
+
+    LOCAL-412 symlinked .env INTO each worktree, which fixed file access but not
+    process environment: the launchd tick's env has no OPENAI_API_KEY, so a task
+    running `python3 -c "..."` still saw os.environ empty and every module that
+    reads os.environ.get('OPENAI_API_KEY') fell into its no-key branch. LOCAL-442
+    then reported "no OPENAI_API_KEY available in this worktree environment" and
+    hand-wrote its acceptance fixtures instead of capturing live verdicts -- the
+    file was right there, symlinked, unread. Exporting here means the kiro-cli
+    child and everything it spawns inherit the keys without knowing the incantation.
+
+    Existing environment always wins, so an explicitly-set key is never clobbered.
+    """
+    env_file = WATCH_DIR / ".env"
+    if not env_file.exists():
+        return
+    try:
+        for raw in env_file.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError as e:
+        print(f"[dispatcher] WARNING: could not export .env: {e}")
+
+
 def worker(task_path_str):
+    export_dotenv_into_environ()
     task_path = Path(task_path_str)
     task_filename = task_path.name
     m = TASK_FILE_RE.match(task_filename)
@@ -390,6 +588,8 @@ def worker(task_path_str):
         )
         return
 
+    base_sha = resolve_base_sha(base, WATCH_DIR)
+
     try:
         worktree_path = setup_worktree(task_id, branch, base)
     except subprocess.CalledProcessError as e:
@@ -407,7 +607,8 @@ def worker(task_path_str):
     try:
         start_time = time.monotonic()
         start_iso = now_iso()
-        cmd = ["kiro-cli", "chat", "--trust-all-tools", "--no-interactive", prompt]
+        full_prompt = base_preamble(base, base_sha) + prompt
+        cmd = ["kiro-cli", "chat", "--trust-all-tools", "--no-interactive", full_prompt]
 
         try:
             result = subprocess.run(
@@ -432,13 +633,34 @@ def worker(task_path_str):
 
     session_id = None
     if status == "COMPLETED":
-        session_id = find_session_id(prompt.strip(), worktree_path)
+        session_id = find_session_id(full_prompt.strip(), worktree_path)
+
+    # [D358] Report the base the work ACTUALLY sits on, not the one we asked for.
+    # LOCAL-418's line said base=storied while its commits hung off origin/storied,
+    # 18 commits back. The branch field is likewise a guess -- the agent names its
+    # own branch -- so record what the worktree really has.
+    real_branch = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=str(worktree_path), capture_output=True, text=True,
+    ).stdout.strip() or branch
+    stale = ""
+    if base_sha:
+        on_base = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", base_sha, "HEAD"],
+            cwd=str(worktree_path), capture_output=True, text=True,
+        ).returncode
+        if on_base != 0:
+            behind = subprocess.run(
+                ["git", "rev-list", "--count", f"HEAD..{base}"],
+                cwd=str(worktree_path), capture_output=True, text=True,
+            ).stdout.strip() or "?"
+            stale = f" | *** STALE BASE: work is {behind} commits behind {base} ***"
 
     locked_append(
         f"- {status:<10}| task={task_filename} | id=T{task_id} | "
-        f"branch={branch} | base={base} | worktree={worktree_path} | "
+        f"branch={real_branch} | base={base}@{base_sha or '?'} | worktree={worktree_path} | "
         f"session={session_id or 'unknown'} | started={start_iso} | "
-        f"duration={duration_s}s | exit={exit_code} | log={session_log_path}"
+        f"duration={duration_s}s | exit={exit_code} | log={session_log_path}{stale}"
     )
 
 

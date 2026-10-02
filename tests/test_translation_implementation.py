@@ -13,6 +13,8 @@ import time
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_tour_factory import TestTourFactory
 from db_connection import get_connection
@@ -20,6 +22,8 @@ from db_connection import get_connection
 # Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
 _factory = TestTourFactory(auto_cleanup=True)
 
+
+@pytest.mark.service
 def test_tour_generation_with_content():
     """Test that new tours store content properly"""
     print("🔧 **SERVICES AMAZON-Q** - Testing enhanced tour generation with content storage...")
@@ -99,6 +103,8 @@ def test_tour_generation_with_content():
         print(f"❌ Error testing tour generation: {e}")
         return None
 
+
+@pytest.mark.service
 def test_translation_service():
     """Test translation service endpoints"""
     print("\n🔧 **SERVICES AMAZON-Q** - Testing translation service...")

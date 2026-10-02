@@ -11,7 +11,6 @@
     "pubmed.ncbi.nlm.nih.gov",
     "cairn.info",
     "theartnewspaper.com",
-    "artnet.com",
     "frieze.com",
     "apollo-magazine.com",
     "washingtonpost.com",
@@ -32,7 +31,6 @@
     "artforum.com",
     "hyperallergic.com",
     "artnews.com",
-    "artsy.net",
     "museumsassociation.org",
     "atlasobscura.com",
     "historytoday.com",
@@ -48,6 +46,19 @@
     "theparisreview.org",
     "literaryhub.com",
     "aeon.co"
+  ],
+  "art_market_domains": [
+    "artnet.com",
+    "artsy.net",
+    "invaluable.com",
+    "liveauctioneers.com",
+    "christies.com",
+    "sothebys.com",
+    "1stdibs.com",
+    "mutualart.com",
+    "abebooks.com",
+    "drouot.com",
+    "artprice.com"
   ],
   "institutional_domain_seed": [
     "moma.org",

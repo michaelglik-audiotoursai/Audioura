@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+import pytest
+pytest.importorskip("Crypto")  # LOCAL-544: skip when optional dep missing
 import base64
 from Crypto.Cipher import AES
 import hashlib

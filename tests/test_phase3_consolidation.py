@@ -8,7 +8,9 @@ import requests
 import json
 import sys
 from user_consolidation_service import user_consolidation_service
+import pytest
 
+@pytest.mark.service
 def test_consolidation_status():
     """Test consolidation status endpoint"""
     print("=== Testing Consolidation Status ===")

@@ -280,7 +280,8 @@ class BostonGlobeAuthenticator:
                         # Clear and fill password
                         password_field.clear()
                         time.sleep(0.5)
-                        password_field.send_keys(credentials['password'])\n                        time.sleep(1)
+                        password_field.send_keys(credentials['password'])
+                        time.sleep(1)
                         
                         # Find and click submit button
                         submit_button = self.find_submit_button(driver, email_field)

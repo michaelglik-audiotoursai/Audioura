@@ -1,0 +1,2082 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+==============================================================================
+RUN church: Our Lady Help of Christians Catholic Church, Newton MA  (4 stops)
+==============================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #001 | 12:22:29.062 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  tour_type: 
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_church_20260923_1222.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #002 | 12:22:29.067 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "churches",
+    "location": "Newton, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Our Lady Help of Christians Catholic Church",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: churches
+   Location: Newton, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Our Lady Help of Christians Catholic Church
+  [venue_name sanity] 'Our Lady Help of Christians Catholic Church' OK
+  [S15/LOCAL-485] venue_name='Our Lady Help of Christians Catholic Church' NOT forced to museum — request names a worship/civic place class (stops are places, not works)
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
+[LOCAL-474] tour_type='' → category='walking' (source=inferred)
+
+Detected tour category: WALKING
+Using walking template for Our Lady Help of Christians Catholic Church, Newton MA - 
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #003 | 12:22:30.927 | GENERATING_PROMPT
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  user_request: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Our Lady Help of Christians Catholic Church, Newton MA...
+  [S17] no scope_constraint (precision='', scope='')
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='Catholic parish church' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Portico', 'Nave', 'Narthex', 'Pews', 'Side chapels', 'Stations of the Cross', 'Confessional', 'Transept']
+  [D571]   stops: ['Nave', 'Pews', 'Portico', 'Narthex']
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Nave [?]
+   - Pews [?]
+   - Portico [?]
+   - Narthex [?]
+  [area_resolver] Parsed: city='Newton MA', neighborhood='Our Lady Help of Christians Catholic Church'
+  [area_resolver] City resolved: Newton MA → Q49196 (42.3369, -71.2097)
+  [area_resolver] Neighborhood 'Our Lady Help of Christians Catholic Church' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3369, -71.2097), radius=2.0km, lang=en
+  [area_cache] HIT for Q49196: 49 landmarks (tier=rich)
+  [verify_landmarks] 0/4 stops verified against 49 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 0 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Our Lady Help of Christians Catholic Church, Newton MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Nave' — wikipedia_en_summary: 'Nave' exists and mentions region
+    [VERIFIED] 'Pews' — stop_corpus(geographic): 'Pews' at 'Our Lady Help of Christians Catholic Church,
+    [VERIFIED] 'Portico' — stop_corpus(geographic): 'Portico' at 'Our Lady Help of Christians Catholic Chur
+    [VERIFIED] 'Narthex' — stop_corpus(geographic): 'Narthex' at 'Our Lady Help of Christians Catholic Chur
+    [HARVEST] 'Nave': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'Pews': +1 passages (2 queries)
+    [INTERPRETIVE] 'Portico': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +2 passages, 8 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #004 | 12:23:36.443 | PHASE_3B_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  stop_count: 4
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:9153. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:9154. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0006 (770 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.349874, -71.206979', refetching...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:9590. Caller should supply input_tokens and output_tokens separately.
+   Cluster refetch OK 'Pews': 42.347389, -71.208796
+   Cluster refetch OK 'Portico': 42.350474, -71.204034
+   Cluster refetch OK 'Narthex': 42.3525, -71.2001
+   Cluster refetch OK 'Nave': 42.3529, -71.2095
+   GEO-CHECK: all 4 stops within walking distance (max leg 0.62 km, total 1.53 km, limit 12 km)
+Extracted first POI coordinates: (42.3529, -71.2095)
+
+=== Extracted POI Information ===
+1. Nave
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3529, -71.2095
+   Directions: Exit the main entrance and walk straight ahead toward the large wooden doors.
+2. Pews
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.347389, -71.208796
+   Directions: Walk towards the center aisle and turn right, proceeding towards the back of the...
+3. Portico
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.350474, -71.204034
+   Directions: Exit the church through the rear doors and turn left to reach the portico.
+4. Narthex
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3525, -71.2001
+   Directions: Walk straight ahead through the portico to enter the narthex.
+================================
+
+  [D556] +6 story fact(s) for 'Nave' via gemini (6 high)
+  [D556] +6 story fact(s) for 'Pews' via gemini (6 high)
+  [D556] +3 story fact(s) for 'Portico' via gemini (3 high)
+  [D556] +3 story fact(s) for 'Narthex' via gemini (3 high)
+[TIMING] phase=poi_selection elapsed=152.3s cumulative=154.2s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Nave Our Lady Help of Christians Catholic Church' → 2257 chars
+  [LOCAL-47] Nave: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Pews Our Lady Help of Christians Catholic Church' → 4858 chars
+  [LOCAL-47] Pews: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Portico Our Lady Help of Christians Catholic Church' → 1609 chars
+  [LOCAL-47] Portico: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Narthex Our Lady Help of Christians Catholic Church' → 9424 chars
+  [LOCAL-47] Narthex: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Our Lady Help of Christians Ca model=gpt-4o tokens=1524 (in=853 out=671) cost=$0.0088 latency=8.2s
+[COST_METER] FRESH | spine_generate | $0.008843 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0088
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (9 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Nave' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Pews' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Portico' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Narthex' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=18.2s cumulative=172.4s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=172.4s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=172.4s
+
+Generating description for Stop 1: Nave by , ...
+
+Generating description for Stop 2: Pews by , ...
+
+Generating description for Stop 3: Portico by , ...
+
+Generating description for Stop 4: Narthex by , ...
+  [LOCAL-381] stop='Pews' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Narthex' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Portico' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Pews', 6, ''), ('Pews', 6, ''), ('Pews', 6, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15424 after=25617 (+10193 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25617)
+  [LOCAL-411] Stop 1 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 6, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=15337 after=21939 (+6602 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21939)
+  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Narthex', 6, ''), ('Narthex', 6, ''), ('Narthex', 6, '')]  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Portico', 6, ''), ('Portico', 6, ''), ('Portico', 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=14886 after=24951 (+10065 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24951)
+  [LOCAL-411] Stop 3 prompt size: before_snippets=14779 after=24146 (+9367 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24146)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-3498/prompt_dump_stop1.txt
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:13706. Caller should supply input_tokens and output_tokens separately.
+Stop 1 API call cost: $0.0263 (5542 tokens, model=gpt-4o)
+Stop 1 description word count: 289 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0284 (5974 tokens, model=gpt-4o)
+Stop 3 description word count: 247 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0299 (6287 tokens, model=gpt-4o)
+Stop 4 description word count: 308 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 2 API call cost: $0.0301 (6338 tokens, model=gpt-4o)
+Stop 2 description word count: 281 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [STORY_FIRST] step=description_generation elapsed=19.3s cumulative=19.3s
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Nave': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+    ✓ PASS stop='Pews': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+    ✓ PASS stop='Portico': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Narthex': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+  [LOCAL-439] Classification cost: $0.000553 (input=2444, output=310)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:15019. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 3 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 10 paragraphs retried, 3 fixed/improved, 7 kept original
+  [LOCAL-192] Retry cost: $0.0038 (4726 tokens)
+  [STORY_FIRST] step=style_validation_5_1 elapsed=16.6s cumulative=44.7s
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+  [STORY_FIRST] step=r1_imperative_5_13 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r7_sensory_5_14 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r2_question_5_141 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r3_suggestive_5_142 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r4_feeling_5_143 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r8_leakage_5_144 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 2 'Pews': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] Stop 3 'Portico': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] Stop 4 'Narthex': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 3 sentences deleted, 0 paragraphs emptied, 3 stops affected
+  [STORY_FIRST] step=r9_generic_5_15 elapsed=0.0s cumulative=44.7s
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'Pews': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Narthex': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 3 sentences deleted, 2 paragraphs emptied, 2 stops affected
+  [STORY_FIRST] step=r10_promise_5_155 elapsed=0.0s cumulative=44.8s
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 13
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 19
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Our Lady Help' reason='It does not specify a direct link between the individuals and the stop.' in: "The nave of Our Lady Help of Christians has been more than a place of worship; it has witnessed sign"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='In December' reason='It does not specify how Rev. Cuenin or Cardinal Law directly relate to the nave itself.' in: "The nave of Our Lady Help of Christians has been more than a place of worship; it has witnessed sign"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Cardinal Bernard' reason='No concrete link between Cardinal Bernard and the nave is established.' in: "The nave of Our Lady Help of Christians has been more than a place of worship; it has witnessed sign"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='In June' reason='It does not specify how Mother Teresa is concretely linked to the church.' in: "In June 1995, another memorable moment occurred here when Mother Teresa visited the church. Her pres"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Mother Teresa' reason='It does not specify where Mother Teresa stayed or what she did at this stop.' in: "In June 1995, another memorable moment occurred here when Mother Teresa visited the church. Her pres"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='In June' reason='It does not specify how the individuals are directly linked to the nave.' in: "In June 2023, the community gathered in the nave for a 'Mass of Peace' following the tragic murders "
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Lucia Arpino' reason='It does not specify how Lucia Arpino relates to the nave.' in: "In June 2023, the community gathered in the nave for a 'Mass of Peace' following the tragic murders "
+    [LOCAL-472] UNGROUNDED entity stop='Pews' entity='Cardinal Bernard Law' reason='It does not specify a concrete link between Cardinal Law and the pews.' in: "In December 2002, these pews bore witness to a moment of profound defiance. Rev. Walter H. Cuenin, s"
+    [LOCAL-472] UNGROUNDED entity stop='Pews' entity='On June' reason='No concrete link to the stop is provided.' in: "On June 25, 2023, a tragic event unfolded as Gilda 'Jill' D’Amore and her family were discovered mur"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Father Walter' reason='It does not specify a concrete link between Father Walter and the portico.' in: "The portico is more than just an architectural feature; it embodies the church's dual role as both a"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='In December' reason='It does not specify how Father Walter H. Cuenin is directly linked to the portico.' in: "The portico is more than just an architectural feature; it embodies the church's dual role as both a"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Cardinal Bernard Law' reason='It does not specify a concrete link between Cardinal Bernard Law and the portico.' in: "The portico is more than just an architectural feature; it embodies the church's dual role as both a"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='In September' reason='No concrete link to the portico is established.' in: "In September 2005, Father Cuenin's resignation as pastor marked another pivotal moment. Under scruti"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Father Cuenin' reason='No concrete link to the portico is provided.' in: "In September 2005, Father Cuenin's resignation as pastor marked another pivotal moment. Under scruti"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Mother Teresa' reason='It does not specify a concrete link to the portico.' in: "In an entirely different chapter, the portico witnessed a notable visitor: Mother Teresa of Calcutta"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='In December' reason='It does not specify how Father Cuenin relates to the narthex itself.' in: "The narthex, historically a place for those not yet permitted into the main worship space, has evolv"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='Cardinal Bernard' reason='It does not specify Cardinal Bernard's direct connection to the narthex.' in: "The narthex, historically a place for those not yet permitted into the main worship space, has evolv"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='Father Cuenin' reason='It does not specify a direct link between Father Cuenin and the narthex.' in: "The narthex, historically a place for those not yet permitted into the main worship space, has evolv"
+    [LOCAL-472] UNGROUNDED entity stop='Narthex' entity='Lucia Arpino' reason='No concrete link to the narthex is provided.' in: "Fast forward to June 2023, when the church community was shaken by the tragic murder of Jill and Bru"
+  [STORY_FIRST] step=specificity_5_152 elapsed=45.2s cumulative=89.9s
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/47)
+  [STORY_FIRST] step=unsupported_claim_5_156 elapsed=0.0s cumulative=90.0s
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Nave' cut orphaned dependant of a removed introduction — subject 'christians/nave': "The nave of Christians has been more than a place of worship; it has witnessed s"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 24
+    Glossed (composed): 8
+    Suppressed (already explained): 1
+    Degraded (name dropped): 12
+    Guard failures: 0
+    Known (skipped): 3
+    Triage: 2457 tokens, $0.0006, 10.9s
+    Gloss: 1710 tokens, $0.0004, 9.1s
+    Compose: 2471 tokens, $0.0004, 4.5s
+    Total added cost: $0.0015
+    Stops affected: 4
+    Glosses applied:
+      • Our Lady Help → DEGRADED (name dropped)
+      • Christians → SUPPRESSED (already explained)
+      • In December → DEGRADED (name dropped)
+      • Cardinal Bernard → DEGRADED (name dropped)
+      • Cardinal Law → "the archbishop during the scandal" [source: model]
+      • Lucia Arpino → DEGRADED (name dropped)
+      • Peace → DEGRADED (name dropped)
+      • Bruno → DEGRADED (name dropped)
+      • In December → DEGRADED (name dropped)
+      • Cardinal Bernard Law → "the archbishop of boston from 1984 to 2002" [source: model]
+      • Cardinal Law → "a prominent figure in the church" [source: model]
+      • Cuenin → "a priest and pastor in jamaica plain" [source: model]
+      • Father Walter → DEGRADED (name dropped)
+      • Cardinal Bernard Law → "the archbishop of boston from 1984 to 2002" [source: model]
+      • In September → DEGRADED (name dropped)
+      • Father Cuenin → "the pastor of st. john's church in newton" [source: model]
+      • In December → DEGRADED (name dropped)
+      • Cardinal Bernard → "the Archbishop of Boston until 2002" [source: model]
+      • Father Walter → DEGRADED (name dropped)
+      • Lucia Arpino → "mentioned in connection with the tragic events" [source: model]
+      • Jill → DEGRADED (name dropped)
+  [STORY_FIRST] step=unglossed_ref_5_157 elapsed=24.6s cumulative=114.6s
+  [STORY_FIRST] step=entity_grounding_5_158 elapsed=0.0s cumulative=114.6s
+  [STORY_FIRST] step=role_claim_5_158b elapsed=0.0s cumulative=114.6s
+  [STORY_FIRST] step=org_grounding_5_158c elapsed=0.0s cumulative=114.6s
+  [STORY_FIRST] step=form_claim_5_159 elapsed=0.0s cumulative=114.6s
+  [STORY_FIRST] step=numeric_claim_5_160 elapsed=0.0s cumulative=114.6s
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+  [STORY_FIRST] step=temporal_5_161 elapsed=0.0s cumulative=114.6s
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+  [STORY_FIRST] step=contradicted_5_16 elapsed=0.1s cumulative=114.6s
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+  [STORY_FIRST] step=venue_scope_5_5 elapsed=0.0s cumulative=114.6s
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+  [STORY_FIRST] step=dangling_ref_5_7 elapsed=0.1s cumulative=114.7s
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [3] DELETED: 'This episode' in: This episode reflects the portico's role as a stage for courageous discourse, a 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+  [STORY_FIRST] step=dangling_demo_5_7b elapsed=0.0s cumulative=114.7s
+  [STORY_FIRST] step=self_contradiction_5_8 elapsed=0.0s cumulative=114.7s
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+  [STORY_FIRST] step=audio_native_5_9 elapsed=0.0s cumulative=114.7s
+
+  [D498] step 7c: most valuable stop is 2 'Pews' (index 41) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Nave': the longest run (3 sentences, In June) has agency=0 stakes=0 — someone is described, but nothing is risked, re
+    stop 2 'Pews': the longest run (3 sentences, Catholic Church) has agency=1 stakes=0 — someone is described, but nothing is ri
+    stop 3 'Portico': the longest run (3 sentences, Father Cuenin) has agency=0 stakes=0 — someone is described, but nothing is risk
+    stop 4 'Narthex': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Nave' (index 20)
+  [D534] Stop 3 repeats 3 thing(s) said earlier — will regenerate with them banned
+      already told: Rev. Walter H. Cuenin, standing at the pulpit, gave a homily condemning Cardinal Bernard Law, the ar
+      already told: The tension of that period was palpable as over 850 parishioners filled the nave on December 8, 2002
+      already told: The narrative continued in September 2005 when Fr. Cuenin, a priest and pastor in jamaica plain, res
+  [D534] Stop 4 repeats 3 thing(s) said earlier — will regenerate with them banned
+      already told: In December 2002, Cuenin announced a gathering of priests at this very location, a bold move that re
+      already told: Rev. Walter H. Cuenin, standing at the pulpit, gave a homily condemning Cardinal Bernard Law, the ar
+      already told: On June 25, 2023, a tragic event unfolded as Gilda 'Jill' D’Amore and her family were discovered mur
+
+  [LOCAL-474] PHASE 5.17: retry 'Nave' — 256w → 170w after gates, 6 sentence(s) removed
+    removed: "The nave of Our Lady Help of Christians has been more than a place of worship; it has witnessed sign"
+    removed: "In December 2002, during the Boston clergy sex abuse crisis, this very nave became a stage for a bol"
+    removed: "Cuenin hosted a gathering of priests who dared to challenge the established order, a courageous move"
+    removed: "Cuenin, who openly condemned Cardinal Law, leading to fervent standing ovations."
+    removed: "More recently, in June 2023, the community came together once more in the nave for a 'Mass of Peace."
+    removed: "The service offered solace and unity, reinforcing the nave's role as a place where the community con"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 1: Nave by , ...
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 6, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=15337 after=21939 (+6602 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21939)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-3498/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0287 (6033 tokens, model=gpt-4o)
+Stop 1 description word count: 247 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+
+  [LOCAL-474] PHASE 5.17: retry 'Pews' — 281w → 209w after gates, 9 sentence(s) removed
+    removed: "In December 2002, these pews bore witness to a moment of profound defiance."
+    removed: "Cuenin, standing at the pulpit, gave a homily condemning Cardinal Bernard Law amidst the unfolding s"
+    removed: "Cuenin resigned under the weight of alleged financial irregularities, viewed by many as a political "
+    removed: "Here, the pews once again cradled a community in turmoil—echoing with voices of dissent and solidari"
+    removed: "On June 25, 2023, another dark chapter unfolded."
+    removed: "Gilda 'Jill' D’Amore and her family were found murdered after failing to attend a Mass celebrating t"
+    removed: "Their absence on such a significant day sent ripples of shock through the congregation, a poignant r"
+    removed: "These stories are not just tales of past events; they are woven into the very fabric of the church, "
+    removed: "As you prepare to move on, let your gaze lift towards the light filtering through the portico, a sym"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 2: Pews by , ...
+  [LOCAL-381] stop='Pews' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Pews', 6, ''), ('Pews', 6, ''), ('Pews', 6, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15424 after=25617 (+10193 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25617)
+Stop 2 API call cost: $0.0323 (6808 tokens, model=gpt-4o)
+Stop 2 description word count: 269 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 244w (was 209w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Portico' — 247w → 199w after gates, 5 sentence(s) removed
+    removed: "The narrative of Father Walter H."
+    removed: "In December 2002, Cuenin announced a gathering of priests at this very location, a bold move that re"
+    removed: "This episode reflects the portico's role as a stage for courageous discourse, a place where ideas an"
+    removed: "In September 2005, Father Cuenin's resignation as pastor marked another pivotal moment."
+    removed: "In this transitional space, the secrets of the church's founding await — a reminder that every entra"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 3: Portico by , ...
+  [LOCAL-381] stop='Portico' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Portico', 6, ''), ('Portico', 6, ''), ('Portico', 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=14779 after=24146 (+9367 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24146)
+Stop 3 API call cost: $0.0313 (6579 tokens, model=gpt-4o)
+Stop 3 description word count: 261 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 230w (was 199w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Narthex' — 275w → 230w after gates, 6 sentence(s) removed
+    removed: "The narthex, historically a place for those not yet permitted into the main worship space, has evolv"
+    removed: "Its role as a gathering space is palpable, even as the echoes of past events linger in the air."
+    removed: "In December 2002, this church was at the center of a significant episode when Cardinal Bernard F."
+    removed: "Law banned official archdiocesan events here due to Father Walter H."
+    removed: "Fast forward to June 2023, when the church community was shaken by the tragic murder of Jill and Bru"
+    removed: "As you reflect on the names etched in brass, consider how their legacy shapes the path you will walk"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 4: Narthex by , ...
+  [LOCAL-381] stop='Narthex' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Narthex', 6, ''), ('Narthex', 6, ''), ('Narthex', 6, '')]
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=14886 after=24951 (+10065 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24951)
+Stop 4 API call cost: $0.0325 (6833 tokens, model=gpt-4o)
+Stop 4 description word count: 261 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+      [TRAGEDY-CONTEXT] stop='Narthex' RECOVERED circumstances (4 source(s)): On June 25, 2023, Bruno D'Amore, his wife Gilda D'Amore, and her mother Lucia Arpino were 
+  [TRAGEDY-CONTEXT] recovered 1, removed 0 sentence(s)
+  [D534] removed 2 repeated sentence(s) the capped retries could not reach:
+      stop 3: In December 2002, amidst a turbulent period for the Catholic Church, he banned official ar
+      stop 4: On June 25, 2023, Bruno D'Amore, his wife Gilda D'Amore, and her mother Lucia Arpino were 
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 2 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 2 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+  [STORY_FIRST] step=postgate_retry_5_17 elapsed=49.6s cumulative=164.4s
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+  [STORY_FIRST] step=anti_preaching_5_10 elapsed=0.0s cumulative=164.4s
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts) (attempt 1)
+  [LOCAL-459] R5: Fetched 2177 chars from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Chr
+  [LOCAL-427] HTTP 200 from https://canningliturgicalarts.com/portfolio/our-lady-help-of-christians/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://canningliturgicalarts.com/portfolio/our-la
+  [LOCAL-427] HTTP 200 from https://buildingsofnewengland.com/tag/timothy-g-oconnell/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://buildingsofnewengland.com/tag/timothy-g-oc
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/191682034340498/posts/947293765445984/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/StJoeOst/posts/our-church-renovation-project-is-now-underway-after-the-final-mass-in-the-sanctu/1318040403773911/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://thebostonpilot.com/bcd/web_parish.asp?ektronid=4676 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://thebostonpilot.com/bcd/web_parish.asp?ektr
+  [LOCAL-427] HTTP 200 from https://johncanningco.com/blog/characteristics-of-gothic-churches-and-chapels/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2148 chars from https://johncanningco.com/blog/characteristics-of-
+  [D512] verb discovery: query='Our Lady Help of Christians Catholic Church, Newton MA construct' -> 12 new verb(s): dedicated, conserved, involved, uncovered, overview, pointed, revealed, consolidated, reinstated, ribbed, vaulted, gilded
+  [D512] _AGENCY_VERB widened by 12 discovered verb(s)
+  [STORY_FIRST] step=obligation_audit_5_20 elapsed=5.1s cumulative=169.4s
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Nave                                       20    24     0    50
+     2  Pews                                       53    24    27    31
+     3  Portico                                    28    12     0    54
+     4  Narthex                                    38    59     0    73
+    [LOCAL-485] index mean 34.8 over 4 stop(s), range 20-53
+    [LOCAL-485] weakest: 'Nave' at 20
+  [STORY_FIRST] step=story_valuation_5_21 elapsed=0.0s cumulative=169.5s
+  [STORY_FIRST] per_stop: n=4 sum_wall=42.7s observed_span=19.3s slowest=19.3s (serial_would_cost=42.7s vs parallel_span=19.3s)
+    [STORY_FIRST] stop=0 elapsed=6.9s words=289
+    [STORY_FIRST] stop=1 elapsed=19.3s words=281
+    [STORY_FIRST] stop=2 elapsed=7.4s words=247
+    [STORY_FIRST] stop=3 elapsed=9.1s words=308
+  [STORY_FIRST] TOTAL phase_wall=169.5s serial_steps: postgate_retry_5_17=49.6s, specificity_5_152=45.2s, unglossed_ref_5_157=24.6s, description_generation=19.3s, style_validation_5_1=16.6s, obligation_audit_5_20=5.1s, dangling_ref_5_7=0.1s, contradicted_5_16=0.1s, unsupported_claim_5_156=0.0s, story_valuation_5_21=0.0s, dangling_demo_5_7b=0.0s, r7_sensory_5_14=0.0s, r1_imperative_5_13=0.0s, r9_generic_5_15=0.0s, r10_promise_5_155=0.0s, r8_leakage_5_144=0.0s, r4_feeling_5_143=0.0s, anti_preaching_5_10=0.0s, r3_suggestive_5_142=0.0s, venue_scope_5_5=0.0s, r2_question_5_141=0.0s, audio_native_5_9=0.0s, org_grounding_5_158c=0.0s, entity_grounding_5_158=0.0s, temporal_5_161=0.0s, role_claim_5_158b=0.0s, form_claim_5_159=0.0s, numeric_claim_5_160=0.0s, self_contradiction_5_8=0.0s
+[TIMING] phase=story_first elapsed=169.5s cumulative=341.8s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (92 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 92 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 77 words (delta: -15)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "From the Nave to the Narthex, you'll traverse the sacred space where community stories unfold."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 4 orientation R9: 1 sentence(s) deleted
+    Stop 4 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 235
+    Words after:  179
+    Delta: -56
+    Stops affected: 1/4
+    Deletions (2):
+      [Stop 4][R9_GENERIC] "The narthex serves as a bridge between the bustling world outside and the sacred interior you have a..."
+      [Stop 4][R10_UNFULFILLED_PROMISE] "As you step into the narthex of Our Lady Help of Christians Catholic Church in Newton, MA, pause for..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 3.2s, $0.0085, 1230 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Nave] (dated_event_with_consequence): The tension of that period was palpable as over 850 parishioners filled the nave...
+      [Pews] (cause): The pews, filled to capacity, resonated with the collective spirit of the congre...
+      [Portico] (mystery): In June 1982, a moment of quiet significance unfolded here when Mother Teresa of...
+      [Narthex] (cause): Father Cuenin had openly criticized the archdiocese’s handling of clergy abuse c...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0032 (547 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (35 words):
+      "As you continue your tour, you'll learn about the visit of Mother Teresa of Calcutta in June 1982 at the Portico and the bold stand Father Cuenin took in the Narthex regarding clergy abuse cases."
+      Stops referenced: 2
+    Part 4 total cost: $0.0032
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:18712. Caller should supply input_tokens and output_tokens separately.
+  [T4] Transition to Stop 2: As you exit the Nave of Our Lady Help of Christians Catholic...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you exit the pews, head towards the main entrance of Our ...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the Portico, walk straight towards the main ent...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.1s, $0.0023, 413 tokens
+  [LOCAL-280] Recap built: 22 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Portico] (mystery): "In June 1982, a moment of quiet significance unfolded here when Mother Teresa of..."
+      → composed: "Portico, Mother Teresa visited the church in June 1982"
+    [Pews] (cause): "The pews, filled to capacity, resonated with the collective spirit of the congre..."
+      → composed: "Pews, congregation united during a time of controversy"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Portico, Mother Teresa visited the church in June 1982 and Pews, congregation united during a time of controversy."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+REPETITION WARN: Stop 2 and Stop 3 share near-identical sentence (sim=0.71)
+  [S27] 1 repetition pair(s) found (log only, no rewrite)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-3498/generate_tour_text.py:18889. Caller should supply input_tokens and output_tokens separately.
+  [S29] Sentence not found in Stop 3 block — skipping
+  [D533] REPEATED FACT removed from stop 2 (first told at stop 1, 2002/december): The story goes back to December 2002, when a pivotal moment in this church's his
+  [D533] 1 repeated fact(s) removed, 0 kept
+  [D533] Person-year role guard: no mismatches (1373 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='walking')
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 3: PARTS_OUT_OF_ORDER — Part 3 appears before Part 2 (sentence 2 vs 3).
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne..."
+  [2] "That's 4 stops — Portico, Mother Teresa visited the church in June 1982 and Pews, congregation unite..."
+
+=== Word Count Statistics ===
+Stop 1: Nave - 289 words
+Stop 2: Pews - 281 words
+Stop 3: Portico - 247 words
+Stop 4: Narthex - 308 words
+===========================
+
+
+Total API cost: $0.2050 (38369 tokens)
+CACHE STORE: Our Lady Help of Christians Catholic Church, Newton MA /  / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_church_20260923_1222.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_church_20260923_1222_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Our Lady Help of Christians Catholic Church, Newton MA
+Tour-Category: walking
+
+Stop 1: Nave
+
+Address: 573 Washington St, Newton, MA 02458
+
+Coordinates: 42.3529, -71.2095
+
+Type/Specialty: Church interior
+
+Specific Examples: Stained glass windows, altar, wooden pews
+
+Operational Details: Open for visitors during non-service hours
+
+Orientation: You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Newton MA. The Pews, where...
+
+[TIMING] phase=packing elapsed=13.7s cumulative=355.5s
+[TIMING] phase=verification elapsed=0.0s cumulative=355.5s
+[TIMING] TOTAL wall=355.5s phases: story_first=169.5s, poi_selection=152.3s, fact_sheets=18.2s, packing=13.7s, intent=1.9s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+RUN church OK: 9448 chars in 355.5s -> L3498_church_20260923_1222.txt
+==============================================================================
+RUN airport: Boston Logan International Airport, Boston MA  (4 stops)
+==============================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #005 | 12:28:24.592 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  tour_type: 
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_airport_20260923_1222.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #006 | 12:28:24.592 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='' not prepended (pre_category='facility'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "airport",
+    "location": "Boston Logan International Airport, Boston MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston Logan International Airport, Boston MA",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: airport
+   Location: Boston Logan International Airport, Boston MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=2.0s cumulative=2.0s
+[LOCAL-474] tour_type='' → category='facility' (source=inferred)
+
+Detected tour category: FACILITY
+Using facility template for Boston Logan International Airport, Boston MA - 
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #007 | 12:28:26.609 | GENERATING_PROMPT
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  user_request: Boston Logan International Airport, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Boston Logan International Airport, Boston MA...
+  [S17] no scope_constraint (precision='BUILDING', scope='Boston Logan International Airport, Boston MA')
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='international airport' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Apron and tarmac viewing windows', 'Air traffic control tower', 'Terminal A Concourse', 'Jet bridges', 'Terminal A Departures Curbside', 'Terminal A Ticketing / Check-In', 'Flight information display systems (FIDS)', 'Check-in desks and kiosks']
+  [D571]   stops: ['Terminal A Concourse', 'Jet bridges', 'Apron and tarmac viewing windows', 'Air traffic control tower']
+  [D571]   precondition: some stops are not open to the public, so you will see it from outside; past the security checkpoint, so you will need a boarding pass; inside the ticketed area, so you will need admission
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Terminal A Concourse [?]
+   - Jet bridges [?]
+   - Apron and tarmac viewing windows [?]
+   - Air traffic control tower [?]
+
+PHASE 4.5: Validating AI knowledge for Boston Logan International Airport, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='facility', no type-verification required)
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 4 stops pass location guard
+  [EXISTENCE-GATE] LOG_ONLY — 0/4 stops verified (0%), 4 would be dropped
+    [UNVERIFIED] 'Terminal A Concourse' — no evidence
+    [UNVERIFIED] 'Jet bridges' — no evidence
+    [UNVERIFIED] 'Apron and tarmac viewing windows' — no evidence
+    [UNVERIFIED] 'Air traffic control tower' — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #008 | 12:29:51.070 | PHASE_3B_REQUEST
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (869 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.3667, -71.0189', refetching...
+   Cluster refetch OK 'Jet bridges': 42.3656, -71.0189
+   Cluster refetch OK 'Air traffic control tower': 42.365613, -71.009560
+   Cluster refetch OK 'Apron and tarmac viewing windows': 42.3656, -71.0199
+   Cluster refetch OK 'Terminal A Concourse': 42.3656, -71.0170
+Extracted first POI coordinates: (42.3656, -71.017)
+
+=== Extracted POI Information ===
+1. Terminal A Concourse
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0170
+   Directions: Exit the transportation drop-off area and follow signs towards Terminal A, notic...
+2. Jet bridges
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0189
+   Directions: Walk towards the gates area and proceed to the designated jet bridge, hearing th...
+3. Apron and tarmac viewing windows
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0199
+   Directions: Continue past the boarding gates area and follow signs to the viewing windows, f...
+4. Air traffic control tower
+   Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.365613, -71.009560
+   Directions: Walk towards the central airport area, noting the iconic tower structure looming...
+================================
+
+[TIMING] phase=poi_selection elapsed=92.1s cumulative=94.1s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal A Concourse Boston Logan International Airport' → 22872 chars
+  [LOCAL-47] Terminal A Concourse: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Jet bridges Boston Logan International Airport' → 36413 chars
+  [LOCAL-47] Jet bridges: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Apron and tarmac viewing windows Boston Logan International Airport' → 26948 chars
+  [LOCAL-47] Apron and tarmac viewing windo: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Air traffic control tower Boston Logan International Airport' → 21525 chars
+  [LOCAL-47] Air traffic control tower: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=facility venue=Boston Logan International Air model=gpt-4o tokens=1214 (in=656 out=558) cost=$0.0072 latency=10.2s
+[COST_METER] FRESH | spine_generate | $0.007220 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0072
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/4 stops have per-stop passages (1 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Terminal A Concourse' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Jet bridges' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Apron and tarmac viewing windows' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Air traffic control tower' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 3 EMPTY, 1 SHORTENED
+No RAG context for Terminal A Concourse — cannot generate fact sheet
+No RAG context for Apron and tarmac viewing windows — cannot generate fact sheet
+  [Storied] Fact sheets: 2/4 generated
+  [S25] Story types assigned: ['history', 'anecdote', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=20.6s cumulative=114.7s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=114.7s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=114.7s
+
+Generating description for Stop 1: Terminal A Concourse by , ...
+  [D571] re-attached 6 chain fact(s) to 'Terminal A Concourse' (lost in a poi_list rebuild)
+
+Generating description for Stop 2: Jet bridges by , ...
+  [D571] re-attached 6 chain fact(s) to 'Jet bridges' (lost in a poi_list rebuild)
+
+Generating description for Stop 3: Apron and tarmac viewing windows by , ...
+  [D571] re-attached 6 chain fact(s) to 'Apron and tarmac viewing windo' (lost in a poi_list rebuild)
+
+Generating description for Stop 4: Air traffic control tower by , ...
+  [D571] re-attached 6 chain fact(s) to 'Air traffic control tower' (lost in a poi_list rebuild)
+  [LOCAL-381] stop='Terminal A Concourse' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Apron and tarmac viewing windows' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Air traffic control tower' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Jet bridges' matched_work=False medium='' work_identity_chars=0
+Stop 1 API call cost: $0.0176 (3715 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Terminal A, a vital artery in this hive of activity, reflects Boston's role as a gateway to the world. Its design focuses on efficient passenger flow, embodying the aspirations of a city and its continual march towards the future."
+  [LOCAL-417] Stop 1: retrying (attempt 1, temp=0.90)...
+Stop 2 API call cost: $0.0178 (3741 tokens, model=gpt-4o)
+  [LOCAL-295] Stop 2: PLACEHOLDER REJECTED (reason: empty_text)
+  [LOCAL-295]   verbatim (0 words): ''
+  [LOCAL-26] Stop 2: placeholder leak detected (attempt 1), retrying (temp=0.85)...
+Stop 3 API call cost: $0.0184 (3867 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'This vantage point connects you directly to the dynamic choreography of ground operations. Each vehicle and crew member plays a vital role in preparing aircraft for departure, echoing the function of the jet bridges you visited earlier. This scene captures the meticulous coordination required for ea'
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0180 (3784 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 101 words < 120, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0182 (3834 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 2: WORD FLOOR — 111 words < 120, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0184 (3866 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'From this vantage point, observe a scene of meticulous coordination, where every vehicle has a purpose and every crew member is a part of the larger mechanism facilitating departures and arrivals. This spot offers a glimpse into the dynamic heart of Boston Logan International Airport, where history '
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 4 API call cost: $0.0226 (4756 tokens, model=gpt-4o)
+Stop 4 description word count: 290 words
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0184 (3877 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 112 words < 120, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0190 (4007 tokens, model=gpt-4o)
+Stop 2 description word count: 201 words
+Stop 3 API call cost: $0.0185 (3892 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)"]
+  [LOCAL-417]   verbatim: "Boston Logan International Airport's rich narrative unfolds here through vivid chapters. Imagine Charles Lindbergh's historic 1927 landing in the Spirit of St. Louis. Sense the palpable excitement when The Beatles first arrived in 1964 to throngs of fans, a moment echoing with musical revolution. In"
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+Stop 1 API call cost: $0.0186 (3910 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 106 words < 120, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0184 (3874 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Notice the symphony of vehicles and personnel as they move in concert to support each aircraft. This vista connects you back to the essence of air travel you saw amongst the jet bridges moments ago, marrying the mechanical with the human. With each airborne vessel inspiring wonder, consider the skil'
+  [LOCAL-417] Stop 3: retrying (attempt 4, temp=1.00)...
+Stop 1 API call cost: $0.0189 (3981 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Terminal A Concourse' below_floor words=99 — kept (never dropped)
+Stop 1 description word count: 99 words
+Stop 3 API call cost: $0.0184 (3881 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "Before you is a constant dance of planes, vehicles, and personnel performing their essential duties. The vibrant yellow of baggage carts traces paths between aircraft, each maneuvering with the precision you've seen in the jet bridges. Listen for the hum of engines and the faint crackle of radios as"
+  [LOCAL-417] Stop 3: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 3: resolved final description (92 words)
+  [LOCAL-394] stop='Apron and tarmac viewing windows' below_floor words=92 — kept (never dropped)
+Stop 3 description word count: 92 words
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+  [STORY_FIRST] step=description_generation elapsed=22.5s cumulative=22.5s
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Terminal A Concourse': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Jet bridges': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✗ FAIL stop='Apron and tarmac viewing windows': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Air traffic control tower': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=3, deduction=0, total=5
+  [LOCAL-439] Classification cost: $0.001366 (input=5438, output=917)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+  [LOCAL-394] stop='Terminal A Concourse' below_floor words=99 — kept (never dropped)
+  [LOCAL-394] stop='Apron and tarmac viewing windows' below_floor words=69 — kept (never dropped)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 4 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 3: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 7 paragraphs retried, 2 fixed/improved, 5 kept original
+  [LOCAL-192] Retry cost: $0.0026 (3262 tokens)
+  [STORY_FIRST] step=style_validation_5_1 elapsed=18.2s cumulative=76.0s
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Terminal A Concourse': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 2 'Jet bridges': 1 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 1 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/3 = 33.3% exceeds 10% — rewriter may be failing and quietly shortening tours
+  [STORY_FIRST] step=r1_imperative_5_13 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r7_sensory_5_14 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] Stop 3 'Apron and tarmac viewing windo': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-261] R2 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+  [STORY_FIRST] step=r2_question_5_141 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r3_suggestive_5_142 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r4_feeling_5_143 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r8_leakage_5_144 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r9_generic_5_15 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'Jet bridges': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+  [STORY_FIRST] step=r10_promise_5_155 elapsed=0.0s cumulative=76.0s
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 8
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 5
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Jet bridges' conf=high reason='Generic scene-setting applicable to any historic church.': "As the sound of engines prepares for another takeoff, consider the complex choreography on the ground."
+    [LOCAL-472] UNGROUNDED entity stop='Jet bridges' entity='Massachusetts Governor Channing' reason='It does not specify how Governor Channing relates to the jet bridges.' in: "Here, at one of the busiest points of the airport, you'll find yourself standing at the convergence "
+    [LOCAL-472] UNGROUNDED entity stop='Air traffic control tower' entity='Washington Naval Conference' reason='It does not specify how Curley's actions directly relate to the air traffic control tower.' in: "What began as a modest airfield in 1923 has transformed into one of the busiest aviation hubs in the"
+    [LOCAL-472] UNGROUNDED entity stop='Air traffic control tower' entity='Massachusetts Legislature' reason='No concrete link between the Massachusetts Legislature and the air traffic control tower is established.' in: "In 1928, the Massachusetts Legislature transferred management of the airfield to the City of Boston,"
+    [LOCAL-472] UNGROUNDED entity stop='Air traffic control tower' entity='New Hampshire' reason='No concrete link between New Hampshire and the air traffic control tower is established.' in: "In 1928, the Massachusetts Legislature transferred management of the airfield to the City of Boston,"
+    [LOCAL-472] UNGROUNDED entity stop='Air traffic control tower' entity='St. Louis' reason='It does not specify a concrete link between "St. Louis" and the air traffic control tower.' in: "In 1928, the Massachusetts Legislature transferred management of the airfield to the City of Boston,"
+  [STORY_FIRST] step=specificity_5_152 elapsed=32.0s cumulative=108.1s
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/29)
+  [STORY_FIRST] step=unsupported_claim_5_156 elapsed=0.0s cumulative=108.1s
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 13
+    Glossed (composed): 2
+    Suppressed (already explained): 0
+    Degraded (name dropped): 7
+    Guard failures: 0
+    Known (skipped): 4
+    Triage: 1457 tokens, $0.0003, 6.1s
+    Gloss: 808 tokens, $0.0002, 4.1s
+    Compose: 972 tokens, $0.0002, 2.5s
+    Total added cost: $0.0007
+    Stops affected: 3
+    Glosses applied:
+      • Boston Logan → DEGRADED (name dropped)
+      • Commonwealth Flats → DEGRADED (name dropped)
+      • Governor Channing → DEGRADED (name dropped)
+      • Massachusetts Governor Channing → DEGRADED (name dropped)
+      • Boston Chamber → "a business organization advocating for local interests" [source: model]
+      • Commerce → DEGRADED (name dropped)
+      • Washington Naval Conference → DEGRADED (name dropped)
+      • Charles Lindbergh → "the aviator famous for his 1927 flight" [source: model]
+      • New Hampshire → DEGRADED (name dropped)
+  [STORY_FIRST] step=unglossed_ref_5_157 elapsed=12.8s cumulative=120.9s
+  [STORY_FIRST] step=entity_grounding_5_158 elapsed=0.0s cumulative=120.9s
+  [STORY_FIRST] step=role_claim_5_158b elapsed=0.0s cumulative=120.9s
+  [STORY_FIRST] step=org_grounding_5_158c elapsed=0.0s cumulative=120.9s
+  [STORY_FIRST] step=form_claim_5_159 elapsed=0.0s cumulative=120.9s
+  [STORY_FIRST] step=numeric_claim_5_160 elapsed=0.0s cumulative=120.9s
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+  [STORY_FIRST] step=temporal_5_161 elapsed=0.0s cumulative=120.9s
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+  [STORY_FIRST] step=contradicted_5_16 elapsed=0.0s cumulative=120.9s
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Boston Logan International Airport, Boston MA'...
+   OK 'Jet bridges' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Apron and tarmac viewing windows' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Air traffic control tower' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+  [STORY_FIRST] step=venue_scope_5_5 elapsed=0.2s cumulative=121.1s
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+  [STORY_FIRST] step=dangling_ref_5_7 elapsed=0.1s cumulative=121.2s
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [4] DELETED: 'This strategic' in: This strategic move allowed for the expansion and modernization of facilities, s
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+  [STORY_FIRST] step=dangling_demo_5_7b elapsed=0.0s cumulative=121.2s
+  [STORY_FIRST] step=self_contradiction_5_8 elapsed=0.0s cumulative=121.2s
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+  [STORY_FIRST] step=audio_native_5_9 elapsed=0.0s cumulative=121.2s
+
+  [LOCAL-477] stripped markdown from 1 prose field(s) — these are spoken aloud
+
+  [D498] step 7c: most valuable stop is 1 'Terminal A Concourse' (index 41) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Terminal A Concourse': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Jet bridges': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Apron and tarmac viewing windows': longest qualifying run is 0 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Air traffic control tower': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Apron and tarmac viewing windows' (index 17)
+  [D534] Stop 4 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: This site, now known for accommodating 43.5 million passengers in 2024, unfolded from these humble b
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal A Concourse' — 99w → 81w after gates, 3 sentence(s) removed
+    removed: "Terminal A holds a unique place in the legacy of Boston Logan, echoing back to its roots on the salt"
+    removed: "The ambitious beginnings under Governor Channing H."
+    removed: "Army engineer corps, transformed the tidal flatlands into one of America’s earliest airfields."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 1: Terminal A Concourse by , ...
+  [LOCAL-381] stop='Terminal A Concourse' matched_work=False medium='' work_identity_chars=0
+Stop 1 API call cost: $0.0193 (4068 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ["subject not named (expected 'Terminal A Concourse' or significant word)"]
+  [LOCAL-417]   verbatim: 'The story of this place begins on the salt marshes of Commonwealth Flats, transformed in the early 1920s through the vision of Mayor James Michael Curley and the Boston Chamber of Commerce. This was a time when aviation was still taking its first tentative steps, and the area was chosen for the esta'
+  [LOCAL-417] Stop 1: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0194 (4090 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 108 words < 120, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0197 (4139 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Terminal A stands on land reclaimed from the Commonwealth Flats, a project driven by Mayor James Michael Curley and the Boston Chamber of Commerce in the early 1920s. It was crafted under the guidance of Lieutenant Donald W. Douglas and the U.S. Army engineer corps. This area served as a strategic l'
+  [LOCAL-417] Stop 1: retrying (attempt 3, temp=1.00)...
+Stop 1 API call cost: $0.0197 (4153 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 111 words < 120, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0199 (4181 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Terminal A Concourse' below_floor words=95 — kept (never dropped)
+Stop 1 description word count: 95 words
+    [LOCAL-474] regenerated and re-gated: 95w (was 81w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Jet bridges' — 201w → 133w after gates, 7 sentence(s) removed
+    removed: "It all began in 1922 when Massachusetts Governor Channing H."
+    removed: "Cox signed the legislation to establish an airfield."
+    removed: "Douglas and a determined Boston Chamber of Commerce."
+    removed: "The jet bridges symbolize an engineering marvel — they adapt seamlessly to varying aircraft sizes, j"
+    removed: "And here lies the secret: these bridges, quietly efficient, embody the history of aviation's evoluti"
+    removed: "And as the sound of engines prepares for another takeoff, consider the complex choreography on the g"
+    removed: "The next chapter in your journey at Boston Logan awaits, where the orchestration of aircraft operati"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 2: Jet bridges by , ...
+  [LOCAL-381] stop='Jet bridges' matched_work=False medium='' work_identity_chars=0
+Stop 2 API call cost: $0.0207 (4357 tokens, model=gpt-4o)
+Stop 2 description word count: 231 words
+    [LOCAL-474] regenerated and re-gated: 231w (was 133w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Apron and tarmac viewing windows' — 69w → 48w after gates, 3 sentence(s) removed
+    removed: "Before you is a constant dance of planes, vehicles, and personnel performing their essential duties."
+    removed: "The vibrant yellow of baggage carts traces paths between aircraft, each maneuvering with the precisi"
+    removed: "Listen for the hum of engines and the faint crackle of radios as this orchestrated chaos unfolds bef"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 3: Apron and tarmac viewing windows by , ...
+  [LOCAL-381] stop='Apron and tarmac viewing windows' matched_work=False medium='' work_identity_chars=0
+Stop 3 API call cost: $0.0206 (4330 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 92 words < 120, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0209 (4401 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)"]
+  [LOCAL-417]   verbatim: "Boston Logan International Airport, opening in 1923 and originally named Jeffery Field, was born from the ambition of Boston's civic leaders. Mayor James Michael Curley petitioned for its establishment, securing Boston's role in air commerce. This site holds the memory of Charles Lindbergh landing t"
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 3 API call cost: $0.0209 (4402 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)"]
+  [LOCAL-417]   verbatim: "At this vantage point, the runways stretch out like a vast tapestry, echoing the perseverance of Boston's aviation pioneers. This location, originally championed by Boston Mayor James Michael Curley in 1922, answered the city’s call to compete in the burgeoning world of air commerce. Mayor Curley's "
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+Stop 3 API call cost: $0.0209 (4398 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Apron and tarmac viewing windows' or significant word)"]
+  [LOCAL-417]   verbatim: "Here, you're witnessing the stage where numerous historical arrivals have taken place. It was on these runways that Charles Lindbergh landed the Spirit of St. Louis in 1927, marking a milestone in aviation history. In 1964, The Beatles arrived here, welcomed by an enthusiastic crowd, their presence "
+  [LOCAL-417] Stop 3: retrying (attempt 4, temp=1.00)...
+Stop 3 API call cost: $0.0213 (4476 tokens, model=gpt-4o)
+Stop 3 description word count: 154 words
+    [LOCAL-474] regenerated and re-gated: 154w (was 48w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Air traffic control tower' — 270w → 240w after gates, 5 sentence(s) removed
+    removed: "The evolution of this site owes much to the foresight of John "Honey Fitz" Curley, who championed th"
+    removed: "This strategic move allowed for the expansion and modernization of facilities, setting the stage for"
+    removed: "After his historic solo transatlantic flight, Lindbergh flew the *Spirit of St."
+    removed: "Louis* here, landing before tens of thousands of cheering spectators."
+    removed: "His arrival marked a moment of triumph and inspiration, highlighting Boston's growing prominence in "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 4: Air traffic control tower by , ...
+  [LOCAL-381] stop='Air traffic control tower' matched_work=False medium='' work_identity_chars=0
+Stop 4 API call cost: $0.0255 (5357 tokens, model=gpt-4o)
+Stop 4 description word count: 287 words
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 252w (was 240w)
+      [PERSON-CAP] stop 3: 'airport' already carries two stops — cut: The apron and tarmac viewing windows offer a glimpse into the bustling choreogra
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 4 improved, 0 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+  [STORY_FIRST] step=postgate_retry_5_17 elapsed=66.7s cumulative=187.8s
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+  [STORY_FIRST] step=anti_preaching_5_10 elapsed=0.0s cumulative=187.8s
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.massport.com/logan-airport/about-logan/airport-modernization (attempt 1)
+  [LOCAL-459] R5: Fetched 1851 chars from https://www.massport.com/logan-airport/about-logan
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Logan_International_Airport (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Logan_International_
+  [LOCAL-427] HTTP 200 from https://www.meetboston.com/plan/getting-here/logan-airport/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1964 chars from https://www.meetboston.com/plan/getting-here/logan
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/SenatorMikeRush/posts/as-a-member-of-the-joint-committee-on-transportation-i-joined-my-colleagues-for-/1572615789415288/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://aecom.com/projects/boston-logan-international-airports-terminal-e/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://aecom.com/projects/boston-logan-internatio
+  [LOCAL-427] HTTP 200 from https://airportscouncil.org/2023/09/13/customizing-common-use-at-boston-logan-international/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://airportscouncil.org/2023/09/13/customizing
+  [LOCAL-427] HTTP 200 from https://www.tremcosealants.com/case-studies/logan-airport (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.tremcosealants.com/case-studies/logan-
+  [D512] verb discovery: query='Boston Logan International Airport, Boston MA how it is made pro' -> 6 new verb(s): applied, expanded, united, required, speed, modernized
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+  [STORY_FIRST] step=obligation_audit_5_20 elapsed=6.0s cumulative=193.8s
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Terminal A Concourse                       20    27     0    45
+     2  Jet bridges                                42    38    14    45
+     3  Apron and tarmac viewing windows           40    45     0    50
+     4  Air traffic control tower                  40    44     0    95
+    [LOCAL-485] index mean 35.5 over 4 stop(s), range 20-42
+    [LOCAL-485] weakest: 'Terminal A Concourse' at 20
+  [STORY_FIRST] step=story_valuation_5_21 elapsed=0.0s cumulative=193.9s
+  [STORY_FIRST] per_stop: n=4 sum_wall=64.9s observed_span=22.5s slowest=22.5s (serial_would_cost=64.9s vs parallel_span=22.5s)
+    [STORY_FIRST] stop=0 elapsed=20.6s words=99
+    [STORY_FIRST] stop=1 elapsed=12.4s words=201
+    [STORY_FIRST] stop=2 elapsed=22.5s words=92
+    [STORY_FIRST] stop=3 elapsed=9.4s words=290
+  [STORY_FIRST] TOTAL phase_wall=193.9s serial_steps: postgate_retry_5_17=66.7s, specificity_5_152=32.0s, description_generation=22.5s, style_validation_5_1=18.2s, unglossed_ref_5_157=12.8s, obligation_audit_5_20=6.0s, venue_scope_5_5=0.2s, dangling_ref_5_7=0.1s, story_valuation_5_21=0.0s, unsupported_claim_5_156=0.0s, contradicted_5_16=0.0s, r1_imperative_5_13=0.0s, r7_sensory_5_14=0.0s, r10_promise_5_155=0.0s, r9_generic_5_15=0.0s, anti_preaching_5_10=0.0s, r8_leakage_5_144=0.0s, r4_feeling_5_143=0.0s, r3_suggestive_5_142=0.0s, dangling_demo_5_7b=0.0s, r2_question_5_141=0.0s, audio_native_5_9=0.0s, org_grounding_5_158c=0.0s, temporal_5_161=0.0s, entity_grounding_5_158=0.0s, role_claim_5_158b=0.0s, form_claim_5_159=0.0s, numeric_claim_5_160=0.0s, self_contradiction_5_8=0.0s
+[TIMING] phase=story_first elapsed=193.9s cumulative=308.6s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (89 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 89 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 89 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 167
+    Words after:  167
+    Delta: 0
+    Stops affected: 0/4
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.8s, $0.0089, 1300 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Terminal A Concourse] (cause): The establishment was a response to the Massachusetts General Court's 1922 decre...
+      [Jet bridges] (reversal): Army quickly moved in, leasing the land for a mere dollar a year, and transforme...
+      [Apron and tarmac viewing windows] (mystery): Through these windows, you can see the runways where Charles Lindbergh once land...
+      [Air traffic control tower] (cause): Its construction reflects the foresight of Boston's leaders, like John "Honey Fi...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0033 (562 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (36 words):
+      "At the upcoming stops, you'll discover the site where the Army transformed a former landfill into an airfield at Jet bridges and view the runways where Charles Lindbergh once landed at Apron and tarmac viewing windows."
+      Stops referenced: 2
+    Part 4 total cost: $0.0033
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: From Terminal A Concourse, head towards the main terminal bu...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you exit the jet bridges, head towards Terminal E and mak...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the Apron and tarmac viewing windows, head towa...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.9s, $0.0026, 433 tokens
+  [LOCAL-280] Recap built: 19 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Jet bridges] (reversal): "Army quickly moved in, leasing the land for a mere dollar a year, and transforme..."
+      → composed: "Jet bridges"
+    [Apron and tarmac viewing windows] (mystery): "Through these windows, you can see the runways where Charles Lindbergh once land..."
+      → composed: "Army leased land for a dollar, creating an airfield from a landfill"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Jet bridges and Army leased land for a dollar, creating an airfield from a landfill."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 2 (first told at stop 1, 1922/become): In 1922, Massachusetts Governor Channing H. Cox set the stage for what would bec
+  [D533] REPEATED FACT kept in stop 3 (1922/boston) — next sentence refers back to it ("These stories from the viewing windows c...")
+  [D533] REPEATED FACT kept in stop 4 (1922/curley) — next sentence refers back to it ("This foresight committed the City of Bos...")
+  [D533] REPEATED FACT kept in stop 4 (1927/louis) — next sentence refers back to it ("His arrival was met with tens of thousan...")
+  [D533] REPEATED FACT removed from stop 4 (first told at stop 2, 2024/million): The nearby Boston Air Route Traffic Control Center, located in Nashua, New Hamps
+  [D533] 2 repeated fact(s) removed, 3 kept
+  [D533] Person-year role guard: no mismatches (42 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='facility')
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Boston Logan International Airport, Boston MA."
+  [2] "As you move from the Terminal A Concourse you visited earlier, pay attention to the busy scene unfol..."
+  [3] "That's 4 stops — Jet bridges and Army leased land for a dollar, creating an airfield from a landfill..."
+
+=== Word Count Statistics ===
+Stop 1: Terminal A Concourse - 99 words
+Stop 2: Jet bridges - 201 words
+Stop 3: Apron and tarmac viewing windows - 92 words
+Stop 4: Air traffic control tower - 290 words
+===========================
+
+
+Total API cost: $0.1900 (26212 tokens)
+CACHE STORE: Boston Logan International Airport, Boston MA /  / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_airport_20260923_1222.txt
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Boston Logan International Airport, Boston MA
+Tour-Category: facility
+
+Stop 1: Terminal A Concourse
+
+Address: Boston Logan International Airport, 1 Harborside Dr, Boston, MA 02128
+
+Coordinates: 42.3656, -71.0170
+
+Type/Specialty: Airport terminal
+
+Specific Examples: Gates with various destinations, shops, restaurants
+
+Operational Details: Open 24/7, services vary by time of day
+
+Orientation: You are about to embark on a walking journey through Boston Logan Internat...
+
+[TIMING] phase=packing elapsed=11.8s cumulative=320.3s
+[TIMING] phase=verification elapsed=0.0s cumulative=320.3s
+[TIMING] TOTAL wall=320.3s phases: story_first=193.9s, poi_selection=92.1s, fact_sheets=20.6s, packing=11.8s, intent=2.0s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+
+RUN airport OK: 8681 chars in 320.3s -> L3498_airport_20260923_1222.txt
+==============================================================================
+RUN church2: Our Lady Help of Christians Catholic Church, Newton MA  (4 stops)
+==============================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #009 | 12:33:44.927 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  tour_type: 
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_church2_20260923_1222.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #010 | 12:33:44.927 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "churches",
+    "location": "Newton, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Our Lady Help of Christians Catholic Church",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: churches
+   Location: Newton, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Our Lady Help of Christians Catholic Church
+  [venue_name sanity] 'Our Lady Help of Christians Catholic Church' OK
+  [S15/LOCAL-485] venue_name='Our Lady Help of Christians Catholic Church' NOT forced to museum — request names a worship/civic place class (stops are places, not works)
+[TIMING] phase=intent elapsed=2.3s cumulative=2.3s
+[LOCAL-474] tour_type='' → category='walking' (source=inferred)
+
+Detected tour category: WALKING
+Using walking template for Our Lady Help of Christians Catholic Church, Newton MA - 
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #011 | 12:33:47.182 | GENERATING_PROMPT
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  user_request: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Our Lady Help of Christians Catholic Church, Newton MA...
+  [S17] no scope_constraint (precision='', scope='')
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='Catholic parish church' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Portico', 'Nave', 'Sanctuary', 'Pulpit', 'Pews', 'Stations of the Cross', 'Transept', 'Altar']
+  [D571]   stops: ['Nave', 'Pulpit', 'Sanctuary', 'Portico']
+  [D571]   precondition: some stops are not open to the public, so you will see it from outside
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Nave [?]
+   - Pulpit [?]
+   - Sanctuary [?]
+   - Portico [?]
+  [area_resolver] Parsed: city='Newton MA', neighborhood='Our Lady Help of Christians Catholic Church'
+  [area_resolver] City resolved: Newton MA → Q49196 (42.3369, -71.2097)
+  [area_resolver] Neighborhood 'Our Lady Help of Christians Catholic Church' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3369, -71.2097), radius=2.0km, lang=en
+  [area_cache] HIT for Q49196: 49 landmarks (tier=rich)
+  [verify_landmarks] 0/4 stops verified against 49 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 0 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Our Lady Help of Christians Catholic Church, Newton MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Nave' — wikipedia_en_summary: 'Nave' exists and mentions region
+    [VERIFIED] 'Pulpit' — wikipedia_en_summary: 'Pulpit' exists and mentions region
+    [VERIFIED] 'Sanctuary' — wikipedia_en_search: 'Sanctuary' matches and snippet mentions region
+    [VERIFIED] 'Portico' — stop_corpus(geographic): 'Portico' at 'Our Lady Help of Christians Catholic Chur
+    [HARVEST] 'Nave': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Pulpit': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Sanctuary': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 1 already had corpus, 3 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 8 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 0 stops with coordinates — skipping algorithmic routing
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_122229.txt'
+
+======================================================================
+CALL #012 | 12:34:55.323 | PHASE_3B_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (861 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.3526, -71.2076', refetching...
+   Cluster refetch OK 'Portico': 42.3514, -71.2077
+   Cluster refetch OK 'Nave': 42.3527, -71.2084
+   Cluster refetch OK 'Sanctuary': 42.3506, -71.1919
+   Cluster refetch OK 'Pulpit': 42.3529, -71.2089
+   GEO-CHECK: all 4 stops within walking distance (max leg 1.42 km, total 2.77 km, limit 12 km)
+Extracted first POI coordinates: (42.3527, -71.2084)
+
+=== Extracted POI Information ===
+1. Nave
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3527, -71.2084
+   Directions: Exit the main entrance and turn left onto Washington St, walk straight ahead, th...
+2. Pulpit
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3529, -71.2089
+   Directions: Exit the Nave and head towards the front, take the stairs on the left up to the ...
+3. Sanctuary
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3506, -71.1919
+   Directions: Descend from the Pulpit, walk towards the altar area at the front, the Sanctuary...
+4. Portico
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3514, -71.2077
+   Directions: Exit the Sanctuary and head towards the main entrance, the Portico is the covere...
+================================
+
+  [D556] +7 story fact(s) for 'Nave' via gemini (7 high)
+  [D556] +4 story fact(s) for 'Pulpit' via gemini (4 high)
+  [D556] +4 story fact(s) for 'Sanctuary' via gemini (4 high)
+  [D556] +6 story fact(s) for 'Portico' via gemini (6 high)
+[TIMING] phase=poi_selection elapsed=155.5s cumulative=157.8s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Nave Our Lady Help of Christians Catholic Church' → 2257 chars
+  [LOCAL-47] Nave: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Pulpit Our Lady Help of Christians Catholic Church' → 8846 chars
+  [LOCAL-47] Pulpit: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Sanctuary Our Lady Help of Christians Catholic Church' → 14953 chars
+  [LOCAL-47] Sanctuary: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Portico Our Lady Help of Christians Catholic Church' → 1609 chars
+  [LOCAL-47] Portico: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Our Lady Help of Christians Ca model=gpt-4o tokens=1445 (in=851 out=594) cost=$0.0081 latency=6.9s
+[COST_METER] FRESH | spine_generate | $0.008068 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0081
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/4 stops have per-stop passages (2 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Nave' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Pulpit' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Sanctuary' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Portico' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=16.1s cumulative=173.9s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=173.9s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=173.9s
+
+Generating description for Stop 1: Nave by , ...
+
+Generating description for Stop 2: Pulpit by , ...
+
+Generating description for Stop 3: Sanctuary by , ...
+
+Generating description for Stop 4: Portico by , ...
+  [LOCAL-381] stop='Sanctuary' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sanctuary', 6, ''), ('Sanctuary', 6, ''), ('Sanctuary', 6, '')]
+  [LOCAL-381] stop='Pulpit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15023 after=21244 (+6221 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21244)
+    Top scores: [('Pulpit', 6, ''), ('Pulpit', 6, ''), ('Pulpit', 4, '')]
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15188 after=21864 (+6676 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21864)
+  [LOCAL-381] stop='Portico' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Portico', 6, ''), ('Portico', 6, ''), ('Portico', 6, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 10, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=15438 after=22158 (+6720 from snippets+instructions, facts_first=no)
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15347 after=25121 (+9774 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25121)  [LOCAL-411] WARNING: prompt exceeds 20K chars (22158)
+
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-3498/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0267 (5611 tokens, model=gpt-4o)
+Stop 1 description word count: 283 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0260 (5473 tokens, model=gpt-4o)
+Stop 2 description word count: 290 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 4 API call cost: $0.0296 (6228 tokens, model=gpt-4o)
+Stop 4 description word count: 264 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0251 (5280 tokens, model=gpt-4o)
+Stop 3 description word count: 260 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [STORY_FIRST] step=description_generation elapsed=9.3s cumulative=9.3s
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Nave': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+    ✓ PASS stop='Pulpit': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+    ✓ PASS stop='Sanctuary': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+    ✓ PASS stop='Portico': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+  [LOCAL-439] Classification cost: $0.000580 (input=2377, output=372)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 8 paragraphs retried, 5 fixed/improved, 3 kept original
+  [LOCAL-192] Retry cost: $0.0034 (4198 tokens)
+  [STORY_FIRST] step=style_validation_5_1 elapsed=16.0s cumulative=34.4s
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+  [STORY_FIRST] step=r1_imperative_5_13 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Nave': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+  [STORY_FIRST] step=r7_sensory_5_14 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r2_question_5_141 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r3_suggestive_5_142 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r4_feeling_5_143 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r8_leakage_5_144 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [STORY_FIRST] step=r9_generic_5_15 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'Pulpit': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 1 paragraphs emptied, 1 stops affected
+  [STORY_FIRST] step=r10_promise_5_155 elapsed=0.0s cumulative=34.5s
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 11
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 16
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='On December' reason='It does not specify how Rev. Walter H. Cuenin is directly linked to the nave.' in: "In this sacred space, history has unfolded in ways that resonate deeply with the community. On Decem"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Cardinal Bernard Law' reason='It does not specify a concrete link between Cardinal Bernard Law and the nave.' in: "In this sacred space, history has unfolded in ways that resonate deeply with the community. On Decem"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Cardinal Law' reason='It does not specify Cardinal Law's direct connection to the nave.' in: "Just a few days later, on December 11, 2002, the reform group Voice of the Faithful convened an asse"
+    [LOCAL-472] UNGROUNDED entity stop='Pulpit' entity='Cardinal Bernard Law' reason='It does not specify a concrete link between Cardinal Bernard Law and the pulpit.' in: "Elevated for visibility and audibility, it is here that Father Walter H. Cuenin, in December of 2002"
+    [LOCAL-472] UNGROUNDED entity stop='Pulpit' entity='In June' reason='It does not specify how the D’Amore family or Lucia Arpino relates to the pulpit.' in: "The pulpit's history is not solely rooted in defiance; it has also been a silent witness to tragedy."
+    [LOCAL-472] UNGROUNDED entity stop='Pulpit' entity='Lucia Arpino' reason='It does not specify how Lucia Arpino is directly related to the pulpit.' in: "The pulpit's history is not solely rooted in defiance; it has also been a silent witness to tragedy."
+    [LOCAL-472] UNGROUNDED entity stop='Sanctuary' entity='Mother Teresa' reason='It does not specify a concrete link to the sanctuary.' in: "The sanctuary welcomed Mother Teresa of Calcutta in June 1995 during her tour of Massachusetts. Her "
+    [LOCAL-472] UNGROUNDED entity stop='Sanctuary' entity='Christopher Ferguson' reason='No concrete link to the sanctuary is provided.' in: "Yet, the sanctuary has also been touched by tragedy. In late June 2023, the community was shaken by "
+    [LOCAL-472] UNGROUNDED entity stop='Sanctuary' entity='Mary Help' reason='It does not specify a direct connection to the sanctuary.' in: "The sanctuary's significance lies not only in its spiritual aspect but also in its historical ties t"
+    [LOCAL-472] UNGROUNDED entity stop='Sanctuary' entity='Blessed Virgin Mary' reason='It does not specify a direct link between the Blessed Virgin Mary and the sanctuary.' in: "The sanctuary's significance lies not only in its spiritual aspect but also in its historical ties t"
+    [LOCAL-472] UNGROUNDED entity stop='Sanctuary' entity='John Chrysostom' reason='It does not specify a direct link between John Chrysostom and the sanctuary.' in: "The sanctuary's significance lies not only in its spiritual aspect but also in its historical ties t"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Cardinal Bernard' reason='No concrete link to the stop is provided.' in: "The year 2002 was a pivotal moment in the history of this church. The parish found itself at the cen"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Cardinal Law' reason='It does not specify Cardinal Law's direct connection to the stop.' in: "The year 2002 was a pivotal moment in the history of this church. The parish found itself at the cen"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='In December' reason='No concrete link to the stop is provided.' in: "The year 2002 was a pivotal moment in the history of this church. The parish found itself at the cen"
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Cardinal Law' reason='It does not specify Cardinal Law's direct connection to the portico.' in: "The portico also witnessed another critical event on December 11, 2002, when Voice of the Faithful, "
+    [LOCAL-472] UNGROUNDED entity stop='Portico' entity='Our Lady Help' reason='No concrete link to the stop is established.' in: "The portico also witnessed another critical event on December 11, 2002, when Voice of the Faithful, "
+  [STORY_FIRST] step=specificity_5_152 elapsed=42.5s cumulative=76.9s
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/43)
+  [STORY_FIRST] step=unsupported_claim_5_156 elapsed=0.0s cumulative=77.0s
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 23
+    Glossed (composed): 6
+    Suppressed (already explained): 1
+    Degraded (name dropped): 10
+    Guard failures: 0
+    Known (skipped): 6
+    Triage: 2467 tokens, $0.0006, 9.9s
+    Gloss: 1402 tokens, $0.0003, 5.6s
+    Compose: 1926 tokens, $0.0003, 4.2s
+    Total added cost: $0.0013
+    Stops affected: 4
+    Glosses applied:
+      • Boston → DEGRADED (name dropped)
+      • Father Walter → DEGRADED (name dropped)
+      • Cardinal Bernard Law → SUPPRESSED (already explained)
+      • Father Cuenin → DEGRADED (name dropped)
+      • Lucia Arpino → "one of the murder victims" [source: model]
+      • Gilda → DEGRADED (name dropped)
+      • Calcutta → "the capital of west bengal, formerly british india" [source: model]
+      • Gilda → DEGRADED (name dropped)
+      • Amore → DEGRADED (name dropped)
+      • Mary Help → DEGRADED (name dropped)
+      • Blessed Virgin Mary → "the mother of jesus christ" [source: model]
+      • John Chrysostom → "an early church father and archbishop" [source: model]
+      • Cardinal Bernard → DEGRADED (name dropped)
+      • Cardinal Law → "the archbishop of boston from 1984 to 2002" [source: model]
+      • In December → DEGRADED (name dropped)
+      • Our Lady Help → "a roman catholic parish church" [source: corpus]
+      • Christians → DEGRADED (name dropped)
+  [STORY_FIRST] step=unglossed_ref_5_157 elapsed=19.8s cumulative=96.7s
+  [STORY_FIRST] step=entity_grounding_5_158 elapsed=0.0s cumulative=96.7s
+  [STORY_FIRST] step=role_claim_5_158b elapsed=0.0s cumulative=96.7s
+  [STORY_FIRST] step=org_grounding_5_158c elapsed=0.0s cumulative=96.7s
+  [STORY_FIRST] step=form_claim_5_159 elapsed=0.0s cumulative=96.7s
+  [STORY_FIRST] step=numeric_claim_5_160 elapsed=0.0s cumulative=96.7s
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+  [STORY_FIRST] step=temporal_5_161 elapsed=0.0s cumulative=96.7s
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+  [STORY_FIRST] step=contradicted_5_16 elapsed=0.0s cumulative=96.7s
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+  [STORY_FIRST] step=venue_scope_5_5 elapsed=0.0s cumulative=96.7s
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+  [STORY_FIRST] step=dangling_ref_5_7 elapsed=0.1s cumulative=96.8s
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 7
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 7
+    Stops affected: 4
+    [1] DELETED: 'This decision' in: This decision was more than a call for accountability; it was a declaration of t
+    [2] DELETED: 'This act' in: This act of defiance resonated far beyond the church walls, marking an indelible
+    [2] DELETED: 'This shocking' in: This shocking event unfolded when the faithful, expecting to celebrate a milesto
+    [3] DELETED: 'This revered' in: This revered figure's presence underscores the church's role as a beacon of hope
+    [3] DELETED: 'This title' in: This title, attributed to the Blessed Virgin Mary by John Chrysostom, an early c
+    [4] DELETED: 'This bold defiance' in: This bold defiance by Rev. Cuenin not only highlighted issues within the church 
+    [4] DELETED: 'This series' in: This series of events at Our Lady Help, a roman catholic parish church, of Chris
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+  [STORY_FIRST] step=dangling_demo_5_7b elapsed=0.0s cumulative=96.8s
+  [STORY_FIRST] step=self_contradiction_5_8 elapsed=0.0s cumulative=96.8s
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+  [STORY_FIRST] step=audio_native_5_9 elapsed=0.0s cumulative=96.8s
+
+  [D498] step 7c: most valuable stop is 3 'Sanctuary' (index 39) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Nave': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Pulpit': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Sanctuary': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Portico': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Pulpit' (index 22)
+  [D534] Stop 2 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: On December 8, 2002, the nave was filled with over 850 parishioners for the 10:00 a.m. Mass.
+  [D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: In June 2023, parishioners Bruno and Gilda D’Amore and Gilda’s mother, Lucia Arpino, one of the murd
+  [D534] Stop 4 repeats 3 thing(s) said earlier — will regenerate with them banned
+      already told: Elevated for visibility and audibility, it is here that H. Cuenin, in December of 2002, took a bold 
+      already told: Just a few days later, on December 11, 2002, the reform group Voice of the Faithful convened an asse
+      already told: On December 8, 2002, the nave was filled with over 850 parishioners for the 10:00 a.m. Mass.
+
+  [LOCAL-474] PHASE 5.17: retry 'Nave' — 257w → 187w after gates, 5 sentence(s) removed
+    removed: "Cuenin deliver a powerful homily against Cardinal Bernard Law during the height of the Archdiocese o"
+    removed: "This decision was more than a call for accountability; it was a declaration of the parish's commitme"
+    removed: "The nave’s grandeur, with its towering columns and the gentle hum of quiet prayers, continues to be "
+    removed: "As you stand here, consider the sermons and voices that have filled this space, leaving an indelible"
+    removed: "The stories of courage and conviction that unfolded here continue to inspire those who step through "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 1: Nave by , ...
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 10, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=15438 after=22158 (+6720 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22158)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-3498/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0286 (6024 tokens, model=gpt-4o)
+Stop 1 description word count: 278 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 240w (was 187w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Pulpit' — 245w → 118w after gates, 6 sentence(s) removed
+    removed: "Elevated for visibility and audibility, it is here that Father Walter H."
+    removed: "This act of defiance resonated far beyond the church walls, marking an indelible moment in the churc"
+    removed: "In June 2023, parishioners Bruno and Gilda D’Amore and Gilda’s mother, Lucia Arpino, were discovered"
+    removed: "This shocking event unfolded when the faithful, expecting to celebrate a milestone of love and devot"
+    removed: "The stories it holds are woven into the very fabric of this church, connecting to the nave you visit"
+    removed: "Ahead, the heart of the church awaits, a space where countless ceremonies have unfolded, continuing "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 2: Pulpit by , ...
+  [LOCAL-381] stop='Pulpit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Pulpit', 6, ''), ('Pulpit', 6, ''), ('Pulpit', 4, '')]
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15188 after=21864 (+6676 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21864)
+Stop 2 API call cost: $0.0295 (6218 tokens, model=gpt-4o)
+Stop 2 description word count: 256 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+    [LOCAL-474] regenerated and re-gated: 234w (was 118w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Sanctuary' — 260w → 162w after gates, 9 sentence(s) removed
+    removed: "The sanctuary, a haven of peace and reflection, carries with it tales that resonate with both faith "
+    removed: "In June 1995, this very place welcomed Mother Teresa of Calcutta during her tour of Massachusetts."
+    removed: "Her visit was a moment of profound inspiration, as she brought her message of compassion and service"
+    removed: "The presence of such a revered figure underscores the church's role as a beacon of hope and charity."
+    removed: "In late June 2023, the community was shaken by the news of Gilda (Jill) and Bruno D’Amore's murder o"
+    removed: "The sanctuary's importance is not merely spiritual but historical, echoing its dedication to Mary He"
+    removed: "This title of the Blessed Virgin Mary, first described by John Chrysostom in AD 345, is linked to si"
+    removed: "This layered past enriches the sanctuary's atmosphere, making it a place where faith, history, and p"
+    removed: "As you move through this space, consider the weight of its legacy and the stories it holds."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 3: Sanctuary by , ...
+  [LOCAL-381] stop='Sanctuary' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sanctuary', 6, ''), ('Sanctuary', 6, ''), ('Sanctuary', 6, '')]
+  [LOCAL-402] Stop 3: injected 4 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15023 after=21244 (+6221 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21244)
+Stop 3 API call cost: $0.0280 (5898 tokens, model=gpt-4o)
+Stop 3 description word count: 217 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+    [LOCAL-474] regenerated and re-gated: 217w (was 162w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Portico' — 264w → 219w after gates, 8 sentence(s) removed
+    removed: "Cuenin, the pastor at the time, became an outspoken critic of Cardinal Bernard F."
+    removed: "Cuenin attempted to host a meeting for priests to air grievances, an act that led Cardinal Law to ba"
+    removed: "This bold defiance by Rev."
+    removed: "Cuenin not only highlighted issues within the church but also galvanized the local community."
+    removed: "In December 2002, more than 850 parishioners gathered to show their support, giving Fr."
+    removed: "This series of events at Our Lady Help of Christians became a catalyst for broader discussions about"
+    removed: "Today, the portico stands quietly, its imposing columns unchanged in the face of time, yet the echoe"
+    removed: "As you step outside, remember that this church continues to be a vital part of Newton's narrative, s"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+Generating description for Stop 4: Portico by , ...
+  [LOCAL-381] stop='Portico' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Portico', 6, ''), ('Portico', 6, ''), ('Portico', 6, '')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15347 after=25121 (+9774 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25121)
+Stop 4 API call cost: $0.0326 (6873 tokens, model=gpt-4o)
+Stop 4 description word count: 252 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-474] regenerated and re-gated: 232w (was 219w)
+      [TRAGEDY-CONTEXT] stop='Portico' RECOVERED circumstances (4 source(s)): On June 25, 2023, Jill D’Amore, her husband Bruno D’Amore, and her mother Lucia Arpino wer
+  [TRAGEDY-CONTEXT] recovered 1, removed 0 sentence(s)
+      [PERSON-CAP] stop 4: 'law' already carries two stops — cut: His outspoken stance led to Cardinal Law banning official archdiocesan activitie
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 4: In December 2002, this very church became the focal point for local and national attention
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 4 improved, 0 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 3 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+  [STORY_FIRST] step=postgate_retry_5_17 elapsed=35.8s cumulative=132.7s
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+  [STORY_FIRST] step=anti_preaching_5_10 elapsed=0.0s cumulative=132.7s
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [D512] _AGENCY_VERB widened by 12 discovered verb(s)
+  [STORY_FIRST] step=obligation_audit_5_20 elapsed=0.0s cumulative=132.7s
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Nave                                       39    36     6    50
+     2  Pulpit                                     31    32     0    89
+     3  Sanctuary                                  21    33     0    45
+     4  Portico                                    29    23     0    65
+    [LOCAL-485] index mean 30.0 over 4 stop(s), range 21-39
+    [LOCAL-485] weakest: 'Sanctuary' at 21
+  [STORY_FIRST] step=story_valuation_5_21 elapsed=0.0s cumulative=132.7s
+  [STORY_FIRST] per_stop: n=4 sum_wall=28.4s observed_span=9.3s slowest=9.3s (serial_would_cost=28.4s vs parallel_span=9.3s)
+    [STORY_FIRST] stop=0 elapsed=5.4s words=283
+    [STORY_FIRST] stop=1 elapsed=6.7s words=290
+    [STORY_FIRST] stop=2 elapsed=9.3s words=260
+    [STORY_FIRST] stop=3 elapsed=7.0s words=264
+  [STORY_FIRST] TOTAL phase_wall=132.7s serial_steps: specificity_5_152=42.5s, postgate_retry_5_17=35.8s, unglossed_ref_5_157=19.8s, style_validation_5_1=16.0s, description_generation=9.3s, dangling_ref_5_7=0.1s, story_valuation_5_21=0.0s, unsupported_claim_5_156=0.0s, contradicted_5_16=0.0s, r7_sensory_5_14=0.0s, r1_imperative_5_13=0.0s, r9_generic_5_15=0.0s, r10_promise_5_155=0.0s, r8_leakage_5_144=0.0s, obligation_audit_5_20=0.0s, r4_feeling_5_143=0.0s, r3_suggestive_5_142=0.0s, venue_scope_5_5=0.0s, r2_question_5_141=0.0s, dangling_demo_5_7b=0.0s, anti_preaching_5_10=0.0s, audio_native_5_9=0.0s, org_grounding_5_158c=0.0s, temporal_5_161=0.0s, entity_grounding_5_158=0.0s, numeric_claim_5_160=0.0s, role_claim_5_158b=0.0s, form_claim_5_159=0.0s, self_contradiction_5_8=0.0s
+[TIMING] phase=story_first elapsed=132.7s cumulative=306.6s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (93 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 93 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 2 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 41 words (delta: -52)
+  [LOCAL-244] Prolog deletions (2):
+    [R10_UNFULFILLED_PROMISE] "Discover the architectural marvels that mirror the community's enduring spirit as you delve into the..."
+    [R10_UNFULFILLED_PROMISE] "Uncover the tales of a parish that has weathered profound shifts, from bustling activity to intimate..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 209
+    Words after:  190
+    Delta: -19
+    Stops affected: 1/4
+    Deletions (1):
+      [Stop 3][R10_UNFULFILLED_PROMISE] "The craftsmanship speaks volumes, with each carved figure and gilded accent telling its own tale of ..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.8s, $0.0080, 1187 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Nave] (cause): His words drew standing ovations, echoing the community's shared demand for refo...
+      [Pulpit] (cause): This act of defiance reverberated far beyond the church walls, marking a pivotal...
+      [Sanctuary] (dated_event): One notable instance occurred in 1571 when Pope Pius V attributed the victory of...
+      [Portico] (cause): More than 850 parishioners gathered in the church to give him two standing ovati...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0030 (517 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (35 words):
+      "At the upcoming stops, you will learn about the pivotal moment in the church's history at the Pulpit and the victory of Christian armies over the Ottoman Empire attributed to Mary's intercession at the Sanctuary."
+      Stops referenced: 2
+    Part 4 total cost: $0.0030
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+    Stop 3 'Sanctuary': removed duplicate sentence: "One notable instance occurred in 1571 when Pope Pius V attributed the victory of..."
+  [LOCAL-286] Deduplication: 1 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave the Nave of Our Lady Help of Christians Catholi...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave the pulpit area, head down the center aisle tow...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you exit the Sanctuary of Our Lady Help of Christians Cat...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap: D177 FAILED for 'Sanctuary': fact not in delivered text
+    Fact: "One notable instance occurred in 1571 when Pope Pius V attributed the victory of..."
+  [LOCAL-280] Recap composition: 1.1s, $0.0023, 401 tokens
+  [LOCAL-280] Recap built: 25 words, 2 composed clauses (1 D177 rejected, 0 navigation rejected)
+    [Nave] (cause): "His words drew standing ovations, echoing the community's shared demand for refo..."
+      → composed: "Nave: Standing ovations followed his call for reform and transparency"
+    [Pulpit] (cause): "This act of defiance reverberated far beyond the church walls, marking a pivotal..."
+      → composed: "Pulpit: Defiance here marked a pivotal moment in church history"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Nave: Standing ovations followed his call for reform and transparency and Pulpit: Defiance here marked a pivotal moment in church history."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2: no restaurant or museum verified nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 2 (first told at stop 1, 2002/december): It was here, in December 2002, that Father Walter H. Cuenin courageously spoke o
+  [D533] REPEATED FACT removed from stop 2 (first told at stop 1, 2005/forward): Fast forward to September 2005, and the pulpit again becomes a focal point of co
+  [D533] 2 repeated fact(s) removed, 0 kept
+  [D533] Person-year role guard: no mismatches (288 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='walking')
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne..."
+  [2] "That's 4 stops — Nave: Standing ovations followed his call for reform and transparency and Pulpit: D..."
+
+=== Word Count Statistics ===
+Stop 1: Nave - 283 words
+Stop 2: Pulpit - 290 words
+Stop 3: Sanctuary - 260 words
+Stop 4: Portico - 264 words
+===========================
+
+
+Total API cost: $0.2508 (35468 tokens)
+CACHE STORE: Our Lady Help of Christians Catholic Church, Newton MA /  / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_church2_20260923_1222.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-3498/L3498_church2_20260923_1222_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Our Lady Help of Christians Catholic Church, Newton MA
+Tour-Category: walking
+
+Stop 1: Nave
+
+Address: 573 Washington St, Newton, MA 02458
+
+Coordinates: 42.3527, -71.2084
+
+Type/Specialty: Main worship area
+
+Specific Examples: High ceilings, stained glass windows, wooden pews
+
+Operational Details: Open for prayer and services, check website for schedule
+
+Orientation: You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne...
+
+[TIMING] phase=packing elapsed=13.6s cumulative=320.2s
+[TIMING] phase=verification elapsed=0.0s cumulative=320.2s
+[TIMING] TOTAL wall=320.2s phases: poi_selection=155.5s, story_first=132.7s, fact_sheets=16.1s, packing=13.6s, intent=2.3s, external_lookups=0.0s, verification=0.0s, narration=0.0s
+
+RUN church2 OK: 9862 chars in 320.2s -> L3498_church2_20260923_1222.txt

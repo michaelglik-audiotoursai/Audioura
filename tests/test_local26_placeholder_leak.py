@@ -16,23 +16,36 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Inline copy of the detection function for unit testing ----------
 # (avoids importing the full generate_tour_text module which has many dependencies)
+# [LOCAL-295] Updated to match the refactored classification logic.
 
-def _detect_placeholder_leak(text):
-    """Return True if text appears to be a placeholder echo rather than real content."""
+def _classify_placeholder_leak(text):
+    """Classify text as placeholder echo, short-but-valid prose, or normal content."""
     if not text or not text.strip():
-        return True
+        return ("placeholder", "empty_text")
     stripped = text.strip()
-    # Bracketed line matching "[...word description...]"
     if re.search(r'\[.*\bword\b.*\bdescription\b.*\]', stripped, re.IGNORECASE):
-        return True
-    # Output wholly enclosed in square brackets (entire text is a placeholder)
+        return ("placeholder", "bracketed_word_description_echo")
     if stripped.startswith('[') and stripped.endswith(']') and '\n' not in stripped:
-        return True
-    # Output far below the minimum useful length (< 30 words when we asked for 120+)
+        return ("placeholder", "wholly_bracketed")
     word_count = len(stripped.split())
     if word_count < 30:
-        return True
-    return False
+        _lower = stripped.lower()
+        _is_placeholder_like = (
+            re.search(r'\b(insert|placeholder|description here|your .* here|todo|tbd)\b', _lower) or
+            stripped.count('...') >= 2 or
+            re.search(r'\b(create a|write a|generate a)\s+(detailed|brief)?\s*(description|narration)', _lower) or
+            (word_count < 8 and '.' not in stripped)
+        )
+        if _is_placeholder_like:
+            return ("placeholder", f"short_and_template_like ({word_count} words)")
+        return ("short_valid", word_count)
+    return (None, None)
+
+
+def _detect_placeholder_leak(text):
+    """Return True only for genuine placeholder echoes (not short-but-valid prose)."""
+    classification, _ = _classify_placeholder_leak(text)
+    return classification == "placeholder"
 
 
 # ---------- Test cases ----------
@@ -74,9 +87,15 @@ def test_rejects_empty_or_whitespace():
 
 
 def test_rejects_too_short():
-    """Under 30 words is suspiciously short — reject."""
-    text = "This is a painting by an artist."
+    """Under 30 words AND template-like is suspicious — reject."""
+    # [LOCAL-295] Updated: short text is only rejected if it looks like a placeholder
+    # (has template keywords, ellipsis, or no sentence structure).
+    # A bare fragment with no period AND < 8 words is a placeholder:
+    text = "This painting by an artist"
     assert _detect_placeholder_leak(text) is True
+    # But a short sentence with a period is valid prose (short_valid):
+    text2 = "This is a painting by an artist."
+    assert _detect_placeholder_leak(text2) is False, "Short valid prose should NOT be rejected"
 
 
 def test_accepts_valid_description():

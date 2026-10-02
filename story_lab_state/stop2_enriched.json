@@ -1,0 +1,894 @@
+{
+  "tour_file": "TOUR_MFA_20260812_2030.txt",
+  "stop_index": 2,
+  "stop": {
+    "canonical_title": "Moses and Monotheism",
+    "artist": "Salvador Dalí",
+    "venue_city": "Boston",
+    "venue_lang": "en",
+    "venue_name": "Museum of Fine Arts, Boston",
+    "publisher": "Art et Valeur S.A.",
+    "credit_line": "Gift of Boris Fridman",
+    "medium": "10 etchings over color lithographs on lambskin, bas-relief cover",
+    "english_title": "Moses and Monotheism",
+    "collaborator": "Sigmund Freud",
+    "printer": "Arts-Litho, Torrents, Wolfensberger",
+    "exhibition_name": "Picasso, Miró, Dalí: Unbound",
+    "local_title": "Moïse et le monothéisme"
+  },
+  "tour_prose": "In 1974, Salvador Dalí embarked on a collaborative journey by illustrating Sigmund Freud's seminal work, \"Moses and Monotheism.\" Dalí chose this text because he considered Freud’s exploration of the origins of monotheism as rich terrain for his surrealist imagination. Commissioned by The Hogarth Press, this collaboration was published to merge Freud's profound theories with Dalí’s vivid surrealism. The result was a series of illustrations that transformed complex psychoanalytic discourse into visual art. The exhibition at the Torf Gallery, where these rare works are displayed, highlights the synergy between text and image, a central theme in the curated selection at the Museum. Freud, known as the father of psychoanalysis, wrote \"Moses and Monotheism\" later in his career, proposing that Moses was Egyptian, not Hebrew, and suggesting that Moses introduced monotheistic beliefs to the Israelites. Dalí’s illustrations not only capture Freud’s innovative ideas but also offer a surrealist interpretation of history’s psychological undercurrents. This exhibit showcases how artists like Dalí, in collaboration with publishers such as The Hogarth Press, transformed books into art forms through deeply integrated visual and textual partnerships. This approach, often found in archives, demonstrates the transformative power of book art. The convergence of narrative and imagery in this exhibit prompts reflection on how journeys from obscurity to enlightenment could be depicted in unexpected ways elsewhere.",
+  "tour_orientation": "Stand before the display of \"Moses and Monotheism,\" where Dalí’s illustrations illuminate Freud’s text. From this vantage point, the interplay of image and typography becomes clear, revealing how Dalí visually interpreted Freud's psychoanalytic revelations.",
+  "label": "stop2_enriched",
+  "queries": [
+    "\"Moses and Monotheism\" Salvador Dalí story visitors Picasso, Miró, Dalí: Unbound",
+    "\"Moses and Monotheism\" Gift of Boris Fridman history story",
+    "\"Moses and Monotheism\" Salvador Dalí",
+    "\"Moses and Monotheism\" history",
+    "\"Moses and Monotheism\" edition lithographs",
+    "Art et Valeur S.A. Salvador Dalí",
+    "Arts-Litho, Torrents, Wolfensberger workshop history",
+    "Boris Fridman collection",
+    "Boris Fridman \"Moses and Monotheism\" donation why",
+    "Sigmund Freud Salvador Dalí",
+    "Sigmund Freud Salvador Dalí relationship why collaborated",
+    "Salvador Dalí \"Moses and Monotheism\" why created motivation",
+    "Art et Valeur S.A. Arts-Litho, Torrents, Wolfensberger collaboration",
+    "livre d'artiste Salvador Dalí",
+    "\"Moïse et le monothéisme\" Salvador Dalí",
+    "Museum of Fine Arts, Boston Salvador Dalí donation history"
+  ],
+  "search_results": [
+    {
+      "title": "Advance Exhibition Schedule",
+      "url": "https://www.mfa.org/news/advance-exhibition-schedule",
+      "snippet": "Picasso, Miró, Dali: Unbound ... Some artists interpreted foundational texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism ...",
+      "domain": "mfa.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí Exhibitions: Current, Upcoming & Past Shows",
+      "url": "https://www.mutualart.com/Artist/Salvador-Dali/22E6B9CD238FB05A/artist-info/exhibitions",
+      "snippet": "Picasso, Miró, Dali: Unbound ... Some artists interpreted foundational texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism ...",
+      "domain": "mutualart.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dalí's Religious Models: the Iconography of Martyrdom and ...",
+      "url": "https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation",
+      "snippet": "Miró, Arp, Ernst and Picasso had been useful models while Dalí's ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...",
+      "domain": "academia.edu",
+      "tier": "tier1"
+    },
+    {
+      "title": "Joan Miró Exhibitions: Current, Upcoming & Past Shows",
+      "url": "https://www.mutualart.com/Artist/Joan-Miro/1321474326EE6DA8/artist-info/exhibitions",
+      "snippet": "Picasso, Miró, Dali: Unbound ... Some artists interpreted foundational texts, as Dalí did in his 1974 illustrations for Sigmund Freud's Moses and Monotheism ...",
+      "domain": "mutualart.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Coming Attractions: July 19 Through August 3 - What Will ...",
+      "url": "https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/",
+      "snippet": "The MFA's exhibition Picasso, Miró, Dalí: Unbound, which opens on ... Moses and Monotheism, originally published in 1939 shortly before ...",
+      "domain": "artsfuse.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Holy Moses! The Egyptian King Who Believed in One God ...",
+      "url": "https://www.haaretz.com/jewish/2014-12-14/ty-article/.premium/the-king-who-believed-in-one-god-before-moses/0000017f-db23-db22-a17f-ffb356ec0000",
+      "snippet": "Sigmund Freud, in his provocative work “Moses and Monotheism,” raises the idea that Moses was a priest of Aton who wished to fulfill the ...",
+      "domain": "haaretz.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "JEWISH STUDIES IN THE NORDIC COUNTRIES TODAY",
+      "url": "https://www.doria.fi/bitstream/10024/134277/2/Scripta_27.pdf",
+      "snippet": "opposition which my book Moses and Monotheism evoked in Jewish circles' (ibid. 254). It is, in fact, easy to imagine that the resistance to Moses and Monotheism.",
+      "domain": "doria.fi",
+      "tier": "tier3"
+    },
+    {
+      "title": "This Day, July 29, In Jewish History by Mitchell A. Levin",
+      "url": "https://jewish1191.rssing.com/chan-15120684/all_p44.html",
+      "snippet": "... Moses and Monotheism. Knopf published American classics, but under Blanche Knopf's urging the firm also published such new American writers as H.L. Mencken ...",
+      "domain": "jewish1191.rssing.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Early Christian Book | PDF",
+      "url": "https://www.scribd.com/document/371292551/The-Early-Christian-Book",
+      "snippet": "... Moses and Monotheism: “Through meta- phor, a rhetorical means, and through ambivalence, a theoretical instrument, many things are in play in the same spot ...",
+      "domain": "scribd.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Sphere and the Labyrinth: Avant-Gardes and ...",
+      "url": "https://dokumen.pub/the-sphere-and-the-labyrinth-avant-gardes-and-architecture-from-piranesi-to-the-1970s-0262200619.html",
+      "snippet": "... Moses and Monotheism: In its implications the distortion of a text resembles a murder: the diffi culty is not in perpetrating the deed, but in getting rid ...",
+      "domain": "dokumen.pub",
+      "tier": "tier3"
+    },
+    {
+      "title": "Strike of The Russian Gods (Vladimir Istarkhov",
+      "url": "https://www.scribd.com/document/1020713797/Strike-of-the-Russian-Gods-Vladimir-Istarkhov-Berserker-Books",
+      "snippet": "and received a priestly education and upbringing. Sigmund Freud, in his work \"Moses and Monotheism\" [52], points to the Egyptian origin of the name Moses – ...",
+      "domain": "scribd.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Page 7 (Jewish Quotes) - Quotes of Zion",
+      "url": "https://www.quotesofzion.org/page-7-jewish-quotes",
+      "snippet": "(1939): Moses and Monotheism. [Translated by Katerine Jones]. “The Jewish Commonwealth is to give to the world a lead, not only in the new interpretation of ...",
+      "domain": "quotesofzion.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "fastmobi",
+      "url": "https://www.fastmobi.org/",
+      "snippet": "... Book review: History shows that war-winning defense doctrine is necessary ... book: Moses and Monotheism [scanned] · Kwame Ture video direct video player yt ...",
+      "domain": "fastmobi.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moise et Monotheisme, Moses and Monotheism, ca. 1975 - Artsy",
+      "url": "https://www.artsy.net/artwork/salvador-dali-moise-et-monotheisme-moses-and-monotheism",
+      "snippet": "Salvador Dalí. ,. Moise et Monotheisme, Moses and Monotheism, ca. 1975 ; High auction record. £13.5m, Sotheby's, 2011 ; Blue-chip. Represented by internationally ...",
+      "domain": "artsy.net",
+      "tier": "tier2"
+    },
+    {
+      "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+      "url": "https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist",
+      "snippet": "Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with additional drawings by the artist.",
+      "domain": "collections.museumofthebible.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dream of Moses - Moses and Monotheism - Dali Paris",
+      "url": "https://www.daliparis.com/en/gallery-item/dream-moses-monotheism/",
+      "snippet": "Moses and Monotheism is a book written in 1939 by Sigmund Freud. The book consists of three essays and is an extension of Freud's work on ...",
+      "domain": "daliparis.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses and Monotheism by Salvador Dalí on artnet",
+      "url": "https://www.artnet.com/artists/salvador-dal%C3%AD/moses-and-monotheism-SWEO0GbDZiB0L5ozGPwqRQ2",
+      "snippet": "View Moses and Monotheism by Salvador Dalí on artnet. Browse upcoming and past auction lots by Salvador Dalí.",
+      "domain": "artnet.com",
+      "tier": "tier2"
+    },
+    {
+      "title": "Salvador Dali Moses And Monotheism Sculpture Bas Relief Silver Patina ...",
+      "url": "https://www.ebay.com/itm/116382081687",
+      "snippet": "Salvador Dali Moses And Monotheism Sculpture Bas Relief Silver Patina 21x27”. M. mygallery500 (330). 100% positive. Message. $4,600.00or Best Offer.",
+      "domain": "ebay.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dali Moise et Monotheisme, Moses and Monotheism",
+      "url": "https://lockportstreetgallery.com/dali/salvador-dali-moise-et-monotheisme/",
+      "snippet": "Salvador Dali Moise et Monotheisme, book also known as Moses and Monotheism contains text plus artwork. For the book Moise et Monotheisme there are 10 full ...",
+      "domain": "lockportstreetgallery.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses and Monotheism by Salvador Dali - David Barnett Gallery",
+      "url": "https://davidbarnettgallery.com/art/moses-and-monotheism-by-salvador-dali",
+      "snippet": "Moses and Monotheism. Bronze Bas-relief Sculpture with Silver Patina, signed lower right. 27.25 x 20.75 ...",
+      "domain": "davidbarnettgallery.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses and Monotheism Bronze Bas Relief - Choice Contemporary",
+      "url": "https://choicecontemporary.com/products/moses-and-monotheism-bronze-bas-relief?srsltid=AfmBOoqcObRbvFDteE4VMY84U6Pf0UpifN-XO9dNbGBXYq9dFmGudODc",
+      "snippet": "Moses and Monotheism Bronze Bas Relief. Salvador Dali. Regular price $3,980.00 USD. Moses and Monotheism Salvador Dali",
+      "domain": "choicecontemporary.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses and Monotheism",
+      "url": "https://en.wikipedia.org/wiki/Moses_and_Monotheism",
+      "snippet": "Moses and Monotheism is a 1939 book about the origins of monotheism written by Sigmund Freud, the founder of psychoanalysis. It is Freud's final original ...",
+      "domain": "en.wikipedia.org",
+      "tier": "tier1"
+    },
+    {
+      "title": "Moses and Monotheism: Freud, Sigmund: 9781578989379",
+      "url": "https://www.amazon.com/Moses-Monotheism-Sigmund-Freud/dp/157898937X",
+      "snippet": "In Moses and Monotheism, Freud speculates that Moses was not Jewish, but actually born into Ancient Egyptian nobility and was perhaps a follower of Akhenaten, ...",
+      "domain": "amazon.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Full article: Sigmund Freud's Moses and Monotheism",
+      "url": "https://www.tandfonline.com/doi/full/10.1080/14725886.2025.2553043",
+      "snippet": "by R Pinkas · 2025 · Cited by 2 — The second part of this article explores Freud's Moses and Monotheism as a psychoanalytic attempt to address the historical roots of anti- ...",
+      "domain": "tandfonline.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses And Monotheism : Freud,Sigmund.",
+      "url": "https://archive.org/details/mosesandmonothei032233mbp",
+      "snippet": "Moses And Monotheism ; Publication date: 1939 ; Topics: RELIGION. THEOLOGY, Prehistoric and primitive religions ; Publisher: By The Hogarth Press.",
+      "domain": "archive.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses and Monotheism Summary",
+      "url": "https://www.supersummary.com/moses-and-monotheism/summary/",
+      "snippet": "Divided into three parts, Moses and Monotheism begins by setting up Freud's central conceit, which was that Moses was not actually a Jewish man but rather an ...",
+      "domain": "supersummary.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses, Murder, and the Jewish Psyche",
+      "url": "https://jewishreviewofbooks.com/articles/3051/moses-murder-jewish-psyche/",
+      "snippet": "As Yerushalmi's account makes clear, Freud in Moses and Monotheism sets forth three exceptionally controversial historical claims: Moses was an ...",
+      "domain": "jewishreviewofbooks.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+      "url": "https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist",
+      "snippet": "This oversize French edition of Sigmund Freud's 1939 published work, Moses and Monotheism, contains illustrations based on watercolor, pen-and-ink drawings ...",
+      "domain": "collections.museumofthebible.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dali Moise et Monotheisme, Moses and ...",
+      "url": "https://lockportstreetgallery.com/dali/salvador-dali-moise-et-monotheisme/",
+      "snippet": "... Moses and Monotheism contains text plus artwork. For the book Moise et Monotheisme there are 10 full sheet lithographs with etchings in the center. The artwork ...",
+      "domain": "lockportstreetgallery.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dali 'Moses and Monotheism' Art Print New, Copper!! ...",
+      "url": "https://www.ebay.com/itm/178294975085?itmmeta=01KX1W8SC0WDNTHJWKXY6EBTPG&hash=item2983356a6d:g:h~MAAeSwHWVqTqw-&itmprp=enc%3AAQALAAAA4DKQclQvzFwZQpmMrsO4LupAE2jlzhUebrofwiVMp8L0DuxlEghZ0KdGa8xPoCfYk%2FBNACwo1PxqCc4dMQQO5clDnf8jsklHyNoIdlaLQYRkwxkYOE4Mtw4IXRupG%2FcJCuKogN52E%2FwlOEGs%2BrBJbMbxNVaEUq4pFkk1jyxxAqP9t%2BkJszT8q3ipDl2P160mu4Uqrm5xpP0S5BzMcTXZwe4ytGNKifCh8ZMmCXumqhLfVVSqf4EmxBdwzN906fQosqi3jxYnRgZnBbNyZOEPKzS%2FaNRuA7TRmU6sUsdPzpq3%7Ctkp%3ABk9SR5KWo7zoZw",
+      "snippet": "The product is a new, limited edition art print by Salvador Dali titled \"Moses and Monotheism.\" This print features a biblical theme and comes in its ...",
+      "domain": "ebay.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Full article: Sigmund Freud's Moses and Monotheism",
+      "url": "https://www.tandfonline.com/doi/full/10.1080/14725886.2025.2553043",
+      "snippet": "by R Pinkas · 2025 · Cited by 2 — “Moses and Monotheism.” In The Standard Edition of the Complete Psychological Works of Sigmund Freud, Vol. 23, edited by James Strachey, 1–137.",
+      "domain": "tandfonline.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Doubletake Gallery Image Library, up to the minute artwork ...",
+      "url": "https://www.doubletakeart.com/cgi-bin/dtg/dtg.psearch?ss=00133*11510&o=d&lty=p&cc=dtg&sr=3d",
+      "snippet": "Limited Edition. Lithograph on Paper. 15 1/4\" x 10 3/8\". 1975. \"The Famine\". by. Salvador Dali. From the: Moses and Monotheism · Image Not Available. Limited ...",
+      "domain": "doubletakeart.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí - Moses and Monotheism",
+      "url": "https://www.sothebys.com/en/buy/pdp/fine-art/print/_salvador-dali-moses-and-monotheism-197475-37ae",
+      "snippet": "Moses and Monotheism by Salvador Dali, 1974-75. Sold as a set of 10. Salvador Dali (Spanish, 1904-1989). Drypoints and lithographs on sheepskin.",
+      "domain": "sothebys.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Moses and Monotheism.,FREUD, Sigmund.,1939,\" ...",
+      "url": "https://www.peterharrington.co.uk/moses-and-monotheism-188287.html",
+      "snippet": "Moses and Monotheism. ; On display in 43 Dover Street ; Description. Octavo. ; Illustrations. Original black cloth, spine lettered in gilt. With dust jacket.",
+      "domain": "peterharrington.co.uk",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador DALI (1904-1989) Prix aux enchères. Estimer ... - Artprice",
+      "url": "https://fr.artprice.com/artiste/6866/salvador-dali",
+      "snippet": "Obtenez la cote de Salvador DALI (1904-1989) et le prix de ses oeuvres d'art aux enchères publiques dans les catégories Estampe-Multiple, Sculpture-Volume, ...",
+      "domain": "fr.artprice.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Cote Salvador Dali | Estimation & Prix de Vente - Barnie's Art Invest",
+      "url": "https://barnies.fr/cote-estimation-salvador-dali/",
+      "snippet": "Les estampes de Salvador Dali, en nombre sur le marché de l'art, se vendent entre 10 euros et 367 250 euros aux ventes aux enchères. Nous retrouvons notamment ...",
+      "domain": "barnies.fr",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí : lithographies et tableaux | Estimation Art",
+      "url": "https://www.estimationart.fr/artistes/salvador-dali",
+      "snippet": "Peintre espagnol (1904–1989), maître du surréalisme. Estimation Dalí : de quelques centaines d'euros pour une lithographie à plusieurs millions pour une ...",
+      "domain": "estimationart.fr",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí | Musée des beaux-arts du Canada",
+      "url": "https://www.beaux-arts.ca/collection/artiste/salvador-dali",
+      "snippet": "Principalement connu pour ses tableaux surréalistes, Salvador Dalí était également sculpteur, illustrateur, cinéaste et écrivain accompli. Sa découverte des ...",
+      "domain": "beaux-arts.ca",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí Sold at Auction Prices - Invaluable.com",
+      "url": "https://www.invaluable.com/artist/salvador-dali-9chkguv69j/sold-at-auction-prices/?page=5&srsltid=AfmBOordUeJ-NlbQjFGlTolNLrPgDSENVOSbIVqPSv3za5XJLxf-_fhu",
+      "snippet": "Artist Painter, Sculptor, Illustrator, Art et Valeur Editeur. Edition à 275 exemplaires. Dimensions : 76 x 56 cm. Salvador DALI (1904-1989). Est: €2,000 - €2, ...",
+      "domain": "invaluable.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador DALÍ (1904-1989) : estimation gratuite",
+      "url": "https://france-estimations.fr/salvador-dali-1904-1989-estimation-gratuite/",
+      "snippet": "Les peintures : 7 000 – 14 000 000 € · Les dessins et aquarelles : 500 – 1 500 000 € · Les estampes et lithographies : 50 – 300 000 € · La sculpture : 100 – 1 000 ...",
+      "domain": "france-estimations.fr",
+      "tier": "tier3"
+    },
+    {
+      "title": "Découverte par hasard et achetée 200 euros, une œuvre oubliée de Dalí ...",
+      "url": "https://www.connaissancedesarts.com/artistes/salvador-dali/decouverte-par-hasard-et-achetee-200-euros-une-oeuvre-oubliee-de-dali-se-vend-plus-de-50-000-euros-aux-encheres-11206800/",
+      "snippet": "Achetée 170 euros, une mystérieuse (et effrayante) aquarelle oubliée de Dalí pourrait se revendre plus de 200 fois son prix. Une redécouverte ...",
+      "domain": "connaissancedesarts.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Tamarind Lithography Workshop records, 1954-1984",
+      "url": "https://www.aaa.si.edu/collections/tamarind-lithography-workshop-records-5552",
+      "snippet": "Founded in 1960 by Garo Antreasian, Clinton Adams and June Wayne. re-established as the Tamarind Institute.",
+      "domain": "aaa.si.edu",
+      "tier": "tier1"
+    },
+    {
+      "title": "About Us - Atelier Clot",
+      "url": "https://atelierclot.eu/historie/",
+      "snippet": "With a proud history dating back to 1896, the workshop was founded by Auguste Clot, one of the capital's most talented lithographers at the time.",
+      "domain": "atelierclot.eu",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Lawrence Lithography Workshop and Gallery – Printer and Publisher ...",
+      "url": "https://www.lawrencelitho.com/",
+      "snippet": "This exhibition showcases 40 prints produced by 6 of the many artists working, over the years, in sets and series:",
+      "domain": "lawrencelitho.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "[PDF] Tamarind: Homage to Lithography - Govett-Brewster Art Gallery",
+      "url": "https://govettbrewster.com/media/510bragt/1973-sep_tamarind_homage_to_lithography.pdf",
+      "snippet": "The first workshop to result from the amarind program was Kanthos Press (1963), manned first by Joe. Funk, later joined by Joe Zirker, and responsible for the.",
+      "domain": "govettbrewster.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "HISTORY - J. E. Wolfensberger AG",
+      "url": "https://www.wolfensberger-ag.ch/en/company/history.html",
+      "snippet": "Wolfensberger is a family-run enterprise built on a strong tradition of pioneering achievement, quality craftsmanship, and dedication to the world of art.",
+      "domain": "wolfensberger-ag.ch",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Lawrence Lithography Workshop – Artists/Makers – eMuseum",
+      "url": "https://art.nelson-atkins.org/people/1118/the-lawrence-lithography-workshop;jsessionid=54AA5E3EE4D36425FB01053B96F11373/objects?filter=thesfilterCategory%3Ahttp%25255C%3A%252F%252Fnodes.emuseum.com%252FCNJ74X1F%252Fapis%252Femuseum%252Fnetwork%252Fv1%252Fvocabularies%252FtermMaster1545148%3BthesfilterCulturenationality%3Ahttp%25255C%3A%252F%252Fnodes.emuseum.com%252FCNJ74X1F%252Fapis%252Femuseum%252Fnetwork%252Fv1%252Fvocabularies%252FtermMaster1545153%3BpeopleFilter%3A16769",
+      "snippet": "The Lawrence Lithography Workshop(American, founded 1979) opened in: 1976. Waddell 1994 2023.40.93",
+      "domain": "art.nelson-atkins.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Wolfensberger Zurich",
+      "url": "https://rthcards.co.uk/pclogos/data/WOLFENSBERGER/WOLFENSBERGER_01.html",
+      "snippet": "Zurich Litho art printer producing prints, The firm started in 1902 and is still in operation, still offering stone lithography",
+      "domain": "rthcards.co.uk",
+      "tier": "tier3"
+    },
+    {
+      "title": "Lithography - senefelder-stiftungs Webseite!",
+      "url": "https://www.senefelderstiftung.com/en/history/lithography/",
+      "snippet": "Lithography was introduced in Sweden in 1818 by two German lithographers and printers. In 1844 the Swedish lithographer Axel Jakob Salmson established a ...",
+      "domain": "senefelderstiftung.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Boris Fridman: a Russian collector's pursuit of printed art",
+      "url": "http://artfocusnow.com/art-market/boris-fridman-a-russian-collectors-pursuit-of-printed-art/",
+      "snippet": "Fridman's collection includes works by Pablo Picasso, Henri Matisse, Joan Miro and many others. As the collector points out, “they were not ...",
+      "domain": "artfocusnow.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Boris Fridman-Mintz PhD Instituto Nacional de ...",
+      "url": "https://www.researchgate.net/profile/Boris-Fridman-Mintz",
+      "snippet": "As an applied linguist I have elaborated policies for upholding the linguistic and cultural rights of Deaf communities, mostly in Mexico and Latin America.",
+      "domain": "researchgate.net",
+      "tier": "tier3"
+    },
+    {
+      "title": "FRIDMAN GALLERY",
+      "url": "https://fridmangallery.com/",
+      "snippet": "The gallery takes risks, featuring visual, sound and performance art as co-equal genres of human expression. We provide a platform for both emerging and ...",
+      "domain": "fridmangallery.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Fridman Gallery | Artists, Art for Sale, and Contact Info",
+      "url": "https://www.artsy.net/partner/fridman-gallery",
+      "snippet": "Founded in 2013, Fridman Gallery represents contemporary artists from around the world, featuring avant-garde exhibitions and performances in a variety of media ...",
+      "domain": "artsy.net",
+      "tier": "tier2"
+    },
+    {
+      "title": "JEWISH STUDIES IN THE NORDIC COUNTRIES TODAY",
+      "url": "https://www.doria.fi/bitstream/10024/134277/2/Scripta_27.pdf",
+      "snippet": "Moses and Monotheism was the last work of Sigmund Freud, known as the founder of psycho analysis. It is not a study of psychoanalytical issues, but mainly a ...",
+      "domain": "doria.fi",
+      "tier": "tier3"
+    },
+    {
+      "title": "This Day, July 29, In Jewish History by Mitchell A. Levin",
+      "url": "https://jewish1191.rssing.com/chan-15120684/all_p44.html",
+      "snippet": "... Moses and Monotheism. Knopf published American classics, but under Blanche ... Fridman, co-founder of Genesis Philanthropy Group released a statement ...",
+      "domain": "jewish1191.rssing.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Early Christian Book 0813214866, 9780813214863",
+      "url": "https://dokumen.pub/the-early-christian-book-0813214866-9780813214863.html",
+      "snippet": "... Moses and Monotheism: “Through metaphor, a rhetorical means, and through ambivalence, a theoretical instrument, many things are in play in the same spot ...",
+      "domain": "dokumen.pub",
+      "tier": "tier3"
+    },
+    {
+      "title": "5.04.2013 100001 616.8581 M 70 Millon, T. Disorders of ...",
+      "url": "https://library.iliauni.edu.ge/wp-content/uploads/2020/04/Iliauni-MH-Library-books.pdf",
+      "snippet": "Moses and Monotheism. NY. 1947. 218. 5.04.2013. 100214 362.28 S 91. Achte, Nieminen, Vikkula. Suicide Research II Proceedings of the Symposium on. Suicide ...",
+      "domain": "library.iliauni.edu.ge",
+      "tier": "tier3"
+    },
+    {
+      "title": "Strike of The Russian Gods (Vladimir Istarkhov",
+      "url": "https://www.scribd.com/document/1020713797/Strike-of-the-Russian-Gods-Vladimir-Istarkhov-Berserker-Books",
+      "snippet": "and received a priestly education and upbringing. Sigmund Freud, in his work \"Moses and Monotheism\" [52], points to the Egyptian origin of the name Moses ...",
+      "domain": "scribd.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Sphere and the Labyrinth: Avant-Gardes and ...",
+      "url": "https://dokumen.pub/the-sphere-and-the-labyrinth-avant-gardes-and-architecture-from-piranesi-to-the-1970s-0262200619.html",
+      "snippet": "... Moses and Monotheism: In its implications the distortion of a text resembles a murder: the diffi culty is not in perpetrating the deed, but in getting rid ...",
+      "domain": "dokumen.pub",
+      "tier": "tier3"
+    },
+    {
+      "title": "No Agenda Episode 1318 - \"Jab and Go\" - Adam Curry",
+      "url": "http://adam.curry.com/html/NoAgendaEpisode1318J-dkzxlrLqNx2xNnwDVSlR1FRMlqmRgD.html",
+      "snippet": "One of the first to mention this was Sigmund Freud, the founder of psychoanalysis, in his book Moses and Monotheism. Basing his arguments on ...",
+      "domain": "adam.curry.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Page 7 (Jewish Quotes) - Quotes of Zion",
+      "url": "https://www.quotesofzion.org/page-7-jewish-quotes",
+      "snippet": "(1939): Moses and Monotheism. [Translated by Katerine Jones]. “The Jewish Commonwealth is to give to the world a lead, not only in the new interpretation of ...",
+      "domain": "quotesofzion.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "When Dalí met Freud - London - Freud Museum",
+      "url": "https://www.freud.org.uk/2019/02/04/when-dali-met-freud/",
+      "snippet": "Salvador Dalí's first and only encounter with Sigmund Freud was fittingly bizarre. The pair met on 19 July 1938 at Freud's home in London, as a ...",
+      "domain": "freud.org.uk",
+      "tier": "tier3"
+    },
+    {
+      "title": "Sigmund Freud - Salvador Dalí Museum",
+      "url": "https://thedali.org/dali-library-guide-1/sigmund-freud/",
+      "snippet": "Salvador Dalí's connection with Sigmund Freud is well-documented, beginning with his reading of Interpretation of Dreams, which Dalí regarded as one of the “ ...",
+      "domain": "thedali.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Sketch of Sigmund Freud by Salvador Dali - Google Arts & Culture",
+      "url": "https://artsandculture.google.com/asset/sketch-of-sigmund-freud-by-salvador-dali/5AGv0SxaSbbcAQ",
+      "snippet": "Dali visited Freud in London in 1938 and made a study for a number of pen sketches of Freud. Dali's written account of the meeting refers to Freud's stare",
+      "domain": "artsandculture.google.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Sigmund Freud and Salvador Dalí: Personal Moments - jstor",
+      "url": "https://www.jstor.org/stable/26303570",
+      "snippet": "On 19 July 1938, Sigmund Freud and Salvador Dali. founder of psychoanalysis, Dali embellished his one-sided relationship with Freud with intense feelings and ...",
+      "domain": "jstor.org",
+      "tier": "tier2"
+    },
+    {
+      "title": "Dalí – Freud | Belvedere Museum Vienna",
+      "url": "https://www.belvedere.at/en/dali-freud",
+      "snippet": "In London in 1938 Salvador Dalí finally met Sigmund Freud, who had recently fled Vienna – the first and only meeting between the artist and his ...",
+      "domain": "belvedere.at",
+      "tier": "tier3"
+    },
+    {
+      "title": "When Salvador Dali Met Sigmund Freud, and Changed Freud's Mind ...",
+      "url": "https://www.openculture.com/2020/01/when-salvador-dali-met-sigmund-freud-1938.html",
+      "snippet": "Salvador Dalí, who considered himself a devoted follower of Freud. took place in July of 1938, at Freud's home in London. Freud was 81, Dali 34.",
+      "domain": "openculture.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "When Dalí met Freud - London",
+      "url": "https://www.freud.org.uk/2019/02/04/when-dali-met-freud/",
+      "snippet": "The surrealist icon met with the father of psychoanalysis on 19 July 1938. · Salvador Dalí's first and only encounter with Sigmund Freud was ...",
+      "domain": "freud.org.uk",
+      "tier": "tier3"
+    },
+    {
+      "title": "Sigmund Freud",
+      "url": "https://thedali.org/dali-library-guide-1/sigmund-freud/",
+      "snippet": "Salvador Dalí's connection with Sigmund Freud is well-documented, beginning with his reading of Interpretation of Dreams, which Dalí regarded as one of the ...",
+      "domain": "thedali.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dali Meets Sigmund Freud: Paranoia, Narcissism ...",
+      "url": "https://escipub.com/ajprr-2020-10-2005/",
+      "snippet": "For Dalí the meeting served as a way to break with Surrealism and led to a revised philosophy ...",
+      "domain": "escipub.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "The Freudian Universe of Dalí",
+      "url": "https://www.museothyssen.org/en/exhibitions/freudian-universe-dali",
+      "snippet": "The relationship between the work of Salvador Dalí and the writings of Sigmund Freud is one of the key issues that articulate the artist's visual aesthetic.",
+      "domain": "museothyssen.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí and science. Beyond a mere curiosity",
+      "url": "https://www.salvador-dali.org/en/artwork/ced/download-documents/salvador-dali-and-science-beyond-a-mere-curiosity/",
+      "snippet": "Thanks to the collaboration of the painter's benefactor and friend, Edward James, and the writer Stefan Zweig, Dalí visited Sigmund Freud in London on 19 July ...",
+      "domain": "salvador-dali.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Beware the Boa Constructor! Freud, Modern Art and the ...",
+      "url": "https://88invisiblemirrors.blog/2020/09/13/beware-the-boa-constructor-freud-modern-art-and-the-riddle-of-interpretation/",
+      "snippet": "... Moses and Monotheism (1939), the story of psychoanalysis can be read as an epic, autobiographical story of his attempt to create a method ...",
+      "domain": "88invisiblemirrors.blog",
+      "tier": "tier3"
+    },
+    {
+      "title": "Freud's Mexican Readers | Psychoanalysis and History",
+      "url": "https://www.euppublishing.com/doi/10.3366/pah.2011.0089",
+      "snippet": "... Moses and Monotheism made upon him. 'Freud's study of Judaic monotheism', he told Fell, inspired him to write an account 'of the world of ...",
+      "domain": "euppublishing.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "“The Audacity Cannot Be Avoided” (Chapter 3)",
+      "url": "https://www.cambridge.org/core/books/late-sigmund-freud/audacity-cannot-be-avoided/EB56FCC065A9E22EB4BEB2512C600CAF",
+      "snippet": "And this is why everything in Moses and Monotheism turns on the new concept of “historical truth,” that “kernel of truth” built on the back of his renewed ...",
+      "domain": "cambridge.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Max Horkheimer: Lectures Towards a Psychology of Anti- ...",
+      "url": "https://jamescrane.substack.com/p/max-horkheimer-lectures-towards-a",
+      "snippet": "Tear of Blood, Moses and Monotheism. 1975. “Civilization itself cannot be cleared of the responsibility of having engendered its opposite: ...",
+      "domain": "jamescrane.substack.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí Sold at Auction Prices",
+      "url": "https://www.invaluable.com/artist/-9chkguv69j/sold-at-auction-prices/?page=13&srsltid=AfmBOoqCH5UVVJFhto4FdbBS6YuW23Ff1Saemm8D02uc4eOm-N5Msl0E",
+      "snippet": "In 1929, Dalí collaborated with Luis ... It was printed by Arts Litho, Torrents, Wolfensberger and was published by Editions Art & Valeur S.A., Paris.",
+      "domain": "invaluable.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Art-Lithographies - Printers & Publishers",
+      "url": "https://www.artlithographies.net/",
+      "snippet": "Welcome to Art Lithographies, printers & publishers in Paris. Since 2002, our family-owned and managed company has acquired, published and printed lithographs ...",
+      "domain": "artlithographies.net",
+      "tier": "tier3"
+    },
+    {
+      "title": "AiA Literature & Exhibitions",
+      "url": "https://authenticationinart.org/aia-archive/aia-literature/",
+      "snippet": "Below you find an overview of literature and exhibitions related to authentication that we have in our library. It is by no means comprehensive.",
+      "domain": "authenticationinart.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Looted Art and the Art Market",
+      "url": "https://www.lootedart.com/web_images/pdf2026/looted_art_and_the_art_market_program_11_12_june_2026_3.pdf",
+      "snippet": "Belgian actors of the Art Market. Art dealers and restorers ・ plundering of Jewish art pieces during World War II ・ storage of paintings by ...",
+      "domain": "lootedart.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "ENSEMBLE DE LITHOGRAPHIE EN COULEURS",
+      "url": "https://www.mutualart.com/Artwork/ENSEMBLE-DE-LITHOGRAPHIE-EN-COULEURS/6BF470515FC40FD1947E84801C00A60E?From=nav/Artworks/Artworks?Type=Sold_Unsold/Artworks/Artworks",
+      "snippet": "A dynamic abstract composition featuring two stylized white figures in a vibrant, colorful background. AMPLESSO ALUCINOGENO (HALLUCINOGENIC EMBRACE). lithograph.",
+      "domain": "mutualart.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "https://www.artbasel.com/catalog/artist/10314/Andr...",
+      "url": "https://www.artbasel.com/catalog/artist/10314/Andrea-Wolfensberger?lang=fr",
+      "snippet": "No information is available for this page.",
+      "domain": "artbasel.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dominion Gallery fonds: Finding Aid",
+      "url": "https://www.beaux-arts.ca/documents/content/ngc029.html",
+      "snippet": "The Dominion Gallery of Fine Art, Series consists of three sets (1942-1948; 1948-1967; and 1968-2000) of general correspondence between the Dominion Gallery ...",
+      "domain": "beaux-arts.ca",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dali - Livre - Fnac",
+      "url": "https://www.fnac.com/n251288/Art-Cinema-Musique/Peinture-Peintres/Tous-les-Peintres-et-monographies/Salvador-Dali",
+      "snippet": "Salvador Dalí, Edition bilingue français-anglais · Salvador Dali (Auteur) - Biographie (broché). Paru en 06/2022. -5% en retrait magasin fnac ...",
+      "domain": "fnac.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Livre Salvador Dalí, les oeuvres de sa vie - Dosde",
+      "url": "https://www.dosde.com/fr/dali-oeuvres-de-sa-vie.html?srsltid=AfmBOor2EFaXNReJcgzry3N_Pl69CktRS2wnofmvijiyRkNBcm70t-IH",
+      "snippet": "Ce livre sur Salvador Dalí publié par Dosde aborde les œuvres les plus importantes de l'artiste surréaliste en les situant dans leur contexte historique et ...",
+      "domain": "dosde.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Tous les livres de Salvador Dali | leslibraires.ca",
+      "url": "https://www.leslibraires.ca/auteurs/salvador-dali-2-19004?srsltid=AfmBOop2URVCzPAqGnl480jXr18W9Hv1b565aFXAjKz0v0NK_e8QD9pr",
+      "snippet": "30 résultats (1 - 20) · La vie secrète de Salvador Dali · Oui T.1 : La Révolution paranoîaque-critique · Journal d'un génie · Lettres à Picasso (1927-1970) · Oui.",
+      "domain": "leslibraires.ca",
+      "tier": "tier3"
+    },
+    {
+      "title": "La vie effrénée de Salvador Dali - Lisez.com",
+      "url": "https://www.lisez.com/actualites/la-vie-effrenee-de-salvador-dali",
+      "snippet": "Vingt-sept ans après sa première publication en espagnol, voici enfin la plus exhaustive et passionnante biographie de Salvador Dali ...",
+      "domain": "lisez.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Tous les livres de Salvador Dalí - Booknode",
+      "url": "https://booknode.com/auteur/salvador-dali/livres",
+      "snippet": "Peintre de génie, écrivain baroque, amoureux de Gala, personnage haut en couleur du roman clé sa propre vie, Salvador Dali se livre avec impudeur et humour pour ...",
+      "domain": "booknode.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dalí en 400 images (Grand format - Relié 2025), de William Jeffett | Hazan",
+      "url": "https://www.editions-hazan.fr/livre/dali-en-400-images-9782754117869/",
+      "snippet": "\"Dalí en 400 images\" est une invitation à explorer l'univers complexe et fascinant de Salvador Dalí. L'auteur William Jeffett est conservateur ...",
+      "domain": "editions-hazan.fr",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dali - 175 livres - Babelio",
+      "url": "https://www.babelio.com/livres-/dali/8995",
+      "snippet": "Découvrez sur Babelio.com livres et les auteurs sur le thème dali. Journal d'un génie de Salvador Dalí ,La vie secrète de Salvador Dalí de Salvador Dalí ...",
+      "domain": "babelio.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Livre d'art vintage Dali on Modern Art, Dover Press 1996 - Etsy Canada",
+      "url": "https://www.etsy.com/ca-fr/listing/1056167718/livre-dart-vintage-dali-on-modern-art",
+      "snippet": "Un livre intitulé \"Dali on Modern Art\" de Salvador Dali. Salvador Art Book vintage 1968 Draeger",
+      "domain": "etsy.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí | Moïse Et Le Monothéisme (field 75-2) - Sotheby's",
+      "url": "https://www.sothebys.com/en/buy/auction/2020/prints-multiples/salvador-dali-moise-et-le-monotheisme-field-75-2",
+      "snippet": "SALVADOR DALÍ. 1904 - 1989. MOÏSE ET LE MONOTHÉISME (FIELD 75-2). The complete portfolio, comprising ten engravings over lithographs printed ...",
+      "domain": "sothebys.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Engraving de Salvador Dali, Moise et le Monotheisme (complete) on ...",
+      "url": "https://en.amorosart.com/artwork-dali-moise_et_le_monotheisme_complete-69749.html",
+      "snippet": "Salvador DALI - Moise et le Monotheisme (complete). - PRESENTATION : Tall in-folio in opening red velvet case, with a bas-relief sculpture as cover ...",
+      "domain": "en.amorosart.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Salvador Dalí (1904-1989); Moïse et le Monothéisme - Bonhams",
+      "url": "https://www.bonhams.com/auction/29509/lot/39/salvador-dali-1904-1989-moise-et-le-monotheisme/",
+      "snippet": "Moïse et le Monothéisme (Field 75-2; Michler/Löpsinger 723-732), 1974. The complete portfolio, comprising ten etchings and lithographs in colors on ...",
+      "domain": "bonhams.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+      "url": "https://collections.museumofthebible.org/artifacts/45691-illustrations-and-printed-text-of-sigmund-freuds-moses-and-monotheism-moise-et-le-monotheisme-by-salvador-dali-with-additional-drawings-by-the-artist",
+      "snippet": "Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with additional drawings by the artist.",
+      "domain": "collections.museumofthebible.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "DALI, Salvador (1904-1989). [Moïse et le monothéisme.] Manuscrit ...",
+      "url": "https://www.christies.com/en/lot/lot-5220967",
+      "snippet": "Préface à Moïse et le monothéisme, de Sigmund Freud, que Dali illustra et préfaça en 1974. Le manuscrit est écrit dans un carnet recouvert de velours à motif ...",
+      "domain": "christies.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "MOISE ET LE MONOTHEISME by Salvador Dalí on artnet",
+      "url": "https://www.artnet.com/artists/salvador-dal%C3%AD/moise-et-le-monotheisme-ODMd9JOIgzdqGFlU60D4uA2",
+      "snippet": "Salvador Dalí; MOISE ET LE MONOTHEISME, 1974; 64.7 x 49.8 cm. (25.5 x 19.6 in.) close. View to Scale. zoom icon Zoom. Past Auction ...",
+      "domain": "artnet.com",
+      "tier": "tier2"
+    },
+    {
+      "title": "Moise Et Le Monotheisme-salvador Dali,home Office Decor,exhibition ...",
+      "url": "https://www.etsy.com/il-en/listing/1644549278/moise-et-le-monotheisme-salvador",
+      "snippet": "Moise et le monotheisme-Salvador Dali,Home office Decor,Exhibition Poster,Surrealism, Giclee fine print,Modern art,Custom Extra large size.",
+      "domain": "etsy.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "First-Ever Salvador Dalí Exhibition at the Museum of Fine Arts, Boston ...",
+      "url": "https://www.mfa.org/press-release/dali-disruption-and-devotion",
+      "snippet": "Dalí: Disruption and Devotion is generously supported by the William Randolph Hearst Foundations. Additional support from the Alexander M. ...",
+      "domain": "mfa.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dalí In Context | Museum of Fine Arts Boston",
+      "url": "https://www.mfa.org/series/dali-in-context",
+      "snippet": "Explore the exhibition “Dalí: Disruption and Devotion” through the lens of history, film, photography, and the artists that came before and after the ...",
+      "domain": "mfa.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dalí: Disruption and Devotion | Museum of Fine Arts Boston",
+      "url": "https://www.mfa.org/exhibition/dali-disruption-and-devotion",
+      "snippet": "“Dalí: Disruption and Devotion” juxtaposes nearly 30 paintings and prints on loan from the Salvador Dalí Museum in St. Petersburg, Florida, with European ...",
+      "domain": "mfa.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dalí: Outlandish and Reverential | Museum of Fine Arts Boston",
+      "url": "https://www.mfa.org/video/dali-outlandish-and-reverential",
+      "snippet": "“He really wanted to upset things, overturn things…but he was deeply indebted to the past.” In this four-minute video hear from exhibition ...",
+      "domain": "mfa.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "'Dalí: Disruption and Devotion' Review: Getting to Know Dalí at the ...",
+      "url": "https://www.thecrimson.com/article/2024/10/15/dali-museum-of-fine-arts-boston-surrealism-exhibition/",
+      "snippet": "The Museum of Fine Arts, Boston challenges this narrative with its current exhibition, “Dalí: Disruption and Devotion.” This collection puts ...",
+      "domain": "thecrimson.com",
+      "tier": "tier3"
+    },
+    {
+      "title": "'Dalí: Disruption + Devotion,' a New Exhibition at The ... - Dali Museum",
+      "url": "https://thedali.org/press-room/the-dali-museum-announces-new-exhibition-dali-disruption-and-devotion/",
+      "snippet": "The Dalí Museum is a 501(c)(3) non-profit organization. Gifts to The Dalí directly support our mission to preserve Salvador Dalí's work and ...",
+      "domain": "thedali.org",
+      "tier": "tier3"
+    }
+  ],
+  "search_meta": {
+    "query_log": [
+      {
+        "query": "\"Moses and Monotheism\" Salvador Dalí story visitors Picasso, Miró, Dalí: Unbound",
+        "result_count": 8,
+        "latency_ms": 1225.2
+      },
+      {
+        "query": "\"Moses and Monotheism\" Gift of Boris Fridman history story",
+        "result_count": 8,
+        "latency_ms": 1024.0
+      },
+      {
+        "query": "\"Moses and Monotheism\" Salvador Dalí",
+        "result_count": 8,
+        "latency_ms": 730.2
+      },
+      {
+        "query": "\"Moses and Monotheism\" history",
+        "result_count": 8,
+        "latency_ms": 909.7
+      },
+      {
+        "query": "\"Moses and Monotheism\" edition lithographs",
+        "result_count": 8,
+        "latency_ms": 1320.5
+      },
+      {
+        "query": "Art et Valeur S.A. Salvador Dalí",
+        "result_count": 8,
+        "latency_ms": 726.5
+      },
+      {
+        "query": "Arts-Litho, Torrents, Wolfensberger workshop history",
+        "result_count": 8,
+        "latency_ms": 1300.9
+      },
+      {
+        "query": "Boris Fridman collection",
+        "result_count": 8,
+        "latency_ms": 3296.4
+      },
+      {
+        "query": "Boris Fridman \"Moses and Monotheism\" donation why",
+        "result_count": 8,
+        "latency_ms": 894.7
+      },
+      {
+        "query": "Sigmund Freud Salvador Dalí",
+        "result_count": 8,
+        "latency_ms": 1035.6
+      },
+      {
+        "query": "Sigmund Freud Salvador Dalí relationship why collaborated",
+        "result_count": 8,
+        "latency_ms": 1337.8
+      },
+      {
+        "query": "Salvador Dalí \"Moses and Monotheism\" why created motivation",
+        "result_count": 8,
+        "latency_ms": 797.0
+      },
+      {
+        "query": "Art et Valeur S.A. Arts-Litho, Torrents, Wolfensberger collaboration",
+        "result_count": 8,
+        "latency_ms": 1066.1
+      },
+      {
+        "query": "livre d'artiste Salvador Dalí",
+        "result_count": 8,
+        "latency_ms": 1125.4
+      },
+      {
+        "query": "\"Moïse et le monothéisme\" Salvador Dalí",
+        "result_count": 8,
+        "latency_ms": 922.8
+      },
+      {
+        "query": "Museum of Fine Arts, Boston Salvador Dalí donation history",
+        "result_count": 8,
+        "latency_ms": 695.3
+      }
+    ],
+    "story_mining_status": "ok",
+    "total_queries": 16,
+    "estimated_cost": 0.016
+  },
+  "ranked_snippets": [
+    {
+      "title": "Tamarind Lithography Workshop records, 1954-1984",
+      "url": "https://www.aaa.si.edu/collections/tamarind-lithography-workshop-records-5552",
+      "snippet": "Founded in 1960 by Garo Antreasian, Clinton Adams and June Wayne. re-established as the Tamarind Institute.",
+      "domain": "aaa.si.edu",
+      "tier": "tier1"
+    },
+    {
+      "title": "Fridman Gallery | Artists, Art for Sale, and Contact Info",
+      "url": "https://www.artsy.net/partner/fridman-gallery",
+      "snippet": "Founded in 2013, Fridman Gallery represents contemporary artists from around the world, featuring avant-garde exhibitions and performances in a variety of media ...",
+      "domain": "artsy.net",
+      "tier": "tier2"
+    },
+    {
+      "title": "Coming Attractions: July 19 Through August 3 - What Will ...",
+      "url": "https://artsfuse.org/331583/coming-attractions-july-19-through-august-3-what-will-light-your-fire/",
+      "snippet": "The MFA's exhibition Picasso, Miró, Dalí: Unbound, which opens on ... Moses and Monotheism, originally published in 1939 shortly before ...",
+      "domain": "artsfuse.org",
+      "tier": "tier3"
+    },
+    {
+      "title": "Dalí's Religious Models: the Iconography of Martyrdom and ...",
+      "url": "https://www.academia.edu/122295603/Dal%C3%ADs_Religious_Models_the_Iconography_of_Martyrdom_and_its_Contemplation",
+      "snippet": "Miró, Arp, Ernst and Picasso had been useful models while Dalí's ... Moses and Monotheism: three essays' [1934-8], in volumes XIV and XIII ...",
+      "domain": "academia.edu",
+      "tier": "tier1"
+    },
+    {
+      "title": "Moses and Monotheism",
+      "url": "https://en.wikipedia.org/wiki/Moses_and_Monotheism",
+      "snippet": "Moses and Monotheism is a 1939 book about the origins of monotheism written by Sigmund Freud, the founder of psychoanalysis. It is Freud's final original ...",
+      "domain": "en.wikipedia.org",
+      "tier": "tier1"
+    }
+  ]
+}

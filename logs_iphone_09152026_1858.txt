@@ -1,0 +1,79 @@
+[18:41:49] EDIT API: Stop 0 - Has custom audio: false, Audio path: null
+[18:41:49] EDIT API: Stop 2 - TTS mode, generate: true
+[18:41:49] EDIT API: ===== MAKING HTTP POST REQUEST =====
+[18:41:49] EDIT API: URL: https://storied-api.audioura.com/tour/421/update-multiple-stops
+[18:41:49] EDIT API: Payload stops count: 1
+[18:42:00] EDIT API: ===== HTTP RESPONSE RECEIVED =====
+[18:42:00] EDIT API: Response status: 200
+[18:42:00] EDIT API: Response body: {"download_url":"/tour/61401cdb-1eab-4881-8fcc-344e1c177723/download","message":"Tour updated successfully with 1 text-to-speech audio file(s)","new_tour_id":"61401cdb-1eab-4881-8fcc-344e1c177723","status":"success","stops":[{"audio_source":"tts_generated","audio_updated":true,"generate_audio_from_text":true,"has_custom_audio":false,"stop_number":2,"text_updated":true}]}
+
+[18:42:00] EDIT API: Save success - Tour updated successfully with 1 text-to-speech audio file(s)
+[18:42:00] API_CALL: TourEditingService.updateMultipleStops returned successfully
+[18:42:00] API_CALL: Response keys: [download_url, message, new_tour_id, status, stops]
+[18:42:00] EDIT: Save response: {download_url: /tour/61401cdb-1eab-4881-8fcc-344e1c177723/download, message: Tour updated successfully with 1 text-to-speech audio file(s), new_tour_id: 61401cdb-1eab-4881-8fcc-344e1c177723, status: success, stops: [{audio_source: tts_generated, audio_updated: true, generate_audio_from_text: true, has_custom_audio: false, stop_number: 2, text_updated: true}]}
+[18:42:00] CRITICAL_TOUR_ID: Backend returned new_tour_id=61401cdb-1eab-4881-8fcc-344e1c177723
+[18:42:00] EDIT: Starting new tour download process
+[18:42:00] EDIT: REQ-016 new tour created: 61401cdb-1eab-4881-8fcc-344e1c177723
+[18:42:00] EDIT API: Downloading updated tour 61401cdb-1eab-4881-8fcc-344e1c177723
+[18:42:01] EDIT API: Downloaded 2607141 bytes
+[18:42:01] EDIT API: Extracted 10 files
+[18:42:01] EDIT API: Tour download and extraction completed
+[18:42:01] DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: 61401cdb-1eab-4881-8fcc-344e1c177723
+[18:42:01] DEBUG_UPDATE_ID: Local tour updated with new ID reference
+[18:42:01] USER_ACTION: Loading tour for editing
+[18:42:01] STATUS: Loaded 3 stops for editing
+[18:42:01] DEBUG_RESET: Processing 3 stops
+[18:42:01] LISTEN: Loading 15 tours from storage
+[18:42:01] LISTEN: Loaded 15 valid tours (0 skipped)
+[18:42:32] TOUR_PLAYER: Using mobile file URL: file:///var/mobile/Containers/Data/Application/F7A3A5E3-7B26-439D-B72A-69A375569739/Documents/tours/__ru_421/index.html
+[18:42:32] NAV: TTS initialized
+[18:42:32] VOICE: InAppWebView created, controller set
+[18:42:32] VOICE: WebView loaded: file:///var/mobile/Containers/Data/Application/F7A3A5E3-7B26-439D-B72A-69A375569739/Documents/tours/__ru_421/index.html
+[18:42:32] VOICE: Getting tour info
+[18:42:34] TOUR_PLAYER: Auto-start command executed
+[18:44:23] TOUR_PLAYER: Using mobile file URL: file:///var/mobile/Containers/Data/Application/F7A3A5E3-7B26-439D-B72A-69A375569739/Documents/tours/__ru_419/index.html
+[18:44:23] NAV: TTS initialized
+[18:44:23] VOICE: InAppWebView created, controller set
+[18:44:23] VOICE: WebView loaded: file:///var/mobile/Containers/Data/Application/F7A3A5E3-7B26-439D-B72A-69A375569739/Documents/tours/__ru_419/index.html
+[18:44:23] VOICE: Getting tour info
+[18:44:25] TOUR_PLAYER: Auto-start command executed
+[18:45:38] TOUR_PLAYER: Using mobile file URL: file:///var/mobile/Containers/Data/Application/F7A3A5E3-7B26-439D-B72A-69A375569739/Documents/tours/__ru_421/index.html
+[18:45:38] NAV: TTS initialized
+[18:45:38] VOICE: InAppWebView created, controller set
+[18:45:39] VOICE: WebView loaded: file:///var/mobile/Containers/Data/Application/F7A3A5E3-7B26-439D-B72A-69A375569739/Documents/tours/__ru_421/index.html
+[18:45:39] VOICE: Getting tour info
+[18:45:41] TOUR_PLAYER: Auto-start command executed
+[18:47:56] USER_ACTION: Loading tour for editing
+[18:47:56] STATUS: Loaded 3 stops for editing
+[18:47:58] CRITICAL_ADD: Added new stop 4 with action=add, modified=true
+[18:47:58] LISTEN: Loading 15 tours from storage
+[18:47:58] LISTEN: Loaded 15 valid tours (0 skipped)
+[18:48:04] USER_ACTION: Loading tour for editing
+[18:48:04] STATUS: Loaded 3 stops for editing
+[18:48:06] CRITICAL_ADD: Added new stop 4 with action=add, modified=true
+[18:48:06] LISTEN: Loading 15 tours from storage
+[18:48:06] LISTEN: Loaded 15 valid tours (0 skipped)
+[18:50:03] ATTEST: App Attest MethodChannel not registered (native side not implemented yet)
+[18:50:04] TOUR_REQUEST: Response status: 429
+[18:50:04] TOUR_REQUEST: Response body: {"allowed":false,"error":"quota_exceeded","limit":"tours_per_day","max":1,"plan":"free","reset":"2026-09-16T00:00:00Z","upgrade":true,"used":1}
+
+[18:50:04] TOUR_REQUEST_ERROR: quota_exceeded
+[18:50:04] DETAILED ERROR: Exception: quota_exceeded
+[18:50:04] ERROR: Failed to generate tour: Exception: quota_exceeded
+[18:50:56] ATTEST: App Attest MethodChannel not registered (native side not implemented yet)
+[18:50:57] TOUR_REQUEST: Response status: 429
+[18:50:57] TOUR_REQUEST: Response body: {"allowed":false,"error":"quota_exceeded","limit":"tours_per_day","max":1,"plan":"free","reset":"2026-09-16T00:00:00Z","upgrade":true,"used":1}
+
+[18:50:57] TOUR_REQUEST_ERROR: quota_exceeded
+[18:50:57] DETAILED ERROR: Exception: quota_exceeded
+[18:50:57] ERROR: Failed to generate tour: Exception: quota_exceeded
+[18:51:13] ATTEST: App Attest MethodChannel not registered (native side not implemented yet)
+[18:51:14] TOUR_REQUEST: Response status: 429
+[18:51:14] TOUR_REQUEST: Response body: {"allowed":false,"error":"quota_exceeded","limit":"tours_per_day","max":1,"plan":"free","reset":"2026-09-16T00:00:00Z","upgrade":true,"used":1}
+
+[18:51:14] TOUR_REQUEST_ERROR: quota_exceeded
+[18:51:14] DETAILED ERROR: Exception: quota_exceeded
+[18:51:14] ERROR: Failed to generate tour: Exception: quota_exceeded
+[18:55:16] ABOUT: Checking user: USER-773827679
+[18:55:16] Testing connectivity to: https://storied-api.audioura.com/health
+[18:55:16] ✅ Server connectivity: OK

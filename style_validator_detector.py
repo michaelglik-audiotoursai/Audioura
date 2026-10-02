@@ -194,6 +194,9 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
       "Start biking southeast…" → start + biking + southeast → navigation
     The gerund must be a known transport-movement word; "Start looking south"
     does NOT exempt (looking is attention, not transport).
+
+    LOCAL-255: Also handles "Start your ride/journey/trip at X and pedal..."
+    where the transport mode is explicit as a noun after "your".
     """
     lower = sentence.lower().strip()
 
@@ -202,6 +205,13 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
         'cycling', 'biking', 'riding', 'driving', 'walking', 'hiking',
         'pedaling', 'pedalling', 'cruising', 'trotting', 'galloping',
         'strolling',
+    }
+
+    # Transport nouns after "your" that indicate navigation intent:
+    # "Start your ride at...", "Begin your journey from..."
+    _TRANSPORT_NOUNS = {
+        'ride', 'journey', 'trip', 'route', 'tour', 'trek', 'hike',
+        'walk', 'cycle', 'bike',
     }
 
     # Verbs too general-purpose to be confirmed by weak directional words
@@ -233,6 +243,22 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
                 second_word = words[1]
                 if second_word in _STYLE_NAV_DIRECTIONAL:
                     return True
+            # LOCAL-255: Possessive match: verb + "your" + transport noun → navigation
+            # e.g. "Start your ride at Cap d'Antibes and pedal east"
+            if first_word == 'your' and len(words) >= 2:
+                second_word = words[1]
+                if second_word in _TRANSPORT_NOUNS:
+                    # Confirm there's a transport verb later in the sentence
+                    # (pedal, cycle, ride, walk, etc.) OR a directional word
+                    rest_of_sentence = ' '.join(words[2:])
+                    has_transport_verb = bool(re.search(
+                        r'\b(?:pedal|cycle|bike|ride|walk|hike|drive|cruise)\b',
+                        rest_of_sentence
+                    ))
+                    has_directional = any(d in rest_of_sentence.split()
+                                         for d in _STRONG_DIRECTIONAL)
+                    if has_transport_verb or has_directional:
+                        return True
     return False
 
 
@@ -1070,9 +1096,179 @@ _R7_PATTERNS = [
     r'\b(?:the\s+)?(?:salty|gentle|soft|warm|cool|sweet|fresh)\s+(?:breeze|wind|air|scent|aroma|fragrance)\s+(?:carries|brings|fills|wafts)\b.*\b(?:ambiance|ambience|atmosphere|serenity|tranquility|tranquillity|calm|peace)\b',
     # Sound + abstract emotional causation: "the sound of X creates a [feeling]"
     r'\bthe\s+sound\s+of\s+.*\b(?:creates?|produces?|evokes?|offers?|provides?|conjures?)\s+(?:a\s+)?(?:soothing|calming|serene|peaceful|tranquil|harmonious|magical|enchanting)\s+(?:ambiance|ambience|atmosphere|backdrop|setting|mood)\b',
+    # LOCAL-251: "breathe in the [scent/aroma] of X" without absence marker —
+    # When the inhaled sensory combines MULTIPLE invented details (sea + pastries,
+    # lavender + baking) that the narrator cannot source, this is fabrication.
+    # Pattern: "breathe in" + scent/aroma + "mingling/mixed/combined" (multi-source indicator)
+    r'\bbreathe\s+in\s+.*\b(?:scent|smell|aroma|fragrance)\b.*\b(?:mingling|mixed|combined|blending|intertwined)\b',
+    # LOCAL-251: "The sound of X" + "provide/offer" + "backdrop/soundtrack/accompaniment"
+    # Fabricated ambient scene presented as stage-setting. The narrator
+    # invents a soundscape for atmosphere. Does NOT fire on factual statements
+    # about real audible things ("The sound of the fountain is audible from the square").
+    r'\b(?:the\s+)?sound\s+of\s+\w+.*\b(?:provide|offer|create|lend|give|add)\w*\s+(?:a\s+)?(?:sensory|sonic|auditory|natural|perfect|soothing|rhythmic|gentle|calming|constant)?\s*(?:backdrop|soundtrack|accompaniment|setting|tapestry)\b',
+    # LOCAL-251: "the gentle lapping of waves" + sensory descriptor
+    # Fabricated seaside ambiance — cannot be sourced from documents.
+    # Does NOT fire on "waves crash against the seawall" (bare factual observation).
+    r'\b(?:gentle|soft|rhythmic)\s+(?:lapping|lapping|crashing|splashing)\s+of\s+(?:waves|water)\b.*\b(?:provide|create|offer|lend|add|give)\b',
+    # LOCAL-256: "gentle/salty/fresh [WORD]* breeze/wind carries/brings the scent/smell"
+    # The round 12 pattern "gentle sea breeze carries the scent" has an intervening
+    # word between the sensory adjective and the carrier noun. Catches multi-sensory
+    # fabrication where the narrator invents a scent + sound + breeze scene.
+    # Requires BOTH a sensory carrier verb AND "mingling/sounds/waves" later in the
+    # sentence to confirm it's an invented multi-sensory ambiance, not a bare
+    # factual observation.
+    r'\b(?:salty|gentle|soft|warm|cool|sweet|fresh)\s+\w*\s*(?:breeze|wind|air)\s+(?:carries|brings|fills|wafts)\s+(?:the\s+)?(?:scent|smell|fragrance|aroma)\b.*\b(?:mingling|sounds?\s+of|waves?\s+lapping|seagulls?)\b',
+    # LOCAL-256: "the scent/smell/fragrance of X mingles/mixes/blends with the
+    # fragrance/scent/aroma of Y" — dual-sensory fabrication without "breathe in".
+    # The narrator invents TWO scent sources combined. Does NOT fire on a single
+    # factual scent ("The scent of lavender fills the garden" — one source, factual).
+    r'\b(?:the\s+)?(?:scent|smell|fragrance|aroma)\s+of\s+.+?\b(?:mingles?|mixes?|blends?|intertwines?|combines?)\s+with\s+(?:the\s+)?(?:scent|smell|fragrance|aroma)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-303 CATEGORY 1: Fabricated-sensory adjectives — fire regardless of
+    # what noun follows. These adjectives are NEVER sourced from documents in a
+    # narrated tour; they are atmospheric fillers the model invents.
+    #
+    # The adjective alone is the signal. "azure sky" is as fabricated as
+    # "azure waters". Unlike factual colors (red, white, blue), these are
+    # literary/poetic intensifiers that assert a visual experience.
+    #
+    # Guard: requires the adjective to modify a noun (followed by \w+ or
+    # end-of-clause). Does NOT fire on quoted speech or factual construction
+    # like "is painted azure" (predicate adjective describing a verifiable
+    # property — handled by exclusion below).
+    # ──────────────────────────────────────────────────────────────────────────
+    # azure/turquoise/cerulean/sapphire/crystal-clear/crystalline + any noun
+    r'\b(?:azure|turquoise|cerulean|sapphire|crystal-clear|crystalline)\s+\w+',
+    # shimmering/glistening/sparkling/glinting + any noun — fabricated visual
+    r'\b(?:shimmering|glistening|sparkling|glinting|glittering)\s+\w+',
+    # sun-kissed/sun-drenched/sun-soaked etc. — model default warm-climate filler
+    r'\bsun-(?:kissed|drenched|soaked|bathed|warmed|bleached)\b',
+    # verdant/lush as scene-dressing — fires when modifying a noun
+    # ("verdant gardens", "lush greenery") — never sourced from documents
+    r'\b(?:verdant|lush)\s+(?:garden|green|vegetation|foliage|landscape|hillside|valley|canopy|oasis|paradise|surroundings|tropical)',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-303 CATEGORY 2: Sensory-assertion shapes — structural patterns where
+    # the text presents a sensory experience as fact, regardless of vocabulary.
+    #
+    # The shape itself is the signal: "the [texture/scent/feel/fragrance] of X
+    # [verb] beneath/against/in your [body part/senses]", "a sensory delight",
+    # "offers a [adj] touch/feel of".
+    # ──────────────────────────────────────────────────────────────────────────
+    # "the [sensory-noun] of X ... beneath/against/under your [body-part]"
+    r'\b(?:the\s+)?(?:texture|warmth|coolness|roughness|smoothness|chill|heat)\s+of\s+.+?\b(?:beneath|against|under|between|across)\s+your\s+(?:finger|hand|palm|feet|skin|cheek|face|body)',
+    # "offers/provides a [adj] touch/feel/sensation of"
+    r'\b(?:offers?|provides?|gives?|delivers?)\s+(?:a\s+)?(?:\w+\s+)?(?:touch|feel|sensation|burst|wave|rush)\s+of\b',
+    # "a sensory delight/feast/experience/treat" — explicit sensory-claim marker
+    r'\ba\s+sensory\s+(?:delight|feast|experience|treat|journey|adventure|symphony|tapestry|overload)\b',
+    # "the fragrance/scent/aroma of X ... hangs/lingers/drifts/wafts in the air"
+    r'\b(?:the\s+)?(?:fragrance|scent|aroma|perfume|smell)\s+of\s+.+?\b(?:hangs?|lingers?|drifts?|wafts?|floats?|permeates?)\s+(?:in|through|on)\s+the\s+(?:air|breeze|atmosphere)',
+    # "invites [sensory verb]" — "invites exploration/contemplation" is fine,
+    # but we catch the atmospheric "set against the azure sky, invites" via
+    # category 1 above. This catches "invites you to touch/feel/smell/taste"
+    r'\binvites?\s+(?:you\s+to\s+)?(?:touch|feel|smell|taste|breathe|inhale|savor|savour)\b',
+    # "[noun] beneath/against/under your fingertips/palms/hands" — asserts touch
+    r'\b(?:beneath|against|under|between)\s+your\s+(?:fingertips?|palms?|hands?|fingers?|feet|toes|skin)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-286 (preserved): Compound patterns that remain useful for
+    # multi-sensory fabrication scenes.
+    # ──────────────────────────────────────────────────────────────────────────
+    # "rugged/craggy/jagged cliffs/terrain" + sensory context — fabricated dramatic landscape
+    # Only fires when combined with another sensory element in the same sentence
+    # to avoid false positives on factual geography descriptions.
+    r'\b(?:rugged|craggy|jagged|towering)\s+(?:cliffs?|rocks?|coastline|terrain)\b.*\b(?:waves?|breeze|wind|sea|scent|sound|crash|pine)',
+    # "salty/briny breeze/air" — standalone fabricated atmospheric marker.
+    # This is ALWAYS a fabrication in a narrated tour — it cannot be sourced
+    # from documents. Allows an intervening adjective (e.g. "salty sea breeze").
+    r'\b(?:salty|briny)\s+\w*\s*(?:breeze|air|wind)\b',
+    # "the sound of waves crashing" — fabricated soundscape unless reporting a real observation
+    # Fires when combined with another fabricated sensory element (scent, breeze, etc.)
+    r'\b(?:sound|crash(?:ing)?)\s+(?:of\s+)?waves?\b.*\b(?:salty|scent|breeze|pine|mingling|rugged)\b',
+    # "scent of X mingling with Y" (without requiring second "scent" keyword)
+    # Catches "scent of pine trees mingling with the sea air" which the earlier
+    # pattern missed because it requires "scent of Y" not just "the Y".
+    r'\b(?:scent|smell|fragrance|aroma)\s+of\s+\w+(?:\s+\w+)?\s+(?:mingling|blending|mixing|intertwining)\s+with\b',
+    # "gentle/soft lapping of waves" without requiring "provide/create" —
+    # the pattern already existed but required a specific causation verb.
+    # This standalone version fires whenever the model fabricates ambient sound.
+    r'\b(?:gentle|soft|rhythmic)\s+(?:lapping|crashing|splashing)\s+of\s+(?:waves?|water)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-303: Additional sensory-assertion shapes caught during verification
+    # ──────────────────────────────────────────────────────────────────────────
+    # "waves [adverb] lapping/crashing against" — word-order variant of the above
+    r'\bwaves?\s+\w*\s*(?:lapping|crashing|splashing)\s+(?:against|on|upon)\b.*\b(?:mingles?|hum|scent|distant|reminder)\b',
+    # "the air/breeze carries/holds/is filled with the [adj] scent/smell of" —
+    # fabricated atmospheric scene (narrator invents what the air smells like)
+    r'\b(?:the\s+)?(?:air|breeze|wind)\s+(?:carries|holds|is\s+filled\s+with|is\s+thick\s+with|is\s+heavy\s+with)\s+(?:the\s+)?(?:\w+\s+)?(?:scent|smell|fragrance|aroma)\b',
+    # "[noun] breeze/wind carries the [adj] scent" — variant where breeze is
+    # preceded by a non-listed adjective (e.g. "sea breeze carries the faint scent")
+    r'\b\w+\s+(?:breeze|wind|air)\s+carries\s+(?:the\s+)?(?:faint|lingering|subtle|fresh|sweet|salty)?\s*(?:scent|smell|fragrance|aroma)\b',
+    # "faint/lingering scent of X ... mingling/mixing" — catches intervening words
+    # between the scent descriptor and the mingling verb
+    r'\b(?:faint|lingering|subtle)\s+(?:scent|smell|fragrance|aroma)\s+of\b.*\b(?:mingling|mixing|blending|intertwining)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-317: Culinary/interior sensory register — asserted-experience shapes
+    # that fire on structural pattern, not on food-word lists.
+    #
+    # Rule: a sentence asserting a sensory experience the listener cannot be
+    # guaranteed to have, presented as fact, without a source. A kitchen smell
+    # is exactly that — we have no evidence the garlic is cooking today.
+    # "The scent of jasmine fills the courtyard" has the identical fault.
+    #
+    # These patterns do NOT fire on dish-naming facts ("The menu features socca")
+    # because naming a dish uses none of these assertion structures.
+    # ──────────────────────────────────────────────────────────────────────────
+    # SMELL ASSERTED AS PRESENT: "the aroma/scent/fragrance of X fills/weaves/
+    # wafts/hangs/drifts/permeates/envelops" — broadens the existing pattern by
+    # (a) adding fills/weaves/envelops/suffuses to the verb list and (b) not
+    # requiring "the air" after the verb — any location works.
+    # Handles both singular and plural (aromas/scents).
+    r'\b(?:the\s+)?(?:aroma|scent|fragrance|perfume|smell)s?\s+of\s+.+?\b(?:fills?|weaves?|wafts?|hangs?|lingers?|drifts?|floats?|permeates?|envelops?|suffuses?|spills?)\b',
+    # AMBIENT SOUND ASSERTED AS PRESENT: "the [adj] clinking/clatter/hum/buzz/
+    # murmur/chatter of X" — requires a sensory-atmospheric adjective to confirm
+    # the sentence is asserting an ambient experience, not a bare factual mention.
+    # Excludes "hum of visitors/tourists" which describes present factual activity.
+    r'\bthe\s+(?:gentle|soft|cheerful|rhythmic|faint|muffled|constant)\s+(?:clinking|clink|clatter|clang|clanging|rattle|rattling|hum|humming|buzz|buzzing|murmur|chatter|chattering|sizzle|sizzling|din|hubbub|cacophony)\s+of\s+(?!the\s+(?:bell|clock|hammer|chisel)\b)(?!visitors?\b|tourists?\b)',
+    # AMBIENT SOUND bare form: "the clinking/clatter of X" WITHOUT an adjective,
+    # but only when the same sentence contains another sensory marker (scent,
+    # aroma, hum, murmur, glow, candlelight). This catches paired sensory
+    # fabrications without over-firing on single factual sound mentions.
+    r'\bthe\s+(?:clinking|clink|clatter|clang|sizzle|sizzling)\s+of\s+\w+.*\b(?:aroma|scent|fragrance|smell|hum|murmur|buzz|chatter|glow|candlelight|warmth)\b',
+    # AMBIENT SOUND variant: "the [adj] hum/buzz/murmur of conversation/voices/
+    # diners" — with an intervening adjective
+    r'\bthe\s+(?:\w+\s+)?(?:hum|buzz|murmur|chatter|din)\s+of\s+(?:conversations?|voices?|diners?|patrons?|guests?|crowds?|people|laughter|life)\b',
+    # AMBIENT SOUND: "the sounds from the kitchen/market/street" — asserts
+    # a soundscape from a specific source location
+    r'\bthe\s+sounds?\s+(?:from|of)\s+the\s+(?:kitchen|market|street|café|restaurant|bakery|workshop|forge|courtyard)\b',
+    # AMBIENT WARMTH/GLOW: "the golden glow/warmth/light of its/the interior"
+    # Asserts an interior atmospheric experience the listener cannot verify.
+    r'\bthe\s+(?:golden|warm|soft|amber|gentle|inviting|cozy|cosy)\s+(?:glow|warmth|light|radiance)\s+of\s+(?:its|the|this)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
+
+# ── LOCAL-303: Artwork-description exclusion ─────────────────────────────────
+# Sentences describing what IS in a painting, sculpture, or artwork use sensory
+# adjectives factually (cerulean blue IS the color Matisse used; lush foliage IS
+# what the painting depicts). These must not fire R7.
+_R7_ARTWORK_EXCLUSION = re.compile(
+    r'\b(?:'
+    r'depicts?|depicted|depicting'
+    r'|render(?:s|ed|ing)'
+    r'|canvas|oil\s+on'
+    r'|palette|pigment'
+    r'|shades?\s+of'
+    r'|hues?\s+of'
+    r'|colors?\s+such\s+as|bold\s+colors?|vibrant\s+(?:shades?|colors?|hues?)'
+    r'|in\s+this\s+(?:piece|work|painting|composition)'
+    r'|this\s+(?:oil|painting|canvas|work|piece)'
+    r'|presents?\s+(?:a\s+)?(?:nude|figure|scene|landscape|portrait)'
+    r'|(?:use|usage)\s+of\s+(?:\w+\s+)?(?:color|colour|blue|red|yellow)'
+    r'|serves?\s+as\s+a\s+backdrop'
+    r'|symboliz(?:ed|es|ing)'
+    r"|clad\s+in"
+    r')\b',
+    re.IGNORECASE
+)
 
 
 def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
@@ -1084,12 +1280,25 @@ def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
     Does NOT fire on present-tense factual sensory descriptions without
     absence markers (e.g., "The market smells of lavender").
 
+    Does NOT fire on artwork descriptions where sensory adjectives describe
+    verifiable properties of a painting/sculpture (LOCAL-303).
+
     Severity: WARNING (not error) because regex cannot perfectly distinguish
     absent from present sensation in all cases.
     """
     findings = []
     stripped = sentence.strip()
     if not stripped:
+        return findings
+
+    # ── LOCAL-303: Artwork-description exclusion ─────────────────────────────
+    # When a sentence describes what IS depicted in a painting, sculpture, or
+    # artwork, sensory adjectives are factual (they describe the art object's
+    # actual visible properties). Skip these entirely.
+    # Markers: depicts, depicted, rendering, rendered, canvas, oil on, palette,
+    # shades of, colors such as, bold colors, this piece, in this work,
+    # presents a [figure/scene], use of [adj] color
+    if _R7_ARTWORK_EXCLUSION.search(stripped):
         return findings
 
     for pat in _R7_COMPILED:
@@ -1103,6 +1312,1783 @@ def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
             break  # One R7 finding per sentence
 
     return findings
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R1 REWRITE LOGIC (assembly-time) — LOCAL-255
+# ═══════════════════════════════════════════════════════════════════════════════
+# Michael (Round 2, twice 2/5): "provides instructions; I thought we should have
+# overcome that error by now." R1 fires at 36.2% of paragraphs corpus-wide.
+#
+# At this rate, DELETION would gut every tour. R1 needs a REWRITE path:
+# - The instruction becomes a statement; the content survives intact.
+# - Only pure instructions with no content ("Take a moment to absorb the
+#   atmosphere.") are deleted.
+#
+# Michael's endorsed transformation (Round 2, "Fixes / Pair 1"):
+#   BEFORE: "Position yourself at the entrance of Eze Village, a medieval gem..."
+#   AFTER:  "Eze Village is a medieval gem..."
+#   Verdict: "absolutely agree! After immeasurably better than before."
+#
+# Navigation is exempt (D107): "Start cycling south on the main road..." survives.
+#
+# Behind DISABLE_R1_REWRITE=1 env var — caller checks this.
+
+# ── Deterministic rewrite rules ─────────────────────────────────────────────
+# The common imperative shapes are few and regular. These handle the majority.
+# An LLM pass is permitted for the residue (ceiling $0.60 per task), but it may
+# only RESTATE the sentence — it must not add a fact. If a deterministic rule
+# and the model disagree, prefer the deterministic one.
+
+_R1_REWRITE_RULES = [
+    # "Position yourself at X, a Y" → "X is a Y"
+    # Handles "at the entrance of X", "at the edge of X", "at X" etc.
+    (re.compile(
+        r'^(?:Position yourself|Place yourself|Station yourself|Stand)\s+'
+        r'(?:at|near|by|beside|before|in front of)\s+'
+        r'(?:the\s+)?(?:(?:entrance|edge|top|foot|base|center|centre|heart|start|beginning|end)\s+(?:of|to)\s+)?'
+        r'(?:the\s+)?(.+?),\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"{m.group(1).strip().rstrip(',')} is {m.group(2).strip()}"
+    ),
+
+    # "As you arrive at X, take in / observe / admire the Y" → "From X, the Y..."
+    # or "At X, the Y..." or "From this vantage point, you can admire the Y..."
+    # LOCAL-271: Must not produce "you can admire yourself" when the verb's object
+    # is reflexive or a participle phrase ("find yourself amidst X").
+    (re.compile(
+        r'^As you (?:arrive|approach|reach|come)\s+'
+        r'(?:at|to|near)?\s*(.+?),\s*'
+        r'(?:take in|observe|admire|notice|see|behold|absorb|enjoy|appreciate|discover|find)\s+'
+        r'(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_as_you_arrive_handler'
+    ),
+
+    # "Take in / Admire / Observe the X [that VERB ...]" → supply a predicate
+    # LOCAL-256: The old rule just produced "The X" which is a fragment.
+    # Now: if the captured tail contains a relative clause ("that ..." / "which ..."),
+    # hoist the relative verb to main-clause position. Otherwise supply "is visible".
+    (re.compile(
+        r'^(?:Take in|Admire|Observe|Appreciate|Enjoy|Behold|Absorb|Notice|See)\s+'
+        r'(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_take_in_handler'  # LOCAL-256: delegate to handler that ensures a finite verb
+    ),
+
+    # "Look for the X" → supply a predicate to avoid fragments
+    # LOCAL-256: "Look for the Fondation Maeght, founded in 1964..." → must remain a sentence.
+    (re.compile(
+        r'^(?:Look for|Look at|Look upon|Seek out|Search for|Find)\s+'
+        r'(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_look_for_handler'  # LOCAL-256: delegate to handler that ensures a finite verb
+    ),
+
+    # "Take a moment to X" → delete if X is pure feeling; rewrite otherwise
+    # Pure feeling: "absorb the atmosphere", "enjoy the view", "reflect"
+    (re.compile(
+        r'^Take a moment to\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_take_a_moment_handler'  # Special handler below
+    ),
+
+    # "Let yourself X" / "Allow yourself to X" → remove or rewrite
+    (re.compile(
+        r'^(?:Let yourself|Allow yourself to|Let the)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_let_yourself_handler'
+    ),
+
+    # "Prepare to X" / "Get ready to X" → remove (pure instruction)
+    (re.compile(
+        r'^(?:Prepare to|Prepare yourself|Get ready to)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     None  # Always delete
+    ),
+
+    # "Find your way to X" / "Make your way to X" → navigation-like but not
+    # truly navigational unless followed by directional content
+    (re.compile(
+        r'^(?:Find your way|Make your way)\s+(?:to|towards|toward)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"{m.group(1).strip()}" if ',' in m.group(1) else None
+    ),
+
+    # Mid-sentence: "As you X, pause/take in/notice/observe/admire Y"
+    # → "From this vantage point, Y"
+    # LOCAL-271: Must not produce "you can admire yourself" — delegate to handler.
+    (re.compile(
+        r'^(?:As you|While you|When you)\s+.+?,\s*'
+        r'(?:pause to |stop to )?'
+        r'(?:take in|observe|admire|notice|absorb|appreciate|enjoy|discover|look at|look for)\s+'
+        r'(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_as_you_mid_handler'
+    ),
+
+    # "Imagine X" → "X ..." (just state it)
+    (re.compile(
+        r'^(?:Imagine|Picture|Envision|Visualize|Visualise)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: m.group(1).strip() if len(m.group(1).strip()) > 20 else None
+    ),
+
+    # "Consider X" → "X ..." (just state it) — only if it has content
+    (re.compile(
+        r'^Consider\s+(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"The {m.group(1).strip()}" if len(m.group(1).strip()) > 20
+     else None
+    ),
+
+    # "Immerse yourself in X" → "X surrounds you" / just state X
+    (re.compile(
+        r'^(?:Immerse yourself|Lose yourself|Plunge yourself)\s+'
+        r'(?:in|into)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: m.group(1).strip() if len(m.group(1).strip()) > 20 else None
+    ),
+
+    # "Listen to/for X" → "The sound of X..." / "X can be heard"
+    (re.compile(
+        r'^Listen\s+(?:to|for)\s+(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"The sound of {m.group(1).strip()}" if 'sound' not in m.group(1).lower()
+     else f"The {m.group(1).strip()}"
+    ),
+
+    # "Keep in mind X" / "Bear in mind X" → "X ..."
+    (re.compile(
+        r'^(?:Keep in mind|Bear in mind|Remember)\s+(?:that\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: m.group(1).strip()
+    ),
+]
+
+# ── Pure-instruction patterns (deletion, not rewrite) ────────────────────────
+# These sentences contain NO factual content. They only instruct or prescribe.
+_R1_PURE_INSTRUCTION_PATTERNS = [
+    re.compile(r'^Take a moment to (?:absorb|soak in|enjoy|savor|savour|relish|appreciate|reflect on|breathe in|feel|embrace)\s+(?:the )?(?:atmosphere|ambiance|ambience|view|scenery|beauty|moment|surroundings|experience|serenity|tranquility|magic|charm|energy|vibe|spirit)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Enjoy|Savor|Savour|Relish|Embrace|Absorb|Soak in)\s+(?:the )?(?:view|scenery|atmosphere|moment|beauty|experience|surroundings|sights?|sounds?)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Pause|Stop|Wait)\s+(?:here\s+)?(?:to\s+)?(?:for a moment|and\s+)?(?:absorb|enjoy|take in|appreciate|soak in|reflect)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Take|Spare|Give yourself) a (?:moment|minute|second|breath)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Breathe|Inhale|Exhale)\s+(?:in|out|deeply)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Let|Allow)\s+(?:yourself|the\s+(?:atmosphere|moment|view|scenery))\s+(?:sink in|wash over you|envelop you|surround you)\s*\.?$', re.IGNORECASE),
+]
+
+# ── Feeling/experience terms that signal a "take a moment" is contentless ────
+_FEELING_TERMS = re.compile(
+    r'\b(?:absorb|soak\s+in|enjoy|savor|savour|relish|appreciate|embrace|'
+    r'reflect\s+on|breathe\s+in|feel|experience|immerse|lose\s+yourself)\b'
+    r'.*\b(?:atmosphere|ambiance|ambience|view|scenery|beauty|moment|'
+    r'surroundings|serenity|tranquility|magic|charm|energy|spirit|vibe)\b',
+    re.IGNORECASE
+)
+
+
+def _as_you_arrive_handler(m):
+    """Handle 'As you arrive at X, admire/take in Y' — LOCAL-271 reflexive fix.
+
+    The old lambda blindly produced "you can admire {tail}" which becomes nonsense
+    when tail starts with "yourself" (e.g. "find yourself amidst the lush greenery").
+
+    Strategy:
+    - If tail starts with "yourself" or a gerund phrase, state the scene declaratively.
+    - Otherwise use "From X, the Y stretches out..." or "From X, you can see the Y."
+    """
+    location = m.group(1).strip().rstrip(',')
+    tail = m.group(2).strip()
+
+    # LOCAL-271 fix: detect reflexive / gerund-led tail
+    if re.match(r'^yourself\b', tail, re.IGNORECASE):
+        # "find yourself amidst the lush greenery" → "The lush greenery of X..."
+        # Strip "yourself amidst/surrounded by/standing at" etc.
+        inner = re.sub(
+            r'^yourself\s+(?:amidst|surrounded by|standing (?:at|on|in)|immersed in|lost in|'
+            r'amongst|in the midst of|in|at|on)\s+',
+            '', tail, flags=re.IGNORECASE
+        )
+        if inner and inner != tail:
+            # LOCAL-274: The result will appear after "From X, " so it must
+            # start lowercase (unless it's a proper noun).  We lowercase the
+            # first character to avoid "From X, The lush greenery..." which
+            # the well-formedness check rightly rejects.
+            inner_clean = inner.rstrip('.')
+            # Ensure it starts with "the/a/an" lowercased for mid-sentence use
+            if re.match(r'^(?:The|A|An)\b', inner_clean):
+                inner_clean = inner_clean[0].lower() + inner_clean[1:]
+            elif inner_clean[0].isupper() and not re.match(r'^[A-Z][a-z]+\s+[A-Z]', inner_clean):
+                # Not a proper noun — lowercase it
+                inner_clean = inner_clean[0].lower() + inner_clean[1:]
+            return f"From {location}, {inner_clean} is visible."
+        else:
+            # Can't parse — fall back to simple declarative
+            return f"From {location}, the surrounding landscape is visible."
+
+    # Normal case: safe to say "From X, the Y..."
+    # But check for doubled "stretches out before you" risk
+    return f"From {location}, you can admire {tail}"
+
+
+def _as_you_mid_handler(m):
+    """Handle 'As you X, admire/take in Y' (mid-sentence) — LOCAL-271 reflexive fix.
+
+    Same problem: "you can admire yourself standing at the tip" is nonsense.
+    """
+    tail = m.group(1).strip()
+
+    # LOCAL-271: detect reflexive-led tail
+    if re.match(r'^yourself\b', tail, re.IGNORECASE):
+        inner = re.sub(
+            r'^yourself\s+(?:amidst|surrounded by|standing (?:at|on|in)|immersed in|lost in|'
+            r'amongst|in the midst of|in|at|on)\s+',
+            '', tail, flags=re.IGNORECASE
+        )
+        if inner and inner != tail:
+            if inner[0].islower() and not re.match(r'^(?:the|a|an|this|that)\b', inner, re.IGNORECASE):
+                inner = f"The {inner}"
+            elif inner[0].islower():
+                inner = inner[0].upper() + inner[1:]
+            inner_clean = inner.rstrip('.')
+            return f"{inner_clean} is visible from this vantage point."
+        else:
+            return None  # Can't salvage — delete
+
+    return f"From this vantage point, you can admire {tail}"
+
+
+# ─── LOCAL-371 helpers ────────────────────────────────────────────────────────
+
+# Words that indicate the subject is a vista/landscape/view — appropriate for
+# "stretches out before you".
+_VISTA_SUBJECT_WORDS = re.compile(
+    r'\b(?:view|views|vista|vistas|panorama|panoramas|landscape|landscapes|'
+    r'coastline|coastlines|horizon|horizons|scenery|seascape|seascapes|'
+    r'skyline|skylines|bay|ocean|sea|waters|valley|valleys|hillside|hillsides|'
+    r'mountain|mountains|plain|plains|expanse|terrain|shore|shoreline|'
+    r'cliff|cliffs|meadow|meadows|field|fields|waterfront|riverbank|'
+    r'countryside|rolling\s+hills|azure\s+waters|turquoise\s+waters|'
+    r'Mediterranean|stretch(?:es)?\s+of\s+(?:sand|beach|coast))\b',
+    re.IGNORECASE
+)
+
+
+def _tail_is_vista_subject(tail: str) -> bool:
+    """Return True if the subject noun phrase refers to a vista/landscape/view.
+
+    Used by _take_in_handler Case 3 to decide whether "stretches out before you"
+    is an appropriate predicate. Returns False for objects, artifacts, instruments,
+    artworks, etc.
+    """
+    # Check the head of the noun phrase (first ~8 words, before any prepositional
+    # phrase). This avoids matching "the guitar of the Mediterranean coast" as a vista.
+    head = tail.split(',')[0]  # Strip trailing participial modifiers
+    # Take only the head noun phrase (before "of/with/for/in" PPs)
+    head_match = re.match(r'^(?:The|A|An|This|That)?\s*(.+?)(?:\s+(?:of|with|for|in|from|at|on|by)\s+|$)', head, re.IGNORECASE)
+    head_words = head_match.group(1) if head_match else head[:60]
+    return bool(_VISTA_SUBJECT_WORDS.search(head_words))
+
+
+def _take_in_tail_is_unrepairable(tail: str) -> bool:
+    """Return True if the tail is already broken and cannot be repaired by
+    appending a predicate.
+
+    LOCAL-371: Detects two patterns:
+    1. Comma-led participial pile: "X, marking/noting/making/representing..."
+       This signals the tail was already mangled before it reached Case 3.
+    2. Missing clean head noun: the tail lacks a determiner + noun structure
+       and instead starts with a bare prepositional phrase or adverbial.
+
+    When True, _take_in_handler returns None (deletion) so the sentence becomes
+    visible to the deletion pass rather than shipping as confident nonsense.
+    """
+    # Pattern 1: Comma followed by a present participle (participial pile).
+    # "this guitar for its influence, marking a crucial moment" — the comma +
+    # participle signals that this is not a clean noun phrase; it's a fragment
+    # with a dangling modifier.
+    if re.search(
+        r',\s*(?:marking|noting|making|representing|signifying|highlighting|'
+        r'demonstrating|illustrating|showcasing|suggesting|indicating|'
+        r'reflecting|revealing|symbolizing|embodying|capturing|evoking|'
+        r'creating|offering|providing|serving|forming|constituting|'
+        r'establishing|defining|transforming|shaping)\b',
+        tail, re.IGNORECASE
+    ):
+        return True
+
+    # Pattern 2: "X for its/their Y" without a clean subject — signals a mangled
+    # purpose clause left over from a rewrite, not a self-standing NP.
+    # "this guitar for its influence on future string instruments" is not a
+    # sentence-ready noun phrase.
+    if re.search(r'\bfor\s+(?:its|their|his|her)\s+\w+', tail, re.IGNORECASE):
+        # But allow "the garden for its rare orchids" if it starts with a clean head
+        # Only reject if there's no obvious subject-predicate boundary
+        head = tail.split(' for ')[0].strip()
+        # If the head before "for" is short and has no verb, this is a dangling purpose clause
+        words_in_head = head.split()
+        if len(words_in_head) <= 5:
+            return True
+
+    # Pattern 2b: "X with an understanding/appreciation/sense of Y" — a mangled
+    # abstract clause that cannot be a physical object's attribute.
+    # "this remarkable piece with an understanding of its historical context"
+    if re.search(
+        r'\bwith\s+(?:an?\s+)?(?:understanding|appreciation|sense|knowledge|'
+        r'awareness|recognition|grasp|notion|feeling)\s+of\b',
+        tail, re.IGNORECASE
+    ):
+        return True
+
+    # Pattern 3: Lacks any determiner at all and doesn't start with a proper noun.
+    # A repairable NP starts with the/a/an/this/that or a capitalized proper noun.
+    if not re.match(r'^(?:the|a|an|this|that|these|those)\b', tail, re.IGNORECASE):
+        # Check if it's a proper noun (capitalized word that isn't a common adjective)
+        first_word = tail.split()[0] if tail.split() else ''
+        if not (first_word and first_word[0].isupper() and first_word.lower() not in {
+            'beautiful', 'stunning', 'magnificent', 'breathtaking', 'remarkable',
+            'impressive', 'elegant', 'exquisite', 'intricate', 'ornate', 'ancient',
+            'historic', 'famous', 'notable', 'grand', 'majestic', 'unique'
+        }):
+            return True
+
+    return False
+
+
+def _take_in_handler(m):
+    """Handle 'Take in / Admire / Observe the X' — LOCAL-256 fragment fix.
+
+    The old rule just produced "The X" which is a bare noun phrase (fragment).
+    Now: detect whether the captured tail already contains a finite verb
+    (via relative clause "that stretches" or "which stands"). If so, promote
+    it to the main verb. Otherwise supply "stretches out before you" or
+    "is visible before you" depending on context.
+    """
+    tail = m.group(1).strip()
+    if not tail:
+        return None
+
+    # Case 1: tail contains "that VERB" relative clause → hoist verb to main
+    # "panoramic view that stretches out before you, with ..."
+    # → "The panoramic view stretches out before you, with ..."
+    rel_match = re.match(
+        r'^(.+?)\s+that\s+((?:stretch|extend|spread|open|unfold|sweep|reach|rise|tower|stand|lie|sit|overlook|face)\w*\s+.+)$',
+        tail, re.IGNORECASE | re.DOTALL
+    )
+    if rel_match:
+        subject = rel_match.group(1).strip().rstrip(',')
+        predicate = rel_match.group(2).strip()
+        # Ensure subject has "The" prefix — don't capitalize internal words
+        if not re.match(r'^(?:the|a|an|this|that)\b', subject, re.IGNORECASE):
+            subject = f"The {subject}"
+        elif subject[0].islower():
+            subject = subject[0].upper() + subject[1:]
+        return f"{subject} {predicate}"
+
+    # Case 2: tail contains "which VERB" → same treatment
+    rel_match2 = re.match(
+        r'^(.+?),?\s+which\s+((?:stretch|extend|spread|open|unfold|sweep|reach|rise|tower|stand|lie|sit|overlook|face)\w*\s+.+)$',
+        tail, re.IGNORECASE | re.DOTALL
+    )
+    if rel_match2:
+        subject = rel_match2.group(1).strip().rstrip(',')
+        predicate = rel_match2.group(2).strip()
+        if subject and subject[0].islower():
+            subject = subject[0].upper() + subject[1:]
+        if not re.match(r'^(?:the|a|an|this|that)\b', subject, re.IGNORECASE):
+            subject = f"The {subject}"
+        return f"{subject} {predicate}"
+
+    # Case 3: no relative clause — supply a predicate
+    # "the breathtaking views of the azure waters" → "The breathtaking views of the azure waters stretch out before you."
+    # LOCAL-271: AVOID doubling if the tail already contains "stretching/stretches out before you"
+    # LOCAL-274: Don't capitalize interior words — "vibrant" stays lowercase after "The"
+
+    # LOCAL-371: REFUSE if tail is already broken (comma-led participial pile,
+    # or missing a clean head noun). Appending a predicate to damaged input
+    # produces a confidently broken sentence rather than a detectably broken one.
+    # A repair that cannot decline to fire is not a repair.
+    if _take_in_tail_is_unrepairable(tail):
+        import logging
+        logging.getLogger(__name__).warning(
+            "LOCAL-371: _take_in_handler Case 3 declining unrepairable tail: %r", tail
+        )
+        return None  # Signal deletion — let the empty-sentence pass handle shortfall
+
+    if not re.match(r'^(?:the|a|an|this|that)\b', tail, re.IGNORECASE):
+        # No determiner — prepend "The" (tail stays as-is, lowercase is correct)
+        tail = f"The {tail}"
+    elif tail and tail[0].islower():
+        # Has determiner but lowercase — capitalize the first letter for sentence start
+        tail = tail[0].upper() + tail[1:]
+    # Rstrip period so we can add our predicate
+    tail_clean = tail.rstrip('.')
+    # LOCAL-271: Check if tail already contains a "stretch/extend/spread out before you" phrase
+    if re.search(r'\b(?:stretch|extend|spread|unfold|sweep|reach)(?:es|ing)?\s+out\s+before\s+you\b', tail_clean, re.IGNORECASE):
+        # Already has the phrase — just make it the main verb
+        # "The panoramic views of the Mediterranean Sea stretching out before you, while..."
+        # → convert participle to finite: "stretching" → "stretch"
+        tail_fixed = re.sub(
+            r'\b(stretch|extend|spread|unfold|sweep|reach)ing\s+out\s+before\s+you\b',
+            r'\1 out before you',
+            tail_clean, flags=re.IGNORECASE
+        )
+        # Ensure subject-verb agreement (singular subject → "stretches")
+        # Heuristic: if subject looks singular, use -es form
+        tail_fixed = re.sub(
+            r'\b(stretch|extend|spread|unfold|sweep|reach)\s+out\s+before\s+you\b',
+            lambda sv: sv.group(1) + ('es' if not re.match(r'^(?:The\s+)?.*s\b', tail_fixed.split(',')[0]) else '') + ' out before you',
+            tail_fixed, count=1, flags=re.IGNORECASE
+        )
+        return f"{tail_fixed}."
+
+    # LOCAL-371: Choose predicate based on subject type.
+    # "stretches out before you" is only appropriate for vistas/landscapes/views.
+    # For objects/artifacts, use "is displayed here". If uncertain, decline.
+    if _tail_is_vista_subject(tail_clean):
+        return f"{tail_clean} stretches out before you."
+    else:
+        # Object/artifact — "is displayed here" is universally appropriate
+        # for museum items (instruments, books, busts, sculptures, etc.)
+        return f"{tail_clean} is displayed here."
+
+
+def _look_for_handler(m):
+    """Handle 'Look for / Search for the X' — LOCAL-256 fragment fix.
+
+    The old rule just produced "The X" which has no verb. Now: detect whether
+    the tail contains a participle that can be hoisted ("X, founded in Y")
+    or supply a copula ("X was founded in Y" / "X stands here").
+    """
+    tail = m.group(1).strip()
+    if not tail:
+        return None
+
+    # Case 1: "X, PARTICIPLE ..." (past participle as reduced relative)
+    # "Fondation Maeght, founded in 1964 by Marguerite and Aimé Maeght."
+    # → "The Fondation Maeght was founded in 1964 by Marguerite and Aimé Maeght."
+    participle_match = re.match(
+        r'^(.+?),\s+(founded|built|created|established|constructed|designed|'
+        r'opened|completed|erected|dedicated|commissioned|painted|sculpted|'
+        r'carved|written|composed|named|known|located|situated|dating|placed)\b(.*)$',
+        tail, re.IGNORECASE | re.DOTALL
+    )
+    if participle_match:
+        subject = participle_match.group(1).strip()
+        participle = participle_match.group(2)
+        rest = participle_match.group(3).strip()
+        # Ensure "The" prefix
+        if not re.match(r'^(?:the|a|an)\b', subject, re.IGNORECASE):
+            subject = f"The {subject}"
+        # Choose auxiliary: "dating" gets "is", others get "was"
+        aux = "is" if participle.lower() in ('dating', 'known', 'located', 'situated') else "was"
+        result = f"{subject} {aux} {participle}{' ' + rest if rest else ''}"
+        # Ensure ends with period
+        if not result.rstrip().endswith('.'):
+            result = result.rstrip() + '.'
+        return result
+
+    # Case 2: tail has no participle — supply "stands here" / "can be found here"
+    # LOCAL-274: Don't capitalize the first letter of tail if we're going to
+    # prepend "The" — that creates "The Winding path" (wrong mid-sentence cap).
+    if not re.match(r'^(?:the|a|an)\b', tail, re.IGNORECASE):
+        tail = f"The {tail}"
+    elif tail and tail[0].islower():
+        # Already has "the/a/an" — just capitalize the first letter for sentence start
+        tail = tail[0].upper() + tail[1:]
+    tail_clean = tail.rstrip('.')
+    return f"{tail_clean} can be found here."
+
+
+def _take_a_moment_handler(m):
+    """Handle 'Take a moment to X' — delete if pure feeling, rewrite otherwise."""
+    rest = m.group(1).strip()
+    # If the rest is purely about feeling/absorbing with no factual content, delete
+    if _FEELING_TERMS.search(rest):
+        return None  # Signal deletion
+    # Otherwise, the sentence has some content — rewrite as statement
+    # "Take a moment to admire the Fondation Maeght, founded in 1964..."
+    # → "The Fondation Maeght was founded in 1964..."
+    # Strip the imperative prefix verb
+    content_match = re.match(
+        r'(?:admire|observe|notice|examine|study|inspect|appreciate|explore|discover|look at)\s+(.+)',
+        rest, re.IGNORECASE | re.DOTALL
+    )
+    if content_match:
+        extracted = content_match.group(1).strip()
+        # LOCAL-256: Check for participle pattern (same as _look_for_handler)
+        # "the Fondation Maeght, founded in 1964 by ..." → supply copula
+        participle_match = re.match(
+            r'^(?:the\s+)?(.+?),\s+(founded|built|created|established|constructed|designed|'
+            r'opened|completed|erected|dedicated|commissioned|painted|sculpted|'
+            r'carved|written|composed|named|known|located|situated|dating|placed)\b(.*)$',
+            extracted, re.IGNORECASE | re.DOTALL
+        )
+        if participle_match:
+            subject = participle_match.group(1).strip()
+            participle = participle_match.group(2)
+            p_rest = participle_match.group(3).strip()
+            if not re.match(r'^(?:the|a|an)\b', subject, re.IGNORECASE):
+                subject = f"The {subject}"
+            aux = "is" if participle.lower() in ('dating', 'known', 'located', 'situated') else "was"
+            result = f"{subject} {aux} {participle}{' ' + p_rest if p_rest else ''}"
+            if not result.rstrip().endswith('.'):
+                result = result.rstrip() + '.'
+            return result
+        # No participle — add "The" prefix if needed
+        if extracted and extracted[0].islower():
+            # Add "The" if it doesn't already start with a determiner
+            if not re.match(r'^(?:the|a|an|this|that|these|those)\b', extracted, re.IGNORECASE):
+                return f"The {extracted}"
+        return extracted
+    # Fallback: just state it directly
+    return rest
+
+
+def _let_yourself_handler(m):
+    """Handle 'Let yourself X' — delete if pure feeling."""
+    rest = m.group(1).strip()
+    if _FEELING_TERMS.search(rest):
+        return None
+    # "Let yourself be transported by the story of X" → "The story of X..."
+    content_match = re.match(
+        r'(?:be\s+(?:transported|carried|moved|inspired|guided)\s+by\s+)(.+)',
+        rest, re.IGNORECASE | re.DOTALL
+    )
+    if content_match:
+        return content_match.group(1).strip()
+    return None  # Can't rewrite safely — delete
+
+
+def _is_pure_instruction(sentence: str) -> bool:
+    """Check if a sentence is a pure instruction with no factual content."""
+    stripped = sentence.strip().rstrip('.')
+    for pattern in _R1_PURE_INSTRUCTION_PATTERNS:
+        if pattern.match(stripped):
+            return True
+    # Additional heuristic: very short imperative with no proper nouns, dates, or numbers
+    if len(stripped.split()) <= 8:
+        has_content = bool(re.search(r'\d{3,4}|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+', stripped))
+        if not has_content and not re.search(r'(?:founded|built|created|established|opened|dating|century)', stripped, re.IGNORECASE):
+            return True
+    return False
+
+
+# ── LOCAL-256/257: Finite-verb checker ────────────────────────────────────────
+# A sentence without a finite main verb is a fragment. Every R1 rewrite must
+# pass this check; if it fails, the original sentence is kept (an imperative
+# is better than a fragment).
+#
+# Heuristic: A sentence has a finite verb if it contains a word that is
+# (a) a common English finite form (is, was, are, were, has, had, stands, etc.)
+# OR (b) a verb-like word (ends -s, -ed, -es) that is NOT inside a relative
+# clause modifier ("that stretches") — wait, relative clause verbs ARE finite,
+# but they don't make the main clause complete. The key insight:
+#
+# "The X that stretches before you" → "stretches" is finite but it's in the
+# relative clause, not the main clause. The main clause is "The X" — no verb.
+#
+# Strategy: strip relative clauses (that/which + ...) and participial phrases
+# (, founded in ..., , perched high ...) then check if ANYTHING remains that
+# looks like a finite verb.
+#
+# LOCAL-257: MASK QUOTED SPANS before any verb search. A verb inside a book
+# title, artwork name, or other quoted text is part of a noun phrase, not the
+# sentence's predicate. E.g. "Tender is the Night" — "is" here does not make
+# the sentence containing it a complete clause.
+
+# Regex to match quoted spans: "…", '…', «…», *…* (emphasis/italic markers)
+_QUOTED_SPAN = re.compile(
+    '\u201c[^\u201d]*\u201d'    # "curly" double quotes (U+201C…U+201D)
+    '|"[^"]*"'                   # straight double quotes
+    '|\u2018[^\u2019]*\u2019'    # 'curly' single quotes (U+2018…U+2019)
+    r"|(?<!\w)'[^']*'(?!\w)"     # straight single quotes (not contractions)
+    '|\xab[^\xbb]*\xbb'         # «guillemets» (U+00AB…U+00BB)
+    r'|\*[^*]+\*'               # *emphasis*
+    r'|_[^_]+_'                  # _italic_
+    , re.UNICODE
+)
+
+_FINITE_VERB_FORMS = re.compile(
+    r'\b(?:is|are|was|were|has|have|had|does|do|did|can|could|will|would|'
+    r'shall|should|may|might|must|stands|stretches|extends|spreads|opens|'
+    r'unfolds|sweeps|reaches|rises|towers|lies|sits|overlooks|faces|'
+    r'remains|holds|carries|contains|features|offers|provides|marks|'
+    r'dates|runs|winds|leads|connects|separates|dominates|reveals|'
+    r'houses|displays|showcases|preserves|reflects|represents|serves|'
+    r'forms|includes|combines|embodies|captures|draws|creates|transforms|'
+    r'attracts|hosts|produces|joins|crowns|graces|defines|illustrates|'
+    # LOCAL-257: additional verbs found in generation output
+    r'held|drew|found|built|wrote|lived|came|became|began|grew|went|'
+    r'took|made|saw|gave|knew|fell|brought|kept|left|stood|'
+    r'lay|sat|ran|won|met|paid|told|sent|led|'
+    r'shimmers?|glimmers?|gleams?|glows?|sparkles?|'
+    r'beckons?|buzzes?|echoes?|whispers?|resonates?|'
+    r'flourished|thrived|emerged|evolved|survived|endured|'
+    r'witnessed|experienced|underwent|bore|borne)\b',
+    re.IGNORECASE
+)
+
+# Patterns for subordinate/relative clauses and participial phrases
+_RELATIVE_CLAUSE = re.compile(r'\bthat\s+\w+|\bwhich\s+\w+', re.IGNORECASE)
+_PARTICIPIAL_PHRASE = re.compile(
+    r',\s*(?:founded|built|created|established|constructed|designed|opened|'
+    r'completed|erected|dedicated|commissioned|painted|sculpted|carved|'
+    r'written|composed|named|known|located|situated|dating|placed|'
+    r'perched|nestled|surrounded|overlooking|facing|rising|towering|'
+    r'stretching|extending|winding)\b[^,]*', re.IGNORECASE
+)
+
+
+def _has_finite_main_verb(sentence: str) -> bool:
+    """Check if a sentence has a finite verb in the main clause.
+
+    LOCAL-256: Used to reject rewrites that produce fragments.
+    LOCAL-257: Masks quoted spans before checking. A verb inside a title
+    (e.g. "Tender is the Night") does not make the sentence complete.
+
+    Returns True if the sentence appears to have a complete main clause.
+
+    Design: conservative — returns True (allow) in ambiguous cases. The
+    purpose is to catch the SPECIFIC fragment patterns our R1 rewrite rules
+    can produce:
+      "The X, founded in Y." (noun + participial — no main verb)
+      "The X that stretches..." (noun + relative clause — no main verb)
+    Anything that doesn't match these fragment shapes passes.
+    """
+    stripped = sentence.strip().rstrip('.')
+    if not stripped:
+        return False
+
+    # LOCAL-257: Strip field-label prefixes that precede actual content
+    # "Orientation: Start cycling..." → check "Start cycling..."
+    _label_match = re.match(r'^(?:Orientation|Directions|Description|Address|Type/Specialty|Specific Examples|Coordinates|Tour-Category):\s*', stripped)
+    if _label_match:
+        stripped = stripped[_label_match.end():]
+        if not stripped:
+            return False
+
+    # LOCAL-257: Imperative sentences ARE grammatically complete — the verb
+    # is finite in imperative mood. "Start cycling south..." is a sentence.
+    # Check before masking quotes since the imperative verb is at the start.
+    _first_word = stripped.split()[0].lower() if stripped.split() else ''
+    if _first_word in ('start', 'head', 'turn', 'follow', 'continue', 'cross',
+                       'walk', 'cycle', 'ride', 'pedal', 'take', 'go', 'proceed',
+                       'look', 'find', 'explore', 'discover', 'enter', 'exit',
+                       'pass', 'climb', 'descend', 'stop', 'notice', 'observe',
+                       'admire', 'enjoy', 'imagine', 'picture', 'consider',
+                       'remember', 'note', 'keep', 'bear', 'let', 'make',
+                       'prepare', 'position', 'place', 'stand', 'listen',
+                       'park', 'hey', 'once'):
+        return True
+
+    # LOCAL-257: "Once/When/As you [verb]..." has a finite verb in the subordinate
+    if re.match(r'^(?:Once|When|As|After|Before)\s+you\s+\w+', stripped, re.IGNORECASE):
+        return True
+
+    # LOCAL-257: Mask quoted spans — verbs inside titles/quotes are not predicates
+    stripped = _QUOTED_SPAN.sub(' QUOTED ', stripped)
+
+    # Strip relative clauses and participial phrases to isolate main clause
+    main_clause = _RELATIVE_CLAUSE.sub('', stripped)
+    main_clause = _PARTICIPIAL_PHRASE.sub('', main_clause)
+    main_clause = main_clause.strip().rstrip(',').strip()
+
+    # If after stripping, nothing substantial remains (just a noun phrase),
+    # it's a fragment. "The Fondation Maeght" after stripping ", founded in..."
+    # But "The Fondation Maeght was founded in 1964" → "The Fondation Maeght was founded in 1964" (not stripped)
+
+    # Check for finite verb forms in what remains
+    if _FINITE_VERB_FORMS.search(main_clause):
+        return True
+
+    # "you can" pattern (modal + infinitive)
+    if re.search(r'\byou\s+can\b', main_clause, re.IGNORECASE):
+        return True
+
+    # "From X, ..." patterns with a verb after the comma
+    from_match = re.match(r'^From\s+.+?,\s*(.+)$', main_clause, re.IGNORECASE)
+    if from_match:
+        rest = from_match.group(1)
+        if _FINITE_VERB_FORMS.search(rest) or re.search(r'\byou\s+can\b', rest, re.IGNORECASE):
+            return True
+
+    # Heuristic: any word ending in -ed/-es/-s after an article/determiner
+    # Catches "the village buzzed", "the foundation embodies", "beckons with"
+    if re.search(r'\b[a-z]+(?:ed|es|ons|ens)\b', main_clause):
+        return True
+
+    # Check for verbs ending in -s (3rd person present): "beckons", "holds"
+    # But exclude words that are commonly nouns ending in -s: "views", "streets", "walls"
+    # LOCAL-257: Also exclude possessives and adjectives ending in -ous/-ious/-us
+    _COMMON_NOUN_S = {'views', 'streets', 'walls', 'trees', 'arts', 'works',
+                      'examples', 'gardens', 'galleries', 'paths', 'stones',
+                      'waters', 'waves', 'sounds', 'scents', 'facts', 'years',
+                      'words', 'names', 'steps', 'stops', 'tours', 'times',
+                      'heights', 'lights', 'nights', 'sights', 'rights',
+                      'twenties', 'forties', 'sixties', 'things', 'buildings',
+                      'paintings', 'carvings', 'surroundings', 'proceedings',
+                      'artists', 'inhabitants', 'visitors', 'residents',
+                      'mountains', 'islands', 'ruins', 'remains', 'hills',
+                      'cliffs', 'fields', 'banks', 'shores', 'woods', 'plains',
+                      'this', 'thus', 'plus', 'minus', 'versus', 'atlas'}
+    # Adjectives/adverbs ending in -s that are NOT verbs
+    _ADJ_S_SUFFIXES = ('ous', 'ious', 'eous', 'uous', 'ous', 'less', 'ness')
+    words = main_clause.split()
+    for w in words:
+        wl = w.lower().rstrip('.,;:!?')
+        # LOCAL-257: Skip possessives — "Fitzgerald's" is not a verb
+        if "'s" in wl or "\u2019s" in wl:
+            continue
+        # Skip adjectives ending in -ous, -less, etc.
+        if any(wl.endswith(suf) for suf in _ADJ_S_SUFFIXES):
+            continue
+        if wl.endswith('s') and len(wl) > 3 and wl not in _COMMON_NOUN_S:
+            # Check if preceded by a noun phrase (likely verb position)
+            idx = main_clause.lower().find(wl)
+            if idx > 0:
+                before = main_clause[:idx].strip()
+                # If what's before looks like a subject (ends with a capitalized word or pronoun)
+                if before and (before[-1] not in '.,;:' and
+                    (re.search(r'[A-Z][a-z]+$', before) or
+                     re.search(r'\b(?:it|he|she|they|we|one|this|that|which)\s*$', before, re.IGNORECASE))):
+                    return True
+
+    # "In YEAR/decade" pattern — virtually always has a verb
+    if re.search(r'^In\s+(?:the\s+)?\d{3,4}s?\b', main_clause):
+        return True
+
+    # If the main clause is very short (< 5 words) after stripping, likely a fragment
+    words_remaining = [w for w in main_clause.split() if len(w) > 2]
+    if len(words_remaining) <= 4:
+        return False
+
+    # LOCAL-257: Instead of blindly passing long sentences, check for verb
+    # indicators more broadly. A long noun-phrase fragment like
+    # "Scott Fitzgerald's QUOTED a vivid portrayal of the Roaring Twenties..."
+    # has 15 words but no verb.
+    #
+    # Broader verb check: any past tense (-ed), 3rd-person present that looks
+    # like a verb in context (preceded by a noun/pronoun), or common verb
+    # patterns we may have missed above.
+    if re.search(r'\b(?:became|began|came|gave|grew|knew|made|saw|went|took|'
+                 r'found|built|wrote|lived|died|born|moved|worked|arrived|'
+                 r'created|painted|composed|inspired|captured|attracted|'
+                 r'transformed|developed|produced|hosted|gathered|brought|'
+                 r'flourished|thrived|emerged|evolved|survived|endured|'
+                 r'welcomed|celebrated|exhibited|inaugurated|embarked|'
+                 r'experimented|discovered|explored|settled|constructed|'
+                 r'restored|renovated|demolished|expanded|connected|'
+                 r'commissioned|dedicated|renamed|merged|split|formed|'
+                 r'introduced|launched|published|recorded|documented|'
+                 r'established|erected|sculpted|adorned|permeates|emanates|'
+                 r'beckons|buzzes|buzzed|echoes|breathes|pulses|pulsed|'
+                 r'whispers|resonates|embodies)\b', main_clause, re.IGNORECASE):
+        return True
+
+    # Check for any word that looks like a past-tense verb (ending in -ed)
+    # but NOT after a comma (which would be participial)
+    if re.search(r'(?:^|(?<![,]))\s+\w+ed\b', main_clause):
+        # Extra check: the -ed word should not be an adjective before a noun
+        ed_matches = re.finditer(r'\b(\w+ed)\b', main_clause)
+        for em in ed_matches:
+            word = em.group(1).lower()
+            # Skip known adjectives that end in -ed
+            if word in ('renowned', 'famed', 'named', 'storied', 'sacred',
+                        'detailed', 'cobbled', 'walled', 'gilded', 'vaulted',
+                        'arched', 'terraced', 'landscaped', 'elevated',
+                        'illustrated', 'animated', 'documented', 'rugged'):
+                continue
+            # If followed by a preposition or end-of-clause, likely a verb
+            after_pos = em.end()
+            after_text = main_clause[after_pos:after_pos+10].strip()
+            if not after_text or after_text[0] in '.,;:!?' or \
+               re.match(r'^(?:in|on|at|by|to|for|with|from|of|the|a|an|and|but|or|that|this|it|he|she|they)\b', after_text, re.IGNORECASE):
+                return True
+
+    # If main clause has > 12 meaningful words AND contains what looks like
+    # a subject-verb pattern (capitalized word followed by lowercase word
+    # that could be a verb), cautiously allow
+    if len(words_remaining) > 12:
+        # Look for patterns like "Name verb" or "The Noun verbs"
+        if re.search(r'(?:[A-Z][a-z]+|the\s+\w+)\s+(?:is|are|was|were|has|have|had|'
+                     r'does|did|will|would|can|could|shall|should|may|might|must)\b',
+                     main_clause, re.IGNORECASE):
+            return True
+
+    return False
+
+
+# ── LOCAL-257: Determiner restoration ────────────────────────────────────────
+# When stripping an imperative ("Explore the charming village of X…"), the LLM
+# or a deterministic rule may drop the article along with the verb, producing
+# "Charming village of X is…" instead of "The charming village of X is…".
+# This function detects the pattern and restores "The".
+
+# Common adjectives that frequently precede nouns in tour text
+_BARE_ADJ_START = re.compile(
+    r'^(?:charming|quaint|bustling|ancient|historic|medieval|majestic|opulent|'
+    r'picturesque|stunning|beautiful|magnificent|narrow|famous|renowned|'
+    r'legendary|hidden|tranquil|serene|vibrant|colourful|colorful|elegant|'
+    r'grand|imposing|impressive|scenic|idyllic|enchanting|lovely|striking|'
+    r'dramatic|remarkable|spectacular|breathtaking|winding|cobbled|steep|'
+    r'rugged|lush|verdant|azure|golden|crimson|pristine|sleepy|tiny|vast|'
+    r'enormous|sprawling|compact|towering|crumbling|weathered|ornate|'
+    r'delicate|exquisite|intricate)\s+'
+    r'(?:village|town|city|street|streets|road|path|trail|castle|church|'
+    r'chapel|cathedral|abbey|monastery|palace|fortress|tower|bridge|'
+    r'garden|gardens|park|square|plaza|courtyard|harbour|harbor|port|'
+    r'beach|bay|coast|coastline|cliff|cliffs|cape|peninsula|island|'
+    r'hill|hills|mountain|mountains|valley|river|lake|fountain|statue|'
+    r'museum|gallery|market|quarter|district|promenade|boulevard|avenue|'
+    r'building|mansion|villa|hotel|restaurant|café|cafe|terrace|'
+    r'landscape|panorama|view|vista|area|region|neighborhood|neighbourhood)\b',
+    re.IGNORECASE
+)
+
+# Bare common nouns without preceding determiner (no article, no possessive)
+_BARE_NOUN_START = re.compile(
+    r'^(?:village|town|city|castle|church|chapel|cathedral|abbey|monastery|'
+    r'palace|fortress|tower|bridge|garden|gardens|park|square|plaza|'
+    r'courtyard|harbour|harbor|port|museum|gallery|market|quarter|'
+    r'district|promenade|boulevard|avenue|building|mansion|villa|hotel|'
+    r'restaurant|café|cafe|terrace|landscape|panorama|area|region|'
+    r'neighbourhood|neighborhood)\s+(?:of|at|in|on|near|by|along|beside)\b',
+    re.IGNORECASE
+)
+
+
+def _restore_determiner(sentence: str) -> str:
+    """LOCAL-257: Restore 'The' when a rewrite stripped it with the imperative.
+
+    "Charming village of X is…" → "The charming village of X is…"
+    Only triggers when the sentence starts with an adjective+noun or bare
+    common noun followed by a preposition — patterns that require an article
+    in English.
+    """
+    stripped = sentence.strip()
+    if not stripped:
+        return stripped
+
+    # Don't add "The" if already starts with a determiner or proper noun
+    first_word = stripped.split()[0] if stripped.split() else ''
+    if first_word.lower() in ('the', 'a', 'an', 'this', 'that', 'these', 'those',
+                               'my', 'your', 'his', 'her', 'its', 'our', 'their'):
+        return stripped
+
+    # Check if first word is capitalized and might be a proper noun
+    # (proper nouns don't need articles). But adjectives at sentence start
+    # are also capitalized, so we check the pattern.
+    if _BARE_ADJ_START.match(stripped) or _BARE_NOUN_START.match(stripped):
+        # Restore "The" with proper capitalization
+        return 'The ' + stripped[0].lower() + stripped[1:]
+
+    return stripped
+
+
+def rewrite_r1_sentence_deterministic(sentence: str) -> str:
+    """Attempt deterministic rewrite of an R1-flagged sentence.
+
+    Returns:
+        - The rewritten sentence (if a deterministic rule matched)
+        - None if the sentence should be DELETED (pure instruction, no content)
+        - The sentinel string '__LLM_NEEDED__' if no deterministic rule matched
+          and an LLM pass is needed for this residue.
+    """
+    stripped = sentence.strip()
+
+    # Step 1: Is this a pure instruction? → Delete
+    if _is_pure_instruction(stripped):
+        return None
+
+    # Step 2: Try deterministic rewrite rules in order
+    for pattern, handler in _R1_REWRITE_RULES:
+        m = pattern.match(stripped)
+        if m:
+            if handler is None:
+                return None  # Rule says delete
+            elif handler == '_take_a_moment_handler':
+                result = _take_a_moment_handler(m)
+                if result is None:
+                    return None  # Delete
+                return result
+            elif handler == '_let_yourself_handler':
+                result = _let_yourself_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_take_in_handler':
+                result = _take_in_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_look_for_handler':
+                result = _look_for_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_as_you_arrive_handler':
+                result = _as_you_arrive_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_as_you_mid_handler':
+                result = _as_you_mid_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif callable(handler):
+                result = handler(m)
+                if result is None:
+                    return None  # Handler says delete
+                # Ensure it ends with a period if the original did
+                result = result.strip()
+                if stripped.endswith('.') and not result.endswith('.'):
+                    result += '.'
+                # Capitalize first letter
+                if result and result[0].islower():
+                    result = result[0].upper() + result[1:]
+                return result
+
+    # Step 3: No deterministic rule matched — signal LLM needed
+    return '__LLM_NEEDED__'
+
+
+def rewrite_r1_sentence_llm(sentence: str, api_key: str, model: str = None) -> str:
+    """Rewrite an R1 sentence using an LLM call.
+
+    The LLM may only RESTATE the sentence — it must not add a fact.
+    Returns the rewritten sentence, or None if deletion is the outcome.
+    """
+    import requests as _req
+
+    if not model:
+        model = os.environ.get('TOUR_LLM_MODEL', 'gpt-4o-mini')
+
+    prompt = f"""Rewrite this sentence to remove the imperative/instruction while preserving ALL factual content.
+
+SENTENCE: "{sentence}"
+
+RULES:
+1. Convert the imperative (command to the listener) into a declarative statement.
+2. DO NOT add any facts, dates, names, or information not in the original.
+3. DO NOT delete any facts, dates, names, or quoted content from the original.
+4. The rewritten sentence must contain every proper noun and every number from the original.
+5. If the sentence is purely an instruction with no factual content (e.g., "Take a moment to absorb the atmosphere."), respond with exactly: DELETE
+6. Return ONLY the rewritten sentence. No explanation, no quotes around it.
+
+EXAMPLES:
+- "Position yourself at the entrance of Eze Village, a medieval gem perched high above the French Riviera." → "Eze Village is a medieval gem perched high above the French Riviera."
+- "Take in the stunning views of the azure Mediterranean Sea." → "The stunning views of the azure Mediterranean Sea stretch out from here."
+- "Look for the Fondation Maeght, founded in 1964 by Marguerite and Aimé Maeght." → "The Fondation Maeght, founded in 1964 by Marguerite and Aimé Maeght, stands here."
+- "As you arrive, take in the breathtaking views of the azure waters." → "From this vantage point, the breathtaking views of the azure waters are visible."
+- "Take a moment to absorb the atmosphere." → DELETE
+- "Enjoy the view." → DELETE
+"""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    data = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You are a copy editor. You rewrite imperative sentences as declarative statements. You never add information."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "max_tokens": 200,
+    }
+
+    try:
+        resp = _req.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            data=json.dumps(data),
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            text = result["choices"][0]["message"]["content"].strip()
+            tokens_used = result["usage"]["total_tokens"]
+
+            # Check for DELETE signal
+            if text.upper().strip() == 'DELETE':
+                return None, tokens_used
+
+            # Strip quotes if wrapped
+            if text.startswith('"') and text.endswith('"'):
+                text = text[1:-1].strip()
+            if text.startswith('\u201c') and text.endswith('\u201d'):
+                text = text[1:-1].strip()
+
+            # Content preservation check: every proper noun and number in the
+            # original must appear in the rewrite.
+            orig_proper_nouns = set(re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', sentence))
+            orig_numbers = set(re.findall(r'\b\d{3,4}\b', sentence))
+            new_proper_nouns = set(re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text))
+            new_numbers = set(re.findall(r'\b\d{3,4}\b', text))
+
+            # If proper nouns or numbers were dropped, reject the LLM rewrite
+            # and fall back to keeping the original (better imperative than lost content)
+            lost_nouns = orig_proper_nouns - new_proper_nouns
+            lost_numbers = orig_numbers - new_numbers
+            # Filter out very common words that happen to be capitalized
+            _common_caps = {'The', 'This', 'That', 'Here', 'From', 'You', 'As', 'In', 'At', 'On'}
+            lost_nouns -= _common_caps
+
+            if lost_nouns or lost_numbers:
+                # Content loss — reject LLM rewrite, keep original
+                return '__KEEP_ORIGINAL__', tokens_used
+
+            return text, tokens_used
+        else:
+            return '__KEEP_ORIGINAL__', 0
+    except Exception:
+        return '__KEEP_ORIGINAL__', 0
+
+
+def _r1_rewrite_wellformed(original: str, rewritten: str) -> bool:
+    """LOCAL-271/LOCAL-274: Post-rewrite well-formedness check.
+
+    After any R1 rewrite, verify the result is a well-formed sentence:
+    1. Has a finite main verb (no fragments)
+    2. No repeated clause (doubled "stretches out before you")
+    3. Correct capitalisation:
+       a. Sentence must start with a capital letter.
+       b. No capitalised word mid-sentence unless it is a proper noun.
+    4. No reflexive nonsense ("you can admire yourself standing at")
+
+    Returns True if well-formed, False if the rewrite should be rejected
+    (and the original imperative kept instead, per D158).
+    """
+    if not rewritten or not rewritten.strip():
+        return False
+
+    stripped = rewritten.strip()
+
+    # Check 1: finite main verb (already existed in LOCAL-256, but re-confirm)
+    if not _has_finite_main_verb(stripped):
+        return False
+
+    # Check 2: repeated clause — detect near-duplicate phrases > 5 words
+    # "stretching out before you ... stretches out before you"
+    words = stripped.lower().split()
+    if len(words) > 12:
+        # Sliding window: look for 5-word sequences repeated
+        _window = 5
+        seen_ngrams = set()
+        for i in range(len(words) - _window + 1):
+            ngram = tuple(words[i:i + _window])
+            if ngram in seen_ngrams:
+                return False  # Doubled clause detected
+            seen_ngrams.add(ngram)
+
+    # Check 3a (LOCAL-274): sentence-initial capital
+    # "breathe in the salty sea air..." fails — must start with uppercase.
+    first_alpha = next((c for c in stripped if c.isalpha()), None)
+    if first_alpha and first_alpha.islower():
+        return False
+
+    # Check 3b: mid-sentence capitals
+    # After the first word, a capitalized word should only appear if it's:
+    # - After a period/colon/semicolon
+    # - A proper noun (multi-cap sequence, known proper adj, place name)
+    # - "I" (pronoun)
+    # LOCAL-274: Expanded to catch determiners like "The" after a comma,
+    # not just adjectives. "From Cap d'Antibes, The lush greenery…" fails.
+    #
+    # Strategy: a word that is capitalised after a comma (not sentence-start)
+    # is wrong unless it is plausibly a proper noun. Common words that should
+    # NEVER be capitalised mid-sentence are checked explicitly.
+    _NEVER_MID_CAP = {
+        # Determiners / articles
+        'the', 'a', 'an', 'this', 'that', 'these', 'those', 'some', 'any',
+        'each', 'every', 'no', 'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        # Common adjectives (from prior LOCAL-271 list)
+        'vibrant', 'panoramic', 'breathtaking', 'stunning', 'beautiful',
+        'magnificent', 'ancient', 'historic', 'medieval', 'narrow', 'charming',
+        'picturesque', 'scenic', 'dramatic', 'remarkable', 'spectacular',
+        'lush', 'verdant', 'azure', 'golden', 'pristine', 'serene', 'tranquil',
+        'bustling', 'quaint', 'gentle', 'rugged', 'steep', 'winding', 'cobbled',
+        'ornate', 'elegant', 'grand', 'imposing', 'vast', 'sprawling', 'towering',
+        'tiny', 'sleepy',
+        # Prepositions / conjunctions / adverbs that could appear mid-sentence
+        'and', 'but', 'or', 'so', 'yet', 'for', 'nor', 'with', 'from', 'into',
+        'here', 'there', 'where', 'while', 'when', 'as', 'if', 'then',
+        # Pronouns (other than I)
+        'you', 'he', 'she', 'it', 'we', 'they',
+    }
+    # Proper adjectives that ARE legitimately capitalised mid-sentence
+    _PROPER_ADJS = {'french', 'british', 'italian', 'spanish', 'german',
+                    'roman', 'greek', 'byzantine', 'moorish', 'ottoman',
+                    'mediterranean', 'atlantic', 'pacific', 'european',
+                    'american', 'african', 'asian', 'christian', 'jewish',
+                    'muslim', 'buddhist', 'hindu', 'victorian', 'baroque',
+                    'gothic', 'renaissance', 'neoclassical', 'art'}
+
+    _sent_words = stripped.split()
+    if len(_sent_words) > 2:
+        for i in range(1, len(_sent_words)):
+            w = _sent_words[i]
+            # Skip if preceded by sentence-ending punctuation
+            prev = _sent_words[i - 1]
+            if prev.endswith(('.', '!', '?', ':')):
+                continue
+            clean_w = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', w)
+            if not clean_w or len(clean_w) <= 1:
+                continue
+            if clean_w[0].isupper() and clean_w[1:].islower():
+                # Word is Title-Case mid-sentence — check if it's allowed
+                lower_w = clean_w.lower()
+                # Immediately fail if it's in the never-mid-cap list
+                if lower_w in _NEVER_MID_CAP:
+                    return False
+                # Proper adjectives are OK
+                if lower_w in _PROPER_ADJS:
+                    continue
+                # Check if this is part of a multi-word proper noun sequence:
+                # If the NEXT word is also capitalised, both are likely a proper noun
+                if i < len(_sent_words) - 1:
+                    next_clean = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i + 1])
+                    if next_clean and next_clean[0].isupper():
+                        continue  # Part of multi-word proper noun (e.g. "Cap d'Antibes")
+                # If the PREVIOUS word (non-punctuation) was also capitalised,
+                # we're in a multi-word proper noun sequence
+                if i > 1:
+                    prev_clean = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i - 1])
+                    if prev_clean and prev_clean[0].isupper() and prev_clean[1:].islower():
+                        continue  # Continuation of proper noun sequence
+                # Single capitalised word followed by lowercase — suspect
+                if i < len(_sent_words) - 1:
+                    next_clean = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i + 1])
+                    if next_clean and next_clean[0].islower():
+                        # This looks like a wrongly-capitalised common word
+                        # But only flag if it's a common English word, not a name
+                        # Heuristic: if it's short and common, flag it
+                        if lower_w in _NEVER_MID_CAP:
+                            return False  # Already checked above, but belt-and-suspenders
+
+    # Check 4: reflexive nonsense — "you can admire yourself"
+    if re.search(r'\byou can admire yourself\b', stripped, re.IGNORECASE):
+        return False
+
+    return True
+
+
+def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) -> tuple:
+    """Apply R1 rewrites to a paragraph.
+
+    Rewrites imperative sentences to declarative form. Deletes only pure
+    instructions with no factual content.
+
+    Args:
+        paragraph: The paragraph text
+        api_key: OpenAI API key for LLM fallback (optional)
+        model: LLM model name (optional, defaults to TOUR_LLM_MODEL or gpt-4o-mini)
+
+    Returns:
+        (new_paragraph, sentences_rewritten, sentences_deleted, llm_tokens_used)
+
+    Behind DISABLE_R1_REWRITE=1 — caller must check.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph, 0, 0, 0
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph, 0, 0, 0
+
+    kept = []
+    rewritten_count = 0
+    deleted_count = 0
+    llm_tokens = 0
+
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+
+        # Navigation sentences are never touched (D107)
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+
+        # Check if this sentence fires R1
+        findings = check_r1_imperatives(sentence)
+        if not findings:
+            kept.append(sentence)
+            continue
+
+        # This sentence is R1-flagged → attempt rewrite
+        result = rewrite_r1_sentence_deterministic(sentence)
+
+        if result is None:
+            # Pure instruction → delete
+            deleted_count += 1
+            continue
+        elif result == '__LLM_NEEDED__':
+            # No deterministic rule matched → try LLM if key available
+            if api_key:
+                llm_result, tokens = rewrite_r1_sentence_llm(sentence, api_key, model)
+                llm_tokens += tokens
+                if llm_result is None:
+                    # LLM says delete
+                    deleted_count += 1
+                    continue
+                elif llm_result == '__KEEP_ORIGINAL__':
+                    # LLM failed or dropped content → keep original
+                    kept.append(sentence)
+                    continue
+                else:
+                    # LLM rewrite accepted — LOCAL-271: full well-formedness check
+                    if not _r1_rewrite_wellformed(sentence, llm_result):
+                        # LLM produced damaged output — keep original
+                        kept.append(sentence)
+                        continue
+                    # LOCAL-257: restore determiner if rewrite stripped it
+                    llm_result = _restore_determiner(llm_result)
+                    kept.append(llm_result)
+                    rewritten_count += 1
+                    continue
+            else:
+                # No API key — keep original (safe fallback)
+                kept.append(sentence)
+                continue
+        else:
+            # Deterministic rewrite succeeded — LOCAL-271: full well-formedness check
+            if not _r1_rewrite_wellformed(sentence, result):
+                # Rewrite produced damaged output — keep original (D158: an imperative
+                # is better than nonsense)
+                kept.append(sentence)
+                continue
+            # LOCAL-257: restore determiner if rewrite stripped it
+            result = _restore_determiner(result)
+            kept.append(result)
+            rewritten_count += 1
+            continue
+
+    if not kept:
+        return '', rewritten_count, deleted_count, llm_tokens
+
+    # Reassemble
+    result_text = ' '.join(kept)
+
+    # Fix dangling connective on the new first sentence
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip(), rewritten_count, deleted_count, llm_tokens
+
+
+def apply_r1_to_description(description: str, api_key: str = None, model: str = None) -> tuple:
+    """Apply R1 rewrites to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_rewritten, sentences_deleted, llm_tokens_used)
+
+    Behind DISABLE_R1_REWRITE=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0, 0
+
+    new_paragraphs = []
+    total_rewritten = 0
+    total_deleted = 0
+    total_llm_tokens = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        result, rewritten, deleted, llm_tok = apply_r1_rewrites(para, api_key, model)
+        total_rewritten += rewritten
+        total_deleted += deleted
+        total_llm_tokens += llm_tok
+
+        if result:
+            new_paragraphs.append(result)
+        # else: entire paragraph was deleted (all sentences were pure instructions)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_rewritten, total_deleted, total_llm_tokens
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R7 DELETION LOGIC (assembly-time) — LOCAL-251
+# ═══════════════════════════════════════════════════════════════════════════════
+# Michael scored this class 1/5: "guessing what one would feel: very annoying
+# to humans." R7 fires on fabricated sensory claims; until now it only reported.
+#
+# The distinction between legitimate and invented sensory:
+#   LEGITIMATE: "the Mediterranean is visible below" — observable fact
+#   INVENTED:   "breathe in the salty scent mingling with freshly baked pastries"
+#               — the narrator cannot know this from any source
+#
+# R7's patterns already encode this distinction (absence markers, multi-sensory
+# fabrication, fabricated soundscapes). The deletion path trusts the detection.
+#
+# Behind DISABLE_R7_DELETION=1 env var — caller checks this.
+
+def apply_r7_deletions(paragraph: str) -> str:
+    """Apply R7 deletions to a paragraph.
+
+    - Removes sentences flagged by check_r7_hallucinated_sensory
+    - Strips dangling connectives from the resulting first sentence
+    - Returns empty string if all sentences are deleted
+
+    Behind DISABLE_R7_DELETION=1 env var — caller checks this.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        # Navigation sentences are never deleted
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r7_hallucinated_sensory(sentence)
+        if not findings:
+            kept.append(sentence)
+        # else: sentence is fabricated sensory — drop it
+
+    if not kept:
+        return ''  # All sentences deleted — caller removes the paragraph
+
+    # Fix dangling connective on the new first sentence
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r7_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R7 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R7_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r7_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-261: Deletion paths for R2, R3, R4, R8
+# ═══════════════════════════════════════════════════════════════════════════════
+# D165: Four of seven detectors can see and cannot act. R2, R3, R4, R8 fire
+# during PHASE 5.1 style validation (triggering a retry) but when the retry
+# fails to fix the sentence, it ships. These four are deletion-only — unlike
+# R1, there is no content to preserve beneath the violation.
+#
+# Pattern copied from apply_r7_deletions / apply_r7_to_description (D154).
+# Navigation exemption carries through: nav sentences are never deleted.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def apply_r2_deletions(paragraph: str) -> str:
+    """Apply R2 (question) deletions to a paragraph.
+
+    Removes sentences flagged by check_r2_questions (severity=error only).
+    R2_INTERROGATIVE_OPENER (warning) is NOT deleted — many are declaratives
+    like "What began as a fishing village became…" (D165 scope: do not widen).
+
+    Behind DISABLE_R2_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r2_questions(sentence)
+        # Only delete on ERROR severity (contains '?'), not WARNING
+        has_error = any(f['severity'] == 'error' for f in findings)
+        if not has_error:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r2_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R2 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R2_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r2_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+def apply_r3_deletions(paragraph: str) -> str:
+    """Apply R3 (suggestive exploration) deletions to a paragraph.
+
+    Removes sentences flagged by check_r3_suggestive_exploration.
+    Behind DISABLE_R3_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r3_suggestive_exploration(sentence)
+        if not findings:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r3_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R3 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R3_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r3_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+def apply_r4_deletions(paragraph: str) -> str:
+    """Apply R4 (prescribed feeling) deletions to a paragraph.
+
+    Removes sentences flagged by check_r4_prescribed_feeling.
+    Behind DISABLE_R4_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r4_prescribed_feeling(sentence)
+        if not findings:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r4_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R4 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R4_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r4_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+def apply_r8_deletions(paragraph: str) -> str:
+    """Apply R8 (prompt leakage) deletions to a paragraph.
+
+    Removes sentences flagged by check_r8_prompt_leakage.
+    Behind DISABLE_R8_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r8_prompt_leakage(sentence)
+        if not findings:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r8_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R8 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R8_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r8_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
 
 
 # ─── R8: Prompt leakage (LOCAL-213) ──────────────────────────────────────────
@@ -1539,12 +3525,97 @@ def _has_filler_signal(sentence: str) -> bool:
     return False
 
 
+def _has_contentless_signal(sentence: str) -> bool:
+    """LOCAL-251: Detect sentences with NO content — metaphorical language about nothing.
+
+    Michael's round 2 review: "senseless combination of words and facts with no
+    interconnectedness… they make listener confused instead of informed."
+
+    These sentences have no proper noun, no date, no number, AND use metaphorical
+    or abstract language that says nothing concrete about the stop. They differ from
+    filler (which uses journey/charming/uncover patterns) in that they use:
+      - Metaphorical verbs with abstract objects (bear the weight of, echo with,
+        exude, intertwine, linger)
+      - "portal to a world" / "journey through the annals" type constructions
+      - Abstract nouns as the entire substance (history, culture, creativity,
+        warmth, spirit) with no concrete predicate
+
+    CONSERVATIVE: Only fires when the sentence is ENTIRELY metaphorical/abstract.
+    A sentence that has metaphorical language but ALSO contains a fact should NOT
+    fire — the fact saves it. The caller ensures no specifics are present.
+
+    Guard: this is called ONLY when _has_proper_noun, _has_date, and _has_number
+    have all returned False. So by the time we get here, the sentence has no
+    anchoring specifics at all.
+    """
+    lower = sentence.lower()
+
+    # Pattern 1: Metaphorical verbs paired with abstract objects
+    # "bear the weight of history", "echo with the footsteps", "exude warmth"
+    _METAPHORICAL_PATTERNS = [
+        # [subject] bear/carry/hold the weight/burden of [abstract]
+        r'\b(?:bear|bears|carry|carries|carried|hold|holds)\s+the\s+(?:weight|burden)\s+of\b',
+        # [subject] echo/resound/ring with [abstract]
+        r'\b(?:echo|echoes|echoed|echoing|resound|resounds|ring|rings)\s+with\b',
+        # [subject] exude/radiate/emanate [abstract]
+        r'\b(?:exude|exudes|exuded|radiate|radiates|emanate|emanates|emanating)\s+(?:\w+\s+){0,3}(?:warmth|charm|elegance|beauty|sense|aura|energy|spirit)\b',
+        # [subject] intertwine/weave/blend seamlessly/together
+        r'\b(?:intertwine|intertwines|weave|weaves|blend|blends)\s+(?:seamlessly|together|harmoniously)\b',
+        # "lingers in the very air" / "infusing every corner"
+        r'\blingers?\s+in\s+the\s+(?:very\s+)?(?:air|atmosphere|streets?|walls?)\b',
+        r'\binfusing\s+(?:every|each|the)\s+(?:corner|street|wall|stone)\b',
+        # "testament to the enduring power/spirit of"
+        r'\btestament\s+to\s+the\s+(?:enduring|lasting|timeless|eternal)\b',
+        # "palpable" as standalone quality claim
+        r'\b(?:is|are|was|were)\s+palpable\b',
+        # "living testament" / "a living [metaphor]"
+        r'\ba\s+living\s+(?:testament|proof|reminder|example|embodiment)\b',
+    ]
+
+    # Pattern 2: Journey/portal metaphors (not the "continue your journey" filler
+    # but the "is a portal to a world" / "journey through the annals" type)
+    _JOURNEY_METAPHORS = [
+        # "is a portal/gateway to a world where"
+        r'\b(?:is|becomes?|serves?\s+as)\s+(?:a\s+)?(?:portal|gateway|window|bridge|doorway)\s+(?:to|into|between)\b',
+        # "a journey through the annals of"
+        r'\bjourney\s+through\s+the\s+(?:annals|pages|chapters|corridors)\s+of\b',
+        # "is not merely a destination" (meta-comment about the place)
+        r'\bnot\s+merely\s+a\s+(?:destination|stop|place|village|town|city)\b',
+        # "each step taken is a [metaphor]"
+        r'\beach\s+step\s+(?:taken\s+)?(?:is|becomes)\s+a\b',
+    ]
+
+    # Pattern 3: Abstract nouns as entire predicate with no concrete detail
+    # "the enduring power of human expression"
+    # "a sense of creative energy"
+    _ABSTRACT_PREDICATE = [
+        # "the enduring/timeless [power/spirit/essence] of [abstract]"
+        r'\bthe\s+(?:enduring|timeless|eternal|lasting|profound)\s+(?:power|spirit|essence|allure|beauty|charm|nature)\s+of\b',
+        # "a sense of [abstract noun]"
+        r'\ba\s+(?:sense|feeling|aura|air|atmosphere)\s+of\s+(?:creative|artistic|historic|historical|cultural|spiritual|timeless|ancient)\b',
+        # "[noun]'s artistic/creative/cultural spirit is"
+        r"\b(?:artistic|creative|cultural|spiritual)\s+spirit\s+(?:is|are|was|were)\b",
+    ]
+
+    for patterns in (_METAPHORICAL_PATTERNS, _JOURNEY_METAPHORS, _ABSTRACT_PREDICATE):
+        for pat in patterns:
+            if re.search(pat, lower):
+                return True
+
+    return False
+
+
 def check_r9_generic(sentence: str) -> List[Dict]:
     """R9: Detect generic sentences that carry no stop-specific content.
 
     A sentence is generic when:
     1. It has NO proper noun, date, or number (nothing tying it to this stop)
     2. It HAS generic filler signals (stance/atmosphere/transition language)
+
+    LOCAL-251 extension: ALSO fires when:
+    1. It has NO proper noun, date, or number (nothing tying it to this stop)
+    2. It HAS contentless signals — metaphorical/abstract language about nothing
+       (the "senseless combination of words" class Michael identified in round 2)
 
     BOTH conditions must be true. A terse factual sentence without specifics
     but also without filler is NOT generic — it's just short.
@@ -1572,17 +3643,28 @@ def check_r9_generic(sentence: str) -> List[Dict]:
     if has_specifics:
         return findings  # Has something tying it to a specific place/time
 
-    # Check for filler signals
-    if not _has_filler_signal(stripped):
-        return findings  # No filler detected — not clearly generic
+    # Check for filler signals (original path)
+    if _has_filler_signal(stripped):
+        findings.append({
+            'rule_id': 'R9_GENERIC',
+            'severity': 'delete',
+            'sentence': stripped,
+            'suggestion': 'This sentence carries nothing specific to this stop — it could be placed in millions of stops. Delete it.',
+        })
+        return findings
 
-    # Both conditions met: no specifics + filler present → generic
-    findings.append({
-        'rule_id': 'R9_GENERIC',
-        'severity': 'delete',
-        'sentence': stripped,
-        'suggestion': 'This sentence carries nothing specific to this stop — it could be placed in millions of stops. Delete it.',
-    })
+    # LOCAL-251: Check for contentless signals — metaphorical/abstract language
+    # that says nothing concrete. This catches "The ancient pathways bear the
+    # weight of history on their worn stones" and "Each step taken is a journey
+    # through the annals of creativity and culture."
+    if _has_contentless_signal(stripped):
+        findings.append({
+            'rule_id': 'R9_GENERIC',
+            'severity': 'delete',
+            'sentence': stripped,
+            'suggestion': 'This sentence uses metaphorical language about nothing concrete — no fact, no date, no specific claim. Delete it.',
+        })
+        return findings
 
     return findings
 
@@ -1839,6 +3921,81 @@ def _sentence_has_structural_promise(sentence: str) -> bool:
     return True
 
 
+# ─── Subject-matter promise detection (LOCAL-249) ────────────────────────────
+# Michael's complaint: R10 relies on matching verb+noun idioms, but a language
+# model rephrases endlessly. "hinting at the secrets", "echoing with stories",
+# "reveal different facets" — all promise subject matter without delivering it,
+# and none match the verb whitelist.
+#
+# The structural insight: the PRESENCE of abstract subject-matter nouns as the
+# point of the sentence IS the promise, regardless of verb. A sentence that
+# asserts the existence of "secrets", "stories", "facets", "grandeur" etc.
+# without concrete substantiation (date, person, measurement) is making a
+# promise by construction.
+#
+# Guard against false positives: sentences with concrete payload self-deliver
+# and are handled downstream by _sentence_has_concrete_payload in the R10 flow.
+# Navigation sentences are exempt via _is_navigation_sentence.
+#
+# This is VERB-INDEPENDENT: we do not require a specific carrying verb.
+# The abstract noun itself, positioned as the object of the sentence's claim,
+# is sufficient.
+
+_R10_SUBJECT_MATTER_NOUNS = frozenset({
+    # Core narrative-promise nouns (from existing _R10_STRUCTURAL_PROMISE_NOUNS)
+    'tale', 'tales', 'story', 'stories', 'secret', 'secrets',
+    'chapter', 'chapters', 'legacy', 'legacies', 'roots',
+    'tapestry', 'whispers', 'whisper', 'essence', 'juxtaposition', 'symphony',
+    # Extended set (LOCAL-249): abstract nouns Michael identified as the defect
+    'allure', 'grandeur', 'opulence', 'elegance', 'splendor', 'splendour',
+    'intrigue', 'mystique', 'enigma',
+    'facets', 'facet',
+    'spirit',
+    'treasures',  # "hidden treasures" with no follow-up
+    'wonders',
+    'mysteries', 'mystery',
+    'introspection',  # "quiet introspection" — what introspection?
+})
+
+# NOTE: "history", "heritage", "culture", "beauty", "charm", "tradition",
+# "modernity" are intentionally EXCLUDED. They are too common as incidental
+# words in substantiated sentences (e.g., "the hotel's history began in 1870")
+# and their inclusion pushed R10 beyond the 3x corpus-wide threshold.
+# They ARE part of the defect Michael describes, but catching them requires
+# a syntactic role check (are they the POINT of the sentence?) which is
+# beyond deterministic detection without an LLM. Future work (LOCAL-249+).
+
+
+def _sentence_has_subject_matter_promise(sentence: str) -> bool:
+    """LOCAL-249: Detect promise by subject-matter noun presence (verb-independent).
+
+    A sentence that puts forward abstract subject-matter nouns as its assertion
+    is making a promise regardless of the verb carrying them. "hinting at the
+    secrets", "echoing with stories", "reveal different facets" all promise
+    without the specific verbs in the old whitelist.
+
+    Returns True if the sentence contains subject-matter nouns that make it a
+    promise. The concrete-payload check downstream prevents false positives on
+    sentences that self-deliver (have dates, names, measurements).
+    """
+    words = set(re.findall(r'[a-z]+', sentence.lower()))
+    if words & _R10_SUBJECT_MATTER_NOUNS:
+        return True
+    return False
+
+
+def _extract_subject_matter(sentence: str) -> list:
+    """Extract the abstract subject-matter nouns from a sentence.
+
+    Returns a list of the abstract nouns found, for evidence/reporting purposes.
+    """
+    words = set(re.findall(r'[a-z]+', sentence.lower()))
+    found = []
+    for noun in sorted(words & _R10_SUBJECT_MATTER_NOUNS):
+        found.append(noun)
+    return found
+
+
 def _sentence_has_promise(sentence: str) -> bool:
     """Check if a sentence contains a promise-trigger phrase or shape."""
     # Path 1: original regex patterns (exact phrases)
@@ -1847,6 +4004,10 @@ def _sentence_has_promise(sentence: str) -> bool:
             return True
     # Path 2: structural detection (LOCAL-240) — noun + verb shape
     if _sentence_has_structural_promise(sentence):
+        return True
+    # Path 3: subject-matter detection (LOCAL-249) — verb-independent
+    # The sentence puts forward abstract nouns as its assertion.
+    if _sentence_has_subject_matter_promise(sentence):
         return True
     return False
 
@@ -2039,7 +4200,20 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
     #      break a capitalized run. "Cap d'Antibes Coastal Path" is one name.
     #   b) Uses _PLACE_WORDS (unified vocabulary) instead of separate sets.
     #   c) Adjective forms resolved via _normalize_for_place_check.
+    #
+    # LOCAL-251 fix: A person's name ALONE is not delivery. It must be paired
+    # with a date, an event, or a named work. "The legacy of artists like Marc
+    # Chagall lingers in the very air you breathe" names Chagall but tells you
+    # NOTHING about Chagall — it is anchoring, not substantiation.
+    # Same reasoning LOCAL-247 applied to place names now applied to people.
+    #
+    # A person name IS delivery when paired with:
+    #   - A date/year (already caught by checks 1-2 above, so won't reach here)
+    #   - An event verb: hosted, visited, painted, wrote, built, founded, etc.
+    #   - A named work: title in quotes, or "novel"/"painting"/"book" nearby
+    #   - A documented fact about what the person DID at this place
     words = sentence.split()
+    has_person_name = False
     consecutive_caps = 0
     consecutive_cap_words = []
     _skip_words = {
@@ -2056,7 +4230,7 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
         if not clean:
             # Check accumulated caps before resetting
             if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
-                return True
+                has_person_name = True
             consecutive_caps = 0
             consecutive_cap_words = []
             continue
@@ -2090,12 +4264,55 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
                 consecutive_cap_words.append(clean)
             else:
                 if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
-                    return True
+                    has_person_name = True
                 consecutive_caps = 0
                 consecutive_cap_words = []
     # Final check
     if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
-        return True
+        has_person_name = True
+
+    # LOCAL-251: If a person name was found, check whether the sentence also
+    # contains a substantiating context (event, date, or work). A name floating
+    # in an abstraction ("the legacy of artists like X lingers in the air") is
+    # NOT delivery. A name paired with a factual claim IS delivery.
+    if has_person_name:
+        # Event verbs: the sentence says what the person DID or what happened
+        # involving them. "hosted", "painted", "wrote", "visited", "built", etc.
+        _EVENT_VERB_RE = re.compile(
+            r'\b(?:hosted|visited|painted|wrote|built|founded|created|composed|'
+            r'performed|directed|established|designed|sculpted|discovered|'
+            r'invented|published|recorded|filmed|opened|launched|introduced|'
+            r'lived|stayed|resided|settled|retreated|frequented|gathered|'
+            r'died|born|married|arrived|departed|fled|exiled|returned|'
+            r'became|served|worked|taught|studied|graduated|'
+            r'won|awarded|received|commissioned|donated|'
+            r'inspired|influenced|mentored|collaborated|'
+            r'hosting|painting|writing|building|creating|performing)\b',
+            re.IGNORECASE
+        )
+        if _EVENT_VERB_RE.search(sentence):
+            return True
+
+        # Named work: quotes in the sentence suggest a title
+        if '"' in sentence or '\u201c' in sentence or '\u201d' in sentence:
+            return True
+
+        # Work-type nouns already checked in #5 below, but also here:
+        if re.search(r'\b(?:novel|book|work|painting|poem|opera|film|song|'
+                     r'sculpture|composition|masterpiece|series|collection|'
+                     r'exhibition|memoir|autobiography|biography)\b',
+                     sentence, re.IGNORECASE):
+            return True
+
+        # Decades pattern: "In the 1960s" — not caught by check #1's strict
+        # year pattern but is a factual temporal anchor
+        if re.search(r'\b\d{4}s\b', sentence):
+            return True
+
+        # If none of the above, the person name is just ANCHORING, not DELIVERY.
+        # Same reasoning as LOCAL-247 for place names: naming ≠ substantiating.
+        # Fall through to remaining checks (5, 6, 7) which may still trigger.
+        pass
 
     # 5. Named entity that's clearly a DOCUMENT, WORK, or PERSON
     #    (contains title-indicators like "novel", "itinerary", "book")
@@ -2552,6 +4769,102 @@ def analyze_tour_style(tour_id: int, conn) -> Dict:
         'stops': stop_results,
         'totals': totals,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-271: FORWARD TRANSITION AT FINAL STOP DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Patterns that indicate a forward-looking transition — pointing at "what's next"
+_FORWARD_TRANSITION_PATTERNS = [
+    re.compile(r'\bjust\s+ahead\b', re.IGNORECASE),
+    re.compile(r'\bup\s+ahead\b', re.IGNORECASE),
+    re.compile(r'\bahead\s+(?:of\s+you|lies|awaits|is|stands)\b', re.IGNORECASE),
+    re.compile(r'\bnext\s+(?:stop|you\'?ll?\s+(?:find|see|discover|reach|come\s+to))\b', re.IGNORECASE),
+    re.compile(r'\bcontinue\s+(?:on|to|towards|toward|along)\b', re.IGNORECASE),
+    re.compile(r'\bmoving\s+(?:on|forward|ahead)\b', re.IGNORECASE),
+    re.compile(r'\bas\s+you\s+(?:continue|move|proceed|head|make\s+your\s+way)\b', re.IGNORECASE),
+    re.compile(r'\bour\s+(?:next|final)\s+(?:stop|destination)\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+(?:awaits|lies)\s+(?:ahead|next|beyond)\b', re.IGNORECASE),
+    re.compile(r'\blead(?:s|ing)?\s+(?:you\s+)?(?:to|toward|towards)\s+(?:the\s+)?next\b', re.IGNORECASE),
+    re.compile(r'\bfurther\s+(?:along|ahead|on|down)\b', re.IGNORECASE),
+]
+
+
+def check_forward_transition_final_stop(description: str) -> List[Dict]:
+    """LOCAL-271: Detect forward-looking transitions in what is the final stop.
+
+    A forward transition in the last stop points at nothing — there is no next
+    stop. Returns a list of violations (sentence + pattern matched).
+    """
+    violations = []
+    if not description or not description.strip():
+        return violations
+
+    sentences = _split_sentences(description)
+    for sent in sentences:
+        if len(sent) < 10:
+            continue
+        for pat in _FORWARD_TRANSITION_PATTERNS:
+            if pat.search(sent):
+                violations.append({
+                    'sentence': sent,
+                    'pattern': pat.pattern,
+                    'rule': 'FORWARD_TRANSITION_FINAL_STOP',
+                })
+                break  # One match per sentence is enough
+    return violations
+
+
+def remove_forward_transitions_final_stop(description: str) -> Tuple[str, List[str]]:
+    """LOCAL-271: Remove forward-looking transitions from the final stop.
+
+    Only removes sentences that carry no content of their own (the forward
+    reference IS the sentence). Sentences with factual content that happen
+    to also contain a forward reference are reported but kept.
+
+    Returns: (cleaned_description, list_of_removed_sentences)
+    """
+    if not description or not description.strip():
+        return description, []
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    new_paragraphs = []
+    removed = []
+
+    for para in paragraphs:
+        sentences = _split_sentences(para)
+        kept = []
+        for sent in sentences:
+            if len(sent) < 10:
+                kept.append(sent)
+                continue
+
+            is_forward = False
+            for pat in _FORWARD_TRANSITION_PATTERNS:
+                if pat.search(sent):
+                    is_forward = True
+                    break
+
+            if is_forward:
+                # Check if sentence has its own content (date, proper noun, fact)
+                has_content = bool(
+                    re.search(r'\d{3,4}', sent) or  # dates/numbers
+                    re.search(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,}', sent)  # multi-word proper noun
+                )
+                if has_content:
+                    # Has content — keep it, but report
+                    kept.append(sent)
+                else:
+                    # Pure forward reference — remove
+                    removed.append(sent)
+            else:
+                kept.append(sent)
+
+        if kept:
+            new_paragraphs.append(' '.join(kept))
+
+    return '\n\n'.join(new_paragraphs), removed
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

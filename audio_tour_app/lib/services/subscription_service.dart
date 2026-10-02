@@ -55,8 +55,10 @@ class SubscriptionService {
       await DebugLogHelper.addDebugLog('SUBSCRIPTION: Starting credential submission for article: $articleId');
       
       // Encrypt credentials (GitHub approach - no pre-check)
+      // SECURITY (wdvrday4pk): never log credential VALUES. Log only that the
+      // call is happening and non-sensitive lengths/domain for diagnostics.
       await DebugLogHelper.addDebugLog('SUBSCRIPTION: About to call encryptCredentials');
-      await DebugLogHelper.addDebugLog('SUBSCRIPTION: Calling SubscriptionEncryptionService.encryptCredentials with username="$username", password="$password", domain="$domain"');
+      await DebugLogHelper.addDebugLog('SUBSCRIPTION: encryptCredentials for domain="$domain" (username ${username.length} chars, password ${password.length} chars)');
       
       // Test if the class and method exist
       try {
@@ -115,7 +117,10 @@ class SubscriptionService {
       }
       
       await DebugLogHelper.addDebugLog('SUBSCRIPTION: Submitting to: $url');
-      await DebugLogHelper.addDebugLog('SUBSCRIPTION: Request body: ${json.encode(requestBody)}');
+      // SECURITY (wdvrday4pk): never log the request body — it carries the
+      // encrypted credentials, the mobile public key, and device_id. Log the
+      // field NAMES and the endpoint only.
+      await DebugLogHelper.addDebugLog('SUBSCRIPTION: Request fields: ${requestBody.keys.toList()}');
       
       final response = await http.post(
         Uri.parse(url),
@@ -163,7 +168,9 @@ class SubscriptionService {
       final result = await SubscriptionEncryptionService.performKeyExchange(serverPublicKey);
       if (result != null) {
         await DebugLogHelper.addDebugLog('SUBSCRIPTION: Key exchange successful');
-        await DebugLogHelper.addDebugLog('SUBSCRIPTION: Client public key: ${result['client_public_key']}');
+        // Do not log key material (even public keys) — keeps the log clean of
+        // anything crypto-related. See wdvrday4pk.
+        await DebugLogHelper.addDebugLog('SUBSCRIPTION: Client public key generated (${(result['client_public_key'] ?? '').length} chars)');
       } else {
         await DebugLogHelper.addDebugLog('SUBSCRIPTION: Key exchange failed');
       }

@@ -11,6 +11,8 @@ import requests
 import json
 import time
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_tour_factory import TestTourFactory
 from db_connection import get_connection
@@ -18,6 +20,8 @@ from db_connection import get_connection
 # Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
 _factory = TestTourFactory(auto_cleanup=True)
 
+
+@pytest.mark.service
 def test_user_integration():
     print("Testing User Tracking Integration")
     print("=" * 50)
@@ -106,7 +110,12 @@ def test_user_integration():
         
         if user_data['tours']:
             for i, tour in enumerate(user_data['tours']):
-                print(f"     Tour {i+1}: {tour['tour_id']} - {tour['request_string'][:50]}...")
+                # [D223] request_string can be None on a tour the API returns
+                # before generation has populated it. This is a diagnostic print;
+                # it must not crash the test. Whether the column should be
+                # NOT NULL is a schema question for Michael, not a test fix.
+                _req = tour.get('request_string') or '(no request_string)'
+                print(f"     Tour {i+1}: {tour['tour_id']} - {_req[:50]}...")
     else:
         print(f"   Error: {response.status_code} - {response.text}")
 

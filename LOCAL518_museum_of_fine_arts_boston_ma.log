@@ -1,0 +1,1318 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_104749.txt'
+
+======================================================================
+CALL #001 | 10:47:49.064 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Museum of Fine Arts, Boston MA
+  tour_type: contained
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-518/tours/local518_museum_of_fine_arts_boston_ma.json
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_104749.txt'
+
+======================================================================
+CALL #002 | 10:47:49.064 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Museum of Fine Arts, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+[TIMING] phase=intent elapsed=1.5s cumulative=1.5s
+[LOCAL-474] tour_type='contained' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Museum of Fine Arts, Boston MA - contained
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_104749.txt'
+
+======================================================================
+CALL #003 | 10:47:50.535 | GENERATING_PROMPT
+======================================================================
+  location: Museum of Fine Arts, Boston MA
+  user_request: contained Museum of Fine Arts, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Museum of Fine Arts, Boston MA...
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Geo-disambiguated by distance: Q49133 (Museum of Fine Arts Boston) — 3.8km from Boston MA
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [venue_resolver] SPARQL: 194 works found for Q49133
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Geo-disambiguated by distance: Q49133 (Museum of Fine Arts Boston) — 3.8km from Boston MA
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-10-23 13:33:20.287675)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168436
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168436
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168826
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168826
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168441
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168441
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168831
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168831
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168446
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168446
+  [venue_resolver] SPARQL: 194 works found for Q49133
+  [LOCAL-30] Deterministic selection: 251 documented works (5 catalogue, 194 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 8 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Main navigation [catalogue]
+     - Saint Mary Magdalen Penitent [sparql]
+     - Parable of the Good Samaritan [sparql]
+     - Virgin and Child [sparql]
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] Geo-disambiguated by distance: Q49133 (Museum of Fine Arts Boston) — 3.8km from Boston MA
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-10-23 13:33:20.287675)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168436
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168436
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168826
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168826
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168441
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168441
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168831
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168831
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168446
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168446
+  [venue_resolver] SPARQL: 194 works found for Q49133
+  [LOCAL-30] Deterministic selection: 251 documented works (5 catalogue, 194 SPARQL)
+  [LOCAL-328] Quality score map: 21 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 8 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Artist in his studio [sparql] (quality=34.0)
+     - Adam and Eve [sparql] (quality=26.0)
+     - Appeal to the Great Spirit [sparql] (quality=22.0)
+     - Ancient Nubia Now [canonical] (quality=20.0)
+  [R4] Museum tour: asking for 8 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 8 documented works)
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Artist in his studio
+   - Adam and Eve
+   - Appeal to the Great Spirit
+   - Ancient Nubia Now
+   - An Italian Autumn
+   - Madame Monet wearing a kimono
+   - John Singer Sargent’s  The Daughters of Edward Darley Boit
+   - Artist in the Gorge aux Loups, Forest of Fontainebleau
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [D1v2] Venue resolved: Q49133 → URL=http://www.mfa.org/, lang=en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-10-23 13:33:20.287675)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168436
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168436
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168826
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168826
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168441
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168441
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168831
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168831
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168446
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168446
+  [D1v2] Cache HIT: 145 canonical titles (tier=rich), 5 catalogue works, combined_text=689968 chars
+  [LOCAL-24] Classification: 145 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 145 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 129 dynamic aliases from 126 works
+  [D1v2] Injected 129 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] DROPPED 'Artist in his studio' — no canonical title match
+  [D1v2] DROPPED 'Adam and Eve' — no canonical title match
+  [D1v2] DROPPED 'Appeal to the Great Spirit' — no canonical title match
+  [D1v2] VERIFIED 'Ancient Nubia Now' → canonical: 'Ancient Nubia Now'
+  [D1v2] DROPPED 'An Italian Autumn' — no canonical title match
+  [D1v2] DROPPED 'Madame Monet wearing a kimono' — no canonical title match
+  [D1v2] VERIFIED 'John Singer Sargent’s  The Daughters of Edward Darley Boit' → canonical: 'John Singer Sargent’s  The Daughters of Edward Darley Boit'
+  [D1v2] VERIFIED 'Artist in the Gorge aux Loups, Forest of Fontainebleau' → canonical: 'Artist in the Gorge aux Loups, Forest of Fontainebleau'
+  [D1v2] 3/8 works verified — tier: rich
+  [D1] Tier: rich (3 verified works)
+
+  [R4] Replenishment round 1/3: need 1 more, asking for 6
+    [R4] VERIFIED 'A Student' → 'A Student'
+    [R4] VERIFIED 'Adoration of the Magi' → 'Adoration of the Magi'
+    [R4] VERIFIED 'An Italianate Landscape with Travelers on a Path' → 'An Italianate Landscape with Travelers on a Path'
+    [R4] VERIFIED 'Approaching Storm: Beach near Newport' → 'Approaching Storm: Beach near Newport'
+    [R4] VERIFIED 'Arab Horsemen Resting at a Fountain' → 'Arab Horsemen Resting at a Fountain'
+    [R4] VERIFIED 'Bacchus and Ariadne' → 'Bacchus and Ariadne'
+    [R4] Round 1: +1 verified, total now 4
+  [R4] Target reached: 4/4 stops
+  [LOCAL-16 GATE] All 4 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Museum of Fine Arts, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Ancient Nubia Now' — venue_corpus canonical_title: 'Ancient Nubia Now' at 'Museum of Fine Arts, Bosto
+    [VERIFIED] 'John Singer Sargent’s  The Daughters of Edward Da — venue_corpus canonical_title: 'John Singer Sargent’s  The Daughters of Edward Da
+    [VERIFIED] 'Artist in the Gorge aux Loups, Forest of Fontaine — venue_corpus canonical_title: 'Artist in the Gorge aux Loups, Forest of Fontaine
+    [VERIFIED] 'A Student' — venue_corpus canonical_title: 'A Student' at 'Museum of Fine Arts, Boston'
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Ancient Nubia Now': +1 passages (2 queries)
+    [INTERPRETIVE] 'Artist in the Gorge aux Loups, Forest of Fontainebleau': +5 passages (3 queries)
+    [INTERPRETIVE] 'A Student': +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 3 stops enriched, +8 passages, 9 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260923_104749.txt'
+
+======================================================================
+CALL #004 | 10:48:48.647 | PHASE_3B_REQUEST
+======================================================================
+  location: Museum of Fine Arts, Boston MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0005 (630 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 4 stops
+  [LOCAL-35] Visitor info page found (en): http://www.mfa.org/visit
+  [LOCAL-35] Extracted from http://www.mfa.org/visit: closed=['Wednesday'], hours=1, admission=''
+  [LOCAL-35] Final Museum Information: Closed on Wednesday. 10:00–05:00
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Boston, hint: museum)
+  [LOCAL-355] Ancient Nubia Now: no practical facts in OSM
+  [LOCAL-355] John Singer Sargent’s  The Daughters of Edward Darley Boit: no practical facts in OSM
+  [LOCAL-355] Artist in the Gorge aux Loups, Forest of Fontainebleau: no practical facts in OSM
+  [LOCAL-355] A Student: no practical facts in OSM
+   Coords cluster detected: 4 stops share '42.3395, -71.0941', refetching...
+   Cluster refetch OK 'Artist in the Gorge aux Loups, Forest of Fontainebleau': 42.3368, -71.0985
+   Cluster refetch OK 'John Singer Sargent’s  The Daughters of Edward Darley Boit': 42.3391, -71.0942
+   Cluster refetch OK 'A Student': 42.3375, -71.0969
+   Cluster refetch OK 'Ancient Nubia Now': 42.3394, -71.0897
+Extracted first POI coordinates: (42.3394, -71.0897)
+  [D4] Museum single-coordinate: all stops set to (42.3394, -71.0897) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Ancient Nubia Now
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3394, -71.0897
+   Directions: Head northeast on Museum Rd, pass the beautiful Fenway Victory Gardens.
+2. John Singer Sargent’s  The Daughters of Edward Darley Boit
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3394, -71.0897
+   Directions: Walk southeast on Museum Rd, then turn right towards the Shapiro Family Courtyar...
+3. Artist in the Gorge aux Loups, Forest of Fontainebleau
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3394, -71.0897
+   Directions: Continue straight to walk past the Koch Gallery, with its striking contemporary ...
+4. A Student
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3394, -71.0897
+   Directions: Turn left after the Linde Family Wing for Contemporary Art to reach the final st...
+================================
+
+[TIMING] phase=poi_selection elapsed=164.1s cumulative=165.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Museum of Fine Arts, Boston'
+    page[0] score=11790 url=https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston
+    page[1] score=6915 url=http://www.mfa.org/collections/guide-to-searching-the-collections
+    page[2] score=5920 url=http://www.mfa.org/collections/prints-and-drawings
+  [§3-adapter] Raw elements: 17 from 4 pages
+  [§3-adapter] After corroboration scoring: 17 elements
+  [§3-adapter] Final: 17 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 17 elements → /Users/micha/audioura-worktrees/LOCAL-518/tours/local518_museum_of_fine_arts_boston_ma.json
+  [§3] Updated venue_corpus.story_elements_json for Q49133 (17 elements)
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [SQ-S6b] Elements per stop: s0=8, s1=8, s2=8, s3=9
+  [SQ-S6b] Entity clusters found: 42 (≥2 stops)
+    → 20th century (eras): 4 stops, 5 elements
+    → the museum (people): 4 stops, 5 elements
+    → 19th century (eras): 4 stops, 4 elements
+    → francis bartlett (people): 4 stops, 3 elements
+    → francis bartlett donation (people): 4 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0163, 2267 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Francis Bartlett's Legacy in Museum Acquisitions': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'Evolution of the Museum's Architecture and Design': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'MFA's Collection Expansion through Donations and Bequests': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+  [SQ-S6b] Blended 3 threads: 'Francis Bartlett's Legacy in Museum Acquisitions'=0.33, 'Evolution of the Museum's Architecture and Design'=0.33, 'MFA's Collection Expansion through Donations and Bequests'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Francis Bartlett's Legacy in Museum Acquisitions': coverage=100%, weight=0.33, elements=['se_004', 'se_005', 'se_006']
+    → 'Evolution of the Museum's Architecture and Design': coverage=100%, weight=0.33, elements=['se_001', 'se_010', 'se_007']
+    → 'MFA's Collection Expansion through Donations and Bequests': coverage=100%, weight=0.33, elements=['se_003', 'se_008', 'se_013']
+  [§3] Story elements injected into spine prompt (17 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Museum of Fine Arts, Boston model=gpt-4o tokens=2417 (in=1811 out=606) cost=$0.0106 latency=5.7s
+[COST_METER] FRESH | spine_generate | $0.010587 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0106
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': False, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=found)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (40 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Ancient Nubia Now' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='A Student' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=47.9s cumulative=213.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='dedicated to the Homeric epics features works that chart the Trojan War and illu'
+
+  [LOCAL-383] Extracted 73 story beats, 73 named people: Africa An, Alfred Stieglitz, Americas, Amorsolo, Ancient Mesoamerica, Angelica Lloyd Russell
+[TIMING] phase=narration elapsed=0.1s cumulative=213.6s
+  [D495] venue domain seeded tier1: mfa.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 4 stops...
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 2 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for ajaonline.org: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for ajaonline.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for patrons.org.es: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 2 unverified, 0 budget-expired
+    [D489] material kind: stop='Ancient Nubia Now' kind=active volume=COVERED sentences=36 active=1 staked=0 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+         best: "The original MFA was founded in 1870 and opened its doors to the public on July 4, 1876, the nation's centennial."
+    [LOCAL-489] Stop 1 needs more material (eventless): 20 passages, 3048 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Ancient Nubia Now" "Museum of Fine Arts, Boston" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3048 -> 4151 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The original MFA was founded in 1870 and opened its doors to the public on July 4, 1876, the nation's centenni"
+    [LOCAL-488] step 4: 3 providers, 8 leads, 1 with cross-model agreement, 0 SERP-confirmed
+    Stop 1 'Ancient Nubia Now': queries=3 serp_results=20 snippets=28
+      → Through a majestic display of art and objects, “Ancient Nubia Now ... Through a majestic display of art and objects, “An
+      → Featuring more than 400 objects drawn from the MFA's vast collection of Nubian art ... Ancient Nubia Now” (October 13, 2
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 3 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 3 unverified, 0 budget-expired
+    [D489] material kind: stop='John Singer Sargent’s  The Daughters o' kind=inert volume=COVERED sentences=32 active=0 staked=0 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 2 needs more material (eventless): 15 passages, 2282 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "John Singer Sargent’s The Daughters of Edward Darley Boit" "Museum of Fine Ar
+      [LOCAL-498] after replenishment: kind inert -> inert, 2282 -> 3421 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 13 leads, 1 with cross-model agreement, 0 SERP-confirmed
+    Stop 2 'John Singer Sargent’s  The Daughters of Edward Dar': queries=3 serp_results=15 snippets=23
+      → John Singer Sargent's The Daughters of Edward Darley Boit ... Visit the Art of the Americas Wing, Level 2, to see a gall
+      → The Real Story Behind John Singer Sargent's “The Daughters of Edward Darley Boit” ... Museum of Fine Arts, Boston. They 
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 6 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 6 unverified, 0 budget-expired
+    [D489] material kind: stop='Artist in the Gorge aux Loups, Forest ' kind=active volume=COVERED sentences=37 active=1 staked=0 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+         best: "The original MFA was founded in 1870 and opened its doors to the public on July 4, 1876, the nation's centennial."
+    [LOCAL-489] Stop 3 needs more material (eventless): 19 passages, 2960 chars, verdict=COVERED
+      [LOCAL-489] +5 from: "Artist in the Gorge aux Loups, Forest of Fontainebleau" "Museum of Fine Arts,
+      [LOCAL-498] after replenishment: kind active -> active, 2960 -> 3705 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The original MFA was founded in 1870 and opened its doors to the public on July 4, 1876, the nation's centenni"
+    [LOCAL-488] step 4: 3 providers, 16 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'Artist in the Gorge aux Loups, Forest of Fontaineb': queries=3 serp_results=19 snippets=24
+      → Order a museum-quality reproduction of Artist in the Gorge aux Loups Forest of Fontainebleau 1852 by Eugene Ciceri. Hand
+      → instance of · painting ; inception. 1852 ; title. Artist in the Gorge aux Loups, Forest of Fontainebleau (English) ; loc
+    [D500] Stop 4: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 4 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 4 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 4 unverified, 0 budget-expired
+    [D489] material kind: stop='A Student' kind=inert volume=COVERED sentences=39 active=0 staked=1 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 4 needs more material (eventless): 21 passages, 3210 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "A Student" "Museum of Fine Arts, Boston" provenance
+      [LOCAL-498] after replenishment: kind inert -> inert, 3210 -> 4410 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 12 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 4 'A Student': queries=3 serp_results=21 snippets=29
+      → Boston Ballet - Students are eligible for $20 rush tickets or can sign up for a student subscription for just $30 per ti
+      → Purchase a student membership to the A.R.T. for $10, and get access to $15 tickets for select seats. $15 student rush ti
+
+  [LOCAL-410] SERP search complete: 16 queries, 104 results, 104 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 104 raw → max 20 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Ancient Nubia Now: serp_results=20 elements_extracted=- beats_injected=- (measured post-generation)
+    John Singer Sargent’s  The Daughters of Edward Dar: serp_results=15 elements_extracted=- beats_injected=- (measured post-generation)
+    Artist in the Gorge aux Loups, Forest of Fontaineb: serp_results=19 elements_extracted=- beats_injected=- (measured post-generation)
+    A Student: serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 28 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Ancient Nubia Now' has 28 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via gemini (4 high-confidence) — stop will be labelled aloud
+      [high] 'Ancient Nubia Now' is not an individual museum object, but a temporary major exhibition held at the Museum of
+      [high] The exhibition featured more than 400 objects selected from the Museum of Fine Arts, Boston's collection of an
+      [high] Key individual artifacts showcased within the exhibition included the granodiorite Statue of Lady Sennuwy (exc
+      [high] The Museum of Fine Arts, Boston also published a 416-page accompanying exhibition catalogue titled 'Ancient Nu
+  [D534] Stop 2 has 23 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'John Singer Sargent’s  The Daughters of Edward Dar' has 23 snippet(s) — asking the knowledge fallback
+  [D533] +8 fact(s) via gemini (8 high-confidence) — stop will be labelled aloud
+      [high] The painting was created by American artist John Singer Sargent in Paris in autumn 1882.
+      [high] The work is an oil painting on canvas measuring 221.93 x 222.57 cm (87 3/8 x 87 5/8 in.).
+      [high] It is signed and dated in the lower right corner: 'John S. Sargent 1882'.
+      [high] The painting depicts the four daughters of Edward Darley Boit and Mary Louisa Cushing Boit—Florence, Jane, Mar
+      [high] The work was exhibited under the title 'Portraits d'enfants' at the Paris Salon of 1883.
+      [high] The painting was given to the Museum of Fine Arts, Boston, in 1919 by Mary Louisa Boit, Florence D. Boit, Jane
+  [D534] Stop 3 has 24 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'Artist in the Gorge aux Loups, Forest of Fontaineb' has 24 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via gemini (5 high-confidence) — stop will be labelled aloud
+      [high] The painting was created in 1852 by the French painter, lithographer, and illustrator Eugène Cicéri (1813–1890
+      [high] The work is executed in oil on wood panel, measuring approximately 47.3 by 37.1 cm (18 5/8 by 14 5/8 inches).
+      [high] The Museum of Fine Arts, Boston, holds the painting under accession number 13.460.
+      [high] The painting entered the MFA's permanent collection in 1913 as part of the Bequest of Mrs. Edward Wheelwright.
+      [high] The composition depicts a plein-air artist positioned among massive boulders and trees in the Gorge-aux-Loups 
+  [D534] Stop 4 has 29 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 4 'A Student' has 29 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via gemini (5 high-confidence) — stop will be labelled aloud
+      [high] The painting was created by the Italian painter and printmaker Felice Casorati (1883–1963), who worked primari
+      [high] The work was painted around 1930.
+      [high] The medium is oil on plywood panel.
+      [high] The painting holds the accession/object number RES.32.8 at the Museum of Fine Arts, Boston.
+      [high] The piece entered the Museum of Fine Arts, Boston collection in 1932.
+      [low] Unlike Casorati's better-known early Symbolist works or harsh metaphysical interiors, this portrait exemplifie
+  [D533] Knowledge fallback filled 4 starved stop(s)
+[TIMING] phase=external_lookups elapsed=229.4s cumulative=443.0s
+
+  [LOCAL-445] Story-first pipeline — processing 4 stops (parallel)...
+
+  [LOCAL-445] Across-stop parallelism: 4 stops, budget=40.0s, mode=PARALLEL(pool=6)
+
+  [LOCAL-443] Story-first pipeline for 'Ancient Nubia Now' (budget=25.0s)
+    [SF-STEP] stop='Ancient Nubia Now' step=1_extract_anchor_facts elapsed=0.00s
+    Step 1: anchor_facts — artist='', entities=[]
+
+  [LOCAL-443] Story-first pipeline for 'John Singer Sargent’s  The Daughters of Edward Dar' (budget=25.0s)
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=1_extract_anchor_facts elapsed=0.00s
+    Step 1: anchor_facts — artist='', entities=[]
+
+  [LOCAL-443] Story-first pipeline for 'Artist in the Gorge aux Loups, Forest of Fontaineb' (budget=25.0s)
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=1_extract_anchor_facts elapsed=0.00s
+    Step 1: anchor_facts — artist='', entities=[]
+
+  [LOCAL-443] Story-first pipeline for 'A Student' (budget=25.0s)
+    [SF-STEP] stop='A Student' step=1_extract_anchor_facts elapsed=0.00s
+    Step 1: anchor_facts — artist='', entities=[]
+  [LOCAL-441] Batch P856 check: 4 domains, budget=10s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 4 unverified, 0 budget-expired
+  [LOCAL-440] Story-seeking: 2 queries, 9 results, 0.8s
+    [SF-STEP] stop='Ancient Nubia Now' step=2_seek_stories elapsed=0.81s
+  [LOCAL-443] Full-page fetch: 3 URLs, 1 succeeded, 0.1s
+    [SF-STEP] stop='Ancient Nubia Now' step=2b_fullpage_fetch elapsed=0.14s
+    Step 2b: 1 pages → 84 story-unit candidates
+    [SF-STEP] stop='Ancient Nubia Now' step=2d_build_candidates elapsed=0.00s
+  [LOCAL-443] Pre-filter: 125 → 10 (rejected: {'short': 30, 'no_name': 11, 'duplicate': 3})
+    [SF-STEP] stop='Ancient Nubia Now' step=3_prefilter elapsed=0.00s
+    Pre-filter: 125 raw → 10 candidates for classification
+  [LOCAL-440] Story-seeking: 2 queries, 2 results, 1.3s
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=2_seek_stories elapsed=1.32s
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=2b_fullpage_fetch elapsed=0.00s
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=2d_build_candidates elapsed=0.00s
+  [LOCAL-443] Pre-filter: 31 → 5 (rejected: {'short': 20, 'no_name': 0, 'duplicate': 6})
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=3_prefilter elapsed=0.00s
+    Pre-filter: 31 raw → 5 candidates for classification
+  [LOCAL-441] Batch P856 check: 2 domains, budget=10s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 2 unverified, 0 budget-expired
+  [LOCAL-440] Story-seeking: 2 queries, 6 results, 1.5s
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=2_seek_stories elapsed=1.48s
+  [LOCAL-443] Full-page fetch: 1 URLs, 0 succeeded, 0.0s
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=2b_fullpage_fetch elapsed=0.04s
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=2d_build_candidates elapsed=0.00s
+  [LOCAL-443] Pre-filter: 37 → 6 (rejected: {'short': 26, 'no_name': 0, 'duplicate': 5})
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=3_prefilter elapsed=0.00s
+    Pre-filter: 37 raw → 6 candidates for classification
+  [LOCAL-441] Batch P856 check: 9 domains, budget=9.670329093933105s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 9 unverified, 0 budget-expired
+  [LOCAL-440] Story-seeking: 2 queries, 11 results, 1.8s
+    [SF-STEP] stop='A Student' step=2_seek_stories elapsed=1.83s
+  [LOCAL-443] Full-page fetch: 2 URLs, 1 succeeded, 0.7s
+    [SF-STEP] stop='A Student' step=2b_fullpage_fetch elapsed=0.71s
+    Step 2b: 1 pages → 47 story-unit candidates
+    [SF-STEP] stop='A Student' step=2d_build_candidates elapsed=0.00s
+  [LOCAL-443] Pre-filter: 91 → 10 (rejected: {'short': 38, 'no_name': 18, 'duplicate': 2})
+    [SF-STEP] stop='A Student' step=3_prefilter elapsed=0.00s
+    Pre-filter: 91 raw → 10 candidates for classification
+  [LOCAL-443] Concurrent classification: 0/5 are stories (1.5s)
+  [LOCAL-443] Concurrent evaluation: 5 candidates → 0 verified stories (1.5s)
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=4_classify_verify elapsed=1.51s
+    [SF-STEP] stop='Artist in the Gorge aux Loups, Forest of' step=5_size_adapt elapsed=0.00s
+    Step 4: 0 stories ready for packer (2.8s, $0.0020)
+    [SF-BREAKDOWN] stop='Artist in the Gorge aux Loups, Forest of' total=2.84s :: 4_classify_verify=1.51s, 2_seek_stories=1.32s, 3_prefilter=0.00s, 2d_build_candidates=0.00s, 1_extract_anchor_facts=0.00s, 2b_fullpage_fetch=0.00s, 5_size_adapt=0.00s
+  [LOCAL-443] Concurrent classification: 0/6 are stories (3.2s)
+  [LOCAL-443] Concurrent evaluation: 6 candidates → 0 verified stories (3.2s)
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=4_classify_verify elapsed=3.20s
+    [SF-STEP] stop='John Singer Sargent’s  The Daughters of ' step=5_size_adapt elapsed=0.00s
+    Step 4: 0 stories ready for packer (4.7s, $0.0020)
+    [SF-BREAKDOWN] stop='John Singer Sargent’s  The Daughters of ' total=4.72s :: 4_classify_verify=3.20s, 2_seek_stories=1.48s, 2b_fullpage_fetch=0.04s, 3_prefilter=0.00s, 2d_build_candidates=0.00s, 1_extract_anchor_facts=0.00s, 5_size_adapt=0.00s
+  [LOCAL-443] Concurrent classification: 0/10 are stories (5.4s)
+  [LOCAL-443] Concurrent evaluation: 10 candidates → 0 verified stories (5.4s)
+    [SF-STEP] stop='Ancient Nubia Now' step=4_classify_verify elapsed=5.43s
+    [SF-STEP] stop='Ancient Nubia Now' step=5_size_adapt elapsed=0.00s
+    Step 4: 0 stories ready for packer (6.4s, $0.0020)
+    [SF-BREAKDOWN] stop='Ancient Nubia Now' total=6.38s :: 4_classify_verify=5.43s, 2_seek_stories=0.81s, 2b_fullpage_fetch=0.14s, 2d_build_candidates=0.00s, 3_prefilter=0.00s, 1_extract_anchor_facts=0.00s, 5_size_adapt=0.00s
+  [LOCAL-443] Concurrent classification: 5/10 are stories (4.0s)
+  [LOCAL-443] Concurrent evaluation: 10 candidates → 5 verified stories (4.0s)
+    [SF-STEP] stop='A Student' step=4_classify_verify elapsed=4.00s
+    [SF-STEP] stop='A Student' step=5_size_adapt elapsed=2.40s
+    Step 4: 5 stories ready for packer (8.9s, $0.0020)
+    [SF-BREAKDOWN] stop='A Student' total=8.94s :: 4_classify_verify=4.00s, 5_size_adapt=2.40s, 2_seek_stories=1.83s, 2b_fullpage_fetch=0.71s, 3_prefilter=0.00s, 2d_build_candidates=0.00s, 1_extract_anchor_facts=0.00s
+
+  [LOCAL-445] Batch complete: 4 stops in 8.9s (budget=40.0s), stories=5, cost=$0.0080
+  [SF-AGG] stops_measured=4 wall=8.94s
+  [SF-AGG] MEAN per-stop step: 4_classify_verify=3.53s, 2_seek_stories=1.36s, 5_size_adapt=0.60s, 2b_fullpage_fetch=0.22s, 2d_build_candidates=0.00s, 3_prefilter=0.00s, 1_extract_anchor_facts=0.00s
+  [SF-AGG] MAX  per-stop step (critical path drivers): 4_classify_verify=5.43s, 5_size_adapt=2.40s, 2_seek_stories=1.83s, 2b_fullpage_fetch=0.71s, 2d_build_candidates=0.00s, 3_prefilter=0.00s, 1_extract_anchor_facts=0.00s
+    Stop 1 'Ancient Nubia Now': verified_stories=0 elapsed=6.4s cost=$0.0020
+    Stop 2 'John Singer Sargent’s  The Daughters of ': verified_stories=0 elapsed=4.7s cost=$0.0020
+    Stop 3 'Artist in the Gorge aux Loups, Forest of': verified_stories=0 elapsed=2.8s cost=$0.0020
+    Stop 4 'A Student': verified_stories=5 elapsed=8.9s cost=$0.0020
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+
+  [LOCAL-445] Story-first complete: wall_elapsed=8.9s, total_cost=$0.0080, verified_stories=5 across 4 stops
+
+Generating description for Stop 1: Ancient Nubia Now by , ...
+
+Generating description for Stop 2: John Singer Sargent’s  The Daughters of Edward Darley Boit by , ...
+
+Generating description for Stop 3: Artist in the Gorge aux Loups, Forest of Fontainebleau by , ...
+
+Generating description for Stop 4: A Student by , ...
+  [LOCAL-381] stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Rubens, Donatello, British
+  [LOCAL-411] Stop 3 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Artist in the Gorge aux Loups, Forest of Fontaineb', 18, ''), ('This rare, 11th century German or ...', 11, ''), ('Artist in the Gorge aux Loups, Forest of Fontaineb', 11, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 18 required names (no snippet evidence): ['Rubens', 'Donatello', 'British', 'Sargent', 'Linde', 'Monet', 'Newland House Drawing', 'Earth', 'Lowell', 'Nubia', 'Herb Ritts', 'Sharf Visitor', 'Renoir', 'Ruth', 'Rajput', 'Loring', 'Japanese Garden', 'National Portrait']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13576 after=32122 (+18546 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (32122)
+  [LOCAL-381] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Dou, Landon, Tchaikovsky
+  [LOCAL-411] Stop 2 snippet ranking: input=31 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('John Singer Sargent’s  The Daughters of Edward Dar', 13, ''), ('John Singer Sargent’s  The Daughters of Edward Dar', 13, ''), ('John Singer Sargent’s  The Daughters of Edward Dar', 13, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 31 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 17 required names (no snippet evidence): ['Dou', 'Landon', 'Tchaikovsky', 'Asiatic', 'Degas', 'Ancient Mesoamerica', 'Moody', 'Joseph', 'Americas', 'National', 'Musical Instruments', 'Gail', 'Emile Simon', 'Nishida', 'Carefully', 'Kinsaku Nakane', 'West']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13221 after=30890 (+17669 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (30890)
+  [LOCAL-381] stop='Ancient Nubia Now' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Rembrandt, Japanese, Conservation
+  [LOCAL-411] Stop 1 snippet ranking: input=32 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Ancient Nubia Now', 17, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 32 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 19 required names (no snippet evidence): ['Rembrandt', 'Japanese', 'Conservation', 'Dallin', 'Picture', 'Guided Tour', 'Hamilton Palace Dining', 'Athenæum', 'Bowling', 'Amorsolo', 'Sharf Information', 'Nolan', 'Gauguin', 'Margo Behrakis', 'Rabbi Howard', 'John Hubbard Sturgis', 'Chinese Song Dynasty', 'Forsyth Wickes', 'Hugh Stubbins']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12481 after=29611 (+17130 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29611)
+  [LOCAL-381] stop='A Student' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 4 beats: Angelica Lloyd Russell, Jessie, Horticultural
+  [LOCAL-411] Stop 4 snippet ranking: input=40 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('A Student', 15, ''), ('How to save money on museums in Massachusetts', 10, 'unverified'), ('[Story-first] President Nixon, Eyewitness Ginny Ri', 8, 'tier1')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 40 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 4: SUPPRESSED 16 required names (no snippet evidence): ['Angelica Lloyd Russell', 'Jessie', 'Horticultural', 'Ming', 'Pacific', 'Nishimuraya Yohachi', 'Böcklin', 'Koehler', 'Alfred Stieglitz', 'Bougival', 'Photographs', 'Laurence', 'John Goelet', 'Chris', 'Pace', 'Teitelbaum']
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13354 after=28369 (+15015 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28369)
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 4 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 4 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0036
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0044
+    story: "In the autumn of 1882, American artist John Singer Sargent painted "The Daughters of Edward Darley Boit" in Paris. The following year, he exhibited th"
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0050
+    story: "The Museum of Fine Arts, Boston, had a vast collection of ancient Nubian art, primarily assembled through the joint Harvard University–Boston Museum o"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-518/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (4 sentences), $0.0049
+    story: "In 1852, Eugène Cicéri, a French painter, lithographer, and illustrator, created the painting "Artist in the Gorge aux Loups, Forest of Fontainebleau."
+Stop 2 API call cost: $0.0380 (8010 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0349 (7348 tokens, model=gpt-4o)
+  [LOCAL-391] Stop 4: BEAT RETRY — missing ['William'], retrying (attempt 2/5)
+Stop 3 API call cost: $0.0397 (8356 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0363 (7645 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0397 (8362 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0420 (8836 tokens, model=gpt-4o)
+Stop 3 description word count: 294 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0384 (8089 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 4 API call cost: $0.0352 (7419 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'In the heart of this gallery, you stand before "A Student," a work by the Italian painter and printmaker Felice Casorati, who was known for his meticulous technique and evocative scenes. Here, Casorati captures both the solitude and introspection of a student\'s life in a delicately rendered scene. T'
+  [LOCAL-417] Stop 4: retrying (attempt 2, temp=1.00)...
+Stop 2 API call cost: $0.0424 (8919 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0407 (8563 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 4 API call cost: $0.0354 (7442 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0443 (9333 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 4 API call cost: $0.0371 (7801 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0428 (9018 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 2 API call cost: $0.0468 (9849 tokens, model=gpt-4o)
+Stop 2 description word count: 300 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0397 (8362 tokens, model=gpt-4o)
+  [LOCAL-391] Stop 4: scrubbed 1 unfilled role(s)
+Stop 4 description word count: 220 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0449 (9441 tokens, model=gpt-4o)
+Stop 1 description word count: 288 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['invites us to', 'a testament to']
+  [LOCAL-388] PRE-GATE stop='Ancient Nubia Now' beats_assigned=19 beats_in_output=3 dropped=['Dallin', 'Picture', 'Guided Tour', 'Hamilton Palace Dining', 'Athenæum', 'Bowling', 'Amorsolo', 'Sharf Information', 'Nolan', 'Gauguin', 'Margo Behrakis', 'Rabbi Howard', 'John Hubbard Sturgis', 'Chinese Song Dynasty', 'Forsyth Wickes', 'Hugh Stubbins']
+  [LOCAL-388] PRE-GATE stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' beats_assigned=18 beats_in_output=3 dropped=['Dou', 'Landon', 'Tchaikovsky', 'Degas', 'Ancient Mesoamerica', 'Moody', 'Joseph', 'Americas', 'Musical Instruments', 'Gail', 'Emile Simon', 'Nishida', 'Carefully', 'Kinsaku Nakane', 'West']
+  [LOCAL-388] PRE-GATE stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' beats_assigned=18 beats_in_output=1 dropped=['Rubens', 'Donatello', 'Sargent', 'Linde', 'Monet', 'Newland House Drawing', 'Earth', 'Lowell', 'Nubia', 'Herb Ritts', 'Sharf Visitor', 'Renoir', 'Ruth', 'Rajput', 'Loring', 'Japanese Garden', 'National Portrait']
+  [LOCAL-388] PRE-GATE stop='A Student' beats_assigned=18 beats_in_output=5 dropped=['Horticultural', 'Ming', 'Pacific', 'Nishimuraya Yohachi', 'Böcklin', 'Koehler', 'Alfred Stieglitz', 'Bougival', 'Photographs', 'Laurence', 'Chris', 'Pace', 'Teitelbaum']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Ancient Nubia Now': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✗ FAIL stop='John Singer Sargent’s  The Daughters of Edward Darley Boit': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✗ FAIL stop='Artist in the Gorge aux Loups, Forest of Fontainebleau': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✗ FAIL stop='A Student': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+  [LOCAL-439] Classification cost: $0.003413 (input=14125, output=2157)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='Ancient Nubia Now': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✓ PASS stop='John Singer Sargent’s  The Daughters of Edward Darley Boit': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='Edward Darley Boit and the artist' ← https://www.mfa.org/collections/americas
+    ✓ PASS stop='Artist in the Gorge aux Loups, Forest of Fontainebleau': claims=3, sourced=3, unsourced=0, contradicted=0
+      evidence (3 sourced claims):
+        claim='1852' ← https://www.oceansbridge.com/shop/museums/boston-museum-of-f
+        claim='Eugène Cicéri, a French painter' ← 
+        claim='1913' ← 
+    ✗ FAIL stop='A Student': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 2: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 5 paragraphs retried, 5 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0020 (2536 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Artist in the Gorge aux Loups,': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Ancient Nubia Now': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Artist in the Gorge aux Loups,': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 12
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 10
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' conf=high reason='Generic claims about artistic contributions and mission.': "The British illustrator's contributions to 19th-century illustrated books resonated with the spirit of exploration and d"
+    [LOCAL-472] UNGROUNDED entity stop='Ancient Nubia Now' entity='Fine Arts' reason='No specific link to "Fine Arts" is established.' in: "The story of "Ancient Nubia Now" unfolds through over 400 carefully chosen objects, each with tales "
+    [LOCAL-472] UNGROUNDED entity stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' entity='Francis Bartlett Donation' reason='It does not specify how the donation relates to the painting or its context.' in: "The gallery in which this painting resides is named for an influential patron, Asiatic, underscoring"
+    [LOCAL-472] UNGROUNDED entity stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' entity='Eugène Cicéri' reason='It does not specify that Cicéri painted the work at this stop.' in: "In 1852, Eugène Cicéri, a French painter, lithographer, and illustrator, created "Artist in the Gorg"
+    [LOCAL-472] UNGROUNDED entity stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' entity='Fine Arts' reason='It does not specify a direct link between the painting and the stop.' in: "In 1852, Eugène Cicéri, a French painter, lithographer, and illustrator, created "Artist in the Gorg"
+    [LOCAL-472] UNGROUNDED entity stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' entity='Edward Wheelwright' reason='It does not specify Edward Wheelwright's direct connection to the stop.' in: "In 1852, Eugène Cicéri, a French painter, lithographer, and illustrator, created "Artist in the Gorg"
+    [LOCAL-472] UNGROUNDED entity stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' entity='Barbizon School' reason='It does not specify any artist from the Barbizon School who worked in the Forest of Fontainebleau.' in: "The Forest of Fontainebleau, known for its ancient trees and rocky paths, was a favored subject for "
+    [LOCAL-472] UNGROUNDED entity stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' entity='Francis Bartlett Donation' reason='It does not specify how the Francis Bartlett Donation relates to this stop.' in: "The Forest of Fontainebleau, known for its ancient trees and rocky paths, was a favored subject for "
+    [LOCAL-472] UNGROUNDED entity stop='A Student' entity='Fine Arts' reason='It does not specify how Jessie relates to this stop.' in: "This painting became part of the Museum of Fine Arts, Boston, thanks to the generosity of John Goele"
+    [LOCAL-472] UNGROUNDED entity stop='A Student' entity='John Goelet Jessie' reason='It does not specify how Jessie is directly connected to "A Student."' in: "This painting became part of the Museum of Fine Arts, Boston, thanks to the generosity of John Goele"
+    [LOCAL-472] UNGROUNDED entity stop='A Student' entity='Angelica Lloyd Russell' reason='No concrete link to the stop is provided.' in: "The portrait's subdued palette, characterized by earthy tones and soft contrasts, enhances the figur"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/37)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 12
+    Glossed (composed): 4
+    Suppressed (already explained): 2
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1740 tokens, $0.0004, 5.3s
+    Gloss: 756 tokens, $0.0001, 2.5s
+    Compose: 1788 tokens, $0.0003, 3.2s
+    Total added cost: $0.0008
+    Stops affected: 4
+    Glosses applied:
+      • George → "the excavations in Egypt and Sudan" [source: corpus]
+      • Reisner → SUPPRESSED (already explained)
+      • Denise Doxey → "the curator of this groundbreaking display" [source: corpus]
+      • Francis Bartlett Donation → DEGRADED (name dropped)
+      • Barbizon School → SUPPRESSED (already explained)
+      • Cicéri → DEGRADED (name dropped)
+      • Francis Bartlett Donation → "a significant collection of artworks donated" [source: model]
+      • Wheelwright → DEGRADED (name dropped)
+      • Casorati → DEGRADED (name dropped)
+      • European → DEGRADED (name dropped)
+      • Angelica Lloyd Russell → "a supporter of arts and museums" [source: model]
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 45
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 2 'John Singer Sargent’s  The Dau': claim='1883 (in context: "traits d'enfants' at the Paris Salon of 1' contradicted_by='apartment. It was painted in 1882 and is now exhibited in the Art of the America' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=2 claim='1883 (in context: "traits d'enfants' at the Paris ' evidence='apartment. It was painted in 1882 and is now exhib' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Museum of Fine Arts, Boston'...
+   Authority: 3 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 4 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 2
+    [1] DELETED: 'This collection' in: This collection, the largest of its kind outside Khartoum, is a result of George
+    [2] DELETED: 'This aligns' in: This aligns with the institution's broader mission to bridge continents and eras
+    [2] DELETED: 'This masterwork' in: This masterwork encapsulates both the personal world of Edward Darley Boit and t
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Ancient Nubia Now' (index 58) — allowance 5 -> 7 sentences on regeneration, story currently 4 sentence(s)
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Ancient Nubia Now': the longest run (3 sentences, Boston Museum) has agency=1 stakes=0 — someone is described, but nothing is risk
+    stop 2 'John Singer Sargent’s  The Daughters o': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Artist in the Gorge aux Loups, Forest ': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'A Student': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Artist in the Gorge aux Loups, For' (index 26)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Ancient Nubia Now' — 231w → 180w after gates, 8 sentence(s) removed
+    removed: "This collection, the largest of its kind outside Khartoum, owes much to the diligence of George A."
+    removed: "Reisner."
+    removed: "Reisner spearheaded the joint excavations by Harvard University and the Boston Museum of Fine Arts f"
+    removed: "During these expeditions, he meticulously unearthed thousands of artifacts, which became the corners"
+    removed: "Curated by Denise Doxey and her team, this groundbreaking display invited visitors to reconsider the"
+    removed: "Meanwhile, the resonance of Rembrandt’s artistry transcends the centuries, offering a parallel in cr"
+    removed: "Known for more than just his European artworks, this visionary artist authored texts that inspired v"
+    removed: "The Japanese influence in the display design of the exhibition further underscored the global tapest"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Ancient Nubia Now is held at Museum of Fine Arts, Boston."
+
+Generating description for Stop 1: Ancient Nubia Now by , ...
+  [LOCAL-381] stop='Ancient Nubia Now' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Rembrandt, Japanese, Conservation
+  [LOCAL-411] Stop 1 snippet ranking: input=32 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('Ancient Nubia Now', 17, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 32 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 19 required names (no snippet evidence): ['Rembrandt', 'Japanese', 'Conservation', 'Dallin', 'Picture', 'Guided Tour', 'Hamilton Palace Dining', 'Athenæum', 'Bowling', 'Amorsolo', 'Sharf Information', 'Nolan', 'Gauguin', 'Margo Behrakis', 'Rabbi Howard', 'John Hubbard Sturgis', 'Chinese Song Dynasty', 'Forsyth Wickes', 'Hugh Stubbins']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12481 after=29611 (+17130 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29611)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (5 sentences), $0.0065
+    story: "The Museum of Fine Arts, Boston, held a vast collection of ancient Nubian art, primarily gathered during the joint excavations with Harvard University"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-518/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0385 (8100 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0401 (8451 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0426 (8960 tokens, model=gpt-4o)
+Stop 1 description word count: 251 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+    [D498] step 7c judged on the index, not on length: 58 -> 63, accepted=True
+    [LOCAL-474] regenerated and re-gated: 251w (was 180w)
+
+  [LOCAL-474] PHASE 5.17: retry 'John Singer Sargent’s  The Daughters of Edwa' — 300w → 127w after gates, 6 sentence(s) removed
+    removed: "In the autumn of 1882, the American artist John Singer Sargent painted "The Daughters of Edward Darl"
+    removed: "The following year, Sargent exhibited the work under the title 'Portraits d'enfants' at the Paris Sa"
+    removed: "This cherished piece eventually found its home at the Museum of Fine Arts, Boston, thanks to the gen"
+    removed: "This aligns with the institution's broader mission to bridge continents and eras, similar to when th"
+    removed: "Sargent's painting not only holds its own among these cultural riches but also enriches the dialogue"
+    removed: "As you stand before this masterwork, consider how it encapsulates both the personal world of Edward "
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "John Singer Sargent’s The Daughters of Edward Darley Boit is held at Museum of Fine Arts, Boston."
+
+Generating description for Stop 2: John Singer Sargent’s  The Daughters of Edward Darley Boit by , ...
+  [LOCAL-381] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Dou, Landon, Tchaikovsky
+  [LOCAL-411] Stop 2 snippet ranking: input=31 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('John Singer Sargent’s  The Daughters of Edward Dar', 13, ''), ('John Singer Sargent’s  The Daughters of Edward Dar', 13, ''), ('John Singer Sargent’s  The Daughters of Edward Dar', 13, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 31 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 17 required names (no snippet evidence): ['Dou', 'Landon', 'Tchaikovsky', 'Asiatic', 'Degas', 'Ancient Mesoamerica', 'Moody', 'Joseph', 'Americas', 'National', 'Musical Instruments', 'Gail', 'Emile Simon', 'Nishida', 'Carefully', 'Kinsaku Nakane', 'West']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13221 after=30890 (+17669 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (30890)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0062
+    story: "In 1882, American artist John Singer Sargent painted "The Daughters of Edward Darley Boit" in Paris, capturing a scene of four young sisters. The foll"
+Stop 2 API call cost: $0.0405 (8528 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0420 (8843 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0445 (9359 tokens, model=gpt-4o)
+Stop 2 description word count: 246 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+    [LOCAL-474] regenerated and re-gated: 246w (was 127w)
+
+  [LOCAL-474] PHASE 5.17: retry 'Artist in the Gorge aux Loups, Forest of Fon' — 294w → 201w after gates, 6 sentence(s) removed
+    removed: "Cicéri’s work, with its dramatic depiction of the gorge, aligns with this tradition, highlighting th"
+    removed: "Wheelwright's bequest mirrors the institution's commitment to expanding its collection, similar to t"
+    removed: "Interestingly, the British illustrator's contributions to 19th-century illustrated books resonated w"
+    removed: "This echoes the museum's broader mission to document and celebrate artistic achievements from around"
+    removed: "As you stand here, consider the lasting impact of these acquisitions and donations, both on the muse"
+    removed: "The legacy of collectors and donors like Wheelwright and Bartlett continues to resonate within these"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Artist in the Gorge aux Loups, Forest of Fontainebleau is held at Museum of Fine Arts, Boston."
+
+Generating description for Stop 3: Artist in the Gorge aux Loups, Forest of Fontainebleau by , ...
+  [LOCAL-381] stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Rubens, Donatello, British
+  [LOCAL-411] Stop 3 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Artist in the Gorge aux Loups, Forest of Fontaineb', 18, ''), ('This rare, 11th century German or ...', 11, ''), ('Artist in the Gorge aux Loups, Forest of Fontaineb', 11, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 18 required names (no snippet evidence): ['Rubens', 'Donatello', 'British', 'Sargent', 'Linde', 'Monet', 'Newland House Drawing', 'Earth', 'Lowell', 'Nubia', 'Herb Ritts', 'Sharf Visitor', 'Renoir', 'Ruth', 'Rajput', 'Loring', 'Japanese Garden', 'National Portrait']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13576 after=32122 (+18546 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (32122)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=True (4 sentences), $0.0060
+    story: "Eugène Cicéri painted "Artist in the Gorge aux Loups, Forest of Fontainebleau" in 1852, capturing the essence of the French landscape. In 1913, this p"
+Stop 3 API call cost: $0.0421 (8866 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0438 (9211 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0461 (9710 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0480 (10106 tokens, model=gpt-4o)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0507 (10664 tokens, model=gpt-4o)
+Stop 3 description word count: 286 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+
+  [LOCAL-474] PHASE 5.17: retry 'A Student' — 193w → 168w after gates, 5 sentence(s) removed
+    removed: "This painting became part of the Museum of Fine Arts, Boston, thanks to the generosity of the John G"
+    removed: "By gifting "A Student," Jessie ensured that Casorati's contemplative vision would find its rightful "
+    removed: "William also played a pivotal role in this acquisition, providing the museum an opportunity to showc"
+    removed: "Through such contributions, the museum continues its tradition of expanding its collection, adding d"
+    removed: "This display of collaborative effort among patrons like Angelica Lloyd Russell, Jessie, and William "
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "A Student is held at Museum of Fine Arts, Boston."
+
+Generating description for Stop 4: A Student by , ...
+  [LOCAL-381] stop='A Student' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 4 beats: Angelica Lloyd Russell, Jessie, Horticultural
+  [LOCAL-411] Stop 4 snippet ranking: input=40 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [('A Student', 15, ''), ('How to save money on museums in Massachusetts', 10, 'unverified'), ('[Story-first] President Nixon, Eyewitness Ginny Ri', 8, 'tier1')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 40 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 4: SUPPRESSED 16 required names (no snippet evidence): ['Angelica Lloyd Russell', 'Jessie', 'Horticultural', 'Ming', 'Pacific', 'Nishimuraya Yohachi', 'Böcklin', 'Koehler', 'Alfred Stieglitz', 'Bougival', 'Photographs', 'Laurence', 'John Goelet', 'Chris', 'Pace', 'Teitelbaum']
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13354 after=28369 (+15015 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28369)
+  [D498] Stop 4 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 4 story pass: ok=True (3 sentences), $0.0055
+    story: "Felice Casorati, an Italian painter and printmaker, created "A Student" while primarily working in Turin. This painting eventually found its way to th"
+Stop 4 API call cost: $0.0360 (7587 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Felice Casorati, an Italian painter and printmaker, crafted "A Student" during his time working primarily in Turin. This intriguing piece now resides in the Museum of Fine Arts in Boston, enriching the cultural landscape by allowing visitors to engage with Casorati\'s distinctive artistic vision. The'
+  [LOCAL-417] Stop 4: retrying (attempt 1, temp=0.90)...
+Stop 4 API call cost: $0.0361 (7596 tokens, model=gpt-4o)
+  [LOCAL-391] Stop 4: BEAT RETRY — missing ['William'], retrying (attempt 3/5)
+Stop 4 API call cost: $0.0366 (7709 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Felice Casorati, an Italian painter and printmaker, created "A Student" while primarily working in Turin. This painting eventually found its way to the Museum of Fine Arts in Boston, where it is now part of their collection. Its presence in the museum allows visitors to engage with Casorati\'s unique'
+  [LOCAL-417] Stop 4: retrying (attempt 3, temp=1.00)...
+Stop 4 API call cost: $0.0367 (7725 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Felice Casorati, an Italian painter and printmaker, created "A Student" while working primarily in Turin. This painting eventually made its way to the Museum of Fine Arts, Boston, where it enriches the cultural tapestry through Casorati’s distinct artistic vision. The work reflects a moment of conte'
+  [LOCAL-417] Stop 4: retrying (attempt 4, temp=1.00)...
+Stop 4 API call cost: $0.0366 (7706 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 4: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Felice Casorati, the Italian painter and printmaker, was primarily active in Turin when he created "A Student." This intriguing painting finds itself amidst the collections at the Museum of Fine Arts, Boston, a result of the museum\'s continuous effort to engage with diverse narratives and artistic j'
+  [LOCAL-417] Stop 4: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 4: resolved final description (234 words)
+Stop 4 description word count: 234 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+    [LOCAL-474] regenerated and re-gated: 205w (was 168w)
+      [PERSON-CAP] stop 4: 'arts' already carries two stops — cut: This painting eventually made its way to the Museum of Fine Arts, Boston, where 
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/programs/community-programs/art-making-at-home/printmaking (attempt 1)
+  [LOCAL-459] R5: Fetched 1529 chars from https://www.mfa.org/programs/community-programs/ar
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.1s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.8s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 6.1s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=9HTyAganCIw (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/beyond-the-gallery/sylvester-koehler-exploring-print-history (attempt 1)
+  [LOCAL-459] R5: Fetched 1803 chars from https://www.mfa.org/beyond-the-gallery/sylvester-k
+  [LOCAL-427] HTTP 200 from https://augustaarts.com/calls-for-artists/printmaking-process-and-possibilities/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1186 chars from https://augustaarts.com/calls-for-artists/printmak
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=pJcMN8Mwuxk (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.tribecaprintworks.com/history-of-printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1724 chars from https://www.tribecaprintworks.com/history-of-print
+  [LOCAL-427] HTTP 200 from https://blog.dma.org/tag/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2297 chars from https://blog.dma.org/tag/printmaking/
+  [D512] verb discovery: query='Museum of Fine Arts, Boston printmaking process how it is made t' -> 8 new verb(s): applied, uncarved, inked, unparalleled, required, exceed, coated, tried
+  [D512] _AGENCY_VERB widened by 8 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: Ancient Nubia Now
+    [D501] no object record for 'Ancient Nubia Now' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 1.1                    kind=none     idx=18  C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/exhibitions/nubia (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.mfa.org/exhibitions/nubia
+  [LOCAL-427] HTTP 200 from https://gregcookland.com/wonderland/2020/01/17/nubia/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2157 chars from https://gregcookland.com/wonderland/2020/01/17/nub
+  [LOCAL-427] HTTP 200 from https://ajaonline.org/wp-content/uploads/2020/05/1243_Emberling.pdf (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.americamagazine.org/arts-culture/2019/12/20/ancient-nubia-now-combines-aesthetic-brilliance-political-challenge/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2204 chars from https://www.americamagazine.org/arts-culture/2019/
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/video/ancient-nubia-now-walkthrough (attempt 1)
+  [LOCAL-459] R5: Fetched 2976 chars from https://www.mfa.org/video/ancient-nubia-now-walkth
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/press-release/nubia (attempt 1)
+  [LOCAL-459] R5: Fetched 1796 chars from https://www.mfa.org/press-release/nubia
+  [LOCAL-427] HTTP 200 from https://www.albanyinstitute.org/event/unearthing-ancient-nubia (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.albanyinstitute.org/event/unearthing-a
+    [D511] 4.1                    kind=inert    idx=38  C2 X3 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/collections/ancient-egypt-nubia-and-the-near-east (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.mfa.org/collections/ancient-egypt-nubi
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/ISAC.UChicago/posts/while-we-wait-for-the-isac-special-exhibition-a-bestiary-of-ancient-nubia-to-ope/1423409856490905/ (attempt 1)
+  [LOCAL-427] HTTP 200 from http://www.jewelry-history.com/2014/07/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2236 chars from http://www.jewelry-history.com/2014/07/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/ISAC.UChicago/posts/the-isac-museum-special-exhibition-a-bestiary-of-ancient-nubia-opens-next-thursd/1431383055693585/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/275114380263865/posts/1471692420606049/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://iconotheca.com/museums/museum-of-fine-arts-boston/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://iconotheca.com/museums/museum-of-fine-arts
+  [LOCAL-427] Cache HIT: https://www.mfa.org/press-release/nubia (18741 chars)
+  [LOCAL-459] R5: Fetched 1796 chars from https://www.mfa.org/press-release/nubia
+  [LOCAL-427] HTTP 200 from https://patrons.org.es/ancient-nubia-now/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2292 chars from https://patrons.org.es/ancient-nubia-now/
+  [LOCAL-427] Cache HIT: https://www.americamagazine.org/arts-culture/2019/12/20/ancient-nubia-now-combines-aesthetic-brilliance-political-challenge/ (14784 chars)
+  [LOCAL-459] R5: Fetched 2796 chars from https://www.americamagazine.org/arts-culture/2019/
+    [D511] 4.2                    kind=active   idx=40  C3 X3 fail:index_d515  [old gate: eventful,index]
+  [LOCAL-427] Cache HIT: https://www.mfa.org/exhibitions/nubia (10149 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.mfa.org/exhibitions/nubia
+  [LOCAL-427] Cache HIT: https://patrons.org.es/ancient-nubia-now/ (19058 chars)
+  [LOCAL-459] R5: Fetched 3003 chars from https://patrons.org.es/ancient-nubia-now/
+  [LOCAL-427] Cache HIT: https://gregcookland.com/wonderland/2020/01/17/nubia/ (19182 chars)
+  [LOCAL-459] R5: Fetched 2157 chars from https://gregcookland.com/wonderland/2020/01/17/nub
+  [LOCAL-427] Cache HIT: https://gregcookland.com/wonderland/2020/01/17/nubia/ (19182 chars)
+  [LOCAL-459] R5: Fetched 2479 chars from https://gregcookland.com/wonderland/2020/01/17/nub
+  [LOCAL-427] HTTP 200 from https://www.scribd.com/document/891082720/Ancient-Nubia-a-Captivating-Gu-History-Captivating (attempt 1)
+  [LOCAL-459] R5: Fetched 2289 chars from https://www.scribd.com/document/891082720/Ancient-
+    [D511] 5.1                    kind=active   idx=35  C1 X4 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.076, max=0.197 (DIVERSE)
+      presented over 400 m × formed the foundatio = 0.010
+      presented over 400 m × offering a glimpse i = 0.003
+      presented over 400 m × inspired visual stor = 0.009
+      formed the foundatio × offering a glimpse i = 0.197
+      formed the foundatio × inspired visual stor = 0.131
+      offering a glimpse i × inspired visual stor = 0.104
+    [D511] examined 4 credit_line(s) (indices 18, 38, 40, 35), no story passed, ~$0.054, 68s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: John Singer Sargent’s  The Daughters of Edwa
+    [D501] no object record for 'John Singer Sargent’s  The Daughters of Edwa' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+  [LOCAL-427] HTTP 200 from https://teenworldarts.com/magazine/sargent-daughters-boit (attempt 1)
+  [LOCAL-459] R5: Fetched 890 chars from https://teenworldarts.com/magazine/sargent-daughte
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/1748037352167720/posts/3315901872047919/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1723 chars from https://ascholarlyskater.com/2018/04/18/mysterious
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/PastelMarketplace/videos/john-singer-sargents-the-daughters-of-edward-darley-boit-is-one-of-those-portrai/960343043633002/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=-znOSWfAb_8 (attempt 1)
+  [LOCAL-427] HTTP 200 from http://www.thelonelypalette.com/episode-11-sargent (attempt 1)
+  [LOCAL-459] R5: Fetched 1479 chars from http://www.thelonelypalette.com/episode-11-sargent
+  [LOCAL-427] Cache HIT: https://teenworldarts.com/magazine/sargent-daughters-boit (18884 chars)
+  [LOCAL-459] R5: Fetched 890 chars from https://teenworldarts.com/magazine/sargent-daughte
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=Z4eDbsV9SCI (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.mfa.org/media/audio/8964 (attempt 1)
+  [LOCAL-459] R5: Fetched 2379 chars from https://www.mfa.org/media/audio/8964
+  [LOCAL-427] Cache HIT: https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/ (5026 chars)
+  [LOCAL-459] R5: Fetched 1723 chars from https://ascholarlyskater.com/2018/04/18/mysterious
+    [D511] 1.1                    kind=inert    idx=26  C1 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/everythingvictorian/posts/3769079929904256/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://teenworldarts.com/magazine/sargent-daughters-boit (18884 chars)
+  [LOCAL-459] R5: Fetched 890 chars from https://teenworldarts.com/magazine/sargent-daughte
+  [LOCAL-427] Cache HIT: https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/ (5026 chars)
+  [LOCAL-459] R5: Fetched 1723 chars from https://ascholarlyskater.com/2018/04/18/mysterious
+  [LOCAL-427] Cache HIT: https://www.mfa.org/media/audio/8964 (2379 chars)
+  [LOCAL-459] R5: Fetched 2379 chars from https://www.mfa.org/media/audio/8964
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/PastelMarketplace/posts/john-singer-sargents-the-daughters-of-edward-darley-boit-is-one-of-those-portrai/122187163400752320/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/100057556297114/posts/john-singer-sargent-american-painter-18561925-the-daughters-of-edward-darley-boi/3484644414920766/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.thehistoryofart.org/john-singer-sargent/daughters-of-edward-darley-boit/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2899 chars from https://www.thehistoryofart.org/john-singer-sargen
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/theartguide/posts/daily-art-quotetheres-something-sad-about-the-picture-and-when-i-discovered-that/1697252492198922/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/female.artists.in.history/posts/attributed-tocamelia-whitehurst-american-painter-1871-1936the-red-blanket-portra/1545552000945184/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/641056265549785/posts/879800515008691/ (attempt 1)
+    [D511] 2.1                    kind=active   idx=37  C1 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] Cache HIT: https://teenworldarts.com/magazine/sargent-daughters-boit (18884 chars)
+  [LOCAL-459] R5: Fetched 890 chars from https://teenworldarts.com/magazine/sargent-daughte
+  [LOCAL-427] Cache HIT: https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/ (5026 chars)
+  [LOCAL-459] R5: Fetched 1723 chars from https://ascholarlyskater.com/2018/04/18/mysterious
+  [LOCAL-427] Cache HIT: http://www.thelonelypalette.com/episode-11-sargent (27646 chars)
+  [LOCAL-459] R5: Fetched 1479 chars from http://www.thelonelypalette.com/episode-11-sargent
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/anna.agnelli.798/posts/my-favorite-painting-by-john-singer-sargent-the-daughters-of-edward-darley-boit-/1472147703840583/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://www.thehistoryofart.org/john-singer-sargent/daughters-of-edward-darley-boit/ (40690 chars)
+  [LOCAL-459] R5: Fetched 2899 chars from https://www.thehistoryofart.org/john-singer-sargen
+  [LOCAL-427] HTTP 200 from http://arteyewitness.blogspot.com/2025/06/art-eyewitness-review-sargent-and-paris.html (attempt 1)
+  [LOCAL-459] R5: Fetched 1409 chars from http://arteyewitness.blogspot.com/2025/06/art-eyew
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/61556013975806/posts/john-singer-sargent-1856-1925-the-daughters-of-edward-darley-boit-detail-1882-oi/122244362390200465/ (attempt 1)
+  [LOCAL-427] Timeout from https://www.washingtonpost.com/entertainment/art/2025/05/31/john-singer-sargent-paris-met-review/ — retrying in 2.0s
+  [LOCAL-427] Timeout from https://www.washingtonpost.com/entertainment/art/2025/05/31/john-singer-sargent-paris-met-review/ — budget exhausted (2 attempts)
+  [LOCAL-427] HTTP 200 from https://permanentcollections.substack.com/p/the-museum-of-fine-arts-in-boston-667 (attempt 1)
+  [LOCAL-459] R5: Fetched 2107 chars from https://permanentcollections.substack.com/p/the-mu
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/gardnermuseum/posts/this-is-violet-the-younger-sister-of-john-singer-sargentbefore-her-marriage-in-1/1484028323765383/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/heritagefilmproject/videos/john-singer-sargents-madame-x-themet-art/1949167985954915/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/DQLmsVNAtNK/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/AuthorAngelaBell/posts/portrait-of-edith-russell-circa-1884by-john-singer-sargent-1856-1925-victorianer/1965481893701294/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/921221289237878/posts/1165658978127440/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/175656581404240/posts/1193369099632978/ (attempt 1)
+  [LOCAL-427] Cache HIT: https://teenworldarts.com/magazine/sargent-daughters-boit (18884 chars)
+  [LOCAL-459] R5: Fetched 890 chars from https://teenworldarts.com/magazine/sargent-daughte
+  [LOCAL-427] Cache HIT: https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/ (5026 chars)
+  [LOCAL-459] R5: Fetched 1723 chars from https://ascholarlyskater.com/2018/04/18/mysterious
+  [LOCAL-427] HTTP 200 from https://open.spotify.com/episode/4ArXvSNKr9UIwnCrKo0EXK?go=1&sp_cid=254315503c2364daf1a639faf9679571&utm_source=embed_player_p&utm_medium=desktop (attempt 1)
+  [LOCAL-459] R5: Fetched 509 chars from https://open.spotify.com/episode/4ArXvSNKr9UIwnCrK
+  [LOCAL-427] Cache HIT: https://teenworldarts.com/magazine/sargent-daughters-boit (18884 chars)
+  [LOCAL-459] R5: Fetched 890 chars from https://teenworldarts.com/magazine/sargent-daughte
+  [LOCAL-427] Cache HIT: https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/ (5026 chars)
+  [LOCAL-459] R5: Fetched 1311 chars from https://ascholarlyskater.com/2018/04/18/mysterious
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=7DbW78SHNS4 (attempt 1)
+  [LOCAL-427] Cache HIT: https://www.mfa.org/media/audio/8964 (2379 chars)
+  [LOCAL-459] R5: Fetched 2379 chars from https://www.mfa.org/media/audio/8964
+    [D511] 3.1                    kind=inert    idx=28  C1 X10 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.203, max=0.269 (DIVERSE)
+      capturing a moment t × Edward Darley Boit,  = 0.204
+      capturing a moment t × introducing it to a  = 0.269
+      Edward Darley Boit,  × introducing it to a  = 0.135
+    [D511] examined 4 credit_line(s) (indices 26, 37, 28), no story passed, ~$0.057, 112s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: Artist in the Gorge aux Loups, Forest of Fon
+    [D501] no object record for 'Artist in the Gorge aux Loups, Forest of Fon' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+  [LOCAL-427] HTTP 200 from https://commons.wikimedia.org/wiki/File:Eug%C3%A8ne_Cic%C3%A9ri_-_Artist_in_the_Gorge_aux_Loups,_Forest_of_Fontainebleau_-_13.460_-_Museum_of_Fine_Arts.jpg (attempt 1)
+  [LOCAL-459] R5: Fetched 1553 chars from https://commons.wikimedia.org/wiki/File:Eug%C3%A8n
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/p/CNmxDzCFFx8/?hl=tl (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.wikidata.org/wiki/Q20539424 (attempt 1)
+  [LOCAL-459] R5: Fetched 2014 chars from https://www.wikidata.org/wiki/Q20539424
+  [LOCAL-427] HTTP 200 from https://eustis.estate/location/woman-reading-tree/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1974 chars from https://eustis.estate/location/woman-reading-tree/
+    [D511] 1.2                    kind=active   idx=50  C2 X2 PASS  [old gate: eventful,index,confirmed]
+  [LOCAL-427] Cache HIT: https://commons.wikimedia.org/wiki/File:Eug%C3%A8ne_Cic%C3%A9ri_-_Artist_in_the_Gorge_aux_Loups,_Forest_of_Fontainebleau_-_13.460_-_Museum_of_Fine_Arts.jpg (5978 chars)
+  [LOCAL-459] R5: Fetched 1553 chars from https://commons.wikimedia.org/wiki/File:Eug%C3%A8n
+  [LOCAL-427] Cache HIT: https://www.wikidata.org/wiki/Q20539424 (2014 chars)
+  [LOCAL-459] R5: Fetched 2014 chars from https://www.wikidata.org/wiki/Q20539424
+  [LOCAL-427] Cache HIT: https://eustis.estate/location/woman-reading-tree/ (12725 chars)
+  [LOCAL-459] R5: Fetched 1974 chars from https://eustis.estate/location/woman-reading-tree/
+    [D511] 2.1                    kind=active   idx=40  C2 X2 fail:index_d515  [old gate: eventful,index]
+    [LOCAL-468] pairwise overlap: mean=0.297, max=0.297 (DIVERSE)
+      he often explored th × Boston's permanent c = 0.297
+    [D511] examined 4 credit_line(s) (indices 50, 40), STORY ACCEPTED at 50, ~$0.038, 34s
+      [D518] dropped (anchors 1.00 1852,ciceri,eugene,french | content 0.43): "In 1852, Eugène Cicéri, a French painter, lithographer, and illustrator, created "Artist"
+    [D518] 1 of 8 prose sentence(s) replaced by story 1
+    [D511] stop 3: 1 story published (50) from credit_lines 'he often explored through his art'
+
+  [D511] stop 4: A Student
+    [D501] no object record for 'A Student' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 3.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] examined 4 credit_line(s), no story passed, ~$0.036, 34s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 1/4 stops got a gated story (0 with multiple stories), ~$0.185, [D518] 1 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Ancient Nubia Now                          63    24     0    81
+     2  John Singer Sargent’s  The Daughters of    37    32     6    80
+     3  Artist in the Gorge aux Loups, Forest of   46    38     7    54
+     4  A Student                                  23     0     0    45
+    [LOCAL-485] index mean 42.2 over 4 stop(s), range 23-63
+    [LOCAL-485] weakest: 'A Student' at 23
+[TIMING] phase=story_first elapsed=489.3s cumulative=932.2s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 3 facts found {'architecture': 1, 'founding': 2}
+  [LOCAL-382] Thesis block injected into prolog (374 chars)
+  [R2] Prolog saved for Stop 1 (103 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 103 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 103 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 181
+    Words after:  181
+    Delta: 0
+    Stops affected: 0/4
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 3.0s, $0.0094, 1389 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Ancient Nubia Now] (reversal): During the exhibition, pieces were displayed in both traditional and innovative ...
+      [John Singer Sargent’s  The Daughters of Edward Darley Boit] (mystery): The somber palette and expansive setting evoke a timeless quality, inviting view...
+      [Artist in the Gorge aux Loups, Forest of Fontainebleau] (cause): This bequest ensured that the painting would be preserved and accessible to the ...
+      [A Student] (mystery): What’s remarkable here is how different patrons have enabled this continuity of ...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0035 (588 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (38 words):
+      "As we journey forward, prepare to explore the innovative display of Nubian history at Ancient Nubia Now and the preservation efforts of Artist in the Gorge aux Loups, Forest of Fontainebleau, ensuring the painting's accessibility for future generations."
+      Stops referenced: 2
+    Part 4 total cost: $0.0035
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Museum of Fine Arts, Boston — next is John ...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Artist in the Gorge aux Loups, Forest of Fontainebleau...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Your final stop in Museum of Fine Arts, Boston: A Student....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 3.1s, $0.0027, 451 tokens
+  [LOCAL-280] Recap built: 30 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Ancient Nubia Now] (reversal): "During the exhibition, pieces were displayed in both traditional and innovative ..."
+      → composed: "Ancient Nubia Now, pieces displayed traditionally and innovatively to rewrite misconceptions"
+    [John Singer Sargent’s  The Daughters of Edward Darley Boit] (mystery): "The somber palette and expansive setting evoke a timeless quality, inviting view..."
+      → composed: "John Singer Sargent’s The Daughters of Edward Darley Boit, somber palette evokes timeless quality"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Ancient Nubia Now, pieces displayed traditionally and innovatively to rewrite misconceptions and John Singer Sargent’s The Daughters of Edward Darley Boit, somber palette evokes timeless quality."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (698888 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 2
+    Dropped: 0
+    AUDIT: closed_day | Closed on Wednesday | http://www.mfa.org/visit | VERIFIED
+    AUDIT: hours | 10:00–05:00 | http://www.mfa.org/visit | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (2 verified)
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 4 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to explore the Museum of Fine Arts in Boston, where you will encounter four remarkable..."
+  [2] "In 1882, John Singer Sargent painted "The Daughters of Edward Darley Boit" in Paris, capturing a mom..."
+  [3] "Felice Casorati, an Italian painter and printmaker, created "A Student" while working primarily in T..."
+  [4] "From Ancient Nubia Now to A Student, you have followed the thread of Francis Bartlett's Legacy in Mu..."
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='Ancient Nubia Now' beats_assigned=19 beats_in_output=5 dropped=['Dallin', 'Picture', 'Hamilton Palace Dining', 'Athenæum', 'Bowling', 'Amorsolo', 'Nolan', 'Gauguin', 'Margo Behrakis', 'Rabbi Howard', 'John Hubbard Sturgis', 'Chinese Song Dynasty', 'Forsyth Wickes', 'Hugh Stubbins'] causes=[Dallin=never_written, Picture=never_written, Hamilton Palace Dining=never_written, Athenæum=never_written, Bowling=never_written, Amorsolo=never_written, Nolan=never_written, Gauguin=never_written, Margo Behrakis=never_written, Rabbi Howard=never_written, John Hubbard Sturgis=never_written, Chinese Song Dynasty=never_written, Forsyth Wickes=never_written, Hugh Stubbins=never_written]
+    stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' beats_assigned=18 beats_in_output=3 dropped=['Dou', 'Tchaikovsky', 'Asiatic', 'Degas', 'Ancient Mesoamerica', 'Moody', 'Joseph', 'Americas', 'Musical Instruments', 'Gail', 'Emile Simon', 'Nishida', 'Carefully', 'Kinsaku Nakane', 'West'] causes=[Dou=never_written, Tchaikovsky=never_written, Asiatic=never_written, Degas=never_written, Ancient Mesoamerica=never_written, Moody=never_written, Joseph=never_written, Americas=never_written, Musical Instruments=never_written, Gail=never_written, Emile Simon=never_written, Nishida=never_written, Carefully=never_written, Kinsaku Nakane=never_written, West=never_written]
+    stop='Artist in the Gorge aux Loups, Forest of Fontainebleau' beats_assigned=18 beats_in_output=0 dropped=['Rubens', 'Donatello', 'British', 'Sargent', 'Linde', 'Monet', 'Newland House Drawing', 'Earth', 'Lowell', 'Nubia', 'Herb Ritts', 'Sharf Visitor', 'Renoir', 'Ruth', 'Rajput', 'Loring', 'Japanese Garden', 'National Portrait'] causes=[Rubens=never_written, Donatello=never_written, British=never_written, Sargent=never_written, Linde=never_written, Monet=never_written, Newland House Drawing=never_written, Earth=never_written, Lowell=never_written, Nubia=never_written, Herb Ritts=never_written, Sharf Visitor=never_written, Renoir=never_written, Ruth=never_written, Rajput=never_written, Loring=never_written, Japanese Garden=never_written, National Portrait=never_written]
+    stop='A Student' beats_assigned=18 beats_in_output=3 dropped=['Angelica Lloyd Russell', 'Jessie', 'Horticultural', 'Ming', 'Pacific', 'Nishimuraya Yohachi', 'Böcklin', 'Koehler', 'Alfred Stieglitz', 'Bougival', 'Photographs', 'Laurence', 'John Goelet', 'Chris', 'Teitelbaum'] causes=[Angelica Lloyd Russell=never_written, Jessie=never_written, Horticultural=never_written, Ming=never_written, Pacific=never_written, Nishimuraya Yohachi=never_written, Böcklin=never_written, Koehler=never_written, Alfred Stieglitz=never_written, Bougival=never_written, Photographs=never_written, Laurence=never_written, John Goelet=never_written, Chris=never_written, Teitelbaum=never_written]
+
+=== Word Count Statistics ===
+Stop 1: Ancient Nubia Now - 288 words
+Stop 2: John Singer Sargent’s  The Daughters of Edward Darley Boit - 300 words
+Stop 3: Artist in the Gorge aux Loups, Forest of Fontainebleau - 294 words
+Stop 4: A Student - 220 words
+===========================
+
+
+Total API cost: $0.5094 (46681 tokens)
+CACHE STORE: Museum of Fine Arts, Boston MA / contained / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-518/tours/local518_museum_of_fine_arts_boston_ma.json
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-518/tours/local518_museum_of_fine_arts_boston_ma.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Museum of Fine Arts, Boston MA - Museum Tour
+Tour-Category: museum
+
+Stop 1: Ancient Nubia Now
+
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Coordinates: 42.3394, -71.0897
+
+Museum Information: Closed on Wednesday. 10:00–05:00
+
+Orientation: You are about to explore the Museum of Fine Arts in Boston, where you will encounter four remarkable works: Ancient Nubia Now, John Singer Sargent’s The Daughters of Edward Darley Boit, Artist in the Gorge aux Loups, Forest of ...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Ancient Nubia Now: serp_results=20 snippets_injected=28 beats_in_delivered_text=0
+    John Singer Sargent’s  The Daughters of Edward Dar: serp_results=15 snippets_injected=23 beats_in_delivered_text=1
+    Artist in the Gorge aux Loups, Forest of Fontaineb: serp_results=19 snippets_injected=24 beats_in_delivered_text=0
+    A Student: serp_results=21 snippets_injected=29 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=396.4s cumulative=1328.7s
+[TIMING] phase=verification elapsed=0.0s cumulative=1328.7s
+[TIMING] TOTAL wall=1328.7s phases: story_first=489.3s, packing=396.4s, external_lookups=229.4s, poi_selection=164.1s, fact_sheets=47.9s, intent=1.5s, narration=0.1s, verification=0.0s

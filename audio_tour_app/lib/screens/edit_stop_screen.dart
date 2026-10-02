@@ -9,10 +9,38 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_editing_service.dart';
 import '../services/html_audio_player_service.dart';
 import '../services/html_audio_recorder_service.dart';
+import '../services/webview_console_logger.dart';
+import '../utils/tour_path_healer.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 // Cross-platform native recording: Android MediaRecorder, iOS AVAudioRecorder
 // Replaces flutter_sound due to consistent microphone access issues
+
+/// LOCAL-478 — What `_loadSelectedAudio` should do given controller readiness.
+///
+/// Extracted as a pure value so the null-controller path is unit-testable
+/// without a WebView / platform channel. The ORIGINAL defect was a bare
+/// `return` when the controller was null: no log, no UI, no retry. The plan
+/// makes the two legitimate outcomes explicit and enforces that "controller
+/// not ready" is a *deferred, logged* outcome — never a silent drop.
+enum AudioLoadPlan {
+  /// Controller is ready: proceed to resolve + load the audio.
+  proceed,
+
+  /// Controller is null: log the reason and remember the request so
+  /// onWebViewCreated can replay it. Must NOT be a silent no-op.
+  deferAndLog,
+}
+
+/// Decide how to handle a load request given whether the audio WebView
+/// controller exists yet.
+///
+/// A test pins this: if someone reintroduces the silent `return`, the mapping
+/// from `controllerReady == false` to [AudioLoadPlan.deferAndLog] breaks and
+/// the test goes red (AC #4).
+AudioLoadPlan planAudioLoad({required bool controllerReady}) {
+  return controllerReady ? AudioLoadPlan.proceed : AudioLoadPlan.deferAndLog;
+}
 
 class EditStopScreen extends StatefulWidget {
   final Map<String, dynamic> tourData;
@@ -39,6 +67,18 @@ class _EditStopScreenState extends State<EditStopScreen> {
   final HtmlAudioRecorderService _htmlRecorder = HtmlAudioRecorderService();
   InAppWebViewController? _audioWebViewController;
   InAppWebViewController? _recorderWebViewController;
+  // LOCAL-483: forward each WebView's JS console (errors/warnings always,
+  // verbose only in debug) into DebugLogHelper so a failure inside the WebView
+  // — like the audio retry-loop error that read as success in Michael's log —
+  // shows up in the device log instead of dying in the WebView.
+  final WebViewConsoleLogger _audioConsoleLogger =
+      WebViewConsoleLogger(source: 'editor-audio');
+  final WebViewConsoleLogger _recorderConsoleLogger =
+      WebViewConsoleLogger(source: 'editor-recorder');
+  // LOCAL-478: set when _loadSelectedAudio ran before the audio WebView was
+  // ready. onWebViewCreated replays the load once the controller exists so the
+  // request is retried rather than silently dropped.
+  bool _pendingAudioLoad = false;
   bool _hasCustomAudio = false;
   bool _isRecording = false;
   bool _isPausedRecording = false;
@@ -220,6 +260,15 @@ class _EditStopScreenState extends State<EditStopScreen> {
   void dispose() {
     _textController.dispose();
     _htmlRecorder.dispose();
+    // LOCAL-482: delete the scratch player HTML written beside the audio so it
+    // never ends up in a re-zip, download, or sync (AC #5). dispose() can't be
+    // async; fire-and-forget the deletion (same pattern as _htmlRecorder).
+    _htmlAudioPlayer.dispose();
+    // LOCAL-483: flush any held (de-duplicated) console run so the last line of
+    // a burst is not lost when the WebViews go away. dispose() can't be async;
+    // fire-and-forget like the deletions above.
+    _audioConsoleLogger.flush();
+    _recorderConsoleLogger.flush();
     super.dispose();
   }
 
@@ -326,16 +375,65 @@ class _EditStopScreenState extends State<EditStopScreen> {
   }
   
   Future<void> _loadSelectedAudio() async {
-    if (_audioWebViewController == null) return;
-    
+    // LOCAL-478: The original defect was a bare `return` here. When the audio
+    // WebView had not finished creating yet, the controller was null and the
+    // loader vanished — no log line, no UI change, just `00:00 -- 00:00`. That
+    // silence made the field report undiagnosable. We now (a) log the bail,
+    // (b) remember the request, and (c) let onWebViewCreated replay it once the
+    // controller exists. Do NOT restore the silent return — see
+    // test/edit_stop_audio_load_test.dart (AC #4).
+    if (planAudioLoad(controllerReady: _audioWebViewController != null) ==
+        AudioLoadPlan.deferAndLog) {
+      _pendingAudioLoad = true;
+      await DebugLogHelper.addDebugLog(
+        'AUDIO_LOAD: Controller not ready for "$_selectedAudioSource" — '
+        'deferring load until WebView is created');
+      return;
+    }
+    _pendingAudioLoad = false;
+
     try {
       if (_selectedAudioSource == 'original') {
-        // Load original audio
-        final tourPath = widget.tourData['path'];
-        final audioFile = widget.stopData['audio_file'];
-        final audioPath = '$tourPath/$audioFile';
-        await _htmlAudioPlayer.loadAudio(audioPath, _audioWebViewController!);
-        await DebugLogHelper.addDebugLog('AUDIO_LOAD: Loaded original audio: $audioPath');
+        // Load original audio.
+        final tourPath = widget.tourData['path'] as String? ?? '';
+        final audioFile = widget.stopData['audio_file'] as String? ?? '';
+
+        // LOCAL-478: heal stale iOS container UUID before touching the file.
+        // The stored tourPath is absolute; after a reinstall/TestFlight update
+        // it points into an old container. This is the SAME rule the Listen
+        // screen applies to saved_tours (shared healTourPath util).
+        final docsDir = (await getApplicationDocumentsDirectory()).path;
+        final rawPath = '$tourPath/$audioFile';
+        final audioPath = healTourPath(rawPath, docsDir);
+        if (audioPath != rawPath) {
+          await DebugLogHelper.addDebugLog(
+            'AUDIO_LOAD: Healed stale container path: $rawPath -> $audioPath');
+        }
+
+        // Log the resolved path + existence BEFORE loading so the next field
+        // report distinguishes "controller not ready" from "file missing"
+        // without anyone reading source (AC #3).
+        final exists = File(audioPath).existsSync();
+        await DebugLogHelper.addDebugLog(
+          'AUDIO_LOAD: Resolving original audio: $audioPath (exists: $exists)');
+
+        if (!exists) {
+          await DebugLogHelper.addDebugLog(
+            'AUDIO_LOAD: FAILED — original audio file missing: $audioPath');
+          _showAudioError('Original audio file not found on this device.');
+          return;
+        }
+
+        final loaded =
+            await _htmlAudioPlayer.loadAudio(audioPath, _audioWebViewController!);
+        if (loaded) {
+          await DebugLogHelper.addDebugLog(
+            'AUDIO_LOAD: Loaded original audio: $audioPath');
+        } else {
+          await DebugLogHelper.addDebugLog(
+            'AUDIO_LOAD: FAILED — player could not load original audio: $audioPath');
+          _showAudioError('Original audio could not be loaded.');
+        }
       } else if (_selectedAudioSource.startsWith('part_')) {
         // Load recording part
         final partIndex = int.parse(_selectedAudioSource.split('_')[1]);
@@ -382,7 +480,23 @@ class _EditStopScreenState extends State<EditStopScreen> {
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('AUDIO_LOAD: Error loading $_selectedAudioSource - $e');
+      _showAudioError('Audio could not be loaded.');
     }
+  }
+
+  /// LOCAL-478: surface a load failure to the user. `00:00 -- 00:00` with no
+  /// explanation was the bug; when audio genuinely cannot load the UI must say
+  /// so (AC #3). Guarded by `mounted` because loads can complete after the
+  /// screen is popped.
+  void _showAudioError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
   
   Future<void> _startNewRecording() async {
@@ -1880,7 +1994,10 @@ class _EditStopScreenState extends State<EditStopScreen> {
         ),
       );
       
-      Navigator.pop(context, true);
+      // LOCAL-475: return the mutated stop map (not a bool) so the caller in
+      // edit_tour_screen._editStop can assign it back into _stops and
+      // _hasAnyChanges() can read modified/action off a real Map.
+      Navigator.pop(context, widget.stopData);
     } catch (e) {
       await DebugLogHelper.addDebugLog('EDIT: Error marking stop: $e');
     }
@@ -2201,7 +2318,9 @@ class _EditStopScreenState extends State<EditStopScreen> {
         ),
       );
       
-      Navigator.pop(context, true);
+      // LOCAL-475: return the stop map (action='delete') so the caller assigns a
+      // Map into _stops and _hasAnyChanges() detects the deletion.
+      Navigator.pop(context, widget.stopData);
     }
   }
   
@@ -2511,9 +2630,28 @@ class _EditStopScreenState extends State<EditStopScreen> {
                                             mediaPlaybackRequiresUserGesture: false,
                                             allowsInlineMediaPlayback: true,
                                             javaScriptEnabled: true,
+                                            // LOCAL-3482: match the Listen tab /
+                                            // news player, which read the tour
+                                            // dir and play fine. File access is
+                                            // required for the <source> to read
+                                            // the audio beside the scratch HTML.
+                                            allowFileAccess: true,
+                                            allowContentAccess: true,
                                           ),
+                                          onConsoleMessage: (controller, consoleMessage) {
+                                            _audioConsoleLogger.onConsoleMessage(consoleMessage);
+                                          },
                                           onWebViewCreated: (controller) async {
                                             _audioWebViewController = controller;
+                                            // LOCAL-478: the controller now
+                                            // exists — replay any load that was
+                                            // deferred because it ran first.
+                                            // This is the retry that closes the
+                                            // null-controller ordering gap.
+                                            if (_pendingAudioLoad) {
+                                              await DebugLogHelper.addDebugLog(
+                                                'AUDIO_LOAD: WebView ready — retrying deferred load');
+                                            }
                                             await _loadSelectedAudio();
                                           },
                                           onLoadStop: (controller, url) async {
@@ -2590,6 +2728,9 @@ class _EditStopScreenState extends State<EditStopScreen> {
                                   allowsInlineMediaPlayback: true,
                                   javaScriptEnabled: true,
                                 ),
+                                onConsoleMessage: (controller, consoleMessage) {
+                                  _recorderConsoleLogger.onConsoleMessage(consoleMessage);
+                                },
                                 onWebViewCreated: (controller) async {
                                   _recorderWebViewController = controller;
                                   await _htmlRecorder.initialize(controller);

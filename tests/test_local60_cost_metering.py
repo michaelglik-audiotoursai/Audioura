@@ -73,6 +73,8 @@ def test_cost_meter_valid_types():
         "tour_generate", "tour_cache_hit",
         "translation_generate", "translation_cache_hit",
         "news_generate", "news_cache_hit", "photo_extension",
+        "spine_generate",  # LOCAL-278: spine registers with cost meter
+        "tts_generate", "tts_cache_hit",  # LOCAL-323: TTS metering
     }
     assert expected == VALID_OPERATION_TYPES, f"Mismatch: {expected - VALID_OPERATION_TYPES}"
     print("PASS: test_cost_meter_valid_types")

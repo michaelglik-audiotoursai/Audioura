@@ -3,7 +3,9 @@
 Test the URL matching fix
 """
 import requests
+import pytest
 
+@pytest.mark.service
 def test_url_matching():
     """Test both working and problematic newsletters"""
     

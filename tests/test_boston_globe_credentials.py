@@ -3,6 +3,9 @@
 Test Boston Globe Credentials Authentication
 Direct test of login functionality
 """
+
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
 import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options

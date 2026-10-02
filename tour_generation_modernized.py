@@ -266,6 +266,11 @@ def generate_html_with_external_audio(tour_data):
             // Track current playing audio
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
+                    audioElements.forEach((otherAudio, otherIndex) => {
+                        if (otherIndex !== index && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
                     currentStopIndex = index;
                 });
             });
@@ -322,7 +327,7 @@ self.addEventListener('install', function(event) {
 });
 '''
 
-def generate_modernized_tour_async(job_id, tour_file_path):
+def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchestrator_job_id=None):
     """Generate modernized tour from existing tour text file"""
     try:
         ACTIVE_JOBS.update(job_id, status="processing", progress="Processing tour text file...")
@@ -334,7 +339,27 @@ def generate_modernized_tour_async(job_id, tour_file_path):
         # Parse the tour content using the same logic as the working system
         ACTIVE_JOBS.update(job_id, progress="Parsing tour content...")
         modernized_data = parse_tour_content_to_modernized(tour_content)
-        
+
+        # [BETA-4 / wdvrdaxqjn] Validate stop coordinates before anything consumes
+        # them. Coordinates arrive here as a "Coordinates:" line the language model
+        # wrote from memory, and nothing had ever checked them — measured errors of
+        # 1-2 km, and one stop that put a Toronto car park on an island reachable
+        # only by ferry. This runs before the zip is built, so both audio_N.txt
+        # (which the map reads) and the map buttons in the HTML get the corrected
+        # values. Fail-soft: any geocoder problem leaves the original untouched.
+        ACTIVE_JOBS.update(job_id, progress="Validating stop coordinates...")
+        try:
+            import geocode_stops
+            hint = geocode_stops.location_hint(modernized_data.get("tour_name", ""))
+            anchor = geocode_stops.geocode(hint) if hint else None
+            modernized_data["text_content"], geo_records = geocode_stops.correct_stops(
+                modernized_data["text_content"], hint, tour_anchor=anchor)
+            corrected = sum(1 for r in geo_records if r.get("action") == "replaced")
+            if corrected:
+                print(f"[GEOCODE] corrected {corrected} of {len(geo_records)} stop coordinates")
+        except Exception as e:
+            print(f"[GEOCODE] validation skipped ({e}); keeping model coordinates")
+
         # Generate audio using TTS service
         ACTIVE_JOBS.update(job_id, progress="Generating audio files...")
         audio_files = []
@@ -343,10 +368,19 @@ def generate_modernized_tour_async(job_id, tour_file_path):
                 # Call Polly TTS service (with auth for Cloud Run)
                 tts_headers = {"Content-Type": "application/json"}
                 tts_headers.update(_get_auth_token(POLLY_TTS_URL))
+                # [LOCAL-323] Forward user_id and job_id for cost attribution
+                tts_payload = {
+                    "text": _strip_nav_fields_for_tts(text_content),
+                    "voice": "Joanna",
+                }
+                if user_id:
+                    tts_payload["user_id"] = user_id
+                if orchestrator_job_id:
+                    tts_payload["job_id"] = orchestrator_job_id
                 tts_response = requests.post(
                     f"{POLLY_TTS_URL}/synthesize",
                     headers=tts_headers,
-                    json={"text": _strip_nav_fields_for_tts(text_content), "voice": "Joanna"},
+                    json=tts_payload,
                     timeout=30
                 )
                 
@@ -465,6 +499,9 @@ def process_tour():
     Accepts EITHER:
       - tour_file: filename to read from /app/tours/ (local Docker mode)
       - tour_content: inline text content (Cloud Run mode, no shared volume)
+    Optional attribution fields (LOCAL-323):
+      - user_id: user who triggered the tour (forwarded to TTS metering)
+      - job_id: orchestrator job_id (forwarded to TTS metering)
     """
     data = request.json
     if not data:
@@ -472,6 +509,9 @@ def process_tour():
     
     tour_file = data.get('tour_file')
     tour_content = data.get('tour_content')
+    # [LOCAL-323] Accept user_id and job_id for cost attribution
+    user_id = data.get('user_id')
+    orchestrator_job_id = data.get('job_id')
     
     if not tour_file and not tour_content:
         return jsonify({"error": "Either 'tour_file' or 'tour_content' parameter is required"}), 400
@@ -504,7 +544,7 @@ def process_tour():
     
     thread = threading.Thread(
         target=generate_modernized_tour_async,
-        args=(job_id, tour_file_path)
+        args=(job_id, tour_file_path, user_id, orchestrator_job_id)
     )
     thread.daemon = True
     thread.start()

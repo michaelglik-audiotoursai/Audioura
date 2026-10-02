@@ -1,0 +1,71 @@
+LEAD verification of LOCAL-418 — 2026-08-11 16:2x
+=================================================
+The submission's own run was made on a tree 18 commits behind storied
+(the agent branched from origin/storied, which is stale because storied is
+unpushed behind the field-test gate). Everything below is LEAD re-running it
+on CURRENT storied (e9fb43b) + the two 418 commits, in /tmp/wt418.
+
+1. CHERRY-PICK ONTO CURRENT storied
+   240bce3 + cddcbda applied with no conflict — exhibition_checklist.py has
+   not diverged since the agent's base (consistent with D357).
+
+2. THE BUG IS REAL IN THE CURRENT TREE
+   $ python3 -c "from exhibition_checklist import plausibility_gate; ..."
+   REVERTED plausibility_gate kept: 1
+     [{'title': 'Wednesday, September 16-Wednesday', 'artist': 'October 7',
+       'date': '2026'}]
+
+3. D242 CHECK #1 — SURGICAL REVERT, NOT A MIRROR (D277)
+   Deleting the module-level helper only produces an ImportError, which proves
+   nothing. LEAD instead KEPT _is_date_like defined and removed ONLY its two
+   production call sites (_work_entry_is_implausible, and the validation block
+   in extract_works_from_exhibition_page):
+
+     4 failed, 29 passed
+       TestWorkEntryImplausibleDates::test_date_title_is_implausible
+       TestWorkEntryImplausibleDates::test_date_artist_is_implausible
+       TestPlausibilityGateRejectsDateWork::test_single_date_work_rejected
+       TestExtractWorksRejectsDateAtSource::test_date_line_not_extracted_as_work
+
+   The tests bind to the production call sites. Restored: 33 passed.
+
+4. LIVE RUN ON CURRENT storied + FIX (not the agent's stale tree)
+   DISABLE_TOUR_CACHE=1 DATABASE_URL=...:5433/audiotours STORIED_MODE=true
+   python3 run_mfa_unbound_eval.py        # byte-identical to the committed
+                                          # runner — no case drift (D355/D357)
+   exit=0, 4955 chars, 767 words
+
+     Stop 1: Le Lezard aux plumes d'or (The Lizard with Golden Feathers)
+     Stop 2: Moses and Monotheism
+     Stop 3: Au Soleil du Plafond
+
+   [LOCAL-368] PROSE LLM PATH: 3 works extracted from prose
+   Date-leak scan (wednesday|october 7|september 16) over delivered text: EMPTY.
+
+5. REGRESSION — IDENTICAL ON BOTH TREES (D242: two trees, not one)
+   tests/            37 collection errors on storied AND on storied+fix
+                     -> pre-existing, not caused by this change
+   test_local402/403/405/406/407/409/410/411/413  11/5/11/16/20/9/5/6/8 passed
+                     on both trees
+   test_sq4_merge.py                ALL TESTS PASSED on both
+   test_palais_fix_lead_fixture.py  All tests passed on both
+
+6. BLAST RADIUS
+   grep for plausibility_gate/_is_date_like outside exhibition_checklist.py:
+   no external callers. The venue (Palais) path cannot reach this code, so
+   418's Palais 4/4 control run on its stale tree is not invalidated by the
+   merge.
+
+7. NEW FINDING, NOT A BLOCKER FOR THIS MERGE — see LOCAL-419
+   With extraction finally correct, the same live run reports:
+
+     Le Lezard aux plumes d'or : serp_results=30 snippets_injected=31 beats_in_delivered_text=0
+     Moses and Monotheism      : serp_results=24 snippets_injected=24 beats_in_delivered_text=0
+     Au Soleil du Plafond      : serp_results=30 snippets_injected=30 beats_in_delivered_text=0
+
+   ~30 snippets injected per stop, zero story beats in delivered text, on all
+   three stops. This is the first honest measurement of the correct evaluation
+   case (D357: it could not be evaluated at all while extraction returned one
+   fake work).
+
+VERDICT: MERGED to storied as 55687b9 + d6274df.

@@ -1,0 +1,18 @@
+{
+  "Nave": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Narthex": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Pulpit": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Altar": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  }
+}

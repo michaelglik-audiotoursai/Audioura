@@ -4,6 +4,7 @@ Test the new tour editing endpoints
 """
 import requests
 import json
+import pytest
 
 BASE_URL = "http://192.168.1.20:5005"
 

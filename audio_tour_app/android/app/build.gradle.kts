@@ -10,8 +10,8 @@ plugins {
 
 android {
     namespace = "com.audioura.app"
-    compileSdk = 35
-    ndkVersion = "27.0.12077973"
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
     
     signingConfigs {
         getByName("debug") {
@@ -36,6 +36,21 @@ android {
                 storeFile = file("debug.keystore")
                 storePassword = "android"
             }
+            // Signature schemes: v2 + v3 (v1/JAR is not needed for minSdk>=24;
+            // AGP omits it by default). Play Store re-signs on delivery, so
+            // testers are unaffected regardless.
+            //
+            // NOTE on the "App wasn't installed" saga: signing was investigated
+            // and RULED OUT as the cause. The real cause is device-side — on a
+            // Pixel 4 / Android 13, Play Protect runs a ~6s Just-in-Time scan on
+            // sideloaded APKs (PlayProtectDialogsActivity) that races and
+            // outlives the PackageInstaller session ("Session ID is no longer
+            // active"), so tap-install intermittently fails even though the
+            // verdict is ALLOW. It is non-deterministic and not a build defect:
+            // the same APK installs reliably via `adb install -r` and via the
+            // Play Store. See ClickUp wdvrdaxxmb for the full logcat evidence.
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 

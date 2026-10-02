@@ -2,12 +2,123 @@ import 'dart:io';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
+/// LOCAL-482 — how the stop editor grants WKWebView read access to a stop's
+/// original audio.
+///
+/// The old code did `loadData(baseUrl: file://)` with a `<source
+/// src="file://$absolutePath">`. On iOS `loadData` maps to
+/// `loadHTMLString(_:baseURL:)`, which grants the page read access ONLY to the
+/// baseURL's own directory. A bare `file://` root grants access to *nothing*,
+/// so the `<source>` into `.../Documents/tours/<tour>/audio_N.mp3` was blocked
+/// by the sandbox — the `<audio>` element errored, the retry loop burned five
+/// attempts, and the field showed "Failed to load audio".
+///
+/// The Listen tab and news player never hit this because they load
+/// `file://<tourDir>/index.html` BY URL — the baseURL is then the tour
+/// directory and the granted scope covers the audio beside it
+/// (news_player_screen.dart:75, tour_player_screen.dart:71).
+///
+/// This value object mirrors that working model for the editor: write a scratch
+/// HTML page INTO the audio's own directory and load it by URL, with a RELATIVE
+/// `<source src="audio_N.mp3">` that resolves inside the granted scope.
+///
+/// LOCAL-3482 (build-25 re-report) — the LOCAL-482 layout above is necessary
+/// but was NOT sufficient on iOS. `flutter_inappwebview`'s `loadUrl` only
+/// grants directory read access when it is given an `allowingReadAccessTo`
+/// URL; without it, it falls through to a bare `WKWebView.load(URLRequest)`
+/// that reads nothing beyond the HTML file itself, so the relative `<source>`
+/// stayed sandbox-blocked and "Failed to load audio" persisted. The model now
+/// also carries [readAccessUrl] — the audio directory as a `file://` URL — and
+/// the service passes it to `loadUrl(allowingReadAccessTo:)`, which is what
+/// forces WKWebView's access-granting `loadFileURL(_:allowingReadAccessTo:)`
+/// path (flutter_inappwebview_ios InAppWebView.swift:925-932).
+///
+/// It is a pure function of the audio path so the access model is unit-testable
+/// without a WebView or platform channel. A test pins every field; restoring
+/// the `file://` baseURL, an absolute `src`, or dropping the read-access scope
+/// breaks it (AC #6).
+class EditorAudioAccessModel {
+  /// Absolute path to the audio file being played.
+  final String audioPath;
+
+  /// Directory the audio lives in — becomes the WKWebView read-access scope.
+  final String directory;
+
+  /// Relative `<source src>` — MUST be relative (just the filename) so it
+  /// resolves inside [directory]. An absolute `file://` src escapes the grant.
+  final String relativeSrc;
+
+  /// Absolute path of the scratch HTML file, written beside the audio.
+  final String scratchHtmlPath;
+
+  /// The `file://` URL the WebView loads. Its directory equals [directory], so
+  /// WKWebView grants read access to the audio next to it.
+  final String loadUrl;
+
+  /// LOCAL-3482 — the `file://` URL of [directory] itself, passed to
+  /// `loadUrl(allowingReadAccessTo:)`.
+  ///
+  /// This is the field the build-25 re-report turned on. Writing the scratch
+  /// HTML into the audio dir and loading it BY URL (LOCAL-482) is necessary but
+  /// NOT sufficient on iOS: `flutter_inappwebview`'s `loadUrl` only routes to
+  /// WKWebView's access-granting `loadFileURL(_:allowingReadAccessTo:)` when an
+  /// `allowingReadAccessTo` URL is supplied — otherwise it falls through to a
+  /// bare `WKWebView.load(URLRequest)`, which grants the page read access to
+  /// NOTHING beyond the HTML file, so the relative `<source>` subresource is
+  /// sandbox-blocked and "Failed to load audio" returns
+  /// (flutter_inappwebview_ios InAppWebView.swift:925-932). Supplying this
+  /// directory URL is what forces the granting branch.
+  final String readAccessUrl;
+
+  const EditorAudioAccessModel({
+    required this.audioPath,
+    required this.directory,
+    required this.relativeSrc,
+    required this.scratchHtmlPath,
+    required this.loadUrl,
+    required this.readAccessUrl,
+  });
+
+  /// Dot-prefixed so it is a hidden scratch file that existing tour parsers
+  /// ignore: they count `*.mp3` (tour_generator_screen.dart:563,
+  /// tour_translation_helper.dart:166) and never enumerate this HTML. The dot
+  /// prefix also keeps it out of casual directory listings and re-zips.
+  static const String scratchFileName = '.audioura_editor_scratch.html';
+
+  /// Build the access model from an absolute audio file path.
+  ///
+  /// Splits off the directory, keeps only the filename for the relative
+  /// `<source src>`, and places the scratch HTML in the same directory so the
+  /// dir-scoped baseURL covers the audio.
+  factory EditorAudioAccessModel.forAudioPath(String audioPath) {
+    final sep = audioPath.lastIndexOf('/');
+    // A path with no separator has no directory scope we can grant; fall back
+    // to '.' so the model is still well-formed and the caller can decide.
+    final directory = sep >= 0 ? audioPath.substring(0, sep) : '.';
+    final fileName = sep >= 0 ? audioPath.substring(sep + 1) : audioPath;
+    final scratchHtmlPath = '$directory/$scratchFileName';
+    return EditorAudioAccessModel(
+      audioPath: audioPath,
+      directory: directory,
+      relativeSrc: fileName,
+      scratchHtmlPath: scratchHtmlPath,
+      loadUrl: 'file://$scratchHtmlPath',
+      readAccessUrl: 'file://$directory',
+    );
+  }
+}
+
 class HtmlAudioPlayerService {
   InAppWebViewController? _webViewController;
   bool _isPlaying = false;
   String? _currentAudioPath;
 
-  Future<String> _createAudioHtml(String audioPath) async {
+  /// LOCAL-482: path of the scratch HTML we wrote beside the audio, so we can
+  /// delete it on the next load and when the editor closes.
+  String? _scratchHtmlPath;
+
+  Future<String> _createAudioHtml(String relativeSrc) async {
+    final audioPath = relativeSrc;
     return '''
 <!DOCTYPE html>
 <html>
@@ -64,10 +175,10 @@ class HtmlAudioPlayerService {
 </head>
 <body>
     <audio id="audioPlayer" controls preload="metadata">
-        <source src="file://$audioPath" type="audio/mp3">
-        <source src="file://$audioPath" type="audio/wav">
-        <source src="file://$audioPath" type="audio/webm">
-        <source src="file://$audioPath" type="audio/ogg">
+        <source src="$audioPath" type="audio/mp3">
+        <source src="$audioPath" type="audio/wav">
+        <source src="$audioPath" type="audio/webm">
+        <source src="$audioPath" type="audio/ogg">
         Your browser does not support the audio element.
     </audio>
     
@@ -269,15 +380,70 @@ class HtmlAudioPlayerService {
         },
       );
       
-      final html = await _createAudioHtml(audioPath);
-      await controller.loadData(data: html, baseUrl: WebUri('file://'));
-      
-      await DebugLogHelper.addDebugLog('HTML_AUDIO: Loaded audio player for $audioPath');
+      // LOCAL-482: Match the players' access model instead of loadData(file://).
+      // Write a scratch HTML page INTO the audio's own directory and load it BY
+      // URL, with a RELATIVE <source src>. WKWebView then grants the page read
+      // access to that directory, so the audio beside it is readable — the same
+      // grant the Listen tab / news player get from file://<dir>/index.html.
+      final access = EditorAudioAccessModel.forAudioPath(audioPath);
+
+      // Clean up any scratch file from a previous load before writing a fresh
+      // one (also guards against a leftover from a crash).
+      await _deleteScratchHtml();
+
+      final html = await _createAudioHtml(access.relativeSrc);
+      await File(access.scratchHtmlPath).writeAsString(html, flush: true);
+      _scratchHtmlPath = access.scratchHtmlPath;
+
+      await DebugLogHelper.addDebugLog(
+        'HTML_AUDIO: Wrote scratch player ${access.scratchHtmlPath} '
+        '(src="${access.relativeSrc}")');
+
+      await controller.loadUrl(
+        urlRequest: URLRequest(url: WebUri(access.loadUrl)),
+        // LOCAL-3482: THE fix for the build-25 re-report. Without this,
+        // flutter_inappwebview's loadUrl falls through to a bare
+        // WKWebView.load(URLRequest) that grants NO directory read access, so
+        // the relative <source> subresource is sandbox-blocked exactly as
+        // before. Supplying the audio directory forces the access-granting
+        // loadFileURL(_:allowingReadAccessTo:) branch
+        // (flutter_inappwebview_ios InAppWebView.swift:928-929).
+        allowingReadAccessTo: WebUri(access.readAccessUrl),
+      );
+
+      await DebugLogHelper.addDebugLog(
+        'HTML_AUDIO: Loaded audio player by URL ${access.loadUrl} '
+        '(allowingReadAccessTo=${access.readAccessUrl}) for $audioPath');
       return true;
     } catch (e) {
       await DebugLogHelper.addDebugLog('HTML_AUDIO: Error loading audio: $e');
       return false;
     }
+  }
+
+  /// LOCAL-482: delete the scratch HTML we wrote beside the audio. Safe to call
+  /// repeatedly; no-op if nothing was written. Call when the editor closes so
+  /// no scratch file is left in the tour directory (AC #5).
+  Future<void> _deleteScratchHtml() async {
+    final path = _scratchHtmlPath;
+    if (path == null) return;
+    try {
+      final f = File(path);
+      if (await f.exists()) {
+        await f.delete();
+        await DebugLogHelper.addDebugLog('HTML_AUDIO: Deleted scratch player $path');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HTML_AUDIO: Failed to delete scratch player $path: $e');
+    } finally {
+      _scratchHtmlPath = null;
+    }
+  }
+
+  /// Public cleanup hook for the editor's dispose(). Deletes the scratch HTML
+  /// file so it never ends up in a re-zip, download, or sync (AC #5).
+  Future<void> dispose() async {
+    await _deleteScratchHtml();
   }
 
   Future<void> play() async {

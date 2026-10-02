@@ -1,0 +1,42 @@
+5 stops for  "Biking tour in French Riviera 
+   with a stop at Hippodrome de la Cote d'Azur starting from Nice, France"
+Overal General Tour Description. 
+Judgement: Excellent
+Improvements: None
+Acceptance as is: Acceptable
+
+Stop 1: Cap d'Ail
+Judgement: Very good.
+Improvements: Neecs a story or two
+Acceptance as is: Acceptable
+
+Stop 2: Monaco
+Judgement: Excellent
+Improvements: Nothing
+Acceptance as is: Acceptable
+
+Stop 3: Eze Village
+Judgement: Excellent
+Improvements: Nothing
+Acceptance as is: Acceptable
+
+Stop 4: Hippodrome de la Cote d'Azur
+Judgement: Acceptable
+Improvements: more data and stories, as a visitor-listener I will see Hippodrome
+   and what it represents.  What I would like to listen are the stories of 
+   horses, important people, historic events here.
+Acceptance as is: Acceptable
+
+Stop 5: Saint-Jean-Cap-Ferrat
+Judgement: Good (there is some information)
+Improvements: more data and stories, as a visitor-listener the tour intruiged me 
+    quotes like "Four Seasons Hotel, looms with its storied past of hosting luminaries" ,
+    and "It stands as a silent witness to countless chapters of history, 
+    each echoing with laughter and whispers of clandestine meetings."  What I would
+    like to listen are the stories about these luminaries, countless chapters of history,
+    and especially clandestine meetings.
+Acceptance as is: Acceptable
+
+Conclusion: 
+Judgement: Excellent -- PERFECT!
+Acceptance as is: Acceptable

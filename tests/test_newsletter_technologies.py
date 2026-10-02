@@ -7,6 +7,7 @@ import requests
 import json
 import psycopg2
 from datetime import datetime
+import pytest
 
 def clean_url(url):
     """Clean URL same way as newsletter processor"""
@@ -66,6 +67,7 @@ def cleanup_test_newsletter(url):
         if 'conn' in locals():
             conn.close()
 
+@pytest.mark.service
 def test_newsletter_processing(newsletter_url, newsletter_name, expected_min_articles=1):
     """Test newsletter processing end-to-end"""
     print(f"\n{'='*60}")

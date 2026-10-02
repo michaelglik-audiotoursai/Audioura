@@ -47,6 +47,107 @@ LANDMARK_ROOTS = [
     "Q839954",   # archaeological site
 ]
 
+# LOCAL-294: P31 types to EXCLUDE — administrative divisions and transit infrastructure.
+# These are real Wikidata entities with coordinates, but not places a listener visits on a tour.
+# Filtering by P31 (not by name) so it generalises across languages and areas.
+_EXCLUDED_P31_TYPES = {
+    # Administrative divisions
+    "Q484170",    # commune of France
+    "Q18524218",  # canton of France (post-2015)
+    "Q674687",    # canton of France (pre-2015)
+    "Q194203",    # arrondissement of France
+    "Q6465",      # arrondissement (generic)
+    "Q36784",     # region of France
+    "Q34876",     # province
+    "Q1221156",   # department of France (collectivité territoriale)
+    "Q6138528",   # department of France (entity)
+    "Q515",       # city (the area itself, not a place to visit within it)
+    "Q1549591",   # big city
+    "Q5119",      # capital city
+    "Q3957",      # town
+    "Q532",       # village
+    "Q1357964",   # quarter (urban subdivision)
+    "Q1523821",   # département of France
+    "Q34876",     # province
+    "Q3624078",   # sovereign state
+    "Q6256",      # country
+    "Q15284",     # municipality
+    "Q15042",     # municipality of Italy
+    "Q747074",    # canton (administrative division)
+    "Q2989457",   # administrative territorial entity of France
+    "Q1115575",   # civil parish
+    "Q1093829",   # city of the United States
+    # Transit infrastructure
+    "Q55488",     # railway station
+    "Q928830",    # metro station
+    "Q953806",    # bus stop
+    "Q18543139",  # railway stop
+    "Q55485",     # train station (alternate)
+    "Q4663385",   # tram stop
+    "Q44782",     # port
+    "Q94993",     # bus station
+    "Q1248784",   # airport
+    "Q11707",     # restaurant (not transit, but commonly a non-POI in tour context)
+    "Q2175765",   # halt (railway)
+    "Q22808404",  # railway halt in France
+    "Q15640053",  # tram system
+    "Q18706073",  # public institution of intermunicipal cooperation (e.g. Métropole Nice)
+    "Q1620908",   # historical region
+    "Q3024240",   # historical country
+    "Q353344",    # countship (former administrative division)
+}
+
+# LOCAL-294: P31 types known to be TOUR-WORTHY — used for logging unknown types.
+_KNOWN_GOOD_P31_TYPES = {
+    "Q811979",    # architectural structure
+    "Q4989906",   # monument
+    "Q22698",     # park
+    "Q174782",    # town square (plaza)
+    "Q860861",    # sculpture
+    "Q557141",    # public art
+    "Q12280",     # bridge
+    "Q16970",     # church building
+    "Q5003624",   # memorial
+    "Q839954",    # archaeological site
+    "Q33506",     # museum
+    "Q23413",     # castle
+    "Q570116",    # tourist attraction
+    "Q16560",     # palace
+    "Q483110",    # stadium
+    "Q57821",     # fortification
+    "Q751876",    # château
+    "Q3947",      # house
+    "Q41176",     # building
+    "Q35112127",  # public building
+    "Q655686",    # historic building
+    "Q1030034",   # art museum
+    "Q207694",    # art gallery
+    "Q24354",     # theatre (building)
+    "Q18674739",  # event venue
+    "Q1244442",   # promenade
+    "Q1457376",   # viewpoint
+    "Q39614",     # cemetery
+    "Q190928",    # fountain
+    "Q1007870",   # bay
+    "Q40080",     # beach
+    "Q131681",    # triumphal arch
+    "Q162875",    # marketplace
+    "Q7075",      # library
+    "Q16917",     # hospital
+    "Q24398318",  # religious building
+    "Q44613",     # monastery
+    "Q80638",     # ruin
+    "Q3152824",   # cultural property
+    "Q2065736",   # cultural heritage site
+    "Q35127",     # website  — skip, but not excluded (let it through silently)
+    "Q133215",    # cave
+    "Q8502",      # mountain
+    "Q34038",     # waterfall
+    "Q46831",     # mountain pass
+    "Q4022",      # river
+    "Q23442",     # island
+}
+
 # Default bounding radii (A2)
 NEIGHBORHOOD_RADIUS_KM = 1.5
 CITY_RADIUS_KM = 2.0
@@ -214,6 +315,15 @@ def discover_landmarks(area: AreaResolution) -> List[Landmark]:
     print(f"  [landmark_discovery] Wikipedia extraction: +{wiki_added} new names "
           f"(total: {len(landmarks)})")
     
+    # LOCAL-294: Final QID enforcement — every Landmark must carry a QID.
+    # Path 1 already enforces this; Paths 2 and 3 produce QID-bearing results by design.
+    # This is a safety net.
+    before_final = len(landmarks)
+    landmarks = [lm for lm in landmarks if lm.qid]
+    if before_final != len(landmarks):
+        print(f"  [LOCAL-294] Final QID enforcement: dropped {before_final - len(landmarks)} "
+              f"landmarks without QID")
+    
     return landmarks
 
 
@@ -264,6 +374,41 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     parts = [_SEGMENT_FILLER_RE.sub('', p).strip() for p in parts]
     # Remove empty segments that result from stripping
     parts = [p for p in parts if p]
+    
+    # [LOCAL-351] Detect US-format addresses by structural signals.
+    # A 2-letter uppercase token followed by a 5-digit ZIP (e.g. "MA 02062") or
+    # a bare 2-letter uppercase token that is NOT a plausible city name (when
+    # adjacent to a country segment) signals "City, ST [ZIP], [Country]" format.
+    # In this format, parts[0] is the CITY (not a neighborhood), and subsequent
+    # parts are state/country qualifiers.
+    #
+    # Pattern: segment matches "XX" or "XX NNNNN" or "XX NNNNN-NNNN"
+    _US_STATE_ZIP_RE = re.compile(r'^([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$')
+    
+    if len(parts) >= 2:
+        # Check if any segment (from index 1 onward) matches the state+ZIP pattern.
+        # A ZIP code or 2-letter state code is a strong structural signal (D236):
+        # "MA 02062" cannot be a city name.
+        us_state_idx = None
+        for i in range(1, len(parts)):
+            m = _US_STATE_ZIP_RE.match(parts[i])
+            if m:
+                # Confirm it's structural: must have a ZIP, OR there must be a
+                # subsequent segment (country), OR the preceding segment looks
+                # like a city name (not a known country).
+                has_zip = m.group(2) is not None
+                has_more_parts = i < len(parts) - 1
+                if has_zip or has_more_parts:
+                    us_state_idx = i
+                    break
+        
+        if us_state_idx is not None:
+            # US-format: "City, ST ZIP, Country" or "City, ST, Country" or "City, ST ZIP"
+            # Everything before the state segment is the city name.
+            city = ', '.join(parts[:us_state_idx])
+            # The state segment and anything after are qualifiers (not used for
+            # Wikidata resolution, but the city name alone resolves correctly).
+            return "", city
     
     if len(parts) >= 2:
         # "Beacon Hill, Boston" or "Beacon Hill, Boston, MA"
@@ -643,8 +788,18 @@ def _sparql_coordinate_query(lat: float, lng: float, radius_km: float) -> List[L
                 type_label="",
             ))
         
-        # Enrich top landmarks with Wikidata QIDs (batch lookup)
-        _enrich_with_qids(landmarks[:30])
+        # Enrich ALL landmarks with Wikidata QIDs (batch lookup)
+        _enrich_with_qids(landmarks)
+        
+        # LOCAL-294: Drop landmarks that failed QID enrichment (cannot be type-checked)
+        before_qid_filter = len(landmarks)
+        landmarks = [lm for lm in landmarks if lm.qid]
+        if before_qid_filter != len(landmarks):
+            print(f"  [LOCAL-294] QID enforcement: {before_qid_filter} → {len(landmarks)} "
+                  f"(dropped {before_qid_filter - len(landmarks)} without QID)")
+        
+        # LOCAL-294: Filter by P31 type — exclude admin divisions and transit
+        landmarks = _filter_by_p31_type(landmarks)
         
         return landmarks
         
@@ -657,50 +812,171 @@ def _sparql_coordinate_query(lat: float, lng: float, radius_km: float) -> List[L
 
 
 def _enrich_with_qids(landmarks: List[Landmark]):
-    """Enrich landmarks with Wikidata QIDs via Wikipedia→Wikidata sitelink lookup."""
+    """Enrich landmarks with Wikidata QIDs via Wikipedia→Wikidata sitelink lookup.
+
+    LOCAL-294: Processes ALL landmarks (not just first 30) in batches of 50
+    to ensure every geosearch result gets a QID lookup opportunity.
+    """
     if not landmarks:
         return
-    
-    # Batch lookup: get Wikidata item IDs for Wikipedia titles
-    titles = [lm.name for lm in landmarks[:30]]
-    titles_str = "|".join(titles)
-    
-    try:
-        resp = requests.get(
-            "https://en.wikipedia.org/w/api.php",
-            params={
-                "action": "query",
-                "titles": titles_str,
-                "prop": "pageprops",
-                "ppprop": "wikibase_item",
-                "format": "json",
-            },
-            headers={"User-Agent": _USER_AGENT},
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            return
-        
-        data = resp.json()
-        pages = data.get("query", {}).get("pages", {})
-        
-        # Build title→QID map
-        title_to_qid = {}
-        for page_id, page in pages.items():
-            if page_id == "-1":
+
+    # Process all landmarks in batches of 50 (Wikipedia API limit)
+    for batch_start in range(0, len(landmarks), 50):
+        batch = landmarks[batch_start:batch_start + 50]
+        titles = [lm.name for lm in batch]
+        titles_str = "|".join(titles)
+
+        try:
+            resp = requests.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "titles": titles_str,
+                    "prop": "pageprops",
+                    "ppprop": "wikibase_item",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=10,
+            )
+            if resp.status_code != 200:
                 continue
-            title = page.get("title", "")
-            qid = page.get("pageprops", {}).get("wikibase_item", "")
-            if title and qid:
-                title_to_qid[title] = qid
-        
-        # Apply QIDs to landmarks
-        for lm in landmarks:
-            if lm.name in title_to_qid:
-                lm.qid = title_to_qid[lm.name]
-                
-    except Exception:
-        pass
+
+            data = resp.json()
+            pages = data.get("query", {}).get("pages", {})
+
+            # Build title→QID map
+            title_to_qid = {}
+            for page_id, page in pages.items():
+                if page_id == "-1":
+                    continue
+                title = page.get("title", "")
+                qid = page.get("pageprops", {}).get("wikibase_item", "")
+                if title and qid:
+                    title_to_qid[title] = qid
+
+            # Apply QIDs to landmarks in this batch
+            for lm in batch:
+                if lm.name in title_to_qid:
+                    lm.qid = title_to_qid[lm.name]
+
+        except Exception:
+            continue
+
+
+def _fetch_p31_types(qids: List[str]) -> Dict[str, List[str]]:
+    """Fetch P31 (instance of) types for a list of Wikidata QIDs.
+
+    LOCAL-294: Returns a dict mapping QID → list of P31 type QIDs.
+    Batch-fetches in groups of 50 via wbgetentities.
+    """
+    if not qids:
+        return {}
+
+    qid_to_types: Dict[str, List[str]] = {}
+
+    for batch_start in range(0, len(qids), 50):
+        batch = qids[batch_start:batch_start + 50]
+        ids_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                _WIKIDATA_API,
+                params={
+                    "action": "wbgetentities",
+                    "ids": ids_str,
+                    "props": "claims",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            entities = data.get("entities", {})
+            for qid, entity in entities.items():
+                claims = entity.get("claims", {})
+                p31_claims = claims.get("P31", [])
+                types = []
+                for claim in p31_claims:
+                    type_id = (claim.get("mainsnak", {})
+                               .get("datavalue", {})
+                               .get("value", {})
+                               .get("id", ""))
+                    if type_id:
+                        types.append(type_id)
+                qid_to_types[qid] = types
+        except Exception:
+            continue
+
+    return qid_to_types
+
+
+def _filter_by_p31_type(landmarks: List[Landmark]) -> List[Landmark]:
+    """Filter landmarks by P31 (instance of) type.
+
+    LOCAL-294: Excludes administrative divisions and transit infrastructure.
+    Keeps unknown types and logs them for future tuning.
+    Returns the filtered list plus prints excluded/unknown entities.
+    """
+    if not landmarks:
+        return []
+
+    # Collect QIDs that need type checking
+    qids_to_check = [lm.qid for lm in landmarks if lm.qid]
+    if not qids_to_check:
+        return landmarks
+
+    qid_to_types = _fetch_p31_types(qids_to_check)
+
+    kept = []
+    excluded = []
+    unknown_types_seen: Dict[str, str] = {}  # type_qid → first landmark name that had it
+
+    for lm in landmarks:
+        if not lm.qid:
+            # No QID — cannot verify type, will be removed later by QID enforcement
+            continue
+
+        types = qid_to_types.get(lm.qid, [])
+        if not types:
+            # No P31 at all — keep it (missing type is not a reason to exclude)
+            kept.append(lm)
+            continue
+
+        # Check if ANY type is excluded
+        excluded_types = [t for t in types if t in _EXCLUDED_P31_TYPES]
+        if excluded_types:
+            # Look up human-readable label for log (use first excluded type)
+            excluded.append((lm.name, lm.qid, excluded_types[0]))
+            continue
+
+        # Check for unknown types (not in known-good or excluded)
+        for t in types:
+            if t not in _KNOWN_GOOD_P31_TYPES and t not in _EXCLUDED_P31_TYPES:
+                if t not in unknown_types_seen:
+                    unknown_types_seen[t] = lm.name
+
+        # Not excluded → keep
+        kept.append(lm)
+
+    # Log exclusions
+    if excluded:
+        print(f"  [LOCAL-294] P31 type filter: excluded {len(excluded)} entities:")
+        for name, qid, type_qid in excluded:
+            print(f"    EXCLUDED: {name} ({qid}) — P31={type_qid}")
+
+    # Log unknown types (kept, but flagged for future tuning)
+    if unknown_types_seen:
+        print(f"  [LOCAL-294] Unknown P31 types encountered (kept, not excluded):")
+        for type_qid, first_name in unknown_types_seen.items():
+            print(f"    UNKNOWN TYPE: {type_qid} — first seen on: {first_name}")
+
+    print(f"  [LOCAL-294] P31 filter result: {len(landmarks)} → {len(kept)} kept, "
+          f"{len(excluded)} excluded, {len(unknown_types_seen)} unknown types logged")
+
+    return kept
 
 
 def _sparql_p131_query(area_qid: str) -> List[Landmark]:
@@ -759,16 +1035,19 @@ def _sparql_p131_query(area_qid: str) -> List[Landmark]:
 
 
 def _wikipedia_landmark_extraction(area: AreaResolution) -> List[Landmark]:
-    """Extract landmark names from the area's Wikipedia article (section headers, bold names)."""
-    landmarks = []
-    
+    """Extract landmark candidates from the area's Wikipedia article, then resolve via Wikidata.
+
+    LOCAL-293: A section heading is NOT a landmark. Only candidates that resolve to a
+    Wikidata entity with coordinates inside the area's bounding box are returned.
+    This ensures Path 3 produces the same quality as Paths 1/2 (QID + coordinates).
+    """
     # Fetch the neighborhood or city Wikipedia article
     target_name = area.neighborhood_name or area.city_name
     if not target_name:
         return []
-    
+
+    candidates = []  # raw heading strings that pass syntax filter
     try:
-        # Use Wikipedia API to get article text
         resp = requests.get(
             "https://en.wikipedia.org/w/api.php",
             params={
@@ -783,44 +1062,176 @@ def _wikipedia_landmark_extraction(area: AreaResolution) -> List[Landmark]:
         )
         if resp.status_code != 200:
             return []
-        
+
         data = resp.json()
         pages = data.get("query", {}).get("pages", {})
-        
+
         for page_id, page in pages.items():
             if page_id == "-1":
                 continue
             text = page.get("extract", "")
             if not text:
                 continue
-            
+
             # Extract from section headers (== Name ==)
             sections = re.findall(r'^==+\s*(.+?)\s*==+', text, re.MULTILINE)
-            # Filter out generic sections and geographic/political names
             generic = {'history', 'geography', 'demographics', 'economy', 'transportation',
-                      'education', 'government', 'politics', 'climate', 'references',
-                      'see also', 'external links', 'further reading', 'notes',
-                      'notable residents', 'sister cities', 'demographics', 'culture',
-                      'media', 'sports', 'infrastructure', 'architecture', 'overview',
-                      'etymology', 'description', 'location', 'population', 'gallery',
-                      'places', 'communities', 'countries', 'states', 'regions',
-                      'canada', 'united states', 'united kingdom', 'england', 'wales',
-                      'scotland', 'ireland', 'australia', 'france', 'germany', 'italy',
-                      'other uses', 'fictional places', 'people', 'music', 'film',
-                      'television', 'books', 'other', 'arts and entertainment'}
+                       'education', 'government', 'politics', 'climate', 'references',
+                       'see also', 'external links', 'further reading', 'notes',
+                       'notable residents', 'sister cities', 'demographics', 'culture',
+                       'media', 'sports', 'infrastructure', 'architecture', 'overview',
+                       'etymology', 'description', 'location', 'population', 'gallery',
+                       'places', 'communities', 'countries', 'states', 'regions',
+                       'canada', 'united states', 'united kingdom', 'england', 'wales',
+                       'scotland', 'ireland', 'australia', 'france', 'germany', 'italy',
+                       'other uses', 'fictional places', 'people', 'music', 'film',
+                       'television', 'books', 'other', 'arts and entertainment'}
             for section in sections:
                 section_lower = section.lower().strip()
-                if (section_lower not in generic and 
-                    len(section) > 3 and len(section) < 60 and
-                    not section_lower.startswith('list of') and
-                    not section_lower.startswith('see ') and
-                    # Must look like a proper name (starts with capital, not all caps)
-                    section[0].isupper() and not section.isupper()):
-                    landmarks.append(Landmark(name=section))
-            
+                if (section_lower not in generic and
+                        len(section) > 3 and len(section) < 60 and
+                        not section_lower.startswith('list of') and
+                        not section_lower.startswith('see ') and
+                        section[0].isupper() and not section.isupper()):
+                    candidates.append(section)
+
     except Exception:
         pass
-    
+
+    if not candidates:
+        return []
+
+    # LOCAL-293: Resolve candidates — only keep those with a Wikidata entity + in-area coords.
+    resolved = _resolve_wikipedia_candidates(candidates, area)
+    print(f"    [LOCAL-293] Wikipedia headings: {len(candidates)} candidates → "
+          f"{len(resolved)} resolved with QID + in-area coords")
+    return resolved
+
+
+def _resolve_wikipedia_candidates(
+    candidates: List[str], area: AreaResolution
+) -> List[Landmark]:
+    """Resolve Wikipedia heading candidates to Wikidata entities with in-area coordinates.
+
+    LOCAL-293: A candidate is only promoted to a Landmark if:
+      1. It resolves to a Wikipedia article (not a redirect to a disambiguation page).
+      2. That article has a Wikidata QID.
+      3. The entity has P625 coordinates.
+      4. Those coordinates fall within the area's bounding radius.
+
+    Returns only fully-resolved Landmarks (QID + coordinates guaranteed).
+    """
+    if not candidates:
+        return []
+
+    # Step 1: Batch-resolve candidate names to Wikipedia page titles + QIDs.
+    # Wikipedia API accepts up to 50 titles per request.
+    title_to_qid = {}
+    for batch_start in range(0, len(candidates), 50):
+        batch = candidates[batch_start:batch_start + 50]
+        titles_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "titles": titles_str,
+                    "prop": "pageprops|coordinates",
+                    "ppprop": "wikibase_item",
+                    "format": "json",
+                    "redirects": 1,
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            pages = data.get("query", {}).get("pages", {})
+            # Build redirect map (original → resolved title)
+            redirects = {r["from"]: r["to"]
+                         for r in data.get("query", {}).get("redirects", [])}
+
+            for page_id, page in pages.items():
+                if page_id == "-1":
+                    continue
+                title = page.get("title", "")
+                qid = page.get("pageprops", {}).get("wikibase_item", "")
+                if title and qid:
+                    title_to_qid[title] = qid
+                    # Also map any original candidate that redirected here
+                    for orig, resolved in redirects.items():
+                        if resolved == title:
+                            title_to_qid[orig] = qid
+        except Exception:
+            continue
+
+    if not title_to_qid:
+        return []
+
+    # Step 2: For candidates with QIDs, fetch P625 coordinates from Wikidata (batch).
+    qids_to_fetch = list(set(title_to_qid.values()))
+    qid_to_coords = {}  # qid → (lat, lng)
+
+    for batch_start in range(0, len(qids_to_fetch), 50):
+        batch = qids_to_fetch[batch_start:batch_start + 50]
+        ids_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                _WIKIDATA_API,
+                params={
+                    "action": "wbgetentities",
+                    "ids": ids_str,
+                    "props": "claims",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            entities = data.get("entities", {})
+            for qid, entity in entities.items():
+                claims = entity.get("claims", {})
+                for claim in claims.get("P625", []):
+                    value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+                    lat = value.get("latitude", 0.0)
+                    lng = value.get("longitude", 0.0)
+                    if lat or lng:
+                        qid_to_coords[qid] = (lat, lng)
+                        break
+        except Exception:
+            continue
+
+    # Step 3: Filter — keep only candidates whose coordinates are inside the area bbox.
+    landmarks = []
+    # Use a generous radius: area bounding radius + 50% margin for Path 3 candidates
+    # that sit just outside the primary search circle.
+    max_dist_km = area.bounding_radius_km * 1.5
+
+    # Exclude the area's own QID — a section heading that redirects to the area
+    # article is not a distinct landmark (e.g. "Place Garibaldi" → Nice#Place_Garibaldi).
+    area_qids = {area.city_qid, area.neighborhood_qid} - {""}
+
+    for candidate in candidates:
+        qid = title_to_qid.get(candidate, "")
+        if not qid:
+            continue
+        if qid in area_qids:
+            continue
+        coords = qid_to_coords.get(qid)
+        if not coords:
+            continue
+        lm_lat, lm_lng = coords
+        dist = _haversine_km(area.center_lat, area.center_lng, lm_lat, lm_lng)
+        if dist <= max_dist_km:
+            landmarks.append(Landmark(
+                name=candidate, qid=qid, lat=lm_lat, lng=lm_lng, type_label="",
+            ))
+
     return landmarks
 
 
@@ -938,39 +1349,74 @@ def verify_landmarks(poi_list: List[Dict], area: AreaResolution, landmarks: List
     }
 
 
+def _normalize_landmark_name(name: str) -> str:
+    """Normalize a landmark name for matching: accent-fold, lowercase, strip articles/prepositions.
+
+    LOCAL-290 (Fault 3 / D187 pattern): "Old Town of Menton" must match "Old Town Menton",
+    "Île Sainte-Marguerite" must match "Ile Sainte-Marguerite", "La Croisette" must match
+    "Cannes Croisette". The key operations:
+      1. Accent folding (Île→Ile, Èze→Eze, Château→Chateau)
+      2. Strip French/English articles and short prepositions
+      3. Collapse whitespace and punctuation
+    """
+    import unicodedata
+    # Accent fold
+    nfkd = unicodedata.normalize('NFKD', name)
+    folded = ''.join(c for c in nfkd if not unicodedata.combining(c))
+    # Lowercase
+    s = folded.lower().strip()
+    # Remove punctuation (hyphens→spaces, apostrophes→space to split elisions like d'Or→d Or)
+    s = s.replace("'", " ").replace("\u2019", " ").replace("-", " ")
+    s = re.sub(r'[^\w\s]', ' ', s)
+    # Strip articles and short prepositions (French + English)
+    _ARTICLES = {'the', 'a', 'an', 'le', 'la', 'les', 'l', 'de', 'du', 'des',
+                 'un', 'une', 'of', 'et', 'and', 'd', 'au', 'aux', 'en', 'sur'}
+    words = s.split()
+    content = [w for w in words if w not in _ARTICLES and len(w) > 1]
+    return ' '.join(content) if content else ' '.join(words)
+
+
 def _match_stop_to_landmark(stop_name: str, landmarks: List[Landmark]) -> Optional[Landmark]:
     """Match a GPT-proposed stop name to a discovered landmark.
-    
-    Uses normalized name comparison + fuzzy substring matching.
+
+    LOCAL-290 (Fault 3): Uses accent-folded, article-stripped normalization so that
+    "Old Town of Menton" matches "Old Town Menton" and "Île Sainte-Marguerite" matches
+    "Ile Sainte-Marguerite". This is the D187 pattern — name fragmentation that caused
+    0/7 matches against 28 discovered landmarks.
     """
+    stop_norm = _normalize_landmark_name(stop_name)
     stop_lower = stop_name.lower().strip()
-    # Remove common prefixes for matching
-    stop_clean = re.sub(r'^(the|saint|st\.?|mount|mt\.?)\s+', '', stop_lower, flags=re.IGNORECASE)
-    
+
     for lm in landmarks:
         if not lm.name:
             continue
+        lm_norm = _normalize_landmark_name(lm.name)
         lm_lower = lm.name.lower().strip()
-        lm_clean = re.sub(r'^(the|saint|st\.?|mount|mt\.?)\s+', '', lm_lower, flags=re.IGNORECASE)
-        
-        # Exact match
-        if stop_lower == lm_lower or stop_clean == lm_clean:
+
+        # Exact normalized match
+        if stop_norm == lm_norm:
             return lm
-        
-        # Substring containment (either direction)
-        if len(stop_clean) >= 4 and len(lm_clean) >= 4:
-            if stop_clean in lm_clean or lm_clean in stop_clean:
+
+        # Substring containment on normalized forms (either direction)
+        if len(stop_norm) >= 4 and len(lm_norm) >= 4:
+            if stop_norm in lm_norm or lm_norm in stop_norm:
                 return lm
-        
-        # Word-overlap score (Jaccard-style)
-        stop_words = set(stop_clean.split())
-        lm_words = set(lm_clean.split())
+
+        # Also try raw lowercase substring (handles "Cap Ferrat" in "Saint-Jean-Cap-Ferrat")
+        if len(stop_lower) >= 4 and len(lm_lower) >= 4:
+            if stop_lower in lm_lower or lm_lower in stop_lower:
+                return lm
+
+        # Word-overlap score (Jaccard-style) on normalized content words
+        stop_words = set(stop_norm.split())
+        lm_words = set(lm_norm.split())
         if stop_words and lm_words:
             overlap = len(stop_words & lm_words)
-            union = len(stop_words | lm_words)
-            if union > 0 and overlap / union >= 0.6:
+            shorter = min(len(stop_words), len(lm_words))
+            # Match if >=60% of the SHORTER name's words appear in the longer
+            if shorter > 0 and overlap / shorter >= 0.60:
                 return lm
-    
+
     return None
 
 

@@ -1,0 +1,42 @@
+{
+  "Faneuil Hall": {
+    "status": "VERIFIED",
+    "canonical_name": "Faneuil Hall",
+    "qid": "Q49137",
+    "type": "",
+    "coordinates": "42.360000, -71.056111"
+  },
+  "Quincy Market": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Union Oyster House": {
+    "status": "VERIFIED",
+    "canonical_name": "Union Oyster House",
+    "qid": "Q14450004",
+    "type": "",
+    "coordinates": "42.361389, -71.056944"
+  },
+  "Paul Revere House": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Old State House": {
+    "status": "VERIFIED",
+    "canonical_name": "Old State House (Boston)",
+    "qid": "Q1320533",
+    "type": "",
+    "coordinates": "42.358750, -71.057470"
+  },
+  "New England Holocaust Memorial": {
+    "status": "VERIFIED",
+    "canonical_name": "New England Holocaust Memorial",
+    "qid": "Q1532554",
+    "type": "",
+    "coordinates": "42.361250, -71.057270"
+  },
+  "Custom House Tower": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  }
+}

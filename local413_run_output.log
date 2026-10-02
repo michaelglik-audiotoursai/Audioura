@@ -1,0 +1,800 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-413/generate_tour_text.py:6906. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-413/generate_tour_text.py:6907. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass HTTP 504 for 'Appeal to the Great Spirit'
+[OSM-VENUE] Overpass HTTP 504 for 'Ancient Nubia Now'
+[OSM-VENUE] Overpass ReadTimeout for 'Adam and Eve' (attempt 1/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Adam and Eve' (attempt 2/2)
+[OSM-VENUE] Overpass 429 for 'Artist in his studio' (attempt 1/2)
+[OSM-VENUE] Overpass ConnectionError for 'Artist in his studio' (attempt 2/2)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-413/generate_tour_text.py:7335. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-413/fact_extractor.py:217. Caller should supply input_tokens and output_tokens separately.
+SERP_API_KEY present: ****b9e4
+SERP_PROVIDER: serper
+
+========================================================================
+  LOCAL-413: LIVE MFA STORIED TOUR GENERATION
+========================================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260811_113926.txt'
+
+======================================================================
+CALL #001 | 11:39:26.016 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Museum of Fine Arts, Boston, Massachusetts
+  tour_type: contained
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-413/tours/local413_live_run.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260811_113926.txt'
+
+======================================================================
+CALL #002 | 11:39:26.020 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Museum of Fine Arts, Boston, Massachusetts
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Boston, Massachusetts",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Boston, Massachusetts
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+
+Detected tour category: MUSEUM
+Using museum template for Museum of Fine Arts, Boston, Massachusetts - contained
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260811_113926.txt'
+
+======================================================================
+CALL #003 | 11:39:29.675 | GENERATING_PROMPT
+======================================================================
+  location: Museum of Fine Arts, Boston, Massachusetts
+  user_request: contained Museum of Fine Arts, Boston, Massachusetts
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Museum of Fine Arts, Boston, Massachusetts...
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [venue_resolver] SPARQL: 195 works found for Q49133
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-09-08 01:41:17.131968)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [venue_resolver] SPARQL: 195 works found for Q49133
+  [LOCAL-30] Deterministic selection: 279 documented works (5 catalogue, 195 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 8 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Main navigation [catalogue]
+     - Château-Gaillard at Sunset [sparql]
+     - Village Road [sparql]
+     - Farm on the Bank of a River [sparql]
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-09-08 01:41:17.131968)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [venue_resolver] SPARQL: 195 works found for Q49133
+  [LOCAL-30] Deterministic selection: 279 documented works (5 catalogue, 195 SPARQL)
+  [LOCAL-328] Quality score map: 11 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 8 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Appeal to the Great Spirit [sparql] (quality=17.0)
+     - Ancient Nubia Now [canonical] (quality=17.0)
+     - Adam and Eve [sparql] (quality=11.0)
+     - Artist in his studio [sparql] (quality=10.0)
+  [R4] Museum tour: asking for 8 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 8 documented works)
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Appeal to the Great Spirit
+   - Ancient Nubia Now
+   - Adam and Eve
+   - Artist in his studio
+   - April 1957 (Celestial Blue)
+   - the Japanese
+   - Madame Monet wearing a kimono
+   - An Italian Autumn
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
+    URL: http://www.mfa.org/
+    Coords: 42.339444444444446, -71.09416666666667
+    Language: en
+  [D1v2] Venue resolved: Q49133 → URL=http://www.mfa.org/, lang=en
+  [venue_cache] HIT for Q49133 (tier=rich, expires=2026-09-08 01:41:17.131968)
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168246
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168636
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168251
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168641
+  [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [LOCAL-28] Extracted 1 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168256
+  [D1v2] Cache HIT: 168 canonical titles (tier=rich), 5 catalogue works, combined_text=690170 chars
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Ankhhaf' → 'Ankhhaf (1905)'
+  [LOCAL-24] Classification: 168 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 168 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 161 dynamic aliases from 199 works
+  [D1v2] Injected 161 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Appeal to the Great Spirit' → canonical: 'Appeal to the Great Spirit'
+  [D1v2] VERIFIED 'Ancient Nubia Now' → canonical: 'Ancient Nubia Now'
+  [D1v2] VERIFIED 'Adam and Eve' → canonical: 'Adam and Eve'
+  [D1v2] VERIFIED 'Artist in his studio' → canonical: 'Artist in his studio'
+  [D1v2] VERIFIED 'April 1957 (Celestial Blue)' → canonical: 'April 1957 (Celestial Blue)'
+  [D1v2] VERIFIED 'the Japanese' → canonical: 'Madame Monet wearing a kimono'
+  [D1v2] DEDUP 'Madame Monet wearing a kimono' → same QID as already-verified work (Q10322900)
+  [D1v2] VERIFIED 'An Italian Autumn' → canonical: 'An Italian Autumn'
+  [D1v2] 7/8 works verified — tier: rich
+  [D1] Tier: rich (7 verified works)
+  [R4] Target reached: 7/4 stops
+  [LOCAL-16 GATE] All 7 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Museum of Fine Arts, Boston, Massachusetts...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 4×VENUE_ONLY (not enough covered candidates to fill 4 stops)
+  [LOCAL-212] Selected: ['Appeal to the Great Spirit=VENUE_ONLY', 'Ancient Nubia Now=VENUE_ONLY', 'Adam and Eve=VENUE_ONLY', 'Artist in his studio=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['April 1957 (Celestial Blue)=VENUE_ONLY', 'Madame Monet wearing a kimono=VENUE_ONLY', 'An Italian Autumn=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Appeal to the Great Spirit=17.0', 'Ancient Nubia Now=17.0', 'Adam and Eve=11.0', 'Artist in his studio=10.0']
+  [LOCAL-349] Yield scores (dropped):  ['April 1957 (Celestial Blue)=10.0', 'Madame Monet wearing a kimono=8.0', 'An Italian Autumn=7.0']
+  [EXISTENCE-GATE] LOG_ONLY — 7/7 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Appeal to the Great Spirit' — venue_corpus canonical_title: 'Appeal to the Great Spirit' at 'Museum of Fine Ar
+    [VERIFIED] 'Ancient Nubia Now' — venue_corpus canonical_title: 'Ancient Nubia Now' at 'Museum of Fine Arts, Bosto
+    [VERIFIED] 'Adam and Eve' — venue_corpus canonical_title: 'Adam and Eve' at 'Museum of Fine Arts, Boston'
+    [VERIFIED] 'Artist in his studio' — venue_corpus canonical_title: 'Artist in his studio' at 'Museum of Fine Arts, Bo
+    [VERIFIED] 'April 1957 (Celestial Blue)' — venue_corpus canonical_title: 'April 1957 (Celestial Blue)' at 'Museum of Fine A
+    [VERIFIED] 'Madame Monet wearing a kimono' — venue_corpus canonical_title: 'Madame Monet wearing a kimono' at 'Museum of Fine
+    [VERIFIED] 'An Italian Autumn' — venue_corpus canonical_title: 'An Italian Autumn' at 'Museum of Fine Arts, Bosto
+    [HARVEST] Summary: 0 harvested, 7 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Appeal to the Great Spirit': +1 passages (3 queries)
+    [INTERPRETIVE] DROPPED attributed quote for 'Appeal to the Great Spirit': 'statue that is' — no_primary_source_found_for:statue that is
+    [INTERPRETIVE] 'Adam and Eve': +5 passages (2 queries)
+    [INTERPRETIVE] 'Artist in his studio': +2 passages (4 queries)
+    [INTERPRETIVE] DROPPED attributed quote for 'Artist in his studio': 'named after the' — no_primary_source_found_for:named after the
+    [INTERPRETIVE] DROPPED attributed quote for 'Artist in his studio': 'William Wetmore Story' — no_primary_source_found_for:William Wetmore Story
+    [INTERPRETIVE] 'April 1957 (Celestial Blue)': +4 passages (3 queries)
+    [INTERPRETIVE] DROPPED attributed quote for 'April 1957 (Celestial Blue)': 'was also' — no_primary_source_found_for:was also
+    [INTERPRETIVE] 'An Italian Autumn': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 5 stops enriched, +13 passages, 18 queries issued, 4 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260811_113926.txt'
+
+======================================================================
+CALL #004 | 11:40:12.156 | PHASE_3B_REQUEST
+======================================================================
+  location: Museum of Fine Arts, Boston, Massachusetts
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0005 (620 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 4 stops
+  [LOCAL-35] Visitor info page found (en): http://www.mfa.org/visit
+  [LOCAL-35] Extracted from http://www.mfa.org/visit: closed=['Wednesday'], hours=1, admission=''
+  [LOCAL-35] Final Museum Information: Closed on Wednesday. 10:00–17:00
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Boston, hint: museum)
+  [LOCAL-355] Appeal to the Great Spirit: no practical facts in OSM
+  [LOCAL-355] Ancient Nubia Now: no practical facts in OSM
+  [LOCAL-355] Adam and Eve: no practical facts in OSM
+  [LOCAL-355] Artist in his studio: no practical facts in OSM
+   Coords cluster detected: 4 stops share '42.3396, -71.0941', refetching...
+   Cluster refetch OK 'Artist in his studio': 42.3395, -71.0896
+   Cluster refetch OK 'Adam and Eve': 42.3379, -71.0955
+   Cluster refetch OK 'Ancient Nubia Now': 42.3367, -71.0987
+   Cluster refetch OK 'Appeal to the Great Spirit': 42.3393, -71.0878
+Extracted first POI coordinates: (42.3393, -71.0878)
+  [D4] Museum single-coordinate: all stops set to (42.3393, -71.0878) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Appeal to the Great Spirit
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3393, -71.0878
+   Directions: Head southeast on Museum Rd, then turn left onto Huntington Ave. You will see th...
+2. Ancient Nubia Now
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3393, -71.0878
+   Directions: Continue on Huntington Ave, the museum will be on your right. Walk past the cour...
+3. Adam and Eve
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3393, -71.0878
+   Directions: From Ancient Nubia Now, head towards the Linde Family Wing for Contemporary Art....
+4. Artist in his studio
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3393, -71.0878
+   Directions: From Adam and Eve, continue through the Linde Family Wing. Artist in his studio ...
+================================
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-413/generate_tour_text.py:9711. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-413/generate_tour_text.py:10430. Caller should supply input_tokens and output_tokens separately.
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Museum of Fine Arts, Boston'
+    page[0] score=11790 url=https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston
+    page[1] score=6915 url=http://www.mfa.org/collections/guide-to-searching-the-collections
+    page[2] score=5920 url=http://www.mfa.org/collections/prints-and-drawings
+  [§3-adapter] Raw elements: 17 from 4 pages
+  [§3-adapter] After corroboration scoring: 17 elements
+  [§3-adapter] Final: 17 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 17 elements → /Users/micha/audioura-worktrees/LOCAL-413/tours/local413_live_run_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q49133 (17 elements)
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [SQ-S6b] Elements per stop: s0=9, s1=8, s2=9, s3=8
+  [SQ-S6b] Entity clusters found: 43 (≥2 stops)
+    → the museum (people): 4 stops, 5 elements
+    → 20th century (eras): 4 stops, 4 elements
+    → francis bartlett (people): 4 stops, 3 elements
+    → francis bartlett donation (people): 4 stops, 3 elements
+    → 19th century (eras): 4 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0197, 2499 tokens
+  [SQ-S6b] LLM named 4 candidate themes
+  [SQ-S6b] Scored themes: 4
+    → 'The Influence of Francis Bartlett's Donations': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'Cultural Exchange Through Art Donations': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'Development of the Museum's Architecture': coverage=1.00, evidence=0.60, distinct=0.80, arc=1.00, TOTAL=0.860
+    → 'The Role of Key Donors in Museum Expansion': coverage=0.50, evidence=0.60, distinct=1.00, arc=0.47, TOTAL=0.618
+  [SQ-S6b] Blended 3 threads: 'The Influence of Francis Bartlett's Donations'=0.33, 'Cultural Exchange Through Art Donations'=0.33, 'Development of the Museum's Architecture'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'The Influence of Francis Bartlett's Donations': coverage=100%, weight=0.33, elements=['se_004', 'se_005', 'se_006']
+    → 'Cultural Exchange Through Art Donations': coverage=100%, weight=0.33, elements=['se_002', 'se_003', 'se_008']
+    → 'Development of the Museum's Architecture': coverage=100%, weight=0.33, elements=['se_007', 'se_010', 'se_011']
+  [§3] Story elements injected into spine prompt (17 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Museum of Fine Arts, Boston model=gpt-4o tokens=2415 (in=1810 out=605) cost=$0.0106 latency=11.8s
+[COST_METER] FRESH | spine_generate | $0.010575 | user=local413_live | job=local413_live
+  [LOCAL-278] Spine cost folded into total: $0.0106
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=found)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (41 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Appeal to the Great Spirit' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Ancient Nubia Now' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Adam and Eve' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Artist in his studio' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='dedicated to the Homeric epics features works that chart the Trojan War and illu'
+
+  [LOCAL-383] Extracted 74 story beats, 74 named people: Africa An, Alfred Stieglitz, Americas, Amorsolo, Ancient Mesoamerica, Angelica Lloyd Russell
+
+  [LOCAL-410] SERP search wiring — searching for stories on 4 stops...
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [SQ-S2] Wikidata P856 check failed for mfa.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artsfuse.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for dallin.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for docsteach.org: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for henryehooper.blog: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for sothebys.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for etsy.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ebay.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artuk.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for hnanews.org: The read operation timed out
+    Stop 1 'Appeal to the Great Spirit': queries=4 serp_results=28 snippets=28
+      → Appeal to the Great Spirit is a 1908 equestrian statue by Cyrus Dallin, located in front of the Museum of Fine Arts, Bos
+      → Depicting a Native American man astride a horse with his arms outstretched, Appeal to the Great Spirit has become an ico
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [SQ-S2] Wikidata P856 check failed for mfa.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ajaonline.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for patrons.org.es: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for researchgate.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for fineartconnoisseur.com: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for hnanews.org: The read operation timed out
+    Stop 2 'Ancient Nubia Now': queries=4 serp_results=25 snippets=25
+      → Through a majestic display of art and objects, “Ancient Nubia Now” confronts past misinterpretations and offers new ways
+      → Through a majestic display of art and objects, “Ancient Nubia Now” confronts past misinterpretations and offers new ways
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [SQ-S2] Wikidata P856 check failed for adameve.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for answersingenesis.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for churchofjesuschrist.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for biblicalarchaeology.org: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for progressivechristianity.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for etsy.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for composition.gallery: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for chairish.com: HTTP Error 502: Bad Gateway
+  [SQ-S2] Wikidata P856 check failed for ecoconsultingadvisor.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for mfa.org: HTTP Error 429: Too Many Requests
+  [SQ-S2] Wikidata P856 check failed for hnanews.org: The read operation timed out
+    Stop 3 'Adam and Eve': queries=4 serp_results=24 snippets=24
+      → Featured Categories. Vibrators. Adam and eve rose. Dildos. purple dildo. Masturbators. male sex toy. Anal Toys. black bu
+      → Adam and Eve, the first humans, were real, historical people created by God and placed in the Garden of Eden. Their hist
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [SQ-S2] Wikidata P856 check failed for amazon.com: HTTP Error 502: Bad Gateway
+  [SQ-S2] Wikidata P856 check failed for thebroad.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for mfa.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ebay.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for smarthistory.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wikiart.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for rembrandtpaintings.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for hnanews.org: The read operation timed out
+    Stop 4 'Artist in his studio': queries=4 serp_results=25 snippets=25
+      → The Artist in his Studio is the title of an oil painting on panel created by Rembrandt in 1629. The Museum of Fine Arts 
+      → The Artist in His Studio · Opens the same content in full screen. What's it about? A culturally important public domain 
+
+  [LOCAL-410] SERP search complete: 16 queries, 102 results, 102 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 102 raw → max 20 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Appeal to the Great Spirit: serp_results=28 elements_extracted=- beats_injected=- (measured post-generation)
+    Ancient Nubia Now: serp_results=25 elements_extracted=- beats_injected=- (measured post-generation)
+    Adam and Eve: serp_results=24 elements_extracted=- beats_injected=- (measured post-generation)
+    Artist in his studio: serp_results=25 elements_extracted=- beats_injected=- (measured post-generation)
+
+Generating description for Stop 1: Appeal to the Great Spirit by , ...
+
+Generating description for Stop 2: Ancient Nubia Now by , ...
+
+Generating description for Stop 3: Adam and Eve by , ...
+
+Generating description for Stop 4: Artist in his studio by , ...
+  [LOCAL-381] stop='Adam and Eve' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Rembrandt, Donatello, Landon
+  [LOCAL-411] Stop 3 snippet ranking: input=24 bio_rejected=0 cap=5 output=5
+    Top scores: [('About the MFA | Museum of Fine Arts Boston', 14), ('The Adam and Eve Story: Eve Came From Where?', 11), ('Adam and Eve: The True Account | Answers in Genesi', 6)]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=10229 after=23993 (+13764 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23993)
+  [LOCAL-381] stop='Ancient Nubia Now' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Böcklin, Ming, Africa An
+  [LOCAL-411] Stop 2 snippet ranking: input=25 bio_rejected=0 cap=5 output=5
+    Top scores: [('Exhibiting Ancient Africa at the Museum of Fine Ar', 14), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 9), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 9)]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10790 after=23415 (+12625 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23415)
+  [LOCAL-381] stop='Artist in his studio' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 4 beats: Dou, Horticultural, William
+  [LOCAL-411] Stop 4 snippet ranking: input=25 bio_rejected=0 cap=5 output=5
+    Top scores: [('The Artist in his Studio - Wikipedia', 14), ('About the MFA | Museum of Fine Arts Boston', 14), ('The Artist in His Studio | eBay', 10)]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=10533 after=23560 (+13027 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23560)
+  [LOCAL-381] stop='Appeal to the Great Spirit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: John Hubbard Sturgis, Rubens, Guided Tour
+  [LOCAL-411] Stop 1 snippet ranking: input=28 bio_rejected=0 cap=5 output=5
+    Top scores: [('The Problematics of Multiculturalism at the MFA', 8), ('Appeal to the Great Spirit', 6), ("Cyrus Dallin's 'Appeal to the Great Spirit' | Muse", 6)]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=9808 after=22920 (+13112 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22920)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-413/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0045 (5667 tokens)
+  [LOCAL-391] Stop 1: BEAT RETRY — missing ['Sturgis', 'Rubens', 'Tour', 'Ritts', 'Yohachi', 'Simon', 'Dining', 'West', 'Linde', 'Koehler', 'Mesoamerica', 'National', 'Teitelbaum', 'Russell', 'Stubbins', 'Gauguin', 'Garden', 'British', 'Athenæum'], retrying (attempt 2/3)
+Stop 4 API call cost: $0.0047 (5845 tokens)
+  [LOCAL-391] Stop 4: scrubbed 2 unfilled role(s)
+  [LOCAL-391] Stop 4: BEAT RETRY — missing ['Dou', 'Tchaikovsky', 'Conservation', 'Family', 'Degas', 'Bowling', 'Moody', 'Picture', 'Carefully', 'Nubia', 'Chris', 'Behrakis', 'Bougival', 'Nakane', 'Laurence'], retrying (attempt 2/3)
+Stop 2 API call cost: $0.0047 (5817 tokens)
+  [LOCAL-391] Stop 2: BEAT RETRY — missing ['Böcklin', 'Ruth', 'Rajput', 'Asiatic', 'Monet', 'Visitor', 'Dallin', 'Photographs', 'Americas', 'Portrait', 'Japanese', 'Amorsolo', 'Jessie', 'Nolan', 'Lowell'], retrying (attempt 2/3)
+Stop 2 API call cost: $0.0048 (6028 tokens)
+  [LOCAL-295] Stop 2: SHORT BUT VALID — keeping (29 words, corpus likely thin)
+  [LOCAL-295]   verbatim: "I'm sorry, but it seems that your request contains multiple errors, and I'm unable to proceed with the generation. Please review the text and resubmit it for further assistance."
+  [LOCAL-393] Stop 2: WORD FLOOR — 29 words < 120, retrying (attempt 3/3)
+Stop 3 API call cost: $0.0048 (6029 tokens)
+  [LOCAL-391] Stop 3: scrubbed 1 unfilled role(s)
+  [LOCAL-391] Stop 3: BEAT RETRY — missing ['Rembrandt', 'Donatello', 'Sargent', 'Nishida', 'Stieglitz', 'Earth', 'Goelet', 'Pacific', 'Joseph', 'Pace', 'Howard', 'Information', 'Renoir', 'Gail', 'Wickes'], retrying (attempt 2/3)
+Stop 4 API call cost: $0.0049 (6088 tokens)
+  [LOCAL-393] Stop 4: WORD FLOOR — 43 words < 120, retrying (attempt 3/3)
+Stop 1 API call cost: $0.0049 (6155 tokens)
+  [LOCAL-393] Stop 1: WORD FLOOR — 82 words < 120, retrying (attempt 3/3)
+Stop 3 API call cost: $0.0051 (6321 tokens)
+  [LOCAL-393] Stop 3: WORD FLOOR — 54 words < 120, retrying (attempt 3/3)
+Stop 1 API call cost: $0.0050 (6255 tokens)
+  [LOCAL-394] stop='Appeal to the Great Spirit' below_floor words=89 — kept (never dropped)
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Sturgis' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Rubens' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Tour' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Ritts' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Yohachi' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Simon' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Dining' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='West' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Linde' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Koehler' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Mesoamerica' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='National' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Teitelbaum' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Russell' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Stubbins' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Gauguin' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Garden' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='British' — never fabricate, moving on
+  [LOCAL-391] Stop 1: beat_unrecoverable name='Athenæum' — never fabricate, moving on
+Stop 1 description word count: 89 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0051 (6374 tokens)
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Böcklin' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Ming' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Monet' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Dallin' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Photographs' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Americas' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Portrait' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Japanese' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Amorsolo' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Jessie' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Nolan' — never fabricate, moving on
+  [LOCAL-391] Stop 2: beat_unrecoverable name='Lowell' — never fabricate, moving on
+Stop 2 description word count: 187 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0052 (6446 tokens)
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Dou' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Horticultural' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='William' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Tchaikovsky' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Conservation' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Family' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Degas' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Bowling' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Moody' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Picture' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Carefully' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Nubia' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Chris' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Behrakis' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Bougival' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Nakane' — never fabricate, moving on
+  [LOCAL-391] Stop 4: beat_unrecoverable name='Laurence' — never fabricate, moving on
+Stop 4 description word count: 249 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0053 (6648 tokens)
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Rembrandt' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Donatello' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Landon' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Sargent' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Nishida' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Stieglitz' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Drawing' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Earth' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Goelet' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Pacific' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Loring' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Joseph' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Pace' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Howard' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Renoir' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Gail' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Museum' — never fabricate, moving on
+  [LOCAL-391] Stop 3: beat_unrecoverable name='Wickes' — never fabricate, moving on
+Stop 3 description word count: 228 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-388] PRE-GATE stop='Appeal to the Great Spirit' beats_assigned=19 beats_in_output=0 dropped=['John Hubbard Sturgis', 'Rubens', 'Guided Tour', 'Herb Ritts', 'Nishimuraya Yohachi', 'Emile Simon', 'Hamilton Palace Dining', 'West', 'Linde', 'Koehler', 'Ancient Mesoamerica', 'National', 'Teitelbaum', 'Angelica Lloyd Russell', 'Hugh Stubbins', 'Gauguin', 'Japanese Garden', 'British', 'Athenæum']
+  [LOCAL-388] PRE-GATE stop='Ancient Nubia Now' beats_assigned=18 beats_in_output=6 dropped=['Böcklin', 'Ming', 'Monet', 'Dallin', 'Photographs', 'Americas', 'National Portrait', 'Japanese', 'Amorsolo', 'Jessie', 'Nolan', 'Lowell']
+  [LOCAL-388] PRE-GATE stop='Adam and Eve' beats_assigned=19 beats_in_output=1 dropped=['Rembrandt', 'Donatello', 'Landon', 'Sargent', 'Nishida', 'Alfred Stieglitz', 'Newland House Drawing', 'Earth', 'John Goelet', 'Pacific', 'Loring', 'Joseph', 'Pace', 'Rabbi Howard', 'Renoir', 'Gail', 'Museum', 'Forsyth Wickes']
+  [LOCAL-388] PRE-GATE stop='Artist in his studio' beats_assigned=18 beats_in_output=1 dropped=['Dou', 'Horticultural', 'William', 'Tchaikovsky', 'Conservation', 'Linde Family', 'Degas', 'Bowling', 'Moody', 'Picture', 'Carefully', 'Nubia', 'Chris', 'Margo Behrakis', 'Bougival', 'Kinsaku Nakane', 'Laurence']
+  [LOCAL-394] stop='Appeal to the Great Spirit' below_floor words=89 — kept (never dropped)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 4 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 3 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0011 (1330 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'Ancient Nubia Now': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 3 'Adam and Eve': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 0 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 3 'Adam and Eve': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/26)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 4
+    Glossed (composed): 1
+    Suppressed (already explained): 1
+    Degraded (name dropped): 1
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1060 tokens, $0.0002, 5.4s
+    Gloss: 384 tokens, $0.0001, 1.8s
+    Compose: 1018 tokens, $0.0002, 1.5s
+    Total added cost: $0.0004
+    Stops affected: 2
+    Glosses applied:
+      • Cyrus Edwin Dallin → SUPPRESSED (already explained)
+      • Fine Arts → "one of the largest art museums in the U.S" [source: model]
+      • Fine Arts → DEGRADED (name dropped)
+
+  [LOCAL-385] Prose entity grounding gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 34
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Museum of Fine Arts, Boston'...
+   Authority: 3 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 4 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [2] DELETED: 'This exhibition' in: This exhibition serves as a gateway to understanding the vibrant and diverse art
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 3 facts found {'architecture': 1, 'founding': 2}
+  [LOCAL-382] Thesis block injected into prolog (374 chars)
+  [R2] Prolog saved for Stop 1 (103 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 103 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 103 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 181
+    Words after:  181
+    Delta: 0
+    Stops affected: 0/4
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 1.8s, $0.0089, 1326 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Appeal to the Great Spirit] (mystery): As visitors engage with this powerful artwork, they are drawn into a moment of r...
+      [Ancient Nubia Now] (mystery): The artwork within this exhibit not only serves as a testament to the historical...
+      [Adam and Eve] (mystery): The portrayal of Adam and Eve in the Garden of Eden, surrounded by symbolic anim...
+      [Artist in his studio] (cause): During the 17th century, artists often viewed their studios as sanctuaries where...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0029 (482 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (36 words):
+      "At "Appeal to the Great Spirit," visitors are drawn into a moment of reverence and connection with the divine. Moving on to "Ancient Nubia Now," the exhibit challenges past misinterpretations by providing insights into Nubia's relevance."
+      Stops referenced: 2
+    Part 4 total cost: $0.0029
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+    Stop 1 'Appeal to the Great Spirit': removed duplicate sentence: "As visitors engage with this powerful artwork, they are drawn into a moment of r..."
+    Stop 2 'Ancient Nubia Now': removed duplicate sentence: "The artwork within this exhibit not only serves as a testament to the historical..."
+  [LOCAL-286] Deduplication: 2 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Museum of Fine Arts, Boston — next is Ancie...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Adam and Eve....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Your final stop in Museum of Fine Arts, Boston: Artist in hi...
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap: D177 FAILED for 'Appeal to the Great Spirit': fact not in delivered text
+    Fact: "As visitors engage with this powerful artwork, they are drawn into a moment of r..."
+  [LOCAL-280] Recap: D177 FAILED for 'Ancient Nubia Now': fact not in delivered text
+    Fact: "The artwork within this exhibit not only serves as a testament to the historical..."
+  [LOCAL-280] Recap composition: 1.2s, $0.0024, 419 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (2 D177 rejected, 0 navigation rejected)
+    [Adam and Eve] (mystery): "The portrayal of Adam and Eve in the Garden of Eden, surrounded by symbolic anim..."
+      → composed: "Adam and Eve, depicted in the Garden of Eden with symbolic animals"
+    [Artist in his studio] (cause): "During the 17th century, artists often viewed their studios as sanctuaries where..."
+      → composed: "An artist's studio, considered a sanctuary for creativity during the 17th century"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Adam and Eve, depicted in the Garden of Eden with symbolic animals and an artist's studio, considered a sanctuary for creativity during the 17th century."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [LOCAL-275] Part 2: Treat Page only (no tour verified), anchored to (42.3393, -71.0878)
+  [LOCAL-275] Part 2 (news): news_orchestrator_service.py confirmed
+  [LOCAL-275] Closing offer: 2 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 1
+    Dropped: 1
+    AUDIT: closed_day | Closed on Wednesday | http://www.mfa.org/visit | VERIFIED
+    AUDIT: hours | 10:00–17:00 | http://www.mfa.org/visit | DROPPED — not supported by source
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 5 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to explore the Museum of Fine Arts in Boston, Massachusetts."
+  [2] ""Adam and Eve" is a renowned masterpiece portraying the first couple from the Bible. Created in 1515..."
+  [LOCAL-391] Final assembly scrub: replaced 1 unfilled role(s)
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='Appeal to the Great Spirit' beats_assigned=19 beats_in_output=1 dropped=['John Hubbard Sturgis', 'Rubens', 'Herb Ritts', 'Nishimuraya Yohachi', 'Emile Simon', 'Hamilton Palace Dining', 'West', 'Linde', 'Koehler', 'Ancient Mesoamerica', 'National', 'Teitelbaum', 'Angelica Lloyd Russell', 'Hugh Stubbins', 'Gauguin', 'Japanese Garden', 'British', 'Athenæum'] causes=[John Hubbard Sturgis=never_written, Rubens=never_written, Herb Ritts=never_written, Nishimuraya Yohachi=never_written, Emile Simon=never_written, Hamilton Palace Dining=never_written, West=never_written, Linde=never_written, Koehler=never_written, Ancient Mesoamerica=never_written, National=never_written, Teitelbaum=never_written, Angelica Lloyd Russell=never_written, Hugh Stubbins=never_written, Gauguin=never_written, Japanese Garden=never_written, British=never_written, Athenæum=never_written]
+    stop='Ancient Nubia Now' beats_assigned=18 beats_in_output=5 dropped=['Böcklin', 'Ming', 'Monet', 'Sharf Visitor', 'Dallin', 'Photographs', 'Americas', 'National Portrait', 'Japanese', 'Amorsolo', 'Jessie', 'Nolan', 'Lowell'] causes=[Böcklin=never_written, Ming=never_written, Monet=never_written, Sharf Visitor=never_written, Dallin=never_written, Photographs=never_written, Americas=never_written, National Portrait=never_written, Japanese=never_written, Amorsolo=never_written, Jessie=never_written, Nolan=never_written, Lowell=never_written]
+    stop='Adam and Eve' beats_assigned=19 beats_in_output=1 dropped=['Rembrandt', 'Donatello', 'Landon', 'Sargent', 'Nishida', 'Alfred Stieglitz', 'Newland House Drawing', 'Earth', 'John Goelet', 'Pacific', 'Loring', 'Joseph', 'Pace', 'Rabbi Howard', 'Sharf Information', 'Renoir', 'Gail', 'Forsyth Wickes'] causes=[Rembrandt=never_written, Donatello=never_written, Landon=never_written, Sargent=never_written, Nishida=never_written, Alfred Stieglitz=never_written, Newland House Drawing=never_written, Earth=never_written, John Goelet=never_written, Pacific=never_written, Loring=never_written, Joseph=never_written, Pace=never_written, Rabbi Howard=never_written, Sharf Information=never_written, Renoir=never_written, Gail=never_written, Forsyth Wickes=never_written]
+    stop='Artist in his studio' beats_assigned=18 beats_in_output=1 dropped=['Dou', 'Horticultural', 'William', 'Tchaikovsky', 'Conservation', 'Linde Family', 'Degas', 'Bowling', 'Moody', 'Picture', 'Carefully', 'Nubia', 'Chris', 'Margo Behrakis', 'Bougival', 'Kinsaku Nakane', 'Laurence'] causes=[Dou=never_written, Horticultural=never_written, William=never_written, Tchaikovsky=never_written, Conservation=never_written, Linde Family=never_written, Degas=never_written, Bowling=never_written, Moody=never_written, Picture=never_written, Carefully=never_written, Nubia=never_written, Chris=never_written, Margo Behrakis=never_written, Bougival=never_written, Kinsaku Nakane=never_written, Laurence=never_written]
+
+=== Word Count Statistics ===
+Stop 1: Appeal to the Great Spirit - 89 words
+Stop 2: Ancient Nubia Now - 187 words
+Stop 3: Adam and Eve - 228 words
+Stop 4: Artist in his studio - 249 words
+===========================
+
+
+Total API cost: $0.0453 (32270 tokens)
+CACHE STORE: Museum of Fine Arts, Boston, Massachusetts / contained / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-413/tours/local413_live_run.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-413/tours/local413_live_run_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Museum of Fine Arts, Boston, Massachusetts - Museum Tour
+Tour-Category: museum
+
+Stop 1: Appeal to the Great Spirit
+
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Coordinates: 42.3393, -71.0878
+
+Museum Information: Closed on Wednesday
+
+Orientation: You are about to explore the Museum of Fine Arts in Boston, Massachusetts. The tour will lead you through four captivating stops: "Appeal to the Great Spirit," "Ancient Nubia Now," "Adam and Eve," and "Artist in his Stu...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Appeal to the Great Spirit: serp_results=28 snippets_injected=28 beats_in_delivered_text=1
+    Ancient Nubia Now: serp_results=25 snippets_injected=25 beats_in_delivered_text=0
+    Adam and Eve: serp_results=24 snippets_injected=24 beats_in_delivered_text=0
+    Artist in his studio: serp_results=25 snippets_injected=25 beats_in_delivered_text=0
+========================================================================
+
+  Delivered text written to: /Users/micha/audioura-worktrees/LOCAL-413/tours/local413_live_run.txt
+  Length: 7296 chars
+
+  Prompt dump exists: /Users/micha/audioura-worktrees/LOCAL-413/prompt_dump_stop1.txt
+  Prompt dump length: 23838 chars
+
+========================================================================
+  GENERATION COMPLETE
+========================================================================

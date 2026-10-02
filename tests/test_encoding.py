@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 from bs4 import BeautifulSoup
 

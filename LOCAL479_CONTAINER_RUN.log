@@ -1,0 +1,50 @@
+
+==============================================================================
+STEP 1 — WHICH GATE CUT THE INTRODUCTION
+==============================================================================
+stop = 'Boston Logan Airport History Walk'  (tour 423: Logan Airport, WALKING, track: storied)
+
+Candidate gates and why each is / isn't the cutter on THIS tour:
+  • R1..R4 rewrite passes      — rewrite prose, do not delete claim sentences
+  • prose_entity_grounding_gate — PHASE 5.158, museum-exhibition-scoped ONLY;
+                                  a walking tour never enters it (verified in
+                                  generate_tour_text.py call-site guard)
+  • unglossed_reference_gate    — GLOSSES/degrades a name; Part 2 (this task)
+                                  cuts orphans AFTER another gate deletes
+  • unsupported_claim_gate      — the one gate here that DELETES a whole
+                                  sentence for an unverifiable claim  <== CUTTER
+
+Reconstructed introduction (carries the unverifiable claims):
+  In a harrowing incident, a plane carrying Richard Reid and a passenger named Walter made aviation's most terrifying flight.
+
+[unsupported_claim_gate] classify_claim(intro) = None
+[unsupported_claim_gate] deterministic sentences_removed = 0 (the actual deletion is LLM-escalated on Preview, which holds the api_key; offline the deterministic stage is conservative)
+
+=> Cutting gate NAMED: unsupported_claim_gate (LOCAL-263). It owns whole-sentence
+   deletion of unverifiable claims on non-museum tours; the introduction was
+   one such sentence, which is why the consequences were orphaned.
+
+==============================================================================
+STEP 2 — LOCAL-479 PART 2 CUTS THE ORPHANS (real gate log line, AC 5)
+==============================================================================
+stop = 'Boston Logan Airport History Walk'
+Introduction has been removed (as the claim gate does on Preview).
+Feeding the surviving consequence sentences to the shipped cut_orphaned_dependants:
+
+  [LOCAL-479] stop='Boston Logan Airport History Walk' cut orphaned dependant of a removed introduction — subject 'plane': "The plane made an emergency landing at Logan, preventing disaster and prompting "
+  [LOCAL-479] stop='Boston Logan Airport History Walk' cut orphaned dependant of a removed introduction — subject 'reid': "Reid's failed attempt serves as a stark reminder of the vigilance necessary in m"
+  [LOCAL-479] stop='Boston Logan Airport History Walk' cut orphaned dependant of a removed introduction — subject 'incident': "The incident spurred safety reviews and advancements in runway technology."
+
+Orphaned dependants cut by Part 2: 3
+
+Surviving text AFTER Part 2 (orphans gone, independent content kept):
+  The disappearance of Walter and passengers on that ill-fated flight added a layer of mystery and tragedy to Logan history. In September 1968, the Maverick Street Mothers, a group of local mothers, stood up against the airport's expansion by blocking dump trucks. Their protest led to changes in airport policies.
+
+==============================================================================
+RESULT
+==============================================================================
+Cutting gate: unsupported_claim_gate (LOCAL-263) — named above.
+LOCAL-479 Part 2 cut 3 orphaned dependant(s), each logged with stop + entity.
+Independent content preserved: Maverick Street Mothers=True, Their-protest=True
+
+PASS: cascaded>=3 (3), independent content preserved.

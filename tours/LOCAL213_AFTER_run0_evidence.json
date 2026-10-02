@@ -1,5 +1,9 @@
 {
-  "Cap d'Antibes": {
+  "Old Town of Menton": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Eze Village": {
     "status": "UNVERIFIED",
     "reason": "not in discovered landmarks"
   }

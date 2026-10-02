@@ -1,16 +1,332 @@
 """
 RAG Retriever — lightweight knowledge-fetch utilities for Storied tour generation.
 No OpenAI calls. Fetches factual summaries from public APIs to ground tour narratives.
+
+LOCAL-447: DB-first path — checks stop_corpus for existing Wikipedia content before
+any network call. If the content was previously fetched and stored, we serve it from
+the DB with zero network overhead. This implements D403a step 1 (own DB first).
+
+LOCAL-448: Correctness fixes to LOCAL-447:
+  - Defect 1: Containment match removed. Only exact accent-folded matching is used.
+    The old `topic in title or title in topic` served wrong corpus (fabrication vector).
+  - Defect 2: DB connection uses production pattern (psycopg2 + env vars), not tests/.
+    Import failure is now logged at WARNING (not silently swallowed).
+  - Defect 3: Wayback fallback removed from production chain. LOCAL-447 measurement
+    proved it unfit (7% coverage, 9.6s median, wrong articles). Function retained
+    for probe/fixture evidence only.
+
+LOCAL-451: Content-based selection replaces order-based selection.
+  Neither DB-first (LOCAL-448) nor live-first (LOCAL-450) is correct — a fixed order
+  cannot know which source holds more for a given title.
+
+  New design:
+    1. Fetch live as before (REST, breaker-governed, action-API enrichment unchanged).
+    2. Consult stop_corpus with the same exact accent-folded match LOCAL-448 built.
+    3. Return the richer of the two (length as proxy — see SUBMISSION for discussion).
+    4. `source` reflects whichever won; losing length logged for auditability.
+    5. Every branch that previously returned {} now consults the DB first.
+       (404, non-200, empty-extract — all closed.)
 """
+import os
 import requests
 import logging
+import re
+import unicodedata
+from datetime import datetime, timezone
 from urllib.parse import quote
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
+# ─── LOCAL-447 chain gate (LEAD, D408) ───────────────────────────────────────
+#
+# The LOCAL-447 retrieval chain is OFF by default. Both new paths are unsafe as
+# merged and LEAD verified each failure by running it:
+#
+#   DB-first  — the containment match (`title in topic or topic in title`) serves
+#               the WRONG stop's corpus. Live proof: asking for "The Dream of Saint
+#               Ursula by Carpaccio" returned the Musée international d'Art naïf
+#               Anatole Jakovsky, logged as a success, 0 network calls, no warning.
+#               It is also silently dead in the container — it imports
+#               db_connection from tests/, which Dockerfile.generator never copies.
+#   Wayback   — LOCAL-447's own measurement rejected it: 7% coverage, median 9.6s
+#               (over the 5s budget), both hits the wrong article. Wiring it puts a
+#               ~10s stall back on the exact failure path LOCAL-445 made instant.
+#
+# LOCAL-448 fixes both; this flag is how it gets turned on. Same precedent as
+# D400/D402/D404 — unproven wiring does not ride on the default path.
+
+def _l447_enabled() -> bool:
+    """True unless the LOCAL-447 retrieval chain is explicitly disabled.
+
+    D417: default flipped from OFF to ON. It was OFF from D408 because the DB path
+    could lose content — DB-first served 8% of live for one title, live-first served
+    7% of the DB for another. LOCAL-451 replaced ordering with selection, so the path
+    is now strictly additive: it returns the richer of live and stop_corpus and can
+    never be worse than live alone (D414).
+
+    Kill switch: L447_RETRIEVAL_CHAIN=false (or 0/no).
+    """
+    return os.environ.get('L447_RETRIEVAL_CHAIN', 'true').strip().lower() in ('1', 'true', 'yes')
+
+
+# ─── Accent folding (D243) ───────────────────────────────────────────────────
+
+def _strip_accents(text: str) -> str:
+    """Remove accents for matching (D243 pattern)."""
+    nfkd = unicodedata.normalize('NFKD', text)
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+
+# ─── DB-first lookup (LOCAL-447, D403a step 1; LOCAL-448 correctness fix) ────
+
+def _get_db_connection():
+    """Get a production DB connection using the same pattern as other services.
+
+    LOCAL-448 (Defect 2): Production code must NOT import from tests/.
+    Uses direct psycopg2 with env vars, same as generate_tour_text_service.py.
+    Inside Docker: DB_HOST=postgres-2, DB_PORT=5432 (from DATABASE_URL env).
+    Outside Docker (host): DB_HOST=localhost, DB_PORT=5433 (mapped port).
+    """
+    import psycopg2
+    # Parse DATABASE_URL if available (set in docker-compose-master.yml)
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        return psycopg2.connect(database_url)
+    # Fallback to individual env vars (same defaults as generate_tour_text_service.py)
+    return psycopg2.connect(
+        host=os.environ.get("DB_HOST", "postgres-2"),
+        port=os.environ.get("DB_PORT", "5432"),
+        dbname=os.environ.get("DB_NAME", "audiotours"),
+        user=os.environ.get("DB_USER", "admin"),
+        password=os.environ.get("DB_PASSWORD", "password123"),
+    )
+
+
+def _fetch_from_stop_corpus(topic: str) -> Optional[str]:
+    """Check stop_corpus for existing Wikipedia content matching this topic.
+
+    Returns the concatenated passage text if found, None otherwise.
+
+    LOCAL-448 (Defect 1): Only exact accent-folded matching is used.
+    The previous containment match (`topic in title or title in topic`) served
+    the WRONG stop's corpus — e.g. "The Dream" inside "The Dream of Saint Ursula
+    by Carpaccio" returned a completely unrelated museum's content. A wrong DB
+    hit puts false content into a tour; a missed hit costs one network call.
+    When in doubt, return None.
+
+    LOCAL-448 (Defect 2): Uses production DB connection pattern, not tests/ import.
+    Import failure is logged at WARNING (not silently swallowed).
+    """
+    if not _l447_enabled():
+        return None
+
+    try:
+        conn = _get_db_connection()
+    except Exception as e:
+        logger.warning(f"DB-first: cannot connect to database: {e}")
+        return None
+
+    topic_folded = _strip_accents(topic).lower().strip()
+    if not topic_folded:
+        conn.close()
+        return None
+
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT stop_title, passages_json, source_pages
+            FROM stop_corpus
+            WHERE passages_json IS NOT NULL
+              AND source_pages::text LIKE '%%wikipedia%%'
+        """)
+        rows = cur.fetchall()
+        conn.close()
+
+        import json
+        for stop_title, passages_json, source_pages in rows:
+            title_folded = _strip_accents(stop_title).lower().strip()
+            # LOCAL-448: EXACT accent-folded match ONLY.
+            # No substring/containment — that serves wrong corpus.
+            if title_folded != topic_folded:
+                continue
+
+            # Found an exact match — extract Wikipedia-sourced passages
+            passages = json.loads(passages_json) if isinstance(passages_json, str) else passages_json
+            sources = json.loads(source_pages) if isinstance(source_pages, str) else source_pages
+
+            # Verify at least one source is Wikipedia
+            has_wiki_source = any(
+                s.get('type') == 'wikipedia' or 'wikipedia.org' in s.get('url', '')
+                for s in (sources if isinstance(sources, list) else [])
+            )
+            if not has_wiki_source:
+                continue
+
+            # Extract text from passages
+            texts = []
+            for p in (passages if isinstance(passages, list) else []):
+                if isinstance(p, dict):
+                    text = p.get('text', '')
+                elif isinstance(p, str):
+                    text = p
+                else:
+                    continue
+                if text and len(text) > 20:
+                    texts.append(text)
+
+            if texts:
+                combined = '\n'.join(texts)
+                logger.info(f"DB-first: served '{topic}' from stop_corpus ({len(combined)} chars, 0 network calls)")
+                return combined
+
+        return None
+
+    except Exception as e:
+        logger.warning(f"DB-first lookup failed for '{topic}': {e}")
+        return None
+
+
+# ─── Wayback fallback (LOCAL-447, D403a step 2) — REMOVED FROM CHAIN ─────────
+#
+# LOCAL-448 (Defect 3): Wayback is removed from the active retrieval chain.
+# LOCAL-447 measurement proved it unfit: 7% coverage, median 9.6s (over 5s budget),
+# both hits the wrong article. Wiring it puts a ~10s stall back on the failure
+# path LOCAL-445 made instant (~77s on an 8-stop tour for 9-year-stale content
+# 7% of the time).
+#
+# The probe (wayback_wikipedia_probe.py) and its fixture remain as evidence that
+# settled the question. The parsing code below is retained for reference and for
+# the probe to use, but is NOT called from the production retrieval chain.
+
+def _parse_wayback_timestamp(url_or_ts: str) -> Optional[datetime]:
+    """Parse a Wayback Machine timestamp (YYYYMMDDHHmmss) from a URL or raw string.
+    
+    Retained for wayback_wikipedia_probe.py reference. Not used in production chain.
+    """
+    m = re.search(r'/web/(\d{14})/', url_or_ts)
+    if not m:
+        m = re.match(r'^(\d{14})$', url_or_ts.strip())
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), '%Y%m%d%H%M%S').replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _fetch_from_wayback_wikipedia(topic: str, timeout: float = 12.0) -> Optional[dict]:
+    """Fetch the archived Wikipedia article from Wayback Machine.
+
+    LOCAL-448: REMOVED FROM PRODUCTION CHAIN. This function is retained for the
+    probe/fixture evidence but is never called from fetch_wikipedia_summary_with_provenance().
+
+    LOCAL-447 measurement rejected it:
+      - 7% coverage (2/30 titles)
+      - Median 9.6s latency (over 5s budget)
+      - Both hits returned the WRONG article
+    """
+    # LOCAL-448: This function is no longer called from the production chain.
+    # It remains here only so wayback_wikipedia_probe.py can still import it.
+    if not _l447_enabled():
+        return None
+
+    encoded = quote(topic.strip().replace(' ', '_'), safe='')
+    article_url = f"https://en.wikipedia.org/wiki/{encoded}"
+    wayback_url = f"https://web.archive.org/web/2/{article_url}"
+
+    try:
+        resp = requests.get(
+            wayback_url,
+            headers={'User-Agent': 'Audioura/2.2 (LOCAL-447 wayback-fallback)'},
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        if resp.status_code != 200:
+            return None
+
+        # Parse snapshot timestamp
+        final_url = resp.url if isinstance(resp.url, str) else str(resp.url)
+        snapshot_dt = _parse_wayback_timestamp(final_url)
+        snapshot_ts_str = snapshot_dt.strftime('%Y%m%d%H%M%S') if snapshot_dt else ''
+        age_days = (datetime.now(timezone.utc) - snapshot_dt).days if snapshot_dt else None
+
+        html = resp.text
+        if not html or len(html) < 500:
+            return None
+
+        # Extract lead section (before first <h2>)
+        lead_html = re.split(r'<h2', html, maxsplit=1)[0]
+
+        paragraphs = []
+        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', lead_html, re.DOTALL):
+            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
+            clean = re.sub(r'\[\d+\]', '', clean).strip()
+            if clean and len(clean) > 30:
+                paragraphs.append(clean)
+
+        lead_text = '\n'.join(paragraphs)
+        if not lead_text or len(lead_text) < 50:
+            return None
+
+        logger.info(f"Wayback fallback: served '{topic}' from archive "
+                    f"(snapshot {snapshot_ts_str}, age {age_days}d, {len(lead_text)} chars)")
+
+        return {
+            'text': lead_text,
+            'is_from_archive': True,
+            'wayback_snapshot_timestamp': snapshot_ts_str,
+            'snapshot_age_days': age_days,
+        }
+
+    except Exception as e:
+        logger.debug(f"Wayback fallback failed for '{topic}': {e}")
+        return None
+
+
+# ─── LOCAL-451: Content-based selection ──────────────────────────────────────
+
+def _select_richer(live_text: str, db_text: str, topic: str) -> Tuple[str, str]:
+    """Choose the richer source between live Wikipedia text and DB stop_corpus text.
+
+    Returns (selected_text, source_label) where source_label is either
+    'wikipedia_live' or 'stop_corpus'.
+
+    Selection proxy: length. Length is acceptable as a first cut because both
+    sources contain Wikipedia-sourced prose about the same topic. A longer text
+    from the same origin (Wikipedia) means more coverage. See SUBMISSION for
+    discussion of why a prose-quality heuristic was not implemented.
+
+    The losing length is logged for auditability.
+    """
+    live_len = len(live_text) if live_text else 0
+    db_len = len(db_text) if db_text else 0
+
+    if live_len == 0 and db_len == 0:
+        return ('', 'wikipedia_live')
+
+    if db_len > live_len:
+        logger.info(
+            f"Selection '{topic}': stop_corpus wins "
+            f"(db={db_len} chars > live={live_len} chars, delta=+{db_len - live_len})"
+        )
+        return (db_text, 'stop_corpus')
+    else:
+        logger.info(
+            f"Selection '{topic}': wikipedia_live wins "
+            f"(live={live_len} chars >= db={db_len} chars, delta=+{live_len - db_len})"
+        )
+        return (live_text, 'wikipedia_live')
+
+
 def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
     """Fetch a plain-text summary from Wikipedia's REST API.
+
+    LOCAL-447 retrieval chain (D403a):
+      1. Own DB (stop_corpus) — zero network cost, accent-folded match
+      2. Live Wikipedia REST/Action API — existing path
+      3. Wayback archived article — only when Wikimedia is cold (dead_host_breaker)
 
     Args:
         topic: The Wikipedia article title (e.g. "Marc Chagall").
@@ -21,13 +337,68 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
         The 'extract' field (plain text) from the Wikipedia summary response.
         Returns empty string on 404, redirect loops, network errors, or if
         the topic doesn't exist — never raises.
+        
+        When content is from the archive, the return value is still a plain string
+        (backwards compatible). Use fetch_wikipedia_summary_with_provenance() if
+        you need the archive metadata.
+    """
+    result = fetch_wikipedia_summary_with_provenance(topic, sentences)
+    return result.get('text', '') if result else ''
+
+
+def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> dict:
+    """Fetch Wikipedia summary with provenance metadata.
+
+    LOCAL-451 retrieval chain (content-based selection):
+      1. Fetch live Wikipedia (REST + action-API enrichment), governed by breaker.
+      2. Consult stop_corpus (exact accent-folded match, local DB read).
+      3. Return the richer of the two (length proxy).
+      4. `source` reflects whichever won; losing length logged for auditability.
+
+    Every branch that can yield empty (404, non-200, empty extract, timeout, etc.)
+    consults the DB before returning {} — closing the gaps LOCAL-450 left open.
+
+    Returns:
+        dict with keys:
+            'text': str — the summary text
+            'source': str — 'stop_corpus' or 'wikipedia_live'
+            'is_from_archive': bool — always False (Wayback removed)
+            'wayback_snapshot_timestamp': str — always '' (Wayback removed)
+            'snapshot_age_days': int or None — always None (Wayback removed)
+        Returns empty dict on total failure.
     """
     if not topic or not topic.strip():
-        return ""
+        return {}
 
-    # URL-encode the topic (spaces → underscores is Wikipedia convention)
+    # ─── Cold branch: zero network calls (LOCAL-449 guarantee) ───────────────
+    # When Wikimedia is cold, skip network entirely. Consult DB only.
+
+    try:
+        from dead_host_breaker import is_host_cold, mark_host_cold
+        wikimedia_cold = is_host_cold('en.wikipedia.org')
+    except ImportError:
+        wikimedia_cold = False
+
+    if wikimedia_cold:
+        logger.info(f"Wikipedia: Wikimedia is cold, trying stop_corpus for '{topic}'")
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            logger.info(f"DB-fallback: served '{topic}' from stop_corpus ({len(db_content)} chars, 0 network calls)")
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
+        return {}
+
+    # ─── Step 1: Live Wikipedia (REST, then action API enrichment) ────────────
+
     encoded_topic = quote(topic.strip().replace(" ", "_"), safe="")
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_topic}"
+
+    live_text = ""  # Will hold whatever live yields
 
     try:
         response = requests.get(
@@ -40,39 +411,148 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
             allow_redirects=True,
         )
 
+        if response.status_code == 429:
+            # Rate limited — mark cold, try action API
+            try:
+                mark_host_cold('en.wikipedia.org', '429 rate limit')
+            except Exception:
+                pass
+            logger.warning(f"Wikipedia: 429 for '{topic}', marked cold, trying action API")
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                live_text = action_result
+            # Whether action API succeeded or not, also consult DB and select
+            db_content = _fetch_from_stop_corpus(topic)
+            if live_text or db_content:
+                selected, source = _select_richer(live_text, db_content, topic)
+                if selected:
+                    return {'text': selected, 'source': source,
+                            'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                            'snapshot_age_days': None}
+            return {}
+
         if response.status_code == 404:
-            logger.info(f"Wikipedia: no article found for '{topic}'")
-            # Try the action API as fallback (broader search)
-            return _fetch_via_action_api(topic)
+            # LOCAL-451: 404 is the most valuable DB-consult case (D243 name-form mismatch).
+            # Also try action API — it may resolve differently.
+            logger.info(f"Wikipedia: no article found for '{topic}' (404)")
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                live_text = action_result
+            db_content = _fetch_from_stop_corpus(topic)
+            if live_text or db_content:
+                selected, source = _select_richer(live_text, db_content, topic)
+                if selected:
+                    return {'text': selected, 'source': source,
+                            'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                            'snapshot_age_days': None}
+            return {}
 
         if response.status_code != 200:
             logger.warning(f"Wikipedia API returned {response.status_code} for '{topic}' | URL: {url} | body[:200]: {response.text[:200]}")
-            return _fetch_via_action_api(topic)
+            # LOCAL-451: non-200 also consults DB before giving up.
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                live_text = action_result
+            db_content = _fetch_from_stop_corpus(topic)
+            if live_text or db_content:
+                selected, source = _select_richer(live_text, db_content, topic)
+                if selected:
+                    return {'text': selected, 'source': source,
+                            'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                            'snapshot_age_days': None}
+            return {}
 
         data = response.json()
         extract = data.get("extract", "")
 
         if not extract:
+            # LOCAL-451: empty extract also consults DB.
             logger.info(f"Wikipedia: empty extract for '{topic}'")
-            return _fetch_via_action_api(topic)
+            action_result = _fetch_via_action_api(topic)
+            if action_result:
+                live_text = action_result
+            db_content = _fetch_from_stop_corpus(topic)
+            if live_text or db_content:
+                selected, source = _select_richer(live_text, db_content, topic)
+                if selected:
+                    return {'text': selected, 'source': source,
+                            'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                            'snapshot_age_days': None}
+            return {}
 
         # If summary is too short, try action API for richer content
         if len(extract) < 500:
             richer = _fetch_via_action_api(topic)
             if richer and len(richer) > len(extract):
-                return richer
+                extract = richer
 
-        return extract
+        live_text = extract
 
     except requests.Timeout:
         logger.warning(f"Wikipedia: timeout fetching '{topic}'")
-        return ""
+        try:
+            mark_host_cold('en.wikipedia.org', 'timeout')
+        except Exception:
+            pass
+        # LOCAL-449: Timeout means the host is dead. Consult DB before returning {}.
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            logger.info(f"DB-fallback: served '{topic}' from stop_corpus after timeout ({len(db_content)} chars)")
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
+        return {}
     except requests.RequestException as e:
         logger.warning(f"Wikipedia: request error for '{topic}': {e}")
-        return ""
+        # Network error — consult DB
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            logger.info(f"DB-fallback: served '{topic}' from stop_corpus after network error ({len(db_content)} chars)")
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
+        return {}
     except (ValueError, KeyError) as e:
         logger.warning(f"Wikipedia: parse error for '{topic}': {e}")
-        return ""
+        # LOCAL-451: even parse errors consult DB.
+        db_content = _fetch_from_stop_corpus(topic)
+        if db_content:
+            return {
+                'text': db_content,
+                'source': 'stop_corpus',
+                'is_from_archive': False,
+                'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None,
+            }
+        return {}
+
+    # ─── Step 2: Consult stop_corpus (LOCAL-451 selection) ───────────────────
+    # We have live_text. Now check DB and pick the richer one.
+
+    if not _l447_enabled():
+        # Flag OFF: return live directly (byte-identical to pre-451 storied behaviour)
+        if live_text:
+            return {'text': live_text, 'source': 'wikipedia_live',
+                    'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                    'snapshot_age_days': None}
+        return {}
+
+    db_content = _fetch_from_stop_corpus(topic)
+    selected, source = _select_richer(live_text, db_content, topic)
+
+    if selected:
+        return {'text': selected, 'source': source,
+                'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                'snapshot_age_days': None}
+    return {}
 
 
 def fetch_poi_rag_context(
@@ -173,13 +653,22 @@ def _fetch_via_action_api(topic: str) -> str:
     
     Returns the complete article extract — much richer than the REST summary endpoint.
     Also tries French Wikipedia for French museums.
+    
+    LOCAL-449: Consults dead_host_breaker per-host inside the loop. All Wikimedia
+    hosts share one rate-limit bucket, so if any is cold, all are skipped.
     """
     import requests as _req
+    from dead_host_breaker import is_host_cold, mark_host_cold
     if not topic or not topic.strip():
         return ""
     
     # Try English Wikipedia first (full text, no char limit)
     for wiki_host in ['en.wikipedia.org', 'fr.wikipedia.org']:
+        # LOCAL-449 fix #3: consult breaker per-host before making any request.
+        # The Wikimedia bucket rule means a cold en.wikipedia.org covers fr. too.
+        if is_host_cold(wiki_host):
+            logger.info(f"Wikipedia action API: {wiki_host} is cold, skipping")
+            continue
         try:
             response = _req.get(
                 f"https://{wiki_host}/w/api.php",
@@ -197,6 +686,10 @@ def _fetch_via_action_api(topic: str) -> str:
                 },
                 timeout=10,
             )
+            
+            if response.status_code == 429:
+                mark_host_cold(wiki_host, '429 rate limit in action API')
+                continue
             
             if response.status_code != 200:
                 continue
@@ -220,6 +713,9 @@ def _fetch_via_action_api(topic: str) -> str:
                     if extract and len(extract) > 200:
                         logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
                         return extract
+        except _req.Timeout:
+            mark_host_cold(wiki_host, 'timeout in action API')
+            continue
         except Exception as e:
             logger.warning(f"Wikipedia action API error ({wiki_host}) for '{topic}': {e}")
             continue

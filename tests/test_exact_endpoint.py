@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_endpoint():
     url = "http://localhost:5005/tours-near/42.3086718/-71.1942855?radius=50"
     

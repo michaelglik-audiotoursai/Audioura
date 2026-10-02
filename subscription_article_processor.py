@@ -41,41 +41,14 @@ class SubscriptionArticleProcessor:
         self.subscription_detector = SubscriptionDetector()
         
     def get_user_credentials(self, user_id, domain):
-        """Get stored credentials for user and domain"""
-        try:
-            import psycopg2
-            import os
-            
-            conn = psycopg2.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
-                database=os.getenv('DB_NAME', 'audiotours'),
-                user=os.getenv('DB_USER', 'admin'),
-                password=os.getenv('DB_PASSWORD', 'password123'),
-                port=os.getenv('DB_PORT', '5433')
-            )
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT decrypted_username, decrypted_password 
-                FROM user_subscription_credentials 
-                WHERE device_id = %s AND domain = %s
-                ORDER BY created_at DESC LIMIT 1
-            """, (user_id, domain))
-            
-            result = cursor.fetchone()
-            cursor.close()
-            conn.close()
-            
-            if result:
-                return {
-                    'username': result[0],
-                    'password': result[1]
-                }
-            return None
-            
-        except Exception as e:
-            logging.error(f"Error getting user credentials: {e}")
-            return None
+        """Get stored credentials for user and domain.
+
+        LOCAL-321: reads ONLY encrypted columns via credential_store.
+        Returns None if no encrypted credentials exist (plaintext columns
+        are deliberately not read — they are a retired design defect).
+        """
+        from credential_store import get_credentials_for_device
+        return get_credentials_for_device(user_id, domain)
     
     def process_article_with_subscription(self, article_url, article_content, user_id):
         """

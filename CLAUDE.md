@@ -145,6 +145,116 @@ The Mac Mini is now a full development environment. To continue working:
 
 ---
 
+# SESSION NAMING — every Claude session has a name, and every reply starts with it
+
+**Michael's rule, 2026-08-11.** He now runs multiple concurrent Claude sessions and
+needs to tell them apart at a glance.
+
+**Every reply must begin with `[<SessionName>]@<MM/DD/YYYY|HH:MM>`** — e.g.
+`[Storied_Tours]@08/11/2026|10:22`. Use the real current time; run `date` if unsure.
+
+**Assigned names:**
+
+| Session | Scope |
+|---|---|
+| **Storied_Tours** | This one. Tour generation quality — the story pipeline, gates, `generate_tour_text.py`, the LOCAL-4xx chain. Runs on the Mac Mini. |
+| **GCloud_Storied** | Track B — the Storied vs Beta selector: mobile app, GCloud services, DB `track` discriminator. Spec in `TRACK_B_STORIED_VS_BETA.md`. Runs on the Windows machine. |
+| **Beta_Bugs** | Beta-track bug fixes: server code on `main`, GCloud-Beta deploys, Play Console uploads. Runs on the **Windows laptop** on `main` (never `storied`). It fixed Yury Makedonov's BETA-1 concurrent-audio bug server-side, 2026-08-17. **It has been signing ClickUp comments "the Beta_Bugs session" but not prefixing its replies — that is the rule it is missing.** Michael also called it "Claude-Beta" (2026-08-17); **`Beta_Bugs` is the canonical name**, matching how it already identifies itself and the underscore form of the others. |
+| ~~**Beta_Mobile**~~ | **RETIRED 2026-08-17.** Mac Mini worktree `~/audioura-worktrees/beta-mobile`, branch `beta/yuri-bugs` — the D459 branch, deleted from origin. The work moved to **Beta_Bugs** on Windows. The local worktree still exists and holds one markdown commit; do not build on it. |
+
+A restarted session inherits its name from this table by the directory and work it
+picks up. If a new track is added, name it here first.
+
+## HOW THE SESSIONS ACTUALLY TALK TO EACH OTHER (2026-08-30)
+
+Michael asked how a warning from one session reaches another. **Three channels, and
+only three. Nothing said in one session's chat is visible to any other.**
+
+| channel | carries | rule |
+|---|---|---|
+| **ClickUp task descriptions** | the assignment, the reasoning, the acceptance criteria | Every task starts with `**Agent:** <ID>`. A session works its own list. |
+| **GitHub** | the code | **A branch that is not pushed does not exist to the other machine.** |
+| **The repo's own markdown** | durable rulings — `DECISIONS.md`, this file, `TRACK_B_STORIED_VS_BETA.md` | Reachable only after a `git pull`. |
+
+**The failure this rule exists to prevent, 2026-08-30:** LEAD wrote into the GCloud
+deploy task that `LOCAL-470` carries the reversed-coordinate fix and must not be
+missed — while `LOCAL-470` existed **only as a local worktree branch on the Mac
+Mini**. The Windows session could have read the warning, gone looking, and found
+nothing. A cross-machine reference to a branch is worthless until `git push`.
+
+**So: push the branch FIRST, then write the ClickUp note that names it.** In that
+order, and name the exact branch and commit, never "the recent work".
+
+**Machine constraints that cannot be worked around:**
+- **iOS/Xcode builds require macOS.** The Mac Mini is the only machine that can
+  produce an IPA. Never assign an iOS build to the Windows laptop.
+- Docker images are architecture-specific and are never shared between machines;
+  each machine builds its own.
+
+**The prefix is not optional and not cosmetic.** Michael runs several of these at once and
+sorts them by that first token. A session that omits it is unidentifiable in a screenshot
+or a pasted log — which is exactly how "Claude-Beta" and "Beta_Bugs" ended up being the
+same session under two names. **On restart, a session's first act is to find its row here
+and adopt that name**; if none of the rows fits the directory and work it picks up, it
+adds one before replying.
+
+# WHERE NEW WORK GOES (D594, 2026-10-02)
+
+**All new development happens on `subscribed`.** `storied` takes only fixes to the Storied
+release, and each one is forward-merged into `subscribed`. Before any Subscribed task, check
+that `subscribed` contains `origin/storied` (LOCAL-558 is the forward-merge).
+
+# ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
+
+**Michael's request, 2026-08-16.** He asked where a tester's bug was filed while we
+were mid-thread on the story validator. LEAD treated it as a work item — searched
+ClickUp, built a worktree, wrote a briefing, edited this file — and the two threads
+became hard to tell apart in the logs. He was asking a question, not opening a task.
+
+**Two prefixes. Either can be used alone or together.**
+
+| prefix | meaning |
+|---|---|
+| `ASK:` | **Answer only.** No tool calls, no files changed, nothing committed. If it cannot be answered without investigating, say so and stop — do not investigate. |
+| `SIDE:` | **Different topic from the current thread.** Log it under its own heading in the conversation file so the threads stay separable. |
+
+`ASK SIDE: where did Yuri file that bug?` → one paragraph, no worktree, no commits.
+
+**Default when neither prefix is present: RULE ZERO still applies** — act, do not
+stall. The prefixes are how Michael switches that off for one message.
+
+**LEAD's obligation:** if a message looks like it might be a question rather than a
+task, and acting on it would create files, branches or commits, say what you are
+about to do in one line before doing it. A question mistaken for a task costs real
+tokens and muddles the record; a task mistaken for a question costs one round trip.
+
+# THE CONVERSATION FILES — append before moving on, or they die again
+
+Three files, three jobs. **Read `STORIED_COMMUNICATION_04.MD` at session start** —
+volumes 01, 02 and 03 are CLOSED and each carries a pointer forward. 03 closed
+2026-09-23 at 97 KB, the size that made 01 unsearchable.
+
+| File | Holds |
+|---|---|
+| `STORIED_COMMUNICATION_04.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. Volumes 01–03 are closed; open 05 only if this one becomes unsearchable. |
+| `ANSWERS.MD` | the same answers, indexed and numbered for lookup months later, plus a **Code map** of clickable links into the source. Includes LEAD-raised items, not only Michael's questions. **One file — there is no QUESTIONS.MD** (tried 2026-08-16, merged back the same day; two overlapping indexes is what killed Volume 01). |
+| `DECISIONS.md` | binding rulings plus the evidence. LEAD only. Tasks must never edit it. |
+
+**The rule: when Michael asks a real question, append the exchange to
+`STORIED_COMMUNICATION_04.MD` before starting the next task.** Not at the end of the
+session — sessions are killed, cleared, and restarted constantly by design (D252), and
+anything held only in context is lost.
+
+**Volume 01 died precisely because this rule was not written down here.** It lived in one
+session's head, that session ended, and the next one had no way to know the practice
+existed. It is not verbose-by-default that killed it; it is that nothing on disk asked
+for it.
+
+**Keep entries short.** Questions and conclusions only — no tool output, no intermediate
+status, no reasoning trace. If an entry takes more than a minute to read, it belongs in
+`DECISIONS.md` with a pointer from here. Volume 01 reached 81 KB by ignoring this and
+became unsearchable.
+
 # SESSION HANDOFF — Audioura review (read this first)
 ## Last updated: 2026-07-31 (autonomy rule + Subscribed kickoff)
 
@@ -203,6 +313,36 @@ but unreviewed for ~10 hours awaiting a "go-ahead". Re-dispatched, they took
 without Michael prompting it. If usage credits run out, schedule a wakeup
 far enough ahead that they have reset, and resume from the files on disk —
 never wait to be re-invoked by a human.
+
+**THE ONE EXCEPTION — Michael asks for a break** (2026-08-08, his words:
+*"should stay in effect (good rule) unless I ask you to take a break like
+now"*). When he says he is stepping away, going to sleep, or not available
+until a stated time:
+
+- **Arm nothing.** No `ScheduleWakeup`, no `CronCreate`. If a loop is already
+  armed, stop it (`ScheduleWakeup stop` / `CronDelete`).
+- **Leave the dispatcher queue empty**, or `touch .continuous_dev/PAUSE`.
+  An unclaimed `new_kiro_session_is_required_*.md` file is claimed by the
+  launchd tick within 5 minutes and spends OpenAI money unattended — that is
+  the only thing on this machine that bills while nobody is watching.
+- **Finish nothing new.** In-flight submissions stay unreviewed on their
+  branches; they are files on disk and do not decay (D252).
+- **Tell him to `/clear`.** Resuming a >150k-token conversation after the
+  1-hour cache TTL costs ~$1.50–2.00 in cache *writes* before any work
+  happens. Measured 2026-08-08: an overnight gap on one session cost $2.65,
+  of which 89% was cache re-writes, for zero lines of code. A cleared
+  session plus `restart.sh` rebuilds the same picture from disk for a few
+  thousand tokens.
+
+**Resuming is `restart`, and RULE ZERO is back in force automatically** —
+this file is read at session start, so a fresh session inherits the default
+without being told. A cleared session is inert until Michael types, so the
+break is safe by default: nothing can spend while he is away.
+
+**Weekly ceiling is now a real constraint,** separate from cost. It is a hard
+limit that resets weekly; long high-context sessions consume it fastest. When
+it is running out, the lever is *shorter LEAD sessions between dispatches*,
+not fewer dispatches — the work lives on disk, so restarting is cheap.
 
 ### ⛔ THE LIVE DATABASE IS PRODUCTION DATA
 
@@ -275,6 +415,25 @@ Every task file should carry this in its PROCESS section.
 ---
 
 ### FIRST ACTIONS ON A FRESH SESSION
+
+**Michael says "Restart" — that is the whole trigger. Run this, then continue:**
+
+```bash
+cd ~/Audioura && bash restart.sh
+```
+
+It prints and writes `RESTART.md`: git state, production row counts, in-flight
+queue, bounces awaiting pickup, parked tasks, current honest tour scores, and
+the five standing checks. Everything is read from live state, never from
+memory — a fresh session has none.
+
+**Restarting is expected and cheap.** Sessions are deliberately short-lived; the
+work lives in files on disk (D252). Do not treat a restart as lost context.
+`.claude/settings.json` holds `permissions.defaultMode: bypassPermissions`,
+which is read at session start — **a restart preserves it, and it is unaffected
+by model choice.**
+
+Then, if more depth is needed:
 1. `git log --oneline -3` and `cat .continuous_dev/STATUS.md`.
 2. Say/expect **"restart continuous dev"** — the watcher loop is
    session-scoped and dies with the session. Detached `kiro-cli` worker
@@ -429,7 +588,23 @@ concurrent claiming across machines). **All work is explicitly dispatched by
 Michael or Claude.**
 
 **Agent IDs:** `Mac Mini Kiro` (this machine) · `Services Kiro` (Windows laptop)
-· `Mobile Kiro` (Windows laptop) · `Claude` (reviewer/dispatcher).
+· `Mobile Kiro` (Windows laptop) · `Claude` (reviewer/dispatcher)
+· **`GCloud_Storied`** (Claude on the **Windows laptop**; renamed from `Beta_Bugs`
+2026-08-31 — comments and commits signed `Beta_Bugs` are the same session).
+
+> **`GCloud_Storied` reads `GCLOUD_STORIED_START_HERE.md`, not this file.** That is its
+> whole briefing: branch, worktrees, dispatcher, current deploy state, hard stops.
+> Added by that session at Michael's request 2026-08-31; the rest of CLAUDE.md remains
+> `Storied_Tours`'s to maintain.
+>
+> ⚠️ **Cross-machine hazard, for whoever reads this next.** The Windows laptop now sits
+> on the `storied` branch, where the Mac Mini's `new_kiro_session_is_required_*.md` task
+> files are tracked. Its dispatcher globs the working tree, so a plain dispatch there
+> picks up **this machine's queue**. On 2026-08-31 that started `LOCAL-382/383/424` in
+> error; they were killed within a minute and produced nothing, and `FAILED` records
+> were written so they cannot re-dispatch. **If a `LOCAL-*` task looks like it ran
+> somewhere unexpected, that is why.** A dispatcher-side fix (allowlist, or only
+> claiming files it created) is still outstanding.
 
 **Lists per space** (current space: Storied; Development folder):
 🔵 Claude — Review (`1000410000000732`) · 🟦 Services — Kiro (`1000410000000733`)
@@ -469,6 +644,38 @@ in `remind_Services_ai.md`.
 **Mac Mini Kiro ClickUp access:** via MCP (`~/.kiro/settings/mcp.json`,
 mcp-remote → https://mcp.clickup.com/mcp, browser OAuth as
 michael.glik@gmail.com). Node.js installed via brew.
+
+## ACCOUNTS — which login owns what (recorded 2026-09-15, Michael's answer)
+
+Michael has four addresses and they are not interchangeable. Guessing costs twenty
+minutes every few weeks, so:
+
+| service | account |
+|---|---|
+| **Google Cloud Console / `audiotours-migration`** | **`michael.glik@gmail.com`** |
+| GitHub, ClickUp | `michael.glik@gmail.com` |
+| Apple ID / App Store Connect / TestFlight | `glikfamily@gmail.com` |
+| Serper and other paid service logins | `michael.glik@audioura.com` |
+| product/brand address | `audiotoursai@gmail.com` |
+
+**GCloud project:** `audiotours-migration`, **project number `60899077572`** — the
+number that appears in every Cloud Run URL
+(`tour-orchestrator-60899077572.us-central1.run.app`), which is how to confirm you
+are in the right project without asking anyone.
+
+**Secrets live in Secret Manager**, not in `.env` and not in a Cloud Run env var.
+A `.env` file is read by `docker-compose` locally and is invisible to Cloud Run.
+First one created: `projects/60899077572/secrets/GEMINI_API_KEY` (2026-09-15).
+**Reference secrets by name in the deploy** — `--set-secrets NAME=NAME:latest` plus
+`roles/secretmanager.secretAccessor` on the runtime SA — so nobody handles a value.
+
+**Passwords are never written here.** They live in Google Password Manager
+(passwords.google.com). The one credential that leaked into a session transcript
+this month was an Apple app-specific password, pasted because LEAD suggested a
+method that echoes the command. **For a secret value, use Terminal directly or the
+USB drive — never the chat.**
+
+---
 
 ## ENVIRONMENT NOTES
 

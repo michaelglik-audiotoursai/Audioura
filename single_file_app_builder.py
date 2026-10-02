@@ -229,6 +229,11 @@ def create_single_file_app(tour_directory):
             // Add event listeners to track manual play
             audioElements.forEach((audio, index) => {
                 audio.addEventListener('play', function() {
+                    audioElements.forEach((otherAudio, otherIndex) => {
+                        if (otherIndex !== index && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
                     currentStopIndex = index;
                 });
             });

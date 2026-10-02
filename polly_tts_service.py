@@ -62,6 +62,9 @@ def health_check():
 
 @app.route('/synthesize', methods=['POST'])
 def synthesize_speech():
+    # [LOCAL-323] Neural voice list — must match Engine selection below
+    NEURAL_VOICES = frozenset(['Joanna', 'Matthew', 'Amy', 'Brian'])
+
     try:
         if not polly_client:
             return jsonify({"error": "Polly client not available"}), 500
@@ -70,12 +73,19 @@ def synthesize_speech():
         text = data.get('text', '')
         voice_id = data.get('voice_id', 'Joanna')  # Default female voice
         output_format = data.get('output_format', 'mp3')
+        # [LOCAL-323] Optional metering fields — callers pass these for attribution
+        user_id = data.get('user_id')
+        job_id = data.get('job_id')
         
         if not text:
             return jsonify({"error": "No text provided"}), 400
-            
-        logging.info(f"Synthesizing {len(text)} characters with voice {voice_id}")
+
+        engine = 'neural' if voice_id in NEURAL_VOICES else 'standard'
+        logging.info(f"Synthesizing {len(text)} characters with voice {voice_id} (engine={engine})")
         
+        # Track total characters actually submitted to Polly
+        total_chars_submitted = 0
+
         # Split text if too long (use 2000 char limit for safety)
         if len(text) > 2000:
             logging.info(f"Text too long ({len(text)} chars), splitting by sentences")
@@ -117,11 +127,12 @@ def synthesize_speech():
             
             for i, chunk in enumerate(chunks):
                 logging.info(f"Processing chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
+                total_chars_submitted += len(chunk)
                 response = polly_client.synthesize_speech(
                     Text=chunk,
                     OutputFormat=output_format,
                     VoiceId=voice_id,
-                    Engine='neural' if voice_id in ['Joanna', 'Matthew', 'Amy', 'Brian'] else 'standard'
+                    Engine=engine
                 )
                 audio_segments.append(response['AudioStream'].read())
             
@@ -129,14 +140,37 @@ def synthesize_speech():
             combined_audio = b''.join(audio_segments)
         else:
             # Single request for short text
+            total_chars_submitted = len(text)
             response = polly_client.synthesize_speech(
                 Text=text,
                 OutputFormat=output_format,
                 VoiceId=voice_id,
-                Engine='neural' if voice_id in ['Joanna', 'Matthew', 'Amy', 'Brian'] else 'standard'
+                Engine=engine
             )
             combined_audio = response['AudioStream'].read()
         
+        # [LOCAL-323] Meter TTS cost — non-fatal, in its own try block.
+        # Pattern matches generate_tour_text_service.py: metering must never break delivery.
+        try:
+            from cost_meter import record_operation
+            from cost_rates import tts_cost
+            _tts_cost = tts_cost(total_chars_submitted, engine=engine)
+            record_operation(
+                operation_type="tts_generate",
+                our_cost_usd=_tts_cost,
+                cache_hit=False,
+                user_id=user_id,
+                job_id=job_id,
+                breakdown={
+                    "chars": total_chars_submitted,
+                    "engine": engine,
+                    "voice_id": voice_id,
+                },
+            )
+            logging.info(f"[LOCAL-323] TTS metered: {total_chars_submitted} chars, engine={engine}, cost=${_tts_cost:.6f}")
+        except Exception as _meter_err:
+            logging.warning(f"[LOCAL-323] TTS cost metering failed (non-fatal): {_meter_err}")
+
         # Create temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{output_format}') as tmp_file:
             tmp_file.write(combined_audio)

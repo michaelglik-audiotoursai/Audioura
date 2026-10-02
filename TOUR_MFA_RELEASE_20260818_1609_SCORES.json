@@ -1,0 +1,36 @@
+{
+  "location": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "stops_requested": 4,
+  "elapsed_s": 129.90943002700806,
+  "chars": 6219,
+  "cap": "20",
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "index": 42,
+      "historic": 0,
+      "detail": 20,
+      "social": 60,
+      "text": "Louis Broder, the publisher, was instrumental in commissioning this work, recognizing the need for a direct collaboration between artist and Mourlot Frères to breathe life into the book as an art form. The decision to work with Mourlot Frères, a renowned printing atelier, meant that each lithograph was crafted with precision, using techniques that highlighted Miró's surrealist style. The result was an illustrated book printed on Japan, on wove, and with Louis Broder’s vellum, which pushed the boundaries of how text and image could coexist. Boris Fridman, a passionate collector of livres d'artiste, gifted this unique piece to the Museum of Fine Arts in Boston, enriching the museum's collection with a work that embodies the exhibition's argument: that artists, through collaborative efforts, have revolutionized the book as an art form. This piece, with its surreal and mythical elements, not only deepens our understanding of Miró's work but also anchors the exhibition's narrative, showing how the fantastical can be rendered tangible through print.",
+      "orientation": "You are about to explore the Picasso, Miro, Dali: Unbound exhibition at the MFA in Boston. This exhibition showcases the revolutionary livre d'artiste, deeply collaborative ventures that transformed the book into an art form like no other. Within Gallery 184, you will encounter three extraordinary works by Spanish artists. Each piece delves into the unseen threads of spirituality and mythology, unveiling the profound influences on human expression. From \"Le Lézard aux plumes d’or\" to \"Au Soleil du Plafond\" and \"Moses and Monotheism,\" these works invite you to unravel the intricate connections between images, words, and typography, offering a unique perspective on artistic creation. As you journey forward, prepare to delve into the surrealist style highlighted in Miró's lithographs at Le Lézard aux plumes d’or and explore Freud's radical interpretation of Moses at Moses and Monotheism. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). From this vantage point, you can admire the way the light interacts with the Louis Broder’s vellum, casting a soft glow that invites you to explore the intricate layers of this illustrated book. From this vantage point, the vivid interplay of colors across the 40 lithographs becomes more pronounced, revealing the playful yet profound nature of Miró's artistic vision."
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "index": 34,
+      "historic": 12,
+      "detail": 15,
+      "social": 45,
+      "text": "The year was 1955 when the collaborative genius of Juan Gris and Pierre Reverdy culminated in the creation of \"Au Soleil du Plafond\", a livre d'artiste that captures the spirit of artistic innovation. Gris, known for his contributions to Cubism, worked alongside Reverdy, a French poet with a penchant for surrealist prose, to produce this remarkable work. The collection consists of 11 lithographs, each offering a window into the abstract manifestations of Gris's geometric precision and Reverdy's lyrical narrative. These pieces are rarely on public display, usually housed within the archives, making their presence here a unique opportunity for visitors to witness the convergence of two artistic minds. This collaboration brought Reverdy's evocative text into a tangible form, enhancing the viewer's experience by integrating the visual and the verbal. Such endeavors illustrate the transformative potential of collaborative art, emphasizing the invisible influence of belief systems and ideologies that shape human identity and history. The lithographs showcase the revolutionary potential of the book as a complete and cohesive artwork.",
+      "orientation": "From this vantage point, the celestial geometry and vibrant lithographic plates come alive, drawing your attention to the intricate interplay of text and image, a hallmark of the exhibition's celebration of the book as an art form."
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "index": 41,
+      "historic": 33,
+      "detail": 49,
+      "social": 69,
+      "text": "In 1939, Sigmund Freud penned \"Moses and Monotheism,\" offering a radical interpretation of Moses as an Egyptian noble, a theory that challenged traditional narratives. Fast forward to 1974, Salvador Dalí brought these ideas to life through a series of ten illustrations. By doing so, Dalí transformed Freud's contentious ideas into visual forms, using drypoints and lithographs on sheepskin to enhance the psychological undercurrents of the text. Dalí's choice to illustrate Freud's work was not random. He viewed Freud's psychoanalytical theories as foundational to Surrealism, a movement close to his heart. The exhibition \"Picasso, Miró, Dalí: Unbound\" showcases how artists like Dalí collaborated with authors to redefine the book's role in art. The sheepskin medium and the set's limited edition—published by The Hogarth Press—underscore the unique, tactile quality of this artistic endeavor, while raising questions about the enduring influence of monotheism on modern society.\n\nThat's 3 stops — Le Lézard aux plumes d’or collaborated with Mourlot Frères for lithographs and Moses and Monotheism was written by Sigmund Freud in 1939. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.",
+      "orientation": "As you stand before the \"Moses and Monotheism\" exhibit, lean in slightly to appreciate the intricacies of Dalí's illustrations. From this angle, the startling textures of the sheepskin sheets become apparent, weaving a tactile narrative that complements Freud's controversial text. You can almost see how the light catches on the surface, revealing the depth of Dalí's drypoints and lithographs."
+    }
+  ]
+}

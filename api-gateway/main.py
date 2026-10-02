@@ -279,13 +279,15 @@ def attest_nonce():
 def sync():
     return jsonify({"status": "success"})
 
-@app.route('/user/<path:subpath>', methods=['GET', 'POST', 'PUT'])
-def user_route(subpath):
-    return jsonify({"status": "success", "rows_affected": 1})
-
-@app.route('/user', methods=['GET', 'POST', 'PUT'])
-def user_root():
-    return jsonify({"status": "success"})
+# /user is NOT handled here. It used to be, and the handlers returned a hardcoded
+# {"status": "success", "rows_affected": 1} without calling any backend -- so the
+# app's sync reported success while writing nothing, and a GET for an id that had
+# never existed reported a row. Every news request from a real device then died on
+# article_requests_secret_id_fkey because users never contained the row.
+# It now routes to news-orchestrator via gateway_routes.yaml, which has the DB.
+# Do not re-add a local handler: this gateway has no database attachment at all
+# (no cloudsql-instances annotation), so anything it answers here is fabricated.
+# ClickUp wdvrdaycef.
 
 # ---------------------------------------------------------------------------
 # 404

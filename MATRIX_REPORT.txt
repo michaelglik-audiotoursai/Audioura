@@ -1,0 +1,120 @@
+tour file : STEP0_BASELINE_20260820_1459.txt
+venue     : Museum of Fine Arts Boston   http://www.mfa.org/
+
+
+════════════════════════════════════════════════════════════════════════════════
+  STOP 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+════════════════════════════════════════════════════════════════════════════════
+
+  MATRIX
+    canonical_title     Le Lézard aux plumes d’or (The Lizard with Golden Feathers)      checklist
+    english_title       Le Lézard aux plumes d’or (The Lizard with Golden Feathers)      checklist
+    artist              Joan Miró                                                        checklist
+    publisher           Louis Broder                                                     checklist
+    printed_by          Mourlot                                                          OBJECT RECORD
+    medium              Illustrated book with 40 color lithographs (including wrapp...   checklist
+    credit_line         Gift of Boris Fridman                                            checklist
+    venue_name          Museum of Fine Arts, Boston                                      checklist
+    Focus fact (7b)     (empty)                                                          —
+    provenance          Boris Fridman, Newton, MA; 2021, gift of Boris Fridman to t...   OBJECT RECORD
+    publication_year    1971                                                             OBJECT RECORD
+    catalogue_raisonne  Cramer, Miró livres illustrés,148; Mourlot 789 - 828             OBJECT RECORD
+    accession_number    2021.1055                                                        OBJECT RECORD
+
+  AGENTS 3/3   hero=Joan Miró,  sponsor=Louis Broder,  builder=Mourlot
+  WORTHINESS 4/4  mine=True  (has named_agent, credit_line_fact, specific_medium, specific_title)
+
+  FOCUS-FACT LIST — 8 candidate(s), tried in this order
+  (step 7b takes the next one whenever a story fails validation or scores low)
+────────────────────────────────────────────────────────────────────────────────
+   1. [FACT ] Louis Broder published Le Lézard aux plumes d’or (The Lizard with Golden Feathers).
+           why: a publisher is a person who decided to make this happen
+   2. [FACT ] Mourlot printed Le Lézard aux plumes d’or (The Lizard with Golden Feathers).
+           why: a printing house is a workshop where people worked together
+   3. [FACT ] Boris Fridman gave Le Lézard aux plumes d’or (The Lizard with Golden Feathers) to Museum of Fine Arts, Boston.
+           why: a donor chose this work and chose this museum
+   4. [FACT ] Joan Miró made Le Lézard aux plumes d’or (The Lizard with Golden Feathers).
+           why: the maker, when no other agent is available
+   5. [FACT ] Le Lézard aux plumes d’or (The Lizard with Golden Feathers) is Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum.
+           why: how it was physically made — a process involves people
+   6. [FACT ] Le Lézard aux plumes d’or (The Lizard with Golden Feathers) is held at Museum of Fine Arts, Boston.
+           why: institutional context; weakest, but it scopes the search
+   7. [HOOK ] What did Louis Broder actually do, that makes this significant?
+           why: the stop's own text asserts significance ("exemplifies") without showing it
+           from: "Published by Louis Broder, a figure renowned for his commitment to the art of the book, ..."
+   8. [HOOK ] What did Miró actually do, that makes this significant?
+           why: the stop's own text asserts significance ("was pivotal") without showing it
+           from: "Broder's decision to engage Miró was pivotal, as it allowed the artist to explore a new ..."
+
+════════════════════════════════════════════════════════════════════════════════
+  STOP 2: Au Soleil du Plafond
+════════════════════════════════════════════════════════════════════════════════
+
+  MATRIX
+    canonical_title     Au Soleil du Plafond                                             checklist
+    english_title       Au Soleil du Plafond                                             checklist
+    artist              Juan Gris                                                        checklist
+    publisher           (empty)                                                          —
+    printed_by          (empty)                                                          —
+    medium              (empty)                                                          —
+    credit_line         (empty)                                                          —
+    venue_name          Museum of Fine Arts, Boston                                      checklist
+    Focus fact (7b)     (empty)                                                          —
+
+  AGENTS 1/3   hero=Juan Gris,  sponsor=—,  builder=—
+  WORTHINESS 2/4  mine=True  (has named_agent, specific_title)
+
+  FOCUS-FACT LIST — 5 candidate(s), tried in this order
+  (step 7b takes the next one whenever a story fails validation or scores low)
+────────────────────────────────────────────────────────────────────────────────
+   1. [FACT ] Juan Gris made Au Soleil du Plafond.
+           why: the maker, when no other agent is available
+   2. [FACT ] Au Soleil du Plafond is held at Museum of Fine Arts, Boston.
+           why: institutional context; weakest, but it scopes the search
+   3. [HOOK ] What did Juan Gris and Pierre Reverdy change, and what was it like before?
+           why: the stop's own text asserts change ("revolutionized") without showing it
+           from: "In this singular work, Juan Gris and Pierre Reverdy, the French poet linked to Surrealis..."
+   4. [HOOK ] What were the boundaries of artistic media before this, and what changed them?
+           why: the stop's own text asserts change ("challenge") without showing it
+           from: ""Au Soleil du Plafond" vividly represents the exhibition's thesis, which highlights how ..."
+   5. [HOOK ] What did Juan Gris and Pierre Reverdy actually do together, and what came of it?
+           why: the stop's own text asserts relation ("collaborative") without showing it
+           from: "Orientation: This vantage point lets you appreciate its composition, a collaborative vis..."
+
+════════════════════════════════════════════════════════════════════════════════
+  STOP 3: Moses and Monotheism
+════════════════════════════════════════════════════════════════════════════════
+
+  MATRIX
+    canonical_title     Moses and Monotheism                                             checklist
+    english_title       Moses and Monotheism                                             checklist
+    artist              Salvador Dalí                                                    checklist
+    publisher           (empty)                                                          —
+    printed_by          (empty)                                                          —
+    medium              Illustrations                                                    checklist
+    credit_line         (empty)                                                          —
+    venue_name          Museum of Fine Arts, Boston                                      checklist
+    Focus fact (7b)     (empty)                                                          —
+
+  AGENTS 1/3   hero=Salvador Dalí,  sponsor=—,  builder=—
+  WORTHINESS 3/4  mine=True  (has named_agent, specific_medium, specific_title)
+
+  FOCUS-FACT LIST — 4 candidate(s), tried in this order
+  (step 7b takes the next one whenever a story fails validation or scores low)
+────────────────────────────────────────────────────────────────────────────────
+   1. [FACT ] Salvador Dalí made Moses and Monotheism.
+           why: the maker, when no other agent is available
+   2. [FACT ] Moses and Monotheism is Illustrations.
+           why: how it was physically made — a process involves people
+   3. [FACT ] Moses and Monotheism is held at Museum of Fine Arts, Boston.
+           why: institutional context; weakest, but it scopes the search
+   4. [HOOK ] What did Dalí actually do together, and what came of it?
+           why: the stop's own text asserts relation ("collaboration") without showing it
+           from: "Through this collaboration, Dalí and Freud engage in a dialogue, bridging literary and v..."
+
+════════════════════════════════════════════════════════════════════════════════
+  No query issued. No story written. Nothing spent beyond the checklist
+  and one object-record lookup per stop.
+════════════════════════════════════════════════════════════════════════════════
+
+machine-readable -> MATRIX_REPORT.json

@@ -4,6 +4,10 @@ Test Multiple Spotify URLs to identify patterns
 """
 import sys
 import os
+
+import pytest
+pytest.importorskip("selenium")  # LOCAL-544: skip when optional dep missing
+
 sys.path.append('/app')
 
 from browser_automation import get_browser
@@ -36,8 +40,12 @@ def test_spotify_url(url, description):
         print(f"  Title: {title}")
         print(f"  Page Length: {len(page_source)} chars")
         print(f"  Redirected: {indicators['redirected']}")
-        print(f"  Content Found: Episode={indicators['episode_title']}, Description={indicators['episode_description']}")
-        print(f"  Error Messages: NotFound={indicators['couldn't_find']}, SignUp={indicators['sign_up']}")
+        episode_title = indicators['episode_title']
+        episode_description = indicators['episode_description']
+        not_found = indicators["couldn't_find"]
+        sign_up = indicators['sign_up']
+        print(f"  Content Found: Episode={episode_title}, Description={episode_description}")
+        print(f"  Error Messages: NotFound={not_found}, SignUp={sign_up}")
         
         return indicators
         

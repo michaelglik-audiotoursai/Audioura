@@ -6,7 +6,9 @@ Test integrated Boston Globe authentication in newsletter processor service
 import requests
 import json
 import logging
+import pytest
 
+@pytest.mark.service
 def test_integrated_bg_auth():
     """Test Boston Globe authentication integration"""
     

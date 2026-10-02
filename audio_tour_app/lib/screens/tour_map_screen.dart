@@ -312,7 +312,7 @@ class _TourMapScreenState extends State<TourMapScreen> {
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.glikfamily.audioura',
+          userAgentPackageName: 'com.audioura.audiotours',
         ),
         // Arrow line from user to nearest POI
         if (_userLocation != null && next != null)

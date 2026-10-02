@@ -1,0 +1,257 @@
+{
+  "landmarks": {
+    "Nave": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Stations of the Cross": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Sanctuary": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Altar": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 4,
+      "unsourced": 25,
+      "total": 29,
+      "corpus": 4,
+      "grounded": 0,
+      "parametric": 25
+    },
+    "per_stop": {
+      "Nave": {
+        "sourced": 1,
+        "unsourced": 4,
+        "total": 5
+      },
+      "Stations of the Cross": {
+        "sourced": 1,
+        "unsourced": 5,
+        "total": 6
+      },
+      "Sanctuary": {
+        "sourced": 1,
+        "unsourced": 8,
+        "total": 9
+      },
+      "Altar": {
+        "sourced": 1,
+        "unsourced": 8,
+        "total": 9
+      }
+    },
+    "claims": [
+      {
+        "stop": "Nave",
+        "text": "From the Nave to the Altar, you'll traverse the sacred space, where Alphonsus Ligouri's influence on the Stations of the Cross and the craftsmanship of the newly designed Altar await discovery.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "14, 1995, Mother Teresa herself graced this very space for an evening prayer service.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On June 14, 1995, Mother Teresa visited Our Lady Help of Christians in Newton, Massachusetts, for an evening prayer service."
+      },
+      {
+        "stop": "Nave",
+        "text": "Fast forward to December 2002, when Rev. Walter H. Delivered a homily that would shake the local Catholic community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "Standing here, where you now stand, he spoke out against Cardinal Bernard, the archbishop of boston from 1984 to 2002, F. Law amidst the burgeoning scandal within the Catholic Church.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Nave",
+        "text": "His words were a clarion call for accountability and justice, resonating deeply with the over 850 parishioners who responded with standing ovations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "Here, the light filters through stained glass, casting gentle hues upon the sequence of fourteen images that line the walls, each depicting a pivotal moment from the day of Christ's crucifixion.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "This is a place of reflection and remembrance within Our Lady Help of Christians Catholic Church.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "In the 1870s and 1880s, as the church was being built, it embraced a Victorian artistic sensibility.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "Years later, during major interior renovations, the echoes of that era reemerged as original Victorian murals were uncovered, having been concealed beneath layers of paint applied after Vatican II.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "Here, the CatholicTV Network chose to film its Stations of the Cross program, led by Father Robert Reed, who has since become a bishop.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In the mid-2000s, the parish of Our Lady Help of Christians served as the filming location for the CatholicTV Network's *Stations of the Cross* program led by Father (now Bishop) Robert Reed, which wa"
+      },
+      {
+        "stop": "Stations of the Cross",
+        "text": "In 2005, Father Walter Cuenin, a significant figure in the church's recent history, was compelled to leave after an archdiocesan audit cited financial irregularities.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "In 2002, this very sanctuary became a focal point for a gathering of over 850 parishioners who assembled to support Father Walter H. Cuenin.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "His homily that day was a bold declaration against Cardinal Bernard Law, accusing him of hiding behind legalities and financial maneuvering.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "This moment of defiance contributed to Cardinal Law's resignation and departure to Rome, marking a significant turning point in the church's history and highlighting the sanctuary's role as a catalyst for change.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "Fast forward to June 2023, the sanctuary was again the center of attention, this time under tragic circumstances.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "Bruno and Gilda 'Jill' D’Amore were set to renew their marriage vows here for their 50th wedding anniversary.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On June 25, 2023, Bruno and Gilda 'Jill' D’Amore were scheduled to renew their marriage vows at Our Lady Help of Christians for their 50th wedding anniversary but were found murdered in their home."
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "Together, they prayed for the D’Amore family and the parish community, reinforcing the sanctuary's role as a place of collective mourning and spiritual refuge.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "The very name of the church, Our Lady Help of Christians, carries historical weight.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "This title of the Blessed Virgin Mary, first described by John Chrysostom in AD 345, gained prominence during the Middle Ages.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sanctuary",
+        "text": "It was notably invoked in 1571 when Pope Pius V attributed the victory of Christian armies over the Ottoman Empire to Mary's intercession.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "Position yourself in front of the newly designed altar, crafted by Eric Boeglin and Deacon Jim, and let its presence draw you into the stories it holds.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "The altar, a focal point of worship and reflection, was beautifully crafted by local artisans Eric Boeglin and Deacon Jim.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "One episode that unfolded here involves Rev. Walter H. Cuenin.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "In December 2002, Rev. Cuenin delivered a powerful homily that condemned Cardinal Bernard Law amidst the Catholic Church's abuse scandal.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "This moment, resonating beyond the walls of the church, brought national attention and positioned Rev. Cuenin as a courageous voice in a troubled time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "On this date, parishioners Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found murdered in their home, an event that shook the community deeply.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "On June 25, 2023, Gilda (Jill) D’Amore, Bruno D’Amore, and Lucia Arpino were found murdered in their home, preventing their planned 50th anniversary blessing at Our Lady Help of Christians Parish."
+      },
+      {
+        "stop": "Altar",
+        "text": "Bruno D’Amore, his wife Gilda, and her mother Lucia Arpino were fatally beaten and stabbed inside their home in Newton, Massachusetts, during a forced-entry burglary on June 25, 2023.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "A neighbor with no known connection to the victims, Christopher Ferguson, was arrested and charged with the murders.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Altar",
+        "text": "This title, linked to the defense of Christian Europe, North Africa, and the Middle East during the Middle Ages, underlines the church's enduring mission to offer solace and strength against adversity.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+=== CONTROL RUN 1 (org gate OFF) ===
+  [LOCAL-192] Style retry summary: 2 paragraphs retried, 1 fixed/improved, 1 kept original
+  [LOCAL-479] Organisation grounding gate DISABLED by env var
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 2 improved, 0 kept original
+GENERATED 6512 chars in 160.4s -> TOUR_MFA_RELEASE_20260818_1630.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   58    12    29    72
+ 2  Au Soleil du Plafond                           48    25    28    69
+ 3  Moses and Monotheism                           39    21    37    30
+    MEAN                                           48    19    31    57
+=== CONTROL RUN 2 (org gate OFF) ===
+  [LOCAL-192] Style retry summary: 1 paragraphs retried, 0 fixed/improved, 1 kept original
+  [LOCAL-479] Organisation grounding gate DISABLED by env var
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 0 improved, 1 kept original
+GENERATED 5733 chars in 131.1s -> TOUR_MFA_RELEASE_20260818_1633.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   40    27    40    45
+ 2  Au Soleil du Plafond                           45    33    36     8
+ 3  Moses and Monotheism                           35    24    29    60
+    MEAN                                           40    28    35    38
+=== CONTROL RUN 3 (org gate OFF) ===
+  [LOCAL-192] Style retry summary: 1 paragraphs retried, 1 fixed/improved, 0 kept original
+  [LOCAL-479] Organisation grounding gate DISABLED by env var
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 2 improved, 1 kept original
+GENERATED 5812 chars in 176.1s -> TOUR_MFA_RELEASE_20260818_1635.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   54     0    15    84
+ 2  Moses and Monotheism                           28    24     6    15
+ 3  Au Soleil du Plafond                           47    18    42    30
+    MEAN                                           43    14    21    43

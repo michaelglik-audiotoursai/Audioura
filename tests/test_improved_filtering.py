@@ -2,6 +2,9 @@
 """
 Test the improved filtering with social media exclusion and content similarity
 """
+
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urlunparse

@@ -35,11 +35,30 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SERP_API_KEY=${SERP_API_KEY}
       - SERP_PROVIDER=${SERP_PROVIDER:-serper}
+      # [D517] The D511 story loop calls Gemini once per credit_line. This key
+      # was never passed in, so the loop would have failed inside the container
+      # on every stop — non-fatally and silently, which is the worst shape: the
+      # tour would generate, carry no stories, and log nothing a caller sees.
+      # Found while putting the loop into production, 2026-08-24.
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - STORIED_MODE=true
+      # [ST-4] Local Docker has no GATEWAY_API_KEY, so POST /tour/share returned 503
+      # and sharing could not be tested on the Mac Mini. This opens it for LOCAL
+      # DEVELOPMENT ONLY. Cloud sets a real GATEWAY_API_KEY and never reads this.
+      # Do NOT copy this line into any deployed configuration.
+      - ALLOW_UNAUTHENTICATED_SHARING=true
       - ATTESTATION_MODE=log_only
       - BASE_URL=http://localhost:5000
       - REFERRAL_BASE_URL=http://localhost:5000
       - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      # db_connection.py deliberately prefers these over DATABASE_URL (see its
+      # docstring). Without them it falls back to its host default localhost:5433,
+      # which is the HOST port mapping and is closed inside the container. D410.
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
       - PYTHONUNBUFFERED=1
       - VENUE_CACHE_TTL_DAYS=${VENUE_CACHE_TTL_DAYS:-30}
       - VENUE_CACHE_NEGATIVE_TTL_DAYS=${VENUE_CACHE_NEGATIVE_TTL_DAYS:-5}

@@ -1,0 +1,104 @@
+{
+  "current": [
+    {
+      "run": 1,
+      "file": "tours/LOCAL395_palais_current_run1.txt",
+      "score": {
+        "base_score": 68.75,
+        "per_stop_base": [
+          18.75,
+          12.5,
+          12.5,
+          25.0
+        ],
+        "quality": 0.6875
+      }
+    },
+    {
+      "run": 2,
+      "file": "tours/LOCAL395_palais_current_run2.txt",
+      "score": {
+        "base_score": 93.75,
+        "per_stop_base": [
+          25.0,
+          25.0,
+          18.75,
+          25.0
+        ],
+        "quality": 0.875
+      }
+    },
+    {
+      "run": 3,
+      "file": "tours/LOCAL395_palais_current_run3.txt",
+      "score": {
+        "base_score": 81.25,
+        "per_stop_base": [
+          25.0,
+          18.75,
+          18.75,
+          18.75
+        ],
+        "quality": 0.75
+      }
+    }
+  ],
+  "pre_chain": [
+    {
+      "run": 1,
+      "file": "tours/LOCAL395_palais_prechain_run1.txt",
+      "score": {
+        "base_score": 75.0,
+        "per_stop_base": [
+          25.0,
+          12.5,
+          18.75,
+          18.75
+        ],
+        "quality": 0.75
+      }
+    },
+    {
+      "run": 2,
+      "file": "tours/LOCAL395_palais_prechain_run2.txt",
+      "score": {
+        "base_score": 87.5,
+        "per_stop_base": [
+          18.75,
+          25.0,
+          25.0,
+          18.75
+        ],
+        "quality": 0.875
+      }
+    },
+    {
+      "run": 3,
+      "file": "tours/LOCAL395_palais_prechain_run3.txt",
+      "score": {
+        "base_score": 75.0,
+        "per_stop_base": [
+          25.0,
+          18.75,
+          18.75,
+          12.5
+        ],
+        "quality": 0.75
+      }
+    }
+  ],
+  "summary": {
+    "current_mean": 81.25,
+    "current_range": [
+      68.75,
+      93.75
+    ],
+    "prechain_mean": 79.17,
+    "prechain_range": [
+      75.0,
+      87.5
+    ],
+    "delta": 2.08,
+    "verdict": "WITHIN_NORMAL_VARIANCE"
+  }
+}

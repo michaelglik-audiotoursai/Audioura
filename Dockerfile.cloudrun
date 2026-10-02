@@ -3,6 +3,19 @@
 # Build once, deploy many (different CMD per Cloud Run service).
 FROM python:3.11-slim
 
+# Release identity, baked in at build time by the deploy scripts.
+# WITHOUT these ARG lines the --build-arg values are SILENTLY DISCARDED and the
+# image carries no version at all -- the failure mode is a no-op that looks fine.
+# RELEASE_TAG is v<line>t<seq>, e.g. v2t357: line 1=beta 2=storied 3=subscribed,
+# permanent per release line so a promoted build keeps the number it shipped with.
+# The tag is pushed to origin, so `git checkout $RELEASE_TAG` reconstitutes exactly
+# what is running. See release_tag.sh.
+ARG RELEASE_TAG="unset"
+ARG GIT_SHA="unset"
+ENV RELEASE_TAG=${RELEASE_TAG} \
+    GIT_SHA=${GIT_SHA}
+
+
 WORKDIR /app
 
 # System dependencies
@@ -11,6 +24,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python dependencies (superset covering all services)
+# cryptography is NOT optional: dh_service_simple.decrypt_credentials_with_mobile_key
+# imports it INSIDE the function, so a container without it boots, passes health
+# checks, and then returns 400 "Decryption failed: No module named 'cryptography'"
+# on every /submit_credentials call. requirements.txt has declared it all along, but
+# this Dockerfile installs a hand-maintained list and never reads that file, so the
+# declaration bought nothing. Ported from origin/main 81dd1cc. ClickUp wdvrday52p.
 RUN pip install --no-cache-dir \
     flask==2.3.3 \
     flask-cors==4.0.0 \
@@ -21,10 +40,24 @@ RUN pip install --no-cache-dir \
     beautifulsoup4==4.12.2 \
     pydub==0.25.1 \
     python-dotenv \
-    lxml==4.9.3
+    lxml==4.9.3 \
+    cryptography>=41.0.0
 
 # Copy all service files
 COPY *.py /app/
+
+# [GCS-3R B4b] `COPY *.py` above copies ONLY repo-root .py files. The Storied
+# generator imports two modules that live under tests/ (not at root) via
+# style_validator_detector.py — db_connection and stop_anchor_detector_v2 — and
+# reads two non-.py data assets at generation time. Without these, a Storied tour
+# BOOTS and passes /health but ERRORS mid-generation ("No module named
+# 'db_connection'" / "...'stop_anchor_detector_v2'" / missing spine_restaurant.txt
+# / story_type_taxonomy.json). Proven by a local end-to-end run (SUBMISSION_GCS-3R.md).
+# Copy them to /app so they are importable/readable as top-level modules/assets.
+COPY tests/db_connection.py /app/db_connection.py
+COPY tests/stop_anchor_detector_v2.py /app/stop_anchor_detector_v2.py
+COPY story_type_taxonomy.json /app/story_type_taxonomy.json
+COPY templates/ /app/templates/
 
 # Create tours directory (for volume mode compatibility)
 RUN mkdir -p /app/tours

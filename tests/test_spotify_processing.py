@@ -8,6 +8,7 @@ import json
 import psycopg2
 import os
 from datetime import datetime
+import pytest
 
 # Test URL from Guy Raz newsletter
 TEST_SPOTIFY_URL = "https://open.spotify.com/episode/5aYNEkTiA5B3rYEQsvMJUr?si=02TAenI7TXK1GHc6RENr5A"
@@ -40,6 +41,7 @@ def cleanup_existing_articles():
     except Exception as e:
         print(f"ERROR: Database cleanup error: {e}")
 
+@pytest.mark.service
 def test_spotify_processor_direct():
     """Test Spotify processor directly"""
     print("\n=== STEP 2: Direct Spotify Processor Test ===")
@@ -71,6 +73,7 @@ def test_spotify_processor_direct():
         print(f"ERROR: Spotify processor error: {e}")
         return None
 
+@pytest.mark.service
 def test_news_orchestrator():
     """Test news orchestrator with Spotify content"""
     print("\n=== STEP 3: News Orchestrator Test ===")
@@ -133,6 +136,7 @@ def test_news_orchestrator():
         print(f"ERROR: Orchestrator test error: {e}")
         return None
 
+@pytest.mark.service
 def test_final_article_content():
     """Check what was actually stored in the database"""
     print("\n=== STEP 4: Final Article Content Check ===")

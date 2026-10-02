@@ -2,7 +2,9 @@
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_quora_newsletter():
     """Test Quora newsletter processing"""
     

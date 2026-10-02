@@ -7,7 +7,9 @@ import requests
 import json
 import secrets
 from dh_service_simple import DH_PRIME, DH_GENERATOR, derive_aes_key
+import pytest
 
+@pytest.mark.service
 def test_dh_key_exchange():
     """Test DH key exchange flow"""
     print("=== TESTING DIFFIE-HELLMAN KEY EXCHANGE ===")

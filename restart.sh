@@ -1,0 +1,136 @@
+#!/bin/bash
+# restart.sh — one-command session handoff.
+#
+# Michael says "Restart"; the new session runs this and is current.
+# Everything below is read from live state, never from memory, because a fresh
+# session has none. Keep the output SHORT — it is read on every restart and a
+# long briefing is the thing we are trying to avoid paying for.
+#
+# Usage:  bash restart.sh
+# Writes: RESTART.md  (also prints to stdout)
+
+cd "$(dirname "$0")" || exit 1
+PSQL="docker exec development-postgres-2-1 psql -U admin -d audiotours -tAc"
+
+{
+echo "# RESTART briefing — generated $(date '+%Y-%m-%d %H:%M %Z')"
+echo
+echo "## Git"
+echo '```'
+echo "branch   $(git rev-parse --abbrev-ref HEAD)"
+echo "HEAD     $(git log --oneline -1)"
+echo "unpushed $(git rev-list --count origin/storied..storied 2>/dev/null) commits"
+echo "dirty    $(git status --short | wc -l | tr -d ' ') files"
+echo '```'
+echo
+echo "## Production safety"
+REAL=$($PSQL "SELECT count(*) FROM audio_tours WHERE is_test IS NOT TRUE;" 2>/dev/null)
+echo '```'
+echo "audio_tours real rows: ${REAL:-UNREACHABLE}"
+echo "  A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour"
+echo "  adds a row, and its translation adds another. 29 was a snapshot, never a law."
+if [ -f .continuous_dev/last_real_count.txt ]; then
+  PREV=$(cat .continuous_dev/last_real_count.txt)
+  if [ -n "$REAL" ] && [ "$REAL" -lt "$PREV" ] 2>/dev/null; then
+    echo "  *** ROW LOSS: was $PREV, now $REAL — investigate before doing anything else ***"
+  fi
+fi
+[ -n "$REAL" ] && echo "$REAL" > .continuous_dev/last_real_count.txt
+echo "cost_ledger rows:      $($PSQL 'SELECT count(*) FROM cost_ledger;' 2>/dev/null)"
+echo '```'
+# ALERTS.md now carries ONLY production-urgent lines (row loss, production down,
+# domain expiry, disk low, user-visible drift, leaked secret). It is meant to be
+# EMPTY in the normal case — a non-empty ALERTS.md is itself the signal, so we
+# print the whole thing, not a "last 40" window. Routine task-hygiene events
+# (delivered-nothing, backlog low, quarantines) went to task_hygiene.log in
+# D590/LOCAL-545 precisely because 1347 false DELIVERED NOTHING lines had trained
+# every session to ignore this line. Keep the two visibly different.
+if [ -f .continuous_dev/ALERTS.md ]; then
+  # Count only real alert lines: they start with a UTC timestamp and contain ***.
+  # The header of ALERTS.md documents the *** markers, so a plain grep would count
+  # the legend itself — anchor on the leading date.
+  URGENT=$(grep -cE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*\*\*\*' .continuous_dev/ALERTS.md 2>/dev/null)
+  if [ "${URGENT:-0}" -gt 0 ]; then
+    echo "ALERTS.md: *** $URGENT URGENT alert line(s) — READ .continuous_dev/ALERTS.md NOW ***"
+  else
+    echo "ALERTS.md: 0 urgent — clear."
+  fi
+else
+  echo "ALERTS.md: 0 urgent — clear."
+fi
+if [ -f .continuous_dev/task_hygiene.log ]; then
+  HYG=$(tail -200 .continuous_dev/task_hygiene.log | grep -cE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*\*\*\*' 2>/dev/null)
+  echo "task_hygiene.log: $HYG routine event(s) in the last 200 — informational, auto-refiled, not an emergency."
+fi
+echo
+echo "## Queue"
+echo '```'
+echo "in flight:"
+ps aux | grep "[k]iro-cli chat" | grep -oE "Task ID:\*\* LOCAL-[0-9]+" | sort -u | sed 's/^/   /' || echo "   (none)"
+echo
+echo "last 6 dispatcher events:"
+tail -6 kiro_sessions_ran.md 2>/dev/null | cut -c1-118 | sed 's/^/   /'
+echo '```'
+echo
+echo "## Re-dispatchable (last status ABANDONED — a bounce awaiting pickup)"
+FOUND=0
+for f in new_kiro_session_is_required_LOCAL-*.md; do
+  [ -e "$f" ] || continue
+  LAST=$(grep "task=$f" kiro_sessions_ran.md 2>/dev/null | tail -1 | sed -E 's/^- ([A-Z]+).*/\1/')
+  if [ "$LAST" = "ABANDONED" ]; then
+    echo "  - ${f#new_kiro_session_is_required_}"
+    FOUND=1
+  fi
+done
+[ "$FOUND" = "0" ] && echo "  (none — every task file is claimed or finished)"
+echo
+echo "## Parked (deliberately outside the dispatcher glob — do NOT re-dispatch)"
+ls PARKED_kiro_task_*.md 2>/dev/null | sed 's/^/  - /' || echo "  (none)"
+echo
+echo "## Honest tour scores (corpus-loaded scorer, recompute — do not quote from memory)"
+echo '```'
+python3 - <<'PY' 2>/dev/null | sed 's/^/   /'
+import sys, os
+sys.path.insert(0, os.getcwd())
+try:
+    from tour_rubric_scorer import score_tour_file
+    # Newest file per category, so this never goes stale as tours are regenerated.
+    import glob
+    def newest(pat):
+        c = sorted(glob.glob(pat), key=os.path.getmtime, reverse=True)
+        return c[0] if c else None
+    picks = [(newest('tours/*museum_4stop*.txt'), 4), (newest('tours/*walking_4stop*.txt'), 4),
+             (newest('tours/*restaurant_4stop*.txt'), 4), ('tours/LOCAL320_museum_8stop.txt', 8)]
+    for f, n in [(a, b) for a, b in picks if a]:
+        if os.path.exists(f):
+            print(f"{os.path.basename(f)[:34]:36s} base={score_tour_file(f, n).base_score:5.1f}")
+except Exception as e:
+    print(f"(scorer unavailable: {type(e).__name__})")
+PY
+echo '```'
+echo
+echo "## Generating a tour from the host — REQUIRED env (D261)"
+echo '```'
+echo 'DISABLE_TOUR_CACHE=1 \'
+echo 'DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \'
+echo 'STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."'
+echo '# no DISABLE_TOUR_CACHE -> you may score a CACHED tour (D262)'
+echo '# no DATABASE_URL      -> stop-existence gate SILENTLY does not run (D261)'
+echo '```'
+echo
+echo "## Pending reminders for Michael"
+if [ -s PENDING_REMINDERS.md ]; then grep -n "^- \[ \]" PENDING_REMINDERS.md | sed 's/^/  /' | cut -c1-160; else echo "  (none)"; fi
+echo
+echo "## Read next, in this order"
+echo '- `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules'
+echo '- `DECISIONS.md`         — tail -120; D2xx are the recent rulings'
+echo '- `.continuous_dev/STATUS.md` — tail -80; last tick'
+echo '- `TOUR_REVIEW_current.md`     — current quality position (3x4stop.md is SUPERSEDED)'
+echo
+echo "## Standing checks that have caught something every time (D242)"
+echo '1. Break the production code — confirm a test goes red. A test that cannot fail is not evidence.'
+echo '2. `grep` for a production importer before believing a module does anything.'
+echo '3. Re-run the agent'"'"'s own number against a case whose answer you already know.'
+echo '4. Accent-fold every `stop_corpus` join (D243) — exact match on French titles silently reports absence.'
+echo '5. Before writing ABANDONED, `kill -0` the `dispatcher_pid` in the STARTED line (D246).'
+} | tee RESTART.md

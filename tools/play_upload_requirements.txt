@@ -1,0 +1,10 @@
+# Pinned dependencies for upload_play.sh / tools/play_upload.py
+#
+# Installed into a LOCAL venv (tools/.venv-play, gitignored) by upload_play.sh —
+# never globally. Pinned exactly so a rebuild is reproducible. Bump deliberately.
+#
+# Only the Play Developer API v3 client plus its auth stack is needed. No
+# service-account key is ever used; auth is a short-lived impersonated token
+# passed as google.oauth2.credentials.Credentials.
+google-api-python-client==2.198.0
+google-auth==2.40.3

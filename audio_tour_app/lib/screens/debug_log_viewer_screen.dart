@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/platform_logger.dart';
+import '../services/log_redactor.dart';
 
 class DebugLogViewerScreen extends StatefulWidget {
   const DebugLogViewerScreen({super.key});
@@ -145,6 +146,9 @@ class DebugLogHelper {
   static final PlatformLogger _logger = PlatformLogger.instance;
   
   static Future<void> addDebugLog(String message) async {
-    await _logger.log(message);
+    // Guard against secret leakage into the persisted, in-app-viewable log.
+    // Every message is scrubbed here so a stray `... $password ...` at any
+    // call site cannot write a credential/key to disk. See wdvrday4pk.
+    await _logger.log(LogRedactor.redact(message));
   }
 }

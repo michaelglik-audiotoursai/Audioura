@@ -6,7 +6,9 @@ Tests: MailChimp, Apple Podcasts, Spotify, Quora, and Guy Raz (Substack)
 import requests
 import json
 import time
+import pytest
 
+@pytest.mark.service
 def test_newsletter_technology(name, url, expected_articles_min=1):
     """Test a specific newsletter technology"""
     print(f"\n=== Testing {name} ===")

@@ -36,6 +36,22 @@ def _require_api_key():
     """Check X-API-Key header. Returns error response or None."""
     import hmac
     if not API_KEY:
+        # [ST-4] Local Docker has no GATEWAY_API_KEY, so sharing returned 503 and the
+        # feature could not be tested on the Mac Mini at all.
+        #
+        # Deliberately NOT a silent fail-open: this endpoint WRITES, and an
+        # unauthenticated write endpoint reachable from a network is a spam vector.
+        # Michael's "everything in Audioura must be public" (2026-09-24) is about
+        # shared tours being readable by anyone -- resolution -- not about letting
+        # anyone write rows.
+        #
+        # So it opens only when someone has explicitly said so, by setting
+        # ALLOW_UNAUTHENTICATED_SHARING=true. That is set in the LOCAL compose file
+        # and nowhere else. Cloud has a real GATEWAY_API_KEY, so this branch is not
+        # even reached there, and the fail-closed 503 remains for any deployment that
+        # is genuinely misconfigured.
+        if os.getenv('ALLOW_UNAUTHENTICATED_SHARING', '').lower() in ('true', '1', 'yes'):
+            return None
         return jsonify({"error": "service_misconfigured"}), 503
     client_key = request.headers.get('X-API-Key', '')
     if not client_key or not hmac.compare_digest(client_key, API_KEY):
@@ -64,9 +80,36 @@ def share_tour():
     tour_type = data.get('tour_type')
     total_stops = data.get('total_stops')
     tour_text = data.get('tour_text')
+    # [ST-4] Share by TOUR ID. The app already has the tour; making it re-upload the
+    # whole text to share it is wasteful and, since ST-1, unnecessary -- a share
+    # references the row. Everything else is derived here from the row itself, so the
+    # client sends one integer instead of a document.
+    audio_tour_id = data.get('audio_tour_id')
+    if audio_tour_id and not all([location, tour_type, total_stops, tour_text]):
+        try:
+            import psycopg2 as _pg
+            _conn = _pg.connect(DATABASE_URL)
+            with _conn.cursor() as _cur:
+                _cur.execute(
+                    "SELECT tour_name, request_string, stops_count, tour_content "
+                    "FROM audio_tours WHERE id = %s", (int(audio_tour_id),))
+                _row = _cur.fetchone()
+            _conn.close()
+            if not _row:
+                return jsonify({"error": "tour not found"}), 404
+            _name, _req, _stops, _content = _row
+            location = location or _req or _name
+            tour_type = tour_type or 'walking'
+            total_stops = total_stops or _stops or 1
+            # tour_text is legacy: the share resolves through audio_tour_id now. Keep a
+            # copy only so pre-ST-1 readers do not see an empty row.
+            tour_text = tour_text or (_content or '')[:200000] or '(referenced)'
+        except Exception as _e:
+            return jsonify({"error": f"could not read tour: {_e}"}), 500
 
     if not all([location, tour_type, total_stops, tour_text]):
-        return jsonify({"error": "location, tour_type, total_stops, and tour_text are required"}), 400
+        return jsonify({"error": "location, tour_type, total_stops, and tour_text are required "
+                                 "(or pass audio_tour_id)"}), 400
 
     try:
         total_stops = int(total_stops)
@@ -91,6 +134,8 @@ def share_tour():
         tour_type=tour_type,
         total_stops=total_stops,
         db_url=DATABASE_URL,
+        # [ST-1/ST-4] The reference is what makes download and translation work.
+        audio_tour_id=int(audio_tour_id) if audio_tour_id else None,
     )
 
     if not success:

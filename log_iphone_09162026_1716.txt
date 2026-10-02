@@ -1,0 +1,76 @@
+[17:05:19] HAS_CHANGES_CHECK: Called from _saveAllChanges - testing message passing
+[17:05:19] _saveAllChanges: _hasAnyChanges() returned: true
+[17:05:19] EDIT: Using backend tour ID: 421
+[17:05:19] CRITICAL_TOUR_ID: tourPath=/var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421
+[17:05:19] CRITICAL_TOUR_ID: extracted tourId=__ru_421
+[17:05:19] CRITICAL_TOUR_ID: sending to backend=421
+[17:05:19] CRITICAL_SAVE: Modified stops filter found: 1 stops
+[17:05:19] CRITICAL_SAVE: Modified stop 0 - number=4, modified=true, action=add
+[17:05:19] EDIT: Sending only 1 modified stops - backend preserves others
+[17:05:19] EDIT: Preparing 1 stops for backend
+[17:05:19] CRITICAL_JSON: {"stops":[{"stop_number":4,"title":"Stop 4","text":" Я добавил эту остановку чтобы убедиться что добавочная остановка работает.","original_text":"","audio_file":"audio_4.mp3","editable":true,"modified":true,"action":"add","generate_audio_from_text":true,"has_custom_audio":false,"audio_source":"tts_generated"}]}
+[17:05:19] SERVICE_DIRECT: updateMultipleStops method called with tourId: 421
+[17:05:19] SERVICE_DIRECT: ===== TourEditingService.updateMultipleStops CALLED =====
+[17:05:19] EDIT API: Tour ID: 421
+[17:05:19] EDIT API: Received 1 stops to process
+[17:05:19] EDIT API: Stop 0 - Number: 4, Action: add, Modified: true
+[17:05:19] EDIT API: Stop 0 - Has custom audio: false, Audio path: null
+[17:05:19] EDIT API: Stop 4 - TTS mode, generate: true
+[17:05:19] EDIT API: ===== MAKING HTTP POST REQUEST =====
+[17:05:19] EDIT API: URL: https://storied-api.audioura.com/tour/421/update-multiple-stops
+[17:05:19] EDIT API: Payload stops count: 1
+[17:05:28] EDIT API: ===== HTTP RESPONSE RECEIVED =====
+[17:05:28] EDIT API: Response status: 200
+[17:05:28] EDIT API: Response body: {"download_url":"/tour/d852ac5f-eee7-4b79-abe5-d600232937b5/download","message":"Tour updated successfully with 1 text-to-speech audio file(s)","new_tour_id":"d852ac5f-eee7-4b79-abe5-d600232937b5","status":"success","stops":[{"audio_source":"tts_generated","audio_updated":true,"generate_audio_from_text":true,"has_custom_audio":false,"stop_number":4,"text_updated":true}]}
+
+[17:05:28] EDIT API: Save success - Tour updated successfully with 1 text-to-speech audio file(s)
+[17:05:28] API_CALL: TourEditingService.updateMultipleStops returned successfully
+[17:05:28] API_CALL: Response keys: [download_url, message, new_tour_id, status, stops]
+[17:05:28] EDIT: Save response: {download_url: /tour/d852ac5f-eee7-4b79-abe5-d600232937b5/download, message: Tour updated successfully with 1 text-to-speech audio file(s), new_tour_id: d852ac5f-eee7-4b79-abe5-d600232937b5, status: success, stops: [{audio_source: tts_generated, audio_updated: true, generate_audio_from_text: true, has_custom_audio: false, stop_number: 4, text_updated: true}]}
+[17:05:28] CRITICAL_TOUR_ID: Backend returned new_tour_id=d852ac5f-eee7-4b79-abe5-d600232937b5
+[17:05:28] EDIT: Starting new tour download process
+[17:05:28] EDIT: REQ-016 new tour created: d852ac5f-eee7-4b79-abe5-d600232937b5
+[17:05:28] EDIT API: Downloading updated tour d852ac5f-eee7-4b79-abe5-d600232937b5
+[17:05:29] EDIT API: Downloaded 2367673 bytes
+[17:05:29] EDIT API: Extracted 12 files
+[17:05:29] EDIT API: Tour download and extraction completed
+[17:05:29] DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: d852ac5f-eee7-4b79-abe5-d600232937b5
+[17:05:29] DEBUG_UPDATE_ID: Local tour updated with new ID reference
+[17:05:29] USER_ACTION: Loading tour for editing
+[17:05:29] STATUS: Loaded 4 stops for editing
+[17:05:29] DEBUG_RESET: Processing 4 stops
+[17:05:29] LISTEN: Loading 16 tours from storage
+[17:05:29] LISTEN: Loaded 16 valid tours (0 skipped)
+[17:05:35] TOUR_PLAYER: Using mobile file URL: file:///var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/index.html
+[17:05:35] VOICE: Microphone permission status: PermissionStatus.denied
+[17:05:35] VOICE: Speech-to-text initialized: true
+[17:05:35] VOICE: Volume button listener added
+[17:05:35] VOICE: Volume changed to 1.0
+[17:05:35] VOICE: Voice control service initialized successfully
+[17:05:35] VOICE: Volume button press 1/3 at 2026-09-16 17:05:35.285301
+[17:05:35] VOICE: InAppWebView created, controller set
+[17:05:35] NAV: TTS initialized
+[17:05:35] VOICE: WebView loaded: file:///var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/index.html
+[17:05:35] VOICE: Getting tour info
+[17:05:35] VOICE: Button press counter reset
+[17:05:37] TOUR_PLAYER: Auto-start command executed
+[17:05:55] USER_ACTION: Loading tour for editing
+[17:05:55] STATUS: Loaded 4 stops for editing
+[17:06:01] EDIT_STOP: HTML5 audio services initialized
+[17:06:01] AUDIO_LOAD: Resolving original audio: /var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/audio_2.mp3 (exists: true)
+[17:06:01] HTML_RECORDER: Initialized successfully
+[17:06:01] HTML_AUDIO: Loaded audio player for /var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/audio_2.mp3
+[17:06:01] AUDIO_LOAD: Loaded original audio: /var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/audio_2.mp3
+[17:06:21] EDIT_STOP: HTML5 audio services initialized
+[17:06:21] AUDIO_LOAD: Resolving original audio: /var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/audio_4.mp3 (exists: true)
+[17:06:21] HTML_RECORDER: Initialized successfully
+[17:06:22] HTML_AUDIO: Loaded audio player for /var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/audio_4.mp3
+[17:06:22] AUDIO_LOAD: Loaded original audio: /var/mobile/Containers/Data/Application/23A81A10-3173-4117-8854-BA2F7EB3E4C4/Documents/tours/__ru_421/audio_4.mp3
+[17:11:30] SCROLL: Listener disabled - not needed for core functionality
+[17:11:30] LISTEN: Loading 16 tours from storage
+[17:11:30] LISTEN: Loaded 16 valid tours (0 skipped)
+[17:11:34] LISTEN: Loading 16 tours from storage
+[17:11:34] LISTEN: Loaded 16 valid tours (0 skipped)
+[17:11:37] ABOUT: Checking user: USER-773827679
+[17:11:37] Testing connectivity to: https://storied-api.audioura.com/health
+[17:11:37] ✅ Server connectivity: OK

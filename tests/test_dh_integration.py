@@ -3,6 +3,9 @@
 Test Diffie-Hellman Key Exchange Integration
 """
 
+import pytest
+pytest.importorskip("Crypto")  # LOCAL-544: skip when optional dep missing
+
 import requests
 import json
 import secrets
@@ -10,6 +13,7 @@ from diffie_hellman_service import DH_PRIME, DH_GENERATOR, derive_aes_key
 import base64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
+import pytest
 
 def mobile_encrypt_with_dh_key(plaintext, aes_key):
     """Encrypt using DH-derived AES key (simulating mobile app)"""
@@ -27,6 +31,7 @@ def mobile_encrypt_with_dh_key(plaintext, aes_key):
     combined = iv + ciphertext
     return base64.b64encode(combined).decode('utf-8')
 
+@pytest.mark.service
 def test_dh_key_exchange():
     """Test complete DH key exchange flow"""
     print("=== TESTING DIFFIE-HELLMAN KEY EXCHANGE ===")

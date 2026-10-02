@@ -8,6 +8,7 @@ import json
 import psycopg2
 import os
 from datetime import datetime
+import pytest
 
 # Test URL from Guy Raz newsletter
 TEST_APPLE_URL = "https://podcasts.apple.com/us/podcast/babylist-natalie-gordon-how-a-new-mom-used-nap-time/id1150510297?i=1000733348575"
@@ -42,6 +43,7 @@ def cleanup_existing_articles():
     except Exception as e:
         print(f"ERROR: Database cleanup error: {e}")
 
+@pytest.mark.service
 def test_apple_processor_direct():
     """Test Apple Podcasts processor directly"""
     print("\n=== STEP 2: Direct Apple Podcasts Processor Test ===")
@@ -72,6 +74,7 @@ def test_apple_processor_direct():
         print(f"ERROR: Apple processor error: {e}")
         return None
 
+@pytest.mark.service
 def test_news_orchestrator():
     """Test news orchestrator with Apple Podcasts content"""
     print("\n=== STEP 3: News Orchestrator Test ===")
@@ -134,6 +137,7 @@ def test_news_orchestrator():
         print(f"ERROR: Orchestrator test error: {e}")
         return None
 
+@pytest.mark.service
 def test_final_article_content():
     """Check what was actually stored in the database"""
     print("\n=== STEP 4: Final Article Content Check ===")

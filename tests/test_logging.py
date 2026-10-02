@@ -6,6 +6,10 @@ import requests
 import sys
 import time
 
+import pytest
+
+
+@pytest.mark.service
 def test_logging():
     """Test that the tour orchestrator service is properly logging."""
     try:

@@ -16,6 +16,18 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q-2026-08-16-4 — How to ask a side question without derailing the session](#q202608164)
+- [Q-2026-08-16-3 — Is the Beta briefing pushed so Windows can fetch it?](#q202608163)
+- [Q-2026-08-16-2 — After /clear + restart, can the validator work continue?](#q202608162)
+- [Q-2026-08-16-1 — Did LEAD start working on Yuri's bugs? Should I clear?](#q202608161)
+- [Q-2026-08-14-4 — What are the three independent scores for section 1?](#q202608144)
+- [Q-2026-08-14-3 — Can the validator pass a good story and catch a false one?](#q202608143)
+- [Q-2026-08-14-2 — Is our TRUE_TO_SOURCES verdict worth anything?](#q202608142)
+- [Q-2026-08-14-1 — Why is stop 1 silent when the material is there?](#q202608141)
+- [Q24 — Are the docker services working correctly now? Were they broken before?](#q24)
+- [Q23 — Are we ready to continue working on the Storied release? **Answered: yes, pushed**](#q23)
+- [Q22 — Explain "the fleet can't be verified by asking it"](#q22)
+- [Q21 — Why did my tour generation fail completely?](#q21)
 - [Q20 — Status while you were away, 2026-08-04 (LEAD-raised: 2 credentials need rotating)](#q20)
 - [Q19 — Should the billing layer move to `storied`? **Answered: No**](#q19)
 - [Q18 — Translation pricing: what is $2.71 for, can it be cheaper?](#q18)
@@ -36,6 +48,165 @@ the terminal scroll.**
 - [Q3 — What does the $0.53 translation cost consist of?](#q3)
 - [Q2 — Why am I suddenly getting permission requests from Kiro?](#q2)
 - [Q1 — What has been done over the three days?](#q1)
+
+---
+
+## Code map — clickable
+
+**How to use these in VS Code:** in the editor, **Cmd+Click** the link. In the preview
+(**Cmd+Shift+V**) a single click works. Plain text like `story_validator.py:85` is only
+clickable in a terminal, never in a markdown file — that is why the earlier version
+highlighted but did nothing.
+
+Line numbers drift as files change. If a link lands in the wrong place, the function
+name is still right — search for it.
+
+### The story gate (D450–D455)
+
+- [`named_people()`](story_validator.py#L85) — who counts as a person. Fixed four ways: `World War` and `Maresfield Gardens` were people, a bare surname was nobody, and `Salvador Dalí` + a later `Dalí` were two humans
+- [`classify()`](story_validator.py#L169) — UNFALSIFIABLE / CHECKABLE / UNCHECKED_FACTUAL
+- [`open_question()`](story_validator.py#L210) — asks *who did it*, never *did X do it*
+- [`contradiction_check()`](story_validator.py#L215) — SUPPORTED / CONTRADICTED / NO_USABLE_EVIDENCE
+- [`validate()`](story_validator.py#L313) — the gate itself
+
+### Michael's four routines (D445)
+
+- [`request_to_ai()`](request_and_structure.py#L98) — routine 1, builds the query from the matrix
+- [`structure_ai_output()`](request_and_structure.py#L198) — routine 4, the >5-sentences summarise rule
+- [`ask_openai()`](michaels_chain.py#L51) — routine 2, calls the model
+- [`main()`](michaels_chain.py#L66) — runs all four in his order and prints every stage
+
+### The matrix and the story keyword (D441)
+
+- [`build_matrix()`](interrogation_matrix.py#L637) — the interrogation matrix
+- [`_pick_credit_line()`](interrogation_matrix.py#L418) — picks the story keyword; the exclude list is why stop 1 got `book` instead of Louis Broder
+- [`extract_stops()`](interrogation_matrix.py#L96) — splits a tour into stops
+
+### Scoring (D451)
+
+- [`evaluate_story()`](evaluate_story.py#L401) — the three independent 0–100 axes
+- [`_score_historic()`](evaluate_story.py#L221) — dates and consequence; `fled` now counts as a state change
+- [`_score_detail()`](evaluate_story.py#L259) — material, count, process, dimension
+- [`_score_social()`](evaluate_story.py#L300) — people, emotions, conduct
+- [`_count_distinct_people()`](evaluate_story.py#L190) — delegates to `named_people()`
+
+### Lead generation and verification (D440, D446)
+
+- [`verify()`](story_leads.py#L214) — one narrow search per claim, two at most
+- [`_principal()`](story_leads.py#L193) — the named party a claim is *about*
+- [`_gemini()`](story_leads.py#L91) — Gemini, with `grounded=True` for Google Search grounding
+- [`available_providers()`](story_leads.py#L133) — every provider we have a key for
+
+### The old description gate (D447 — backwards for stories, correct for descriptions)
+
+- [`validate_story()`](validate_story.py#L442) — must-be-confirmed; use for DESCRIPTIONS, not stories
+- [`split_sentences()`](story_opportunity_scan.py#L126) — could not split after a quotation mark until 2026-08-14
+
+### Tools
+
+- [`story_trace.py`](story_trace.py) — every routine's input and output for one stop, offline, free
+- [`story_worksheet.py`](story_worksheet.py) — the credit_line worksheet
+- [`story_pipeline.py`](story_pipeline.py) — the retrieve-then-write chain
+- [`STORY_GATE_TIERS.md`](STORY_GATE_TIERS.md) — the tier spec and measurement set
+- [`STORIED_COMMUNICATION_03.MD`](STORIED_COMMUNICATION_03.MD) — the conversation
+- [`DECISIONS.md`](DECISIONS.md) — the rulings and their evidence
+
+---
+
+<a name="q24"></a>
+## Q24 — "Are the docker services working correctly now? Were they broken before?" (asked 2026-08-12, ~17:10 EDT)
+
+**Yes to both.** Two more services were stale beyond the one that broke your tour, and
+three "unhealthy" flags turned out to be false alarms.
+
+- **`tour-editing-phase2`** was running the *same* pre-LOCAL-4xx generator code that
+  broke your tour. It pins `image: audioura-tour-generator:latest` with no build of its
+  own, so rebuilding the image did not touch it — a container keeps its old image until
+  recreated.
+- **`tour-orchestrator`** 1,865 lines vs the repo's 2,017; **`tour-generation-modernized-1`**
+  539 vs 554. Both rebuilt.
+- **`map-delivery`, `tour-processor`, `voice-control`** have shown `unhealthy` with a
+  failing streak of **23,594** — because their healthcheck runs `curl`, which is not
+  installed in those images. All three answer `HTTP 200` fine.
+
+All 12 comparable services now match the repo; all 8 health endpoints return 200.
+Detail: **D412**. The fix for the underlying blindness is dispatched as **LOCAL-452**.
+
+---
+
+<a name="q23"></a>
+## Q23 — "Are we ready to continue working on the Storied release?" (asked 2026-08-12, ~17:25 EDT)
+
+**Yes — and as of 18:0x the release is pushed.**
+
+Your gate (2026-07-29): the iPhone field test proceeds once the internal score reaches
+**75 at N=8 on the Asian Arts Museum**. Regenerated on current code in the rebuilt
+container: **81.2**, up from the previous 75.0, with real margin instead of none.
+
+```
+tours/LOCAL320_museum_8stop_GATE_ce61b01.txt
+Musée des Arts Asiatiques, Nice · 8 stops · 15,309 chars · 500s
+base score 81.2 · container code_sha ce61b01 · now committed
+```
+
+`storied` pushed to origin: `55b2753..aef068e`. That included merging Track B's work
+from the Windows machine, where both machines had independently allocated **D347** —
+Track A keeps D347–D414, Track B renumbered to D415/D416, and Track B now allocates from
+D500 up.
+
+**Next: the iPhone field test.**
+
+---
+
+<a name="q22"></a>
+## Q22 — "Explain 'the fleet can't be verified by asking it; it has to be diffed'" (asked 2026-08-12, ~17:30 EDT)
+
+**20 of 21 services cannot tell you what code they are running.** Only
+`Dockerfile.generator` accepts a `GIT_SHA` build arg, writes `/app/.git_sha`, and reports
+it via `/health`. Every other service answers `unknown` or has no such file.
+
+That is why stale code hid for over a week. `docker ps` said `Up 8 days`, `/health` said
+`healthy`, and `code_sha: unknown` reads like a missing label, not a warning — while the
+container ran 6,796 lines against the repo's 15,011.
+
+Checking it required, per service: read the build context from `docker-compose-master.yml`,
+find the real source file that context copies, and `md5` it against the container's copy.
+That audit produced **five false positives** on its first pass, because a `find` by
+basename matched the wrong `app.py` for five services that build from their own
+subdirectories. An audit that is easy to get wrong is not a control.
+
+**Dispatched as LOCAL-452:** `GIT_SHA` in all 20 remaining Dockerfiles, `code_sha` in
+every `/health`, a `verify_fleet.sh` that prints service / reported sha / HEAD /
+MATCH-STALE in one command, and a fix for the three `curl` healthchecks. Detail: **D410**,
+**D412**.
+
+---
+
+<a name="q21"></a>
+## Q21 — "Why did my tour generation fail completely?" (asked 2026-08-12, ~16:35 EDT)
+
+**The pipeline was fine. The deployment was three years of drift.** Three separate
+faults, all fixed at `742b355`:
+
+1. **The container was not running your code** — 6,796 lines vs the repo's 15,011, with
+   zero `LOCAL-4xx` markers. Anything generated through the app or port 5000 ran
+   pre-LOCAL-4xx code with no exhibition checklist and no story chain.
+2. **A `tests/` import that kills the container mid-run.**
+   `style_validator_detector.py:33` imports `db_connection` from `tests/`, which
+   `Dockerfile.generator` never copies. It blows up **at 138 seconds**, after every
+   expensive phase is paid for. On the host it works, because `tests/` is on disk — same
+   code, different filesystem, which is why LEAD's runs kept passing and yours did not.
+3. **`db_connection.py` defaults to `localhost:5433` from inside the container** — the
+   host's port mapping, closed there.
+
+Result after the fixes: `SUCCESS 5651 chars in 156.9s`, 75.0 base at N=3, through the
+same path your app uses.
+
+**One thing worth knowing:** `beats_in_delivered_text=0`, which appears on every stop of
+every run, is a **broken gauge** — it counts three consecutive ≥5-letter words copied
+*verbatim* from a search snippet, so good prose scores 0 by construction. `LOCAL-388`
+measures the same thing correctly and reported 8/8. Any conclusion resting on that
+counter is void. Detail: **D410**.
 
 ---
 
@@ -619,3 +790,826 @@ server; six cases of correct code with no caller.
 **My mistakes:** opened a plaintext-credential endpoint for 25 minutes (0
 rows written); claimed tour editing worked after checking 2 of 6 routes;
 nearly bounced a correct task over a failure my own probe created.
+
+---
+
+## Should I be suspicious of Kiro asking for Downloads and Documents access?
+*(2026-08-06)*
+
+**My recommendation: revoke both.** System Settings → Privacy & Security → Files
+and Folders → Kiro. The need was spurious, and revoking is cheap to test — if
+something legitimately requires it, it will ask again, and that prompt would be
+worth scrutinising because it couldn't be explained by a stray `find`.
+
+**Why it happened, and it was not malice.** Three Kiro sessions overnight ran
+whole-home-directory scans between 03:36 and 06:40 — `find /Users/micha -name
+"pytest"`, then `find /Users/micha -maxdepth 3 -name "python3*"`, then
+`find / -maxdepth …`. I killed all three (D213, D218). macOS prompts for
+Downloads and Documents exactly when a process traverses them. The agent was
+hunting for the `python3` binary because it was not on PATH, and it widened the
+search each time I removed its method without supplying another.
+
+**What I could not prove.** I cannot read `TCC.db` (macOS protects it) and the
+unified log had nothing retained, so the link between those scans and your
+prompts is inference from timing and mechanism, not proof. It is a strong fit —
+right window, no other plausible trigger, no task that needed those folders, and
+no agent output referencing either path — but I did not watch it happen.
+
+**Why it is still worth acting on.** Kiro runs with `--trust-all-tools`, so it
+never asks before acting; it decided on its own to scan your home directory three
+separate times; and the grant is persistent, not per-session. Every future Kiro
+session can now read anything in Downloads and Documents. That matters more than
+usual here because this repo already has one credential sitting in pushed git
+history — an agent with home-directory read access *and* push access is a
+combination worth being deliberate about.
+
+**The cause is fixed.** Every task file since LOCAL-300 states `/usr/bin/python3`
+as fact plus a no-`find` rule, and LOCAL-300 completed on its first attempt with
+no scanning. Nothing queued needs access beyond the repo.
+
+---
+
+<a name="q202608141"></a>
+## Q-2026-08-14-1 — Why is stop 1 silent when the material is there?
+
+Its `credit_line` — the story keyword, the person a story gets built around — is the
+common noun **"book"**. Every person the stop names is struck off the ladder for
+already occupying another matrix slot: Miró is the `artist`, Mourlot the `printed_by`,
+and Louis Broder — the publisher the whole story is about — the `publisher`.
+
+Proven, not inferred: with the real exclude list `_pick_credit_line` returns
+`('book', MENTIONED)`; drop `publisher` alone and the same call returns
+`('Louis Broder', MENTIONED)`. **The better the matrix does its job, the worse the
+keyword gets.** Not fixed — see D442 for why removing the exclusion needs a
+same-people/same-event redundancy check first. Evidence: D441, D442.
+
+<a name="q202608142"></a>
+## Q-2026-08-14-2 — Is our "TRUE_TO_SOURCES" verdict worth anything?
+
+**Less than its name suggests, and for two independent reasons.**
+
+`validate_story` asks only whether a capitalised token or a year appears in the source
+text. So it cannot see an invented place, an invented number, or a reversed fact — all
+four of these PASS against a corpus containing "1974":
+
+```
+GROUNDED   ...illustrated the work in Barcelona.
+GROUNDED   ...illustrated the work on the surface of the moon.
+GROUNDED   ...illustrated the work using 47 copper plates.
+GROUNDED   ...refused to illustrate the work.
+```
+
+And its gradient runs backwards for stories: a sentence carrying no new name and no new
+year *cannot* fail, so **the vaguer the sentence, the safer it is.** Of Gemini's 30
+sentences it flagged 5 and all five were true.
+
+Separately, `story_pipeline` was reporting `STORY` for output `story_writer` had already
+REJECTED — the writer's verdict was computed and then discarded. Fixed. Evidence: D444,
+D447, D448.
+
+<a name="q202608143"></a>
+## Q-2026-08-14-3 — Can the validator be made to pass a good story and catch a false one?
+
+**Partly, and the honest answer is "better, not finished."** `story_validator.py`
+implements Michael's D450 gate: a story is rejected only when a source names a
+DIFFERENT answer to the same question, never for being unconfirmed.
+
+Measured over three runs each:
+
+```
+Gemini section 1 (true, good)                     PASSES         3/3   as required
+"Leonard Woolf accompanied Dalí…" (false)         CONTRADICTED   3/3   as required
+"Stefan Zweig accompanied Dalí…" (true)           SUPPORTED      3/3
+"Boris Fridman gave Le Lézard… to the MFA" (true) CONTRADICTED   3/3   WRONG
+```
+
+The first three are what Michael asked for. **The fourth is a false rejection and it is
+not solved:** the open question drifts to Alexander Calder's *Lizard*, the actor never
+appears, and absence is read as refutation. A relevance guard was added and did not fix
+it. So the gate is trustworthy when the search lands on the right subject and untrustworthy
+when it does not, and it cannot yet tell those two cases apart.
+
+Also fixed en route, shared by both instruments: `World War` and `Maresfield Gardens`
+were classified as PEOPLE, a bare surname was classified as nobody (so "Dalí sketches
+Freud" scored zero multi-person sentences), and "Salvador Dalí" plus a later "Dalí"
+counted as two humans. Evidence: D450, D451.
+
+<a name="q202608144"></a>
+## Q-2026-08-14-4 — What are the three independent scores for Gemini's section 1?
+
+```
+historic  31     dates and the consequence of acts
+detail     0     facts broken into facts — material, count, process, dimension
+social    50     people, their emotions and their conduct toward each other
+```
+
+Independent 0–100, not a total. The reading is honest: the passage is a scene between
+two men (social), anchored on one date and one state change — Freud fleeing Vienna
+(historic) — and says nothing whatever about the physical object (detail 0).
+
+Both `historic` and `social` were undercounted before today. `fled` scored no state
+change while `destroy` did, so exile read as no event; and `admired`, `considers`,
+`sketches`, `remarks` were absent from the social verbs even though D450 names emotions
+and friendships as the axis. Evidence: D449, D451.
+
+---
+
+<a name="q202608161"></a>
+## Q-2026-08-16-1 — Did LEAD start working on Yuri's bugs? Should the session be cleared?
+
+**No. Zero mobile files were touched** — verified: `git log --name-only` over the last
+six hours contains no path under `audio_tour_app/`.
+
+What was done: located the two reports (they are ClickUp **DMs**, channel
+`2ky4d0u8-919`, not tasks — which is why every list and keyword search missed them),
+created an isolated worktree `~/audioura-worktrees/beta-mobile` on branch
+`beta/yuri-bugs`, wrote `BETA_MOBILE_START_HERE.md`, and named the session in
+`CLAUDE.md`. No mobile code was read or changed.
+
+**This is exactly the confusion that produced the `ASK:` / `SIDE:` convention**
+(Q-2026-08-16-4). The question was "where is the bug filed"; LEAD answered it as a
+work item.
+
+**On clearing: yes, clear now.** This session is long and long sessions are the
+expensive kind against the weekly ceiling. Everything is committed. See
+Q-2026-08-16-2 for exactly what a fresh session recovers.
+
+<a name="q202608162"></a>
+## Q-2026-08-16-2 — After `/clear` + `restart`, can the validator work continue?
+
+**Yes, and nothing of substance is held only in context.** A fresh session recovers it
+by reading, in this order:
+
+```
+bash restart.sh                  git state, row counts, queue, scores
+DECISIONS.md   D440 -> D458      the whole story-gate thread, with evidence
+STORY_GATE_TIERS.md              the tier spec and the measurement set
+STORIED_COMMUNICATION_03.MD      the conversation, Michael's words verbatim
+QUESTIONS.MD / ANSWERS.MD        the indexed questions
+```
+
+The code is committed too: `story_validator.py` (the D450 gate),
+`michaels_chain.py` (his four routines), `story_trace.py`, `story_worksheet.py`, and
+the repaired `evaluate_story.py`.
+
+**Where the work stands, so the next session does not have to re-derive it:** the gate
+passes the good story and catches the known hallucination, but **coverage is 13%** and
+one true obscure claim is still falsely rejected. The binding constraint is not the
+threshold — it is that grounded generation returns per-sentence citations at **83%**
+coverage against our 13% (D458), so the architecture is the next move, not question
+formation.
+
+<a name="q202608163"></a>
+## Q-2026-08-16-3 — Is the Beta briefing pushed so the Windows machine can fetch it?
+
+**Yes.** `beta/yuri-bugs` is on origin at `2d0d92a` and
+`git show origin/beta/yuri-bugs:BETA_MOBILE_START_HERE.md` reads back correctly.
+
+From Windows: `git fetch origin && git checkout beta/yuri-bugs`.
+
+**But there is a second half Michael did not ask about and needs to know.**
+`storied` has **51 unpushed commits**, which is *all* of the validator work — D440–D458,
+`story_validator.py`, `STORY_GATE_TIERS.md`, both conversation files. **None of it is
+reachable from Windows.** The push is gated on the iPhone field test (a standing rule),
+and today's commits are lab tooling rather than tour-pipeline changes, so the gate's
+original reason does not obviously apply to them. **LEAD did not push `storied`** —
+Michael's call, and it is one command either way.
+
+<a name="q202608164"></a>
+## Q-2026-08-16-4 — How to ask a side question without derailing the session
+
+Two prefixes, usable alone or together, now recorded in `CLAUDE.md`:
+
+- **`ASK:`** — answer only. No tool calls, no files changed, nothing committed. If it
+  cannot be answered without investigating, say so and stop.
+- **`SIDE:`** — a different topic from the current thread; logged under its own heading
+  so the threads stay separable.
+
+`ASK SIDE: where did Yuri file that bug?` would have produced one paragraph and no
+worktree.
+
+Without a prefix, RULE ZERO still applies — act, do not stall. **LEAD also carries an
+obligation:** if a message might be a question rather than a task, and acting would
+create files, branches or commits, say so in one line first. A question mistaken for a
+task costs tokens and muddles the record; a task mistaken for a question costs one round
+trip.
+
+<a name="q202608171"></a>
+## Q-2026-08-17-1 — Verify the Beta forward-merge on Storied (ClickUp `wdvrdaxnbw`)
+
+**Merged clean, nothing damaged, and the one open item is fixed and live.**
+`git merge origin/storied` → **11 files, 1468 insertions, zero deletions** — the shape of
+the diff is the proof: no existing Storied file was modified or removed. Safety tag
+`pre-beta-merge-20260817` = `e56be4c`. Merge base `afae00d`, as the task said. Local was
+64 unpushed, not the 51 in `BRANCH_MODEL.md` — the extra 13 are LEAD session commits.
+
+| ask | outcome |
+|---|---|
+| `.dockerignore` conflict | resolution correct. `!*_fixed.py` preserved — and it matters more than stated: `build_*.py` excludes `build_web_page_fixed.py`, so that line is the only thing keeping `tour-processor` buildable. `!requirements*.txt` now duplicated; harmless. |
+| `[LOCAL-323]` cost attribution | intact — 5 refs, signature and the `args=(...)` thread call unchanged. |
+| regression suites | `test_sq4_merge.py` ALL PASSED · `test_palais_fix_lead_fixture.py` 23/23. |
+| `build_web_page_fixed.py:183` | **live, not dead code** — fixed as `a1f5d9f`, live-verified. |
+
+**The liveness trace, because "is it dead code" was the whole question:**
+`Dockerfile.tour-processor` COPYs it → `text_to_index_fixed.py:6` imports `generate_website`
+→ `tour_generation_service.py:48` imports that → `CMD python tour_generation_service.py`
+→ `audioura-tour-processor-1` running, `/health` 200. Image rebuilt, container recreated,
+and the fix read back **from inside the container**, not from the source tree.
+
+**A grep lied again (D242 check 3).** `build_web_page.py` already had the pause pattern at
+:205–208 written as `other.pause()`; searching for `otherAudio.pause()` reported it absent.
+
+**Not pushed.** Local `storied` is 66 ahead of `origin/storied`, still behind the iPhone
+field-test gate; the fix touches a Storied-only file so it owes `main` nothing. No
+`storied` → `main` merge made or proposed.
+
+---
+
+# 2026-08-18 — validator session (D466–D482)
+
+**A181. Are good stories being dismissed as inaccurate without evidence? — YES, and the
+first case was proven.** `local413_run_output.log`: the temporal gate rejected a true Juan
+Gris / Pierre Reverdy collaboration on the claim that Gris "died in 1887". He died 1927.
+Three defects: `(?:died|d\.?)` matched the final `d` of "published"; a partial snippet
+shadowed the correct `_KNOWN_DATES`; a publication year was read as the interaction year.
+[D466] · [`temporal_coherence_gate.py`](temporal_coherence_gate.py)
+
+**A182. Delivered tours cannot show false rejections.** They contain only survivors. The
+evidence lives in run drop logs. `gate_fp_probe.py` was built on the wrong premise and the
+finding is recorded rather than the tool discarded. [D466]
+
+**A183. Is Michael's described algorithm what the code does? — No.** 15 matrix fields not
+8; `medium` = physical medium, `venue` = three fields, `credit_line` = provenance string
+that LOCAL-406 parses `donor`/`printer` out of. Serper.dev is the only retrieval engine;
+Gemini has zero production importers. `evaluate_story`/`story_validator` are not in the
+live generator. Story-worthiness selection and the retry loop do not exist.
+[`STORY_BASELINE.md`](STORY_BASELINE.md)
+
+**A184. Why did the iteration curve plateau? — The metric, not the material.**
+`valuation_index` had no term for the object; groundedness penalised specificity. Raising
+the snippet cap moved `detail` 0→29 while the index FELL 61→50. [D467] ·
+[`evaluate_story.py:342`](evaluate_story.py#L342)
+
+**A185. Fixing the index moved the stories.** Object detail became first-class, sentences
+past the third stopped being free, groundedness became an additive tiebreak. Best story
+47 → 54 → 63 → 64 over four rounds. [D468] · `test_local468`
+
+**A186. We ranked for one definition of "story" and scored on another.** 7 of 80 snippets
+carried a stakes marker, 2 of 20 survived the cap, and the best line in the pool never
+reached the writer. `_STAKES` is now imported by both ranker and scorer so they cannot
+drift. [D469] · [`snippet_ranker.py`](snippet_ranker.py)
+
+**A187. Is Storied ready for release? — No.** Full tour: lab 64 vs production 36. Hogarth
+fabrication shipped; stop 2 was two sentences because a gate correctly deleted a false
+claim and nothing replaced it. [D472] · `TOUR_MFA_RELEASE_20260818_1514.txt`
+
+**A188. The retry loop works — and it teaches the model to evade the gate.** Worst stop
+21→32, detail 13→33. Then, told not to repeat *or rephrase* a rejected claim, the model
+nominalised the verb and shipped the same falsehood. Prohibitions now ban the assertion.
+[D474, D476] · `generate_tour_text.py` PHASE 5.17
+
+**A189. Anything regenerating after the gate chain must re-run the chain.** The retry was
+checked by three fact gates and escaped every style gate. [D477]
+
+**A190. The gates were producing broken English.** `_is_well_known` returned False for
+Miró and Dalí but True for Picasso (no accent folding), so Miró was degraded out of a
+sentence about his own book; the possessive guard tested the same ASCII literal twice.
+[D475] · [`unglossed_reference_gate.py`](unglossed_reference_gate.py)
+
+**A191. One fabrication escaped one gate in three grammatical forms on three runs.**
+Passive (caught), active (D473), em-dash parenthetical (D478). Enumerating patterns loses
+to a generative model. Also `[A-Z]` cannot match `É` — the D243 accent lesson, **fourth
+time in one day**.
+
+**A192. Misattribution ≠ hallucination, and it decides which gate catches what.** The
+Hogarth Press is real and did publish Freud's 1939 edition; attributing the 1974 Dalí
+edition to it is a misattribution. An entity-presence check cannot see it. **The
+role-claim gate's narrow corpus is load-bearing — widening it would break it.** [D482]
+
+**A193. A single tour run is a sample, not a measurement.** The same code scores 36–50.
+Report mean and range over ≥3 runs. Final state: **45.7 mean, range 43–48.** [D480, D482]
+
+**A194. What did today cost? ~$3.13** OpenAI + SERP (16 tours ≈ $2.59, lab ≈ $0.54);
+$1.94 estimated because variance-run cost lines were grepped away. **`cost_ledger`
+under-reports host-side work ~20×** — it showed $0.1110.
+
+**A195. Why the instruments keep lying: three siblings ask the same question and only the
+newest is right.** The org gate folded accents; `check_person_grounded` and
+`_agent_in_text` did not. `story_validator._NAME_SPAN` used the accented capital class;
+its three siblings used bare `[A-Z]`. Each was fixed correctly by whoever had just been
+bitten, and nothing carried it sideways. Fix: **one primitive**
+([`text_fold.py`](text_fold.py)) that every entity-vs-corpus comparison calls, plus a
+**table-driven** suite so a new gate inherits every probe. [D483]
+
+**A196. The word-boundary hunt came back EMPTY — the bugs were in the `in` comparisons.**
+All 42 compiled regexes in the chain were swept mechanically; none matches inside a longer
+word. `_agent_in_text('Ars', 'Arsenal Gallery')` returned True because it was a plain
+substring test, not a regex. An audit scoped to "every regex" would have missed all of it.
+[D483]
+
+**A197. A gate needs a TRUE set, not only a FALSE set — and here is what that buys.**
+`check_org_grounded` exempted any name *containing* a famous museum's, so `Tate Modern
+Press`, `The Met Foundation` and `Louvre Editions` grounded for free against a corpus
+naming none of them. Inventing a publishing arm for a real museum was the one fabrication
+shape guaranteed to pass. The false-rejection half fails loudly and got fixed four times in
+one day; this half fails silently and nobody had looked. [D483, STORY_GATE_TIERS.md m.6]
+
+**A198. A gate that cannot SEE an entity reports success, not a miss.**
+`_PERSON_MULTI_WORD` is gate 5.158's extractor and was blind to `É`, so "Édouard Manet"
+was never recognised as a person and never checked for grounding. The cost was an
+inspection, not a drop. [D483]
+
+**A199. OpenAI credits are exhausted (2026-08-18 21:49).** Three measurement runs failed
+at the first API call — `credit_balance_exhausted`, nothing spent. **No tour can be
+generated at all until credits are added**, which is Michael's billing action. Consequence
+for the record: **45.7 (A193) is stale and must not be re-quoted** — these were
+gate-behaviour changes and their end-to-end effect is unmeasured. [D483]
+
+**A200. All seven of Michael's steps are wired (2026-08-19).** Five modules got their
+first production caller: [`evaluate_story`](evaluate_story.py),
+[`story_opportunity_scan`](story_opportunity_scan.py), [`story_leads`](story_leads.py),
+`corpus_coverage`'s action half, and the new [`story_pass.py`](story_pass.py). The gap was
+integration, not invention — which is why the lab scored 64 and production 43. [D485]
+
+**A201. THE limiting factor is the MATERIAL, not the prompt.** With the story isolated in
+its own pass, it writes the best story the snippets allow and the detector still refuses
+it: *"someone is described, but nothing is risked, refused or lost."* **No stakes exist in
+the retrieved material for any stop.** No prompt can add them without inventing, and an
+invention in the story pass lands **upstream of every gate**. Six rounds of prompt work
+were spent on a shortage of material. **Next work is retrieval.** [D485]
+
+**A202. Two of Michael's own definitions of "story" disagree, and it is his ruling.**
+Step 3 says a chain ACROSS entities (fact → stop → exhibition); the scanner's bar says
+THREE consecutive sentences about ONE person with action and stakes. A sentence each about
+publisher, printer and donor satisfies the first and is "a list of credits" to the second.
+The generator now aims at both; which governs when they conflict is a product question.
+[D485]
+
+**A203. Step 3.4 never fired: these stops are thin in KIND, not in volume.** The
+replenishment floor measures characters; every stop cleared it. What is missing is stakes.
+A volume floor cannot detect that. [D485]
+
+**A204. `gemini` + `gemini_grounded` is ONE model answering twice.** The first live
+fan-out reported exactly one "cross-model agreement" and that was it — a model counted as
+its own corroboration, the error `story_leads`' own docstring warns about. Agreement is
+now counted by model FAMILY. [D485, LOCAL-488]
+
+# 2026-08-19 morning — the story definition, settled from the encyclopedia (D487–D492)
+
+## A205 — What IS a story? Five encyclopedic definitions, and the ruling
+**Q (Michael, 09:58):** *"Let's look at the definition of the story to decide what 'story' is. Let's start with an encyclopedia."*
+
+**Forster/Britannica:** story vs plot is *entirely* causality — "the queen died" vs "died **of grief**", one word.
+**Prince (1973):** a minimal story is three conjoined events, first and third stative, **second active**, third the inverse of the first. Mechanically checkable.
+**Wikipedia:** character, conflict, cause and effect.
+**Labov:** for narrative told *aloud* — our medium — the indispensable part is **evaluation**, the point. *"Pointless stories are met with the withering rejoinder, 'So what?'"*
+**Hühn/Schmid:** a change of state is *tellable* only given relevance, unpredictability, effect, irreversibility, non-iterativity.
+
+**Ruling (D487):** Michael's two definitions were never rivals. The scanner bar IS the story; step 3's chain is *which* story to tell, and structurally it is Labov's **coda**. Sequential filters. Sources: [`STORY_DEFINITION.md`](STORY_DEFINITION.md).
+
+## A206 — Labov's evaluation can enter GENERATION, and our prompt was banning it
+**Q (Michael, 10:09):** *"Is this possible to add into the story generation not only as evaluation?"*
+
+`story_pass.py:144` read *"No evaluation: not 'stands as a testament to'…"* — banning by name the one component Labov calls indispensable. It targeted **external** evaluation (the adjectives) and hit the point as collateral. Now *show the point, do not announce it*, every forbidden phrase kept, plus a mechanical test: **strip every proper noun and number; if praise remains it is commentary.** D488.
+
+## A207 — Plot beats story, and that UPGRADES step 3
+**Q (Michael, 10:14):** *"plot is more valuable than the story to me... it connects things and identifies the causality not just correlation."*
+
+Correct, and it corrected LEAD. LEAD had ruled step 3's chain "relevance, not story" — true of a *correlation* chain, false of a *causal* one. *"This object is here **because** Fridman gave it"* is a plot spanning exactly the entities step 3 names. **The test on step 3 is not "is there a connection" but "is the connection a *because*."** D487.
+
+## A208 — A story needs an AGENT, not a person
+**Q (Michael, 10:14):** *"I question that the story should be always about a person; for example Pompeii was destroyed because of volcanic eruption is a story... The same is true about reconstructions and renovation."*
+
+Correct. Prince requires the middle event to be **active**, not human. Labov reads person-centric because he studied people telling stories about their own lives — his domain, not his definition. **The "person" rule was never about people**; it existed to stop subject-hopping. The real invariant is **continuity of subject**. LOCAL-493 (generator), LOCAL-495 (detector — which still required a person, a mismatch LEAD created one commit earlier). D487.
+
+## A209 — The seven-step matrix, re-verified: six of seven are built
+**Q (Michael, 10:14):** *"I want to see the matrix... How is it changed now?"*
+
+Four of seven rows moved. **LEAD had two claims wrong** (D491): step 7a IS implemented — LOCAL-487, and it fired live — so **six of seven steps are built**, not five; and LOCAL-494 was reported as live-confirmed by a run that never exercised it. Only D489's kind-vs-volume gap remains.
+
+## A210 — Why Fridman vanished, twice, and by two different mechanisms
+**Q (Michael, 10:14):** *"The organizer, charitable gifter, sponsor should not be dismissed, agree?"*
+
+Agreed. Two independent causes:
+- **LOCAL-494** — the gate could not tell a name carrying its own provenance from one the model asserted. *"Gift of Boris Fridman"* **is** the source. And "no web page about this collector" is the *normal* state for a private individual, not evidence of fabrication.
+- **LOCAL-496** — he died again by a different route: "Fine Arts", a fragment of the **venue's own name**, was degraded → *"The Museum Boston"* → org-grounding gate could not ground it → whole sentence dropped, donor included → retry forbade the relationship. Third instance of one class, with LOCAL-475 and LOCAL-494.
+
+**Verified live:** degraded 1 → 0; the tour now reads *"Boris Fridman, a dedicated collector of such works, donated this particular edition to the MFA."*
+
+## A211 — Measured: the volume instrument says COVERED on stops with no story in them
+**Q (Michael, 11:17):** *"do not wait for me to confirm: if you see that your claim is right, start tasks for gating."*
+
+Three clean runs: volume `COVERED` on **9 of 9** stop-observations; kind found no event in **6 of 9** — same two stops failing every run, **zero variance**. Gating landed (D492b): replenishment now fires on `eventless`, degrading to no-opinion if the classifier is unavailable.
+
+**Not in the hypothesis:** the best action-bearing sentence in 112 retrieved sentences was **an auction lot description**; another stop's was *"Sold as a set of 10."* Two of three stops are fed dealer listings, so **source ranking now outranks query shape**. D492.
+
+## A212 — Was the conversation file being updated? No.
+**Q (Michael, 11:59):** *"Are you updating STORIED_COMMUNICATION_03.MD? Are you starting the reply with your name and date?"*
+
+**No, and inconsistently.** `STORIED_COMMUNICATION_03.MD` had not been touched since 00:21 by the previous session while eight real questions were answered into `DECISIONS.md` and commit messages instead — the failure that file exists to prevent. Roughly half of replies carried the `[Storied_Tours]@date|time` prefix; mid-work replies had none, and printed times were estimated rather than read, drifting ~45 minutes by midday. Backfilled at 11:59.
+
+## A213 — Where did the Freud/Dalí London meeting go? Three failures, and the third is structural
+
+**Michael, 2026-08-22:** *"I do not understand why none of the stories about Moses
+and Monotheism was selected, especially the one that mentioned that they met."*
+
+The material exists. `MATRIX_QUERY_RESULTS.json` holds it three times, retrieved by
+the query `Sigmund Freud Salvador Dalí`:
+
+> *In London in 1938 Salvador Dalí finally met Sigmund Freud, who had recently fled
+> Vienna — the first and only meeting between the artist and the psychoanalyst.*
+
+It reached round 1 of Moses credit_line 5.1 and was then deleted:
+
+> `UNATTESTED  Dalí deeply idolized Freud, having met him in London in 1938 just
+> before the psychoanalyst died — no retrieved source supports this`
+
+**1. The challenge query was scoped to the wrong subject.** It was built as
+`"Moses and Monotheism" 1938 died deeply idolized` — anchored on the WORK TITLE.
+The meeting is not about the book; it is two men in a house in Hampstead.
+Searching a book title for a biographical event returns book pages. Dropping the
+title and querying the agents finds it immediately, which is what D506's matrix
+queries did.
+
+**2. So a true claim was marked UNATTESTED and cut** — the same false-negative
+class D510 fixed for Le Lézard, but caused by query SCOPE rather than snippet
+truncation. Two different causes, one symptom: true material deleted for want of
+evidence we failed to fetch.
+
+**3. And no credit_line points at the meeting at all.** All nine Moses
+credit_lines are evaluative modifiers lifted from the baseline stop text —
+*"Dalí's vivid illustrations"*, *"characteristic surrealism"*, *"complexities of
+religious origins"*. That text never mentions the meeting, so no seed can ask
+about it.
+
+**That is the structural finding: credit_lines derived from our own prose can
+only ask about what our prose already said.** Le Lézard and Au Soleil were lucky
+— their baseline text named Broder, Mourlot, Gris and Reverdy, so their seeds
+had people to chase. Moses' baseline text is pure evaluation, so its seeds are
+too, and the pipeline cannot discover what it was never told to look for.
+
+The fix is not a threshold. It is that the seed list must include the MATRIX
+agents as well as the prose modifiers, and that a challenge query must be free to
+drop the work title and interrogate the people.
+
+## A214 — Why Moses published nothing, and why that is correct
+
+Its best candidate scored 71 — above the index threshold — and is `active`, not
+`eventful`: Freud published, Dalí illustrated, sources disagree on 1974 vs 1975.
+Nobody does anything to anybody. Michael's ruling stands: *"correct gate behavior
+is to publish nothing rather than inert 74 — wrong tour outcome signals retrieval
+failure, not gate failure."*
+
+## A215 — The page-fetch fix was not the missing caller
+
+`fetch_pages_for_top_snippets` (LOCAL-459 R5) had zero callers, and wiring it in
+changed nothing. `_fetch_page` extracts from `<p>`, `<h1-4>`, `<figcaption>`,
+`<li>` and img alt **and nothing else**. The Christie's Lot Essay lives in a bare
+`<div class="content-zone chr-body">`. The page was fetched every time and the
+essay was never in what we extracted — which is behind D366 calling the story
+refuted, D507 calling it a fabrication, and D509 marking three true claims
+UNATTESTED. Fixed by reading leaf content divs and widening the passage window
+from 5 sentences/1000 chars to 14/3000; the old window stopped one sentence short
+of the decisive line. Unattested claims fell 53% → 34%; corrections tripled.
+
+## A216 — The loop in production, measured: it raises the floor, and it says everything twice
+
+**2026-08-23.** Michael's "regenerate the whole tour with all stories now in place", run as
+the A/B he required (a single old-vs-new pair is noise at sd 4.9, D484). Six generations,
+arms alternating, 36 min, ~$1.1. Evaluation: `TOUR_MFA_20260823_LOOP_ON_EVALUATION.md`.
+
+| | runs | tour-mean index | sd | range |
+|---|---|---|---|---|
+| loop OFF | 3 | 58.0 | 7.22 | 49.7 - 62.3 |
+| loop ON | 3 | 63.2 | 1.35 | 61.7 - 64.0 |
+
+**+5.2, and not significant** (Welch t=1.24, df~2.1). Removing the single bad OFF run takes
+it to +1.0. **The loop prevented a bad run rather than improving good ones** - reliability,
+not ceiling. Stories passed the gate on 4 of 9 stop-attempts: Au Soleil 3/3, Le Lezard 1/3,
+Moses 0/3.
+
+**The control that keeps this honest:** the loop wrote nothing on Moses in any run, and
+Moses still moved 11.7 points between arms. Generation noise is the size of the gains.
+
+**Four machinery findings, all new:**
+
+1. **The cap makes the lab result unreachable.** `story_production_loop.py:164`
+   `seeds[:MAX_CREDIT_LINES]`, default 4, matrix agents first. Le Lezard has four matrix
+   agents, so *zero* prose seeds are ever tried - and the lab pass that justified building
+   this was **credit_line 13.1, examined 14 of 16**. Every stop that hit the cap failed;
+   every acceptance came by the third candidate.
+2. **`work_stories` cache cannot connect on any host run.** `work_story_searcher.py:124`
+   rewrites `@localhost:` to `@postgres-2:`, which does not resolve on the Mac - in direct
+   conflict with D261, which mandates `@localhost:5433` for host runs. Silent permanent miss.
+   It helped this A/B (no cross-run contamination) and has been costing every other host run.
+3. **Retrieval is still the art market.** Pages actually fetched for Au Soleil: abebooks,
+   araderbooks, iberlibro, 1stdibs, invaluable, baumanrarebooks, christies, art-books. D495
+   demotes them; nothing exists to promote above them. The one scholarly page in the set,
+   metmuseum.org, returned **HTTP 429 four times and was dropped**. D496 tiers 1-3 as
+   retrieval PREFERENCE remain unbuilt and this is the cost.
+4. **The entity check fired on a real person** - `UNGROUNDED:Leonce Rosenberg`, first firing
+   since the fix reported 0 of 37. Needs a by-hand look before `STORY_GATE_STRICT` is used.
+
+**A213's fix did not reach Moses and structurally cannot.** Its matrix yields one agent
+(Dali); Freud is the author, not a `collaborator` in the object record, so no seed asks about
+him. The 1938 London meeting is still absent, 3 runs of 3.
+
+## Code map - added 2026-08-23
+- [`run_ab_d511.sh`](run_ab_d511.sh) - the alternating-arm A/B driver
+- [`score_ab_d511.py`](score_ab_d511.py) - ONE scoring instrument for both arms
+- [`TOUR_MFA_20260823_LOOP_ON_EVALUATION.md`](TOUR_MFA_20260823_LOOP_ON_EVALUATION.md) - the tour and LEAD's evaluation
+- `AB_D511_20260823_1224.log`, `AB_D511_SCORES.json` - six generations, 18 scored stops
+
+## Code map — added 2026-08-22
+- [`story_seeds.py`](story_seeds.py) — D503, every modifier is a credit_line seed
+- [`story_relevance.py`](story_relevance.py) — D505, is this sentence about this stop
+- [`story_query.py`](story_query.py) — D507, one question, two engine encodings
+- [`story_adjudicate.py`](story_adjudicate.py) — D509/D510, challenge + entity linking
+- [`story_gate.py`](story_gate.py) — D510, eventful + index + confirmed, iterate-to-threshold
+- [`object_record.py`](object_record.py) — D501, the museum's own object record
+- [`story_hooks.py`](story_hooks.py) — D502, sentences that open a door and do not walk through it
+- [`story_roles.py`](story_roles.py) — D500, hero / sponsor / builder
+- `ADJUDICATED_STORIES.md`, `ADJUDICATED_EVALUATION.md` — the 37 stories and the verdict
+
+## Code map — added 2026-08-19 (later)
+- [`STORY_DEFINITION.md`](STORY_DEFINITION.md) — the five encyclopedic definitions, with sources
+- [`material_kind.py`](material_kind.py) — D489a: is the material the right KIND, not how much
+- [`provenance_gloss.py`](provenance_gloss.py) — LOCAL-494: a documented role needs no search
+- [`run_prompt_ab.py`](run_prompt_ab.py) — the A/B harness, alternating arms, prints the CI
+- [`test_local495_subject_not_person.py`](test_local495_subject_not_person.py) — the detector accepts non-person subjects
+- [`test_local496_venue_is_not_a_reference.py`](test_local496_venue_is_not_a_reference.py) — the venue is the setting
+- `D489_CLEAN_{1,2,3}.log` — the three runs behind D492
+
+## Code map — added 2026-08-19
+- [`SEVEN_POINTS_PLAN.md`](SEVEN_POINTS_PLAN.md) — what each of the 7 steps needed
+- [`story_pass.py`](story_pass.py) — D474: the story as its own pass over its own object
+- [`story_index_pass.py`](story_index_pass.py) — step 5, report-only valuation index
+- [`story_worthiness.py`](story_worthiness.py) — step 2, which stops earn mining
+- [`story_replenish.py`](story_replenish.py) — step 3.4, capped "learn more" round
+- [`story_focus_fact.py`](story_focus_fact.py) — step 7b, the rotation, named-agent first
+- [`OPENAI_CREDIT_LOG.md`](OPENAI_CREDIT_LOG.md) — top-ups, outages, burn rate
+
+## Code map — added 2026-08-18
+- [`STORY_BASELINE.md`](STORY_BASELINE.md) — what the pipeline actually does, with links
+- [`story_iteration_chart.py`](story_iteration_chart.py) — the retry loop in the lab
+- [`STORY_ITERATION_CHART.md`](STORY_ITERATION_CHART.md) — score over iterations
+- [`gate_fp_probe.py`](gate_fp_probe.py) — false-rejection probe (premise flawed, see A182)
+- [`run_full_tour_release_check.py`](run_full_tour_release_check.py) — full tour + per-stop scores
+- `VARIANCE_{CLEAN,CONTROL,WIDENED}.log` — the three A/B arms
+- [`text_fold.py`](text_fold.py) — THE accent-fold + whole-word primitive for the gate chain
+- [`test_local483_gate_fold_and_boundary.py`](test_local483_gate_fold_and_boundary.py) — the gate chain audited as a class
+- `LOCAL483_REMEASURE.log` — the three blocked runs (`credit_balance_exhausted`)
+
+## A217 — Michael's two fixes of 2026-08-24: the append, and the Treat Page
+
+**The append (D518).** `description + ' ' + story` said everything twice, and his diagnosis is
+the cause: the loop's credit_lines are mined from the stop's own prose, so it is *guaranteed* to
+research what the prose already said. The story now REPLACES the sentences it overlaps, judged on
+shared anchors — names, years, quantities — with the work's own title excluded on both sides.
+**When the story replaced the OPENING, the story becomes the opening** (D518b): a stop's first
+sentence is the one that introduces its subject, and dropping it left all three stops of the
+10:26 run opening on a reference to nobody. Code: [`story_append_merge.py`](story_append_merge.py).
+
+**The Treat Page (D519).** It closed 4 of 4 previous tours unconditionally. It now requires a real
+treat within `TREAT_PAGE_NEAR_KM` (1.0) of a real stop — **any** stop, not the last — and fails
+closed on a missing table or a query error. Zero treats have coordinates on this machine, so it is
+gone. Code: `nearest_treat_to_any_stop()` in [`generate_tour_text.py`](generate_tour_text.py).
+
+## A218 — Nothing read aloud that a listener cannot use (D521)
+
+**Citations**: the loop's FIRST prompt asks for sources in brackets, correctly, because the
+adjudicator must know what backs what — and the model carried the habit into PART 2, which is what
+we publish. PART 2 now forbids brackets and asks for attribution BY INSTITUTION only where sources
+disagree; `strip_bracketed_citations()` is the deterministic guard behind it.
+
+**Duplication inside one sentence**: an appositive is dropped when the rest of the sentence
+performs the same verb family over half the same nouns. It needed its own noun set — the
+sentence-level stoplist drops `work` and `museum`, the very words that prove the repetition.
+
+**The `Closing:` label**: removed. Michael's rule is the good one — `Orientation` and `Directions`
+stay *"because they let listeners know that they are not part of the stop description"*.
+
+## A219 — Why the stories got fewer and worse, answered from the candidate log (D523)
+
+Michael, 2026-08-24: *"I see way less stories and less quality stories from iteration to iteration
+and I wonder why."*
+
+**Since D515 the loop bought exactly ONE credit_line per stop in 12 of 13 stop-attempts.** His
+rule says a story at 50+ "is the story and we do not need to verify more", and at a floor of 50
+the first candidate always qualifies — so it stopped exploring. The same work scores across a
+**20-35 point spread** between runs, so quality became one draw from that distribution. And
+because `allowed_sentences()` maps index to LENGTH — 52 earns three sentences, 74 earns five — a
+low draw is a *shorter* story too. **One cause, both halves of the complaint.**
+
+Fixed by examining up to four and keeping the best (`STORY_LOOP_BEST_OF`, `STORY_LOOP_STOP_AT`).
+Measured on the 15:57 tour: **stop index mean 73.0, range 63-83**, the best recorded; the floor
+moved from 44 to 63. Costs 4x — $0.178 and 644s a tour. Evidence:
+[`story_loop_candidates.jsonl`](story_loop_candidates.jsonl), D514's persistence.
+
+**The two D515 amendments were implemented and shipped OFF, reversing LEAD's own earlier
+recommendation.** Both tighten the gate; the decline was caused by selection, not permissiveness.
+
+## A220 — A request that matches nothing produces a confident fictional tour (D524)
+
+`exhibition blue green and silva in MFA Boston, MA` produced a complete 5,827-character tour.
+**The system did not refuse; LEAD caught it by reading the output.** The venue resolver returned
+Museum of Fine Arts **Houston** for a Boston request; `[LOCAL-212]` logged `0 COVERED` and filled
+the tour anyway; `Knowledge validation passed` twice. The delivered tour misattributes its own
+stop 1, calls a 1944 Arthur Dove abstract "Dutch Golden Age painting", and by pronoun chain hands
+a Siqueiros self-portrait to George Gershwin — which the closing recap repeats.
+
+**The rubric scores it 75.0, identical to the real tour, and every defect check passes it.**
+Neither instrument distinguishes a real subject from an invented one. The story loop can and did:
+it refused 2 of 3 stops on candidates scoring 5-35 against 63-83 for a real subject the same hour.
+**The index floor is a working "there is nothing here" detector and was the only part of the
+pipeline that noticed.** Michael's rule, 2026-08-24: the right answer is *"Exhibition is not
+found"*, or a did-you-mean, **never a fictional tour**. Dispatched as **LOCAL-465**.
+
+## A221 — The wrong gallery: the check fired, an exemption overrode it
+
+Stop 1 of the 15:57 tour says the work is *"housed in the Linde Family Gallery"*. It is in the
+Torf Gallery. **Not a regression** — the chain, from `TOUR_D523_UNBOUND.log`:
+
+| line | what happened |
+|---|---|
+| 227 | `beat='Linde Family' source_work='Le Lézard…' -> stop 1` |
+| 229 | typed as one of the **named people** |
+| 329 | `[LOCAL-417] SUPPRESSED … ['Boris Fridman', 'Linde Family']` — the check works |
+| 476 | `[LOCAL-390] person 'Linde Family' pre-grounded (story beat source) — keeping` |
+| 1005 | the correct gallery: `dropped=['Torf'] causes=[Torf=never_written]` |
+
+Two bugs. **A gallery classified as a person** — D316's family, after `France`, `The Treat Page`
+and `visual tapestry`; fixed once for `France` and never generalised. And **`pre_grounded_names`
+proves EXISTENCE where the sentence asserts a RELATION**: Linde Family Gallery is real, it is
+simply not where that work hangs. Dispatched as **LOCAL-467**.
+
+**Why LEAD missed it:** every instrument built that day tests text MECHANICS plus one curated
+fact table. **Nothing verifies a relation between a work and a place.**
+
+## A222 — Stop 3 was short because three publishable stories were discarded
+
+Michael: *"Stop 3 … is good but too short, why did not we add another story to it?"*
+
+Its four candidates scored **60, 61, 59, 55 — all four cleared the floor of 50.** D523 made the
+loop examine several and keep the best, which fixed quality, but it still publishes exactly one
+and bins the rest. The extra stories were already bought and paid for. Dispatched as
+**LOCAL-466**: up to two per stop, distinct credit_lines, each required to survive the D518/D521
+merge against what is already in the stop, at no additional cost.
+
+**On length, Michael's ruling:** *"I am not bothered that Stop 1 is long… because of the stories
+not mere descriptions."* LEAD's "stop 1 is too long" recommendation is withdrawn — the target is
+the errors in it, not its length.
+
+## A223 — B-naive is not an option, it is what B decays into (D532)
+
+Michael chose **B with C's labelling** and asked the question that settled it: *"what motivation
+would there be to select naive?"* None. If "contradiction" means "the page refutes this title",
+the veto never fires — museum pages do not write *"Guernica is not in this show"* — and B silently
+becomes A. **A guard that cannot fail.** Real B vetoes on the scope the page DECLARES: medium,
+artist set, date range, venue. Silence about a title is not consent; silence about a category the
+page has already bounded is a veto.
+
+Live: Phase 3A proposed Woman in a Hat, The Farm and The Persistence of Memory; all three vetoed on
+form. Against D530, where five works entered D1v2 and all five were dropped for a zero-stop tour.
+
+## A224 — A tour can pass every gate and still contradict its own source (D533)
+
+Corpus: *"Antoine Gautier … born in Nice in 1825."* Tour: *"the quartet founded by Antoine Gautier
+in 1825."* A newborn founding a quartet. D1v2 6/6, existence gate 100%, LOCAL-16 green.
+
+**The gates verify that the STOP exists, not that the SENTENCE is true.** `story_fact_guard.py`
+compares the role the tour gives a (person, year) pair against the role the CORPUS gives it, and
+DELETES a mismatch rather than rewriting — a rewrite has to assert something, which is how a second
+fabrication enters while fixing the first.
+
+**It did not run on the first attempt.** `stop_corpus.passages` is a list for some rows; the wiring
+assumed str and printed `Role guard error (non-fatal)`. **A non-fatal except around a check that
+never ran is indistinguishable from a check that passed.**
+
+## A225 — "Listener should not listen the same story many times" (D533/D534)
+
+Michael's framing was the fix. Sentence-Jaccard scored the repeated 1942 purchase at **0.692**
+against a 0.70 threshold; lowering the threshold would have caught that pair and still missed the
+target, because the same fact can be told in words that barely overlap.
+
+He then found the case that broke the first fix: the 1946 monument classification, told at stops 1
+and 3, where **neither sentence has a capitalised subject** — *"this decision"*, *"the building"*.
+Two detectors now: semantic embeddings for paraphrase, and (year, uncommon-noun) for the case
+embeddings score too low once extra clauses dilute the vector.
+
+**Exempt by his instruction:** stop 1's orientation preview. *"I actually like it."* Counting it as
+a first telling produced four false positives and would have regenerated stop 2 for describing its
+own object.
+
+## A226 — The stop was not starved; a gate that ran too early silenced it (D533)
+
+*"The third stop has no information about it and that is strange because when I asked for it at
+Gemini I got plenty."* Correct, and the cause was not missing sources: the stop had **8 SERP
+snippets** and the corpus gate — which runs BEFORE the search — had marked it `VENUE_ONLY
+action=SHORTENED`, a verdict that forbids describing the object. Stale verdicts are now lifted when
+material arrives. Grounding is what makes the fallback safe: from memory alone gpt-4o gave five
+facts, three of them restatements of the question; with web evidence it gave Turner's 1647-1656
+working range, the Gautier bequest, six strings and inventory number C36.
+
+## A227 — A string prepared for one consumer, fed to another (D536)
+
+The Riviera request delivered **2 stops of 5**. `[BLOCKER1]` strips "tour" and `[LOCAL-46]` strips
+transport words for AREA RESOLUTION — correct for that job — and the stripped string was then used
+to ask the intent model what the tour is ABOUT. With "Biking" gone and `tour_type` suppressed, the
+only concrete noun left was the hippodrome, so intent answered `poi_type: "horse racing tracks"`.
+
+Then `geographic_scope` was set to the named waypoint and PHASE 5.6 removed three stops for being
+"outside" it. **Every removal was correct; a racecourse is not inside another racecourse. The check
+was right and the scope was wrong.** A named stop cannot contain the tour that visits it.
+
+And the opposite failure, caught before delivery: refusing the waypoint as a scope produced a tour
+without it. `named_waypoints()` now refuses it as scope, inserts it if absent, and protects it from
+the address and distance gates.
+
+## A228 — Does the museum work help every tour type? Mostly, and five places where it did not
+
+Verified from the logs, not assumed. The repetition guards, the person-year role guard and the
+thin-stop trigger all ran on a biking tour. **Five checks were museum-gated while named as
+general:** the D535 prompt rules, the LOCAL-439 story gate, the knowledge-fallback trigger, the
+LOCAL-192 phrase filter (stop descriptions only — orientations, Directions and the recap are
+unfiltered), and the D538 restaurant practicals, which sat inside
+`if (_storied_mode and tour_category == 'museum')` and could never run on a restaurant tour.
+
+**The museum path is where this codebase grew, and new work lands inside it by default.** One
+structural pass is owed, not five more discoveries.
+
+## A229 — What size requires a story, and why more facts is not more story (D534/D537)
+
+The floor was **120 words**, which is why nothing fired on stops of 226 and 259. A story-unit is
+separately defined as **>=3 sentences with a named person, real actions and an arc** (LOCAL-439).
+`_THIN_FLOOR=300` added as a second bar.
+
+**The story work Michael asked for did not land.** With the gate finally running on non-museum
+tours: 1/5, 2/5, 0/5 across identical runs — noise. The place-focused retrieval demonstrably
+fetches real episodes; the narration does not reliably use them. **That gap is the remaining
+quality ceiling on every path.**
+
+## A230 — For a restaurant, the practicals ARE the content (D538)
+
+`PRACTICAL FACTS GATE: PASSED (0 verified)` over three restaurants with no hours, no price and no
+booking. **It passed because it verified nothing.** `practical_facts_gate` is SUBTRACTIVE — it
+drops claims it cannot trace — so it is silent when the narration made no claims at all.
+
+Acquisition added in Michael's order: SERP → OpenAI extracting FROM those results → Gemini. **The
+name format was the whole difference:** the full compound `"Le Louis XV - Alain Ducasse à l'Hôtel
+de Paris"` returned **3 snippets**; the house name alone returned **33**, with every field
+populated.
+
+**Price is disclosure, not deletion** — Le Louis XV at 360 EUR is among Europe's most expensive
+restaurants and was the best stop in the tour.
+
+## A231 — Closure is asymmetric, and the mechanism for learning from a miss (D539)
+
+**La Marée Monaco**, closed 2020-09-30, shipped as a stop; the closure check cleared it. The same
+restaurant returns opposite verdicts by spelling — unaccented gave *"Permanently closed"*, accented
+gave *"open 7 days a week"* — because closure notices and stale listings coexist. Weighing one
+against the other makes the verdict a coin toss.
+
+**The costs are not symmetric.** Skipping an open restaurant costs one stop; sending a listener to
+a locked door is the harm. Closure is now decisive, probed across spellings by deterministic marker
+match.
+
+Michael: *"Is there a mechanism for us to learn to make sure we do validate stops?"*
+**`tests/known_closed_venues.json`** — every venue that shipped in a tour and turned out not to be
+visitable, with why it was missed, replayed on every change, never deleted. Joël Robuchon is
+recorded as `verify`, not `closed`, because it is suspected and unconfirmed.
+
+## A232 — "How is it that I can get info from Gemini and you can not?" (D540)
+
+**Because we never asked it.** Four parts:
+
+1. LEAD had claimed `GEMINI_API_KEY` was EMPTY. **It is present and works** — the claim came from a
+   grep that printed only the matched PREFIX. A wrong measurement repeated as fact.
+2. Gemini was wired as a LAST RESORT, consulted only when SERP+OpenAI returned nothing actionable.
+   Le Vistamar returned hours, price and closed days, so it looked healthy and Gemini was never
+   called.
+3. D539's closure check could not catch it anyway — a rebrand says *"now home to Pavyllon"*, not
+   *"permanently closed"*.
+4. **And the evidence was in hand and misread.** The tour said Alléno *"will be taking the helm …
+   a fresh chapter for Le Vistamar"* — reading a replacement as a change of chef. Interpretation,
+   not access.
+
+`venue_still_operating()` asks Gemini first: does this venue still trade under this name? The
+known-closed corpus caught two over-corrections during the build — a marker firing on an Agatha
+Christie snippet, and an unconditional pass reporting Le Louis XV and Cipriani as gone.
+
+## Code map — 2026-08-28
+- [`story_fact_guard.py`](story_fact_guard.py) — person-year role mismatch; deletes rather than rewrites (D533)
+- [`derepetition_guard.py`](derepetition_guard.py) — cross-stop FACT and SEMANTIC repetition, orientation preview exempt (D533/D534)
+- [`stop_knowledge_fallback.py`](stop_knowledge_fallback.py) — web-grounded fill for starved stops; object vs place focus (D533/D537)
+- [`restaurant_practicals.py`](restaurant_practicals.py) — SERP→OpenAI→Gemini acquisition, closure and rebrand checks (D538/D539/D540)
+- [`tests/known_closed_venues.json`](tests/known_closed_venues.json) — venues reality caught us on; never deleted (D539)
+- [`generate_tour_text.py`](generate_tour_text.py) — `named_waypoints`, `scope_is_a_waypoint` (D536); `scope_contradicts` (D532)
+
+## Code map — 2026-08-24
+- [`story_append_merge.py`](story_append_merge.py) — the story replaces overlapping prose; citation strip; intra- and inter-sentence dedupe
+- [`spoken_text_hygiene.py`](spoken_text_hygiene.py) — template seams, missing spaces, dangling prepositions, spoken labels
+- [`known_fact_corrections.py`](known_fact_corrections.py) — facts already established by retrieval, with a three-condition charter
+- [`story_production_loop.py`](story_production_loop.py) — `BEST_OF` / `STOP_AT`, the D523 selection fix
+- [`check_known_defects.py`](check_known_defects.py) — checks (a)-(i), each validated against a tour whose answer was known
+- [`story_loop_candidates.jsonl`](story_loop_candidates.jsonl) — D514's candidate log; the evidence for A219

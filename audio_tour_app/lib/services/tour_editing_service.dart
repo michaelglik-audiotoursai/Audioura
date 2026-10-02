@@ -1,19 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:archive/archive.dart';
 import '../screens/debug_log_viewer_screen.dart';
-import '../screens/edit_tour_screen.dart';
 import '../config/endpoints.dart';
 
 class TourEditingService {
   static Future<String> _getBaseUrl() async {
-    // Gate off in cloud mode — tour editing service not deployed to cloud yet
-    final prefs = await SharedPreferences.getInstance();
-    if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
-      throw Exception('Tour editing is only available on local WiFi mode.');
-    }
+    // Editing is now deployed to Cloud Run behind the gateway (GCS-5), so it
+    // works in both local WiFi and cloud modes. Endpoints.base() returns the
+    // gateway base in cloud mode and the LAN host in local mode.
     return await Endpoints.base(Service.tourEditing);
   }
   
@@ -26,14 +22,15 @@ class TourEditingService {
       await DebugLogHelper.addDebugLog('EDIT API: Updating stop $stopNumber for tour $tourId');
       
       final baseUrl = await _getBaseUrl();
+      final body = {
+        'stop_number': stopNumber,
+        'new_text': newText,
+      };
       
       final response = await http.post(
         Uri.parse('$baseUrl/tour/$tourId/update-stop'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'stop_number': stopNumber,
-          'new_text': newText,
-        }),
+        headers: await Endpoints.apiHeaders(Service.tourEditing, requestBody: body),
+        body: jsonEncode(body),
       );
       
       await DebugLogHelper.addDebugLog('EDIT API: Response status ${response.statusCode}');
@@ -62,6 +59,7 @@ class TourEditingService {
       
       final response = await http.get(
         Uri.parse('$baseUrl/tour/$tourId/job-status/$jobId'),
+        headers: await Endpoints.apiHeaders(Service.tourEditing),
       );
       
       if (response.statusCode == 200) {
@@ -86,7 +84,10 @@ class TourEditingService {
       final baseUrl = await _getBaseUrl();
       final fullUrl = '$baseUrl$downloadUrl';
       
-      final response = await http.get(Uri.parse(fullUrl));
+      final response = await http.get(
+        Uri.parse(fullUrl),
+        headers: await Endpoints.apiHeaders(Service.tourEditing),
+      );
       
       if (response.statusCode == 200) {
         // Save and extract updated tour
@@ -117,7 +118,7 @@ class TourEditingService {
       // Extract files to tour directory
       for (final file in archive) {
         final filename = file.name;
-        if (file.isFile && filename != null && filename.isNotEmpty) {
+        if (file.isFile && filename.isNotEmpty) {
           final data = file.content as List<int>?;
           if (data != null && data.isNotEmpty) {
             final extractedFile = File('$tourPath/$filename');
@@ -219,12 +220,11 @@ class TourEditingService {
       await DebugLogHelper.addDebugLog('EDIT API: URL: $baseUrl/tour/$tourId/update-multiple-stops');
       await DebugLogHelper.addDebugLog('EDIT API: Payload stops count: ${stopsData.length}');
       
+      final requestBody = {'stops': stopsData};
       final response = await http.post(
         Uri.parse('$baseUrl/tour/$tourId/update-multiple-stops'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'stops': stopsData,
-        }),
+        headers: await Endpoints.apiHeaders(Service.tourEditing, requestBody: requestBody),
+        body: jsonEncode(requestBody),
       );
       
       await DebugLogHelper.addDebugLog('EDIT API: ===== HTTP RESPONSE RECEIVED =====');

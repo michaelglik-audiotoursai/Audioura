@@ -1,0 +1,1450 @@
+{
+  "queries": 37,
+  "cost_usd": 0.037,
+  "elapsed_s": 37.0,
+  "rows": [
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "2.1",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "revolutionized the book as an art form with its deep collaboration",
+      "ask": "What did This exhibition in Gallery 184 actually DO that would justify \"revolutionized the book as an art form with its deep collaboration\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" commissioned",
+      "why": "the phrase is ours; hunt the event (commissioned) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miro Artwork",
+          "snippet": "In 1933, he was commissioned to do three etchings for the poems of Georges Hugnet. ... Joan Miró lithograph \"Le Lézard aux Plumes d'Or\". Le Lézard aux Plumes d'Or.",
+          "domain": "clarkfineart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Museum of Fine Arts, Boston",
+          "snippet": "... Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Joan Miró Lithographs & Etchings",
+          "snippet": "Joan Miró Lithograph, Le Lezard Aux Plumes d'Or (The Lizard with Golden Joan Miró Lithograph ... commissioned mural Personnage ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "2.2",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "focusing on the livre d'artiste",
+      "ask": "What did This exhibition in Gallery 184 actually DO that would justify \"focusing on the livre d'artiste\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" dispute",
+      "why": "the phrase is ours; hunt the event (dispute) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery",
+          "snippet": "Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...",
+          "domain": "composition.gallery",
+          "tier": "unverified"
+        },
+        {
+          "title": "Museum of Fine Arts, Boston - Facebook",
+          "snippet": "... Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Lot - JOAN MIRÓ Le Lézard aux Plumes d'Or.",
+          "snippet": "Le Lézard aux Plumes d'Or. Color lithograph on Japan nacré, 1971. 340x480 mm; 13 3/8x19 inches, full margins. Signed and numbered 7/50 in pencil, lower margin.",
+          "domain": "swanngalleries.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "4.1",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "showcasing how artists express these concepts through their unrivaled creativity",
+      "ask": "What did These actually DO that would justify \"showcasing how artists express these concepts through their unrivaled creativity\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" delayed",
+      "why": "the phrase is ours; hunt the event (delayed) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...",
+          "snippet": "Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).",
+          "domain": "moma.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...",
+          "snippet": "Original hand-signed Joan Miró Le Lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 Lithograph from the edition of 100 in pencil in the image ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Joan Miró - Le Lezard aux Plumes d'Or",
+          "snippet": "This is from a series of 15 colour lithographs based on Joan Miró's poem and surrealist fantasy, Le Lézard aux Plumes d'or.",
+          "domain": "nationalgalleries.org",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "5.1",
+      "class": "anchored",
+      "kind_of_seed": "possessive",
+      "seed": "Broder's pivotal decision",
+      "ask": "Is this true, and what is the event behind it: \"Broder's pivotal decision\"?",
+      "query": "Broder \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 2,
+      "staked": 0,
+      "best_sentence": "Printed by Mourlot, Paris; published by Louis Broder, Paris.",
+      "top": [
+        {
+          "title": "Joan Miró. Wrapper front from Le Lézard aux plumes d'or ( The Lizard ...",
+          "snippet": "Joan Miró. Wrapper front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...",
+          "domain": "moma.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...",
+          "snippet": "Printed by Mourlot, Paris; published by Louis Broder, Paris. Catalogue Raisonné & COA: Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers) ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "557135 The Lizard with Golden Feathers Joan Miró - Colección BBVA",
+          "snippet": "Joan Miró. (Barcelona ... Le Lézard aux Plumes d'Or (The Lizard with Golden Feathers), a portfolio published by Louis Broder and printed in Paris by Mourlot.",
+          "domain": "coleccionbbva.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "5.2",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "allowing the artist to blend visual and textual narratives seamlessly",
+      "ask": "What did At Le Lézard aux actually DO that would justify \"allowing the artist to blend visual and textual narratives seamlessly\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" commissioned",
+      "why": "the phrase is ours; hunt the event (commissioned) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miró Artwork - Christopher Clark Fine Art",
+          "snippet": "In 1933, he was commissioned to do three etchings for the poems of Georges Hugnet. ... Joan Miró lithograph \"Le Lézard aux Plumes d'Or\". Le Lézard aux Plumes d'Or.",
+          "domain": "clarkfineart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Museum of Fine Arts, Boston - Facebook",
+          "snippet": "... Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Joan Miró Lithographs & Etchings - Masterworks Fine Art",
+          "snippet": "Joan Miró Lithograph, Le Lezard Aux Plumes d'Or (The Lizard with Golden Joan Miró Lithograph ... commissioned mural Personnage ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "6.1",
+      "class": "anchored",
+      "kind_of_seed": "possessive",
+      "seed": "Freud's exploration of",
+      "ask": "Is this true, and what is the event behind it: \"Freud's exploration of\"?",
+      "query": "Freud \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)",
+          "snippet": "Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...",
+          "domain": "composition.gallery",
+          "tier": "unverified"
+        },
+        {
+          "title": "✨ JARED’S PICKS FOR 8/22-23✨ 1) Picasso, Miró, Dalí ...",
+          "snippet": "Le Lézard aux plumes d'or. Joan Miró (Spanish, 1893–1983) 1971. Illustrated book with forty color lithographs (including wrapper front and cover); ...",
+          "domain": "instagram.com",
+          "tier": "reject"
+        },
+        {
+          "title": "✨ JARED'S PICKS FOR 8/22-23✨ 1) Picasso, Miró, Dalí: ...",
+          "snippet": "Le Lézard aux plumes d'or Joan Miró (Spanish, 1893–1983) 1971 Illustrated book with forty color lithographs (including wrapper front and ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "8.1",
+      "class": "anchored",
+      "kind_of_seed": "participial",
+      "seed": "drawing you into the surreal world that Joan Miró has crafted",
+      "ask": "Is this true, and what is the event behind it: \"drawing you into the surreal world that Joan Miró has crafted\"?",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\"",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 2,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miró - Le lézard aux plumes d'or",
+          "snippet": "Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...",
+          "domain": "choicecontemporary.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...",
+          "snippet": "Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).",
+          "domain": "moma.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Joan Miró, Le lezard aux plumes d'or (The Lizard ...",
+          "snippet": "Joan Miró, Le lezard aux plumes d'or (The Lizard with Golden Feathers), 1967, no. 515 ; Joan Miró (1893 - 1983) · Etching ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "10.1",
+      "class": "anchored",
+      "kind_of_seed": "appositive",
+      "seed": "Louis Broder, a figure renowned for his commitment to the art of the book",
+      "ask": "Is this true, and what is the event behind it: \"Louis Broder, a figure renowned for his commitment to the art of the book\"?",
+      "query": "Louis Broder \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miró. Cover front from Le Lézard aux plumes d'or ...",
+          "snippet": "Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...",
+          "domain": "moma.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Joan Miró - Le Lézard aux plumes d'or (The Lizard with ...",
+          "snippet": "Original hand-signed Joan Miró Le Lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 Lithograph from the edition of 100 in pencil in the image ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Le Lezards aux Plumes by Joan Miro, 1971",
+          "snippet": "Joan Miró · Henry Moore · Ira Moskowitz · Alphonse Mucha · Roger Mühl · Edvard ... Le lézard aux plumes d'or\", Louis Broder publisher. Corredor-Matheos N° 53 ...",
+          "domain": "mourloteditions.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "10.2",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "the exhibition highlights",
+      "ask": "What did Published by actually DO that would justify \"the exhibition highlights\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" history",
+      "why": "the phrase is ours; hunt the event (history) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 3,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Joan Miró. Le Lézard aux plumes d'or ( The Lizard with Golden ... - MoMA",
+          "snippet": "Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).",
+          "domain": "moma.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Untitled (Le Lézard aux Plumes d'Or, M.794), 1971 by Joan Miró",
+          "snippet": "052 - Untitled (Le Lézard aux Plumes d'Or, M.794), 1971 ; Medium: hand-signed lithograph on Kochi Japan paper ; Signature: signed 'Miró' lower right and annotated ...",
+          "domain": "martinlawrence.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...",
+          "snippet": "Historical Description. Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers), 1971 is a dazzling example of the artist's poetic surrealism.",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "11.1",
+      "class": "anchored",
+      "kind_of_seed": "capacity",
+      "seed": "Broder's decision to engage Miró was pivotal",
+      "ask": "Is this true, and what is the event behind it: \"Broder's decision to engage Miró was pivotal\"?",
+      "query": "Broder \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 2,
+      "staked": 0,
+      "best_sentence": "Printed by Mourlot, Paris; published by Louis Broder, Paris.",
+      "top": [
+        {
+          "title": "Le Lézard aux plumes d'or (book) - Joan Miró - Composition Gallery",
+          "snippet": "Joan Miró's Le Lézard aux plumes d'or (The Lizard with Golden Feathers) from 1971 is a limited edition illustrated book that features 15 lithographs in vibrant ...",
+          "domain": "composition.gallery",
+          "tier": "unverified"
+        },
+        {
+          "title": "Joan Miró. Wrapper front from Le Lézard aux plumes d'or ( The Lizard ...",
+          "snippet": "Joan Miró. Wrapper front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...",
+          "domain": "moma.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers ...",
+          "snippet": "Printed by Mourlot, Paris; published by Louis Broder, Paris. Catalogue Raisonné & COA: Joan Miró Le lézard aux plumes d'or (The Lizard with Golden Feathers) ...",
+          "domain": "masterworksfineart.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "11.2",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "blending visual and textual narratives seamlessly",
+      "ask": "What did Broder's decision to engage Miró actually DO that would justify \"blending visual and textual narratives seamlessly\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" abandoned",
+      "why": "the phrase is ours; hunt the event (abandoned) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 0,
+      "material_kind": "eventful",
+      "eventful_sentences": 2,
+      "active": 2,
+      "staked": 4,
+      "best_sentence": "In Paris he abandoned this ...",
+      "top": [
+        {
+          "title": "Museum of Fine Arts, Boston - Facebook",
+          "snippet": "... Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Joan Miró - Le Lezard aux Plumes d'Or - National Galleries of Scotland",
+          "snippet": "This is from a series of 15 colour lithographs based on Joan Miró's poem and surrealist fantasy, Le Lézard aux Plumes d'or ... In Paris he abandoned this ...",
+          "domain": "nationalgalleries.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "Joan Miró (1893-1983), Untitled, from \"Le Lezard aux Plumes d'Or,\" 1967",
+          "snippet": "Untitled, from \"Le Lezard aux Plumes d'Or,\" 1967. Lithograph in colors on ... abandoned (\"Abandoned Property\") and title to it will pass to Moran. Moran ...",
+          "domain": "johnmoran.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "12.1",
+      "class": "anchored",
+      "kind_of_seed": "appositive",
+      "seed": "Boris Fridman, a supporter of the art community",
+      "ask": "Is this true, and what is the event behind it: \"Boris Fridman, a supporter of the art community\"?",
+      "query": "Boris Fridman \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 0,
+      "t1t2": 1,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 1,
+      "staked": 0,
+      "best_sentence": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris",
+      "top": [
+        {
+          "title": "JARED'S PICKS FOR 8/22-23   1) Picasso, Miró, Dalí: Unbound at the ...",
+          "snippet": "Le Lézard aux plumes d'or. Joan Miró (Spanish, 1893–1983) 1971. Illustrated book with forty color lithographs (including wrapper front and cover); ...",
+          "domain": "instagram.com",
+          "tier": "reject"
+        },
+        {
+          "title": "JARED'S PICKS FOR 8/22-23   1) Picasso, Miró, Dalí: Unbound at the ...",
+          "snippet": "Le Lézard aux plumes d'or Joan Miró (Spanish, 1893–1983) 1971 Illustrated book with forty color lithographs (including wrapper front and ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Fall Signature Night: Picasso, Miró, Dalí | Museum of Fine Arts Boston",
+          "snippet": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.",
+          "domain": "mfa.org",
+          "tier": "tier1"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "12.2",
+      "class": "anchored",
+      "kind_of_seed": "possessive",
+      "seed": "Boston's holdings",
+      "ask": "Is this true, and what is the event behind it: \"Boston's holdings\"?",
+      "query": "Boston \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 1,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 1,
+      "staked": 1,
+      "best_sentence": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris",
+      "top": [
+        {
+          "title": "Museum of Fine Arts, Boston",
+          "snippet": "... Joan Miró (Spanish, 1893–1983), \"Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with forty color lithographs (including wrapper ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Fall Signature Night: Picasso, Miró, Dalí",
+          "snippet": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.",
+          "domain": "mfa.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "✨ JARED’S PICKS FOR 8/22-23✨ 1) Picasso, Miró, Dalí ...",
+          "snippet": "Le Lézard aux plumes d'or. Joan Miró (Spanish, 1893–1983) 1971. Illustrated book with forty color lithographs (including wrapper front and cover); ...",
+          "domain": "instagram.com",
+          "tier": "reject"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "13.1",
+      "class": "anchored",
+      "kind_of_seed": "possessive",
+      "seed": "Fridman's contribution ensures",
+      "ask": "Is this true, and what is the event behind it: \"Fridman's contribution ensures\"?",
+      "query": "Fridman \"Le Lézard aux plumes d’or\" Joan Miró",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 0,
+      "t1t2": 1,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 1,
+      "staked": 0,
+      "best_sentence": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris",
+      "top": [
+        {
+          "title": "Fall Signature Night: Picasso, Miró, Dalí",
+          "snippet": "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail), published by Louis Broder, printed by Mourlot Frères, Paris, 1971.",
+          "domain": "mfa.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "JARED'S PICKS FOR 8/22-23 1) Picasso, Miró, Dalí: ...",
+          "snippet": "Le Lézard aux plumes d'or. Joan Miró (Spanish, 1893–1983) 1971. Illustrated book with forty color lithographs (including wrapper front and cover); ...",
+          "domain": "instagram.com",
+          "tier": "reject"
+        },
+        {
+          "title": "✨ JARED'S PICKS FOR 8/22-23✨ 1) Picasso, Miró, Dalí: ...",
+          "snippet": "Le Lézard aux plumes d'or Joan Miró (Spanish, 1893–1983) 1971 Illustrated book with forty color lithographs (including wrapper front and ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "13.2",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "visitors can appreciate the intricate dance between lithography",
+      "ask": "What did Fridman's contribution actually DO that would justify \"visitors can appreciate the intricate dance between lithography\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" destroyed",
+      "why": "the phrase is ours; hunt the event (destroyed) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 3,
+      "t1t2": 0,
+      "material_kind": "eventful",
+      "eventful_sentences": 3,
+      "active": 4,
+      "staked": 3,
+      "best_sentence": "For technical reasons, Miró decided to destroy ...",
+      "top": [
+        {
+          "title": "Le lézard aux plumes d'or II - Joan Miró",
+          "snippet": "In 1967 Miró executed a series of lithographs to illustrate his poem \"Le lézard aux plumes d'or\". Edition of 20. For technical reasons, Miró decided to destroy ...",
+          "domain": "singulart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Bonhams",
+          "snippet": "... Le Lézard aux plumes d'or”, published by Louis ... The Red Sun - Joan Miró - 1948 The art and culture of Joan Miro's ... destroyed when the towers fell ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Le lézard aux plumes d'or I (1967) by Joan Miró - For Sale",
+          "snippet": "In 1967 Miró executed a series of lithographs to illustrate his poem \"Le lézard aux plumes d'or\". For technical reasons, Miró decided to destroy the lithographs ...",
+          "domain": "artsy.net",
+          "tier": "market"
+        }
+      ]
+    },
+    {
+      "stop": "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)",
+      "id": "13.3",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "offering a unique tactile experience and inviting viewers to ponder the narrative beyond the page",
+      "ask": "What did Fridman's contribution actually DO that would justify \"offering a unique tactile experience and inviting viewers to ponder the narrative beyond the page\"? If nothing, cut the phrase.",
+      "query": "Joan Miró \"Le Lézard aux plumes d’or\" refused",
+      "why": "the phrase is ours; hunt the event (refused) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 1,
+      "staked": 0,
+      "best_sentence": "Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with ... ~ Joan Miró rejected the constraints of traditional painting ...",
+      "top": [
+        {
+          "title": "Museum of Fine Arts, Boston - Facebook",
+          "snippet": "... Le Lézard aux plumes d'or\" (detail, 1971), illustrated book with ... ~ Joan Miró rejected the constraints of traditional painting ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Le Lézard aux Plumes d'Or by Joan Mirò at wallector.comwallector.com",
+          "snippet": "\"Le Lézard aux Plumes d'Or\" is an original hand-signed and numbered lithograph realized by Joan Miró in 1971. This is an edition of 80 prints.",
+          "domain": "wallector.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Joan Miró (1893-1983); Le Lézard aux Plumes d'Or - Bonhams",
+          "snippet": "Le Lézard aux Plumes d'Or (Mourlot 789-828, Cramer bk. 148), 1971. The complete set of 15 lithographs in colors on Rives paper with Miró watermark, ...",
+          "domain": "bonhams.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "2.1",
+      "class": "anchored",
+      "kind_of_seed": "appositive",
+      "seed": "Pierre Reverdy, the French poet linked to Surrealism",
+      "ask": "Is this true, and what is the event behind it: \"Pierre Reverdy, the French poet linked to Surrealism\"?",
+      "query": "Pierre Reverdy \"Au Soleil du Plafond\" Juan Gris",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 3,
+      "t1t2": 1,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 2,
+      "staked": 1,
+      "best_sentence": "Juan Gris, 1887–1927) final body of work, as he died of kidney failure at only 40 years old in ...",
+      "top": [
+        {
+          "title": "Designed by Juan Gris - Au Soleil du Plafond",
+          "snippet": "Au Soleil du Plafond; Designer: Designed by Juan Gris (Spanish, Madrid 1887–1927 Boulogne-sur-Seine); Author: Written by Pierre Reverdy (French, 1889–1960)",
+          "domain": "metmuseum.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Gris and Reverdy's Au soleil du plafond | AraderBooks",
+          "snippet": "Au soleil du plafond was José Victoriano González-Pérez (pseud. Juan Gris, 1887–1927) final body of work, as he died of kidney failure at only 40 years old in ...",
+          "domain": "araderbooks.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Au Soleil du Plafond - Pierre Reverdy - Bauman Rare Books",
+          "snippet": "Au Soleil du Plafond rare book for sale. This First Edition, Signed by Pierre REVERDY, Juan GRIS is available at Bauman Rare Books.",
+          "domain": "baumanrarebooks.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "2.2",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "revolutionized the concept of the book as art",
+      "ask": "What did Juan Gris and Pierre Reverdy actually DO that would justify \"revolutionized the concept of the book as art\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" delayed",
+      "why": "the phrase is ours; hunt the event (delayed) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 4,
+      "t1t2": 1,
+      "material_kind": "eventful",
+      "eventful_sentences": 2,
+      "active": 2,
+      "staked": 2,
+      "best_sentence": "It was only many years later in 1955 that Reverdy published a scaled-back version of their original plans: Au soleil du plafond.",
+      "top": [
+        {
+          "title": "Mary Ann Caws on Pierre Reverdy",
+          "snippet": "In particular, Reverdy's close collaboration with Juan Gris lay at the origin of the poems of Au Soleil du plafond (Sun on the Ceiling), published in 1955, but ...",
+          "domain": "poetrysociety.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "Compotier – henripeyrefi",
+          "snippet": "It was only many years later in 1955 that Reverdy published a scaled-back version of their original plans: Au soleil du plafond. In this book ...",
+          "domain": "henripeyrefi.ws.gc.cuny.edu",
+          "tier": "tier1"
+        },
+        {
+          "title": "Au soleil du plafond",
+          "snippet": "View Au soleil du plafond by Juan Gris and other public domain artworks on Artvee. ... Late 1913 or early 1914 they lived together at the Bateau-Lavoir ...",
+          "domain": "artvee.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "2.3",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "exemplifying the collaborative spirit that defines the MFA's exhibition",
+      "ask": "What did Juan Gris and Pierre Reverdy actually DO that would justify \"exemplifying the collaborative spirit that defines the MFA's exhibition\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" history",
+      "why": "the phrase is ours; hunt the event (history) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 2,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 2,
+      "staked": 1,
+      "best_sentence": "Gris died in 1927, having finished only half of the intended ...",
+      "top": [
+        {
+          "title": "Designed by Juan Gris - Au Soleil du Plafond",
+          "snippet": "Au Soleil du Plafond ... This book was originally planned by L. Rosenberg ca. 1916-1917. Gris died in 1927, having finished only half of the intended ...",
+          "domain": "metmuseum.org",
+          "tier": "tier1"
+        },
+        {
+          "title": "Juan Gris: Au soleil du plafond | Buy prints | engravings",
+          "snippet": "Juan Gris , buy and sale of illustrated books ... History · La Aurora in the press · what's graphic ... Juan GrisJuan Gris: Au soleil du plafond 24Book.",
+          "domain": "galerialaaurora.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Au soleil du plafond – Works – eMuseum - Toledo Museum",
+          "snippet": "Au soleil du plafond ; Artist Juan Gris (Spanish, 1887-1927) ; Publisher Éditions Verve, Paris, 1955 (Tériade) ; Printer Mourlot Frères, Paris ; Author Pierre ...",
+          "domain": "emuseum.toledomuseum.org",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "3.1",
+      "class": "evaluative",
+      "kind_of_seed": "possessive",
+      "seed": "Gris's innovative vision",
+      "ask": "What did Gris actually DO that would justify \"innovative vision\"? If nothing, cut the phrase.",
+      "query": "Gris \"Au Soleil du Plafond\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 1,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 1,
+      "staked": 4,
+      "best_sentence": "When the artist died the following year, the lithographs and text remained unfinished.",
+      "top": [
+        {
+          "title": "Living Still Life | John Golding",
+          "snippet": "... Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later). These small ...",
+          "domain": "nybooks.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Pierre reverdy Stock Photos and Images",
+          "snippet": "Juan Gris – The Violin (Le Violon / Au soleil du plafond), 1916. RM 3F4EGGY ... unfinished at the time of Gris's death. A reduced version, with color ...",
+          "domain": "alamy.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "(PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...",
+          "snippet": "... Au soleil du plafond lithographs 240 Other Lithographs 251 Posters 259 ... incomplete circle from left to right. Gris transitioned from the Nature ...",
+          "domain": "academia.edu",
+          "tier": "tier1"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "3.2",
+      "class": "evaluative",
+      "kind_of_seed": "possessive",
+      "seed": "Reverdy's poetic prowess",
+      "ask": "What did Reverdy actually DO that would justify \"poetic prowess\"? If nothing, cut the phrase.",
+      "query": "Reverdy \"Au Soleil du Plafond\" refused",
+      "why": "the phrase is ours; hunt the event (refused) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 0,
+      "t1t2": 2,
+      "material_kind": "eventful",
+      "eventful_sentences": 2,
+      "active": 2,
+      "staked": 2,
+      "best_sentence": "During the Nazi occupation, he joined the Resistance, refused ...",
+      "top": [
+        {
+          "title": "Pierre Reverdy - Reverdy, Pierre; Caws, Mary Ann; Ashbery, John ...",
+          "snippet": "E-Book , EPUB / DRM Adobe (E-Book), Reverdy, Pierre, 184 Seiten. ... During the Nazi occupation, he joined the Resistance, refused ... Au soleil du plafond. La ...",
+          "domain": "obergassbuecher.ch",
+          "tier": "unverified"
+        },
+        {
+          "title": "Mary Ann Caws on Pierre Reverdy - Poetry Society of America",
+          "snippet": "In particular, Reverdy's close collaboration with Juan Gris lay at the origin of the poems of Au Soleil du plafond ... refused to publish anything during ...",
+          "domain": "poetrysociety.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "[PDF] Untitled - Borges Center",
+          "snippet": "“Reverdy et l' art plastique,” Mercure de France 344 (1962): 42–43. Juan Gris. Paris: Gallimard, 1946. Reverdy, Pierre. Au Soleil du plafond et autres poèmes.",
+          "domain": "borges.pitt.edu",
+          "tier": "tier1"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "3.3",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "resulting in a unique interlacing of images and words",
+      "ask": "What did The project actually DO that would justify \"resulting in a unique interlacing of images and words\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 2,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Living Still Life | John Golding",
+          "snippet": "... Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later). These small ...",
+          "domain": "nybooks.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Transforming the Horizon: Reverdy's World War I",
+          "snippet": "Asp Au soleil du plafond et autres po?mes (Paris ... be seen as the frontispiece to Douglas Cooper's Juan Gris: Catalogue raisonn? ... leaves the tableau unfinished ...",
+          "domain": "jstor.org",
+          "tier": "tier2"
+        },
+        {
+          "title": "Au soleil du plafond – Works – eMuseum - Toledo Museum",
+          "snippet": "Au soleil du plafond ; Artist Juan Gris (Spanish, 1887-1927) ; Publisher Éditions Verve, Paris, 1955 (Tériade) ; Printer Mourlot Frères, Paris ; Author Pierre ...",
+          "domain": "emuseum.toledomuseum.org",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "4.1",
+      "class": "evaluative",
+      "kind_of_seed": "capacity",
+      "seed": "Gris's ability to transform visual art",
+      "ask": "What did Gris actually DO that would justify \"ability to transform visual art\"? If nothing, cut the phrase.",
+      "query": "Gris \"Au Soleil du Plafond\" destroyed",
+      "why": "the phrase is ours; hunt the event (destroyed) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "eventful",
+      "eventful_sentences": 2,
+      "active": 4,
+      "staked": 2,
+      "best_sentence": "Dora Szampanier, Etching of destroyed synagogue - Drohobisz, Ukraine.",
+      "top": [
+        {
+          "title": "Juan Gris, Au solei du plafond La pipe, 1955, Lithograph",
+          "snippet": "Juan Gris ... Juan Gris, The Pipe, from Au Soleil du Plafond, 1955 (after display ... Dora Szampanier, Etching of destroyed synagogue - Drohobisz, Ukraine.",
+          "domain": "centraldoaposentado.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Juan Gris, Au solei du plafond Guitare, 1955, Lithograph",
+          "snippet": "Juan Gris, Au solei du ... Juan Gris | Au Soleil du plafond (1955) | MutualArt display picture 1 ... Related Searches. Dora Szampanier, Etching of destroyed ...",
+          "domain": "browswithlea.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Juan Gris Sold at Auction Prices",
+          "snippet": "... Damaged. SOLD AS IS. Price Reflects Condition. Notes: Published by ... After Juan Gris, Spanish 1887-1927- \"Au Soleil du Plafond\",1955; lithographs ...",
+          "domain": "invaluable.com",
+          "tier": "market"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "4.2",
+      "class": "evaluative",
+      "kind_of_seed": "capacity",
+      "seed": "Reverdy's capacity to infuse words with structural beauty",
+      "ask": "What did Reverdy actually DO that would justify \"capacity to infuse words with structural beauty\"? If nothing, cut the phrase.",
+      "query": "Reverdy \"Au Soleil du Plafond\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 5,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Living Still Life | John Golding",
+          "snippet": "... Reverdy's Au Soleil du plafond (not published until much later). ... Oh how I wish I could convey the ease and the charm of the unfinished.",
+          "domain": "nybooks.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Pierre reverdy Stock Photos and Images",
+          "snippet": "... Au soleil du plafond), 1916, post-Cubist color lithograph still life ... unfinished at the time of Gris's death. A reduced version, with color ...",
+          "domain": "alamy.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Au soleil du plafond – Works – eMuseum - Toledo Museum",
+          "snippet": "Au soleil du plafond ; Artist Juan Gris (Spanish, 1887-1927) ; Publisher Éditions Verve, Paris, 1955 (Tériade) ; Printer Mourlot Frères, Paris ; Author Pierre ...",
+          "domain": "emuseum.toledomuseum.org",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "6.1",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "rarely emerge from the archives",
+      "ask": "What did Their actually DO that would justify \"rarely emerge from the archives\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" destroyed",
+      "why": "the phrase is ours; hunt the event (destroyed) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "eventful",
+      "eventful_sentences": 2,
+      "active": 4,
+      "staked": 2,
+      "best_sentence": "Dora Szampanier, Etching of destroyed synagogue - Drohobisz, Ukraine.",
+      "top": [
+        {
+          "title": "Juan Gris, Au solei du plafond La pipe, 1955, Lithograph",
+          "snippet": "Juan Gris ... Juan Gris, The Pipe, from Au Soleil du Plafond, 1955 (after display ... Dora Szampanier, Etching of destroyed synagogue - Drohobisz, Ukraine.",
+          "domain": "centraldoaposentado.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "(PDF) The cubism of Juan Gris. Vol II. Portraits. Pierrots & ...",
+          "snippet": "... Au soleil du plafond lithographs 240 Other Lithographs 251 Posters 259 ... He usually destroyed these drawings after the painting had been completed ...",
+          "domain": "academia.edu",
+          "tier": "tier1"
+        },
+        {
+          "title": "Juan Gris Sold at Auction Prices",
+          "snippet": "... Damaged. SOLD AS IS. Price Reflects Condition. Notes: Published by ... After Juan Gris, Spanish 1887-1927- \"Au Soleil du Plafond\",1955; lithographs ...",
+          "domain": "invaluable.com",
+          "tier": "market"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "6.2",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "offering a glimpse into the transformative collaborations of early-20th-century artists",
+      "ask": "What did Their actually DO that would justify \"offering a glimpse into the transformative collaborations of early-20th-century artists\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" refused",
+      "why": "the phrase is ours; hunt the event (refused) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 1,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 1,
+      "staked": 1,
+      "best_sentence": "Juan Gris, Loupire (Kahnweiler 1969), Au Soleil du Plafond ... refuse any sale due to unforeseen ... refused sale for which payment has alre",
+      "top": [
+        {
+          "title": "Mary Ann Caws on Pierre Reverdy - Poetry Society of America",
+          "snippet": "In particular, Reverdy's close collaboration with Juan Gris lay at the origin of the poems of Au Soleil du plafond (Sun on the Ceiling), published in 1955, but ...",
+          "domain": "poetrysociety.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "The Gallery Collection: Curated Fine Art 2026-06-17 Auction - 300 ...",
+          "snippet": "... Juan Gris, Loupire (Kahnweiler 1969), Au Soleil du Plafond ... refuse any sale due to unforeseen ... refused sale for which payment has already been ...",
+          "domain": "liveauctioneers.com",
+          "tier": "market"
+        },
+        {
+          "title": "International Postwar Gris, Juan 12 works. In: *Au S... - 87825153 ...",
+          "snippet": "- The portfolio *Au Soleil du Plafond* stems from a collaboration between Juan Gris and the poet Pierre Reverdy, which was conceived as early as 1925 but ...",
+          "domain": "interencheres.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "7.1",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "highlights how visual artists",
+      "ask": "What did this actually DO that would justify \"highlights how visual artists\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 1,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Living Still Life | John Golding",
+          "snippet": "... Gris produced the most beautiful of his book illustrations for Reverdy's Au Soleil du plafond (not published until much later). These small ...",
+          "domain": "nybooks.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Au soleil du plafond – Works – eMuseum - Toledo Museum",
+          "snippet": "Au soleil du plafond ; Artist Juan Gris (Spanish, 1887-1927) ; Publisher Éditions Verve, Paris, 1955 (Tériade) ; Printer Mourlot Frères, Paris ; Author Pierre ...",
+          "domain": "emuseum.toledomuseum.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "GRIS (JUAN) REVERDY (PAUL) Au soleil du plafond, NUMBER ...",
+          "snippet": "GRIS (JUAN). REVERDY (PAUL) Au soleil du plafond, NUMBER 142 OF 220 COPIES, SIGNED BY REVERDY on the colophon, Paris, Tériade, 1955. Fine Books, Manuscripts ...",
+          "domain": "bonhams.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Au Soleil du Plafond",
+      "id": "8.1",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "inviting reflection on art as a shared divine expression",
+      "ask": "What did The confluence of art and text here actually DO that would justify \"inviting reflection on art as a shared divine expression\"? If nothing, cut the phrase.",
+      "query": "Juan Gris \"Au Soleil du Plafond\" commissioned",
+      "why": "the phrase is ours; hunt the event (commissioned) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 2,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 1,
+      "staked": 1,
+      "best_sentence": "It was not until 1955 when the book was published by Tériade, entitled Au soleil du plafond.",
+      "top": [
+        {
+          "title": "(PDF) The cubism of Juan Gris. Vol I. Still lifes, landscapes",
+          "snippet": "... Juan Gris, Au soleil du plafond, Paris, 1955, repr. plate 8 among a serie of 10 other gouaches p.105-107. Exhibitions: - Saidenberg Gallery, New York, Juan Gris ...",
+          "domain": "academia.edu",
+          "tier": "tier1"
+        },
+        {
+          "title": "At Cateau-Cambrésis, an enhanced Matisse museum",
+          "snippet": "Architects Emmanuelle and Laurent Beaudoin were commissioned to ... Juan Gris for Pierre Reverdy's Au soleil du plafond. In the near ...",
+          "domain": "gazette-drouot.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Pierre reverdy Stock Photos and Images",
+          "snippet": "Juan Gris – The Violin (Le Violon / Au soleil du plafond), 1916. RM 3F4EGGY–Juan Gris – The Violin (Le Violon / Au soleil du plafond), 1916, post-Cubist ...",
+          "domain": "alamy.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "1.1",
+      "class": "anchored",
+      "kind_of_seed": "possessive",
+      "seed": "Dalí's vivid illustrations",
+      "ask": "Is this true, and what is the event behind it: \"Dalí's vivid illustrations\"?",
+      "query": "Dalí \"Moses and Monotheism\" Salvador Dalí",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+          "snippet": "Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with additional drawings by the artist.",
+          "domain": "collections.museumofthebible.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "Lot - Salvador Dali Moses Monotheism Etching/Lithograph ...",
+          "snippet": "Description: Salvador Dali. Moses' Nightmare (Cauchemar de Moise) from Moses and Monotheism. Etching over lithography on soft glove sheepskin. Year: 1975.",
+          "domain": "kcmgalleries.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Dream of Moses - Moses and Monotheism",
+          "snippet": "Moses and Monotheism is a book written in 1939 by Sigmund Freud. The book consists of three essays and is an extension of Freud's work on ...",
+          "domain": "daliparis.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "2.1",
+      "class": "anchored",
+      "kind_of_seed": "relative",
+      "seed": "breathe life into Freud’s narrative become evident",
+      "ask": "Is this true, and what is the event behind it: \"breathe life into Freud’s narrative become evident\"?",
+      "query": "Freud’s \"Moses and Monotheism\" Salvador Dalí",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 1,
+      "staked": 0,
+      "best_sentence": "Salvador Dali Moise et Monotheisme, Moses and Monotheism illustrated book by Sigmund Freud is available at the Lockport Street Gallery.",
+      "top": [
+        {
+          "title": "Museum - This oversize French edition of Sigmund Freud's 1939 ...",
+          "snippet": "This oversize French edition of Sigmund Freud's 1939 published work, \"Moses and Monotheism ... Salvador Dalí. #ArtifactoftheDay The pages ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Salvador Dali Moise et Monotheisme, Moses and Monotheism",
+          "snippet": "Salvador Dali Moise et Monotheisme, Moses and Monotheism illustrated book by Sigmund Freud is available at the Lockport Street Gallery.",
+          "domain": "lockportstreetgallery.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+          "snippet": "Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with additional drawings by the artist.",
+          "domain": "collections.museumofthebible.org",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "3.1",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "infusing it with his characteristic surrealism",
+      "ask": "What did Salvador Dalí actually DO that would justify \"infusing it with his characteristic surrealism\"? If nothing, cut the phrase.",
+      "query": "Salvador Dalí \"Moses and Monotheism\" refused",
+      "why": "the phrase is ours; hunt the event (refused) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 1,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 1,
+      "staked": 0,
+      "best_sentence": "After Salvador Dali (Spanish, 1904-1989), Moses and Monotheism, gold gilt patinated copper bas relief, 27 x 21in. (71 x 53cm) · Sold: · Addi",
+      "top": [
+        {
+          "title": "About Salvador Dalí - Moderna Museet",
+          "snippet": "... Dalí (The Unspeakable Confessions of Salvador Dalí), 1973. 1974. Provides the introduction and illustrations to Sigmund Freud's book Moses and Monotheism. The ...",
+          "domain": "modernamuseet.se",
+          "tier": "unverified"
+        },
+        {
+          "title": "Sigmund and Monotheism: God, Jokes, and Eloquent Silence ... - jstor",
+          "snippet": ", his commitment stretching from Psychopathy of Everyday Life. (1904) to Moses and Monotheism (1939). ... Salvador Dali had tried unsuccessfully to visit Freud in ...",
+          "domain": "jstor.org",
+          "tier": "tier2"
+        },
+        {
+          "title": "Freud had a lifelong fascination for the figure of Moses, from ... - Facebook",
+          "snippet": "In 1939, Sigmund Freud finished his last book, \"Moses and Monotheism\", shortly before his death. It caused outrage and drew much criticism the ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "4.1",
+      "class": "anchored",
+      "kind_of_seed": "possessive",
+      "seed": "Freud's exploration of",
+      "ask": "Is this true, and what is the event behind it: \"Freud's exploration of\"?",
+      "query": "Freud \"Moses and Monotheism\" Salvador Dalí",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "active",
+      "eventful_sentences": 0,
+      "active": 3,
+      "staked": 0,
+      "best_sentence": "Salvador Dali Moise et Monotheisme, Moses and Monotheism illustrated book by Sigmund Freud is available at the Lockport Street Gallery.",
+      "top": [
+        {
+          "title": "Moses and Monotheism",
+          "snippet": "Dali's edition of Sigmund Freud's last publication, Moses and Monotheism, was published in 1974 and consists of Freud's text, accompanied by ten engravings.",
+          "domain": "vksart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Salvador Dali Moise et Monotheisme, Moses and ...",
+          "snippet": "Salvador Dali Moise et Monotheisme, Moses and Monotheism illustrated book by Sigmund Freud is available at the Lockport Street Gallery.",
+          "domain": "lockportstreetgallery.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+          "snippet": "Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with additional drawings by the artist.",
+          "domain": "collections.museumofthebible.org",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "4.2",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "visualizing the psychological and spiritual transition from polytheistic beliefs",
+      "ask": "What did His imagery actually DO that would justify \"visualizing the psychological and spiritual transition from polytheistic beliefs\"? If nothing, cut the phrase.",
+      "query": "Salvador Dalí \"Moses and Monotheism\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 1,
+      "staked": 4,
+      "best_sentence": "He completed his long-unfinished book Moses and Monotheism, and a synopsis of his lifetime's work, An Outline of Psychoanalysis, which came ",
+      "top": [
+        {
+          "title": "Sigmund Freud",
+          "snippet": "In London Freud worked on his final books, Moses and Monotheism, and the incomplete Outline of Psychoanalysis. He was visited by Salvador Dalí – a ...",
+          "domain": "psychoanalysis.org.uk",
+          "tier": "unverified"
+        },
+        {
+          "title": "Freud and the World Wars",
+          "snippet": "He completed his long-unfinished book Moses and Monotheism, and a synopsis of his lifetime's work, An Outline of Psychoanalysis, which came out ...",
+          "domain": "psychologytoday.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "I can't believe I almost didnt buy this from the antique shop. ...",
+          "snippet": "Dalí was only 27 years old when he created this legendary piece. ... The Philosophical: Goethe's Faust (1969) and Freud's Moses and Monotheism (1975). ... • ...",
+          "domain": "instagram.com",
+          "tier": "reject"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "5.1",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "delves into the complexities of religious origins",
+      "ask": "What did this actually DO that would justify \"delves into the complexities of religious origins\"? If nothing, cut the phrase.",
+      "query": "Salvador Dalí \"Moses and Monotheism\" destroyed",
+      "why": "the phrase is ours; hunt the event (destroyed) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 3,
+      "t1t2": 1,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Moses and Monotheism",
+          "snippet": "Dali's edition of Sigmund Freud's last publication, Moses and Monotheism, was published in 1974 and consists of Freud's text, accompanied by ten engravings.",
+          "domain": "vksart.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Salvador Dali \"Moses and Monotheism\" Ltd. Ed. Signed ...",
+          "snippet": "Description: Salvador Dali (1904-1989) \"Moses And Monotheism\" Bas Relief with Gold Patina. Hand signed in marker lower right, ...",
+          "domain": "bradfordsauction.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Salvador Dali Moses And Monotheism (Platinum Patina) ...",
+          "snippet": "Salvador Dali Moses And Monotheism (Platinum Patina) Bas Relif Signed 5️⃣k obo (request private message if interested)",
+          "domain": "facebook.com",
+          "tier": "reject"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "5.2",
+      "class": "anchored",
+      "kind_of_seed": "participial",
+      "seed": "setting the stage for Dalí's evocative interpretations",
+      "ask": "Is this true, and what is the event behind it: \"setting the stage for Dalí's evocative interpretations\"?",
+      "query": "Dalí's \"Moses and Monotheism\" Salvador Dalí",
+      "why": "verify the named claim",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 2,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 0,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Illustrations and printed text of Sigmund Freud's Moses and ...",
+          "snippet": "Illustrations and printed text of Sigmund Freud's Moses and Monotheism (Moïse et le Monothéisme) by Salvador Dalí, with additional drawings by the artist.",
+          "domain": "collections.museumofthebible.org",
+          "tier": "unverified"
+        },
+        {
+          "title": "DALI Moses and Monotheism The Tear of Blood Hand Sig/Num ... - eBay",
+          "snippet": "DALI Moses and Monotheism The Tear of Blood Hand Sig/Num Etching Surreal ART ; Artist. Salvador Dalí ; Edition Size. EA XXIII/XXV ; ARTIST: Salvador Dali ; TITLE: ...",
+          "domain": "ebay.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "Dream of Moses - Moses and Monotheism - Dali Paris",
+          "snippet": "Moses and Monotheism is a book written in 1939 by Sigmund Freud. The book consists of three essays and is an extension of Freud's work on ...",
+          "domain": "daliparis.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "6.1",
+      "class": "evaluative",
+      "kind_of_seed": "relative",
+      "seed": "the book itself is an artwork",
+      "ask": "What did The work actually DO that would justify \"the book itself is an artwork\"? If nothing, cut the phrase.",
+      "query": "Salvador Dalí \"Moses and Monotheism\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "inert",
+      "eventful_sentences": 0,
+      "active": 0,
+      "staked": 2,
+      "best_sentence": "",
+      "top": [
+        {
+          "title": "Sigmund Freud",
+          "snippet": "In London Freud worked on his final books, Moses and Monotheism, and the incomplete Outline of Psychoanalysis. He was visited by Salvador Dalí – a ...",
+          "domain": "psychoanalysis.org.uk",
+          "tier": "unverified"
+        },
+        {
+          "title": "Lucian Freud Self Portrait (Unfinished), c. 1956 oil on ...",
+          "snippet": "But in 'Moses and Monotheism' we find – amid much fascinating and bizarre speculation – both an enthusiastic defence of monotheism and a ...",
+          "domain": "facebook.com",
+          "tier": "reject"
+        },
+        {
+          "title": "Montagne Noire – 2019 – Life in a 300 Year Old Farmhouse ...",
+          "snippet": "Moses and Monotheism. Hope to hear from you soon about your experience ... ― Salvador Dalí. The Treasure Room in the Dali Theatre. Much ...",
+          "domain": "dreamfastblog.wordpress.com",
+          "tier": "unverified"
+        }
+      ]
+    },
+    {
+      "stop": "Moses and Monotheism",
+      "id": "7.1",
+      "class": "evaluative",
+      "kind_of_seed": "participial",
+      "seed": "bridging literary and visual art forms",
+      "ask": "What did Dalí and Freud actually DO that would justify \"bridging literary and visual art forms\"? If nothing, cut the phrase.",
+      "query": "Salvador Dalí \"Moses and Monotheism\" unfinished",
+      "why": "the phrase is ours; hunt the event (unfinished) behind it",
+      "n_results": 8,
+      "n_ranked": 5,
+      "market_demoted": 1,
+      "t1t2": 0,
+      "material_kind": "eventful",
+      "eventful_sentences": 1,
+      "active": 1,
+      "staked": 4,
+      "best_sentence": "He completed his long-unfinished book Moses and Monotheism, and a synopsis of his lifetime's work, An Outline of Psychoanalysis, which came ",
+      "top": [
+        {
+          "title": "Sigmund Freud",
+          "snippet": "In London Freud worked on his final books, Moses and Monotheism, and the incomplete Outline of Psychoanalysis. He was visited by Salvador Dalí – a ...",
+          "domain": "psychoanalysis.org.uk",
+          "tier": "unverified"
+        },
+        {
+          "title": "Freud and the World Wars",
+          "snippet": "He completed his long-unfinished book Moses and Monotheism, and a synopsis of his lifetime's work, An Outline of Psychoanalysis, which came out ...",
+          "domain": "psychologytoday.com",
+          "tier": "unverified"
+        },
+        {
+          "title": "I can't believe I almost didnt buy this from the antique shop. ...",
+          "snippet": "Dalí was only 27 years old when he created this legendary piece. ... The Philosophical: Goethe's Faust (1969) and Freud's Moses and Monotheism (1975). ... • ...",
+          "domain": "instagram.com",
+          "tier": "reject"
+        }
+      ]
+    }
+  ]
+}

@@ -6,7 +6,9 @@ Tests that fake credentials are rejected
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_fake_credentials():
     """Test that fake credentials are rejected"""
     print("=== Testing Security Fix: Fake Credentials ===")
@@ -49,6 +51,7 @@ def test_fake_credentials():
     else:
         print(f"Failed to get articles: {response.status_code}")
 
+@pytest.mark.service
 def test_verified_credentials_check():
     """Test that only verified credentials grant access"""
     print("\n=== Testing Verified Credentials Check ===")

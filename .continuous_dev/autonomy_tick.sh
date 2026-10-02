@@ -14,6 +14,33 @@
 REPO="$HOME/Audioura"
 CD="$REPO/.continuous_dev"
 LOG="$CD/autonomy.log"
+# Task-hygiene channel (LOCAL-545): routine, self-correcting events that a
+# session should be able to see but that are NOT a production emergency. Kept
+# out of ALERTS.md so a non-empty ALERTS.md stays meaningful.
+HYGIENE="$CD/task_hygiene.log"
+
+# --- Watchdog. Added 2026-09-14 after the loop was DEAD FOR 12 DAYS. ---
+# Docker Desktop stopped when the disk filled on 2026-09-02. backup_tours.sh
+# calls docker with no timeout, so it blocked forever; the tick never finished;
+# launchd will not start a second instance while the first is alive. One hung
+# step silently killed every check downstream of it, including the ones that
+# would have caught the domain lapsing. macOS ships no timeout(1), so:
+guard() {                       # guard <seconds> <command...>
+  local secs=$1; shift
+  "$@" &
+  local pid=$!
+  ( sleep "$secs"; kill -9 "$pid" 2>/dev/null ) &
+  local watcher=$!
+  wait "$pid" 2>/dev/null
+  local rc=$?
+  kill "$watcher" 2>/dev/null
+  # A hung tick step is an operational hiccup, not a production emergency: the
+  # watchdog already killed it and the next launchd tick re-runs everything. It
+  # names which step to look at if the loop keeps stalling, so it is worth
+  # recording — but in the hygiene channel, not the urgent one (LOCAL-545).
+  [ $rc -ge 128 ] && echo "$(date -u +%FT%TZ) | *** TICK STEP TIMED OUT after ${secs}s: $* ***" >> "$HYGIENE"
+  return $rc
+}
 
 cd "$REPO" || exit 1
 
@@ -47,26 +74,47 @@ else
   echo "$(date -u +%FT%TZ) | gate closed: $UNPUSHED commits still unpushed" >> "$LOG"
 fi
 
+# --- PRODUCTION FIRST: nothing that can hang may run before this. ---
+# Added 2026-09-14. check_user_visible.sh polls http://localhost:5005 — this
+# machine's own container — so it stayed green through a three-day production
+# outage. This resolves the real hostnames, calls /health, and warns weeks
+# ahead of domain expiry. It runs first so a wedged local step cannot mask it.
+guard 90 "$CD/check_production.sh"
+
 # --- Snapshot audio_tours and alarm on row loss. ---
 # Added 2026-08-01 after tour 29 and its translations were deleted during
 # autonomous operation and only recovered by luck (ZIP still on disk).
-"$CD/backup_tours.sh"
+guard 120 "$CD/backup_tours.sh"
 
 # --- Guard what Michael actually sees in the app. ---
 # The row-loss alarm catches deletion; this catches the opposite failure —
 # test tours becoming visible, which happened 2026-08-01 with row count UP.
-"$CD/check_user_visible.sh"
+guard 120 "$CD/check_user_visible.sh"
+
+# Added 2026-09-14. check_user_visible.sh polls http://localhost:5005 — this
+# machine's own container. On 2026-09-11 audioura.com lapsed, the registrar
+# parked the nameservers, and BOTH tracks went dark for every tester for THREE
+# DAYS while that check stayed green. This one resolves the real hostnames,
+# calls /health on each, and warns weeks ahead of domain expiry.
 
 # --- Reap orphaned kiro processes; quarantine tasks that keep dying. ---
 # Added 2026-08-01: LOCAL-112/113 each died twice with no log, swap at 91%,
 # and every death leaked an orphaned kiro-cli. The liveness check kept
 # re-dispatching them into the same wall.
-"$CD/reap_orphans.sh"
+guard 120 "$CD/reap_orphans.sh"
 
 # --- Reclaim disk: drop worktrees whose branch is already merged. ---
 # Added 2026-08-04 after 188 accumulated worktrees filled the disk to 98% and
 # a dispatch failed mid-checkout. Nothing is lost; unmerged branches are kept.
-"$CD/prune_worktrees.sh"
+# [2026-09-23] Verify dispatched work BY EFFECT before anything prunes it.
+# Seven tasks ran overnight, all seven logged COMPLETED, four had written their
+# deliverable and never committed — and prune_worktrees.sh then deleted the
+# worktrees, destroying eight hours of work un-noticed. This MUST run before the
+# prune, and it re-files what silently failed. Michael's 30-minute check, made
+# durable: detecting a failure needs no Claude session, only judging one does.
+guard 120 "$CD/verify_deliverables.sh"
+
+guard 120 "$CD/prune_worktrees.sh"
 
 # --- Dispatch any unclaimed task files. ---
 # The dispatcher is idempotent: already-claimed files are skipped, and

@@ -55,7 +55,22 @@ class Endpoints {
   };
 
   /// Default cloud base URL — baked into the build, no user input needed.
+  /// This is BETA. Byte-for-byte unchanged behaviour is the one hard
+  /// requirement of the Storied-vs-Beta comparison feature (Track B) — never
+  /// edit this value or the fallback behaviour below as part of adding Storied.
   static const _defaultCloudBaseUrl = 'https://api.audioura.com';
+
+  /// Storied cloud base URL — the parallel, independently-deployable track
+  /// testers can opt into to compare tour quality against Beta. Same request/
+  /// response contract as Beta; only the base URL differs. See
+  /// TRACK_B_STORIED_VS_BETA.md and DECISIONS.md D347+.
+  /// Custom domain, live and verified (Michael 2026-09-01): it takes the SAME
+  /// network path as Beta — client → Cloudflare → GCP LB → gateway — differing
+  /// only in hostname. Do NOT revert to the bare Cloud Run URL: that returns
+  /// 200 but bypasses Cloudflare (no WAF/DDoS, invisible in monitoring, wrong
+  /// TLS chain), which breaks the like-for-like comparison this feature exists
+  /// for. Note the order: storied-api, not api-storied.
+  static const _storiedCloudBaseUrl = 'https://storied-api.audioura.com';
 
   /// Gateway API key — injected at build time via --dart-define=GATEWAY_API_KEY=...
   /// NEVER hardcode the actual key in source.
@@ -77,13 +92,45 @@ class Endpoints {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
-      // ALWAYS use baked-in default — never read stored overrides in cloud mode.
-      // This ensures a dev device behaves identically to a real new user.
-      return _defaultCloudBaseUrl;
+      // Baked-in defaults only — never read stored URL overrides in cloud
+      // mode. This ensures a dev device behaves identically to a real new
+      // user. cloud_track is the one exception: it's a deliberate, visible
+      // tester choice (Storied vs Beta), not a debug override.
+      return await cloudTrack() == 'storied' ? _storiedCloudBaseUrl : _defaultCloudBaseUrl;
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';
   }
+
+  /// The tester's chosen comparison track: 'beta' (default) or 'storied'.
+  /// Only meaningful in cloud mode. See TRACK_B_STORIED_VS_BETA.md.
+  static Future<String> cloudTrack() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('cloud_track') ?? 'beta';
+  }
+
+  /// Sets the tester's chosen comparison track. Does not affect local mode.
+  static Future<void> setCloudTrack(String track) async {
+    assert(track == 'beta' || track == 'storied');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cloud_track', track);
+  }
+
+  /// Human-facing label for a stored tour's track. Michael 2026-09-01:
+  /// testers see Stable/Preview, never the internal branch names beta/storied.
+  /// A missing or unknown track ⇒ Stable (that is what every older app made).
+  /// When [buildNumber] is present it is appended as "(vNNN)" so a tour listed
+  /// a week later still identifies the exact build that produced it; when
+  /// absent (older tours, or before services populated it) the bare name shows.
+  /// Never compute the number in the app — it is read from the tour record.
+  static String trackLabel(String? track, {int? buildNumber}) {
+    final name = track == 'storied' ? 'Preview' : 'Stable';
+    return buildNumber != null ? '$name (v$buildNumber)' : name;
+  }
+
+  /// Whether a stored track should render as the Preview (Storied) track.
+  /// Missing/unknown ⇒ false (Stable), matching backward-compat behaviour.
+  static bool isPreviewTrack(String? track) => track == 'storied';
 
   /// Convenience: returns a fully-formed [Uri] for [s] + [path].
   static Future<Uri> url(Service s, String path) async =>

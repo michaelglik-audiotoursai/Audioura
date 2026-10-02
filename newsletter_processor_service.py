@@ -1924,28 +1924,12 @@ def process_newsletter():
                                     elif 'nytimes.com' in article['url']:
                                         domain = 'nytimes.com'
                                     
-                                    # Try to get stored credentials
-                                    cred_conn = get_db_connection()
-                                    cred_cursor = cred_conn.cursor()
+                                    # Try to get stored credentials (LOCAL-321: encrypted only)
+                                    from credential_store import get_credentials_for_device
+                                    auth_credentials = get_credentials_for_device(user_id, domain)
                                     
-                                    cred_cursor.execute("""
-                                        SELECT decrypted_username, decrypted_password 
-                                        FROM user_subscription_credentials 
-                                        WHERE device_id = %s AND domain = %s
-                                        ORDER BY created_at DESC LIMIT 1
-                                    """, (user_id, domain))
-                                    
-                                    credentials = cred_cursor.fetchone()
-                                    cred_cursor.close()
-                                    cred_conn.close()
-                                    
-                                    if credentials:
+                                    if auth_credentials:
                                         logging.info(f"Found {domain} credentials - using authenticated access")
-                                        
-                                        auth_credentials = {
-                                            'username': credentials[0],
-                                            'password': credentials[1]
-                                        }
                                         
                                         # Use appropriate authentication method
                                         if domain == 'bostonglobe.com':
@@ -2053,36 +2037,16 @@ def process_newsletter():
                     
                     if is_subscription_required and user_id:
                         # Try to get stored credentials and process with authentication
+                        # LOCAL-321: reads ONLY encrypted columns via credential_store
                         try:
-                            import psycopg2
-                            cred_conn = psycopg2.connect(
-                                host=os.getenv('DB_HOST', 'localhost'),
-                                database=os.getenv('DB_NAME', 'audiotours'),
-                                user=os.getenv('DB_USER', 'admin'),
-                                password=os.getenv('DB_PASSWORD', 'password123'),
-                                port=os.getenv('DB_PORT', '5433')
-                            )
-                            cred_cursor = cred_conn.cursor()
-                            
-                            cred_cursor.execute("""
-                                SELECT decrypted_username, decrypted_password 
-                                FROM user_subscription_credentials 
-                                WHERE device_id = %s AND domain = %s
-                                ORDER BY created_at DESC LIMIT 1
-                            """, (user_id, subscription_domain))
-                            
-                            stored_credentials = cred_cursor.fetchone()
-                            cred_cursor.close()
-                            cred_conn.close()
+                            from credential_store import get_credentials_for_device
+                            stored_credentials = get_credentials_for_device(user_id, subscription_domain)
                             
                             if stored_credentials and subscription_domain in ['bostonglobe.com', 'nytimes.com']:
                                 logging.info(f"Found {subscription_domain} credentials - attempting authenticated access")
                                 
                                 # Use appropriate session authentication
-                                auth_credentials = {
-                                    'username': stored_credentials[0],
-                                    'password': stored_credentials[1]
-                                }
+                                auth_credentials = stored_credentials
                                 
                                 if subscription_domain == 'bostonglobe.com':
                                     auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])

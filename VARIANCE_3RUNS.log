@@ -1,0 +1,21 @@
+=== VARIANCE RUN 1 ===
+GENERATED 5631 chars in 115.2s -> TOUR_MFA_RELEASE_20260818_1614.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   60    12    40    57
+ 2  Au Soleil du Plafond                           49     0    43    30
+ 3  Moses and Monotheism                           33    12    35    60
+    MEAN                                           47     8    39    49
+  stops with detail == 0 (no object named): 0 of 3
+=== VARIANCE RUN 2 ===
+GENERATED 6110 chars in 135.0s -> TOUR_MFA_RELEASE_20260818_1616.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   48     0    27    69
+ 2  Au Soleil du Plafond                           31    12    13    72
+ 3  Moses and Monotheism                           33    24    27    77
+    MEAN                                           37    12    22    73
+  stops with detail == 0 (no object named): 0 of 3
+=== VARIANCE RUN 3 ===
+GENERATED 6176 chars in 148.1s -> TOUR_MFA_RELEASE_20260818_1619.txt
+ 1  Le Lézard aux plumes d’or (The Lizard with G   44    25    22    77
+ 2  Au Soleil du Plafond                           56    12    36    57
+ 3  Moses and Monotheism                           36    12    29    65
+    MEAN                                           45    16    29    66
+  stops with detail == 0 (no object named): 0 of 3

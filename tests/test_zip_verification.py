@@ -9,6 +9,7 @@ import os
 import tempfile
 import psycopg2
 from datetime import datetime
+import pytest
 
 def get_db_connection():
     from db_connection import get_connection
@@ -35,6 +36,7 @@ def get_recent_articles():
     
     return articles
 
+@pytest.mark.service
 def test_zip_download(article_id, title):
     """Test ZIP file download and contents"""
     print(f"\n=== Testing ZIP for: {title[:50]}... ===")

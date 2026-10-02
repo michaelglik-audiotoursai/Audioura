@@ -7,11 +7,13 @@ import psycopg2
 import os
 import time
 import json
+import pytest
 
 def get_db_connection():
     from db_connection import get_connection
     return get_connection()
 
+@pytest.mark.service
 def test_complete_pipeline():
     """Test the complete newsletter processing pipeline"""
     print("=== COMPLETE PIPELINE TEST ===\n")

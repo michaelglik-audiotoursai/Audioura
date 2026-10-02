@@ -5,7 +5,9 @@ Test the services decryption endpoint with mobile app data
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_services_decryption():
     """Test decryption via services API"""
     

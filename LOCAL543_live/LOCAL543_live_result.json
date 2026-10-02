@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "wall_s": 234.8,
+  "chars": 10575,
+  "defects": {
+    "unsourced_person_event": "5 unsourced person-event(s); \"Walter H. Delivered\" placed here in December with no source: \"Fast forward to December 2002, when Rev. Walter H. Delivered a homily that would shake the local Catholic community.\""
+  },
+  "unsourced_person_event": true,
+  "provenance_counts": {
+    "sourced": 4,
+    "unsourced": 25,
+    "total": 29,
+    "corpus": 4,
+    "grounded": 0,
+    "parametric": 25
+  },
+  "grounding_requests": 9,
+  "grounding_cost_usd": 0.315,
+  "total_api_cost_usd": 0.23344
+}

@@ -153,15 +153,18 @@ def decrypt_credentials_from_storage(encrypted_username, encrypted_password, wra
 
 
 def read_credentials(row):
-    """Read credentials from a DB row, handling both plaintext (legacy) and encrypted formats.
+    """Read credentials from a DB row — encrypted columns ONLY.
+    
+    LOCAL-321: Removed plaintext fallback. If no encrypted columns exist,
+    returns (None, None). The read path must never serve plaintext columns.
     
     Args:
-        row: dict-like with keys: decrypted_username, decrypted_password,
-             encrypted_username, encrypted_password, wrapped_dek, encryption_nonce
+        row: dict-like with keys: encrypted_username, encrypted_password,
+             wrapped_dek, encryption_nonce
     
     Returns: (username_str, password_str) or (None, None) if no credentials
     """
-    # Prefer encrypted columns (new format)
+    # Read encrypted columns only (no plaintext fallback)
     if row.get('wrapped_dek') and row.get('encrypted_username'):
         try:
             return decrypt_credentials_from_storage(
@@ -171,12 +174,6 @@ def read_credentials(row):
                 row['encryption_nonce']
             )
         except Exception as e:
-            logging.error(f"[CRED_ENCRYPT] Decryption failed, falling back to plaintext: {e}")
-    
-    # Fall back to plaintext columns (legacy, pre-migration)
-    username = row.get('decrypted_username')
-    password = row.get('decrypted_password')
-    if username and password:
-        return username, password
+            logging.error(f"[CRED_ENCRYPT] Decryption failed: {e}")
     
     return None, None

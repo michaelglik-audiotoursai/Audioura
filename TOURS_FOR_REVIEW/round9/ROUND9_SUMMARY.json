@@ -1,0 +1,30 @@
+[
+  {
+    "name": "CHURCH_1",
+    "ok": true,
+    "wall_s": 330.9,
+    "chars": 10744,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 12,
+      "named_people": 7,
+      "chars": 10744
+    }
+  },
+  {
+    "name": "LOGAN_1",
+    "ok": true,
+    "wall_s": 190.2,
+    "chars": 8737,
+    "defects": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 7,
+      "named_people": 1,
+      "chars": 8737
+    }
+  }
+]

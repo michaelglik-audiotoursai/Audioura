@@ -26,12 +26,262 @@ def _normalize_for_match(text: str) -> str:
     return re.sub(r'[^a-z0-9\s]', '', text.lower()).strip()
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-352] Passage deduplication and narrative-action ranking.
+#
+# Problem: when multiple corpus rows exist for the same stop_title (under
+# different venue_names), only one row was selected. Even within a single row,
+# near-duplicate passages restate the same fact and crowd out unique narrative
+# content — a 2000-char budget fills with "Le Stanc runs La Merenda" six times
+# while the one passage describing what he LEFT to come here never reaches the
+# model.
+#
+# Solution:
+#   1. Merge passages from ALL exact-match rows for the same stop_title.
+#   2. Deduplicate: passages whose normalized text overlaps > 70% by word set
+#      are near-duplicates. Keep the longest.
+#   3. Rank: passages containing narrative-action verbs (left, founded, refused,
+#      gave up, introduced, returned) rank above purely descriptive/state
+#      passages. This matches the NARRATIVE ARC RULE signal.
+#
+# The cap stays at max_chars=2000 in format_passages_for_prompt — this change
+# ensures the BEST passages fill that budget, not just the first stored ones.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Verbs/phrases that signal a person DOING something (narrative action),
+# as opposed to stating a credential or attribute.
+_NARRATIVE_ACTION_MARKERS = re.compile(
+    r'\b('
+    r'gave (it all )?up|left|walked away|abandoned|resigned|quit|'
+    r'founded|opened|started|established|created|launched|'
+    r'refused|rejected|turned down|declined|'
+    r'introduced|recommended|brought|'
+    r'returned|came back|went back|'
+    r'chose|decided|moved|transformed|converted|'
+    r'discovered|revealed|described|recounted|'
+    r'he gave|she gave|who gave'
+    r')\b',
+    re.IGNORECASE,
+)
+
+
+def _passage_has_narrative_action(text: str) -> bool:
+    """Return True if passage describes a person doing something (event/arc)."""
+    return bool(_NARRATIVE_ACTION_MARKERS.search(text))
+
+
+def _word_set(text: str) -> set:
+    """Extract set of meaningful words (4+ chars) from normalized text."""
+    norm = _normalize_for_match(text)
+    return {w for w in norm.split() if len(w) >= 4}
+
+
+def _deduplicate_passages(passages: List[str], roles: List) -> tuple:
+    """Remove near-duplicate passages, keeping the longest representative.
+
+    Two passages are near-duplicates if their 4+-char word sets overlap by
+    more than 70% (Jaccard-like: |intersection| / |smaller set| > 0.7).
+
+    Returns (deduplicated_passages, deduplicated_roles).
+    """
+    if len(passages) <= 1:
+        return passages, roles
+
+    # Build word-set representations
+    word_sets = [_word_set(p) for p in passages]
+
+    # Greedy dedup: iterate longest-first, mark shorter near-dupes for removal
+    indexed = sorted(range(len(passages)), key=lambda i: -len(passages[i]))
+    kept_indices = []
+    removed = set()
+
+    for idx in indexed:
+        if idx in removed:
+            continue
+        kept_indices.append(idx)
+        ws = word_sets[idx]
+        if not ws:
+            continue
+        # Check remaining candidates for overlap
+        for other_idx in indexed:
+            if other_idx in removed or other_idx == idx:
+                continue
+            if other_idx in set(kept_indices):
+                continue
+            other_ws = word_sets[other_idx]
+            if not other_ws:
+                continue
+            overlap = len(ws & other_ws)
+            smaller = min(len(ws), len(other_ws))
+            if smaller > 0 and overlap / smaller > 0.7:
+                removed.add(other_idx)
+
+    # Restore original order among survivors
+    kept_indices.sort()
+    deduped_passages = [passages[i] for i in kept_indices]
+    deduped_roles = [roles[i] if i < len(roles) else None for i in kept_indices]
+
+    if len(passages) != len(deduped_passages):
+        logger.info(
+            "[LOCAL-352] Deduplication: %d passages → %d (removed %d near-duplicates)",
+            len(passages), len(deduped_passages), len(passages) - len(deduped_passages),
+        )
+
+    return deduped_passages, deduped_roles
+
+
+def _rank_passages_by_narrative(passages: List[str], roles: List) -> tuple:
+    """Rank passages so narrative-action passages appear before state passages.
+
+    Within each tier (narrative / non-narrative), original order is preserved.
+    This ensures the character budget in format_passages_for_prompt is filled
+    with story-bearing passages first.
+
+    Returns (ranked_passages, ranked_roles).
+    """
+    narrative_indices = []
+    state_indices = []
+
+    for i, p in enumerate(passages):
+        if _passage_has_narrative_action(p):
+            narrative_indices.append(i)
+        else:
+            state_indices.append(i)
+
+    ranked_order = narrative_indices + state_indices
+    ranked_passages = [passages[i] for i in ranked_order]
+    ranked_roles = [roles[i] if i < len(roles) else None for i in ranked_order]
+
+    if narrative_indices:
+        logger.info(
+            "[LOCAL-352] Narrative ranking: %d narrative-action passages ranked first "
+            "out of %d total",
+            len(narrative_indices), len(passages),
+        )
+
+    return ranked_passages, ranked_roles
+
+
+def deduplicate_and_rank_passages(passages: List[str], roles: List = None) -> tuple:
+    """[LOCAL-352] Public entry point: deduplicate then rank by narrative action.
+
+    Args:
+        passages: List of passage text strings.
+        roles: Corresponding passage_roles list (may be shorter or None).
+
+    Returns:
+        (ranked_passages, ranked_roles) — deduplicated and narrative-ranked.
+    """
+    if roles is None:
+        roles = []
+    # Pad roles to match passages length
+    while len(roles) < len(passages):
+        roles.append(None)
+
+    deduped, deduped_roles = _deduplicate_passages(passages, roles)
+    ranked, ranked_roles = _rank_passages_by_narrative(deduped, deduped_roles)
+    return ranked, ranked_roles
+
+
+def _accent_fold(text: str) -> str:
+    """Fold accented characters to ASCII equivalents for matching.
+
+    LOCAL-277: Île/Ile, Èze/Eze, Château/Chateau, Carré/Carre etc.
+    [LOCAL-340] Also folds typographic apostrophes/quotes to ASCII.
+    U+2019 (') and U+2018 (') → U+0027 (')
+    U+201C (") and U+201D (") → U+0022 (")
+    This is the D243 "third face": L'Armure (U+2019) must match L'Armure (U+0027).
+    """
+    import unicodedata
+    # [LOCAL-340] Fold typographic quotes to ASCII before NFKD decomposition.
+    # These survive NFKD and would otherwise cause exact-match failures.
+    text = text.replace('\u2019', "'").replace('\u2018', "'")
+    text = text.replace('\u201C', '"').replace('\u201D', '"')
+    nfkd = unicodedata.normalize('NFKD', text)
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+
+# LOCAL-277: Name variant groups — these drawn names refer to the same place.
+# Each tuple is (canonical_corpus_title, [variant_names_the_selector_may_use]).
+# Only equivalent places; distinct places (e.g. Cap Ferrat Lighthouse vs Cap Ferrat) stay separate.
+_NAME_VARIANT_MAP = {
+    # Port/Harbor forms for the same place
+    'saint-tropez harbor': ['port de saint-tropez', 'port of saint-tropez', 'saint-tropez port',
+                            'saint-tropez harbour', 'vieux port de saint-tropez'],
+    'port de nice': ['port lympia', 'port of nice', 'nice harbor', 'nice harbour',
+                     'old port of nice', 'vieux port de nice'],
+    'port grimaud': ['port de grimaud', 'port of grimaud'],
+    # Accent/article variants
+    'ile sainte-marguerite': ['ile sainte marguerite', 'ile ste-marguerite',
+                              'ile ste marguerite', 'saint margaret island'],
+    # "Old Town" with/without "of"
+    'old town of antibes': ['old town antibes', 'vieil antibes', 'vieille ville d\'antibes'],
+    # Croisette variants
+    'la croisette': ['cannes croisette', 'boulevard de la croisette',
+                     'promenade de la croisette', 'the croisette'],
+    # Chateau variants
+    'chateau de la chevre d\'or': ['la chevre d\'or', 'chevre d\'or',
+                                    'chateau chevre d\'or'],
+    # Saint-Paul hyphen variants
+    'saint-paul-de-vence': ['saint-paul de vence', 'saint paul de vence',
+                            'st-paul-de-vence', 'st paul de vence'],
+    # Cap Ferrat variants (note: Cap Ferrat Lighthouse IS arguably different — kept separate)
+    'cap ferrat': ['saint-jean-cap-ferrat', 'st-jean-cap-ferrat'],
+    # Fort variants
+    'fort carre d\'antibes': ['fort carre', 'fort carre antibes'],
+    # Eze
+    'eze village': ['village d\'eze', 'eze'],
+    # Mougins
+    'vieux village de mougins': ['mougins village', 'old village of mougins',
+                                  'mougins old village', 'mougins'],
+}
+
+
+def _match_via_variants(stop_name: str, corpus_rows: List[Dict]) -> Optional[Dict]:
+    """LOCAL-277: Match a drawn stop name to corpus via known variant groups.
+
+    Accent-folded, case-insensitive comparison. Returns the best matching row
+    or None if no variant match found.
+    """
+    stop_folded = _accent_fold(stop_name).lower().strip()
+
+    for row in corpus_rows:
+        corpus_folded = _accent_fold(row['stop_title']).lower().strip()
+
+        # Direct accent-folded match
+        if stop_folded == corpus_folded:
+            return row
+
+    # Check variant map: is the drawn name a known variant of a corpus title?
+    for canonical, variants in _NAME_VARIANT_MAP.items():
+        all_forms = [canonical] + variants
+        all_folded = [_accent_fold(f).lower().strip() for f in all_forms]
+
+        if stop_folded in all_folded:
+            # Find corpus row matching canonical or any variant
+            for row in corpus_rows:
+                row_folded = _accent_fold(row['stop_title']).lower().strip()
+                if row_folded in all_folded:
+                    return row
+
+    return None
+
+
 def get_stop_corpus_for_tour(
     venue_name: str,
     stop_names: List[str],
     conn,
 ) -> Dict[str, Optional[Dict]]:
     """Fetch per-stop corpus passages for all stops in a tour.
+
+    [LOCAL-339] Strategy: stop-title-first matching with venue as tie-breaker.
+
+    The same stop_title can appear under multiple venue_name values (e.g.
+    'Chez Palmyre' exists under 3 different venues). Matching by venue first
+    misses stops when the tour's venue string doesn't exactly align with the
+    corpus venue (e.g. 'restaurant tour in Old Nice (Vieux Nice), France' vs
+    'Old Nice, Nice, France'). Matching by stop_title first — with venue as
+    a preference when there are duplicates — is sounder.
 
     Args:
         venue_name: The venue name used in generation (e.g. tour location).
@@ -47,71 +297,313 @@ def get_stop_corpus_for_tour(
 
     result = {}
 
-    # First, find which venue_name(s) in stop_corpus match this tour
-    corpus_venue_name = _find_corpus_venue_name(venue_name, conn)
-    if not corpus_venue_name:
-        # No stop_corpus rows for this venue at all
-        for name in stop_names:
-            result[name] = None
-        return result
+    # [LOCAL-339] Clean the venue name using _prolog_place to strip tour-type
+    # prefixes ("restaurant tour in X" → "X"). This gives a better venue
+    # string for tie-breaking when multiple corpus rows match a stop_title.
+    from generate_tour_text import _prolog_place
+    clean_venue = _prolog_place(venue_name)
 
-    # Fetch all rows for this venue in one query
+    # [LOCAL-339] Fetch ALL stop_corpus rows that could match any of our stops.
+    # Strategy: query by stop_title (accent-folded) across all venues, then use
+    # venue affinity as a tie-breaker.
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        "SELECT stop_title, passages_json, source_pages, passage_roles FROM stop_corpus WHERE venue_name = %s",
-        (corpus_venue_name,)
+        "SELECT venue_name, stop_title, passages_json, source_pages, passage_roles FROM stop_corpus"
     )
-    corpus_rows = cur.fetchall()
+    all_corpus_rows = cur.fetchall()
     cur.close()
 
-    if not corpus_rows:
+    if not all_corpus_rows:
         for name in stop_names:
             result[name] = None
         return result
 
-    # Build lookup index
-    corpus_by_title = {}
-    for row in corpus_rows:
-        corpus_by_title[row['stop_title']] = row
+    # Determine venue affinity: find which venue_name(s) best match this tour.
+    # Used as tie-breaker, not as primary filter.
+    preferred_venue = _find_corpus_venue_name(clean_venue, conn)
 
-    # Match each stop to its corpus row
+    # [LOCAL-342] Pre-fetch venue_corpus rows for venue-as-stop bridging.
+    # A place can be a VENUE in one tour (museum) and a STOP in another (walking).
+    # When stop_corpus has no row for such a stop, the venue's own pages (Wikipedia
+    # articles about the building) are valid material about the stop-as-place.
+    venue_corpus_rows = _fetch_venue_corpus_rows(conn)
+
+    # Match each stop to its best corpus row (title-first, venue as tie-breaker)
     for stop_name in stop_names:
-        matched = _match_stop_to_corpus(stop_name, corpus_rows)
-        if matched:
-            passages_raw = matched['passages_json']
-            if isinstance(passages_raw, str):
-                passages_raw = json.loads(passages_raw)
+        # [LOCAL-352] Merge ALL exact-match rows for this stop_title, then
+        # deduplicate and rank. Previously, _match_stop_title_first picked ONE
+        # row (the preferred venue's or the richest), losing passages from
+        # other rows. La Merenda had the Negresco passage in row A but the
+        # matcher picked row B — the story was never seen by the model.
+        all_matched = _get_all_matching_rows(stop_name, all_corpus_rows, preferred_venue)
 
-            sources_raw = matched.get('source_pages', [])
-            if isinstance(sources_raw, str):
-                sources_raw = json.loads(sources_raw)
+        if all_matched:
+            from corpus_source_quality import filter_passages_for_generation
 
-            # Extract passage texts
-            passages = []
-            for p in (passages_raw or []):
-                if isinstance(p, dict):
-                    text = p.get('text', '')
-                elif isinstance(p, str):
-                    text = p
-                else:
-                    text = str(p)
-                if text:
-                    passages.append(text)
+            # Merge passages, sources, and roles from all matching rows
+            all_passages = []
+            all_sources = []
+            all_roles = []
 
-            # [LOCAL-203] Include passage_roles for role-aware coverage
-            roles_raw = matched.get('passage_roles')
-            if isinstance(roles_raw, str):
-                roles_raw = json.loads(roles_raw)
+            for matched in all_matched:
+                passages_raw = matched['passages_json']
+                if isinstance(passages_raw, str):
+                    passages_raw = json.loads(passages_raw)
 
-            result[stop_name] = {
-                'passages': passages,
-                'sources': sources_raw or [],
-                'passage_roles': roles_raw or [],
-            } if passages else None
+                sources_raw = matched.get('source_pages', [])
+                if isinstance(sources_raw, str):
+                    sources_raw = json.loads(sources_raw)
+
+                roles_raw = matched.get('passage_roles')
+                if isinstance(roles_raw, str):
+                    roles_raw = json.loads(roles_raw) if roles_raw else []
+
+                # [LOCAL-328] Filter sludge passages at read time.
+                passages_filtered = filter_passages_for_generation(passages_raw)
+
+                # Extract passage texts
+                for i, p in enumerate(passages_filtered or []):
+                    if isinstance(p, dict):
+                        text = p.get('text', '')
+                    elif isinstance(p, str):
+                        text = p
+                    else:
+                        text = str(p)
+                    if text:
+                        all_passages.append(text)
+                        role = (roles_raw[i] if roles_raw and i < len(roles_raw)
+                                else None)
+                        all_roles.append(role)
+
+                # Merge sources (dedup by URL)
+                seen_urls = {s.get('url', '') for s in all_sources if isinstance(s, dict)}
+                for s in (sources_raw or []):
+                    if isinstance(s, dict):
+                        if s.get('url', '') not in seen_urls:
+                            all_sources.append(s)
+                            seen_urls.add(s.get('url', ''))
+                    elif isinstance(s, str) and s not in seen_urls:
+                        all_sources.append(s)
+                        seen_urls.add(s)
+
+            # [LOCAL-352] Deduplicate and rank: remove near-duplicate passages
+            # that restate the same fact, then rank narrative-action passages
+            # above state/attribute passages so the character budget fills with
+            # story-bearing content first.
+            if all_passages:
+                all_passages, all_roles = deduplicate_and_rank_passages(
+                    all_passages, all_roles
+                )
+
+            stop_corpus_result = {
+                'passages': all_passages,
+                'sources': all_sources,
+                'passage_roles': all_roles,
+            } if all_passages else None
+
+            # [LOCAL-346] Merge bridge: when a stop_corpus row exists, ALSO
+            # check the venue_corpus bridge. If the bridge provides material,
+            # merge it — the venue_corpus (Wikipedia tier-1 about the building)
+            # complements enrichment (tier-3 travel blogs about the stop).
+            #
+            # Rule: merge, not choose. The bridge provides building-level
+            # context (architecture, history, significance) that the enrichment
+            # rarely duplicates. Three enrichment passages and sixty-three
+            # venue pages are not competitors — they are complementary.
+            #
+            # Safety: _bridge_venue_corpus_to_stop only matches when the stop's
+            # title IS the venue name (e.g. "Palais Lascaris" matches
+            # "Palais Lascaris, Nice"). Museum objects inside the venue
+            # (e.g. "Harpe by Naderman") will never match → museum unaffected.
+            bridged = _bridge_venue_corpus_to_stop(stop_name, venue_corpus_rows)
+            if bridged and stop_corpus_result:
+                result[stop_name] = _merge_stop_and_bridge(
+                    stop_corpus_result, bridged, stop_name
+                )
+            else:
+                result[stop_name] = stop_corpus_result
         else:
-            result[stop_name] = None
+            # [LOCAL-342] Venue-as-stop bridge: when a stop has no stop_corpus
+            # row, check if its title matches a venue_corpus venue_name. If so,
+            # the venue's own pages (about the building/place) are usable as
+            # material for this stop — filtered for relevance.
+            bridged = _bridge_venue_corpus_to_stop(stop_name, venue_corpus_rows)
+            result[stop_name] = bridged
 
     return result
+
+
+def _get_all_matching_rows(
+    stop_name: str,
+    all_corpus_rows: List[Dict],
+    preferred_venue: Optional[str],
+) -> List[Dict]:
+    """[LOCAL-352] Get ALL matching corpus rows for a stop, not just one.
+
+    When multiple rows exist for the same stop_title (under different venue
+    names), we want ALL their passages merged and deduplicated. Previously,
+    _match_stop_title_first picked the single "best" row, losing passages
+    that only existed in the other row.
+
+    Returns a list of matching rows (exact matches first; fuzzy as fallback).
+    Ordered with preferred-venue row first (it provides the primary sources
+    metadata), then others sorted by passage count descending.
+    """
+    exact_matches = []
+    fuzzy_matches = []
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    stop_norm = _normalize_for_match(stop_name)
+
+    for row in all_corpus_rows:
+        title = row['stop_title']
+        # 1. Exact case-insensitive
+        if title.lower().strip() == stop_name.lower().strip():
+            exact_matches.append(row)
+            continue
+        # 2. Accent-folded exact
+        if _accent_fold(title).lower().strip() == stop_folded:
+            exact_matches.append(row)
+            continue
+        # 3. Containment (either direction)
+        if stop_name.lower() in title.lower() or title.lower() in stop_name.lower():
+            fuzzy_matches.append(row)
+            continue
+        # 4. Normalized word overlap
+        corpus_title_norm = _normalize_for_match(title)
+        corpus_words = set(w for w in corpus_title_norm.split() if len(w) >= 4)
+        stop_words = set(w for w in stop_norm.split() if len(w) >= 4)
+        if corpus_words and stop_words:
+            overlap = corpus_words & stop_words
+            threshold = max(1, min(len(corpus_words), len(stop_words)) * 0.5)
+            if len(overlap) >= threshold:
+                fuzzy_matches.append(row)
+
+    # Exact matches take priority; fall back to fuzzy only when no exact match
+    candidates = exact_matches if exact_matches else fuzzy_matches
+
+    if not candidates:
+        # Try variant map as last resort
+        variant_match = _match_via_variants(stop_name, all_corpus_rows)
+        if variant_match:
+            return [variant_match]
+        return []
+
+    # For fuzzy matches, still pick only the BEST one (avoid cross-contamination
+    # between different stops like "Chez Pipo" and "Chez Palmyre")
+    if not exact_matches and fuzzy_matches:
+        if preferred_venue:
+            venue_matches = [r for r in fuzzy_matches if r['venue_name'] == preferred_venue]
+            if venue_matches:
+                return [max(venue_matches, key=lambda r: _passage_count(r))]
+        return [max(fuzzy_matches, key=lambda r: _passage_count(r))]
+
+    # For exact matches, return ALL rows — they are genuinely the same stop
+    # under different venue names. Order: preferred venue first, then by richness.
+    if preferred_venue:
+        preferred = [r for r in candidates if r['venue_name'] == preferred_venue]
+        others = [r for r in candidates if r['venue_name'] != preferred_venue]
+        others.sort(key=lambda r: -_passage_count(r))
+        result = preferred + others
+    else:
+        result = sorted(candidates, key=lambda r: -_passage_count(r))
+
+    if len(result) > 1:
+        logger.info(
+            "[LOCAL-352] Merging %d corpus rows for %r (venues: %s)",
+            len(result), stop_name,
+            ", ".join(r['venue_name'] for r in result),
+        )
+
+    return result
+
+
+def _match_stop_title_first(
+    stop_name: str,
+    all_corpus_rows: List[Dict],
+    preferred_venue: Optional[str],
+) -> Optional[Dict]:
+    """[LOCAL-339] Match a stop to corpus by title first, venue as tie-breaker.
+
+    [LOCAL-340] Match quality tiers: an exact/accent-folded title match ALWAYS
+    beats a fuzzy (containment/word-overlap) match, regardless of venue
+    preference. This prevents "Chez Pipo" from being grounded against
+    "Chez Palmyre" corpus when the only overlap is the word "chez".
+
+    When the same stop_title exists under multiple venues, prefer the row
+    from the preferred_venue. When no preferred venue matches, take the row
+    with the most passages (richest corpus).
+    """
+    # [LOCAL-340] Collect candidates in quality tiers:
+    #   exact_matches: case-insensitive or accent-folded exact title match
+    #   fuzzy_matches: containment or word-overlap matches
+    # Exact matches always take priority — fuzzy matches are only considered
+    # when no exact match exists.
+    exact_matches = []
+    fuzzy_matches = []
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    stop_norm = _normalize_for_match(stop_name)
+
+    for row in all_corpus_rows:
+        title = row['stop_title']
+        # 1. Exact case-insensitive
+        if title.lower().strip() == stop_name.lower().strip():
+            exact_matches.append(row)
+            continue
+        # 2. Accent-folded exact
+        if _accent_fold(title).lower().strip() == stop_folded:
+            exact_matches.append(row)
+            continue
+        # 3. Containment (either direction)
+        if stop_name.lower() in title.lower() or title.lower() in stop_name.lower():
+            fuzzy_matches.append(row)
+            continue
+        # 4. Normalized word overlap
+        corpus_title_norm = _normalize_for_match(title)
+        corpus_words = set(w for w in corpus_title_norm.split() if len(w) >= 4)
+        stop_words = set(w for w in stop_norm.split() if len(w) >= 4)
+        if corpus_words and stop_words:
+            overlap = corpus_words & stop_words
+            threshold = max(1, min(len(corpus_words), len(stop_words)) * 0.5)
+            if len(overlap) >= threshold:
+                fuzzy_matches.append(row)
+
+    # [LOCAL-340] Use exact matches when available; fall back to fuzzy only
+    # when no exact match exists. This is the critical fix: a stop must be
+    # grounded against ITS OWN corpus, not a similarly-named stop's corpus.
+    candidates = exact_matches if exact_matches else fuzzy_matches
+
+    if not candidates:
+        # Try variant map as last resort
+        variant_match = _match_via_variants(stop_name, all_corpus_rows)
+        if variant_match:
+            return variant_match
+        return None
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Multiple candidates — use venue as tie-breaker
+    if preferred_venue:
+        venue_matches = [r for r in candidates if r['venue_name'] == preferred_venue]
+        if venue_matches:
+            # Among venue matches, prefer the one with most passages
+            return max(venue_matches, key=lambda r: _passage_count(r))
+
+    # No venue match or no preferred venue — take richest corpus
+    return max(candidates, key=lambda r: _passage_count(r))
+
+
+def _passage_count(row: Dict) -> int:
+    """Count passages in a corpus row (for tie-breaking)."""
+    passages_raw = row.get('passages_json', '[]')
+    if isinstance(passages_raw, str):
+        try:
+            return len(json.loads(passages_raw))
+        except (json.JSONDecodeError, TypeError):
+            return 0
+    if isinstance(passages_raw, list):
+        return len(passages_raw)
+    return 0
 
 
 def _find_corpus_venue_name(venue_name: str, conn) -> Optional[str]:
@@ -168,23 +660,36 @@ def _find_corpus_venue_name(venue_name: str, conn) -> Optional[str]:
 def _match_stop_to_corpus(stop_name: str, corpus_rows: List[Dict]) -> Optional[Dict]:
     """Match a stop name to its corpus row using multi-strategy matching.
 
-    Same strategy as the detector: exact → ILIKE → fuzzy word overlap.
+    Strategy: exact → accent-folded → variant map → containment → fuzzy word overlap.
+    LOCAL-277: Added accent folding (step 2) and variant map (step 3) to resolve
+    name fragmentation that caused 11/23 drawn stops to find zero corpus.
     """
     stop_norm = _normalize_for_match(stop_name)
 
-    # 1. Exact match
+    # 1. Exact match (case-insensitive)
     for row in corpus_rows:
         if row['stop_title'].lower().strip() == stop_name.lower().strip():
             return row
 
-    # 2. Containment match (either direction)
+    # 2. LOCAL-277: Accent-folded exact match (Île→Ile, Château→Chateau, etc.)
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    for row in corpus_rows:
+        if _accent_fold(row['stop_title']).lower().strip() == stop_folded:
+            return row
+
+    # 3. LOCAL-277: Known variant groups (Port de/Port of/Harbor, Old Town/Old Town of, etc.)
+    variant_match = _match_via_variants(stop_name, corpus_rows)
+    if variant_match:
+        return variant_match
+
+    # 4. Containment match (either direction)
     for row in corpus_rows:
         title_lower = row['stop_title'].lower()
         name_lower = stop_name.lower()
         if name_lower in title_lower or title_lower in name_lower:
             return row
 
-    # 3. Normalized word overlap (significant words)
+    # 5. Normalized word overlap (significant words)
     for row in corpus_rows:
         corpus_title_norm = _normalize_for_match(row['stop_title'])
         corpus_words = set(w for w in corpus_title_norm.split() if len(w) >= 4)
@@ -274,6 +779,61 @@ def format_passages_for_prompt(
         "If a passage names a person or event, you may include it; if it does not, leave it out."
     )
 
+    # [LOCAL-345] Body-usage directive: the passages must appear in the
+    # DESCRIPTION BODY, not only in the orientation. Without this, the LLM
+    # uses corpus words in the orientation header and then writes an entirely
+    # fabricated body from training data.
+    lines.append("")
+    lines.append(
+        "BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative "
+        "paragraphs after the orientation) MUST incorporate specific facts, dates, or claims "
+        "from the passages above. The orientation alone is not sufficient — the body text is "
+        "where the listener spends most of their time. If a passage mentions a UNESCO designation, "
+        "a founding date, a named historical event, or a specific fact, that material MUST appear "
+        "in the body narrative, not just be referenced in the orientation line. A body that "
+        "contains zero material from the provided passages is a failure."
+    )
+
+    # [LOCAL-352] Narrative arc directive: when corpus contains a person doing
+    # something — leaving, founding, refusing, recommending, returning — the
+    # stop must tell what happened, not merely that the person is associated.
+    # Without this, "a chef who left the Negresco to cook for twenty people"
+    # collapses to "a former Michelin-starred chef" — a credential, not a story.
+    lines.append("")
+    lines.append(
+        "NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person "
+        "DOING something — leaving a position, founding a place, refusing an offer, "
+        "recommending a dish, returning after years away — your description MUST tell "
+        "the sequence of events, not merely state the person's credential or association. "
+        "A credential is an adjective (\"Michelin-starred chef\"); a narrative is a "
+        "sequence (\"he left his two-star kitchen at the Negresco to cook for twenty "
+        "people in a back-street bistro\"). The listener wants to experience what "
+        "happened, not read a résumé. Specifically:"
+    )
+    lines.append(
+        "  - If a passage names WHERE someone came from and WHERE they went, state both."
+    )
+    lines.append(
+        "  - If a passage names WHAT someone gave up and WHAT they chose instead, "
+        "state the contrast."
+    )
+    lines.append(
+        "  - If a passage names a specific person recommending, reviewing, or "
+        "recounting an experience at this place, tell it as an event: who did what, "
+        "where, and what they said or found. This applies to visitors, critics, "
+        "chefs from elsewhere, and documented incidents — not only owners."
+    )
+    lines.append(
+        "  - Do NOT flatten a narrative into a single adjective or title. "
+        "\"Former head chef of the Negresco\" is a title; \"walked away from the "
+        "Negresco's two Michelin stars to serve twenty people at a place whose name "
+        "means workman's snack\" is a story. Tell the story."
+    )
+    lines.append(
+        "  - Every element of the story MUST come from the passages above. You may "
+        "not infer motivation, emotion, or dates not stated in the source material."
+    )
+
     # [LOCAL-203] Add role-specific guidance when roles are present
     if roles:
         has_creator = any(
@@ -297,3 +857,316 @@ def format_passages_for_prompt(
             )
 
     return "\n".join(lines) + "\n"
+
+
+# ─── LOCAL-346: Merge stop_corpus + venue_corpus bridge ──────────────────────
+
+
+def _merge_stop_and_bridge(
+    stop_data: Dict,
+    bridge_data: Dict,
+    stop_name: str,
+) -> Dict:
+    """[LOCAL-346] Merge stop_corpus material with venue_corpus bridge material.
+
+    The venue_corpus bridge provides tier-1 Wikipedia content about the building
+    (architecture, history, significance). The stop_corpus enrichment provides
+    tier-3 supplementary web detail. They are complementary, not competing.
+
+    Merge strategy:
+      - Bridge passages go FIRST (richer, tier-1, building-level context).
+      - Stop_corpus passages appended (supplementary detail).
+      - Deduplication by normalized text prefix (first 100 chars).
+      - Sources merged with bridge sources first.
+      - Passage roles merged correspondingly.
+
+    This ensures the generator sees the best material first without losing
+    the enrichment content.
+    """
+    # Deduplicate: reject stop_corpus passages that substantially overlap
+    # with bridge passages (same text from different acquisition paths).
+    bridge_passages = bridge_data.get('passages', [])
+    stop_passages = stop_data.get('passages', [])
+
+    # Build fingerprint set from bridge passages for dedup
+    bridge_fingerprints = set()
+    for p in bridge_passages:
+        fp = _normalize_for_match(p)[:100]
+        bridge_fingerprints.add(fp)
+
+    # Keep only non-duplicate stop_corpus passages
+    unique_stop_passages = []
+    for p in stop_passages:
+        fp = _normalize_for_match(p)[:100]
+        if fp not in bridge_fingerprints:
+            unique_stop_passages.append(p)
+            bridge_fingerprints.add(fp)  # prevent intra-stop duplicates too
+
+    # Merge: bridge first (richer context), then unique enrichment passages
+    merged_passages = bridge_passages + unique_stop_passages
+
+    # Merge sources: bridge sources (tier-1) first, then stop sources
+    bridge_sources = bridge_data.get('sources', [])
+    stop_sources = stop_data.get('sources', [])
+    seen_urls = {s.get('url', '') for s in bridge_sources if s.get('url')}
+    unique_stop_sources = [s for s in stop_sources if s.get('url', '') not in seen_urls]
+    merged_sources = bridge_sources + unique_stop_sources
+
+    # Merge passage_roles: bridge roles first, then stop roles for unique passages
+    bridge_roles = bridge_data.get('passage_roles', [])
+    stop_roles = stop_data.get('passage_roles', [])
+    # Map stop_roles to the unique passages we kept
+    if stop_roles and len(stop_roles) == len(stop_passages):
+        unique_stop_roles = [
+            stop_roles[i] for i, p in enumerate(stop_passages)
+            if _normalize_for_match(p)[:100] not in
+            {_normalize_for_match(bp)[:100] for bp in bridge_passages}
+        ]
+    else:
+        unique_stop_roles = [{'role': 'enrichment'} for _ in unique_stop_passages]
+    merged_roles = bridge_roles + unique_stop_roles
+
+    logger.info(
+        "[LOCAL-346] Merged stop_corpus (%d passages) + venue bridge (%d passages) "
+        "→ %d total for %r (dedup removed %d)",
+        len(stop_passages), len(bridge_passages), len(merged_passages),
+        stop_name, len(stop_passages) - len(unique_stop_passages),
+    )
+
+    return {
+        'passages': merged_passages,
+        'sources': merged_sources,
+        'passage_roles': merged_roles,
+    }
+
+
+# ─── LOCAL-342: Venue-as-stop bridging ───────────────────────────────────────
+#
+# A place that is a VENUE in one tour (e.g. "Palais Lascaris, Nice" as a museum
+# tour) can be a STOP in another (e.g. "Palais Lascaris" as a walking tour stop).
+# The venue_corpus holds Wikipedia pages about the building itself — valid
+# material for a walking-tour listener standing outside.
+#
+# Critical constraint: NOT all venue_corpus content is about the venue-as-place.
+# The stop_corpus rows filed under that venue are about objects INSIDE it
+# (instruments, paintings). Those are already handled by normal stop_corpus
+# matching and must not be confused with venue-level material.
+#
+# The bridge:
+#   1. Match stop title to venue_corpus.venue_name (accent-folded, city-suffix tolerant)
+#   2. Extract pages_json text (Wikipedia articles about the building)
+#   3. Split into paragraph-sized passages
+#   4. Filter: reject passages that are about individual objects inside (catalogue
+#      entries) — keep only content about the building, history, architecture
+
+
+def _fetch_venue_corpus_rows(conn) -> List[Dict]:
+    """Fetch all venue_corpus rows (venue_name + pages_json) for bridging.
+
+    Returns list of {venue_name, pages_json} dicts.
+    Only fetches rows where pages_json is an array (has page content).
+    """
+    import psycopg2.extras
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        "SELECT venue_name, pages_json FROM venue_corpus "
+        "WHERE jsonb_typeof(pages_json) = 'array'"
+    )
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+def _venue_name_matches_stop(stop_name: str, venue_name: str) -> bool:
+    """Check if a stop title matches a venue_corpus venue_name.
+
+    Handles:
+      - Exact match (case-insensitive, accent-folded)
+      - City-suffix stripping: "Palais Lascaris, Nice" → "Palais Lascaris"
+      - Typographic apostrophe folding (D253)
+
+    Does NOT match:
+      - Partial word overlap (too loose)
+      - "walking area" suffixed venue names (those are geographic areas, not buildings)
+    """
+    # Reject "walking area" venues — they are tour-type labels, not specific buildings
+    if 'walking area' in venue_name.lower():
+        return False
+
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    venue_folded = _accent_fold(venue_name).lower().strip()
+
+    # Direct match
+    if stop_folded == venue_folded:
+        return True
+
+    # Strip city suffix from venue: "Palais Lascaris, Nice" → "Palais Lascaris"
+    # Also handles "Musee Picasso, Antibes, France" → "Musee Picasso"
+    venue_parts = venue_folded.split(',')
+    venue_base = venue_parts[0].strip()
+    if stop_folded == venue_base:
+        return True
+
+    # Stop might have a city suffix too: "Nice Cathedral" matching "Nice Cathedral, Nice"
+    stop_parts = stop_folded.split(',')
+    stop_base = stop_parts[0].strip()
+    if stop_base == venue_base:
+        return True
+
+    return False
+
+
+def _split_into_passages(text: str, max_passage_len: int = 800) -> List[str]:
+    """Split a page text into paragraph-sized passages.
+
+    Uses double-newlines (paragraph breaks) as the primary split.
+    Merges very short paragraphs with the next one.
+    Splits very long paragraphs at sentence boundaries.
+    """
+    # Split on section headers (== ... ==) and double newlines
+    raw_paragraphs = re.split(r'\n\s*\n|\n\s*==\s*', text)
+    passages = []
+    buffer = ""
+
+    for para in raw_paragraphs:
+        para = para.strip()
+        # Remove wiki markup header closers
+        para = re.sub(r'\s*==\s*$', '', para).strip()
+        if not para:
+            continue
+
+        if len(buffer) + len(para) + 1 <= max_passage_len:
+            buffer = (buffer + "\n" + para).strip() if buffer else para
+        else:
+            if buffer:
+                passages.append(buffer)
+            # If this paragraph is itself too long, split at sentences
+            if len(para) > max_passage_len:
+                sentences = re.split(r'(?<=[.!?])\s+', para)
+                chunk = ""
+                for sent in sentences:
+                    if len(chunk) + len(sent) + 1 <= max_passage_len:
+                        chunk = (chunk + " " + sent).strip() if chunk else sent
+                    else:
+                        if chunk:
+                            passages.append(chunk)
+                        chunk = sent
+                buffer = chunk
+            else:
+                buffer = para
+
+    if buffer:
+        passages.append(buffer)
+
+    return passages
+
+
+def _is_object_catalogue_passage(passage: str) -> bool:
+    """Detect if a passage is about a specific object inside the venue.
+
+    Returns True for catalogue-style entries about instruments, paintings,
+    sculptures — content that describes individual items, not the building.
+
+    Conservative: only rejects passages that are clearly about a single object,
+    not passages that mention objects in the context of the building's collection.
+    """
+    passage_lower = passage.lower()
+
+    # Catalogue patterns: "made by X in Y", instrument/artwork descriptions
+    # that are about a specific item rather than the venue
+    _object_indicators = [
+        # Specific maker attribution patterns
+        r'\b(made|crafted|built|created|painted|sculpted)\s+by\s+[A-Z]',
+        # Instrument dimensions/materials (catalogue entries)
+        r'\b(length|height|width)\s*:\s*\d+\s*(cm|mm|inches)',
+        # Accession/inventory numbers
+        r'\b(inv\.|accession|catalogue)\s*(no\.?|number|#)\s*[\d]',
+    ]
+
+    for pattern in _object_indicators:
+        if re.search(pattern, passage, re.IGNORECASE):
+            # Only reject if the passage is SHORT (a pure catalogue entry).
+            # Longer passages mentioning a maker in context of the building's
+            # history are fine.
+            if len(passage) < 200:
+                return True
+
+    return False
+
+
+def _bridge_venue_corpus_to_stop(
+    stop_name: str,
+    venue_corpus_rows: List[Dict],
+) -> Optional[Dict]:
+    """[LOCAL-342] Bridge venue_corpus pages into a stop's material.
+
+    When a stop has no stop_corpus row but its title matches a venue_corpus
+    venue_name, the venue's own pages (Wikipedia articles about the building)
+    are valid material for a walking-tour stop.
+
+    Returns {passages: [...], sources: [...], passage_roles: [...]} or None.
+    """
+    matched_venue = None
+    for vc_row in venue_corpus_rows:
+        if _venue_name_matches_stop(stop_name, vc_row['venue_name']):
+            matched_venue = vc_row
+            break
+
+    if not matched_venue:
+        return None
+
+    pages_json = matched_venue['pages_json']
+    if isinstance(pages_json, str):
+        pages_json = json.loads(pages_json)
+
+    if not isinstance(pages_json, list) or not pages_json:
+        return None
+
+    # Extract passages from venue pages, filtering for relevance
+    all_passages = []
+    sources = []
+
+    for page in pages_json:
+        if not isinstance(page, dict):
+            continue
+        text = page.get('text', '')
+        url = page.get('url', '')
+        title = page.get('title', '')
+
+        if not text or len(text) < 50:
+            continue
+
+        # Split into passage-sized chunks
+        page_passages = _split_into_passages(text)
+
+        for p in page_passages:
+            # Filter: reject object catalogue entries
+            if _is_object_catalogue_passage(p):
+                continue
+            # Reject very short fragments
+            if len(p) < 40:
+                continue
+            all_passages.append(p)
+
+        if url:
+            sources.append({
+                'url': url,
+                'tier': 1,  # Wikipedia = tier 1
+                'title': title or f'Venue page: {matched_venue["venue_name"]}',
+                'type': 'venue_corpus_bridge',
+                'tier_reason': 'LOCAL-342: venue_corpus bridge (Wikipedia about the building)',
+            })
+
+    if not all_passages:
+        return None
+
+    logger.info(
+        "[LOCAL-342] Venue-as-stop bridge: %r matched venue %r — %d passages from %d pages",
+        stop_name, matched_venue['venue_name'], len(all_passages), len(pages_json)
+    )
+
+    return {
+        'passages': all_passages,
+        'sources': sources,
+        'passage_roles': [{'role': 'about_venue_as_stop'} for _ in all_passages],
+    }

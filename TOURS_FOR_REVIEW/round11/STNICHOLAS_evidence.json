@@ -1,0 +1,18 @@
+{
+  "Nave": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Iconostasis": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Icon stand": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  },
+  "Memorial table": {
+    "status": "UNVERIFIED",
+    "reason": "not in discovered landmarks"
+  }
+}

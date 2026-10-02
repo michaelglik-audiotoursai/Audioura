@@ -35,7 +35,9 @@ def test_regex_behavior():
     for i, char in enumerate(sample_text[:50]):  # First 50 chars
         ascii_val = ord(char)
         in_range = 0x20 <= ascii_val <= 0x7E
-        print(f"{i:2d}. '{char}' = {ascii_val:3d} (0x{ascii_val:02X}) - {'KEEP' if in_range or char in '\\n\\r\\t' else 'REMOVE'}")
+        ws_escapes = '\\n\\r\\t'
+        keep = 'KEEP' if in_range or char in ws_escapes else 'REMOVE'
+        print(f"{i:2d}. '{char}' = {ascii_val:3d} (0x{ascii_val:02X}) - {keep}")
 
 def test_correct_regex():
     """Test what the regex should be"""

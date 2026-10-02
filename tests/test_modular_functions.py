@@ -4,6 +4,9 @@ Test Suite for Modularized Functions
 Demonstrates isolated function testing
 """
 
+import pytest
+pytest.importorskip("bs4")  # LOCAL-544: skip when optional dep missing
+
 import unittest
 from newsletter_utils import clean_url, validate_content_length, detect_newsletter_platform
 from content_extraction import extract_substack_content, extract_mailchimp_content

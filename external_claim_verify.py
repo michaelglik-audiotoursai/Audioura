@@ -896,6 +896,9 @@ def write_external_sources_to_stop_corpus(
     new_passages = []
     new_sources = []
 
+    # LOCAL-341: Import relevance gate
+    from harvest_relevance_gate import check_passage_relevance
+
     for claim in promoted_claims:
         if claim.get('verdict') != SUPPORTED_EXTERNAL:
             continue
@@ -904,6 +907,15 @@ def write_external_sources_to_stop_corpus(
         tier = claim.get('tier', 3)
 
         if sentence:
+            # LOCAL-341: Relevance gate — passage must be about the stop
+            is_relevant, relevance_reason = check_passage_relevance(sentence, stop_title)
+            if not is_relevant:
+                logger.warning(
+                    f"[LOCAL-341] Relevance gate BLOCKED passage for {stop_title!r}: "
+                    f"{relevance_reason} | url={url} | text={sentence[:80]}"
+                )
+                continue
+
             new_passages.append({
                 'text': sentence,
                 'source': 'external_verified',

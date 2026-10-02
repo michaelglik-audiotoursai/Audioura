@@ -52,10 +52,10 @@ tests/test_guy_raz_binary_fix.py
 tests/test_iframe_auth.py
 tests/test_integrated_bg_auth.py
 tests/test_known_working_newsletter.py
-tests/test_local28_acceptance.py
-tests/test_local30_acceptance.py
+tests/run_local28_acceptance.py
+tests/run_local30_acceptance.py
 tests/test_logging.py
-tests/test_news_quota_integration.py
+tests/run_news_quota_integration.py
 tests/test_newsletter_cloud.py
 tests/test_newsletter_technologies.py
 tests/test_newsletter_utility.py
@@ -71,7 +71,7 @@ tests/test_quora_newsletter_full.py
 tests/test_security_fix.py
 tests/test_services_decryption.py
 tests/test_tour_editing.py
-tests/test_tour_quota_integration.py
+tests/run_tour_quota_integration.py
 tests/test_translation_implementation.py
 tests/test_url_fix.py
 tests/test_url_redirect.py

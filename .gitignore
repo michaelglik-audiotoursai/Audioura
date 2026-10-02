@@ -68,3 +68,13 @@ key.properties
 !.env.example
 newEnv*
 .env.bak.*
+
+# [D495] Persistent domain-tier cache — machine-local resolution results,
+# rebuilt on demand. Never shared: the two machines resolve independently.
+.domain_tier_cache.json
+.appstoreconnect.env
+
+# GCS-PLAY1 — local venv for the Play upload tool (never committed)
+tools/.venv-play/
+.pytest_cache/
+.venue_parts_cache.json

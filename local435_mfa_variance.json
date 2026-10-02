@@ -1,0 +1,67 @@
+{
+  "task": "LOCAL-435",
+  "venue": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "tour_type": "contained",
+  "total_stops": 3,
+  "num_runs_attempted": 5,
+  "num_runs_succeeded": 0,
+  "runs": [],
+  "statistics": null,
+  "timestamps": [
+    [
+      "2026-08-12T08:08:05",
+      18.655179977416992,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T08:08:19",
+      14.69024395942688,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T08:08:35",
+      16.09418296813965,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T08:08:52",
+      17.065664768218994,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T08:09:09",
+      17.072041988372803,
+      "FAILED"
+    ]
+  ],
+  "blocker4b_events": [
+    {
+      "run": 1,
+      "fired": false,
+      "failure_type": "unknown"
+    },
+    {
+      "run": 2,
+      "fired": false,
+      "failure_type": "unknown"
+    },
+    {
+      "run": 3,
+      "fired": false,
+      "failure_type": "unknown"
+    },
+    {
+      "run": 4,
+      "fired": false,
+      "failure_type": "unknown"
+    },
+    {
+      "run": 5,
+      "fired": false,
+      "failure_type": "unknown"
+    }
+  ],
+  "note": "REAL PIPELINE with fence-tolerant intent parse. No pinning, no monkeypatching.",
+  "fence_fix_active": true,
+  "measured_at": "2026-08-12T08:09:09"
+}

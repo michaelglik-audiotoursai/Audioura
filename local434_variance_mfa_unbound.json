@@ -1,0 +1,76 @@
+{
+  "task": "LOCAL-434",
+  "venue": "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA",
+  "tour_type": "contained",
+  "total_stops": 3,
+  "num_runs_attempted": 5,
+  "num_runs_succeeded": 0,
+  "runs": [],
+  "statistics": null,
+  "timestamps": [
+    [
+      "2026-08-12T07:37:04",
+      5.226919174194336,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T07:37:08",
+      4.574087858200073,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T07:37:13",
+      4.973660945892334,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T07:37:18",
+      4.756407976150513,
+      "FAILED"
+    ],
+    [
+      "2026-08-12T07:37:24",
+      5.87719202041626,
+      "FAILED"
+    ]
+  ],
+  "blocker4b_events": [
+    {
+      "run": 1,
+      "fired": true,
+      "unique_addresses": 6,
+      "venue_name": "",
+      "tier": "unknown"
+    },
+    {
+      "run": 2,
+      "fired": true,
+      "unique_addresses": 6,
+      "venue_name": "",
+      "tier": "unknown"
+    },
+    {
+      "run": 3,
+      "fired": true,
+      "unique_addresses": 6,
+      "venue_name": "",
+      "tier": "unknown"
+    },
+    {
+      "run": 4,
+      "fired": true,
+      "unique_addresses": 6,
+      "venue_name": "",
+      "tier": "unknown"
+    },
+    {
+      "run": 5,
+      "fired": true,
+      "unique_addresses": 5,
+      "venue_name": "",
+      "tier": "unknown"
+    }
+  ],
+  "provenance_lines": [],
+  "note": "REAL PIPELINE \u2014 no pinning, no monkeypatching. Wayback fallback is the production path."
+}

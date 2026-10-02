@@ -8,6 +8,142 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_editing_service.dart';
 import 'edit_stop_screen.dart';
 
+/// LOCAL-475 — the edit screen and its caller must agree on the return type.
+///
+/// [EditStopScreen] returns the updated stop as a `Map<String, dynamic>` on
+/// every save/delete path (with `modified: true` and an `action`), and returns
+/// `null` when the user cancels without changes.
+///
+/// This function is the single place that merges that navigator result back
+/// into [stops]. It enforces the invariant that **[stops] only ever contains
+/// maps**: a non-map result (the old, broken `pop(context, true)` behaviour)
+/// is rejected instead of corrupting the list.
+///
+/// Returns `true` when [stops] was mutated (caller should rebuild).
+///
+/// Kept as a top-level pure function so the return contract is unit-testable
+/// without standing up the full [EditStopScreen] widget (AC #6, #7).
+bool applyEditStopResult(
+  List<Map<String, dynamic>> stops,
+  Map<String, dynamic> editedStop,
+  Object? result,
+) {
+  // Cancel / no-change path: nothing to merge, Save All stays as it was.
+  if (result == null) return false;
+
+  // Contract guard: only a Map<String, dynamic> may enter `stops`. A bool or
+  // anything else is a broken return contract — reject it so a later
+  // `stop['modified']` read never operates on a non-map.
+  if (result is! Map<String, dynamic>) {
+    assert(
+      false,
+      'EditStopScreen must return a Map<String, dynamic> stop, got '
+      '${result.runtimeType}. See LOCAL-475.',
+    );
+    return false;
+  }
+
+  final index =
+      stops.indexWhere((s) => s['stop_number'] == editedStop['stop_number']);
+  if (index == -1) return false;
+
+  stops[index] = result;
+  return true;
+}
+
+/// LOCAL-484 — the Listen page's stop count must follow the edit.
+///
+/// The `saved_tours` SharedPreferences list holds one JSON entry per tour.
+/// `my_tours_screen` renders `'${tour['stops']} stops • …'` straight from that
+/// entry. Before this change, `'stops'` was written once at download time and
+/// never updated, so adding or deleting a stop left the Listen count stale.
+///
+/// This is the single walk that rewrites a tour's entry after a Save All that
+/// produced a new tour id. It matches on [tourPath] (the entry keeps its
+/// original path even after the in-memory `widget.tourData['path']` is
+/// repointed) and writes:
+///   * `new_tour_id` — the id returned by the save (unchanged behaviour), and
+///   * `stops`       — the fresh stop count, when [stopCount] is known.
+///
+/// Keeping both writes in one walk avoids a second, divergent copy of the
+/// list-rewriting logic (the task's explicit constraint).
+///
+/// [stopCount] is nullable on purpose: if the true count could not be
+/// determined we leave `'stops'` untouched rather than writing a guess — an
+/// absent/old number is corrected only when we actually know the new one.
+///
+/// Returns a NEW list with the matched entry rewritten. Entries that don't
+/// match [tourPath], and malformed JSON entries, are copied through untouched.
+/// Kept as a top-level pure function so it is unit-testable without standing
+/// up the widget (AC #1–#6).
+List<String> applyTourEditToSavedTours(
+  List<String> savedTours,
+  String tourPath, {
+  String? newTourId,
+  int? stopCount,
+}) {
+  final result = List<String>.from(savedTours);
+
+  for (int i = 0; i < result.length; i++) {
+    final entryJson = result[i];
+    if (entryJson.isEmpty) continue;
+
+    Map<String, dynamic> entry;
+    try {
+      final decoded = jsonDecode(entryJson);
+      if (decoded is! Map<String, dynamic>) continue;
+      entry = decoded;
+    } catch (_) {
+      // Malformed entry — pass it through untouched rather than dropping it.
+      continue;
+    }
+
+    if (entry['path'] == tourPath) {
+      if (newTourId != null) {
+        entry['new_tour_id'] = newTourId;
+      }
+      if (stopCount != null) {
+        // Stored as a String to match the value written at download time
+        // (tour_generator_screen.dart: `'stops': stops.toString()`), so the
+        // Listen page reads a single consistent type.
+        entry['stops'] = stopCount.toString();
+      }
+      result[i] = jsonEncode(entry);
+      break;
+    }
+  }
+
+  return result;
+}
+
+/// LOCAL-484 — count the stops actually written to disk for a tour.
+///
+/// WHY DISK AND NOT THE SERVER RESPONSE: the orchestrator persists
+/// `stops_count` server-side, but the Save All response the app receives
+/// (`/tour/<id>/update-multiple-stops`) does NOT carry it — it returns only
+/// `status`, `message`, `stops` (the processed subset, not the merged total),
+/// `new_tour_id` and `download_url`. So there is no authoritative count in the
+/// response to prefer. The download, however, writes the complete edited tour
+/// to [tourDirPath], one `audio_<n>.mp3` per stop. Counting those files is the
+/// authoritative local number and is what the Listen page should show.
+///
+/// Returns the number of `audio_*.mp3` files directly in [tourDirPath], or
+/// `null` if the directory is missing or contains none (unknown — caller must
+/// not invent a count).
+int? countStopsOnDisk(String tourDirPath) {
+  final dir = Directory(tourDirPath);
+  if (!dir.existsSync()) return null;
+
+  final mp3Pattern = RegExp(r'audio_\d+\.mp3$');
+  int count = 0;
+  for (final entity in dir.listSync()) {
+    if (entity is File && mp3Pattern.hasMatch(entity.uri.pathSegments.last)) {
+      count++;
+    }
+  }
+  return count > 0 ? count : null;
+}
+
 class EditScreenLogger {
   static Future<void> logFromService(String message) async {
     await DebugLogHelper.addDebugLog('SERVICE_LOG: $message');
@@ -29,9 +165,17 @@ class SaveContextLogger {
 class EditTourScreen extends StatefulWidget {
   final Map<String, dynamic> tourData;
 
+  /// Test-only seam (LOCAL-477). When provided, the screen renders these stops
+  /// synchronously and skips the async `_loadTourStops` disk/plugin path,
+  /// which cannot be driven deterministically under `flutter test`
+  /// (initState-time awaits are bound to the fake-async test zone). Production
+  /// call sites never pass this, so behaviour on device is unchanged.
+  final List<Map<String, dynamic>>? debugInitialStops;
+
   const EditTourScreen({
     super.key,
     required this.tourData,
+    this.debugInitialStops,
   });
 
   @override
@@ -47,6 +191,18 @@ class _EditTourScreenState extends State<EditTourScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.debugInitialStops != null) {
+      // Test seam: seed stops synchronously so the loaded list renders
+      // without the async disk/plugin load. See [EditTourScreen.debugInitialStops].
+      _stops = widget.debugInitialStops!
+          .map((s) => Map<String, dynamic>.from(s))
+          .toList();
+      _originalStops = widget.debugInitialStops!
+          .map((s) => Map<String, dynamic>.from(s))
+          .toList();
+      _isLoading = false;
+      return;
+    }
     _loadTourStops();
   }
 
@@ -193,13 +349,18 @@ class _EditTourScreenState extends State<EditTourScreen> {
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        final index = _stops.indexWhere((s) => s['stop_number'] == stop['stop_number']);
-        if (index != -1) {
-          _stops[index] = result;
-        }
-      });
+    // LOCAL-475: EditStopScreen must hand back the updated stop as a
+    // Map<String, dynamic>. Older code popped `true`/`false`, which put a
+    // bool into _stops and silently broke _hasAnyChanges(). The merge + guard
+    // is delegated to applyEditStopResult so the contract is unit-testable.
+    if (result != null && result is! Map<String, dynamic>) {
+      await DebugLogHelper.addDebugLog(
+        'EDIT_CONTRACT_VIOLATION: EditStopScreen returned ${result.runtimeType}, expected Map<String, dynamic>. See LOCAL-475.',
+      );
+    }
+    final merged = applyEditStopResult(_stops, stop, result);
+    if (merged) {
+      setState(() {});
     }
   }
 
@@ -363,7 +524,12 @@ class _EditTourScreenState extends State<EditTourScreen> {
       );
 
       if (downloadSuccess) {
-        await _updateLocalTourId(newTourId);
+        // The download extracted the complete edited tour into `tourPath`
+        // (the old path — the saved_tours entry still keys on it). Count the
+        // audio_*.mp3 files there: that is the authoritative new stop count,
+        // because the Save All response carries no stops_count (LOCAL-484).
+        final diskStopCount = countStopsOnDisk(tourPath);
+        await _updateLocalTourId(newTourId, stopCount: diskStopCount);
 
         final oldTourPath = widget.tourData['path'] as String;
         final newTourPath = oldTourPath.replaceAll(RegExp(r'[0-9a-f-]{36}'), newTourId);
@@ -435,32 +601,25 @@ class _EditTourScreenState extends State<EditTourScreen> {
 
   // ── part3 methods ──────────────────────────────────────────────────────────
 
-  Future<void> _updateLocalTourId(String newTourId) async {
+  Future<void> _updateLocalTourId(String newTourId, {int? stopCount}) async {
     try {
-      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: $newTourId');
+      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Starting _updateLocalTourId with newTourId: $newTourId, stopCount: $stopCount');
 
       final tourPath = widget.tourData['path'] as String;
       final prefs = await SharedPreferences.getInstance();
       final savedTours = prefs.getStringList('saved_tours') ?? [];
 
-      for (int i = 0; i < savedTours.length; i++) {
-        final tourDataJson = savedTours[i];
-        if (tourDataJson.isNotEmpty) {
-          try {
-            final tourData = jsonDecode(tourDataJson) as Map<String, dynamic>;
-            if (tourData['path'] == tourPath) {
-              tourData['new_tour_id'] = newTourId;
-              savedTours[i] = jsonEncode(tourData);
-              break;
-            }
-          } catch (jsonError) {
-            continue;
-          }
-        }
-      }
+      // Single walk that rewrites both new_tour_id and the stop count. See
+      // applyTourEditToSavedTours — no divergent copy of this logic (LOCAL-484).
+      final updated = applyTourEditToSavedTours(
+        savedTours,
+        tourPath,
+        newTourId: newTourId,
+        stopCount: stopCount,
+      );
 
-      await prefs.setStringList('saved_tours', savedTours);
-      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Local tour updated with new ID reference');
+      await prefs.setStringList('saved_tours', updated);
+      await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: Local tour updated with new ID reference and stop count $stopCount');
     } catch (e) {
       await DebugLogHelper.addDebugLog('DEBUG_UPDATE_ID: ERROR in _updateLocalTourId: $e');
     }
@@ -516,14 +675,16 @@ class _EditTourScreenState extends State<EditTourScreen> {
       'action': 'add',
     };
 
-    _stops.add(newStop);
-    _stops.sort((a, b) => a['stop_number'].compareTo(b['stop_number']));
+    // Mutate _stops and refresh the list. Do NOT pop the screen — the user
+    // stays on the edit screen so the new row appears and Save All enables,
+    // exactly as after editing a stop's text. (LOCAL-477)
+    setState(() {
+      _stops.add(newStop);
+      _stops.sort((a, b) => a['stop_number'].compareTo(b['stop_number']));
+      _newStopContent = '';
+    });
 
-    Navigator.pop(context);
     unawaited(DebugLogHelper.addDebugLog('CRITICAL_ADD: Added new stop $newStopNumber with action=add, modified=true')); // sync callback
-
-    _newStopContent = '';
-    setState(() {});
   }
 
   void _reorderStops(int oldIndex, int newIndex) {
