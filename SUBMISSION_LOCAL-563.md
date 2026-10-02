@@ -137,3 +137,56 @@ one of the two runs. So on this baseline a single run is **not** a reliable verd
 a borderline tour; the pass/fail itself has a noise floor of up to 2 defects and 1
 dropped stop. `named_people` (max Δ 4) and `chars` (max Δ 2395) confirm the narrative
 body varies substantially run to run even when the score does not.
+
+---
+
+## Item 3 — Gemini question list
+
+`tests/fixtures/local563/gemini_questions.jsonl` — **157 lines, one per grounded
+Gemini call** (every charged, grounded call across the 20 recordings; the 7 ungrounded
+calls in the `.gemini.jsonl` files are excluded). Each line carries:
+
+```
+tour, run, call_site, purpose, grounded, charged, model,
+prompt (exact), response (exact text),
+grounding_sources [ {domain, uri}, … ],   # de-duplicated, order-stable
+grounding_queries [ … ], ts, wall_s
+```
+
+The recorder tags every call with the same `site` (`story_leads.gemini_with_sources`
+or `story_leads._gemini`), so the real call site is the `caller` field
+(`<file>:<fn>:<line>`), which is what `call_site` and the de-dup below use.
+
+**Purpose mapping** (brief's categories):
+
+| caller | purpose |
+|---|---|
+| `story_production_loop.py:run_for_stop:263` / `:302` | D545 story facts |
+| `generate_tour_text.py:_generate_tour_text_impl:12106` | story leads |
+| `restaurant_practicals.py:_gemini:153` / `venue_still_operating:328` | restaurant practicals |
+| `stop_knowledge_fallback.py:_gemini_facts:233` / `:251` | stop facts |
+| `venue_parts.py:default_ask:360` / `default_ask_grounded:371` | stop facts |
+
+### De-duplicated count per call site
+
+(`gemini_questions_dedup.json`.) `total` = grounded calls from that site;
+`distinct prompts` = unique prompt strings (de-duplicated).
+
+| call site | purpose | total | distinct prompts |
+|---|---|---|---|
+| `stop_knowledge_fallback.py:_gemini_facts:233` | stop facts | 36 | 25 |
+| `story_production_loop.py:run_for_stop:263` | D545 story facts | 32 | 32 |
+| `story_production_loop.py:run_for_stop:302` | D545 story facts | 31 | 30 |
+| `venue_parts.py:default_ask_grounded:371` | stop facts | 20 | 17 |
+| `restaurant_practicals.py:_gemini:153` | restaurant practicals | 13 | 8 |
+| `restaurant_practicals.py:venue_still_operating:328` | restaurant practicals | 9 | 6 |
+| `generate_tour_text.py:_generate_tour_text_impl:12106` | story leads | 8 | 4 |
+| `stop_knowledge_fallback.py:_gemini_facts:251` | stop facts | 8 | 4 |
+| **total** | | **157** | |
+
+Rolled up by purpose: **D545 story facts 63** · **stop facts 64** · **restaurant
+practicals 22** · **story leads 8**. The two story-production sites (`run_for_stop`)
+almost never repeat a prompt (32/32 and 30/31 distinct) — each stop gets its own
+question — whereas the restaurant and fallback sites repeat heavily (e.g. the restaurant
+`_gemini` extractor is called 13 times with only 8 distinct prompts), because those
+prompts are templated on a small, re-visited set of venues.
