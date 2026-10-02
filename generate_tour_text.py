@@ -5852,7 +5852,106 @@ def _extract_city_from_resolved_entity(venue_entity) -> str:
     return ''
 
 
+# [LOCAL-562] Install the single OpenAI HTTP choke point exactly once, at import.
+# Every chat-completion call made anywhere under a tour scope — in this module or
+# in any gate/extractor/writer module — is priced and attributed to the current
+# tour's accumulator from this one place, instead of the ~5 hand-summed call sites
+# that undercounted OpenAI ~3x (see cost_accumulator.py / openai_cost_wrapper.py).
+try:
+    import openai_cost_wrapper as _openai_cost_wrapper
+    _openai_cost_wrapper.install()
+except Exception as _ocw_err:  # pragma: no cover - metering must never block generation
+    _import_logger.error(f"[LOCAL-562] OpenAI cost choke point unavailable: {_ocw_err}")
+    _openai_cost_wrapper = None
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
+    """[LOCAL-562] Public entry: run one tour inside its own cost scope.
+
+    This thin wrapper is the per-tour boundary. It opens a
+    ``cost_accumulator.tour_scope`` so that every OpenAI call made during this
+    generation — no matter which module issues it — lands in THIS tour's
+    accumulator and no other (the generator runs tours concurrently; a
+    process-global counter cross-contaminates, D-note LOCAL-550). After the
+    implementation returns, the authoritative, counted LLM/search/TTS costs from
+    the accumulator overwrite the hand-summed values in ``_LAST_GENERATION_COST``
+    on the fresh-generation path, so the ledger reflects every call on the wire.
+
+    Signature, return value, and all existing ``_LAST_GENERATION_COST`` keys are
+    unchanged — callers and tests that read ``total_cost`` / ``breakdown`` / etc.
+    see the same shape, only now with correct numbers.
+    """
+    global _LAST_GENERATION_COST
+    try:
+        import cost_accumulator as _cost_accumulator
+    except Exception:
+        _cost_accumulator = None
+
+    if _cost_accumulator is None:
+        return _generate_tour_text_impl(
+            location, tour_type, output_file, total_stops,
+            persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops,
+        )
+
+    with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
+        result = _generate_tour_text_impl(
+            location, tour_type, output_file, total_stops,
+            persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops,
+        )
+        _reconcile_cost_record_from_accumulator(_acc)
+    return result
+
+
+def _reconcile_cost_record_from_accumulator(acc):
+    """[LOCAL-562] Make _LAST_GENERATION_COST authoritative from the choke point.
+
+    The implementation still sums ``total_cost`` by hand for its console prints
+    and the phase-boundary cost ceiling (a safety limit that must keep working),
+    but that hand-sum only ever saw ~5 of the ~18 call sites. The accumulator saw
+    every call. So on a FRESH generation we replace the LLM/search/TTS numbers in
+    the record with the accumulator's counted values and recompute the totals.
+
+    Cache hits are left untouched: they legitimately cost ~0 and the impl already
+    writes a zero record; a cache hit issues no OpenAI calls so the accumulator is
+    zero anyway.
+    """
+    try:
+        rec = _LAST_GENERATION_COST
+        if not isinstance(rec, dict) or not rec:
+            return
+        if rec.get("cache_hit"):
+            return
+
+        snap = acc.snapshot()
+        counted_llm = snap["breakdown"]["llm"]
+        counted_search = snap["breakdown"]["search"]
+        counted_tts = snap["breakdown"]["tts"]
+        counted_tokens = snap["llm"]["input_tokens"] + snap["llm"]["output_tokens"]
+
+        # Grounding is already counted via story_leads.get_grounding_requests() and
+        # folded in by the impl; keep whatever it put there (it is the same per-
+        # request channel, counted at its own single chokepoint).
+        grounding = rec.get("grounding_cost", rec.get("breakdown", {}).get("grounding", 0.0)) or 0.0
+
+        breakdown = dict(rec.get("breakdown") or {})
+        breakdown["llm"] = counted_llm
+        breakdown["search"] = counted_search
+        breakdown["tts"] = counted_tts
+        breakdown["grounding"] = grounding
+
+        rec["breakdown"] = breakdown
+        # total_cost historically meant "OpenAI token cost" (the LLM channel);
+        # keep that meaning but now counted from every call site. Search/TTS have
+        # their own breakdown keys and roll into tour_total_cost.
+        rec["total_cost"] = counted_llm
+        rec["total_tokens"] = counted_tokens
+        rec["tour_total_cost"] = counted_llm + counted_search + counted_tts + grounding
+        rec["cost_accumulator"] = snap  # full debug snapshot for traceability
+    except Exception as _rec_err:  # pragma: no cover
+        _import_logger.error(f"[LOCAL-562] cost reconcile skipped: {_rec_err}")
+
+
+def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
