@@ -1,0 +1,685 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #001 | 13:39:15.401 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 4
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #002 | 13:39:15.401 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA' → 'restaurant  of Buttermilk & Bourbon - Back Bay, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Buttermilk & Bourbon - Back Bay, Boston, MA' → 'restaurant of Buttermilk & Bourbon - Back Bay, Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "restaurants",
+    "location": "Buttermilk & Bourbon - Back Bay, Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Buttermilk & Bourbon - Back Bay, Boston, MA",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Buttermilk & Bourbon - Back Bay, Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.3s cumulative=1.3s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #003 | 13:39:16.721 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  user_request: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Buttermilk & Bourbon - Back Bay, Boston, MA'
+  [S17] no scope_constraint (precision='BUILDING', scope='Buttermilk & Bourbon - Back Bay, Boston, MA')
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #004 | 13:39:16.722 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  total_stops: 4
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0006 (757 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #005 | 13:39:19.750 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA.
+List exactly 7 specific, real, well-known restaurants relevant to: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTA
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {
+        "name": "Ostra",
+        "address": "1 Charles St S, Boston, MA 02116",
+        "reason": "Known for its upscale seafood dishes and elegant ambiance"
+    },
+    {
+        "name": "Mistral",
+        "address": "223 Columbus Ave, Boston, MA 02116",
+        "reason": "Renowned for its French-Mediterranean cuisine and stylish setting"
+    },
+    {
+        "name": "Saltie Girl",
+        "address": "281 Dartmouth St, Boston, MA 02116",
+        "reason": "Specializes in seafood with a f
+
+   ! [LOCAL-329] Hollow reason for 'Ostra': 'Known for its upscale seafood dishes and elegant ambiance'
+   ! [LOCAL-329] Hollow reason for 'Mistral': 'Renowned for its French-Mediterranean cuisine and stylish setting'
+   ! [LOCAL-329] Hollow reason for 'Saltie Girl': 'Specializes in seafood with a focus on tinned fish and raw bar offerings'
+   ! [LOCAL-329] Hollow reason for 'Sonsie': 'Popular for its European-style cafe dining and lively atmosphere'
+   ! [LOCAL-329] Hollow reason for 'Coppa': 'Notable for its Italian small plates and charcuterie offerings'
+  [LOCAL-329] Substance filter: 5 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 2 substantive selection reason(s)
+OK PHASE 3A parsed 2 candidate POI(s):
+   - The Capital Grille @ 900 Boylston St, Boston, MA 02115
+   - Stephanie's On Newbury @ 190 Newbury St, Boston, MA 02116
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 2 POI(s) against type 'restaurants' (parallel)...
+   OK Verified The Capital Grille - The Capital Grille is a chain of upscale steakhouses
+   OK Verified Stephanie's On Newbury - Stephanie's On Newbury is a well-known restaurant in Boston, MA
+   PHASE 3C: all 2 stops pass location guard
+
+Part C: Fetching 2 replacement POI(s), attempt 1/2...
+   Part C attempt 1: AI returned 2 usable candidate(s)
+   PHASE 4: Verifying 2 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Saltie Girl - Saltie Girl is a seafood restaurant located in Boston, Massachusetts
+   OK Verified Mistral - Mistral is a restaurant located in Boston, Massachusetts
+   Part C attempt 1: 2 survived; total now 4
+  [EXISTENCE-GATE] LOG_ONLY — 3/4 stops verified (75%), 1 would be dropped
+    [VERIFIED] 'The Capital Grille' — wikipedia_summary: 'The Capital Grille' is a restaurant
+    [VERIFIED] "Stephanie's On Newbury" — wikipedia_search: snippet in 'List of Chopped episodes (seasons 1–20)' mentions 
+    [UNVERIFIED] 'Saltie Girl' — no evidence
+    [VERIFIED] 'Mistral' — wikipedia_search: snippet in 'Joanne Chang' mentions stop+city
+    [HARVEST] 'Mistral': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 2 already had corpus, 1 verified_no_detail
+    [DINING-HARVEST] 'The Capital Grille': no facts found (stop will be thin)
+    [DINING-HARVEST] "Stephanie's On Newbury": +5 passages from ['https://abc7news.com/archive/7691174/', 'https://dailyfreepress.com/10/05/20/63447/stephanies-a-taste-of-the-finer-side-of-life/', 'https://en.wikipedia.org/wiki/List_of_Chopped_episodes_%28seasons_1%E2%80%9320%29', 'https://www.facebook.com/61556023853107/posts/marc-sheehan-of-northern-spy-slices-and-dices-his-way-through-this-weeks-rocklan/122344455236200795/', 'https://www.facebook.com/salemfivebank/posts/for-chef-and-restaurateur-tiffani-faison-salem-five-has-become-more-than-a-bank-/1744186867715961/']
+    [DINING-HARVEST] 'Mistral': +5 passages from ['https://restaurant-ingthroughhistory.com/category/elite-restaurants/', 'https://www.facebook.com/HotelViking/posts/introducing-pescadou-our-forthcoming-signature-restaurant-opening-this-may-lead-/1336583595183103/', 'https://www.facebook.com/brasserielemistralnyc/posts/at-le-mistral-the-answer-is-easy-a-little-bit-of-everything-fresh-salads-french-/1086497244330601/', 'https://www.latimes.com/archives/la-xpm-2000-nov-02-ca-45643-story.html', 'https://www.nytimes.com/2013/10/20/nyregion/a-review-of-mistral-restaurant-in-princeton.html']
+    [DINING-HARVEST] Summary: 2 harvested, 0 already had corpus, 1 no facts found
+    [INTERPRETIVE] "Stephanie's On Newbury": +2 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +2 passages, 6 queries issued, 0 attributions dropped
+  [LOCAL-329] Persisted 1 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #006 | 13:39:46.478 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0008 (949 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-353] Querying OSM for dining operational details (city: Buttermilk)
+  [LOCAL-353] The Capital Grille: no sourceable facts in OSM — omitted
+  [LOCAL-353] Stephanie's On Newbury: no sourceable facts in OSM — omitted
+  [LOCAL-353] Saltie Girl: no sourceable facts in OSM — omitted
+  [LOCAL-353] Mistral: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] The Capital Grille: no guide price, no OSM facts — silence
+  [LOCAL-354] Stephanie's On Newbury: no guide price, no OSM facts — silence
+  [LOCAL-354] Saltie Girl: no guide price, no OSM facts — silence
+  [LOCAL-354] Mistral: no guide price, no OSM facts — silence
+Extracted first POI coordinates: (42.348689, -71.082071)
+
+=== Extracted POI Information ===
+1. The Capital Grille
+   Address: 900 Boylston St, Boston, MA 02115
+   Coordinates: 42.348689, -71.082071
+   Directions: Head southeast on Boylston St, the restaurant will be on your right after passin...
+2. Stephanie's On Newbury
+   Address: 190 Newbury St, Boston, MA 02116
+   Coordinates: 42.351034, -71.078163
+   Directions: Walk northeast on Boylston St, turn right onto Dartmouth St, the restaurant will...
+3. Saltie Girl
+   Address: 281 Dartmouth St, Boston, MA 02116
+   Coordinates: 42.349981, -71.076494
+   Directions: Head southeast on Newbury St, turn left onto Commonwealth Ave, then right onto E...
+4. Mistral
+   Address: 223 Columbus Ave, Boston, MA 02116
+   Coordinates: 42.348405, -71.076740
+   Directions: Walk south on Dartmouth St, turn left onto Stuart St, then right onto Columbus A...
+================================
+
+  [D538] 'The Capital Grille' via serp(26)+openai: hours=Mon - 11:30 am - 9:00 pm, Tue - 11:30 am, reservation=reservations are recommended, price_band=$$$$
+  [D538] 'Stephanie's On Newbury' via serp(28)+openai: hours=Mon - 11:00 AM - 10:00 PM, Tue - 11:00 A, price_band=$31 to $50
+  [D538] 'Saltie Girl' via serp(28)+openai: hours=Monday-Thursday 11:00-22:00, Friday-Satu, reservation=no reservations, price_band=$31 to $50
+  [D538] 'Mistral' via serp(27)+openai: hours=Mon - 5:30 pm - 9:00 pm, Tue - 5:30 pm -, reservation=Reserve your table today, price_band=$$$
+  [D545] +4 story fact(s) for 'The Capital Grille' via gemini (3 high)
+        [high] In early 2012, The Capital Grille’s parent company (Darden Restaurants) was hit with a major federal class-act
+        [high] The Capital Grille was originally located on Newbury Street before moving to the Hynes Convention Center on Bo
+        [low] When Chef Jason Santos took over the subterranean space below the historic Hotel Eliot on Commonwealth Avenue 
+  [D545] +5 story fact(s) for 'Stephanie's On Newbury' via gemini (5 high)
+        [high] Stephanie Sokolove opened Stephanie’s on Newbury in 1994, practically inventing the upscale 'comfort food + se
+        [high] Stephanie Sokolove is married to Jim Sokolove, the attorney who pioneered direct-to-consumer TV personal injur
+        [high] In 2018, Stephanie Sokolove and her sister Kathy Sidell merged their restaurant portfolios under Sidell Hospit
+  [D545] +6 story fact(s) for 'Saltie Girl' via gemini (6 high)
+        [high] When owner Kathy Sidell opened Saltie Girl in 2016, she built the core identity around conservas—high-end tinn
+        [high] Saltie Girl was originally a tiny room with barely 30 seats, wedged next to Sidell’s flagship, MET Back Bay, w
+        [high] Saltie Girl expanded to Mayfair, London, in late 2022, but the location shut down after barely a year due to a
+  [D545] +6 story fact(s) for 'Mistral' via gemini (5 high)
+        [high] Mistral operates its own private, complimentary luxury car service to chauffeur diners within a two-mile radiu
+        [high] In a well-publicized local incident, a diner at Mistral ordered top-tier Burgundy and caviar, then tricked the
+        [high] Mistral has been a discreet dining room for Boston’s sports royalty, including Tom Brady and Gisele Bündchen.
+  [D538] Practicals acquired for 4/4 stop(s)
+[TIMING] phase=poi_selection elapsed=206.0s cumulative=207.3s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'The Capital Grille restaurant of Buttermilk & Bourbon - Back Bay' → 1113 chars
+  [LOCAL-47] The Capital Grille: tier=rich, facts=4
+  [LOCAL-186] Disambiguated fetch hit: 'Stephanie's On Newbury restaurant of Buttermilk & Bourbon - Back Bay' → 1454 chars
+  [LOCAL-47] Stephanie's On Newbury: tier=rich, facts=5
+  [LOCAL-186] Disambiguated fetch hit: 'Saltie Girl restaurant of Buttermilk & Bourbon - Back Bay' → 1227 chars
+  [LOCAL-47] Saltie Girl: tier=rich, facts=5
+  [LOCAL-186] Disambiguated fetch hit: 'Mistral Boston' → 19668 chars
+  [LOCAL-47] Mistral: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Buttermilk  model=gpt-4o tokens=1609 (in=859 out=750) cost=$0.0096 latency=5.8s
+[COST_METER] FRESH | spine_generate | $0.009647 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0096
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (14 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='The Capital Grille' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Stephanie's On Newbury' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Saltie Girl' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Mistral' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['anecdote', 'culture', 'anecdote', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=14.8s cumulative=222.2s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=222.2s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=222.2s
+
+Generating description for Stop 1: The Capital Grille by , ...
+
+Generating description for Stop 2: Stephanie's On Newbury by , ...
+
+Generating description for Stop 3: Saltie Girl by , ...
+
+Generating description for Stop 4: Mistral by , ...
+  [LOCAL-381] stop='Stephanie's On Newbury' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Mistral' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Saltie Girl' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='The Capital Grille' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [("Stephanie's On Newbury", 13, ''), ("Stephanie's On Newbury", 8, ''), ("Stephanie's On Newbury", 6, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15579 after=27720 (+12141 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27720)
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Mistral', 8, ''), ('Mistral', 4, ''), ('Mistral', 4, '')]
+  [LOCAL-402] Stop 4: injected 6 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15522 after=26037 (+10515 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26037)
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Saltie Girl', 14, ''), ('Saltie Girl', 13, ''), ('Saltie Girl', 8, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15565 after=22457 (+6892 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22457)
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Capital Grille', 11, ''), ('The Capital Grille', 11, ''), ('The Capital Grille', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14910 after=24850 (+9940 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24850)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0330 (6938 tokens, model=gpt-4o)
+Stop 2 description word count: 269 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0306 (6431 tokens, model=gpt-4o)
+Stop 4 description word count: 237 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0292 (6155 tokens, model=gpt-4o)
+Stop 1 description word count: 285 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0271 (5699 tokens, model=gpt-4o)
+Stop 3 description word count: 289 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['invites you to explore']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='The Capital Grille': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Stephanie's On Newbury': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Saltie Girl': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Mistral': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=1, total=3
+  [LOCAL-439] Classification cost: $0.001429 (input=5906, output=905)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 1: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 12 paragraphs retried, 8 fixed/improved, 4 kept original
+  [LOCAL-192] Retry cost: $0.0042 (5225 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 2 'Stephanie's On Newbury': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 3 'Saltie Girl': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Mistral': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 4 sentences deleted, 0 paragraphs emptied, 3 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 16
+    Transferable (high, removed): 3
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 10
+    Stops affected: 3
+    [LOCAL-472] REMOVED transferable paragraph stop='The Capital Grille' conf=high reason='Generic scene-setting without specific claims.': "And while you savor your meal, think ahead with anticipation to our next stop. Buttermilk & Bourbon awaits, where Chef J"
+    [LOCAL-472] REMOVED transferable paragraph stop='Stephanie's On Newbury' conf=high reason='Generic description of dining atmosphere.': "Whether dining on their famous brunch specials or savoring a dinner of contemporary American comfort food, visitors are "
+    [LOCAL-472] REMOVED transferable paragraph stop='Mistral' conf=high reason='Generic claims about dining experience and hours.': "Mistral operates Monday through Tuesday from 5:30 to 9:00 pm, offering a dining experience that, while on the pricier si"
+    [LOCAL-472] UNGROUNDED entity stop='The Capital Grille' entity='Darden Restaurants' reason='No concrete link to The Capital Grille is provided.' in: "But it's not just the past that makes The Capital Grille significant; its parent company, Darden Res"
+    [LOCAL-472] UNGROUNDED entity stop='The Capital Grille' entity='Restaurant Opportunities Centers' reason='No concrete link to The Capital Grille is provided.' in: "But it's not just the past that makes The Capital Grille significant; its parent company, Darden Res"
+    [LOCAL-472] UNGROUNDED entity stop='The Capital Grille' entity='Chef Jason Santos' reason='No concrete link to The Capital Grille is provided.' in: "And while you savor your meal, think ahead with anticipation to our next stop. Buttermilk & Bourbon "
+    [LOCAL-472] UNGROUNDED entity stop='Stephanie's On Newbury' entity='Kathy Sidell' reason='No concrete link to the stop is provided.' in: "Stephanie’s journey in the culinary world was marked by more than just her own ambitions. In 2018, s"
+    [LOCAL-472] UNGROUNDED entity stop='Stephanie's On Newbury' entity='Sidell Hospitality' reason='It does not specify a direct connection to "Stephanie's On Newbury."' in: "Stephanie’s journey in the culinary world was marked by more than just her own ambitions. In 2018, s"
+    [LOCAL-472] UNGROUNDED entity stop='Saltie Girl' entity='New England' reason='No concrete link to Kathy Sidell's relationship with the stop.' in: "Step inside this seafood haven, where owner Kathy Sidell has cultivated a unique dining experience s"
+    [LOCAL-472] UNGROUNDED entity stop='Saltie Girl' entity='Jason Santos' reason='It does not specify how Jason Santos is directly linked to Saltie Girl.' in: "Saltie Girl's fame extends beyond the plate. Chef-owner Jason Santos, known for his striking neon el"
+    [LOCAL-472] UNGROUNDED entity stop='Mistral' entity='Southern France' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "This restaurant, renowned for its fireside dining and updated menu of small plates, brings a taste o"
+    [LOCAL-472] UNGROUNDED entity stop='Mistral' entity='Tom Brady' reason='No concrete link to Mistral is provided.' in: "Mistral is discreetly popular among Boston's sports royalty, with Tom Brady and Gisele Bündchen know"
+    [LOCAL-472] UNGROUNDED entity stop='Mistral' entity='Gisele Bündchen' reason='No concrete link to Mistral is provided.' in: "Mistral is discreetly popular among Boston's sports royalty, with Tom Brady and Gisele Bündchen know"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/36)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Saltie Girl' cut orphaned dependant of a removed introduction — subject 'vision': "The vision was to capture the coastal charm of New England summers and infuse it"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 12
+    Glossed (composed): 2
+    Suppressed (already explained): 2
+    Degraded (name dropped): 3
+    Guard failures: 0
+    Known (skipped): 5
+    Triage: 1785 tokens, $0.0004, 6.4s
+    Gloss: 762 tokens, $0.0002, 2.7s
+    Compose: 1968 tokens, $0.0003, 2.9s
+    Total added cost: $0.0009
+    Stops affected: 3
+    Glosses applied:
+      • Darden Restaurants → SUPPRESSED (already explained)
+      • Stephanie Sokolove → "the dreamer who founded this restaurant" [source: corpus]
+      • Sidell → DEGRADED (name dropped)
+      • Jason Santos → SUPPRESSED (already explained)
+      • Hell → DEGRADED (name dropped)
+      • Southern France → DEGRADED (name dropped)
+      • Gisele Bündchen → "the brazilian supermodel and businesswoman" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 2 'Stephanie's On Newbury': claim='2018 (in context: "In 2018, she joined forces with her siste' contradicted_by='opened her own restaurant in 1994, Stephanie's on Newbury. So, I came to underst' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=2 claim='2018 (in context: "In 2018, she joined forces with' evidence='opened her own restaurant in 1994, Stephanie's on ' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Buttermilk & Bourbon - Back Bay, Boston, MA'...
+   OK 'Stephanie's On Newbury' — inside 'Buttermilk & Bourbon - Back Bay, Boston, MA': check error: Expecting ',' delimiter: line 5 column 1 (char 236) (conf=low)
+   X SCOPE-CHECK REMOVED 'Saltie Girl' — outside 'Buttermilk & Bourbon - Back Bay, Boston, MA': Saltie Girl is not physically located inside or within the bounds of 'Buttermilk & Bourbon - Back Bay, Boston, MA'. It is a separate establishment. (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "Saltie Girl", "aliases": [], "scope": "Buttermilk & Bourbon - Back Bay, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "Saltie Girl is not physically located inside or within the bounds of 'Buttermilk & Bourbon - Back Bay, Boston, MA'. It is a separate establishment.", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+   X SCOPE-CHECK REMOVED 'Mistral' — outside 'Buttermilk & Bourbon - Back Bay, Boston, MA': Mistral is not physically located inside 'Buttermilk & Bourbon - Back Bay, Boston, MA' (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "Mistral", "aliases": [], "scope": "Buttermilk & Bourbon - Back Bay, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "Mistral is not physically located inside 'Buttermilk & Bourbon - Back Bay, Boston, MA'", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+OK PHASE 5.6: 2/4 stop(s) within scope
+  [PHASE 5.6] >50% of stops were outside 'Buttermilk & Bourbon - Back Bay, Boston, MA' — scope is likely a small single venue; delivering 2 verified stop(s).
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [1] DELETED: 'This episode' in: This episode underscored the complexities of balancing business operations with 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Stephanie's On Newbury' (index 40) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'The Capital Grille': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Stephanie's On Newbury': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'The Capital Grille' (index 24)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'The Capital Grille' — 262w → 174w after gates, 10 sentence(s) removed
+    removed: "Step inside, and you're not just entering a steakhouse; you're stepping into a slice of Boston's pol"
+    removed: "During the 1990s and 2000s, The Capital Grille was more than just a place to dine—it was the unoffic"
+    removed: "Conversations that shaped policy and whispered agreements took place over expertly seared steaks and"
+    removed: "The walls, if they could talk, would tell tales of decisions and debates that quietly influenced the"
+    removed: "This episode underscored the complexities of balancing business operations with ethical practices."
+    removed: "As you enjoy the plush interiors and the attentive service, remember this place's connection to broa"
+    removed: "Reservations are recommended, given its popularity."
+    removed: "Expect a dining experience that’s as rich in flavor as it is in history, with prices reflecting its "
+    removed: "And while you savor your meal, think ahead with anticipation to our next stop."
+    removed: "Buttermilk & Bourbon awaits, where Chef Jason Santos infuses classic dishes with innovative twists, "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Stephanie's On Newbury' — 269w → 120w after gates, 10 sentence(s) removed
+    removed: "Stephanie Sokolove established this restaurant nearly 30 years ago, transforming a dream into a belo"
+    removed: "Her creation of Stephanie's On Newbury was a pioneering move, essentially launching the trend of ups"
+    removed: "The corner patio here is one of Boston's most coveted dining setups, where patrons enjoy both the cu"
+    removed: "Imagine the aroma of classic comfort dishes, elevated with a touch of sophistication, wafting throug"
+    removed: "In 2018, she joined forces with her sister Kathy Sidell to merge their restaurant ventures under Sid"
+    removed: "The two sisters, each with their own flair and expertise, created a powerful culinary legacy that re"
+    removed: "The restaurant itself is a harmonious blend of casual elegance and culinary creativity, embodying th"
+    removed: "Whether dining on their famous brunch specials or savoring a dinner of contemporary American comfort"
+    removed: "Open Monday and Tuesday from 11 AM to 10 PM, Stephanie's On Newbury offers a menu priced between $31"
+    removed: "As you savor the flavors at this renowned spot, remember that the next stop will bring you closer to"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=2)
+
+Generating description for Stop 1: The Capital Grille by , ...
+
+Generating description for Stop 2: Stephanie's On Newbury by , ...
+  [LOCAL-381] stop='Stephanie's On Newbury' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [("Stephanie's On Newbury", 13, ''), ("Stephanie's On Newbury", 8, ''), ("Stephanie's On Newbury", 6, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15579 after=27720 (+12141 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27720)
+  [LOCAL-381] stop='The Capital Grille' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Capital Grille', 11, ''), ('The Capital Grille', 11, ''), ('The Capital Grille', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14910 after=24850 (+9940 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24850)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0321 (6747 tokens, model=gpt-4o)
+Stop 1 description word count: 268 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0356 (7497 tokens, model=gpt-4o)
+Stop 2 description word count: 276 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 4.0s for 2 stop(s) at max_workers=2
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 228w (was 120w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 1 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.buttermilkbourbon.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1227 chars from https://www.buttermilkbourbon.com/
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=Gn2KNZm9EqQ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/phantomgourmet/videos/buttermilk-bourbon-southern-eats/776897276557984/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://lifefoodwine.com/buttermilk-bourbon-back-bay-boston/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1553 chars from https://lifefoodwine.com/buttermilk-bourbon-back-b
+  [LOCAL-427] HTTP 200 from https://boston.eater.com/2016/8/30/12711070/buttermilk-bourbon-jason-santos-back-bay (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://boston.eater.com/2016/8/30/12711070/butter
+  [LOCAL-427] HTTP 200 from https://www.buttermilkbourbon.com/about/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2515 chars from https://www.buttermilkbourbon.com/about/
+  [LOCAL-427] HTTP 200 from https://www.usfoods.com/tools-tips-and-ideas/articles-and-publications/articles/how-chef-jason-santos-turned-failure-into-a-restaurant-empire (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.usfoods.com/tools-tips-and-ideas/artic
+  [D512] verb discovery: query='restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA h' -> 9 new verb(s): fried, deviled, boiled, covered, inspired, chucked, followed, recognized, loaded
+  [D512] _AGENCY_VERB widened by 9 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  The Capital Grille                         24    12     0    45
+     2  Stephanie's On Newbury                     38    34     0    65
+    [LOCAL-485] index mean 31.0 over 2 stop(s), range 24-38
+    [LOCAL-485] weakest: 'The Capital Grille' at 24
+[TIMING] phase=story_first elapsed=94.9s cumulative=317.1s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (106 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 106 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 106 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R9: 1 sentence(s) deleted
+    Stop 2 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 100
+    Words after:  57
+    Delta: -43
+    Stops affected: 2/2
+    Deletions (2):
+      [Stop 1][R9_GENERIC] "The anticipation is palpable, inviting you to explore what lies within these storied walls."
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Here stands Stephanie's On Newbury, a place where the aromas of contemporary American cuisine mingle..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 2/2
+    [LOCAL-276] Intrigue ranking completed: 1.4s, $0.0057, 892 tokens
+    [LOCAL-276] Ranked 2 stops:
+      [The Capital Grille] (cause): Organized by the Restaurant Opportunities Centers (ROC) United, the lawsuit alle...
+      [Stephanie's On Newbury] (reversal): In 2018, Stephanie embarked on a new chapter by merging her restaurant portfolio...
+    [LOCAL-276] 2 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0027 (458 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (35 words):
+      "In the upcoming stops, you will learn about Stephanie's merger with her sister's restaurant portfolio in 2018 at Stephanie's On Newbury and the lawsuit filed by the Restaurant Opportunities Centers United at The Capital Grille."
+      Stops referenced: 2
+    Part 4 total cost: $0.0027
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 2 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (2 selected == 2 delivered)
+  [D536] ⚠️  LISTENER ASKED FOR 4 STOP(S), DELIVERING 2 — category='restaurant', reason='stops removed by gates or filters'
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you exit The Capital Grille, head south on Dartmouth Stre...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.8s, $0.0025, 432 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Stephanie's On Newbury] (reversal): "In 2018, Stephanie embarked on a new chapter by merging her restaurant portfolio..."
+      → composed: "Stephanie's On Newbury merged with sister Kathy Sidell's restaurants in 2018"
+    [The Capital Grille] (cause): "Organized by the Restaurant Opportunities Centers (ROC) United, the lawsuit alle..."
+      → composed: "The Capital Grille lawsuit by ROC United exposed racial steering and wage theft"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 2 stops — Stephanie's On Newbury merged with sister Kathy Sidell's restaurants in 2018 and the Capital Grille lawsuit by ROC United exposed racial steering and wage theft."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=368 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma -  Tour' (0.4 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 2 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (1984 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (7 line(s), 12 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 2/2 stop(s), spoken to the listener.
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: ✓ all four parts present and conforming
+
+=== Word Count Statistics ===
+Stop 1: The Capital Grille - 285 words
+Stop 2: Stephanie's On Newbury - 269 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (5141 chars, 2/4 stops)
+  [LOCAL-540] defects seen: ['dangling_reference', 'thin', 'truncated']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'Her husband, Jim Sokolove, known for his pioneering role in '
+  [LOCAL-540]   thin [advisory]: 2/4 stops delivered
+  [LOCAL-540]   truncated [REQUIRED_CLEAN]: 1 fragment(s), e.g. 'St'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference', 'truncated']) — issuing ONE retry over 2 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 2) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1112 tokens, $0.005285 (gpt-4o)
+  [LOCAL-540] retry: regenerating orientation (stop 1) for ['truncated']
+  [LOCAL-540] retry rewrite: 794 tokens, $0.003778 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference', 'thin', 'truncated'] -> ['thin']
+  [LOCAL-540] retry removed: ['dangling_reference', 'truncated']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+
+Total API cost: $0.1892 (40120 tokens)
+Grounding:      $0.4200 (12 requests)
+Tour total:     $0.6092
+Provenance:     3/14 factual sentences sourced, 11 unsourced (3 corpus, 0 grounded, 11 parametric)
+CACHE STORE: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA / restaurant / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: restaurant_tour_of_Buttermilk___Bourbon___Back_Bay__Boston__MA_restaurant_tour_20261002_134442.txt
+  [C5-5] Evidence (provenance-only) persisted: restaurant_tour_of_Buttermilk___Bourbon___Back_Bay__Boston__MA_restaurant_tour_20261002_134442_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, MA
+Tour-Category: restaurant
+
+Stop 1: The Capital Grille
+
+Address: 900 Boylston St, Boston, MA 02115
+
+Coordinates: 42.348689, -71.082071
+
+Type/Specialty: Steakhouse
+
+Specific Examples: Classic steak cuts, extensive wine list, elegant ambiance
+
+Orientation: You are about to embark on a walking journey through Buttermilk & Bourbon - Back Bay, Boston, MA. The route spans from The Capital Grille to Stephanie'...
+
+[TIMING] phase=packing elapsed=10.2s cumulative=327.3s
+[TIMING] phase=verification elapsed=0.0s cumulative=327.3s
+[TIMING] TOTAL wall=327.3s phases: poi_selection=206.0s, story_first=94.9s, fact_sheets=14.8s, packing=10.2s, intent=1.3s, narration=0.0s, external_lookups=0.0s, verification=0.0s

@@ -1,0 +1,61 @@
+{
+  "slug": "our_lady_help_newton",
+  "location": "Our Lady Help of Christians Catholic Church, Newton MA",
+  "tour_type": "museum",
+  "stops": 4,
+  "wall_s": 321.8,
+  "chars": 9354,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 118,
+  "cost_record": {
+    "total_cost": 0.24272500000000002,
+    "total_tokens": 40488,
+    "cache_hit": false,
+    "grounding_cost": 0.35000000000000003,
+    "grounding_requests": 10,
+    "tour_total_cost": 0.5927250000000001,
+    "breakdown": {
+      "llm": 0.24272500000000002,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.35000000000000003
+    },
+    "provenance": {
+      "sourced": 7,
+      "unsourced": 19,
+      "total": 26,
+      "corpus": 7,
+      "grounded": 0,
+      "parametric": 19
+    },
+    "score": {
+      "defects_before": {
+        "unsourced_person_event": "5 unsourced person-event(s); \"Cuenin\" placed here in September with no source: \"In September 2005, the nave once again drew attention as Father Cuenin, an outspoken priest in Boston, announced his res\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "5 unsourced person-event(s); \"Cuenin\" placed here in September with no source: \"In September 2005, the nave once again drew attention as Father Cuenin, an outspoken priest in Boston, announced his res\""
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.242725,
+        "total_tokens": 40488
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 3,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

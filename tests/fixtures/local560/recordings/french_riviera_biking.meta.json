@@ -1,0 +1,64 @@
+{
+  "slug": "french_riviera_biking",
+  "location": "French Riviera biking tour",
+  "tour_type": "biking",
+  "stops": 5,
+  "wall_s": 474.6,
+  "chars": 12125,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 124,
+  "cost_record": {
+    "total_cost": 0.3454214500000001,
+    "total_tokens": 52890,
+    "cache_hit": false,
+    "grounding_cost": 0.17500000000000002,
+    "grounding_requests": 5,
+    "tour_total_cost": 0.5204214500000001,
+    "breakdown": {
+      "llm": 0.3454214500000001,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.17500000000000002
+    },
+    "provenance": {
+      "sourced": 9,
+      "unsourced": 41,
+      "total": 50,
+      "corpus": 9,
+      "grounded": 0,
+      "parametric": 41
+    },
+    "score": {
+      "defects_before": {
+        "dangling_reference": "2 dangling pronoun reference(s), e.g. \"His presence here marked the beginning of the area's develop\""
+      },
+      "defects_after": {
+        "thin": "4/5 stops delivered",
+        "dangling_reference": "1 dangling pronoun reference(s), e.g. 'He lived there openly with his younger companions, first Ger'"
+      },
+      "removed": [],
+      "remaining": [
+        "dangling_reference"
+      ],
+      "retried": true,
+      "clean_after": false,
+      "retry_cost": {
+        "total_cost": 0.008247500000000001,
+        "total_tokens": 1736
+      },
+      "cost_without_retry": {
+        "total_cost": 0.337174,
+        "total_tokens": 51154
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 3,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

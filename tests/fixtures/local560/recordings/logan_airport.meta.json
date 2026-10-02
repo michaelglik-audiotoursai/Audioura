@@ -1,0 +1,61 @@
+{
+  "slug": "logan_airport",
+  "location": "Boston Logan International Airport, Boston MA",
+  "tour_type": "facility",
+  "stops": 4,
+  "wall_s": 198.4,
+  "chars": 9334,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 103,
+  "cost_record": {
+    "total_cost": 0.19422845000000002,
+    "total_tokens": 26898,
+    "cache_hit": false,
+    "grounding_cost": 0.14,
+    "grounding_requests": 4,
+    "tour_total_cost": 0.33422845,
+    "breakdown": {
+      "llm": 0.19422845000000002,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.14
+    },
+    "provenance": {
+      "sourced": 0,
+      "unsourced": 20,
+      "total": 20,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 20
+    },
+    "score": {
+      "defects_before": {
+        "unsourced_person_event": "2 unsourced person-event(s); \"Charles Lindbergh\" placed here in July with no source: \"Back on July 22, 1927, famed aviator Charles Lindbergh touched down in his Spirit of St. Louis here, part of a nationwid\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "2 unsourced person-event(s); \"Charles Lindbergh\" placed here in July with no source: \"Back on July 22, 1927, famed aviator Charles Lindbergh touched down in his Spirit of St. Louis here, part of a nationwid\""
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.194228,
+        "total_tokens": 26898
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 2,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

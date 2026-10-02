@@ -1,0 +1,727 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #013 | 13:52:01.853 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  tour_type: restaurant
+  total_stops_parameter: 4
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #014 | 13:52:01.853 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "restaurants",
+    "location": "Newton Centre, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": null,
+    "named_places": ["Sycamore", "Little Big Diner"],
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Newton Centre, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for Dinner at Sycamore and Little Big Diner in Newton Centre, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #015 | 13:52:03.766 | GENERATING_PROMPT
+======================================================================
+  location: Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  user_request: Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Dinner at Sycamore and Little Big Diner in Newton Centre, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Dinner at Sycamore and Little Big Diner in Newton Centre, MA'
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #016 | 13:52:03.767 | PHASE_3A_REQUEST
+======================================================================
+  location: Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  total_stops: 4
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0006 (723 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #017 | 13:52:05.974 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Dinner at Sycamore and Little Big Diner in Newton Centre, MA.
+List exactly 7 specific, real, well-known restaurants relevant to: Dinner at Sycamore and Little Big Diner in Newton Centre, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURAN
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Farmstead Table", "address": "71 Union St, Newton, MA 02459", "reason": "Focuses on farm-to-table cuisine, emphasizing local and seasonal ingredients"},
+{"name": "Comedor", "address": "105 Union St, Newton, MA 02459", "reason": "Known for its Latin American-inspired dishes and cozy atmosphere"},
+{"name": "Cook", "address": "825 Washington St, Newton, MA 02460", "reason": "Offers a rotating menu of globally inspired dishes using locally sourced ingredients"},
+{"name": "Sycamore", "addr
+
+   ! [LOCAL-329] Hollow reason for 'Cook': 'Offers a rotating menu of globally inspired dishes using locally sourced ingredi'
+   ! [LOCAL-329] Hollow reason for 'Baramor': 'Gastropub offering a diverse menu of elevated comfort food and craft beers'
+  [LOCAL-329] Substance filter: 2 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 5 substantive selection reason(s)
+OK PHASE 3A parsed 5 candidate POI(s):
+   - Farmstead Table @ 71 Union St, Newton, MA 02459
+   - Comedor @ 105 Union St, Newton, MA 02459
+   - Sycamore @ 755 Beacon St, Newton, MA 02459
+   - Little Big Diner @ 1247 Centre St, Newton, MA 02459
+   - Fiorella's @ 187 North St, Newton, MA 02460
+  [LOCAL-557] Restaurant request names ['Sycamore', 'Little Big Diner'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Little Big Diner' is already a candidate — marked user_explicit on 'Little Big Diner'
+  [LOCAL-547] Requested stop 'Sycamore' is already a candidate — marked user_explicit on 'Sycamore'
+
+PHASE 4.5: Validating AI knowledge for Dinner at Sycamore and Little Big Diner in Newton Centre, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 5 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Farmstead Table - Farmstead Table is a restaurant located in Newton, Massachusetts
+   OK Verified Comedor - The term 'Comedor' is commonly used to refer to a dining room or restaurant in Spanish-speaking countries.
+   X  Excluded Sycamore - There are many establishments named 'Sycamore', please provide more specific details for accurate verification
+   OK Verified Little Big Diner - Little Big Diner is a restaurant located in Newton, Massachusetts.
+   OK Verified Fiorella's - Fiorella's is a well-known Italian restaurant in the area
+
+! PHASE 4 excluded 1 POI(s)
+   PHASE 3C: all 4 stops pass location guard
+  [EXISTENCE-GATE] LOG_ONLY — 2/4 stops verified (50%), 2 would be dropped
+    [UNVERIFIED] 'Farmstead Table' — no evidence
+    [VERIFIED] 'Comedor' — wikipedia_search: snippet in 'Lilia Comedor' mentions stop+city
+    [UNVERIFIED] 'Little Big Diner' — no evidence
+    [VERIFIED] "Fiorella's" — wikipedia_search: snippet in 'Fiorella's Jack Stack Barbecue' mentions stop+city
+    [HARVEST] 'Comedor': verified_no_detail (name match only, no facts in source)
+    [HARVEST] "Fiorella's": verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 2 verified_no_detail
+    [DINING-HARVEST] 'Comedor': +9 passages from ['https://en.wikipedia.org/wiki/De_Noche_%28restaurant%29', 'https://en.wikipedia.org/wiki/Dining_car', 'https://en.wikipedia.org/wiki/Margarita_Barrientos', 'https://liliapdx.com/about', 'https://thesobercurator.com/tasting-change-interview-with-philip-speer-chef-and-owner-of-comeder-in-austin/', 'https://www.facebook.com/groups/LafayetteMemories/posts/9231223383585681/', 'https://www.instagram.com/reel/DbEEteDhUNw/?hl=en', 'https://www.nmgastronome.com/?p=34086', 'https://www.tripadvisor.com/Restaurant_Review-g30196-d17595695-Reviews-Comedor-Austin_Texas.html']
+    [DINING-HARVEST] "Fiorella's": +5 passages from ['https://merchants.doordash.com/en-us/success-stories/fiorella', 'https://www.facebook.com/fiorellasmarket/posts/thestoryoffiorellas-2000-newtonville-location-opened-known-today-as-our-first-fu/929628309177867/', 'https://www.fiorellas.com/our-story', 'https://www.instagram.com/p/DWyo_owjq80/', 'https://www.visitma.com/blog/january-culinary-corner-remon-karian-chef-owner-fiorellas/']
+    [DINING-HARVEST] Summary: 2 harvested, 0 already had corpus, 0 no facts found
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 4 queries issued, 0 attributions dropped
+  [LOCAL-329] Persisted 2 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133915.txt'
+
+======================================================================
+CALL #018 | 13:52:27.135 | PHASE_3B_REQUEST
+======================================================================
+  location: Dinner at Sycamore and Little Big Diner in Newton Centre, MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (908 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-353] Querying OSM for dining operational details (city: Dinner)
+  [LOCAL-353] Farmstead Table: no sourceable facts in OSM — omitted
+  [LOCAL-353] Comedor: no sourceable facts in OSM — omitted
+  [LOCAL-353] Little Big Diner: no sourceable facts in OSM — omitted
+  [LOCAL-353] Fiorella's: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Farmstead Table: no guide price, no OSM facts — silence
+  [LOCAL-354] Comedor: no guide price, no OSM facts — silence
+  [LOCAL-354] Little Big Diner: no guide price, no OSM facts — silence
+  [LOCAL-354] Fiorella's: no guide price, no OSM facts — silence
+Extracted first POI coordinates: (42.3292, -71.1945)
+
+=== Extracted POI Information ===
+1. Farmstead Table
+   Address: 71 Union St, Newton, MA 02459
+   Coordinates: 42.3292, -71.1945
+   Directions: Head southeast on Union St, the restaurant will be on your right after a few min...
+2. Comedor
+   Address: 105 Union St, Newton, MA 02459
+   Coordinates: 42.3291, -71.1944
+   Directions: Continue southeast on Union St, the restaurant is on the right with a lively out...
+3. Little Big Diner
+   Address: 1247 Centre St, Newton, MA 02459
+   Coordinates: 42.3257, -71.2080
+   Directions: Walk south on Union St, turn left onto Centre St, the diner is ahead on the righ...
+4. Fiorella's
+   Address: 187 North St, Newton, MA 02460
+   Coordinates: 42.3314, -71.2077
+   Directions: Head north on Centre St, turn right onto North St, the restaurant is on the left...
+================================
+
+  [D538] 'Farmstead Table' via serp(25)+openai: hours=Mon - 12:00 pm - 3:00 pm, 5:00 pm - 9:00, closed_days=Tuesday, price_band=$$
+  [D538] 'Comedor' via serp(26)+openai+gemini: nothing actionable
+  [D538] ⚠️  DROPPED 'Comedor' — reported permanently closed: Comedor took to its Facebook page to share a message that the Newton Centre restaurant has closed. Read more on Boston.com. [https://www.boston.com/fo
+  [D538] 'Little Big Diner' via serp(23)+openai: hours=16:30-21:00, reservation=We do not take reservations, price_band=$$
+  [D538] 'Fiorella's' via serp(29)+openai+gemini: hours=Mon-Sat 11:30am — 9pm, Sun 4pm — 9pm, reservation=reservations available, price_band=$$ - $$$
+  [D538] 1 restaurant(s) dropped as closed; 3 remain
+  [D545] Replenish round 1: need 1, proposed 3
+  [D545]   ADDED 'Sycamore' — known for its seasonal menu and cozy atmosphere, offering a 
+  [D546]     practicals: hours=Tuesday-Saturday 4:30 pm - 9:30 pm, closed_days=Sunday, Monday, reservation=reservation recommended, price_band=$$$, cuisine=French, American, Spanish, Contemp
+  [D545] +6 story fact(s) for 'Farmstead Table' via gemini (6 high)
+        [high] Sycamore and Little Big Diner, along with Jinny’s Pizzeria, were co-founded by chef Dave Punch.
+        [high] When Punch opened Little Big Diner in 2016, it sparked the 'Newton Centre ramen madness' with locals waiting i
+        [high] Dave Punch implemented a Monday–Friday work week for himself and cross-trained his kitchen staff across his Ne
+  [D545] +3 story fact(s) for 'Little Big Diner' via gemini (3 high)
+        [high] David Punch and his team at Sycamore became fixated on perfecting Japanese-style broths, noodles, and Hawaiian
+        [high] Little Big Diner opened with a no-reservations policy, leading to long wait times and 'line rage' among diners
+        [high] Before Sycamore opened in late 2012, industry insiders warned David Punch that high-end dining wouldn't surviv
+  [D545] +6 story fact(s) for 'Fiorella's' via gemini (6 high)
+        [high] Sycamore and Little Big Diner are sibling restaurants founded and co-owned by chef David Punch and partner Sha
+        [high] Little Big Diner's 19-seat concept sparked local friction due to its no-reservations policy, leading to long w
+        [high] In 2018, an electrical fire at Buttonwood in Newton Highlands caused significant damage, requiring months of r
+  [D545] +5 story fact(s) for 'Sycamore' via gemini (5 high)
+        [high] In late 2012, David Punch left Cambridge’s Ten Tables to open Sycamore on Beacon Street in Newton Centre, whic
+        [high] In 2016, David Punch and Alison Hearn opened Little Big Diner on Centre Street, occupying a cramped 675 square
+        [high] Little Big Diner operated on a strict no-reservations policy with only around 20 seats, leading to long lines 
+  [D538] Practicals acquired for 4/4 stop(s)
+[TIMING] phase=poi_selection elapsed=187.7s cumulative=189.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-47] Farmstead Table: tier=empty, facts=0
+  [LOCAL-186] Disambiguated fetch hit: 'Little Big Diner Dinner at Sycamore and Little Big Diner in Newton Centre' → 93439 chars
+  [LOCAL-47] Little Big Diner: tier=rich, facts=8
+  [LOCAL-47] Fiorella's: tier=empty, facts=0
+  [LOCAL-186] Disambiguated fetch hit: 'Sycamore Dinner at Sycamore and Little Big Diner in Newton Centre' → 93439 chars
+  [LOCAL-47] Sycamore: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'empty': 2, 'rich': 2}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=Dinner at Sycamore and Little  model=gpt-4o tokens=1537 (in=857 out=680) cost=$0.0089 latency=6.2s
+[COST_METER] FRESH | spine_generate | $0.008943 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0089
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (7 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Farmstead Table' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Little Big Diner' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Fiorella's' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Sycamore' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['anecdote', 'culture', 'anecdote', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=16.0s cumulative=205.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=205.5s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=205.5s
+
+Generating description for Stop 1: Farmstead Table by , ...
+
+Generating description for Stop 2: Little Big Diner by , ...
+
+Generating description for Stop 3: Fiorella's by , ...
+
+Generating description for Stop 4: Sycamore by , ...
+  [LOCAL-381] stop='Little Big Diner' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Little Big Diner', 13, ''), ('Little Big Diner', 8, ''), ('Little Big Diner', 6, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15090 after=24232 (+9142 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24232)
+  [LOCAL-381] stop='Farmstead Table' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Farmstead Table', 13, ''), ('Farmstead Table', 9, ''), ('Farmstead Table', 8, '')]
+  [LOCAL-402] Stop 1: injected 6 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12919 after=22452 (+9533 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22452)
+  [LOCAL-381] stop='Fiorella's' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [("Fiorella's", 7, ''), ("Fiorella's", 7, ''), ("Fiorella's", 7, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13177 after=23822 (+10645 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23822)
+  [LOCAL-381] stop='Sycamore' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sycamore', 11, ''), ('Sycamore', 11, ''), ('Sycamore', 8, '')]
+  [LOCAL-402] Stop 4: injected 6 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15539 after=22286 (+6747 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22286)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0267 (5611 tokens, model=gpt-4o)
+Stop 1 description word count: 304 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0289 (6088 tokens, model=gpt-4o)
+Stop 2 description word count: 305 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0269 (5654 tokens, model=gpt-4o)
+Stop 4 description word count: 285 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0287 (6033 tokens, model=gpt-4o)
+Stop 3 description word count: 263 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Farmstead Table': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Little Big Diner': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Fiorella's': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Sycamore': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=1, total=3
+  [LOCAL-439] Classification cost: $0.001093 (input=4622, output=667)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 4: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Style retry summary: 7 paragraphs retried, 7 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0027 (3309 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Farmstead Table': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] Stop 2 'Little Big Diner': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 4 'Sycamore': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 15
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 18
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Little Big Diner' conf=high reason='Generic description fits any historic church.': "Familiar Italian warmth meets the freshness of local produce in our next destination, continuing this delicious journey "
+    [LOCAL-472] REMOVED transferable paragraph stop='Fiorella's' conf=high reason='Generic description applicable to any restaurant.': "Stepping inside Fiorella's reveals more than a meal—it's an experience born of passion and a love for authentic flavors,"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='Newton Centre' reason='No concrete link to Ericka Harindranath's relationship with the stop.' in: "Nestled among the bustling restaurants of Newton Centre, Farmstead Table offers a slice of tranquili"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='New England' reason='No concrete link between Ericka Harindranath and the stop is provided.' in: "Nestled among the bustling restaurants of Newton Centre, Farmstead Table offers a slice of tranquili"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='Dave Punch' reason='It does not specify a direct link between Dave Punch and the stop "Farmstead Table."' in: "In the culinary landscape of Newton, one can't help but mention the ripple effect Dave Punch created"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='Newton Centre' reason='It does not specify a direct link between Dave Punch and Newton Centre.' in: "In the culinary landscape of Newton, one can't help but mention the ripple effect Dave Punch created"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='Ericka Harindranath' reason='It does not specify how Ericka Harindranath is directly connected to Farmstead Table.' in: "Ericka Harindranath's journey with Farmstead Table highlights the challenges of running a restaurant"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='Newton Centre Pilot Plaza Project' reason='It does not specify how the project directly relates to Farmstead Table.' in: "Ericka Harindranath's journey with Farmstead Table highlights the challenges of running a restaurant"
+    [LOCAL-472] UNGROUNDED entity stop='Farmstead Table' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Farmstead Table provides a cozy haven for those in search of contemporary American cuisine with a to"
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Greater Boston' reason='No concrete link between Little Big Diner and the referenced television series.' in: "In the Greater Boston food scene, Little Big Diner has carved out a niche, much like the television "
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Catch Fire' reason='No concrete link between "Halt and Catch Fire" and Little Big Diner is provided.' in: "In the Greater Boston food scene, Little Big Diner has carved out a niche, much like the television "
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='David Punch' reason='It does not specify a direct link between David Punch and Little Big Diner.' in: "In the Greater Boston food scene, Little Big Diner has carved out a niche, much like the television "
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Halt and Catch Fire' reason='No concrete link between the show and the diner is provided.' in: "In the Greater Boston food scene, Little Big Diner has carved out a niche, much like the television "
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Familiar Italian' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Familiar Italian warmth meets the freshness of local produce in our next destination, continuing thi"
+    [LOCAL-472] UNGROUNDED entity stop='Little Big Diner' entity='Newton Centre' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Familiar Italian warmth meets the freshness of local produce in our next destination, continuing thi"
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Chef David Punch' reason='It does not specify Chef David Punch's direct connection to Sycamore.' in: "At Sycamore, the story of culinary ingenuity traces back to 2012 when Chef David Punch departed from"
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Ten Tables' reason='It does not specify how Ten Tables is directly related to Sycamore.' in: "At Sycamore, the story of culinary ingenuity traces back to 2012 when Chef David Punch departed from"
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Greater Boston' reason='It does not specify how Chef David Punch relates to Sycamore.' in: "At Sycamore, the story of culinary ingenuity traces back to 2012 when Chef David Punch departed from"
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='David Punch' reason='It does not specify a direct link between David Punch and the Sycamore stop.' in: "The synergy of Sycamore extends beyond its delectable menu. In 2016, David Punch, alongside Alison H"
+    [LOCAL-472] UNGROUNDED entity stop='Sycamore' entity='Alison Hearn' reason='No concrete link to the stop is provided.' in: "The synergy of Sycamore extends beyond its delectable menu. In 2016, David Punch, alongside Alison H"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 1
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 1
+    Escalation cost: $0.0001 (246 tokens)
+    Stops affected: 1
+    Deletion rate: 2.9% (1/35)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 15
+    Glossed (composed): 3
+    Suppressed (already explained): 1
+    Degraded (name dropped): 8
+    Guard failures: 0
+    Known (skipped): 3
+    Triage: 1957 tokens, $0.0004, 7.5s
+    Gloss: 1196 tokens, $0.0002, 4.1s
+    Compose: 1539 tokens, $0.0002, 2.3s
+    Total added cost: $0.0009
+    Stops affected: 4
+    Glosses applied:
+      • Owner Ericka Harindranath → DEGRADED (name dropped)
+      • Dave Punch → "his impact on Newton's culinary scene" [source: model]
+      • Jinny → DEGRADED (name dropped)
+      • Punch → DEGRADED (name dropped)
+      • Ericka Harindranath → "the owner of a local restaurant" [source: model]
+      • Japanese → DEGRADED (name dropped)
+      • Catch Fire → DEGRADED (name dropped)
+      • David Punch → "a chef known for Boston restaurants" [source: model]
+      • Punch → DEGRADED (name dropped)
+      • Bentley College → DEGRADED (name dropped)
+      • Chef David Punch → DEGRADED (name dropped)
+      • David Punch → SUPPRESSED (already explained)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [2] DELETED: 'This fascination' in: This fascination grew into an obsession, leading to the creation of Little Big D
+    [4] DELETED: 'This duo' in: This duo of establishments showcases Punch’s vision of creating intimate dining 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Fiorella's' (index 47) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Farmstead Table': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Little Big Diner': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Fiorella's': the longest run (5 sentences, Fiorella) has agency=2 stakes=0 — someone is described, but nothing is risked, r
+    stop 4 'Sycamore': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Little Big Diner' (index 31)
+  [D534] Stop 4 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: Before Sycamore's opening in late 2012, the prevailing wisdom was that high-end dining wouldn't last
+      already told: In the culinary landscape of Newton, one can't help but mention the ripple effect Dave Punch, his im
+
+  [LOCAL-474] PHASE 5.17: retry 'Farmstead Table' — 285w → 243w after gates, 9 sentence(s) removed
+    removed: "Owner Ericka Harindranath has crafted a space that celebrates local and seasonal ingredients, inviti"
+    removed: "You might catch the faint hum of conversation from inside, where patrons gather around tables, eager"
+    removed: "In the culinary landscape of Newton, one can't help but mention the ripple effect Dave Punch created"
+    removed: "When he opened Little Big Diner, it wasn't just about adding another spot to his roster that include"
+    removed: "It was a spark that ignited what locals affectionately call the 'Newton Centre ramen madness.Punch's"
+    removed: "Meanwhile, Ericka Harindranath's journey with Farmstead Table highlights the challenges of running a"
+    removed: "Farmstead Table is a cozy haven for those seeking contemporary American cuisine with a touch of New "
+    removed: "Open every day except Tuesday, from 12:00 pm to 3:00 pm and 5:00 pm to 9:00 pm, it offers a mid-rang"
+    removed: "As you prepare to explore the next stop, consider how the farm-fresh ingredients here set the stage "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Little Big Diner' — 305w → 169w after gates, 8 sentence(s) removed
+    removed: "The story of Little Big Diner begins with Chef David Punch and his culinary team at Sycamore, who be"
+    removed: "This fascination grew into an obsession, leading to the creation of Little Big Diner in late 2015 or"
+    removed: "The restaurant quickly gained notoriety for its refusal to take reservations, a decision that sparke"
+    removed: "Despite this, the allure of savoring their inventive takes on Asian comfort food, such as their reno"
+    removed: "In the Greater Boston food scene, Little Big Diner has carved out a niche, much like the television "
+    removed: "Yet, Punch proved the skeptics wrong, first with Sycamore and then with Little Big Diner, creating s"
+    removed: "Standing here, you can almost hear the clatter of pans and the sizzle of fresh ingredients, as the c"
+    removed: "Imagine the surprise as familiar Italian warmth meets the freshness of local produce in our next des"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Fiorella's' — 236w → 157w after gates, 6 sentence(s) removed
+    removed: "Now, let me tell you a little secret about this place."
+    removed: "Fiorella's Cucina was the brainchild of Rémon Karian, a visionary who opened this very restaurant in"
+    removed: "Armed with a business degree from Bentley College, Rémon embarked on this ambitious journey with lit"
+    removed: "Imagine him working tirelessly, as the story goes, day and night, pouring his heart into creating a "
+    removed: "This was no small feat, but Rémon’s perseverance paid off, turning Fiorella’s into a beloved local i"
+    removed: "As you consider stepping inside, know that Fiorella's offers more than a meal—it's an experience roo"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Sycamore' — 229w → 168w after gates, 5 sentence(s) removed
+    removed: "At Sycamore, the story of culinary ingenuity traces back to 2012 when Chef David Punch departed from"
+    removed: "Known for its cozy, no-reservations policy, it became a local favorite despite its modest 675 square"
+    removed: "Sycamore is open from Tuesday to Saturday, 4:30 pm to 9:30 pm, offering a menu that dances between F"
+    removed: "Reservations are recommended to secure a spot at this beloved locale."
+    removed: "As you savor the flavors crafted with precision and passion, consider how this stop on your culinary"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Farmstead Table by , ...
+
+Generating description for Stop 2: Little Big Diner by , ...
+
+Generating description for Stop 3: Fiorella's by , ...
+
+Generating description for Stop 4: Sycamore by , ...
+  [LOCAL-381] stop='Fiorella's' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [("Fiorella's", 7, ''), ("Fiorella's", 7, ''), ("Fiorella's", 7, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13177 after=23822 (+10645 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23822)
+  [LOCAL-381] stop='Little Big Diner' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Little Big Diner', 13, ''), ('Little Big Diner', 8, ''), ('Little Big Diner', 6, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15090 after=24232 (+9142 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24232)
+  [LOCAL-381] stop='Farmstead Table' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Farmstead Table', 13, ''), ('Farmstead Table', 9, ''), ('Farmstead Table', 8, '')]
+  [LOCAL-402] Stop 1: injected 6 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12919 after=22452 (+9533 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22452)
+  [LOCAL-381] stop='Sycamore' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Sycamore', 11, ''), ('Sycamore', 11, ''), ('Sycamore', 8, '')]
+  [LOCAL-402] Stop 4: injected 6 snippets as reference material
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15539 after=22286 (+6747 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22286)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 4 API call cost: $0.0299 (6300 tokens, model=gpt-4o)
+Stop 4 description word count: 298 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0319 (6722 tokens, model=gpt-4o)
+Stop 2 description word count: 320 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0292 (6151 tokens, model=gpt-4o)
+Stop 1 description word count: 290 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0307 (6467 tokens, model=gpt-4o)
+Stop 3 description word count: 294 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.5s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 259w (was 243w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 277w (was 157w)
+    [LOCAL-474] regenerated and re-gated: 276w (was 168w)
+      [PERSON-CAP] stop 4: 'punch' already carries two stops — cut: An intriguing aspect of Sycamore is the staffing model designed by David Punch.
+      [PERSON-CAP] stop 4: 'diner' already carries two stops — cut: This innovative approach reflects Punch's commitment to work-life balance, resha
+      [PERSON-CAP] stop 4: 'diner' already carries two stops — cut: Opened in 2016, Little Big Diner is known for its compact size and strict no-res
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 4: Sycamore is the brainchild of Chef David Punch, who left his mark on Greater Boston's dini
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.edibleboston.com/blog/qa-chef-david-punch-sycamore-and-little-big-diner (attempt 1)
+  [LOCAL-459] R5: Fetched 1220 chars from https://www.edibleboston.com/blog/qa-chef-david-pu
+  [LOCAL-427] HTTP 200 from https://www.littlebigdiner.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1975 chars from https://www.littlebigdiner.com/
+  [LOCAL-427] HTTP 200 from https://tinyurbankitchen.com/little-big-diner-newton-a-first-look/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1376 chars from https://tinyurbankitchen.com/little-big-diner-newt
+  [LOCAL-427] HTTP 200 from https://www.bostonmagazine.com/reviews/2016/09/25/little-big-diner-newton-review/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1900 chars from https://www.bostonmagazine.com/reviews/2016/09/25/
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=cRKNHmZWrJE (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.phantomgourmet.com/restaurant/little-big-diner/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1311 chars from https://www.phantomgourmet.com/restaurant/little-b
+  [LOCAL-427] HTTP 200 from https://boston.eater.com/venue/18456/little-big-diner (attempt 1)
+  [LOCAL-459] R5: Fetched 1340 chars from https://boston.eater.com/venue/18456/little-big-di
+  [D512] verb discovery: query='Dinner at Sycamore and Little Big Diner in Newton Centre, MA how' -> 6 new verb(s): packed, liked, arrived, helmed, toasted, reserved
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Farmstead Table                            50    27     0    77
+     2  Little Big Diner                           31    35     6    53
+     3  Fiorella's                                 59    48     0    45
+     4  Sycamore                                   22    11     8    50
+    [LOCAL-485] index mean 40.5 over 4 stop(s), range 22-59
+    [LOCAL-485] weakest: 'Sycamore' at 22
+[TIMING] phase=story_first elapsed=93.3s cumulative=298.9s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (99 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 99 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 99 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 4 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 212
+    Words after:  185
+    Delta: -27
+    Stops affected: 1/4
+    Deletions (1):
+      [Stop 4][R7_HALLUCINATED_SENSORY] "Around you, the lively hum of conversation and the aroma of expertly crafted dishes set the stage fo..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.0s, $0.0092, 1371 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Farmstead Table] (cause): Such challenges are not uncommon in the restaurant industry, yet they highlight ...
+      [Little Big Diner] (reversal): Just as the show depicted the personal computer revolution of the 1980s, David P...
+      [Fiorella's] (mystery): But what's fascinating is how one of Rémon's creations here transcended the rest...
+      [Sycamore] (mystery): As you stand here, consider the culinary journey that Sycamore represents—a harm...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0033 (551 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (35 words):
+      "At Little Big Diner, you'll learn how David Punch's venture revolutionized the Newton dining landscape. Then, at Fiorella's, discover how Rémon's marinara sauce became so popular it was eventually bottled and sold in grocery stores."
+      Stops referenced: 2
+    Part 4 total cost: $0.0033
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+    Stop 3 'Fiorella's': removed duplicate sentence: "But what's fascinating is how one of Rémon's creations here transcended the rest..."
+  [LOCAL-286] Deduplication: 1 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave Farmstead Table, stroll down Langley Road towar...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave Little Big Diner, head south on Langley Road. W...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave Fiorella's, walk south on Union Street until yo...
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap: D177 FAILED for 'Fiorella's': fact not in delivered text
+    Fact: "But what's fascinating is how one of Rémon's creations here transcended the rest..."
+  [LOCAL-280] Recap composition: 0.8s, $0.0024, 418 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (1 D177 rejected, 0 navigation rejected)
+    [Little Big Diner] (reversal): "Just as the show depicted the personal computer revolution of the 1980s, David P..."
+      → composed: "Little Big Diner, where David Punch's venture revolutionized Newton's dining scene"
+    [Sycamore] (mystery): "As you stand here, consider the culinary journey that Sycamore represents—a harm..."
+      → composed: "Sycamore, a culinary journey showcasing precision and passion in flavors"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops and 2 kilometres — Little Big Diner, where David Punch's venture revolutionized Newton's dining scene and Sycamore, a culinary journey showcasing precision and passion in flavors."
+  [LOCAL-273] No coordinates for last stop — closing offer skipped
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (886 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (17 line(s), 24 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 4/4 stop(s), spoken to the listener.
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Dinner at Sycamore and Little Big Diner in Newt..."
+  [2] "Behind Farmstead Table's charming façade lies a story of culinary passion and urban challenge. Owner..."
+  [3] "Previously with Cambridge’s Ten Tables, Punch brought his culinary expertise to Newton Centre, trans..."
+
+=== Word Count Statistics ===
+Stop 1: Farmstead Table - 304 words
+Stop 2: Little Big Diner - 305 words
+Stop 3: Fiorella's - 263 words
+Stop 4: Sycamore - 285 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (9452 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Before Sycamore" placed here in 2012 with no source: "Before Sycamore's opening in late 2012, the prevailing wisdom was that high-
+
+Total API cost: $0.2273 (35186 tokens)
+Grounding:      $0.4200 (12 requests)
+Tour total:     $0.6473
+Provenance:     5/31 factual sentences sourced, 26 unsourced (5 corpus, 0 grounded, 26 parametric)
+CACHE STORE: Dinner at Sycamore and Little Big Diner in Newton Centre, MA / restaurant / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: Dinner_at_Sycamore_and_Little_Big_Diner_in_Newton_Centre__MA_restaurant_tour_20261002_135710.txt
+  [C5-5] Evidence (provenance-only) persisted: Dinner_at_Sycamore_and_Little_Big_Diner_in_Newton_Centre__MA_restaurant_tour_20261002_135710_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Dinner at Sycamore and Little Big Diner in Newton Centre, MA - Restaurant Tour
+Tour-Category: restaurant
+
+Stop 1: Farmstead Table
+
+Address: 71 Union St, Newton, MA 02459
+
+Coordinates: 42.3292, -71.1945
+
+Type/Specialty: Farm-to-table cuisine
+
+Specific Examples: Seasonal ingredients, cozy atmosphere, creative dishes
+
+Orientation: You are about to embark on a walking journey through Dinner at Sycamore and Little Big Diner in Newton Centre, MA. The 2 km route from Far...
+
+[TIMING] phase=packing elapsed=10.1s cumulative=309.0s
+[TIMING] phase=verification elapsed=0.0s cumulative=309.0s
+[TIMING] TOTAL wall=309.0s phases: poi_selection=187.7s, story_first=93.3s, fact_sheets=16.0s, packing=10.1s, intent=1.9s, narration=0.0s, external_lookups=0.0s, verification=0.0s

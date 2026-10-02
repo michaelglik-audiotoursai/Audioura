@@ -1,0 +1,712 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #001 | 14:00:33.354 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  tour_type: museum
+  total_stops_parameter: 4
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #002 | 14:00:33.354 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.) — IMPORTANT: poi_type must always be a single string, never a JSON array. If multiple types are detected, combine them with 'or' — e.g. 'restaurants or museums'.",
+    "location": "geographic area",
+    "theme_type": "BOOK/MOVIE/PRODUCT/STANDARD - identify if this is a themed tour",
+    "theme_name": "name of book, movie, or specific product if applicable",
+    "requirements": "any specific criteria mentioned",
+    "business_hours_relevant": true/false,
+    "accessibility_mentioned": true/false,
+    "needs_research": true/false,
+    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
+    "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
+    "named_places": "JSON array of the specific named establishments the listener asks to VISIT as stops (a particular restaurant, bar, cafe, bakery, shop, venue), each as its business name only, copied from the request, without city or branch/neighbourhood suffix (put that location in geographic_scope instead). Exclude places used only as a reference point ('near X', 'around X'), exclude areas, streets and cities, and exclude the museum given in venue_name. [] when none is named.",
+    "scope_precision": "One of
+Intent analysis JSON parse error (attempt 1/2): Expecting ',' delimiter: line 7 column 36 (char 593)
+  [INTENT] Raw response that failed parse: '{\n    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.) — IMPORTANT: poi_type must always be a single string, never a JSON array. If multiple types are detected, combine them with \'or\' — e.g. \'restaurants or museums\'.",\n    "location": "geographic area",\n    "theme_type": "BOOK/MOVIE/PRODUCT/STANDARD - identify if this is a themed tour",\n    "theme_name": "name of book, movie, or specific product if applicable",\n    "requirements": "any specific criteria mentioned",\n    "business_hours_relevant": true/false,\n    "accessibility_mentioned": true/false,\n    "needs_research": true/false,\n    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution\'s complete official name including suffixes like \'Museum\', \'Gallery\', \'Library\' — never a shortened nickname (e.g. \'Museum of Fine Arts, Boston\' not \'MFA\'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",\n    "geographic_scope": "The most specific bounded area the tour must stay within, in the user\'s own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",\n    "named_places": "JSON array of the specific named establishments the listener asks to VISIT as stops (a particular restaurant, bar, cafe, bakery, shop, venue), each as its business name only, copied from the request, without city or branch/neighbourhood suffix (put that location in geographic_scope instead). Exclude places used only as a reference point (\'near X\', \'around X\'), exclude areas, streets and cities, and exclude the museum given in venue_name. [] when none is named.",\n    "scope_precision": "One of'
+  Retrying intent analysis...
+Intent analysis response: {
+    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.) — IMPORTANT: poi_type must always be a single string, never a JSON array. If multiple types are detected, combine them with 'or' — e.g. 'restaurants or museums'.",
+    "location": "geographic area",
+    "theme_type": "BOOK/MOVIE/PRODUCT/STANDARD - identify if this is a themed tour",
+    "theme_name": "name of book, movie, or specific product if applicable",
+    "requirements": "any specific criteria mentioned",
+    "business_hours_relevant": true/false,
+    "accessibility_mentioned": true/false,
+    "needs_research": true/false,
+    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
+    "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
+    "named_places": "JSON array of the specific named establishments the listener asks to VISIT as stops (a particular restaurant, bar, cafe, bakery, shop, venue), each as its business name only, copied from the request, without city or branch/neighbourhood suffix (put that location in geographic_scope instead). Exclude places used only as a reference point ('near X', 'around X'), exclude areas, streets and cities, and exclude the museum given in venue_name. [] when none is named.",
+    "scope_precision": "One of
+Intent analysis JSON parse error (attempt 2/2): Expecting ',' delimiter: line 7 column 36 (char 593)
+  [INTENT] Raw response that failed parse: '{\n    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.) — IMPORTANT: poi_type must always be a single string, never a JSON array. If multiple types are detected, combine them with \'or\' — e.g. \'restaurants or museums\'.",\n    "location": "geographic area",\n    "theme_type": "BOOK/MOVIE/PRODUCT/STANDARD - identify if this is a themed tour",\n    "theme_name": "name of book, movie, or specific product if applicable",\n    "requirements": "any specific criteria mentioned",\n    "business_hours_relevant": true/false,\n    "accessibility_mentioned": true/false,\n    "needs_research": true/false,\n    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution\'s complete official name including suffixes like \'Museum\', \'Gallery\', \'Library\' — never a shortened nickname (e.g. \'Museum of Fine Arts, Boston\' not \'MFA\'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",\n    "geographic_scope": "The most specific bounded area the tour must stay within, in the user\'s own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",\n    "named_places": "JSON array of the specific named establishments the listener asks to VISIT as stops (a particular restaurant, bar, cafe, bakery, shop, venue), each as its business name only, copied from the request, without city or branch/neighbourhood suffix (put that location in geographic_scope instead). Exclude places used only as a reference point (\'near X\', \'around X\'), exclude areas, streets and cities, and exclude the museum given in venue_name. [] when none is named.",\n    "scope_precision": "One of'
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+⚠️ Intent analysis failed, using fallback detection
+[TIMING] phase=intent elapsed=7.0s cumulative=7.0s
+[LOCAL-474] tour_type='museum' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for Our Lady Help of Christians Catholic Church, Newton MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #003 | 14:00:40.406 | GENERATING_PROMPT
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  user_request: Our Lady Help of Christians Catholic Church, Newton MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Our Lady Help of Christians Catholic Church, Newton MA...
+  [S17] no scope_constraint (precision='', scope='')
+  [D571] pinned 4 building part(s) to the venue anchor 42.3558, -71.1963
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='Catholic parish church' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Altar', 'Nave', 'Stained Glass Windows', 'Stations of the Cross', 'Side Chapels', 'Pews', 'Narthex', 'Aisles']
+  [D571]   stops: ['Nave', 'Stained Glass Windows', 'Altar', 'Stations of the Cross']
+  [D571]   dropped 'Portico' — the venue has none of these
+  [D571]   precondition: some stops are not open to the public, so you will see it from outside
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Nave [?]
+   - Stained Glass Windows [?]
+   - Altar [?]
+   - Stations of the Cross [?]
+  [area_resolver] Parsed: city='Newton MA', neighborhood='Our Lady Help of Christians Catholic Church'
+  [area_resolver] City resolved: Newton MA → Q49196 (42.3369, -71.2097)
+  [area_resolver] Neighborhood 'Our Lady Help of Christians Catholic Church' not on Wikidata — using city center
+  [area_resolver] Resolved: center=(42.3369, -71.2097), radius=2.0km, lang=en
+  [area_cache] HIT for Q49196: 49 landmarks (tier=rich)
+  [verify_landmarks] 0/4 stops verified against 49 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 0 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for Our Lady Help of Christians Catholic Church, Newton MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Nave' — wikipedia_en_summary: 'Nave' exists and mentions region
+    [VERIFIED] 'Stained Glass Windows' — stop_corpus(geographic): 'Stained Glass Windows' at 'Our Lady Help of Christians
+    [VERIFIED] 'Altar' — stop_corpus(geographic): 'Main Altar' at 'Our Lady Help of Christians Catholic C
+    [VERIFIED] 'Stations of the Cross' — stop_corpus(geographic): 'Stations of the Cross' at 'Our Lady Help of Christians
+    [HARVEST] 'Nave': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 1 verified_no_detail
+    [INTERPRETIVE] 'Stations of the Cross': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +1 passages, 8 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Computed route for 4 stops with coords (0 without): 0.00km total
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_140033.txt'
+
+======================================================================
+CALL #004 | 14:01:51.990 | PHASE_3B_REQUEST
+======================================================================
+  location: Our Lady Help of Christians Catholic Church, Newton MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (864 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.3514, -71.2094', refetching...
+   Cluster refetch OK 'Nave': 42.349722, -71.209167
+   Cluster refetch OK 'Altar': 42.3497, -71.2079
+   Cluster refetch OK 'Stations of the Cross': 42.3494, -71.2099
+   Cluster refetch OK 'Stained Glass Windows': 42.349188, -71.203719
+   GEO-CHECK: all 4 stops within walking distance (max leg 0.45 km, total 0.97 km, limit 12 km)
+Extracted first POI coordinates: (42.349722, -71.209167)
+
+=== Extracted POI Information ===
+1. Nave
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.349722, -71.209167
+   Directions: Exit the main entrance and turn left onto Washington St, the Nave is the large c...
+2. Stained Glass Windows
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.349188, -71.203719
+   Directions: Walk straight ahead from the Nave, the Stained Glass Windows are on the right si...
+3. Altar
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3497, -71.2079
+   Directions: Continue forward and slightly to the right from the Stained Glass Windows, the A...
+4. Stations of the Cross
+   Address: 573 Washington St, Newton, MA 02458
+   Coordinates: 42.3494, -71.2099
+   Directions: Head towards the left side of the church after the Altar, the Stations of the Cr...
+================================
+
+  [D556] +4 story fact(s) for 'Nave' via gemini (4 high)
+  [D556] +7 story fact(s) for 'Stained Glass Windows' via gemini (6 high)
+  [D556] +6 story fact(s) for 'Altar' via gemini (6 high)
+  [D556] +3 story fact(s) for 'Stations of the Cross' via gemini (3 high)
+[TIMING] phase=poi_selection elapsed=155.7s cumulative=162.8s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Nave Our Lady Help of Christians Catholic Church' → 2257 chars
+  [LOCAL-47] Nave: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Stained Glass Windows Our Lady Help of Christians Catholic Church' → 19068 chars
+  [LOCAL-47] Stained Glass Windows: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Altar Our Lady Help of Christians Catholic Church' → 14953 chars
+  [LOCAL-47] Altar: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Stations of the Cross Our Lady Help of Christians Catholic Church' → 15638 chars
+  [LOCAL-47] Stations of the Cross: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=Our Lady Help of Christians Ca model=gpt-4o tokens=1485 (in=859 out=626) cost=$0.0084 latency=7.9s
+[COST_METER] FRESH | spine_generate | $0.008408 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0084
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (9 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Nave' verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)
+  [CORPUS-GATE] stop='Stained Glass Windows' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Altar' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Stations of the Cross' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=15.9s cumulative=178.7s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=178.7s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=178.7s
+
+Generating description for Stop 1: Nave by , ...
+
+Generating description for Stop 2: Stained Glass Windows by , ...
+
+Generating description for Stop 3: Altar by , ...
+
+Generating description for Stop 4: Stations of the Cross by , ...
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Altar' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Stained Glass Windows' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Stations of the Cross' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 6, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14984 after=21506 (+6522 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21506)
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Altar', 6, ''), ('Altar', 6, ''), ('Altar', 6, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15651 after=25826 (+10175 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25826)
+  [LOCAL-411] Stop 2 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=7 usable=7 (t1t2=0, t3=0, market=0)
+    Top scores: [('Stained Glass Windows', 17, ''), ('Stained Glass Windows', 16, ''), ('Stained Glass Windows', 9, '')]
+  [LOCAL-402] Stop 2: injected 7 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15394 after=26273 (+10879 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26273)
+  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Stations of the Cross', 8, ''), ('Stations of the Cross', 8, ''), ('Stations of the Cross', 6, '')]
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15238 after=25364 (+10126 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25364)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0260 (5464 tokens, model=gpt-4o)
+Stop 1 description word count: 298 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0305 (6428 tokens, model=gpt-4o)
+Stop 3 description word count: 294 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0307 (6460 tokens, model=gpt-4o)
+Stop 2 description word count: 291 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0299 (6301 tokens, model=gpt-4o)
+Stop 4 description word count: 278 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Nave': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+    ✓ PASS stop='Stained Glass Windows': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=0, total=5
+    ✓ PASS stop='Altar': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=2, deduction=1, total=5
+    ✓ PASS stop='Stations of the Cross': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+  [LOCAL-439] Classification cost: $0.001310 (input=5254, output=870)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 5: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry IMPROVED (3→2 errors)
+  [LOCAL-192] Stop 3 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 10 paragraphs retried, 6 fixed/improved, 4 kept original
+  [LOCAL-192] Retry cost: $0.0038 (4792 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Nave': 2 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 2 'Stained Glass Windows': 2 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 4 sentences deleted, 1 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 14
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 29
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Nave' conf=high reason='Generic scene-setting applicable to any historic church.': "As you stand here, the past and present converge, enveloping you in the narratives that define this sacred space."
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='On December' reason='No concrete link between Cuenin and the Nave is established.' in: "On December 8, 2002, Rev. Walter H. Cuenin delivered a homily that resonated deeply within these wal"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Accusing Cardinal Bernard Law' reason='It does not specify a direct link between Cardinal Bernard Law and the Nave.' in: "On December 8, 2002, Rev. Walter H. Cuenin delivered a homily that resonated deeply within these wal"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='behind lawyers and bankruptcy,' reason='It does not specify a direct link between Cuenin and the stop.' in: "On December 8, 2002, Rev. Walter H. Cuenin delivered a homily that resonated deeply within these wal"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='In September' reason='No concrete link to the nave is established.' in: "In September 2005, the nave once again drew attention as Father Cuenin announced his resignation due"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Father Cuenin' reason='It does not specify Father Cuenin's direct connection to the nave.' in: "In September 2005, the nave once again drew attention as Father Cuenin announced his resignation due"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Honda Accord' reason='No concrete link between the Honda Accord and the nave is provided.' in: "In September 2005, the nave once again drew attention as Father Cuenin announced his resignation due"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='In June' reason='It does not specify how Mother Teresa's visit relates to the Nave.' in: "In June 1995, it was Mother Teresa of Calcutta who graced this space, addressing the congregation on"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='Mother Teresa' reason='It does not specify where she spoke or her connection to the location.' in: "In June 1995, it was Mother Teresa of Calcutta who graced this space, addressing the congregation on"
+    [LOCAL-472] UNGROUNDED entity stop='Nave' entity='On June' reason='It does not specify how the D'Amores relate to the nave beyond the event.' in: "On June 25, 2023, parishioners Gilda ('Jill') D'Amore and Bruno D'Amore were tragically murdered. Th"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Doherty Rest' reason='It does not specify how William J. Doherty relates to this stop.' in: "In 1964, a significant event unfolded within these very walls when the renowned Charles J. Connick A"
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Lady Richeldis de Faverches' reason='It does not specify a direct link to the stained glass windows.' in: "The vibrant panels also whisper of far-off lands and visions. One such inspiration can be traced to "
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Blessed Virgin Mary' reason='It does not specify a direct connection to the stained glass windows.' in: "The vibrant panels also whisper of far-off lands and visions. One such inspiration can be traced to "
+    [LOCAL-472] UNGROUNDED entity stop='Stained Glass Windows' entity='Holy House' reason='It does not specify a direct connection to the stained glass windows.' in: "The vibrant panels also whisper of far-off lands and visions. One such inspiration can be traced to "
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Cardinal Bernard Law' reason='No concrete link to the altar is provided.' in: "This altar, a recent creation by local artisans Eric Boeglin and Deacon Jim, serves as a symbol of r"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='In June' reason='It does not specify how the named individuals relate to the altar.' in: "In June 2023, the altar became a sanctuary of grief and unity following the tragic murders of Bruno "
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Lucia Arpino' reason='It does not specify how Lucia Arpino is directly related to the altar.' in: "In June 2023, the altar became a sanctuary of grief and unity following the tragic murders of Bruno "
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Irish Catholic' reason='It does not specify how the individuals relate to the altar.' in: "In June 2023, the altar became a sanctuary of grief and unity following the tragic murders of Bruno "
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Mary Help' reason='No concrete link to the stop is provided.' in: "The devotion to Mary Help of Christians, first described by John Chrysostom in AD 345, is deeply ing"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='John Chrysostom' reason='No concrete link to the stop is provided.' in: "The devotion to Mary Help of Christians, first described by John Chrysostom in AD 345, is deeply ing"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Christian Europe' reason='No concrete link between John Chrysostom and the altar is provided.' in: "The devotion to Mary Help of Christians, first described by John Chrysostom in AD 345, is deeply ing"
+    [LOCAL-472] UNGROUNDED entity stop='Altar' entity='Middle Ages' reason='No concrete link between John Chrysostom and the altar is provided.' in: "The devotion to Mary Help of Christians, first described by John Chrysostom in AD 345, is deeply ing"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='Alphonsus Ligouri' reason='It does not specify a direct link between Ligouri and this stop.' in: "The Stations of the Cross have long served as a meditative path for Catholics, a tradition populariz"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='St. Leonard of' reason='It does not specify a direct link to this stop.' in: "The Stations of the Cross have long served as a meditative path for Catholics, a tradition populariz"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='St. Alphonsus' reason='It does not specify a direct link between St. Alphonsus and this stop.' in: "The Stations of the Cross have long served as a meditative path for Catholics, a tradition populariz"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='Joan Cavanagh' reason='It does not specify how Joan Cavanagh is directly connected to the Stations of the Cross.' in: "Joan Cavanagh, a parishioner and writer, vividly recalls a poignant moment from her childhood at Our"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='Our Lady Help' reason='It does not specify how Joan Cavanagh relates to Our Lady Help.' in: "Joan Cavanagh, a parishioner and writer, vividly recalls a poignant moment from her childhood at Our"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='Christians Grammar School' reason='No concrete link to the stop is provided.' in: "Joan Cavanagh, a parishioner and writer, vividly recalls a poignant moment from her childhood at Our"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='In Sister Paul Marie' reason='No concrete link to the stop is provided.' in: "Joan Cavanagh, a parishioner and writer, vividly recalls a poignant moment from her childhood at Our"
+    [LOCAL-472] UNGROUNDED entity stop='Stations of the Cross' entity='Lucia Arpino' reason='No concrete link to the stop is provided.' in: "In a more recent chapter of the church's history, the community was shaken by the tragic June 2023 m"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/46)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Stations of the Cross' cut orphaned dependant of a removed introduction — subject 'cross/stations/the': "The Stations of the Cross have long served as a meditative path for Catholics, a"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 35
+    Glossed (composed): 10
+    Suppressed (already explained): 3
+    Degraded (name dropped): 16
+    Guard failures: 0
+    Known (skipped): 6
+    Triage: 3115 tokens, $0.0008, 9.9s
+    Gloss: 2096 tokens, $0.0005, 7.7s
+    Compose: 2850 tokens, $0.0005, 4.6s
+    Total added cost: $0.0018
+    Stops affected: 4
+    Glosses applied:
+      • On December → DEGRADED (name dropped)
+      • Cuenin → DEGRADED (name dropped)
+      • Accusing Cardinal Bernard Law → SUPPRESSED (already explained)
+      • Father Cuenin → "an outspoken priest in Boston" [source: model]
+      • Honda Accord → DEGRADED (name dropped)
+      • In June → DEGRADED (name dropped)
+      • Calcutta → DEGRADED (name dropped)
+      • Peace → "a service honoring victims and healing" [source: model]
+      • Connick Associates → DEGRADED (name dropped)
+      • Doherty Rest → DEGRADED (name dropped)
+      • Patrick Keely → "a prominent architect of the Gothic Revival" [source: model]
+      • Lady Richeldis de Faverches → "known for her vision of the Virgin Mary" [source: model]
+      • Holy House → "the house where Mary is believed to have lived" [source: model]
+      • Eric Boeglin → SUPPRESSED (already explained)
+      • Deacon Jim → SUPPRESSED (already explained)
+      • Cardinal Bernard Law → DEGRADED (name dropped)
+      • Father Walter → DEGRADED (name dropped)
+      • Father Cuenin → "known for his criticism of the Church" [source: model]
+      • Lucia Arpino → DEGRADED (name dropped)
+      • Bruno → DEGRADED (name dropped)
+      • Italian → DEGRADED (name dropped)
+      • Mary Help → "a title for the Virgin Mary" [source: model]
+      • John Chrysostom → "an early Church Father and Archbishop" [source: model]
+      • Christian Europe → "the historical influence of Christianity in Europe" [source: model]
+      • Our Lady Help → DEGRADED (name dropped)
+      • Christians Grammar School → DEGRADED (name dropped)
+      • In Sister Paul Marie → DEGRADED (name dropped)
+      • Lucia Arpino → "a longtime parishioner tragically murdered in June 2023" [source: model]
+      • Gilda → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 7
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 7
+    Stops affected: 4
+    [1] DELETED: 'This bold act' in: This bold act of speaking truth to power underscores the church's role as a foru
+    [1] DELETED: 'This shocking' in: This shocking event led to a 'Mass of Peace, a service honoring victims and heal
+    [2] DELETED: 'This act' in: This act of commemoration, like the pennies collected for the lower nave windows
+    [3] DELETED: 'This incident' in: This incident was a pivotal moment in the church's history, marking a congregati
+    [3] DELETED: 'This modern tragedy' in: This modern tragedy echoes the past struggles immigrants who clashed with the Ir
+    [4] DELETED: 'This image' in: This image of personal piety and cultural continuity highlights the stations' en
+    [4] DELETED: 'This event' in: This event, a senseless act of violence during a break-in, brought an outpouring
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Stained Glass Windows' (index 34) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Nave': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Stained Glass Windows': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Altar': the longest run (4 sentences, Church) has agency=0 stakes=0 — someone is described, but nothing is risked, ref
+    stop 4 'Stations of the Cross': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Nave' (index 20)
+  [D534] Stop 4 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: On June 25, 2023, parishioners Gilda ('Jill') D'Amore and Bruno D'Amore were tragically murdered.
+
+  [LOCAL-474] PHASE 5.17: retry 'Nave' — 274w → 147w after gates, 12 sentence(s) removed
+    removed: "On December 8, 2002, Rev."
+    removed: "Cuenin delivered a homily that resonated deeply within these walls."
+    removed: "This bold act of speaking truth to power underscores the church's role as a forum for important dial"
+    removed: "Fast forward to September 2005, and the nave once again became the center of attention when Father C"
+    removed: "Allegations of financial impropriety, including a $500 monthly stipend and a leased Honda Accord, le"
+    removed: "The echoes of this event reverberated through the community, reminding parishioners of the complexit"
+    removed: "In June 1995, it was Mother Teresa of Calcutta who graced this space, addressing the congregation on"
+    removed: "More recently, on June 25, 2023, parishioners Gilda ('Jill') D'Amore and Bruno D'Amore were tragical"
+    removed: "This shocking event led to a 'Mass of Peace' held on June 27, attended by hundreds of mourners who f"
+    removed: "These stories are etched into the very fabric of the nave, each event adding a layer to the communit"
+    removed: "As you stand here, the past and present converge, enveloping you in the narratives that define this "
+    removed: "Ahead, the vibrant colors of the stained glass windows await, ready to share their own stories of fa"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Stained Glass Windows' — 291w → 221w after gates, 10 sentence(s) removed
+    removed: "In 1964, a significant event unfolded within these very walls, as the renowned Charles J."
+    removed: "Connick Associates studio was commissioned to create two memorial windows."
+    removed: "The studio, celebrated for its craftsmanship, left an indelible mark with these vibrant installation"
+    removed: "Doherty Rest in Peace," a tribute born from the urgent commission by Charles I."
+    removed: "Doherty himself."
+    removed: "This act of commemoration, like the pennies collected for the lower nave windows you saw earlier, sp"
+    removed: "Within this context, architect James Murphy, who trained under the esteemed Patrick Keely, brought t"
+    removed: "One such inspiration can be traced to the tale of Lady Richeldis de Faverches, who, in 1061, claimed"
+    removed: "As you absorb these stories etched in glass, each pane becomes a window into a world where faith, co"
+    removed: "Ahead lies the altar, where further mysteries and meanings await, inviting you to delve deeper into "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Altar' — 294w → 180w after gates, 10 sentence(s) removed
+    removed: "Cardinal Bernard Law, amidst a national scandal, banned the church from hosting official archdiocesa"
+    removed: "Father Cuenin, known for his outspoken criticism, delivered a powerful homily condemning the Cardina"
+    removed: "This incident was a pivotal moment in the church's history, marking a congregation's courage to stan"
+    removed: "Fast forward to June 2023, the altar became a sanctuary of grief and unity after the tragic murders "
+    removed: "The church community gathered here, lighting candles and offering prayers, transforming the altar in"
+    removed: "This modern tragedy echoes the past struggles of Italian immigrants who clashed with the Irish Catho"
+    removed: "Historically, the devotion to Mary Help of Christians, whose title was first described by John Chrys"
+    removed: "Her intercession is credited with defending Christian Europe during the Middle Ages, a legacy that r"
+    removed: "As you look upon the altar, consider its role not just as a religious artifact but as a witness to t"
+    removed: "The Stations of the Cross, awaiting you next, continue this journey of reflection and resilience."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Stations of the Cross' — 240w → 156w after gates, 6 sentence(s) removed
+    removed: "The Stations of the Cross have long served as a meditative path for Catholics, a tradition populariz"
+    removed: "Joan Cavanagh, a parishioner and writer, vividly recalls a poignant moment from her childhood at Our"
+    removed: "In Sister Paul Marie’s classroom, she witnessed an elderly Italian immigrant woman deeply moved duri"
+    removed: "This image of personal piety and cultural continuity highlights the stations' enduring significance "
+    removed: "In a more recent chapter of the church's history, the community was shaken by the tragic June 2023 m"
+    removed: "This event, a senseless act of violence during a break-in, brought an outpouring of grief and solida"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Nave by , ...
+
+Generating description for Stop 2: Stained Glass Windows by , ...
+
+Generating description for Stop 3: Altar by , ...
+
+Generating description for Stop 4: Stations of the Cross by , ...
+  [LOCAL-381] stop='Nave' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nave', 6, ''), ('Nave', 6, ''), ('Nave', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14984 after=21506 (+6522 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21506)
+  [LOCAL-381] stop='Altar' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Altar', 6, ''), ('Altar', 6, ''), ('Altar', 6, '')]
+  [LOCAL-402] Stop 3: injected 6 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15651 after=25826 (+10175 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25826)
+  [LOCAL-381] stop='Stations of the Cross' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Stations of the Cross', 8, ''), ('Stations of the Cross', 8, ''), ('Stations of the Cross', 6, '')]
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15238 after=25364 (+10126 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25364)
+  [LOCAL-381] stop='Stained Glass Windows' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=7 usable=7 (t1t2=0, t3=0, market=0)
+    Top scores: [('Stained Glass Windows', 17, ''), ('Stained Glass Windows', 16, ''), ('Stained Glass Windows', 9, '')]
+  [LOCAL-402] Stop 2: injected 7 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15394 after=26273 (+10879 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26273)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0332 (6993 tokens, model=gpt-4o)
+Stop 3 description word count: 318 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 2 API call cost: $0.0330 (6955 tokens, model=gpt-4o)
+Stop 2 description word count: 294 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 1 API call cost: $0.0290 (6105 tokens, model=gpt-4o)
+Stop 1 description word count: 283 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0329 (6916 tokens, model=gpt-4o)
+Stop 4 description word count: 298 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 7.9s for 4 stop(s) at max_workers=4
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 256w (was 221w)
+    [LOCAL-474] regenerated and re-gated: 250w (was 180w)
+    [LOCAL-474] regenerated and re-gated: 225w (was 156w)
+      [TRAGEDY-CONTEXT] stop='Nave' cut (circumstances not documented): On June 25, 2023, parishioners Gilda ('Jill') D'Amore and Bruno D'Amore were tra
+      [TRAGEDY-CONTEXT] stop='Altar' cut (circumstances not documented): Fast forward to June 2023, and the altar became a sanctuary of grief and solidar
+  [TRAGEDY-CONTEXT] recovered 0, removed 2 sentence(s)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Christians_Historic_District_(Newton,_Massachusetts) (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Our_Lady_Help_of_Chr
+  [LOCAL-427] HTTP 200 from https://canningliturgicalarts.com/portfolio/our-lady-help-of-christians/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://canningliturgicalarts.com/portfolio/our-la
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/beautyofallcatholicchurches/posts/1429365095361027/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://buildingsofnewengland.com/tag/timothy-g-oconnell/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://buildingsofnewengland.com/tag/timothy-g-oc
+  [LOCAL-427] HTTP 200 from https://thebostonpilot.com/bcd/web_parish.asp?ektronid=4676 (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://thebostonpilot.com/bcd/web_parish.asp?ektr
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/StJoeOst/posts/our-church-renovation-project-is-now-underway-after-the-final-mass-in-the-sanctu/1318040403773911/ (attempt 1)
+  [D512] verb discovery: query='Our Lady Help of Christians Catholic Church, Newton MA construct' -> 10 new verb(s): conserved, dedicated, involved, uncovered, overview, hampered, revealed, consolidated, reinstated, sacred
+  [D512] _AGENCY_VERB widened by 10 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Nave                                       20    24     0    45
+     2  Stained Glass Windows                      23    24     7    57
+     3  Altar                                      38    36     0    30
+     4  Stations of the Cross                      35    32     0    30
+    [LOCAL-485] index mean 29.0 over 4 stop(s), range 20-38
+    [LOCAL-485] weakest: 'Nave' at 20
+[TIMING] phase=story_first elapsed=134.7s cumulative=313.4s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (106 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 106 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 106 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 2 orientation R10: 1 sentence(s) deleted
+    Stop 3 orientation R10: 1 sentence(s) deleted
+    Stop 3 orientation: COLLAPSED — using fallback
+  [LOCAL-246] Orientation gating summary:
+    Words before: 187
+    Words after:  129
+    Delta: -58
+    Stops affected: 2/4
+    Deletions (2):
+      [Stop 2][R10_UNFULFILLED_PROMISE] "As you stand amidst the hallowed walls of Our Lady Help of Christians Catholic Church in Newton, Mas..."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "As you stand before the altar of Our Lady Help of Christians Catholic Church in Newton, MA, let your..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 1.6s, $0.0086, 1280 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Nave] (reversal): In September 2005, the nave once again drew attention as Father Cuenin, an outsp...
+      [Stained Glass Windows] (reversal): In the 1870s, Nonantum was a working-class Irish enclave, a community striving t...
+      [Altar] (reversal): In December 2002, Father Walter H....
+      [Stations of the Cross] (mystery): One poignant episode from the church's past involves Joan Cavanagh, a parishione...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0029 (517 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (27 words):
+      "At the upcoming stops, you will learn about Father Walter H. at the Altar and the working-class Irish enclave in the 1870s at the Stained Glass Windows."
+      Stops referenced: 2
+    Part 4 total cost: $0.0029
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you exit the Nave, head towards the back of Our Lady Help...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you stand by the beautiful stained glass windows, walk st...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you stand at the altar, walk towards the back of Our Lady...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.0s, $0.0026, 443 tokens
+  [LOCAL-280] Recap built: 26 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Nave] (reversal): "In September 2005, the nave once again drew attention as Father Cuenin, an outsp..."
+      → composed: "Nave, Father Cuenin resigned in 2005 over financial impropriety allegations"
+    [Stained Glass Windows] (reversal): "In the 1870s, Nonantum was a working-class Irish enclave, a community striving t..."
+      → composed: "Stained Glass Windows, Nonantum was an Irish enclave in the 1870s"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Nave, Father Cuenin resigned in 2005 over financial impropriety allegations and Stained Glass Windows, Nonantum was an Irish enclave in the 1870s."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=367 'Newton Centre dining walk MA - restaurant Tour' (2.6 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT removed from stop 4 (first told at stop 1, 1995/mother teresa): In an unexpected moment of grace, Mother Teresa of Calcutta paid an unannounced 
+  [D533] 1 repeated fact(s) removed, 0 kept
+  [D533] Person-year role guard: no mismatches (1616 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 0
+    Dropped: 2
+    AUDIT: admission | Open during church hours, free entry, may be closed during services | (no source) | DROPPED — no source content
+    AUDIT: admission | Visible during church hours, free to admire | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 2 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 1 warning(s)
+    [WARNING] Part 3: PART3_FLUFF_DOMINANT — Part 3 contains a sourced fact but is dominated by vague language.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Ne..."
+  [2] "This altar holds a solemn place in the narrative of the church. It became a focal point for the comm..."
+  [3] "As you move away from the altar you explored earlier, the Stations of the Cross at Our Lady Help of ..."
+
+=== Word Count Statistics ===
+Stop 1: Nave - 298 words
+Stop 2: Stained Glass Windows - 291 words
+Stop 3: Altar - 294 words
+Stop 4: Stations of the Cross - 278 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (9354 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 5 unsourced person-event(s); "Cuenin" placed here in September with no source: "In September 2005, the nave once again drew attention as Father Cuenin, an outsp
+
+Total API cost: $0.2427 (40488 tokens)
+Grounding:      $0.3500 (10 requests)
+Tour total:     $0.5927
+Provenance:     7/26 factual sentences sourced, 19 unsourced (7 corpus, 0 grounded, 19 parametric)
+CACHE STORE: Our Lady Help of Christians Catholic Church, Newton MA / museum / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: Our_Lady_Help_of_Christians_Catholic_Church__Newton_MA_museum_tour_20261002_140555.txt
+  [C5-5] Evidence persisted: Our_Lady_Help_of_Christians_Catholic_Church__Newton_MA_museum_tour_20261002_140555_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Our Lady Help of Christians Catholic Church, Newton MA - Walking Tour
+Tour-Category: walking
+
+Stop 1: Nave
+
+Address: 573 Washington St, Newton, MA 02458
+
+Coordinates: 42.349722, -71.209167
+
+Type/Specialty: Main worship area
+
+Specific Examples: Large seating area, high ceilings, intricate decorations
+
+Orientation: You are about to embark on a walking journey through Our Lady Help of Christians Catholic Church, Newton MA. The tour will take you from the peaceful ser...
+
+[TIMING] phase=packing elapsed=8.4s cumulative=321.8s
+[TIMING] phase=verification elapsed=0.0s cumulative=321.8s
+[TIMING] TOTAL wall=321.8s phases: poi_selection=155.7s, story_first=134.7s, fact_sheets=15.9s, packing=8.4s, intent=7.0s, narration=0.0s, external_lookups=0.0s, verification=0.0s

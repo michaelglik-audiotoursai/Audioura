@@ -1,0 +1,63 @@
+{
+  "slug": "palais_lascaris_nice",
+  "location": "Palais Lascaris, Nice, France",
+  "tour_type": "museum",
+  "stops": 4,
+  "wall_s": 565.9,
+  "chars": 6726,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 111,
+  "cost_record": {
+    "total_cost": 0.5835393000000001,
+    "total_tokens": 51848,
+    "cache_hit": false,
+    "grounding_cost": 1.4000000000000001,
+    "grounding_requests": 40,
+    "tour_total_cost": 1.9835393000000003,
+    "breakdown": {
+      "llm": 0.5835393000000001,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 1.4000000000000001
+    },
+    "provenance": {
+      "sourced": 3,
+      "unsourced": 23,
+      "total": 26,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 23
+    },
+    "score": {
+      "defects_before": {
+        "dangling_reference": "1 dangling pronoun reference(s), e.g. 'He used carved, painted, and gilded wood, employing a tradit'"
+      },
+      "defects_after": {
+        "thin": "3/4 stops delivered"
+      },
+      "removed": [
+        "dangling_reference"
+      ],
+      "remaining": [],
+      "retried": true,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.007325000000000001,
+        "total_tokens": 1541
+      },
+      "cost_without_retry": {
+        "total_cost": 0.576214,
+        "total_tokens": 50307
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 2,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

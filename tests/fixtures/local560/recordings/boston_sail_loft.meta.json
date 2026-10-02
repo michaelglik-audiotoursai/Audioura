@@ -1,0 +1,61 @@
+{
+  "slug": "boston_sail_loft",
+  "location": "restaurant tour of Boston Sail Loft, Boston, MA",
+  "tour_type": "restaurant",
+  "stops": 4,
+  "wall_s": 341.8,
+  "chars": 2735,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 96,
+  "cost_record": {
+    "total_cost": 0.14123975000000005,
+    "total_tokens": 37769,
+    "cache_hit": false,
+    "grounding_cost": 0.42000000000000004,
+    "grounding_requests": 12,
+    "tour_total_cost": 0.5612397500000001,
+    "breakdown": {
+      "llm": 0.14123975000000005,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.42000000000000004
+    },
+    "provenance": {
+      "sourced": 1,
+      "unsourced": 11,
+      "total": 12,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 11
+    },
+    "score": {
+      "defects_before": {
+        "thin": "1/4 stops delivered"
+      },
+      "defects_after": {
+        "thin": "1/4 stops delivered"
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.14124,
+        "total_tokens": 37769
+      }
+    }
+  },
+  "phase517": {
+    "retry_markers": 2,
+    "retried_summary": null
+  },
+  "models_env": {
+    "TOUR_LLM_MODEL": "(unset)",
+    "TOUR_STORY_MODEL": "(unset)"
+  }
+}

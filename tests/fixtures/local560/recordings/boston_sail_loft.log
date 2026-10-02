@@ -1,0 +1,593 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133322.txt'
+
+======================================================================
+CALL #001 | 13:33:22.555 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 4
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133322.txt'
+
+======================================================================
+CALL #002 | 13:33:22.555 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Boston Sail Loft, Boston, MA' → 'restaurant  of Boston Sail Loft, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Boston Sail Loft, Boston, MA' → 'restaurant of Boston Sail Loft, Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: {
+    "poi_type": "restaurants",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston Sail Loft, Boston, MA",
+    "named_places": ["Boston Sail Loft"],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.6s cumulative=1.6s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Boston Sail Loft, Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133322.txt'
+
+======================================================================
+CALL #003 | 13:33:24.148 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  user_request: restaurant tour of Boston Sail Loft, Boston, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for restaurant tour of Boston Sail Loft, Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='Boston Sail Loft, Boston, MA'
+  [S17] no scope_constraint (precision='BUILDING', scope='Boston Sail Loft, Boston, MA')
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133322.txt'
+
+======================================================================
+CALL #004 | 13:33:24.148 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  total_stops: 4
+  poi_type_hint: restaurants
+
+PHASE 3A API call cost: $0.0006 (715 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133322.txt'
+
+======================================================================
+CALL #005 | 13:33:28.154 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Boston Sail Loft, Boston, MA.
+List exactly 7 specific, real, well-known restaurants relevant to: restaurant tour of Boston Sail Loft, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every sto
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Union Oyster House", "address": "41 Union St, Boston, MA 02108", "reason": "Established in 1826, it is the oldest continuously operating restaurant in the U.S."},
+{"name": "The Salty Pig", "address": "130 Dartmouth St, Boston, MA 02116", "reason": "Known for its charcuterie, house-made pastas, and craft beer selection."},
+{"name": "Neptune Oyster", "address": "63 Salem St, Boston, MA 02113", "reason": "Renowned for its fresh oysters and lobster rolls."},
+{"name": "The Barking Crab", 
+
+   ! [LOCAL-329] Hollow reason for 'The Salty Pig': 'Known for its charcuterie, house-made pastas, and craft beer selection.'
+   ! [LOCAL-329] Hollow reason for 'Neptune Oyster': 'Renowned for its fresh oysters and lobster rolls.'
+   ! [LOCAL-329] Hollow reason for 'The Barking Crab': 'Specializes in seafood and has a vibrant waterfront location.'
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'No. 9 Park'
+  [LOCAL-329] Substance filter: 3 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 3 substantive selection reason(s)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Union Oyster House @ 41 Union St, Boston, MA 02108
+   - Parker's Restaurant @ 60 School St, Boston, MA 02108
+   - Legal Sea Foods - Long Wharf @ 255 State St, Boston, MA 02109
+  [LOCAL-557] Restaurant request names ['Boston Sail Loft'] — the listener's stops, not a theme
+  [LOCAL-547] Requested stop 'Boston Sail Loft' was NOT among the candidates — INSERTED as a user-explicit stop
+  [LOCAL-547] 1 requested stop(s) were missing from every fill path and were inserted: ['Boston Sail Loft']
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Boston Sail Loft, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 4 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Boston Sail Loft - Boston Sail Loft is a restaurant located in Boston, Massachusetts.
+   OK Verified Union Oyster House - Union Oyster House is a historic restaurant in Boston, Massachusetts
+   OK Verified Parker's Restaurant - The name 'Parker's Restaurant' suggests it is a restaurant
+   OK Verified Legal Sea Foods - Long Wharf - Legal Sea Foods - Long Wharf is a well-known seafood restaurant chain
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 4 stops pass location guard
+  [EXISTENCE-GATE] LOG_ONLY — 3/4 stops verified (75%), 1 would be dropped
+    [VERIFIED] 'Boston Sail Loft' — nominatim_osm: 'Boston Sail Loft' found in boston (Commercial Wharf, boston) [ca
+    [VERIFIED] 'Union Oyster House' — wikipedia_summary: 'Union Oyster House' is dining+city
+    [VERIFIED] "Parker's Restaurant" — wikipedia_search: snippet in 'Omni Parker House' mentions stop+city
+    [UNVERIFIED] 'Legal Sea Foods - Long Wharf' — no evidence
+    [HARVEST] "Parker's Restaurant": verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 2 already had corpus, 1 verified_no_detail
+    [DINING-HARVEST] "Parker's Restaurant": +7 passages from ['https://en.wikipedia.org/wiki/Harvey_D._Parker', 'https://en.wikipedia.org/wiki/Omni_Parker_House', 'https://historyofmassachusetts.org/omni-parker-house-hotel/', 'https://www.facebook.com/mark.fallon.547/posts/the-ultimate-indulgence-for-breakfast-the-original-boston-cream-pie-which-origin/10238831427316439/', 'https://www.omnihotels.com/hotels/boston-parker-house/dining/parkers-restaurant', 'https://www.thedistractedwanderer.com/2013/03/parkers-restaurant-at-omni-parker-house.html']
+    [DINING-HARVEST] Summary: 1 harvested, 2 already had corpus, 0 no facts found
+    [INTERPRETIVE] 'Union Oyster House': +2 passages (2 queries)
+    [INTERPRETIVE] "Parker's Restaurant": +3 passages (2 queries)
+    [INTERPRETIVE] Summary: 2 stops enriched, +5 passages, 6 queries issued, 0 attributions dropped
+  [LOCAL-329] Persisted 1 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_133322.txt'
+
+======================================================================
+CALL #006 | 13:33:45.949 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Boston Sail Loft, Boston, MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (908 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-353] Querying OSM for dining operational details (city: Boston)
+  [LOCAL-353] Boston Sail Loft: no sourceable facts in OSM — omitted
+  [LOCAL-353] Union Oyster House: no sourceable facts in OSM — omitted
+  [LOCAL-353] Parker's Restaurant: no sourceable facts in OSM — omitted
+  [LOCAL-353] Legal Sea Foods - Long Wharf: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Boston Sail Loft: no guide price, no OSM facts — silence
+  [LOCAL-354] Union Oyster House: no guide price, no OSM facts — silence
+  [LOCAL-354] Parker's Restaurant: no guide price, no OSM facts — silence
+  [LOCAL-354] Legal Sea Foods - Long Wharf: no guide price, no OSM facts — silence
+Extracted first POI coordinates: (42.3622, -71.0511)
+
+=== Extracted POI Information ===
+1. Boston Sail Loft
+   Address: 80 Atlantic Ave, Boston, MA 02110
+   Coordinates: 42.3622, -71.0511
+   Directions: Head northeast on Atlantic Ave, the restaurant will be on your right after a sho...
+2. Union Oyster House
+   Address: 41 Union St, Boston, MA 02108
+   Coordinates: 42.3615, -71.0562
+   Directions: Walk northwest on Atlantic Ave, turn left onto State St, then right onto Union S...
+3. Parker's Restaurant
+   Address: 60 School St, Boston, MA 02108
+   Coordinates: 42.3579, -71.0599
+   Directions: Walk southwest on Union St, turn right onto Hanover St, then left onto School St...
+4. Legal Sea Foods - Long Wharf
+   Address: 255 State St, Boston, MA 02109
+   Coordinates: 42.3603, -71.0510
+   Directions: Head southeast on School St, turn right onto Congress St, then left onto State S...
+================================
+
+  [D538] 'Boston Sail Loft' via serp(26)+openai: hours=Mon - 11:30 am - 2:00 am, Tue - 11:30 am, reservation=no reservations, price_band=$30 and under
+  [D538] 'Union Oyster House' via serp(29)+openai+gemini: hours=Sun-Thu 11:00-21:00, Fri-Sat 11:00-22:00, reservation=reservations recommended / reservations , price_band=$20–70
+  [D538] 'Parker's Restaurant' via serp(23)+openai+gemini: hours=Monday - 7:00 am - 2:00 pm, reservation=We have tables available for walk-ins or, price_band=$$$ ($30-$50)
+  [D538] 'Legal Sea Foods - Long Wharf' via serp(46)+openai+gemini: hours=Sun. 11:00 am - 10:00 pm, Mon. 11:00 am , reservation=reservations available via OpenTable / B, price_band=Restaurant Week 3-course lunch $32, dinn
+  [D545] +5 story fact(s) for 'Boston Sail Loft' via gemini (5 high)
+        [high] When the Sail Loft opened in 1984, they broke the golden rule of Boston chowder by seasoning theirs heavily wi
+        [high] The Sail Loft's clam chowder ended up winning multiple 'Best of Boston' crowns and dethroning historic rivals 
+        [high] In peak season, the Sail Loft sells hundreds of gallons of clam chowder a day, and it sparked such an intense 
+  [D545] +6 story fact(s) for 'Union Oyster House' via gemini (5 high)
+        [high] In 1797, Louis-Philippe, Duke of Orléans, lived in exile on the second floor of the building that would become
+        [low] In the mid-19th century, Daniel Webster was a regular patron at the Union Oyster House, consuming at least six
+        [high] From 1771 to 1775, Isaiah Thomas published The Massachusetts Spy out of the building that would become the Uni
+  [D545] +9 story fact(s) for 'Parker's Restaurant' via gemini (8 high)
+        [high] Between roughly 1912 and 1913, Ho Chi Minh worked in the bakeshop at the Parker House while living abroad.
+        [high] In the early 1940s, Malcolm X, then known as Malcolm Little, was hired as a busboy in Parker’s dining room.
+        [high] On June 24, 1953, John F. Kennedy sat at Table 40 in Parker’s dining room and proposed marriage to Jacqueline 
+  [D545] +4 story fact(s) for 'Legal Sea Foods - Long Wharf' via gemini (4 high)
+        [high] In 2011, Roger Berkowitz hosted a $115-a-plate 'Blacklisted Species' dinner at Legal Sea Foods to defy environ
+        [high] In January 2017, Legal Sea Foods' tradition of serving New England Clam Chowder at every U.S. presidential ina
+        [high] The Boston Sail Loft, founded in the 1980s, routinely bests Legal Sea Foods in local 'Best of Boston' roundups
+  [D538] Practicals acquired for 4/4 stop(s)
+[TIMING] phase=poi_selection elapsed=232.2s cumulative=233.8s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Boston Sail Loft restaurant of Boston Sail Loft' → 42763 chars
+  [LOCAL-47] Boston Sail Loft: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Union Oyster House restaurant of Boston Sail Loft' → 42763 chars
+  [LOCAL-47] Union Oyster House: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Parker's Restaurant restaurant of Boston Sail Loft' → 42763 chars
+  [LOCAL-47] Parker's Restaurant: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Legal Sea Foods - Long Wharf restaurant of Boston Sail Loft' → 113428 chars
+  [LOCAL-47] Legal Sea Foods - Long Wharf: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Boston Sail model=gpt-4o tokens=1483 (in=849 out=634) cost=$0.0085 latency=6.4s
+[COST_METER] FRESH | spine_generate | $0.008463 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0085
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (31 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Boston Sail Loft' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Union Oyster House' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Parker's Restaurant' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Legal Sea Foods - Long Wharf' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['anecdote', 'culture', 'anecdote', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=16.2s cumulative=250.0s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=250.0s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=250.0s
+
+Generating description for Stop 1: Boston Sail Loft by , ...
+
+Generating description for Stop 2: Union Oyster House by , ...
+
+Generating description for Stop 3: Parker's Restaurant by , ...
+
+Generating description for Stop 4: Legal Sea Foods - Long Wharf by , ...
+  [LOCAL-381] stop='Union Oyster House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Parker's Restaurant' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Boston Sail Loft' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Legal Sea Foods - Long Wharf' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=6 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=6 usable=6 (t1t2=0, t3=0, market=0)
+    Top scores: [('Union Oyster House', 16, ''), ('Union Oyster House', 9, ''), ('Union Oyster House', 8, '')]
+  [LOCAL-402] Stop 2: injected 6 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 6 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=15083 after=28492 (+13409 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28492)
+  [LOCAL-411] Stop 3 snippet ranking: input=9 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=9 usable=9 (t1t2=0, t3=0, market=0)
+    Top scores: [("Parker's Restaurant", 16, ''), ("Parker's Restaurant", 13, ''), ("Parker's Restaurant", 11, '')]
+  [LOCAL-402] Stop 3: injected 9 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 9 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15318 after=27700 (+12382 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27700)
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Sail Loft', 13, ''), ('Boston Sail Loft', 6, ''), ('Boston Sail Loft', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14601 after=25568 (+10967 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25568)
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Legal Sea Foods - Long Wharf', 16, ''), ('Legal Sea Foods - Long Wharf', 10, ''), ('Legal Sea Foods - Long Wharf', 10, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=15427 after=24887 (+9460 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24887)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 4 API call cost: $0.0295 (6206 tokens, model=gpt-4o)
+Stop 4 description word count: 330 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0331 (6963 tokens, model=gpt-4o)
+Stop 3 description word count: 324 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0339 (7139 tokens, model=gpt-4o)
+Stop 2 description word count: 301 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0303 (6373 tokens, model=gpt-4o)
+Stop 1 description word count: 296 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Boston Sail Loft': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Union Oyster House': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Parker's Restaurant': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Legal Sea Foods - Long Wharf': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=3, deduction=1, total=5
+  [LOCAL-439] Classification cost: $0.001302 (input=5407, output=818)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE, R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 3: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 4: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 4 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 10 paragraphs retried, 9 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0038 (4740 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Parker's Restaurant': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 3 'Parker's Restaurant': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 16
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 9
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Boston Sail Loft' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The Sail Loft's connection to Boston's maritime heritage adds an authentic layer to the dining exper"
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='Charles Forster' reason='It does not specify that Forster worked or dined at the Union Oyster House.' in: "Inside, the Union Oyster House buzzes with the energy of its storied past and present. This restaura"
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='John Hancock' reason='It does not specify a direct link between John Hancock and the Union Oyster House.' in: "The building itself, constructed in the early 18th century, has witnessed significant historical epi"
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The Union Oyster House offers classic New England seafood and operates from 11:00 AM to 9:00 PM Sund"
+    [LOCAL-472] UNGROUNDED entity stop='Parker's Restaurant' entity='Boston Cream Pie' reason='No concrete link between Boston Cream Pie and Parker's Restaurant is provided.' in: "The restaurant operates from 7:00 am to 2:00 pm on Mondays, welcoming both walk-in guests and those "
+    [LOCAL-472] UNGROUNDED entity stop='Legal Sea Foods - Long Wharf' entity='New England' reason='No concrete link to "New England" is provided.' in: "Arriving at Legal Sea Foods - Long Wharf, you'll notice a lively waterfront energy that contrasts sh"
+    [LOCAL-472] UNGROUNDED entity stop='Legal Sea Foods - Long Wharf' entity='Harry Berkowitz' reason='It does not specify how Harry Berkowitz is directly related to this stop.' in: "Stepping inside, you're greeted by the aroma of fresh seafood, a hallmark of this Boston institution"
+    [LOCAL-472] UNGROUNDED entity stop='Legal Sea Foods - Long Wharf' entity='New England' reason='No specific link to "New England" is provided.' in: "Legal Sea Foods offers a classic New England seafood experience that is both accessible and refined,"
+    [LOCAL-472] UNGROUNDED entity stop='Legal Sea Foods - Long Wharf' entity='Restaurant Week' reason='No concrete link to the stop is provided.' in: "Legal Sea Foods offers a classic New England seafood experience that is both accessible and refined,"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/52)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 13
+    Glossed (composed): 5
+    Suppressed (already explained): 0
+    Degraded (name dropped): 2
+    Guard failures: 0
+    Known (skipped): 6
+    Triage: 1839 tokens, $0.0004, 5.9s
+    Gloss: 790 tokens, $0.0002, 3.2s
+    Compose: 2096 tokens, $0.0003, 2.8s
+    Total added cost: $0.0009
+    Stops affected: 4
+    Glosses applied:
+      • New England → "the go-to spot for fresh seafood" [source: corpus]
+      • In Booth → DEGRADED (name dropped)
+      • Ebenezer Hancock → "a colonel in the Massachusetts militia" [source: model]
+      • Malcolm Little → "born on May 19, 1925, in Omaha" [source: model]
+      • Jacqueline Bouvier → "later known as Jacqueline Kennedy Onassis" [source: model]
+      • Harry Berkowitz → DEGRADED (name dropped)
+      • Blacklisted Species → "fish species overfished or unsustainably caught" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Boston Sail Loft, Boston, MA'...
+   X SCOPE-CHECK REMOVED 'Union Oyster House' — outside 'Boston Sail Loft, Boston, MA': [scope-memory] recorded in known_out_of_scope.json: The Union Oyster House is not within the bounds of Boston Sail Loft, Boston, MA. (conf=high)
+   X SCOPE-CHECK REMOVED 'Parker's Restaurant' — outside 'Boston Sail Loft, Boston, MA': The stop is not within the bounds of 'Boston Sail Loft, Boston, MA' (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "Parker's Restaurant", "aliases": [], "scope": "Boston Sail Loft, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "The stop is not within the bounds of 'Boston Sail Loft, Boston, MA'", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+   X SCOPE-CHECK REMOVED 'Legal Sea Foods - Long Wharf' — outside 'Boston Sail Loft, Boston, MA': Legal Sea Foods - Long Wharf is not physically located inside Boston Sail Loft, Boston, MA. It is a separate establishment at Long Wharf in Boston, MA. (conf=high)
+   [SCOPE-MEMORY] NEW ENTRY {"name": "Legal Sea Foods - Long Wharf", "aliases": [], "scope": "Boston Sail Loft, Boston, MA", "expect": "outside", "actual_location": "", "ground_truth": "Legal Sea Foods - Long Wharf is not physically located inside Boston Sail Loft, Boston, MA. It is a separate establishment at Long Wharf in Boston, MA.", "source": "phase_5_6_high_conf", "recorded": "2026-10-02"}
+OK PHASE 5.6: 1/4 stop(s) within scope
+  [PHASE 5.6] >50% of stops were outside 'Boston Sail Loft, Boston, MA' — scope is likely a small single venue; delivering 1 verified stop(s).
+OK PHASE 5.7: Dangling-reference scrub complete (1 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Boston Sail Loft' (index 53) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 1 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Boston Sail Loft': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Boston Sail Loft' — 296w → 242w after gates, 9 sentence(s) removed
+    removed: "But the Sail Loft's story isn't just about soup."
+    removed: "The building itself whispers tales of its past life as a working sail loft, long before lobster roll"
+    removed: "This connection to Boston's maritime heritage adds an authentic layer to the dining experience, as y"
+    removed: "In this cozy harbor-side spot, the essence of Boston's seafaring community lives on."
+    removed: "The Sail Loft's reputation for fresh seafood and hearty chowders has turned it into a local institut"
+    removed: "And while it may be bustling with activity, there's no need to book ahead; walk-ins are welcomed wit"
+    removed: "With meals priced under $30, it's an accessible taste of Boston's rich culinary tradition."
+    removed: "Open from 11:30 am until 2:00 am on Mondays and Tuesdays, the Boston Sail Loft invites you to savor "
+    removed: "Just wait until you taste Boston's oldest oyster legacy next."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 1 eligible stop(s) concurrently (max_workers=1)
+
+Generating description for Stop 1: Boston Sail Loft by , ...
+  [LOCAL-381] stop='Boston Sail Loft' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=20 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston Sail Loft', 13, ''), ('Boston Sail Loft', 6, ''), ('Boston Sail Loft', 6, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14601 after=25568 (+10967 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25568)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-560/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0329 (6926 tokens, model=gpt-4o)
+Stop 1 description word count: 263 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 3.5s for 1 stop(s) at max_workers=1
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 1 eligible, 1 retried, 0 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.andrewloves.com/blog/sail-loft (attempt 1)
+  [LOCAL-459] R5: Fetched 1032 chars from https://www.andrewloves.com/blog/sail-loft
+  [LOCAL-427] HTTP 200 from https://www.thebostonsailloft.com/ (attempt 1)
+  [LOCAL-459] R5: Fetched 568 chars from https://www.thebostonsailloft.com/
+  [LOCAL-427] HTTP 200 from https://www.tiktok.com/@phatvick/video/7346078732450385183 (attempt 1)
+  [LOCAL-459] R5: Fetched 2509 chars from https://www.tiktok.com/@phatvick/video/73460787324
+  [LOCAL-427] HTTP 200 from https://www.usfoods.com/tools-tips-and-ideas/articles-and-publications/articles/road-trip-the-boston-sail-loft (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://www.usfoods.com/tools-tips-and-ideas/artic
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DCsgzEjPpKS/?hl=en (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.thebostonsailloft.com/location/boston-sail-loft/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1883 chars from https://www.thebostonsailloft.com/location/boston-
+  [D512] verb discovery: query='restaurant tour of Boston Sail Loft, Boston, MA how the dish is ' -> 5 new verb(s): review, visited, ordered, established, excited
+  [D512] _AGENCY_VERB widened by 5 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Boston Sail Loft                           53    27     0    54
+    [LOCAL-485] index mean 53.0 over 1 stop(s), range 53-53
+    [LOCAL-485] weakest: 'Boston Sail Loft' at 53
+[TIMING] phase=story_first elapsed=90.4s cumulative=340.5s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (102 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 102 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 102 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 42
+    Words after:  19
+    Delta: -23
+    Stops affected: 1/1
+    Deletions (1):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you make your way along Boston's North End waterfront, the salty breeze from the harbor mingles w..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 1/1
+    Fewer than 2 stops with content — omitting Part 4
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 1 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (1 selected == 1 delivered)
+  [D536] ⚠️  LISTENER ASKED FOR 4 STOP(S), DELIVERING 1 — category='restaurant', reason='stops removed by gates or filters'
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap: fewer than 2 delivered stops — skipped
+  [LOCAL-280] No recap — closing offer gets full 3-sentence budget
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (0.1 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 1 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (5000 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (4 line(s), 6 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 1/1 stop(s), spoken to the listener.
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: ✓ all four parts present and conforming
+
+=== Word Count Statistics ===
+Stop 1: Boston Sail Loft - 296 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (2735 chars, 1/4 stops)
+  [LOCAL-540] defects seen: ['thin']
+  [LOCAL-540]   thin [advisory]: 1/4 stops delivered
+
+Total API cost: $0.1412 (37769 tokens)
+Grounding:      $0.4200 (12 requests)
+Tour total:     $0.5612
+Provenance:     1/12 factual sentences sourced, 11 unsourced (1 corpus, 0 grounded, 11 parametric)
+CACHE STORE: restaurant tour of Boston Sail Loft, Boston, MA / restaurant / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: restaurant_tour_of_Boston_Sail_Loft__Boston__MA_restaurant_tour_20261002_133904.txt
+  [C5-5] Evidence (provenance-only) persisted: restaurant_tour_of_Boston_Sail_Loft__Boston__MA_restaurant_tour_20261002_133904_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Boston Sail Loft, Boston, MA
+Tour-Category: restaurant
+
+Stop 1: Boston Sail Loft
+
+Address: 80 Atlantic Ave, Boston, MA 02110
+
+Coordinates: 42.3622, -71.0511
+
+Type/Specialty: Seafood
+
+Specific Examples: Waterfront views, clam chowder, lobster rolls
+
+Orientation: You are about to embark on a walking journey through the Boston Sail Loft, Boston, MA. As you explore this renowned seafood restaurant located in the North End Waterfront, established sin...
+
+[TIMING] phase=packing elapsed=1.3s cumulative=341.8s
+[TIMING] phase=verification elapsed=0.0s cumulative=341.8s
+[TIMING] TOTAL wall=341.8s phases: poi_selection=232.2s, story_first=90.4s, fact_sheets=16.2s, intent=1.6s, packing=1.3s, narration=0.0s, external_lookups=0.0s, verification=0.0s
