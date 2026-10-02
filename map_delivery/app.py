@@ -32,6 +32,82 @@ def after_request(response):
 
 # Handle preflight OPTIONS requests
 @app.route('/health', methods=['OPTIONS'])
+@app.route('/tour-by-code/<code>', methods=['GET'])
+def get_tour_by_code(code):
+    """[ST-2] Resolve a share code into ONE tour, shaped exactly like a /tours-near entry.
+
+    Why this exists: the home list is built from /tours-near, which is LOCATION based.
+    Kostya's teammates enter his code at home, nowhere near the trailhead, so proximity
+    will never surface that tour. This is the second way in.
+
+    Why the shape is IDENTICAL and not merely similar: the app drops this straight into
+    the list it already renders, so pick -> download -> translate keep working UNCHANGED.
+    Note `original_tour_id` in particular -- that is the chain the app follows to offer
+    a translation, and it is why a share must reference a real audio_tours row (ST-1)
+    rather than the detached text copy the table used to hold.
+
+    Public, by Michael's ruling 2026-09-24: "Everything in Audioura must be public. It is
+    just some of the tours are paid and most are free." Payment is a property of a tour,
+    not of how it was found, so resolution carries no auth.
+    """
+    print(f"Resolving share code: {code}")
+    sys.stdout.flush()
+    try:
+        code = (code or '').strip()
+        if not code or len(code) > 16:
+            return jsonify({'error': 'invalid code'}), 404
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # ST-1 put the reference here. Legacy rows predate it and hold NULL; they
+        # resolve through their stored text and cannot be surfaced as a map entry, so
+        # they are a clean 404 rather than a half-populated row.
+        cur.execute("SELECT audio_tour_id FROM shared_tours WHERE tour_id = %s", (code,))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'tour not found'}), 404
+
+        cur.execute("""
+            SELECT id, tour_name, request_string, lat, lng, number_requested,
+                   language, original_tour_id
+            FROM audio_tours
+            WHERE id = %s
+        """, (row[0],))
+        t = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not t:
+            return jsonify({'error': 'tour not found'}), 404
+
+        tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = t
+        # Same keys as a /tours-near element. distance_km is None, not 0: the listener
+        # is not near it, and 0 would sort it to the top under false pretences.
+        return jsonify({
+            'tours': [{
+                'id': tour_id,
+                'name': tour_name,
+                'request_string': request_string,
+                'lat': tour_lat,
+                'lng': tour_lng,
+                'distance_km': None,
+                'popularity': requests,
+                'type': 'walking_tour',
+                'language': language or 'en',
+                'original_tour_id': original_id,
+                'via_share_code': code,
+            }],
+            'count': 1,
+        })
+    except Exception as e:
+        print(f"[ST-2] tour-by-code failed for {code!r}: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+        return jsonify({'error': 'tour not found'}), 404
+
+
 @app.route('/tours-near/<lat>/<lng>', methods=['OPTIONS'])
 @app.route('/download-tour/<int:tour_id>', methods=['OPTIONS'])
 @app.route('/tour-info/<int:tour_id>', methods=['OPTIONS'])

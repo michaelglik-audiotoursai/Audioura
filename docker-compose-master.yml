@@ -42,6 +42,11 @@ services:
       # Found while putting the loop into production, 2026-08-24.
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - STORIED_MODE=true
+      # [ST-4] Local Docker has no GATEWAY_API_KEY, so POST /tour/share returned 503
+      # and sharing could not be tested on the Mac Mini. This opens it for LOCAL
+      # DEVELOPMENT ONLY. Cloud sets a real GATEWAY_API_KEY and never reads this.
+      # Do NOT copy this line into any deployed configuration.
+      - ALLOW_UNAUTHENTICATED_SHARING=true
       - ATTESTATION_MODE=log_only
       - BASE_URL=http://localhost:5000
       - REFERRAL_BASE_URL=http://localhost:5000

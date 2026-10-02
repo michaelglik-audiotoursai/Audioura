@@ -24174,3 +24174,80 @@ coverage/yield override — plus the cloud-path threading of `stops` through
 **The gate lifts when Michael approves the results of Igor's test**, not when the code
 looks right. As of this ruling, stop SELECTION is proven 3-of-3 and one end-to-end
 delivery with audio exists (`ab7ee23`); Igor has not yet tested it.
+
+---
+
+## D592 — A thin stop is acceptable. A missing one is not. (Michael, 2026-09-24)
+
+**LEAD proposed the opposite and was overruled**, with a reason worth keeping.
+
+I asked whether a listener-named stop we cannot say much about should ship thin, or
+be announced as "we couldn't say enough about this one". I recommended the second.
+Michael:
+
+> *"Mine would be the first, definitely not second. How can it be that an existing
+> stop has no information — no information at all? I understand that maybe no
+> stories, etc. but some information must be there if the stop is real. For example,
+> for a restaurant: hours, type of food, menu prices, need or no need to reserve,
+> reviews on Internet, and geo location. This alone can be valuable for a listener."*
+
+### The distinction he drew, which is the durable part
+
+| whose choice | what we may do |
+|---|---|
+| **We** selected the stop | dropping a dull one and substituting a better one is reasonable — we had a choice |
+| **The listener** named the stop | take it seriously. Deliver it. |
+
+> *"When it is us who selects the stops, and we have a choice, then it is reasonable
+> to drop not interesting and substitute with interesting, but user requested the
+> stops we should take this seriously."*
+
+### The one honest exception
+
+> *"in some cases we can say: we are not aware of these stops, like the painting
+> example; but definitely not about restaurants"*
+
+If a painting is **not in the catalogue** — we cannot establish it is even exhibited
+there — saying so is fair and correct. A restaurant is different: it has hours, a
+cuisine, a price band, a reservation policy, reviews and a location. **Those facts
+alone are worth hearing**, and `restaurant_practicals.fetch_practicals()` already
+returns every one of them.
+
+### Why LEAD was wrong
+
+I equated "no *story*" with "nothing to say". Michael's point is that a stop is not a
+narrative slot — it is a place, and a real place always has practical facts. The
+listener asked to go there; telling them the hours and whether to book is a service,
+not a consolation prize.
+
+He also noted he got all three test restaurants from Gemini, which "has plenty to
+say" — so thinness here was our retrieval failing, not the world being empty.
+
+### Binding consequences
+
+- A `user_explicit` stop is **never** silently dropped or substituted (LOCAL-556
+  reports it loudly at assembly; the underlying gates still need fixing).
+- When prose is thin, fall back to practicals rather than to removal.
+- "We are not aware of this" is reserved for **existence** failures, not for
+  interestingness failures.
+
+## D593 — D591 is lifted: user-chosen stops go to GCloud (Preview first) and TestFlight
+
+**Michael, 2026-10-01**, after two local Chart House tours (one through user-chosen
+stops, one the original way): *"Yes, I approve today's test, so it is ready for GCloud,
+but also for uploading new version of iPhone to Apple for testing."*
+
+The named-stop tour was the better one (rich tier, 8 facts, story score 46 vs 34).
+Most of that gap came from the original path researching "Chart House Restaurant",
+fixed in LOCAL-557 r3. Both tours were acceptable.
+
+**Concretely:** set `USER_STOPS_ENABLED=true` on the three *-storied* Cloud Run services.
+Beta/Stable stays untouched. The LOCAL-554 title-case fix travels with it: without it,
+a stop typed in lower case was written and then destroyed by the D3(d) gate. iOS
+build 27 goes to TestFlight from `storied`.
+
+**Release tracks unchanged:** Stable = Beta, Preview = Storied. Storied is promoted
+when (1) this deploy is verified on Preview, (2) the true per-tour cost including
+Gemini grounding is measured, and (3) the open urgent cloud bugs are checked against
+the Storied services. Subscribed moves to Preview only when there is a Subscribed
+build to test.

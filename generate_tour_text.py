@@ -1161,6 +1161,56 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
     return poi_list, inserted
 
 
+def _presentable_stop_title(raw):
+    """[LOCAL-554] Turn a stop name a LISTENER TYPED into a presentable title.
+
+    forced_stops began as LOCAL-357's verification harness ("THIS IS A VERIFICATION
+    HARNESS -- NOT A PRODUCT FEATURE") and LOCAL-525 repurposed it as the product path
+    for user-chosen stops. A harness passes names through verbatim; a product cannot.
+
+    Michael typed three restaurants in lower case on 2026-09-24. They were honoured --
+    the feature worked -- and then the tour was DESTROYED at the final gate:
+
+        Stop 1: little big diner in newton center - 233 words
+        FAIL: D3(d) Grounding assertion -- 1 suspicious title(s):
+              ['little big diner in newton center']
+        [BLOCKER4c] FACTUAL QA FAILED (round 1): 1 factual failure(s)
+
+    All three stops were written, then thrown away, because one title began with a
+    lower-case letter. PHASE 3B had already derived the correct names and they were
+    discarded, since forced stops are pinned verbatim:
+
+        PHASE 3B introduced unknown names (ignored): ['Sycamore', 'Little Big Diner']
+
+    Nobody types a tour stop in title case. Presenting it properly is our job.
+
+    Deliberately conservative: a name that ALREADY contains capitals is left alone, so
+    "O'Hara's Food & Spirits" and "MoMA" survive untouched. Only an all-lower-case name
+    is rewritten -- the exact case that fails the gate and reads badly in a tour.
+    """
+    if not raw or not isinstance(raw, str):
+        return raw
+    name = raw.strip()
+    if not name or any(c.isupper() for c in name):
+        return name          # the listener supplied case; respect it
+    # Words that stay lower-case unless they lead the title.
+    _MINOR = {'a', 'an', 'the', 'in', 'on', 'at', 'of', 'for', 'and', 'or', 'by',
+              'to', 'de', 'la', 'le', 'du', 'des', 'von', 'van'}
+    out = []
+    for i, word in enumerate(name.split()):
+        if i > 0 and word.lower() in _MINOR:
+            out.append(word.lower())
+            continue
+        # Capitalise after an apostrophe only for "O'Hara", never for "diner's".
+        if "'" in word:
+            head, _, tail = word.partition("'")
+            if len(head) <= 2 and tail:
+                out.append(head.capitalize() + "'" + tail.capitalize())
+            else:
+                out.append(head.capitalize() + "'" + tail)
+            continue
+        out.append(word.capitalize())
+    return ' '.join(out)
 # "near X", "around X", "close to X" make X a reference point, not the restaurant.
 _PROXIMITY_RE = re.compile(r"\b(?:near|around|by|close\s+to|next\s+to|beside|opposite)\s+",
                            re.IGNORECASE)
@@ -6927,7 +6977,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _forced_stops_active = False
     if forced_stops is not None and len(forced_stops) > 0:
         _forced_stops_active = True
-        poi_list = [_new_poi(name) for name in forced_stops]
+        # [LOCAL-554] Present the listener's own words properly. Matching and
+        # protection still key on what they typed; only the DISPLAY title changes.
+        _forced_titles = [_presentable_stop_title(n) for n in forced_stops]
+        for _orig, _pretty in zip(forced_stops, _forced_titles):
+            if _orig != _pretty:
+                print(f"  [LOCAL-554] stop title '{_orig}' -> '{_pretty}'")
+        poi_list = [_new_poi(name) for name in _forced_titles]
         # Override total_stops to match the forced list length
         total_stops = len(forced_stops)
         print(f"\n{'=' * 70}")
@@ -19696,6 +19752,58 @@ RULES:
         # Clean up double-spaces and triple-newlines left behind
         complete_tour = re.sub(r'  +', ' ', complete_tour)
         complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
+
+    # ── [LOCAL-556] A stop the LISTENER NAMED cannot silently vanish ──────────
+    # Michael's ruling, 2026-09-24, and it reverses what LEAD proposed:
+    #
+    #   "How can it be that an existing stop has no information -- no information at
+    #    all? ... for a restaurant: hours, type of food, menu prices, need or no need
+    #    to reserve, reviews, geo location. This alone can be valuable for a listener.
+    #    ... When it is us who selects the stops, and we have a choice, then it is
+    #    reasonable to drop not interesting and substitute with interesting, but user
+    #    requested the stops we should take this seriously."
+    #
+    # So: a THIN stop is acceptable, a MISSING one is not. Dropping is a privilege we
+    # have over stops WE chose, never over stops the listener named.
+    #
+    # Measured on his own run, 2026-09-24. Asked for sycamore / buttonwood / little
+    # big diner, the assembled tour contained:
+    #     Stop 1: Farmstead Table            <- never requested
+    #     (no header)  Sycamore prose        <- header, Address and Type all stripped
+    #     Stop 3: Little Big Diner
+    # Buttonwood had vanished entirely, 0 mentions. The tour read Stop 1 -> Stop 3 and
+    # nothing complained, because the renumbering above counts only headers that still
+    # exist -- so a stop losing its header becomes invisible rather than an error.
+    #
+    # This is a LOUD REPORT, not a silent repair: the gates upstream are doing
+    # something wrong and hiding it would make the next occurrence harder to find.
+    try:
+        _ux = [p for p in (poi_list or []) if p.get('user_explicit')]
+        if _ux:
+            _delivered = re.findall(r'^Stop\s+\d+:\s*(.+)$', complete_tour, re.M)
+            _dl = [d.strip().lower() for d in _delivered]
+            _missing = []
+            for _p in _ux:
+                _n = (_p.get('name') or '').strip()
+                if not _n:
+                    continue
+                _nl = _n.lower()
+                if not any(_nl == d or _nl in d or d in _nl for d in _dl if d):
+                    _present = _nl in complete_tour.lower()
+                    _missing.append((_n, 'prose survived, HEADER STRIPPED' if _present
+                                     else 'absent entirely'))
+            if _missing:
+                print(f"  [LOCAL-556] ⚠️  {len(_missing)} LISTENER-NAMED stop(s) did not "
+                      f"survive assembly — this is a DEFECT, not a preference:")
+                for _n, _why in _missing:
+                    print(f"      ✗ '{_n}' — {_why}")
+                print(f"      delivered headers: {_delivered}")
+                globals()['_LAST_MISSING_USER_STOPS'] = _missing
+            else:
+                print(f"  [LOCAL-556] all {len(_ux)} listener-named stop(s) survived "
+                      f"assembly with a header")
+    except Exception as _ux_err:
+        print(f"  [LOCAL-556] check failed (non-fatal): {type(_ux_err).__name__}: {_ux_err}")
 
     # -------- [LOCAL-256] Bare field-label gate --------
     # Schema field names (Description:, Orientation:, etc.) must never reach the
