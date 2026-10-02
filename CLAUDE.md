@@ -198,6 +198,12 @@ same session under two names. **On restart, a session's first act is to find its
 and adopt that name**; if none of the rows fits the directory and work it picks up, it
 adds one before replying.
 
+# WHERE NEW WORK GOES (D594, 2026-10-02)
+
+**All new development happens on `subscribed`.** `storied` takes only fixes to the Storied
+release, and each one is forward-merged into `subscribed`. Before any Subscribed task, check
+that `subscribed` contains `origin/storied` (LOCAL-558 is the forward-merge).
+
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
 
 **Michael's request, 2026-08-16.** He asked where a tester's bug was filed while we

@@ -24251,3 +24251,13 @@ when (1) this deploy is verified on Preview, (2) the true per-tour cost includin
 Gemini grounding is measured, and (3) the open urgent cloud bugs are checked against
 the Storied services. Subscribed moves to Preview only when there is a Subscribed
 build to test.
+
+## D594 — All new development happens on `subscribed`; `storied` takes only release fixes
+
+**Michael, 2026-10-02:** *"All new development must be done in Subscribed, not Storied."*
+
+Storied is about to become Stable and Subscribed Preview (D593's plan). From now on:
+- **New features and cost work** (first: LLM translation, LOCAL-559) branch from and merge into `subscribed`.
+- **`storied` receives only fixes to what is being released**, such as the Preview deploy wdvrdayqby and defects Michael finds while testing it. Every such fix is forward-merged into `subscribed`.
+- `subscribed` is 1,485 commits behind `storied` (183 of its own: wallet, billing, RevenueCat, single-pass translation). **LOCAL-558, the forward-merge, comes before any new Subscribed work.**
+- The production translation fix lives only on `kiro/gcs-tr1` (overlay deploy). Subscribed work on `translation_service.py` starts from that file, not from either line's copy.
