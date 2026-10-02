@@ -99,6 +99,9 @@ class TranslationService:
         # path resets at the start of each translation to report a per-tour total.
         self._llm_cost_total = 0.0
         self._llm_tour_cost = 0.0
+        # [LOCAL-559R] Stops are now translated concurrently (bounded pool), so the
+        # cost accumulators are mutated from worker threads — guard them with a lock.
+        self._cost_lock = threading.Lock()
 
     def get_db_connection(self):
         return psycopg2.connect(
@@ -333,12 +336,28 @@ class TranslationService:
         outside sane bounds. Cost is metered per call and accumulated per tour.
         """
         lang_name = self._LANGUAGE_NAMES.get(target_language, target_language)
+        # [LOCAL-559R] The old prompt said "keep lines starting with
+        # Address:/Coordinates:/Type-Specialty:/Specific Examples:/Operational Details:
+        # UNCHANGED". gpt-4o-mini generalised that to EVERY 'Label:' line and left the
+        # SPOKEN 'Orientation:' and 'Directions:' lines in English — a Russian listener
+        # heard English directions. The fix: translate EVERYTHING, including the
+        # 'Orientation:' and 'Directions:' labels and their text, and only special-case
+        # the five nav lines below (and only Address:/Coordinates: keep their value too).
         system_prompt = (
             f"You are a professional translator. Translate the user's text faithfully into {lang_name}. "
             "Preserve the exact meaning with no additions and no omissions. "
             "Keep every line break and the SAME NUMBER OF LINES as the input. "
-            "Keep any line that starts with 'Address:', 'Coordinates:', 'Type/Specialty:', "
-            "'Specific Examples:' or 'Operational Details:' UNCHANGED (do not translate it). "
+            "Translate EVERY line, INCLUDING lines that begin with a label such as "
+            "'Orientation:' or 'Directions:' — you MUST translate the label WORD itself "
+            "(e.g. 'Directions:' and 'Orientation:') into the target language as well as "
+            "the text after it. Never leave the English words 'Directions' or "
+            "'Orientation' in the output. "
+            "There are exactly FIVE special lines, identified ONLY by these exact English "
+            "label prefixes: 'Address:', 'Coordinates:', 'Type/Specialty:', "
+            "'Specific Examples:' and 'Operational Details:'. For these five lines, keep the "
+            "label word itself in English and translate only the text after the colon — "
+            "EXCEPT 'Address:' and 'Coordinates:', whose values are postal/numeric data and "
+            "must be left exactly as written. Do NOT treat any other 'Label:' line as special. "
             "Keep names of venues and people as they are commonly written in that language. "
             "Output only the translation, with no commentary, labels, or quotes."
         )
@@ -353,39 +372,182 @@ class TranslationService:
                 f"do not translate them: {_cmds}."
             )
 
+        # [LOCAL-559R] One LLM attempt, then — if the output contains lines that came
+        # back UNTRANSLATED (byte-identical, not one of the five nav lines, with real
+        # words in them) — ONE retry with the same prompt, then AWS fallback. All other
+        # failure modes (error / empty / line-count / ratio) fall back to AWS immediately.
         reason = None
-        try:
-            if not self._openai_api_key:
-                reason = 'no_api_key'
-                raise RuntimeError('OPENAI_API_KEY not set')
+        for attempt in range(2):  # attempt 0 = first call, attempt 1 = single retry
+            try:
+                if not self._openai_api_key:
+                    reason = 'no_api_key'
+                    raise RuntimeError('OPENAI_API_KEY not set')
 
-            resp = self._openai_chat(system_prompt, text)
-            translated = (resp.get('text') or '').strip('\n')
+                resp = self._openai_chat(system_prompt, text)
+                translated = (resp.get('text') or '').strip('\n')
+                # [LOCAL-559R] Deterministically repair spoken labels: when the model
+                # translated a Directions:/Orientation: VALUE but kept the English label,
+                # swap just the label word for its translation. This fixes the common
+                # case without a retry/fallback (which is slow), while a line that is
+                # STILL fully English falls through to the untranslated check below.
+                translated = self._normalize_spoken_labels(text, translated, target_language)
+                reason = self._evaluate_llm_output(text, translated)
 
-            if not translated.strip():
-                reason = 'empty'
-            else:
-                src_lines = text.count('\n') + 1
-                out_lines = translated.count('\n') + 1
-                if out_lines != src_lines:
-                    reason = f'line_count {out_lines}!={src_lines}'
-                else:
-                    ratio = len(translated) / max(len(text), 1)
-                    if ratio < self._LLM_RATIO_MIN or ratio > self._LLM_RATIO_MAX:
-                        reason = f'ratio {ratio:.2f}'
-
-            if reason is None:
-                # Meter cost only for an accepted LLM result.
-                self._meter_llm_cost(resp.get('input_tokens', 0), resp.get('output_tokens', 0))
-                if preserve_voice_commands:
-                    translated = self._preserve_voice_commands(text, translated, target_language)
-                return translated
-        except Exception as e:
-            if reason is None:
+                if reason is None:
+                    # Meter cost only for an accepted LLM result.
+                    self._meter_llm_cost(resp.get('input_tokens', 0), resp.get('output_tokens', 0))
+                    if preserve_voice_commands:
+                        translated = self._preserve_voice_commands(text, translated, target_language)
+                    return translated
+            except Exception as e:
                 reason = f'error {e}'
+
+            # Only an untranslated-lines failure is worth a retry — the model saw a
+            # valid prompt and simply left some lines in English. Any other reason
+            # (error/empty/line_count/ratio) will not improve on a blind retry.
+            is_untranslated = reason is not None and reason.startswith('untranslated_lines=')
+            if is_untranslated and attempt == 0:
+                logging.warning(f"[TRANSLATE-LLM] RETRY {reason}")
+                continue
+            break
 
         logging.warning(f"[TRANSLATE-LLM] FALLBACK {reason}")
         return self._translate_text_aws(text, target_language, preserve_voice_commands)
+
+    def _evaluate_llm_output(self, source_text, translated):
+        """Validate one LLM translation. Return a failure reason string, or None if OK.
+
+        [LOCAL-559R] Checks, in order: empty, line-count drift, length ratio, and the
+        new DETERMINISTIC untranslated-line check (byte-identical non-nav lines with
+        real words). The untranslated reason is reported as 'untranslated_lines=N' so
+        the caller can retry once before falling back to AWS.
+        """
+        if not translated.strip():
+            return 'empty'
+        src_lines = source_text.count('\n') + 1
+        out_lines = translated.count('\n') + 1
+        if out_lines != src_lines:
+            return f'line_count {out_lines}!={src_lines}'
+        ratio = len(translated) / max(len(source_text), 1)
+        if ratio < self._LLM_RATIO_MIN or ratio > self._LLM_RATIO_MAX:
+            return f'ratio {ratio:.2f}'
+        n_untranslated = self._count_untranslated_lines(source_text, translated)
+        if n_untranslated > 0:
+            return f'untranslated_lines={n_untranslated}'
+        return None
+
+    # [LOCAL-559R] A line is "untranslated" when it is byte-identical to its source
+    # line, is NOT one of the five nav lines, and carries real words (>=4 words of
+    # 4+ letters). Short/numeric/punctuation-only lines and proper-noun-only lines
+    # are legitimately identical across languages and must not trip the check.
+    _WORD_RE = re.compile(r'[^\W\d_]{4,}', re.UNICODE)  # a "letters-word" of length >= 4
+
+    # [LOCAL-559R] Spoken label lines that MUST be fully translated (label + value).
+    # These are NOT among the five nav lines, so they must never keep their English
+    # label. gpt-4o-mini frequently translates the VALUE but leaves the English label
+    # (e.g. 'Directions: Dirígete hacia el sur ...' in Spanish) — which the mobile app
+    # speaks aloud, so a listener hears the English word 'Directions'. Any output line
+    # that still starts with one of these English labels is treated as untranslated.
+    _SPOKEN_LABELS = ('Orientation:', 'Directions:')
+
+    def _is_nav_line(self, stripped_line):
+        """True if the line is one of the five nav lines (by exact English label prefix)."""
+        return any(
+            re.match(rf'^{re.escape(prefix)}', stripped_line, re.IGNORECASE)
+            for prefix in self._NAV_FIELD_PREFIXES
+        )
+
+    def _keeps_english_spoken_label(self, stripped_src, stripped_out):
+        """True if the SOURCE line was a spoken label line and the OUTPUT still begins
+        with the English label (so the label was not translated)."""
+        if not any(stripped_src.startswith(lbl) for lbl in self._SPOKEN_LABELS):
+            return False
+        return any(stripped_out.startswith(lbl) for lbl in self._SPOKEN_LABELS)
+
+    def _count_untranslated_lines(self, source_text, translated_text):
+        """Count output lines that look untranslated per the LOCAL-559R definition.
+
+        Only meaningful when line counts match (the caller guarantees this before
+        calling). A line counts as untranslated iff EITHER:
+          (a) it is byte-identical to the aligned source line, is not one of the five
+              nav lines, and contains 4 or more words of 4+ letters (prose, not a
+              name/number/short label the model is right to leave alone); OR
+          (b) the source line was a spoken label line ('Orientation:'/'Directions:')
+              and the output still begins with that English label — the value may be
+              translated but the SPOKEN label is not, and the app reads it aloud.
+        """
+        src_lines = source_text.split('\n')
+        tr_lines = translated_text.split('\n')
+        if len(src_lines) != len(tr_lines):
+            return 0  # not comparable positionally; handled by the line_count check
+        n = 0
+        for src, tr in zip(src_lines, tr_lines):
+            src_s, tr_s = src.strip(), tr.strip()
+            # (b) spoken label left in English (even if the value was translated)
+            if self._keeps_english_spoken_label(src_s, tr_s):
+                n += 1
+                continue
+            if src != tr:
+                continue  # changed → translated
+            # (a) fully byte-identical prose line
+            if not src_s or self._is_nav_line(src_s):
+                continue
+            if len(self._WORD_RE.findall(src_s)) >= 4:
+                n += 1
+        return n
+
+    def _translate_spoken_label(self, label_word, target_language):
+        """Translate a bare spoken-label word (e.g. 'Directions') via AWS Translate,
+        memoised per (word, language). AWS is used (not the LLM) because it is cheap,
+        deterministic, and the labels are exactly what the AWS engine already produces
+        (e.g. 'Cómo llegar', 'Как добраться'). Returns the English word on any failure
+        so we never crash the main path."""
+        memo_key = ('__label__', target_language, label_word)
+        with self._memo_lock:
+            if memo_key in self._translation_memo:
+                return self._translation_memo[memo_key]
+        try:
+            translated = self._aws_translate_call(label_word, target_language).strip()
+            if not translated:
+                translated = label_word
+        except Exception as e:
+            logging.warning(f"[TRANSLATE-LLM] label translate failed for {label_word!r}: {e}")
+            translated = label_word
+        with self._memo_lock:
+            self._translation_memo[memo_key] = translated
+        return translated
+
+    def _normalize_spoken_labels(self, source_text, translated_text, target_language):
+        """Repair spoken-label lines whose VALUE was translated but whose LABEL stayed
+        English. For each aligned (source, output) line where the source begins with a
+        spoken label ('Orientation:'/'Directions:'), the output still begins with that
+        English label, AND the output value differs from the English value (i.e. the
+        value WAS translated), replace the English label word with its translation.
+        Lines that are still fully English are left untouched so the untranslated check
+        can flag them for retry/fallback."""
+        src_lines = source_text.split('\n')
+        tr_lines = translated_text.split('\n')
+        if len(src_lines) != len(tr_lines):
+            return translated_text
+        changed = False
+        for idx, (src, tr) in enumerate(zip(src_lines, tr_lines)):
+            src_s = src.strip()
+            for label in self._SPOKEN_LABELS:          # 'Orientation:' / 'Directions:'
+                if not src_s.startswith(label):
+                    continue
+                tr_s = tr.strip()
+                if not tr_s.startswith(label):
+                    break  # label already translated — nothing to do
+                src_val = src_s[len(label):].strip()
+                tr_val = tr_s[len(label):].strip()
+                if tr_val and tr_val != src_val:
+                    # Value translated, label English → swap only the label word.
+                    word = label[:-1]  # drop trailing ':'
+                    new_label = self._translate_spoken_label(word, target_language)
+                    tr_lines[idx] = f"{new_label}: {tr_val}"
+                    changed = True
+                break
+        return '\n'.join(tr_lines) if changed else translated_text
 
     def _openai_chat(self, system_prompt, user_text):
         """Call the OpenAI chat completions endpoint (gpt-4o-mini, temperature 0).
@@ -427,8 +589,9 @@ class TranslationService:
             )
         else:  # pragma: no cover - defensive; cost_rates ships in the image
             cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
-        self._llm_cost_total += cost
-        self._llm_tour_cost += cost
+        with self._cost_lock:
+            self._llm_cost_total += cost
+            self._llm_tour_cost += cost
         logging.info(
             f"[TRANSLATE-LLM] tokens_in={input_tokens} tokens_out={output_tokens} cost=${cost:.6f}"
         )
@@ -477,7 +640,42 @@ class TranslationService:
         except Exception as e:
             logging.error(f"Audio generation error: {e}")
             return None
-    
+
+    def _translate_one_stop(self, i, stop_text, n_stops, target_language):
+        """Translate a single stop and derive its TTS text. Returns (translated_stop, tts_text).
+
+        [LOCAL-559R] Extracted from the former serial loop so stops can be translated
+        concurrently (bounded pool). The per-stop logic is unchanged: translate the raw
+        stop, strip nav fields positionally for TTS (two-pass fallback on line drift),
+        then restore the English Coordinates/Address labels. On any error the English
+        text is kept for both outputs, exactly as before.
+        """
+        try:
+            raw_translated = self.translate_text(stop_text, target_language)
+
+            # [LOCAL-142] Try single-pass: strip nav fields positionally from
+            # the raw translation (before _restore_metadata_labels modifies it).
+            tts_text = self._strip_nav_fields_from_translated(stop_text, raw_translated)
+            if tts_text is None:
+                # Fallback: line counts diverged — use two-pass (costs one extra API call)
+                logging.warning(
+                    f"[LOCAL-142] Positional strip fallback on stop {i+1}/{n_stops} "
+                    f"(en_lines={len(stop_text.split(chr(10)))}, "
+                    f"tr_lines={len(raw_translated.split(chr(10)))})"
+                )
+                tts_text = self.translate_text(
+                    self._strip_nav_fields_for_tts(stop_text), target_language
+                )
+
+            translated_stop = self._restore_metadata_labels(
+                stop_text, raw_translated, target_language
+            )
+            logging.info(f"Translated stop {i+1}/{n_stops}")
+            return translated_stop, tts_text
+        except Exception as e:
+            logging.error(f"Error translating stop {i+1}: {e}")
+            return stop_text, stop_text  # Keep original on error
+
     def translate_tour_with_audio(self, original_tour_id, target_language):
         """Translate a tour with full audio generation preserving original HTML structure.
         
@@ -605,51 +803,40 @@ class TranslationService:
             # [LOCAL-142] Single-pass optimization: strip nav fields from the raw
             # translation instead of translating a pre-stripped version separately.
             # This eliminates N translate_text calls per tour (one per stop).
-            translated_stops = []
-            tts_texts = []
-            for i, stop_text in enumerate(tour_stops):
-                try:
-                    raw_translated = self.translate_text(stop_text, target_language)
-
-                    # [LOCAL-142] Try single-pass: strip nav fields positionally from
-                    # the raw translation (before _restore_metadata_labels modifies it).
-                    tts_text = self._strip_nav_fields_from_translated(stop_text, raw_translated)
-                    if tts_text is None:
-                        # Fallback: line counts diverged — use two-pass (costs one extra API call)
-                        logging.warning(
-                            f"[LOCAL-142] Positional strip fallback on stop {i+1}/{len(tour_stops)} "
-                            f"(en_lines={len(stop_text.split(chr(10)))}, "
-                            f"tr_lines={len(raw_translated.split(chr(10)))})"
-                        )
-                        tts_text = self.translate_text(
-                            self._strip_nav_fields_for_tts(stop_text), target_language
-                        )
-
-                    translated_stop = self._restore_metadata_labels(
-                        stop_text, raw_translated, target_language
-                    )
-                    translated_stops.append(translated_stop)
-                    tts_texts.append(tts_text)
-                    logging.info(f"Translated stop {i+1}/{len(tour_stops)}")
-                except Exception as e:
-                    logging.error(f"Error translating stop {i+1}: {e}")
-                    translated_stops.append(stop_text)  # Keep original on error
-                    tts_texts.append(stop_text)
+            # [LOCAL-559R] Translate stops CONCURRENTLY with a bounded pool (max 5
+            # workers). The LLM engine was ~102 s for 10 stops serially; per-stop calls
+            # are independent and I/O-bound, so a small pool cuts wall time well under
+            # 30 s while preserving output order (ThreadPoolExecutor.map is ordered).
+            n_stops = len(tour_stops)
+            max_workers = min(5, n_stops) if n_stops else 1
+            with ThreadPoolExecutor(max_workers=max_workers) as _stop_pool:
+                results = list(_stop_pool.map(
+                    lambda args: self._translate_one_stop(args[0], args[1], n_stops, target_language),
+                    list(enumerate(tour_stops))
+                ))
+            translated_stops = [r[0] for r in results]
+            tts_texts = [r[1] for r in results]
             
             # Generate audio for each translated stop
-            translated_audio_files = []
-            for i, translated_text in enumerate(tts_texts):
+            # Generate audio for each translated stop.
+            # [LOCAL-559R] Polly calls are independent and I/O-bound — run them in the
+            # same bounded pool (max 5), preserving order via map, to cut the serial tail.
+            def _gen_audio(args):
+                i, txt = args
                 try:
-                    audio_bytes = self.generate_audio(translated_text, target_language)
+                    audio_bytes = self.generate_audio(txt, target_language)
                     if audio_bytes:
-                        translated_audio_files.append(audio_bytes)
-                        logging.info(f"Generated audio for stop {i+1}/{len(translated_stops)}")
-                    else:
-                        logging.warning(f"Failed to generate audio for stop {i+1}")
-                        translated_audio_files.append(None)
+                        logging.info(f"Generated audio for stop {i+1}/{len(tts_texts)}")
+                        return audio_bytes
+                    logging.warning(f"Failed to generate audio for stop {i+1}")
+                    return None
                 except Exception as e:
                     logging.error(f"Error generating audio for stop {i+1}: {e}")
-                    translated_audio_files.append(None)
+                    return None
+
+            _audio_workers = min(5, len(tts_texts)) if tts_texts else 1
+            with ThreadPoolExecutor(max_workers=_audio_workers) as _audio_pool:
+                translated_audio_files = list(_audio_pool.map(_gen_audio, list(enumerate(tts_texts))))
             
             # Create translated ZIP by preserving original HTML structure and replacing audio
             translated_zip_data = self._create_mobile_compatible_zip(

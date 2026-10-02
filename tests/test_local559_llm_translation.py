@@ -267,5 +267,261 @@ def test_voice_commands_preserved_under_llm():
     assert 'Play' in out
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# LOCAL-559R. Bounce fix: the llm engine left SPOKEN 'Orientation:' and
+# 'Directions:' lines in English (a Russian listener heard English directions).
+#
+# This fixture is a REAL stop of tour 301 — Stop 2, Palais Lascaris — copied
+# byte-for-byte from the live audio_tours.tour_content row (the same stop LEAD
+# quoted: "373 (ru, llm): Directions: From Palais Lascaris, head south ..."). It
+# carries the five nav lines AND the two spoken label lines Orientation:/Directions:.
+#
+# RED on e406c8f: the old code had no untranslated-line check and no retry, so a
+# model that leaves 'Directions:' / 'Orientation:' verbatim (exactly what the old
+# prompt induced) is returned unchanged — the Directions line stays English.
+# GREEN after the fix: the deterministic check flags those lines, one retry is
+# issued, and the retried (translated) output is returned.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Byte-exact Stop 2 body of tour 301 (verified against the live DB on 2026-10-02).
+TOUR301_STOP2 = (
+    "Palais Lascaris\n"
+    "\n"
+    "Address: 06300 \n"
+    "\n"
+    "Coordinates: 43.6963, 7.2767\n"
+    "\n"
+    "Type/Specialty: Historic palace\n"
+    "\n"
+    "Specific Examples: Baroque architecture, musical instrument collection, ornate decorations\n"
+    "\n"
+    "Orientation: As you arrive at the Palais Lascaris in the heart of Old Town, look for the grand facade of this seventeenth-century aristocratic building. Once the residence of the influential Vintimille-Lascaris family, it now stands as a museum housing over 500 musical instruments, a treasure trove of sound and history waiting to be discovered.\n"
+    "\n"
+    "Built in the early seventeenth century and later modified in the eighteenth century, the Palais Lascaris was a symbol of power and prestige for the Vintimille-Lascaris family until the early 19th century. In 1942, the city of Nice acquired the palace to transform it into a museum, a decision that would preserve its rich heritage and offer visitors a glimpse into its opulent past. Step inside the palace, and you are immediately enveloped in a sensory journey through time. The creaking of the wooden floors beneath your feet echoes the footsteps of the aristocrats who once roamed these halls. The faint scent of aged wood and history lingers in the air, inviting you to explore further. The lavish Baroque interiors of the Palais Lascaris hide stories of a once-powerful Savoy family whose influence shaped the destiny of the region. As you wander through the rooms adorned with intricate tapestries and ornate furnishings, imagine the grandeur and elegance that once filled these spaces. This stop on our walking tour of Nice connects to our theme by showcasing the intersection of art, history, and culture. The Palais Lascaris serves as a window into the past, offering a glimpse of a bygone era when music and luxury intertwined to create a world of beauty and refinement. Just beyond this rich historical site, the echoes of an operatic past await, hinting at the grandeur and drama that once graced this vibrant city.\n"
+    "\n"
+    "Directions: From Palais Lascaris, head south on Rue Droite until you reach Place Rossetti with its bustling cafes. Continue straight on Rue de la Pr\u00e9fecture until you arrive at Op\u00e9ra de Nice, a grand building with a beautiful fa\u00e7ade. Enjoy the walk through the charming streets of Old Town Nice!"
+)
+
+# The five nav-line prefixes that are the ONLY lines allowed to stay in English.
+_NAV_PREFIXES = ('Address:', 'Coordinates:', 'Type/Specialty:',
+                 'Specific Examples:', 'Operational Details:')
+
+
+def _ru_translate_line(line):
+    """Fake-but-faithful per-line RU translation: prefix a Cyrillic marker to the
+    non-label text so the line is byte-DIFFERENT from English (i.e. 'translated'),
+    while preserving line structure and a sane length ratio. Label words on
+    Orientation:/Directions: are themselves translated (label + value)."""
+    s = line.strip()
+    if s == '':
+        return ''
+    if s.startswith('Orientation:'):
+        return 'Ориентация: \u041f\u0435\u0440\u0435\u0432\u043e\u0434 ' + s[len('Orientation:'):].strip()
+    if s.startswith('Directions:'):
+        return 'Как добраться: \u041f\u0435\u0440\u0435\u0432\u043e\u0434 ' + s[len('Directions:'):].strip()
+    return '\u041f\u0435\u0440\u0435\u0432\u043e\u0434 ' + s  # "Перевод " (translation) + text
+
+
+def _nav_passthrough(line):
+    """Nav lines: keep label English; translate value except Address/Coordinates."""
+    s = line.strip()
+    for p in _NAV_PREFIXES:
+        if s.startswith(p):
+            if p in ('Address:', 'Coordinates:'):
+                return line  # value unchanged
+            label, _, val = s.partition(':')
+            return f"{label}: \u041f\u0435\u0440\u0435\u0432\u043e\u0434 {val.strip()}"
+    return None
+
+
+class _Tour301Mock:
+    """Models the live gpt-4o-mini defect, then a correct retry.
+
+    Call 1 (buggy): translate narrative, keep the five nav lines English, but ALSO
+    leave the 'Orientation:' and 'Directions:' lines verbatim English — exactly the
+    over-generalisation the old prompt caused.
+    Call 2 (retry): translate everything correctly (Orientation/Directions included).
+    Line count is always preserved; ratio stays well within bounds.
+    """
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, system_prompt, user_text):
+        self.calls += 1
+        buggy = self.calls == 1
+        out = []
+        for line in user_text.split('\n'):
+            s = line.strip()
+            nav = _nav_passthrough(line)
+            if nav is not None:
+                out.append(nav)
+            elif buggy and (s.startswith('Orientation:') or s.startswith('Directions:')):
+                out.append(line)  # BUG: left in English
+            else:
+                out.append(_ru_translate_line(line))
+        return {'text': '\n'.join(out), 'input_tokens': 400, 'output_tokens': 420}
+
+
+def _directions_line(text):
+    for ln in text.split('\n'):
+        if ln.strip().startswith('Directions:') or ln.strip().startswith('Как добраться:'):
+            return ln
+    return None
+
+
+def test_local559r_directions_line_is_translated_tour301_stop2(caplog):
+    """RED on e406c8f, GREEN after the fix: the spoken Directions line must not
+    survive in English. Mirrors `grep -cE '^Directions: [A-Za-z]' == 0` on live rows."""
+    svc, ts = _make_service(engine='llm')
+    mock = _Tour301Mock()
+    with caplog.at_level(logging.WARNING):
+        with patch.object(svc, '_openai_chat', side_effect=mock):
+            out = svc.translate_text(TOUR301_STOP2, 'ru')
+
+    # Line count preserved (acceptance for the llm engine).
+    assert out.count('\n') == TOUR301_STOP2.count('\n')
+
+    # The Directions line must be translated — NOT the English source line.
+    dline = _directions_line(out)
+    assert dline is not None, 'Directions line vanished'
+    assert not dline.startswith('Directions: From Palais Lascaris'), \
+        'Directions line left in English (the LOCAL-559R defect)'
+    # And it carries Cyrillic (actually translated).
+    assert any('\u0400' <= ch <= '\u04FF' for ch in dline), 'Directions line not in Russian'
+
+    # The spoken Orientation line is likewise translated.
+    assert 'Orientation: As you arrive' not in out
+
+    # The five nav lines are preserved per spec: Address/Coordinates values byte-exact.
+    assert 'Coordinates: 43.6963, 7.2767' in out
+    assert 'Address: 06300' in out
+
+    # The deterministic check fired and a single retry resolved it (no AWS fallback).
+    assert mock.calls == 2, 'expected exactly one LLM retry'
+    assert any('[TRANSLATE-LLM] RETRY untranslated_lines=' in r.message for r in caplog.records)
+    assert not any('[TRANSLATE-LLM] FALLBACK' in r.message for r in caplog.records)
+
+
+def test_local559r_fallback_when_retry_still_untranslated(caplog):
+    """If the retry ALSO leaves spoken lines in English, fall back to AWS and log
+    '[TRANSLATE-LLM] FALLBACK untranslated_lines=N'."""
+    svc, ts = _make_service(engine='llm')
+    svc.translate_client.translate_text.return_value = {'TranslatedText': 'AWS_RESULT'}
+
+    def _always_buggy(system_prompt, user_text):
+        # Keep Orientation/Directions English on EVERY call; translate the rest.
+        out = []
+        for line in user_text.split('\n'):
+            s = line.strip()
+            nav = _nav_passthrough(line)
+            if nav is not None:
+                out.append(nav)
+            elif s.startswith('Orientation:') or s.startswith('Directions:'):
+                out.append(line)
+            else:
+                out.append(_ru_translate_line(line))
+        return {'text': '\n'.join(out), 'input_tokens': 400, 'output_tokens': 420}
+
+    attempts = {'n': 0}
+    def _counting(system_prompt, user_text):
+        attempts['n'] += 1
+        return _always_buggy(system_prompt, user_text)
+
+    with caplog.at_level(logging.WARNING):
+        with patch.object(svc, '_openai_chat', side_effect=_counting):
+            out = svc.translate_text(TOUR301_STOP2, 'ru')
+
+    assert out == 'AWS_RESULT'
+    assert attempts['n'] == 2, 'must try once, retry once, then fall back'
+    assert any('[TRANSLATE-LLM] FALLBACK untranslated_lines=' in r.message
+               for r in caplog.records)
+
+
+def test_local559r_untranslated_counter_ignores_names_and_nav():
+    """The deterministic counter must NOT flag the five nav lines nor short/proper-noun
+    lines that are legitimately identical across languages."""
+    svc, ts = _make_service(engine='llm')
+    source = (
+        "Palais Lascaris\n"              # proper noun, 2 words → not flagged
+        "Address: 06300 \n"               # nav line → not flagged
+        "Coordinates: 43.6963, 7.2767\n"  # nav line → not flagged
+        "This is a long English prose sentence that was left untranslated entirely."
+    )
+    # Identical output on the one prose line only.
+    n = svc._count_untranslated_lines(source, source)
+    assert n == 1, f'exactly the prose line should be flagged, got {n}'
+
+
+def test_local559r_english_spoken_label_with_translated_value_is_flagged():
+    """A spoken label line whose VALUE is translated but whose LABEL stays English
+    (e.g. 'Directions: Dirígete hacia el sur ...' in Spanish) must be flagged — the
+    app speaks the label aloud. This is the es-row defect from the live run."""
+    svc, ts = _make_service(engine='llm')
+    source = (
+        "Orientation: Head north and look for the tower.\n"
+        "\n"
+        "Directions: From here, walk south until you reach the square."
+    )
+    # Value translated to Spanish, label left English on both spoken lines.
+    out = (
+        "Orientation: Dirígete al norte y busca la torre.\n"
+        "\n"
+        "Directions: Desde aquí, camina hacia el sur hasta llegar a la plaza."
+    )
+    n = svc._count_untranslated_lines(source, out)
+    assert n == 2, f'both spoken labels left in English should be flagged, got {n}'
+
+    # Fully translated labels (Spanish) must NOT be flagged.
+    out_ok = (
+        "Orientación: Dirígete al norte y busca la torre.\n"
+        "\n"
+        "Cómo llegar: Desde aquí, camina hacia el sur hasta llegar a la plaza."
+    )
+    assert svc._count_untranslated_lines(source, out_ok) == 0
+
+
+def test_local559r_label_normalized_without_fallback(caplog):
+    """When the model translates the VALUE but keeps the English spoken label, the
+    label is repaired DETERMINISTICALLY (via a cheap AWS label lookup) with NO retry
+    and NO full-text AWS fallback — this is the wall-time fix for the live run."""
+    svc, ts = _make_service(engine='llm')
+
+    # AWS label lookups: 'Directions' -> 'Cómo llegar', 'Orientation' -> 'Orientación'.
+    def _aws_label(Text, SourceLanguageCode, TargetLanguageCode):
+        mapping = {'Directions': 'Cómo llegar', 'Orientation': 'Orientación'}
+        return {'TranslatedText': mapping.get(Text, Text)}
+    svc.translate_client.translate_text.side_effect = _aws_label
+
+    source = (
+        "Orientation: Head north and look for the tower.\n"
+        "\n"
+        "Directions: From here, walk south until you reach the square."
+    )
+    # Model translated the VALUE to Spanish but kept the English labels.
+    llm_out = (
+        "Orientation: Dirígete al norte y busca la torre.\n"
+        "\n"
+        "Directions: Desde aquí, camina hacia el sur hasta llegar a la plaza."
+    )
+    calls = {'n': 0}
+    def _one_shot(system_prompt, user_text):
+        calls['n'] += 1
+        return {'text': llm_out, 'input_tokens': 50, 'output_tokens': 55}
+
+    with caplog.at_level(logging.WARNING):
+        with patch.object(svc, '_openai_chat', side_effect=_one_shot):
+            out = svc.translate_text(source, 'es')
+
+    # Exactly one LLM call — no retry, no fallback.
+    assert calls['n'] == 1
+    assert not any('[TRANSLATE-LLM] RETRY' in r.message for r in caplog.records)
+    assert not any('[TRANSLATE-LLM] FALLBACK' in r.message for r in caplog.records)
+    # Labels repaired, values preserved.
+    assert 'Cómo llegar: Desde aquí' in out
+    assert 'Orientación: Dirígete al norte' in out
+    assert '\nDirections:' not in out and not out.startswith('Directions:')
+    assert 'Orientation:' not in out
+
+
 if __name__ == '__main__':
     sys.exit(pytest.main([__file__, '-v']))

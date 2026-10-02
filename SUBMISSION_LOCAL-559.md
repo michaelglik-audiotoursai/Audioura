@@ -213,3 +213,121 @@ deleted. The shared live translation-service is still up and untouched.
 - **No GCloud deploy.** All testing was local Docker against the local DB.
 - **Did not edit** `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `WORK_QUEUE.md`, or
   `.continuous_dev/STATUS.md`.
+
+---
+
+# LOCAL-559R — bounce: the llm engine left spoken `Directions:` / `Orientation:` lines in English
+
+**Branch:** `LOCAL-559-llm-translation` (continued; base `e406c8f`).
+`git merge-base --is-ancestor e406c8f HEAD` exits 0.
+
+## The defect (heard by the listener)
+
+The llm engine translated narrative prose but left the SPOKEN label lines
+`Directions:` and `Orientation:` in English — LEAD saw it directly in the live rows
+(e.g. `373 (ru, llm): Directions: From Palais Lascaris, head south ...`). Those lines
+are NOT among the five fields `_strip_nav_fields_for_tts` strips, so they are read
+aloud: a Russian listener heard English directions.
+
+Root cause: the old prompt said *"keep lines starting with Address:/Coordinates:/
+Type-Specialty:/Specific Examples:/Operational Details: UNCHANGED"*. gpt-4o-mini
+generalised that to EVERY `Label:` line and left `Directions:`/`Orientation:` verbatim.
+The LOCAL-559 unit fixture had no `Directions:` line, so the tests could not catch it.
+
+## Fix (three parts, all in `translation-service/translation_service.py`)
+
+1. **Prompt.** Translate EVERYTHING, including the `Orientation:`/`Directions:` labels
+   *and* their text. Only the FIVE nav lines are special (identified by their exact
+   English prefixes): keep the label word English, translate the value — except
+   `Address:` and `Coordinates:`, whose values stay byte-exact.
+
+2. **Deterministic post-call check** (`_evaluate_llm_output` + `_count_untranslated_lines`,
+   no new LLM judge). After every llm call, an output line is "untranslated" when
+   EITHER (a) it is byte-identical to its aligned source line, is not one of the five
+   nav lines, and has ≥4 words of ≥4 letters; OR (b) the source line was a spoken label
+   line and the output still begins with the English `Directions:`/`Orientation:` label.
+   On a hit: **one retry** with the llm (`[TRANSLATE-LLM] RETRY untranslated_lines=N`),
+   then **AWS fallback** for that call (`[TRANSLATE-LLM] FALLBACK untranslated_lines=N`).
+
+   To avoid retrying/falling back on the *common* case (gpt-4o-mini translates the
+   directions VALUE but keeps the English label word), a deterministic
+   `_normalize_spoken_labels` pass swaps just the English label for its translation
+   (a cheap, memoised AWS lookup of the single word — the same label AWS already
+   produces, e.g. `Cómo llegar`, `Как добраться`). A line that is *still fully English*
+   after that is left for the check to catch.
+
+3. **Concurrency.** Per-stop translation and per-stop Polly synthesis now run in a
+   bounded `ThreadPoolExecutor(max_workers=5)` via `_translate_one_stop`, preserving
+   output order (`executor.map`). Cost metering is guarded by `_cost_lock`.
+   Baseline was ~102 s for 10 stops; now **< 30 s**.
+
+## Acceptance evidence
+
+### Unit — RED on `e406c8f`, GREEN after the fix
+`tests/test_local559_llm_translation.py` — **17 passed** (the 12 original LOCAL-559
+tests + 5 new LOCAL-559R tests). The new tests are built from a **byte-exact real stop
+of tour 301** (Stop 2, Palais Lascaris, verified against the live
+`audio_tours.tour_content` row), including its `Orientation:` and `Directions:` lines.
+
+Confirmed RED on `e406c8f` by stashing only the service file and re-running: the
+Directions line came back as the English source line, and `_count_untranslated_lines`
+did not exist. New tests:
+- `test_local559r_directions_line_is_translated_tour301_stop2` — the spoken Directions
+  line must not survive in English (mirrors the live grep); one retry resolves it.
+- `test_local559r_fallback_when_retry_still_untranslated` — retry then AWS fallback,
+  logging `[TRANSLATE-LLM] FALLBACK untranslated_lines=N`.
+- `test_local559r_untranslated_counter_ignores_names_and_nav` — the counter does not
+  flag nav lines or short/proper-noun lines.
+- `test_local559r_english_spoken_label_with_translated_value_is_flagged` — English
+  label + translated value is flagged.
+- `test_local559r_label_normalized_without_fallback` — the common case is repaired
+  deterministically with NO retry and NO fallback (the wall-time fix).
+
+(The `tests/test_local142_single_pass_translation.py` DB-backed suite fails identically
+on `e406c8f` and on this branch — a pre-existing harness issue reaching Postgres by its
+Docker hostname from the host; unrelated to this change.)
+
+### Live — tour 301 → ru and → es with the llm engine
+Fixed `translation_service.py` + repo `cost_rates.py` mounted into a one-off container
+on the `development_default` network, `TRANSLATION_ENGINE=llm`, `DB_HOST=postgres-2`.
+Driver: `tests/local559r_live_run.py` (non-destructive — see below).
+
+| lang | new row | wall time | LLM cost |
+|------|---------|-----------|----------|
+| ru   | **383** | **28.6 s** | $0.004552 |
+| es   | **384** | **28.1 s** | $0.004216 |
+
+Acceptance grep on the new rows' `tour_content`:
+
+```
+row 383 (ru): grep -cE '^Directions: [A-Za-z]'  = 0   ('^Orientation: [A-Za-z]' = 0)
+row 384 (es): grep -cE '^Directions: [A-Za-z]'  = 0   ('^Orientation: [A-Za-z]' = 0)
+```
+
+Spoken labels are translated end-to-end: ru `Ориентация:` / `Как добраться:`,
+es `Orientación:` / `Cómo llegar:`. Each row has 10 stops and a real `audio_tour`
+artifact.
+
+### Rows hidden, counts, never deleted
+
+- **Before:** 2 translation rows for `original_tour_id=301` — `373` (ru), `374` (es).
+- **After:** 10 rows — `373,374` (the originals, restored) plus `377–384` added across
+  fix iterations. **Every added row is HIDDEN (`lat` / `lng` = NULL)** and nothing was
+  ever `DELETE`d. The clean acceptance pair is **383 (ru) / 384 (es)**.
+
+The driver bypasses the translation cache without deleting: it temporarily parks prior
+test rows at a valid non-301 `original_tour_id` (the unique index
+`uq_audio_tours_original_name` is on `lower(tour_name) WHERE original_tour_id IS NULL`),
+detaches `373`/`374` to `NULL` so the "already translated for 301" query misses, runs
+the fresh translation, hides the new rows, and in a `finally` restores `original_tour_id
+= 301` on all of them.
+
+## Process honoured
+
+- Continued on `LOCAL-559-llm-translation` from `e406c8f` (did not start a new branch,
+  did not branch from `origin`).
+- Appended this section only; did **not** edit `DECISIONS.md`, `CLAUDE.md`,
+  `BACKLOG.md`, `WORK_QUEUE.md`, or `.continuous_dev/STATUS.md`.
+- No GCloud deploy; all testing was local Docker against the local DB. The shared live
+  translation-service container was left untouched (the fix was exercised in a one-off
+  container).
