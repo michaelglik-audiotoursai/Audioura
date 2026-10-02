@@ -1,0 +1,95 @@
+{
+  "slug": "logan",
+  "run": "run2",
+  "request": "Boston Logan International Airport, Boston MA",
+  "location_passed": "Boston Logan International Airport, Boston MA",
+  "restaurant_signal_appended": false,
+  "tour_type": "facility",
+  "stops_requested": 4,
+  "is_building_tour": true,
+  "status": "ok",
+  "error": null,
+  "wall_s": 213.6,
+  "chars": 8935,
+  "gemini_calls": {
+    "total": 6,
+    "grounded_this_run": 4,
+    "ungrounded_this_run": 2,
+    "pipeline_grounding_requests": 4,
+    "by_site": {
+      "story_leads.gemini_with_sources": {
+        "grounded": 4,
+        "ungrounded": 2
+      }
+    }
+  },
+  "budget": {
+    "cumulative_grounded_before": 34,
+    "cumulative_grounded_after": 42,
+    "cumulative_cost_after_usd": 1.47,
+    "hard_cap_usd": 14.0
+  },
+  "cost_record": {
+    "total_cost": 0.21212169999999994,
+    "total_tokens": 112116,
+    "cache_hit": false,
+    "grounding_cost": 0.14,
+    "grounding_requests": 4,
+    "tour_total_cost": 0.3521217,
+    "breakdown": {
+      "llm": 0.21212169999999994,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.14
+    },
+    "provenance": {
+      "sourced": 0,
+      "unsourced": 30,
+      "total": 30,
+      "corpus": 0,
+      "grounded": 0,
+      "parametric": 30
+    },
+    "score": {
+      "defects_before": {
+        "unsourced_person_event": "2 unsourced person-event(s); \"James Michael Curley\" placed here in March with no source: \"In March 1922, Boston Mayor James Michael Curley approached Massachusetts Governor Channing H. Cox with a vision for a d\""
+      },
+      "defects_after": {
+        "unsourced_person_event": "2 unsourced person-event(s); \"James Michael Curley\" placed here in March with no source: \"In March 1922, Boston Mayor James Michael Curley approached Massachusetts Governor Channing H. Cox with a vision for a d\""
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.181405,
+        "total_tokens": 29339
+      }
+    }
+  },
+  "measures": {
+    "story_score_clean": true,
+    "defects": [
+      "unsourced_person_event"
+    ],
+    "defect_count": 1,
+    "defect_detail": {
+      "unsourced_person_event": "2 unsourced person-event(s); \"James Michael Curley\" placed here in March with no source: \"In March 1922, Boston Mayor James Michael Curley approached Massachusetts Governor Channing H. Cox with a vision for a d\""
+    },
+    "named_people": 7,
+    "stops_delivered": 4,
+    "stops_requested": 4,
+    "dates": 9,
+    "chars": 8935,
+    "gate_removals": {
+      "local235_r10_sentences_deleted": 1,
+      "local229_contradicted_groups_blocked": 0,
+      "local472_specificity_removals": 18,
+      "total": 19
+    }
+  }
+}

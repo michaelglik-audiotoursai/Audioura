@@ -1,0 +1,627 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180956.txt'
+
+======================================================================
+CALL #001 | 18:09:56.596 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  tour_type: facility
+  total_stops_parameter: 4
+  output_file: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/logan_run2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180956.txt'
+
+======================================================================
+CALL #002 | 18:09:56.596 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='facility' not prepended (pre_category='facility'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "airports",
+    "location": "Boston MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston Logan International Airport, Boston MA",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: airports
+   Location: Boston MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.6s cumulative=1.6s
+[LOCAL-474] tour_type='facility' → category='facility' (source=explicit)
+
+Detected tour category: FACILITY
+Using facility template for Boston Logan International Airport, Boston MA - facility
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180956.txt'
+
+======================================================================
+CALL #003 | 18:09:58.162 | GENERATING_PROMPT
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  user_request: Boston Logan International Airport, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Boston Logan International Airport, Boston MA...
+  [S17] no scope_constraint (precision='BUILDING', scope='Boston Logan International Airport, Boston MA')
+  [D571] pinned 4 building part(s) to the venue anchor 42.3632, -71.0136
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='international airport' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Terminal A Main Concourse', 'Terminal E Modernization Great Hall Atrium', 'Panoramic Runway Viewing Windows', 'Air Traffic Control Tower Base', 'Terminal A Security Checkpoint', 'Delta Sky Club (Terminal A Main, Gate A6)', 'Terminal A Departures Curbside Canopy', 'Terminal A Entry Vestibules']
+  [D571]   stops: ['Terminal A Main Concourse', 'Air Traffic Control Tower Base', 'Panoramic Runway Viewing Windows', 'Terminal E Modernization Great Hall Atrium']
+  [D571]   precondition: some stops are not open to the public, so you will see it from outside; past the security checkpoint, so you will need a boarding pass
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Terminal A Main Concourse [?]
+   - Air Traffic Control Tower Base [?]
+   - Panoramic Runway Viewing Windows [?]
+   - Terminal E Modernization Great Hall Atrium [?]
+
+PHASE 4.5: Validating AI knowledge for Boston Logan International Airport, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='facility', no type-verification required)
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 4 stops pass location guard
+  [EXISTENCE-GATE] LOG_ONLY — 0/4 stops verified (0%), 4 would be dropped
+    [UNVERIFIED] 'Terminal A Main Concourse' — no evidence
+    [UNVERIFIED] 'Air Traffic Control Tower Base' — no evidence
+    [UNVERIFIED] 'Panoramic Runway Viewing Windows' — no evidence
+    [UNVERIFIED] 'Terminal E Modernization Great Hall Atrium' — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261002_180956.txt'
+
+======================================================================
+CALL #004 | 18:10:44.558 | PHASE_3B_REQUEST
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0008 (941 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+Extracted first POI coordinates: (42.3656, -71.0202)
+
+=== Extracted POI Information ===
+1. Terminal A Main Concourse
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0202
+   Directions: From the Airport T station, take the escalator up to the main terminal level. Fo...
+2. Air Traffic Control Tower Base
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3657, -71.0205
+   Directions: Exit Terminal A and head towards the walkway leading to the Air Traffic Control ...
+3. Panoramic Runway Viewing Windows
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3660, -71.0210
+   Directions: From the Air Traffic Control Tower, walk back towards Terminal A and take the el...
+4. Terminal E Modernization Great Hall Atrium
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3663, -71.0215
+   Directions: Leave the Panoramic Runway Viewing Windows and head back towards Terminal E. Wal...
+================================
+
+[TIMING] phase=poi_selection elapsed=52.7s cumulative=54.2s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal A Main Concourse Boston Logan International Airport' → 22872 chars
+  [LOCAL-47] Terminal A Main Concourse: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Air Traffic Control Tower Base Boston Logan International Airport' → 36411 chars
+  [LOCAL-47] Air Traffic Control Tower Base: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Panoramic Runway Viewing Windows Boston Logan International Airport' → 5861 chars
+  [LOCAL-47] Panoramic Runway Viewing Windo: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal E Modernization Great Hall Atrium Boston MA' → 63074 chars
+  [LOCAL-47] Terminal E Modernization Great: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=facility venue=Boston Logan International Air model=gpt-4o tokens=1231 (in=672 out=559) cost=$0.0073 latency=6.2s
+[COST_METER] FRESH | spine_generate | $0.007270 | user=None | job=local563-logan-run2
+  [LOCAL-278] Spine cost folded into total: $0.0073
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/4 stops have per-stop passages (13 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Terminal A Main Concourse' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Air Traffic Control Tower Base' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Panoramic Runway Viewing Windows' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Terminal E Modernization Great Hall Atrium' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 1 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/4 generated
+  [S25] Story types assigned: ['history', 'anecdote', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=17.6s cumulative=71.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=71.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=71.8s
+
+Generating description for Stop 1: Terminal A Main Concourse by , ...
+
+Generating description for Stop 2: Air Traffic Control Tower Base by , ...
+
+Generating description for Stop 3: Panoramic Runway Viewing Windows by , ...
+
+Generating description for Stop 4: Terminal E Modernization Great Hall Atrium by , ...
+  [D571] re-attached 6 chain fact(s) to 'Terminal A Main Concourse' (lost in a poi_list rebuild)
+  [D571] re-attached 6 chain fact(s) to 'Air Traffic Control Tower Base' (lost in a poi_list rebuild)
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Terminal A Main Concourse' matched_work=False medium='' work_identity_chars=0
+  [D571] re-attached 6 chain fact(s) to 'Panoramic Runway Viewing Windo' (lost in a poi_list rebuild)
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Panoramic Runway Viewing Windows' matched_work=False medium='' work_identity_chars=0
+  [D571] re-attached 6 chain fact(s) to 'Terminal E Modernization Great' (lost in a poi_list rebuild)
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Terminal E Modernization Great Hall Atrium' matched_work=False medium='' work_identity_chars=0
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Air Traffic Control Tower Base' matched_work=False medium='' work_identity_chars=0
+Stop 3 API call cost: $0.0172 (3611 tokens, model=gpt-4o)
+  [LOCAL-295] Stop 3: PLACEHOLDER REJECTED (reason: empty_text)
+  [LOCAL-295]   verbatim (0 words): ''
+  [LOCAL-26] Stop 3: placeholder leak detected (attempt 1), retrying (temp=0.85)...
+Stop 1 API call cost: $0.0203 (4277 tokens, model=gpt-4o)
+Stop 1 description word count: 259 words
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 2 API call cost: $0.0209 (4395 tokens, model=gpt-4o)
+Stop 2 description word count: 245 words
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0175 (3688 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 91 words < 120, retrying (attempt 3/5)
+Stop 4 API call cost: $0.0252 (5312 tokens, model=gpt-4o)
+Stop 4 description word count: 276 words
+  [LOCAL-414] Stop 4: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0178 (3751 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 108 words < 120, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0183 (3856 tokens, model=gpt-4o)
+Stop 3 description word count: 131 words
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Terminal A Main Concourse': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Air Traffic Control Tower Base': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Panoramic Runway Viewing Windows': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=3, deduction=1, total=5
+    ✗ FAIL stop='Terminal E Modernization Great Hall Atrium': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002886 (input=11689, output=1887)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 4: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 6 paragraphs retried, 3 fixed/improved, 3 kept original
+  [LOCAL-192] Retry cost: $0.0020 (2505 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Terminal A Main Concourse': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 4 'Terminal E Modernization Great': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 13
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 17
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Terminal A Main Concourse' conf=high reason='Generic claims about airport design and sustainability apply to any historic church.': "As you continue through the concourse, these innovations at Logan International Airport have set a precedent for future "
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Main Concourse' entity='Jeffries Point' reason='No concrete link between the named individuals and Jeffries Point is provided.' in: "The airport itself, located on Jeffries Point in East Boston, has a rich history dating back to its "
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Main Concourse' entity='East Boston' reason='No concrete link between the named individuals and the stop is provided.' in: "The airport itself, located on Jeffries Point in East Boston, has a rich history dating back to its "
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Main Concourse' entity='Boston Mayor James Michael Curley' reason='No concrete link to the stop is provided.' in: "The airport itself, located on Jeffries Point in East Boston, has a rich history dating back to its "
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Main Concourse' entity='Massachusetts Governor Channing' reason='No concrete link to the stop is provided.' in: "The airport itself, located on Jeffries Point in East Boston, has a rich history dating back to its "
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Main Concourse' entity='Logan International Airport' reason='No specific entity is named with a concrete link to the stop.' in: "As you continue through the concourse, these innovations at Logan International Airport have set a p"
+    [LOCAL-472] UNGROUNDED entity stop='Air Traffic Control Tower Base' entity='Major General Edward Lawrence Logan' reason='It does not specify a direct link to the Air Traffic Control Tower Base.' in: "The tower's history is intertwined with the growth of Logan International Airport, which spans over "
+    [LOCAL-472] UNGROUNDED entity stop='Air Traffic Control Tower Base' entity='Massachusetts General Court' reason='It does not specify a direct link between the Massachusetts General Court and the Air Traffic Control Tower Base.' in: "The tower's history is intertwined with the growth of Logan International Airport, which spans over "
+    [LOCAL-472] UNGROUNDED entity stop='Air Traffic Control Tower Base' entity='On April' reason='No specific person or entity is mentioned with a concrete link to the stop.' in: "On April 23, 1969, the Massachusetts Port Authority cleared Wood Island Park to extend Runway 15R/33"
+    [LOCAL-472] UNGROUNDED entity stop='Air Traffic Control Tower Base' entity='Massachusetts Port Authority' reason='It does not specify how the Massachusetts Port Authority is directly related to the Air Traffic Control Tower Base.' in: "On April 23, 1969, the Massachusetts Port Authority cleared Wood Island Park to extend Runway 15R/33"
+    [LOCAL-472] UNGROUNDED entity stop='Air Traffic Control Tower Base' entity='Wood Island Park' reason='No specific person or entity is mentioned with a concrete link to the stop.' in: "On April 23, 1969, the Massachusetts Port Authority cleared Wood Island Park to extend Runway 15R/33"
+    [LOCAL-472] UNGROUNDED entity stop='Air Traffic Control Tower Base' entity='Logan Airport' reason='No specific entity is named with a concrete link to the stop.' in: "As you stand here, consider the tower's silent guardianship over the vast airfield, its presence a c"
+    [LOCAL-472] UNGROUNDED entity stop='Panoramic Runway Viewing Windows' entity='Wood Island Park' reason='It mentions historical figures without concrete links to the stop.' in: "The runways you see were a site of considerable history. They stretch over land that was once Wood I"
+    [LOCAL-472] UNGROUNDED entity stop='Panoramic Runway Viewing Windows' entity='Charles Lindbergh' reason='No concrete link to the stop is provided.' in: "The runways you see were a site of considerable history. They stretch over land that was once Wood I"
+    [LOCAL-472] UNGROUNDED entity stop='Panoramic Runway Viewing Windows' entity='Amelia Earhart' reason='No specific link to the stop is provided.' in: "The runways you see were a site of considerable history. They stretch over land that was once Wood I"
+    [LOCAL-472] UNGROUNDED entity stop='Panoramic Runway Viewing Windows' entity='Logan Airport' reason='It mentions historical figures without concrete links to the stop.' in: "The runways you see were a site of considerable history. They stretch over land that was once Wood I"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal E Modernization Great Hall Atrium' entity='Charles Lindbergh' reason='No concrete link to the stop is provided.' in: "A significant historical event occurred at this location on July 22, 1927, when Charles Lindbergh la"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal E Modernization Great Hall Atrium' entity='St. Louis' reason='It does not specify a direct link between St. Louis and the stop.' in: "A significant historical event occurred at this location on July 22, 1927, when Charles Lindbergh la"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/37)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 23
+    Glossed (composed): 3
+    Suppressed (already explained): 1
+    Degraded (name dropped): 10
+    Guard failures: 0
+    Known (skipped): 9
+    Triage: 2310 tokens, $0.0006, 6.3s
+    Gloss: 1272 tokens, $0.0003, 3.8s
+    Compose: 2045 tokens, $0.0003, 2.5s
+    Total added cost: $0.0012
+    Stops affected: 4
+    Glosses applied:
+      • Jeffries Point → DEGRADED (name dropped)
+      • Boston Mayor James Michael Curley → "the mayor who served four terms" [source: model]
+      • Massachusetts Governor Channing → DEGRADED (name dropped)
+      • Massachusetts General Court → DEGRADED (name dropped)
+      • Massachusetts Port Authority → "the agency managing Boston's transportation facilities" [source: model]
+      • Wood Island Park → DEGRADED (name dropped)
+      • Wood Island Park → DEGRADED (name dropped)
+      • Governor Cox → "the governor of ohio from 1921 to 1923" [source: model]
+      • Chapter → DEGRADED (name dropped)
+      • Engineers → DEGRADED (name dropped)
+      • Vidal → DEGRADED (name dropped)
+      • Jeffery Field → SUPPRESSED (already explained)
+      • Army Air Service → DEGRADED (name dropped)
+      • Massachusetts National Guard → DEGRADED (name dropped)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Boston Logan International Airport, Boston MA'...
+   OK 'Air Traffic Control Tower Base' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Panoramic Runway Viewing Windows' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Terminal E Modernization Great Hall Atrium' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 8
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 8
+    Stops affected: 4
+    [1] DELETED: 'This certification' in: This certification highlights its innovative use of sustainable roofing and wate
+    [2] DELETED: 'This 270-foot' in: This 270-foot structure is a striking example of Brutalist architecture, defined
+    [2] DELETED: 'This facility' in: This facility, named after Major General Edward Lawrence Logan, a distinguished 
+    [2] DELETED: 'This expansion' in: This expansion was part of a broader effort to accommodate the increasing air tr
+    [3] DELETED: 'This transformation' in: This transformation led to fierce protest in 1969, where neighborhood mothers fa
+    [3] DELETED: 'This evolving' in: This evolving site embodies aviation's trajectory, a contemplation of what lies 
+    [4] DELETED: 'This space' in: This space, with its soaring ceilings and abundant natural light, invites travel
+    [4] DELETED: 'This modernized' in: This modernized terminal stands on a site rich with history.
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [LOCAL-477] stripped markdown from 1 prose field(s) — these are spoken aloud
+
+  [D498] step 7c: most valuable stop is 1 'Terminal A Main Concourse' (index 48) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Terminal A Main Concourse': the longest run (3 sentences, Terminal) has agency=0 stakes=0 — someone is described, but nothing is risked, r
+    stop 2 'Air Traffic Control Tower Base': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Panoramic Runway Viewing Windows': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Terminal E Modernization Great Hall At': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Air Traffic Control Tower Base' (index 20)
+  [D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: The airport itself, located in East Boston, has a rich history dating back to its inception in 1922,
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal A Main Concourse' — 250w → 180w after gates, 4 sentence(s) removed
+    removed: "This certification highlights its innovative use of sustainable roofing and water systems, marking a"
+    removed: "The airport itself, located on Jeffries Point in East Boston, has a rich history dating back to its "
+    removed: "Cox to establish a dedicated aviation field."
+    removed: "As you continue through the concourse, consider how these innovations at Logan International Airport"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Air Traffic Control Tower Base' — 219w → 129w after gates, 5 sentence(s) removed
+    removed: "This 270-foot structure is a striking example of Brutalist architecture, defined by its raw concrete"
+    removed: "This facility, named after Major General Edward Lawrence Logan, a distinguished World War I commande"
+    removed: "In 1943, the Massachusetts General Court renamed the facility in his honor, celebrating his contribu"
+    removed: "Another notable episode in the airport's history occurred on April 23, 1969, when the Massachusetts "
+    removed: "This expansion was part of a broader effort to accommodate the increasing air traffic demands."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Panoramic Runway Viewing Windows' — 131w → 81w after gates, 5 sentence(s) removed
+    removed: "They stretch over land that was once Wood Island Park, leveled for airport use."
+    removed: "This transformation led to fierce protest in 1969, where neighborhood mothers famously blocked dump "
+    removed: "In 1922, Governor Cox's signing of Chapter 404 initiated the creation of this airfield, constructed "
+    removed: "Army Corps of Engineers."
+    removed: "This evolving site embodies aviation's trajectory, a contemplation of what lies ahead in air travel."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal E Modernization Great Hall Atrium' — 254w → 168w after gates, 8 sentence(s) removed
+    removed: "Vidal's design reshapes the terminal, emphasizing sustainability and passenger experience."
+    removed: "This space, with its soaring ceilings and abundant natural light, invites travelers to contemplate t"
+    removed: "This modernized terminal stands on a site rich with history."
+    removed: "Army Air Service and the Massachusetts National Guard."
+    removed: "A significant historical event linked to this location took place on July 22, 1927, when Charles Lin"
+    removed: "Louis* here."
+    removed: "This event underscored the airport's early importance in connecting America to the wider world, a le"
+    removed: "Each element, from the architectural details to the historical echoes, tells a story of progress and"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Terminal A Main Concourse by , ...
+  [S24] Story-type injection error (stop 1): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Terminal A Main Concourse' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 2: Air Traffic Control Tower Base by , ...
+  [S24] Story-type injection error (stop 2): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Air Traffic Control Tower Base' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 3: Panoramic Runway Viewing Windows by , ...
+  [S24] Story-type injection error (stop 3): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Panoramic Runway Viewing Windows' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 4: Terminal E Modernization Great Hall Atrium by , ...
+  [S24] Story-type injection error (stop 4): [Errno 2] No such file or directory: 'story_type_taxonomy.json'
+  [LOCAL-381] stop='Terminal E Modernization Great Hall Atrium' matched_work=False medium='' work_identity_chars=0
+Stop 3 API call cost: $0.0201 (4232 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 107 words < 120, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0218 (4589 tokens, model=gpt-4o)
+Stop 1 description word count: 211 words
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0231 (4869 tokens, model=gpt-4o)
+Stop 2 description word count: 229 words
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 4 API call cost: $0.0271 (5700 tokens, model=gpt-4o)
+Stop 4 description word count: 282 words
+Stop 3 API call cost: $0.0204 (4296 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 106 words < 120, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0209 (4396 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ["subject not named (expected 'Panoramic Runway Viewing Windows' or significant word)"]
+  [LOCAL-417]   verbatim: "The panes before you overlook the historic grounds where Boston Logan International Airport took shape. This very land was transformed into an airfield in the early 1920s, following Governor Cox's pivotal signing of Chapter 404 in 1922. This decision set in motion the creation of an aircraft landing"
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+Stop 3 API call cost: $0.0205 (4326 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 88 words < 120, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0209 (4406 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Panoramic Runway Viewing Windows' below_floor words=109 — kept (never dropped)
+Stop 3 description word count: 109 words
+  [LOCAL-526] PHASE 5.17 regeneration wall: 11.2s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 189w (was 180w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 109w (was 81w)
+    [LOCAL-474] regenerated and re-gated: 256w (was 168w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 1 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.massport.com/logan-airport/about-logan/airport-modernization (attempt 1)
+  [LOCAL-459] R5: Fetched 1845 chars from https://www.massport.com/logan-airport/about-logan
+  [LOCAL-427] HTTP 200 from https://www.meetboston.com/plan/getting-here/logan-airport/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1964 chars from https://www.meetboston.com/plan/getting-here/logan
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Logan_International_Airport (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Logan_International_
+  [LOCAL-427] HTTP 200 from https://aecom.com/projects/boston-logan-international-airports-terminal-e/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2734 chars from https://aecom.com/projects/boston-logan-internatio
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=nrZz8WG8GGg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://airportscouncil.org/2023/09/13/customizing-common-use-at-boston-logan-international/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://airportscouncil.org/2023/09/13/customizing
+  [LOCAL-427] HTTP 200 from https://www.instagram.com/reel/DaQ59xzB1dp/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://luisvidal.com/en/proyecto/boston-logan-international-airport-terminal-e-modernization/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://luisvidal.com/en/proyecto/boston-logan-int
+  [D512] verb discovery: query='Boston Logan International Airport, Boston MA how it is made pro' -> 7 new verb(s): united, expanded, overview, speed, modernized, entailed, worked
+  [D512] _AGENCY_VERB widened by 7 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Terminal A Main Concourse                  35    33     0    57
+     2  Air Traffic Control Tower Base             20    12     0    15
+     3  Panoramic Runway Viewing Windows           30    12     7    30
+     4  Terminal E Modernization Great Hall Atri   40    37     0    84
+    [LOCAL-485] index mean 31.2 over 4 stop(s), range 20-40
+    [LOCAL-485] weakest: 'Air Traffic Control Tower Base' at 20
+[TIMING] phase=story_first elapsed=130.2s cumulative=202.1s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (98 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 98 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 91 words (delta: -7)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Explore how these structures shaped Boston's legacy."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 192
+    Words after:  167
+    Delta: -25
+    Stops affected: 1/4
+    Deletions (1):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "Feel the smooth, polished terrazzo floor underfoot, and listen for the faint hum of aircraft engines..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 3.5s, $0.0087, 1268 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Terminal A Main Concourse] (cause): This initiative was crucial in supporting civil commerce and national air defens...
+      [Air Traffic Control Tower Base] (cause): The tower's history is intertwined with the growth of Logan International Airpor...
+      [Panoramic Runway Viewing Windows] (dated_event): The transformation of this land set the stage for community resistance in 1969, ...
+      [Terminal E Modernization Great Hall Atrium] (dated_event): A significant historical event linked to this airport occurred on July 22, 1927,...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0035 (582 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At the upcoming stops, you will learn about the historical event at Terminal E Modernization Great Hall Atrium on July 22, 1927, when Charles Lindbergh landed the Spirit of St. and the community resistance at Panoramic Runway Viewing Windows in 1969."
+      FAIL: date '1927' attributed to 'Panoramic Runway Viewing Windows' but belongs to a different stop
+    Part 4 LLM cost: $0.0034 (576 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (41 words):
+      "At the upcoming stops, you will discover the link between the airport's growth and the Air Traffic Control Tower Base, which overlooks Logan International Airport. Additionally, you will learn about the community resistance in 1969 at the Panoramic Runway Viewing Windows."
+      Stops referenced: 2
+    Part 4 total cost: $0.0069
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you exit Terminal A Main Concourse, head towards the park...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: From the Air Traffic Control Tower Base, walk towards the Te...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the Panoramic Runway Viewing Windows, head towa...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.0s, $0.0025, 428 tokens
+  [LOCAL-280] Recap built: 30 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Terminal A Main Concourse] (cause): "This initiative was crucial in supporting civil commerce and national air defens..."
+      → composed: "Terminal A Main Concourse, pivotal for civil commerce and air defense support"
+    [Air Traffic Control Tower Base] (cause): "The tower's history is intertwined with the growth of Logan International Airpor..."
+      → composed: "Air Traffic Control Tower Base, linked to Logan Airport's growth on 2,384 acres"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Terminal A Main Concourse, pivotal for civil commerce and air defense support and Air Traffic Control Tower Base, linked to Logan Airport's growth on 2,384 acres."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=370 'restaurant tour, Boston, MA -  Tour' (2.4 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (2040 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 0
+    Dropped: 1
+    AUDIT: admission | Open to the public during daylight hours, free access | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Boston Logan International Airport, Boston MA. ..."
+  [2] "The tower's cantilever bridge offers a dramatic visual line that captures the eye, a reminder of the..."
+
+=== Word Count Statistics ===
+Stop 1: Terminal A Main Concourse - 259 words
+Stop 2: Air Traffic Control Tower Base - 245 words
+Stop 3: Panoramic Runway Viewing Windows - 131 words
+Stop 4: Terminal E Modernization Great Hall Atrium - 276 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8935 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 2 unsourced person-event(s); "James Michael Curley" placed here in March with no source: "In March 1922, Boston Mayor James Michael Curley approached Massachuse
+
+Total API cost: $0.1814 (29339 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.3214
+Provenance:     0/30 factual sentences sourced, 30 unsourced (0 corpus, 0 grounded, 30 parametric)
+CACHE STORE: Boston Logan International Airport, Boston MA / facility / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/logan_run2.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-563/tests/fixtures/local563/runs/logan_run2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Boston Logan International Airport, Boston MA - Facility Tour
+Tour-Category: facility
+
+Stop 1: Terminal A Main Concourse
+
+Address: 1 Harborside Dr, Boston, MA 02128
+
+Coordinates: 42.3656, -71.0202
+
+Type/Specialty: Airport Terminal
+
+Specific Examples: Check-in counters, retail shops, dining options
+
+Orientation: You are about to embark on a walking journey through Boston Logan International Airport, Boston MA. From the historic Terminal A Main Concourse, where St M...
+
+[TIMING] phase=packing elapsed=11.5s cumulative=213.6s
+[TIMING] phase=verification elapsed=0.0s cumulative=213.6s
+[TIMING] TOTAL wall=213.6s phases: story_first=130.2s, poi_selection=52.7s, fact_sheets=17.6s, packing=11.5s, intent=1.6s, narration=0.0s, external_lookups=0.0s, verification=0.0s
