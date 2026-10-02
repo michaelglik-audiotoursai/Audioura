@@ -1,0 +1,64 @@
+{
+  "slug": "palais_lascaris_nice",
+  "location": "Palais Lascaris, Nice, France",
+  "tour_type": "museum",
+  "stops": 4,
+  "wall_s": 565.0,
+  "chars": 8908,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 117,
+  "models_on_wire": {
+    "gpt-4o-mini": 62,
+    "gpt-4o": 46,
+    "gpt-3.5-turbo": 9
+  },
+  "wire_cost_recomputed": 1.0034,
+  "cost_record": {
+    "total_cost": 0.6064896000000001,
+    "total_tokens": 51110,
+    "cache_hit": false,
+    "grounding_cost": 1.33,
+    "grounding_requests": 38,
+    "tour_total_cost": 1.9364896000000003,
+    "breakdown": {
+      "llm": 0.6064896000000001,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 1.33
+    },
+    "provenance": {
+      "sourced": 3,
+      "unsourced": 36,
+      "total": 39,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 36
+    },
+    "score": {
+      "defects_before": {
+        "dangling_reference": "1 dangling pronoun reference(s), e.g. 'His expertise in designing harps that met the musical demand'"
+      },
+      "defects_after": {
+        "thin": "3/4 stops delivered",
+        "offsite_entity": "1 place(s) framed as part of the tour but not a stop/venue, e.g. \"Violes\" in: That's 4 stops \u2014 Violes"
+      },
+      "removed": [
+        "dangling_reference"
+      ],
+      "remaining": [
+        "offsite_entity"
+      ],
+      "retried": true,
+      "clean_after": false,
+      "retry_cost": {
+        "total_cost": 0.007930000000000001,
+        "total_tokens": 1669
+      },
+      "cost_without_retry": {
+        "total_cost": 0.59856,
+        "total_tokens": 49441
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "slug": "chart_house_boston",
+  "location": "restaurant tour of Chart House, Boston, MA",
+  "tour_type": "restaurant",
+  "stops": 4,
+  "wall_s": 447.0,
+  "chars": 3055,
+  "ok": true,
+  "error": null,
+  "openai_calls_recorded": 137,
+  "models_on_wire": {
+    "gpt-4o-mini": 95,
+    "gpt-3.5-turbo": 21,
+    "gpt-4o": 21
+  },
+  "wire_cost_recomputed": 0.4081,
+  "cost_record": {
+    "total_cost": 0.1448325,
+    "total_tokens": 39274,
+    "cache_hit": false,
+    "grounding_cost": 0.525,
+    "grounding_requests": 15,
+    "tour_total_cost": 0.6698325,
+    "breakdown": {
+      "llm": 0.1448325,
+      "tts": 0.0,
+      "search": 0.0,
+      "grounding": 0.525
+    },
+    "provenance": {
+      "sourced": 2,
+      "unsourced": 12,
+      "total": 14,
+      "corpus": 2,
+      "grounded": 0,
+      "parametric": 12
+    },
+    "score": {
+      "defects_before": {
+        "thin": "1/4 stops delivered",
+        "no_story": "no named people anywhere in the tour"
+      },
+      "defects_after": {
+        "thin": "1/4 stops delivered",
+        "no_story": "no named people anywhere in the tour"
+      },
+      "removed": [],
+      "remaining": [],
+      "retried": false,
+      "clean_after": true,
+      "retry_cost": {
+        "total_cost": 0.0,
+        "total_tokens": 0
+      },
+      "cost_without_retry": {
+        "total_cost": 0.144833,
+        "total_tokens": 39274
+      }
+    }
+  }
+}

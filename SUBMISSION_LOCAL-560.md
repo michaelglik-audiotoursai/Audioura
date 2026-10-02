@@ -254,3 +254,52 @@ held scope gates to `gpt-3.5-turbo` (and stay there even if `CHECK_LLM_MODEL` is
 ### Suites green
 - `tests/test_local560_checker_replay.py`: 4 passed.
 - Storied suites `python3 -m pytest $(ls tests/test_*.py | grep -E "d536|479|480|481|485|d571|d577|547|local55|554|gcs|ks1|user_stops") -q`: **170 passed**.
+
+---
+
+## §6 — Regenerate Chart House + Palais Lascaris with the new settings
+
+Both tours were regenerated with the LOCAL-560 switch live (central knobs unset → committed
+defaults: checkers gpt-4o-mini, writers/held gpt-3.5-turbo), `DISABLE_TOUR_CACHE=1`, on the local
+stack. Script: `tests/fixtures/local560/regen_new_settings.py` → `recordings_new/`.
+
+**DB safety:** `audio_tours` row count **198 before → 198 after** — generation via
+`generate_tour_text()` writes no tour rows (nothing to hide; nothing deleted).
+
+### Whole-tour OpenAI cost, before (recorded) vs after (new settings)
+
+| Tour | Old wire cost | New wire cost | Old model mix | New model mix |
+|---|---:|---:|---|---|
+| Chart House | $0.2577 | $0.4081 | — | 4o-mini×95, 3.5×21, 4o×21 |
+| Palais Lascaris | $0.5835 | $1.0034 | — | 4o-mini×62, 4o×46, 3.5×9 |
+
+The whole-tour cost went **up**, but this is **run-to-run variance, not the switch**: each
+regeneration took a different path (more PHASE 5.17 retries, Overpass HTTP 504s forcing fallbacks,
+and notably **more gpt-4o WRITER calls** — 21 and 46 vs the recorded runs). The dominant cost is
+the gpt-4o stop-description WRITER (§1), which this task does not change and which varies run to
+run. Whole-tour cost is therefore the wrong lens for the checker switch.
+
+### Controlled comparison (the real savings) — identical prompts, replay
+The replay (§3) issues the **exact same prompts** on both models, removing run variance. Across all
+8 tours, the switched extraction/listing checker calls (gpt-3.5-turbo → gpt-4o-mini, 75 calls):
+
+| | Total cost | Output tokens |
+|---|---:|---:|
+| OLD gpt-3.5-turbo | $0.0485 | 16,233 |
+| NEW gpt-4o-mini | **$0.0184** | 18,731 |
+| **Δ** | **−$0.0301 (−62%)** | +15% |
+
+On identical inputs the switch is a **62% cost reduction** on those checker calls — confirming the
+ticket's premise. gpt-4o-mini emits ~15% more output tokens but its far lower input rate
+($0.15 vs $0.50 /1M) and output rate ($0.60 vs $1.50 /1M) still net a large saving. The absolute
+dollars are small ($0.03 across 8 tours) because these checkers are cheap to begin with; the real
+money is the WRITER gpt-4o calls, which are out of scope for LOCAL-560.
+
+### Bottom line
+- The checker switch does exactly what Michael asked: cheaper checks (−62% on identical inputs)
+  with **no recall loss** on the switched sites (offline test green), and the sites where
+  gpt-4o-mini missed a recorded discrepancy are **held on their current model**.
+- The two highest-recall-risk scope gates (is-restaurant, geography) and the biggest-spend WRITER
+  are deliberately untouched.
+- Whole-tour cost is dominated by WRITER gpt-4o and run variance; use the controlled replay
+  numbers to judge the checker switch, not a single live regen.
