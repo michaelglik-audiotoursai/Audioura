@@ -24305,3 +24305,19 @@ claimed cap-4 = cap-5 equality is unproven. Decision: LOCAL-569 adds always-on p
 and writes a blind P/Q pack. Flags flip only after Michael's blind read; keep-best alone cannot lower
 the shipped story_count, so it is the first candidate to flip. 568 projection: up to ~$0.4 per 4-stop
 museum tour (directional, small n).
+
+## D598 — LOCAL-569 merged to subscribed, flags OFF; blind P/Q pack awaits Michael (2026-10-03, LEAD)
+
+Merged `subscribed` @ 006f727. Always-on: `[LOCAL-569] Stop N attempt K/5 story_count=C` logging
+(regex counter, the same `extract_story_sentences` the LOCAL-432 trigger uses, so no LLM cost).
+Default OFF: `STORY_RETRY_KEEP_BEST`, `STORY_RETRY_EARLY_STOP` (hard cap 3, stop on no improvement).
+LEAD verified: 18 tests green, red when keep-best is forced to ship-last (3 fail); diff vs subscribed
+purely additive (0 removed lines); sq4 + palais fixtures green; orchestrator-wiring failure is
+pre-existing on the base (container name).
+Measured, 3 museums × 3 arms, one run each, $3.51: early-stop cut writer $ by 33% on Palais
+(0.516→0.346) and MFA (0.545→0.366), ≈ no change on the Met control. Live logs show keep-best
+rescuing a richer earlier draft (Palais_C stop 2: shipped 2 where ship-last gives 1). Per-stop
+story counts are inside run-to-run noise, so quality is decided by Michael's blind read:
+`~/Desktop/Audioura_story_blind/` (P/Q per museum, key after 60 blank lines in KEY.md).
+**Plan:** flip KEEP_BEST first (cannot lower the shipped count); flip EARLY_STOP only if Michael
+does not prefer the A texts. Neither flips before his verdict.
