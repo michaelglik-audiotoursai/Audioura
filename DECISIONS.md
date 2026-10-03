@@ -24321,3 +24321,19 @@ story counts are inside run-to-run noise, so quality is decided by Michael's bli
 `~/Desktop/Audioura_story_blind/` (P/Q per museum, key after 60 blank lines in KEY.md).
 **Plan:** flip KEEP_BEST first (cannot lower the shipped count); flip EARLY_STOP only if Michael
 does not prefer the A texts. Neither flips before his verdict.
+
+## D599 — Writer model: gpt-4.1 cheaper on all 4 tours (n=1 each); blind read decides (2026-10-03, LEAD)
+
+LOCAL-571 complete (branch LOCAL-571-writer-model; LEAD finished the matrix after the 03:20 credit
+outage; $2.45 total, audio_tours 198 → 198). Writer $ per 3-stop tour, gpt-4o → gpt-4.1:
+Palais 0.724 → 0.339, MFA 0.330 → 0.292, Boston restaurants 0.183 → 0.091, Old Nice walk
+0.136 → 0.099. All-LLM $ summed over the 4 tours: 1.41 → 1.04 (−26%). Writer calls fell on every
+tour (38→17, 22→14, 16→6, 10→6): gpt-4.1 needed fewer rewrites, beyond its ~20% lower price.
+Defects were comparable (both arms show an unsourced_person_event on MFA; B had a dangling_reference
+on restaurants, A had no_story on Old Nice). n = 1 per cell, so this is a signal, not proof.
+**Not switched.** `TOUR_STORY_MODEL` stays gpt-4o until Michael's blind read of
+`~/Desktop/Audioura_model_blind/` (4 P/Q pairs). If he does not prefer the gpt-4o texts, the next
+step is a 3-run confirmation on 4 more venues, then flip the default on `subscribed`.
+**Measurement lesson:** the harness ran all cells in one process; a Wikimedia 429 in one cell
+cold-marked Wikidata for the following cells (museum B cells failed in ~4 s with no writer call).
+That is the production bug LOCAL-572 fixes. Re-run in separate processes, the cells were valid.
