@@ -15133,6 +15133,9 @@ Write the story FIRST, then add physical description if space allows.
                                   f"(non-fatal, shipping current): {_l569_ship_err}")
 
                     return idx, orientation, description, word_count, tokens_used, call_cost
+                else:
+                    # [LOCAL-292] Retry transient failures following _PROLOG_MAX_RETRIES pattern (LOCAL-119)
+                    _DESC_TRANSIENT_CODES = {429, 500, 502, 503, 504}
                     if description_response.status_code in _DESC_TRANSIENT_CODES and _attempt < _max_retries:
                         # [2026-09-22] A 429 is not a 500. The old backoff capped at
                         # 8s and gave up after three tries, which is far too quick
