@@ -1,0 +1,255 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "The Rockefeller Legacy at The Met",
+      "description": "This theme connects the stops through the influence of the Rockefeller family, particularly Nelson A. Rockefeller and his son Michael Rockefeller, who played a significant role in the development of The Met's collections and wings.",
+      "supporting_elements": [
+        "se_001",
+        "se_004",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_001",
+        "se_004",
+        "se_009"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "The Evolution of The Met's Collections",
+      "description": "This theme traces the growth and changes in The Met's collections over time, highlighting key dates and expansions that shaped its current form.",
+      "supporting_elements": [
+        "se_002",
+        "se_004",
+        "se_008"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_002",
+        "se_004",
+        "se_008"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "Cultural Exchange and Influence",
+      "description": "This theme explores how The Met's exhibitions reflect a blend of cultural influences, particularly through the arts of Africa, Oceania, and the Americas.",
+      "supporting_elements": [
+        "se_003",
+        "se_007"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_003",
+        "se_007"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 0.8,
+      "arc_potential": 1.0,
+      "total_score": 0.86,
+      "weight": 0.333
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "The Rockefeller Legacy at The Met",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_004",
+            "se_009"
+          ],
+          "element_summaries": [
+            "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi",
+            "The Michael C. Rockefeller Wing is named after Nelson Rockefeller's son, Michael Rockefeller, who di"
+          ]
+        },
+        {
+          "name": "The Evolution of The Met's Collections",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_004"
+          ],
+          "element_summaries": [
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi"
+          ]
+        },
+        {
+          "name": "Cultural Exchange and Influence",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003",
+            "se_007"
+          ],
+          "element_summaries": [
+            "The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra",
+            "The Met's Asian department holds a collection of Asian art of more than 35,000 pieces, which dates b"
+          ]
+        }
+      ],
+      "thread_angle": "[The Rockefeller Legacy at The Met] (weight 0.33): In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[The Evolution of The Met's Collections] (weight 0.33): The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[Cultural Exchange and Influence] (weight 0.33): The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra; The Met's Asian department holds a collection of Asian art of more than 35,000 pieces, which dates b",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Rockefeller Legacy at The Met",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_004"
+          ],
+          "element_summaries": [
+            "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi"
+          ]
+        },
+        {
+          "name": "The Evolution of The Met's Collections",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002",
+            "se_004",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The Metropolitan Museum of Art was founded in 1870.",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi",
+            "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill"
+          ]
+        },
+        {
+          "name": "Cultural Exchange and Influence",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_007"
+          ],
+          "element_summaries": [
+            "The Met's Asian department holds a collection of Asian art of more than 35,000 pieces, which dates b"
+          ]
+        }
+      ],
+      "thread_angle": "[The Rockefeller Legacy at The Met] (weight 0.33): In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[The Evolution of The Met's Collections] (weight 0.33): The Metropolitan Museum of Art was founded in 1870.; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[Cultural Exchange and Influence] (weight 0.33): The Met's Asian department holds a collection of Asian art of more than 35,000 pieces, which dates b",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_009",
+          "element_text": "The Michael C. Rockefeller Wing is named after Nelson Rockefeller's son, Michael Rockefeller, who died while collecting ",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        }
+      ]
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Rockefeller Legacy at The Met",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Michael C. Rockefeller Wing is named after Nelson Rockefeller's son, Michael Rockefeller, who di"
+          ]
+        },
+        {
+          "name": "The Evolution of The Met's Collections",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The Metropolitan Museum of Art was founded in 1870.",
+            "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill"
+          ]
+        },
+        {
+          "name": "Cultural Exchange and Influence",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003"
+          ],
+          "element_summaries": [
+            "The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra"
+          ]
+        }
+      ],
+      "thread_angle": "[The Rockefeller Legacy at The Met] (weight 0.33): The Michael C. Rockefeller Wing is named after Nelson Rockefeller's son, Michael Rockefeller, who di\n[The Evolution of The Met's Collections] (weight 0.33): The Metropolitan Museum of Art was founded in 1870.; In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill\n[Cultural Exchange and Influence] (weight 0.33): The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_009",
+          "element_text": "The Michael C. Rockefeller Wing is named after Nelson Rockefeller's son, Michael Rockefeller, who died while collecting ",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_004",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "The Rockefeller Legacy at The Met"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of The Rockefeller Legacy at The Met. This theme connects the stops through the influence of the Rockefeller family, particularly Nelson A. Rockefeller and his son Michael Rockefeller, who played a significant role in the development of T",
+  "epilog_payoff": "From Bacchante in a Landscape to A sketch of the Mitsui shop in Suruga street in Edo, you have followed the thread of The Rockefeller Legacy at The Met."
+}

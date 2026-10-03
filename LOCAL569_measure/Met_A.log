@@ -1,0 +1,952 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_015611.txt'
+
+======================================================================
+CALL #001 | 01:56:11.250 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_A.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_015611.txt'
+
+======================================================================
+CALL #002 | 01:56:11.250 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "New York, NY",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "The Metropolitan Museum of Art",
+    "geographic_scope": "New York, NY",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "USA"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=USA (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: New York, NY
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: The Metropolitan Museum of Art
+  [venue_name sanity] 'The Metropolitan Museum of Art' OK
+  [S15] Forced tour_category=museum from venue_name='The Metropolitan Museum of Art'
+[TIMING] phase=intent elapsed=2.5s cumulative=2.5s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for The Metropolitan Museum of Art, New York, NY - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_015611.txt'
+
+======================================================================
+CALL #003 | 01:56:13.733 | GENERATING_PROMPT
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  user_request: The Metropolitan Museum of Art, New York, NY
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for The Metropolitan Museum of Art, New York, NY...
+  [Museum constraint] Venue from intent='The Metropolitan Museum of Art'
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [venue_resolver] SPARQL: 130 works found for Q160236
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='CITY', scope='New York, NY')
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [venue_cache] MISS for Q160236
+  [venue_resolver] SPARQL: 130 works found for Q160236
+  [LOCAL-30] Deterministic selection: 130 documented works (0 catalogue, 130 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Moulin Rouge: La Goulue [sparql]
+     - Kneeling Bull with Vessel [sparql]
+     - Bullfight in a Divided Ring [sparql]
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [venue_cache] MISS for Q160236
+  [venue_resolver] SPARQL: 130 works found for Q160236
+  [LOCAL-30] Deterministic selection: 130 documented works (0 catalogue, 130 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - A Girl Asleep [sparql] (quality=0.0)
+     - A sketch of the Mitsui shop in Suruga street in Edo [sparql] (quality=0.0)
+     - Allegory of the Catholic Faith [sparql] (quality=0.0)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - A Girl Asleep
+   - A sketch of the Mitsui shop in Suruga street in Edo
+   - Allegory of the Catholic Faith
+   - An Oriental Family
+   - Anjou Legendarium
+   - Bacchante in a Landscape
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [D1v2] Venue resolved: Q160236 → URL=https://www.metmuseum.org/, lang=en
+  [venue_cache] MISS for Q160236
+  [venue_resolver] SPARQL: 130 works found for Q160236
+  [D1v2] SPARQL source: 266 canonical titles
+  [story_miner] Site crawl: 0 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Metropolitan Museum of Art'
+  [story_miner] Wikipedia EN: 88271 chars (title: 'Metropolitan Museum of Art')
+  [T0a] Exhibit-name extraction: 44 from sections, 17 from quoted/bold/list
+  [T0a] Extracted 57 canonical titles, 0 cycle names
+  [story_miner] Corpus: 1 pages, 57 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 57 site/wiki + 266 SPARQL = 323 total
+  [LOCAL-34] Will enrich bare title at stop-naming: 'posada' → 'posada (2019)'
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Spring' → 'Spring (1969)'
+  [D1v2] Removed 29 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 293 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Performance arts' — rule: workshop_program
+  [LOCAL-24] Near-duplicate collapse removed 12:
+    'The Daughters of Catulle Mendes' → collapsed into 'The Daughters of Catulle Mendès'
+    'William Hippopotamus' → collapsed into 'Hippopotamus ("William")'
+    'Peasants at the Market' → collapsed into 'The Peasants at Market'
+    'Kanagawa oki nami ura' → collapsed into 'Kanagawa-oki nami-ura'
+    'Soshu Umezawa-zai' → collapsed into 'Sōshū Umezawa zai'
+    'Sōshū Umezawa-zai' → collapsed into 'Sōshū Umezawa zai'
+    'Edo Nihonbashi' → collapsed into 'Nihonbashi in Edo'
+    'Honjo Tatekawa' → collapsed into 'Tatekawa in Honjo'
+    'Noboto-no-ura' → collapsed into 'Noboto no Ura'
+    'Noboto Bay' → collapsed into 'Bay of Noboto'
+    'Shimo Meguro' → collapsed into 'Shimo-Meguro'
+    'Salomé' → collapsed into 'Salome'
+  [D1v2-LOCAL24] After filter: 281 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 258 dynamic aliases from 130 works
+  [D1v2] Injected 258 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'A Girl Asleep' → canonical: 'A Girl Asleep'
+  [D1v2] VERIFIED 'A sketch of the Mitsui shop in Suruga street in Edo' → canonical: 'A sketch of the Mitsui shop in Suruga street in Edo'
+  [D1v2] VERIFIED 'Allegory of the Catholic Faith' → canonical: 'Allegory of the Catholic Faith'
+  [D1v2] VERIFIED 'An Oriental Family' → canonical: 'An Oriental Family'
+  [D1v2] VERIFIED 'Anjou Legendarium' → canonical: 'Anjou Legendarium'
+  [D1v2] VERIFIED 'Bacchante in a Landscape' → canonical: 'Bacchante in a Landscape'
+  [D1v2] 6/6 works verified — tier: rich
+  [venue_cache] STORED Q160236 (tier=rich, ttl=30d, expires=2026-11-02)
+  [D1] Tier: rich (6 verified works)
+  [R4] Target reached: 6/3 stops
+  [LOCAL-16 GATE] All 6 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for The Metropolitan Museum of Art, New York, NY...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 2×VENUE_ONLY, 1×EMPTY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['A sketch of the Mitsui shop in Suruga street in Edo=VENUE_ONLY', 'Bacchante in a Landscape=VENUE_ONLY', 'A Girl Asleep=EMPTY']
+  [LOCAL-212] Dropped:  ['Allegory of the Catholic Faith=EMPTY', 'An Oriental Family=EMPTY', 'Anjou Legendarium=EMPTY']
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'A sketch of the Mitsui shop in Suruga street in E — venue_corpus canonical_title: 'A sketch of the Mitsui shop in Suruga street in E
+    [VERIFIED] 'Bacchante in a Landscape' — venue_corpus canonical_title: 'Bacchante in a Landscape' at 'The Metropolitan Mu
+    [VERIFIED] 'A Girl Asleep' — venue_corpus canonical_title: 'A Girl Asleep' at 'The Metropolitan Museum of Art
+    [VERIFIED] 'Allegory of the Catholic Faith' — venue_corpus canonical_title: 'Allegory of the Catholic Faith' at 'The Metropoli
+    [VERIFIED] 'An Oriental Family' — venue_corpus canonical_title: 'An Oriental Family' at 'The Metropolitan Museum o
+    [VERIFIED] 'Anjou Legendarium' — venue_corpus canonical_title: 'Anjou Legendarium' at 'The Metropolitan Museum of
+    [HARVEST] 'A sketch of the Mitsui shop in Suruga street in Edo': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Bacchante in a Landscape': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'A Girl Asleep': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Allegory of the Catholic Faith': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'An Oriental Family': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Anjou Legendarium': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 6 verified_no_detail
+    [INTERPRETIVE] 'A sketch of the Mitsui shop in Suruga street in Edo': +4 passages (2 queries)
+    [INTERPRETIVE] 'Bacchante in a Landscape': +10 passages (2 queries)
+    [INTERPRETIVE] 'A Girl Asleep': +2 passages (2 queries)
+    [INTERPRETIVE] 'Allegory of the Catholic Faith': +5 passages (2 queries)
+    [INTERPRETIVE] 'An Oriental Family': +1 passages (2 queries)
+    [INTERPRETIVE] 'Anjou Legendarium': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 6 stops enriched, +23 passages, 12 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_015611.txt'
+
+======================================================================
+CALL #004 | 01:57:14.165 | PHASE_3B_REQUEST
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0005 (665 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 3 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art)
+  [LOCAL-35] Visitor info page found (en): https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art
+  [LOCAL-35] Extracted from https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-34] Visitor info extracted from corpus text (main page fallback, no provenance)
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: York, hint: museum)
+  [LOCAL-355] A sketch of the Mitsui shop in Suruga street in Edo: no practical facts in OSM
+  [LOCAL-355] Bacchante in a Landscape: no practical facts in OSM
+  [LOCAL-355] A Girl Asleep: no practical facts in OSM
+   Coords cluster detected: 3 stops share '40.7794, -73.9632', refetching...
+   Cluster refetch OK 'A sketch of the Mitsui shop in Suruga street in Edo': 40.7794, -73.9632
+   Cluster refetch OK 'Bacchante in a Landscape': 40.7794, -73.9632
+   Cluster refetch OK 'A Girl Asleep': 40.7794, -73.9632
+Extracted first POI coordinates: (40.7794, -73.9632)
+  [D4] Museum single-coordinate: all stops set to (40.7794, -73.9632) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. A sketch of the Mitsui shop in Suruga street in Edo
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9632
+   Directions: From the main entrance of The Metropolitan Museum of Art, walk straight ahead in...
+2. Bacchante in a Landscape
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9632
+   Directions: From 'A sketch of the Mitsui shop in Suruga street in Edo', exit the gallery and...
+3. A Girl Asleep
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9632
+   Directions: From 'Bacchante in a Landscape', exit the gallery and turn left, then walk strai...
+================================
+
+[TIMING] phase=poi_selection elapsed=218.1s cumulative=220.5s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 1/1 corpus pages for 'The Metropolitan Museum of Art'
+    page[0] score=16125 url=https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art
+  [§3-adapter] Raw elements: 10 from 1 pages
+  [§3-adapter] After corroboration scoring: 9 elements
+  [§3-adapter] Final: 9 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 9 elements → /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_A_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q160236 (9 elements)
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=6, s1=6, s2=6
+  [SQ-S6b] Entity clusters found: 18 (≥2 stops)
+    → 20th century (eras): 3 stops, 3 elements
+    → the michael (people): 3 stops, 2 elements
+    → rockefeller wing (people): 3 stops, 2 elements
+    → nelson a. rockefeller (people): 2 stops, 1 elements
+    → 1969 (dates): 2 stops, 1 elements
+  [SQ-S6b] Theme naming: $0.0141, 1864 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'The Rockefeller Legacy in Art Donation': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'The Evolution of The Met's Collection': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'Cultural Representation at The Met': coverage=0.67, evidence=0.60, distinct=1.00, arc=0.70, TOTAL=0.723
+  [SQ-S6b] Blended 3 threads: 'The Rockefeller Legacy in Art Donation'=0.38, 'The Evolution of The Met's Collection'=0.38, 'Cultural Representation at The Met'=0.25
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'The Rockefeller Legacy in Art Donation': coverage=100%, weight=0.38, elements=['se_001', 'se_004', 'se_009']
+    → 'The Evolution of The Met's Collection': coverage=100%, weight=0.38, elements=['se_002', 'se_008', 'se_009']
+    → 'Cultural Representation at The Met': coverage=67%, weight=0.25, elements=['se_003', 'se_006', 'se_009']
+  [§3] Story elements injected into spine prompt (9 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=The Metropolitan Museum of Art model=gpt-4o tokens=2087 (in=1597 out=490) cost=$0.0089 latency=4.6s
+[COST_METER] FRESH | spine_generate | $0.008893 | user=None | job=local569-Met_A
+  [LOCAL-278] Spine cost folded into total: $0.0089
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=found)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (14 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='A sketch of the Mitsui shop in Suruga street in Edo' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Bacchante in a Landscape' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='A Girl Asleep' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=30.2s cumulative=250.7s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='dedicated to what is now called The Department of Asian Art, which spans 5,000 y'
+
+  [LOCAL-383] Extracted 55 story beats, 55 named people: American, Beckmann, Benin, Bernini, Berry, Beyer Blinder Belle
+[TIMING] phase=narration elapsed=0.1s cumulative=250.8s
+  [D495] venue domain seeded tier1: metmuseum.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 11 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for alamy.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for alamy.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ocula.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for br.wikipedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for philanthropyroundtable.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for ja.wikibooks.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for philanthropy.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for meisterdrucke.us: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wikidata.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for fr.wikipedia.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for scribd.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 11 unverified, 0 budget-expired
+    [D489] material kind: stop='A sketch of the Mitsui shop in Suruga ' kind=inert volume=COVERED sentences=45 active=0 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 1 needs more material (eventless): 24 passages, 3523 chars, verdict=COVERED
+      [LOCAL-489] +1 from: "A sketch of the Mitsui shop in Suruga street in Edo" "The Metropolitan Museum
+      [LOCAL-498] after replenishment: kind inert -> inert, 3523 -> 3680 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 1 'A sketch of the Mitsui shop in Suruga street in Ed': queries=3 serp_results=24 snippets=25
+      → depicts · Mitsui Echigoya · Mount Fuji · digital representation of · A sketch of the Mitsui shop in Suruga street in Edo
+      → A sketch of the Mitsui shop in Suruga street in Edo. woodblock printing by Katsushika Hokusai. Kōto Suruga-chō Mitsui-mi
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 7 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 7 unverified, 0 budget-expired
+    [D489] material kind: stop='Bacchante in a Landscape' kind=active volume=COVERED sentences=39 active=6 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The Met object ID · 435965 · image · Bacchante in a Landscape MET ep29.100.598.R.jpg 1,776 × 859; 350 KB. 0 references. title."
+    [LOCAL-489] Stop 2 needs more material (eventless): 23 passages, 3413 chars, verdict=COVERED
+      [LOCAL-489] +7 from: "Bacchante in a Landscape" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3413 -> 4490 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The Met object ID · 435965 · image · Bacchante in a Landscape MET ep29.100.598.R.jpg 1,776 × 859; 350 KB. 0 re"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 2 'Bacchante in a Landscape': queries=3 serp_results=23 snippets=30
+      → Title: Bacchante in a Landscape · Artist: Camille Corot (French, Paris 1796–1875 Paris) · Date: 1865–70 · Medium: Oil on
+      → Summary ; Title. Bacchante in a Landscape ; Object type, painting. object_type QS:P31,Q3305213 ; Genre, nude · Edit this
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 5 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 5 unverified, 0 budget-expired
+    [D489] material kind: stop='A Girl Asleep' kind=active volume=COVERED sentences=37 active=3 staked=2 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Contribute to The Met's future by planning for a special gift, such as a bequest in your Will or Trust, or through a Charitable Gift Annuity"
+    [LOCAL-489] Stop 3 needs more material (eventless): 18 passages, 2697 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "A Girl Asleep" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2697 -> 3841 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Contribute to The Met's future by planning for a special gift, such as a bequest in your Will or Trust, or thr"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 3 'A Girl Asleep': queries=3 serp_results=18 snippets=26
+      → Oil on canvas, 89 x 102 cm. Private collection. The mood of A Girl Asleep is none the less for the first time recognizab
+      → It is now in the Metropolitan Museum of Art in New York City and may not be lent elsewhere under the terms of the donor'
+
+  [LOCAL-410] SERP search complete: 12 queries, 81 results, 81 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 81 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    A sketch of the Mitsui shop in Suruga street in Ed: serp_results=24 elements_extracted=- beats_injected=- (measured post-generation)
+    Bacchante in a Landscape: serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+    A Girl Asleep: serp_results=18 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 25 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'A sketch of the Mitsui shop in Suruga street in Ed' has 25 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via openai+web(16) (5 high-confidence) — stop will be labelled aloud
+      [high] The sketch is a woodblock print by Katsushika Hokusai.
+      [high] The print is titled 'A sketch of the Mitsui shop in Suruga street in Edo'.
+      [high] The print is part of the series 'Thirty-Six Views of Mount Fuji'.
+      [high] The print depicts the Mitsui shop in the Suruga district of Edo.
+      [high] The print was created between 1823 and 1829.
+  [D534] Stop 2 has 30 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Bacchante in a Landscape' has 30 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(14) (6 high-confidence) — stop will be labelled aloud
+      [high] The painting 'Bacchante in a Landscape' was created by Camille Corot, a French artist born in Paris in 1796 an
+      [high] The painting was made between 1865 and 1870.
+      [high] The medium used for 'Bacchante in a Landscape' is oil on canvas.
+      [high] The dimensions of the painting are 12 1/8 x 24 1/4 inches (30.8 x 61.5 cm).
+      [high] The painting is part of the collection at The Metropolitan Museum of Art in New York.
+      [high] The painting is closely related to another work by Corot, 'Bacchante by the Sea', which is also in the museum'
+  [D534] Stop 3 has 26 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'A Girl Asleep' has 26 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via openai+web(16) (7 high-confidence) — stop will be labelled aloud
+      [high] The painting 'A Girl Asleep' is by the Dutch artist Johannes Vermeer.
+      [high] It was created around 1656–1657.
+      [high] The painting is oil on canvas.
+      [high] Its dimensions are approximately 87.6 cm x 76.5 cm.
+      [high] The painting is housed in the Metropolitan Museum of Art in New York City.
+      [high] The painting is also known by other titles, including 'A Woman Asleep', 'A Woman Asleep at Table', and 'A Maid
+  [D533] Knowledge fallback filled 3 starved stop(s)
+[TIMING] phase=external_lookups elapsed=36.0s cumulative=286.8s
+
+Generating description for Stop 1: A sketch of the Mitsui shop in Suruga street in Edo by , ...
+
+Generating description for Stop 2: Bacchante in a Landscape by , ...
+
+Generating description for Stop 3: A Girl Asleep by , ...
+  [LOCAL-381] stop='A sketch of the Mitsui shop in Suruga street in Edo' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Met, Lauder, York
+  [LOCAL-411] Stop 1 snippet ranking: input=30 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified'), ('36 Views of Mount Fuji by Hokusai | PDF', 11, 'unverified'), ('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 30 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 18 required names (no snippet evidence): ['Lauder', 'York', 'Johns', 'Evans', 'Manhattan', 'Steichen', 'Guire', 'Berry', 'Pembroke', 'Bishop', 'Blount', 'Hoving', 'Montebello', 'Marquand', 'Diker', 'Jayne Wrightsman', 'Qatar', 'Hess']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12298 after=27378 (+15080 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27378)
+  [LOCAL-381] stop='Bacchante in a Landscape' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Moody, American, Picasso
+  [LOCAL-411] Stop 2 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Bacchante in a Landscape', 16, ''), ('Camille Corot - Bacchante in a Landscape', 9, ''), ('Bacchante in a Landscape - Jean-Baptiste-Camille C', 9, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 18 required names (no snippet evidence): ['Moody', 'American', 'Picasso', 'Pollock', 'Rockefeller', 'Wing', 'Din', 'Ivins', 'Lehman', 'Dillon', 'Rodin', 'Eilenberg', 'Great', 'Beyer Blinder Belle', 'British Modernism', 'Clare', 'Publica', 'Michael Gross']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13271 after=29711 (+16440 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29711)
+  [LOCAL-381] stop='A Girl Asleep' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Library, Stieglitz, Galerie
+  [LOCAL-411] Stop 3 snippet ranking: input=33 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('"St. Praxedis": New Light on the Early Career of V', 12, ''), ('A Girl Asleep', 11, ''), ('Moça Dormindo (A Maid Asleep / A Woman Asleep / A ', 11, 'unverified')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 33 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 18 required names (no snippet evidence): ['Library', 'Stieglitz', 'Galerie', 'Beckmann', 'Dick', 'Blasio', 'Cameron Stone', 'Tang', 'Velázquez', 'Charlotte Weber', 'Bernini', 'Robert Lehman', 'Cypriot', 'Botticelli', 'Weiss', 'Southport', 'Jezebel', 'Benin']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13281 after=27722 (+14441 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27722)
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0037
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-569/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0036
+  [LOCAL-490] Stop 3 story pass: ok=True (4 sentences), $0.0047
+    story: "Johannes Vermeer painted "A Girl Asleep" around 1656–1657. At that time, Vermeer was developing his distinctive style, and this work marked a pivotal "
+Stop 2 API call cost: $0.0373 (7850 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=4 words=249
+Stop 2 description word count: 249 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0346 (7281 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=5 words=298
+Stop 1 description word count: 298 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0340 (7162 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=2 words=261
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0361 (7601 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=4 words=256
+Stop 3 description word count: 256 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-388] PRE-GATE stop='A sketch of the Mitsui shop in Suruga street in Edo' beats_assigned=19 beats_in_output=1 dropped=['Lauder', 'York', 'Johns', 'Evans', 'Manhattan', 'Steichen', 'Guire', 'Berry', 'Pembroke', 'Bishop', 'Blount', 'Hoving', 'Montebello', 'Marquand', 'Diker', 'Jayne Wrightsman', 'Qatar', 'Hess']
+  [LOCAL-388] PRE-GATE stop='Bacchante in a Landscape' beats_assigned=18 beats_in_output=4 dropped=['Moody', 'Picasso', 'Pollock', 'Ivins', 'Lehman', 'Dillon', 'Rodin', 'Eilenberg', 'Great', 'Beyer Blinder Belle', 'British Modernism', 'Clare', 'Publica', 'Michael Gross']
+  [LOCAL-388] PRE-GATE stop='A Girl Asleep' beats_assigned=18 beats_in_output=0 dropped=['Library', 'Stieglitz', 'Galerie', 'Beckmann', 'Dick', 'Blasio', 'Cameron Stone', 'Tang', 'Velázquez', 'Charlotte Weber', 'Bernini', 'Robert Lehman', 'Cypriot', 'Botticelli', 'Weiss', 'Southport', 'Jezebel', 'Benin']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='A sketch of the Mitsui shop in Suruga street in Edo': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Bacchante in a Landscape': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✗ FAIL stop='A Girl Asleep': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002769 (input=11368, output=1773)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='A sketch of the Mitsui shop in Suruga street in Edo': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✗ FAIL stop='Bacchante in a Landscape': claims=2, sourced=0, unsourced=2, contradicted=0
+      → UNSOURCED: '1969' (year) — no snippet contains this assertion
+      → UNSOURCED: 'in 1982' (year) — no snippet contains this assertion
+    ✗ FAIL stop='A Girl Asleep': claims=1, sourced=0, unsourced=1, contradicted=0
+      → UNSOURCED: 'in 1870' (year) — no snippet contains this assertion
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 2 sentence(s) from 'Bacchante in a Landscape':
+      ✗ "In 1969, Nelson A."
+      ✗ "Rockefeller Wing in 1982, showcasing the arts of Africa, Oceania, and the Americas."
+    [LOCAL-423] Stripped 1 sentence(s) from 'A Girl Asleep':
+      ✗ "This artwork connects indirectly to the broader transformation of The Metropolitan Museum of Art's c"
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 5: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 1 fixed/improved, 3 kept original
+  [LOCAL-192] Retry cost: $0.0017 (2163 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'A sketch of the Mitsui shop in': 1 rewritten, 1 deleted
+  [LOCAL-255] Stop 3 'A Girl Asleep': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 1 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/3 = 33.3% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 2 'Bacchante in a Landscape': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'A sketch of the Mitsui shop in': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 1 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 6
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 6
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Mount Fuji' reason='It does not specify Hokusai's connection to the Mitsui shop or Suruga street.' in: "Hokusai's choice to include Mount Fuji in the background is more than a picturesque addition; it ref"
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Six Views' reason='It does not specify Hokusai's connection to the Mitsui shop or Suruga street.' in: "Hokusai's choice to include Mount Fuji in the background is more than a picturesque addition; it ref"
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Thirty-Six Views of Mount Fuji,' reason='It does not specify Hokusai's connection to the Mitsui shop in Suruga street.' in: "Hokusai's choice to include Mount Fuji in the background is more than a picturesque addition; it ref"
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Nishimuraya Yohachi' reason='It does not specify a direct link to the Mitsui shop in Suruga street.' in: "Published by Nishimuraya Yohachi, a prominent name in the Edo publishing world, this work exemplifie"
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Rockefeller Wing' reason='No concrete link to the Mitsui shop in Suruga street.' in: "The Metropolitan Museum of Art's commitment to housing a diverse collection of cultural artifacts is"
+    [LOCAL-472] UNGROUNDED entity stop='Bacchante in a Landscape' entity='Camille Corot' reason='No concrete link between Corot and the stop is provided.' in: "In the years between 1865 and 1870, the brush of Camille Corot brought to life a scene that immerses"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/25)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='A sketch of the Mitsui shop in Suruga st' cut orphaned dependant of a removed introduction — subject 'rockefeller': "Rockefeller's donations led to the expansion and diversification of The Met's ar"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 10
+    Glossed (composed): 4
+    Suppressed (already explained): 1
+    Degraded (name dropped): 2
+    Guard failures: 0
+    Known (skipped): 3
+    Triage: 1424 tokens, $0.0003, 4.8s
+    Gloss: 414 tokens, $0.0001, 1.6s
+    Compose: 1751 tokens, $0.0003, 2.2s
+    Total added cost: $0.0007
+    Stops affected: 3
+    Glosses applied:
+      • Hokusai → "a woodcut print from the 1830s" [source: corpus]
+      • Six Views → DEGRADED (name dropped)
+      • Rockefeller Wing → DEGRADED (name dropped)
+      • Camille Corot → "the painting titled bacchante in a landscape" [source: corpus]
+      • Corot → SUPPRESSED (already explained)
+      • Rockefeller → "the co-founder of standard oil company" [source: model]
+      • Johannes Vermeer → "a painting also known as a woman asleep at table" [source: corpus]
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] coherence reject: 'The museum continues to adapt and expand, with contributions from the Rockefelle' — 'Met' died in 1675, 'Rockefeller' born in 1874 — cannot have Met
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 28
+    Relations rejected: 1
+    Sentences removed: 1
+    Stops affected: 1
+    [LOCAL-402] coherence reject: 'The museum continues to adapt and expand, with contributions from the Rockefelle' — 'Met' died in 1675, 'Rockefeller' born in 1874 — cannot have Met
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'A sketch of the Mitsui shop in': claim='1830s (in context: "que employed by Hokusai, a woodcut print' contradicted_by='e artist, created around 1831-1834, presenting the Mitsui Store at Surugacho in ' → DROPPED
+  [LOCAL-229] BLOCKED Stop 3 'A Girl Asleep': claim='1656 (in context: "t table, painted "A Girl Asleep" around 1' contradicted_by='utch master Johannes Vermeer, 1657. It is housed in the Metropolitan Museum of A' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 2 group(s) blocked, 2 stop(s) affected
+  [LOCAL-229] Block log (2 entries):
+    stop=1 claim='1830s (in context: "que employed by Hokusai, a woo' evidence='e artist, created around 1831-1834, presenting the' action=DROPPED
+    stop=3 claim='1656 (in context: "t table, painted "A Girl Asleep' evidence='utch master Johannes Vermeer, 1657. It is housed i' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'The Metropolitan Museum of Art'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [2] DELETED: 'This act' in: This act of generosity allowed The Met to enhance its reputation and broaden its
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Bacchante in a Landscape' (index 65) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'A sketch of the Mitsui shop in Suruga ': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Bacchante in a Landscape': the longest run (3 sentences, Camille Corot) has agency=0 stakes=0 — someone is described, but nothing is risk
+    stop 3 'A Girl Asleep': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'A Girl Asleep' (index 30)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'A sketch of the Mitsui shop in Suruga street' — 298w → 179w after gates, 7 sentence(s) removed
+    removed: "This artwork, created between 1831 and 1834, offers a glimpse into Edo-period Japan, capturing the b"
+    removed: "The meticulous woodblock technique employed by Hokusai allows for a play of light and shadow, giving"
+    removed: "This piece is part of Hokusai's renowned series "Thirty-Six Views of Mount Fuji," a collection that "
+    removed: "Rockefeller."
+    removed: "Rockefeller's donations led to the expansion and diversification of The Met's art collections, setti"
+    removed: "Rockefeller Wing."
+    removed: "This sketch not only captures a historical moment but also embodies the rich tapestry of cultural ex"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "A sketch of the Mitsui shop in Suruga street in Edo is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'Bacchante in a Landscape' — 232w → 159w after gates, 4 sentence(s) removed
+    removed: "In the years between 1865 and 1870, the brush of Camille Corot brought to life a scene that immerses"
+    removed: "The painting captures a nude figure, the bacchante, seemingly at one with the rolling hills and verd"
+    removed: "This act of generosity allowed The Met to enhance its reputation and broaden its global reach, which"
+    removed: "Camille Corot, through his nuanced portrayal of the bacchante, invites viewers to consider the seaml"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Bacchante in a Landscape is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'A Girl Asleep' — 222w → 38w after gates, 10 sentence(s) removed
+    removed: "Johannes Vermeer painted "A Girl Asleep" around 1656–1657."
+    removed: "At that time, Vermeer was developing his distinctive style, and this work marked a pivotal moment in"
+    removed: "The painting captured the mood of a girl barely visible behind furniture, inactive and wrapped in he"
+    removed: "Because of this development, "A Girl Asleep" stands as an early example of the artist's unique abili"
+    removed: "Vermeer, known for his meticulous attention to detail, chose to veil a hidden self-portrait beneath "
+    removed: "This technique demonstrates his evolving mastery of composition and the delicate balance of hiding a"
+    removed: "The choice of colors — a soft palette of ochres and blues — not only defines the interior space but "
+    removed: "Just as Vermeer redefined his artistic path, the museum continues to adapt and expand."
+    removed: "The Rockefeller family's contributions, notably in enhancing the cultural representation at the Met,"
+    removed: "As you ponder this peaceful scene, consider how "A Girl Asleep" fits into the larger tapestry of art"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "A Girl Asleep is held at The Metropolitan Museum of Art."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: A sketch of the Mitsui shop in Suruga street in Edo by , ...
+
+Generating description for Stop 2: Bacchante in a Landscape by , ...
+
+Generating description for Stop 3: A Girl Asleep by , ...
+  [LOCAL-381] stop='A sketch of the Mitsui shop in Suruga street in Edo' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Met, Lauder, York
+  [LOCAL-411] Stop 1 snippet ranking: input=30 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified'), ('36 Views of Mount Fuji by Hokusai | PDF', 11, 'unverified'), ('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 30 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 18 required names (no snippet evidence): ['Lauder', 'York', 'Johns', 'Evans', 'Manhattan', 'Steichen', 'Guire', 'Berry', 'Pembroke', 'Bishop', 'Blount', 'Hoving', 'Montebello', 'Marquand', 'Diker', 'Jayne Wrightsman', 'Qatar', 'Hess']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12298 after=27378 (+15080 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27378)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Bacchante in a Landscape' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Moody, American, Picasso
+  [LOCAL-411] Stop 2 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Bacchante in a Landscape', 16, ''), ('Camille Corot - Bacchante in a Landscape', 9, ''), ('Bacchante in a Landscape - Jean-Baptiste-Camille C', 9, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 18 required names (no snippet evidence): ['Moody', 'American', 'Picasso', 'Pollock', 'Rockefeller', 'Wing', 'Din', 'Ivins', 'Lehman', 'Dillon', 'Rodin', 'Eilenberg', 'Great', 'Beyer Blinder Belle', 'British Modernism', 'Clare', 'Publica', 'Michael Gross']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13271 after=29711 (+16440 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29711)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='A Girl Asleep' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Library, Stieglitz, Galerie
+  [LOCAL-411] Stop 3 snippet ranking: input=33 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('"St. Praxedis": New Light on the Early Career of V', 12, ''), ('A Girl Asleep', 11, ''), ('Moça Dormindo (A Maid Asleep / A Woman Asleep / A ', 11, 'unverified')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 33 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 18 required names (no snippet evidence): ['Library', 'Stieglitz', 'Galerie', 'Beckmann', 'Dick', 'Blasio', 'Cameron Stone', 'Tang', 'Velázquez', 'Charlotte Weber', 'Bernini', 'Robert Lehman', 'Cypriot', 'Botticelli', 'Weiss', 'Southport', 'Jezebel', 'Benin']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13281 after=27722 (+14441 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27722)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0053
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0057
+    story: "Katsushika Hokusai created the woodblock print "A sketch of the Mitsui shop in Suruga street in Edo" between 1823 and 1829. This artwork eventually tr"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-569/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0057
+    story: "In the late 19th century, Camille Corot's painting 'Bacchante in a Landscape' was created, capturing a serene rural scene with a nude figure. Years la"
+Stop 3 API call cost: $0.0377 (7932 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=4 words=289
+Stop 3 description word count: 289 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0388 (8168 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=3 words=293
+Stop 2 description word count: 293 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0361 (7603 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=4 words=289
+Stop 1 description word count: 289 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.7s for 3 stop(s) at max_workers=3
+    [LOCAL-474] regenerated and re-gated: 262w (was 179w)
+    [LOCAL-474] regenerated and re-gated: 256w (was 159w)
+    [LOCAL-474] regenerated and re-gated: 289w (was 38w)
+      [PERSON-CAP] stop 3: 'met' already carries two stops — cut: This evolution speaks to The Met's ongoing mission to broaden its collection, re
+  [D534] removed 1 repeated sentence(s) the capped retries could not reach:
+      stop 2: This legacy was further cemented with the opening of the Michael C. Rockefeller Wing, whic
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 3 improved, 0 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 1.7s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.4s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 8.7s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 12.5s (attempt 4, 15s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 1.6s (attempt 1, 29s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 2.8s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 6.6s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/metmuseum/videos/insider-insightsmaking-prints-and-drawings/1660378830826671/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 1.4s (attempt 1, 29s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 3.1s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 6.7s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 10.7s (attempt 4, 17s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=VsgC8OCbr80 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://gelpress.com/blogs/art-and-inspiration/printmaking-art-monoprinting?srsltid=AU7gw4VsLIWYMsrDx3SX2pPIshyTcriDsAbRIZeCkmhbXncXymAQPVAO (attempt 1)
+  [LOCAL-459] R5: Fetched 1218 chars from https://gelpress.com/blogs/art-and-inspiration/pri
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 1.8s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 4.3s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 8.9s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 13.7s (attempt 4, 14s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://blog.dma.org/tag/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1736 chars from https://blog.dma.org/tag/printmaking/
+  [D512] verb discovery: query='The Metropolitan Museum of Art printmaking process how it is mad' -> 3 new verb(s): recognized, coated, covered
+  [D512] _AGENCY_VERB widened by 3 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: A sketch of the Mitsui shop in Suruga street
+    [D501] no object record for 'A sketch of the Mitsui shop in Suruga street' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Bacchante in a Landscape
+    [D501] no object record for 'Bacchante in a Landscape' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: A Girl Asleep
+    [D501] no object record for 'A Girl Asleep' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/3 stops got a gated story (0 with multiple stories), ~$0.072, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  A sketch of the Mitsui shop in Suruga st   63    32     0    35
+     2  Bacchante in a Landscape                   57    55    38    24
+     3  A Girl Asleep                              46    46    40    39
+    [LOCAL-485] index mean 55.3 over 3 stop(s), range 46-63
+    [LOCAL-485] weakest: 'A Girl Asleep' at 46
+[TIMING] phase=story_first elapsed=189.3s cumulative=476.1s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 4 facts found {'architecture': 3, 'founding': 1}
+  [LOCAL-382] Thesis block injected into prolog (338 chars)
+  [R2] Prolog saved for Stop 1 (87 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 87 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 87 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 155
+    Words after:  155
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.5s, $0.0074, 1130 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [A sketch of the Mitsui shop in Suruga street in Edo] (cause): This evolution reflects the dynamic commercial landscape of the time, where merc...
+      [Bacchante in a Landscape] (dated_event_with_consequence): This transition marked a pivotal shift, as the painting became part of a prestig...
+      [A Girl Asleep] (mystery): Interestingly, during a symposium at the Rijksmuseum, X-ray analysis of this pai...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0031 (518 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (34 words):
+      "As you continue on the tour, you will learn about the X-ray analysis revealing Vermeer's self-portrait in "A Girl Asleep" and the transition of "Bacchante in a Landscape" to a prestigious collection available worldwide."
+      Stops referenced: 2
+    Part 4 total cost: $0.0031
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through The Metropolitan Museum of Art — next is Ba...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in The Metropolitan Museum of Art: A Girl As...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.2s, $0.0025, 436 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [A Girl Asleep] (mystery): "Interestingly, during a symposium at the Rijksmuseum, X-ray analysis of this pai..."
+      → composed: "A Girl Asleep, X-ray analysis revealed Vermeer's hidden self-portrait"
+    [A sketch of the Mitsui shop in Suruga street in Edo] (cause): "This evolution reflects the dynamic commercial landscape of the time, where merc..."
+      → composed: "A sketch of the Mitsui shop in Suruga street, reflecting Edo's commercial evolution"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — A Girl Asleep, X-ray analysis revealed Vermeer's hidden self-portrait and a sketch of the Mitsui shop in Suruga street, reflecting Edo's commercial evolution."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 3 (1000/york) — sentence not in stop block
+  [D533] 0 repeated fact(s) removed, 1 kept
+  [D533] Person-year role guard: no mismatches (90390 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 0
+    Dropped: 1
+    AUDIT: admission | Free admission | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to explore The Metropolitan Museum of Art in New York, home to a diverse collection sp..."
+  [2] "Katsushika Hokusai crafted this woodblock print between 1823 and 1829, capturing the vital essence o..."
+  [3] "From A sketch of the Mitsui shop in Suruga street in Edo to A Girl Asleep, you have followed the thr..."
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='A sketch of the Mitsui shop in Suruga street in Edo' beats_assigned=19 beats_in_output=2 dropped=['Lauder', 'Johns', 'Evans', 'Manhattan', 'Steichen', 'Guire', 'Berry', 'Pembroke', 'Bishop', 'Blount', 'Hoving', 'Montebello', 'Marquand', 'Diker', 'Jayne Wrightsman', 'Qatar', 'Hess'] causes=[Lauder=never_written, Johns=never_written, Evans=never_written, Manhattan=never_written, Steichen=never_written, Guire=never_written, Berry=never_written, Pembroke=never_written, Bishop=never_written, Blount=never_written, Hoving=never_written, Montebello=never_written, Marquand=never_written, Diker=never_written, Jayne Wrightsman=never_written, Qatar=never_written, Hess=never_written]
+    stop='Bacchante in a Landscape' beats_assigned=18 beats_in_output=2 dropped=['Moody', 'American', 'Picasso', 'Pollock', 'Wing', 'Ivins', 'Lehman', 'Dillon', 'Rodin', 'Eilenberg', 'Great', 'Beyer Blinder Belle', 'British Modernism', 'Clare', 'Publica', 'Michael Gross'] causes=[Moody=never_written, American=never_written, Picasso=never_written, Pollock=never_written, Wing=never_written, Ivins=never_written, Lehman=never_written, Dillon=never_written, Rodin=never_written, Eilenberg=never_written, Great=never_written, Beyer Blinder Belle=never_written, British Modernism=never_written, Clare=never_written, Publica=never_written, Michael Gross=never_written]
+    stop='A Girl Asleep' beats_assigned=18 beats_in_output=0 dropped=['Library', 'Stieglitz', 'Galerie', 'Beckmann', 'Dick', 'Blasio', 'Cameron Stone', 'Tang', 'Velázquez', 'Charlotte Weber', 'Bernini', 'Robert Lehman', 'Cypriot', 'Botticelli', 'Weiss', 'Southport', 'Jezebel', 'Benin'] causes=[Library=never_written, Stieglitz=never_written, Galerie=never_written, Beckmann=never_written, Dick=never_written, Blasio=never_written, Cameron Stone=never_written, Tang=never_written, Velázquez=never_written, Charlotte Weber=never_written, Bernini=never_written, Robert Lehman=never_written, Cypriot=never_written, Botticelli=never_written, Weiss=never_written, Southport=never_written, Jezebel=never_written, Benin=never_written]
+
+=== Word Count Statistics ===
+Stop 1: A sketch of the Mitsui shop in Suruga street in Edo - 298 words
+Stop 2: Bacchante in a Landscape - 249 words
+Stop 3: A Girl Asleep - 256 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8053 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['dangling_reference', 'unsourced_person_event']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'His donations and vision for cultural inclusivity helped pav'
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Camille Corot" placed here in 1969 with no source: "Encounter a woodcut print by Katsushika Hokusai depicting the Mitsui Store in 
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 1) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1650 tokens, $0.007838 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference', 'unsourced_person_event'] -> ['offsite_entity', 'thin', 'unsourced_person_event']
+  [LOCAL-540] retry removed: ['dangling_reference']
+  [LOCAL-540] retry did NOT remove: ['offsite_entity'] — shipping with defect recorded (D577)
+
+Total API cost: $0.3230 (32714 tokens)
+Grounding:      $0.0000 (0 requests)
+Tour total:     $0.3230
+Provenance:     0/36 factual sentences sourced, 36 unsourced (0 corpus, 0 grounded, 36 parametric)
+CACHE STORE: The Metropolitan Museum of Art, New York, NY / museum / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_A.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_A_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: The Metropolitan Museum of Art, New York, NY
+Tour-Category: museum
+
+Stop 1: A sketch of the Mitsui shop in Suruga street in Edo
+
+Address: 1000 5th Ave, New York, NY 10028
+
+Coordinates: 40.7794, -73.9632
+
+Orientation: You are about to explore The Metropolitan Museum of Art in New York, home to a diverse collection spanning 5,000 years of Asian art. Encounter a woodcut print by Katsushika Hokusai depicting the Mitsui Store in Edo, followed by Camille Corot's "Baccha...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    A sketch of the Mitsui shop in Suruga street in Ed: serp_results=24 snippets_injected=25 beats_in_delivered_text=0
+    Bacchante in a Landscape: serp_results=23 snippets_injected=30 beats_in_delivered_text=0
+    A Girl Asleep: serp_results=18 snippets_injected=26 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=10.4s cumulative=486.5s
+[TIMING] phase=verification elapsed=0.0s cumulative=486.5s
+[TIMING] TOTAL wall=486.5s phases: poi_selection=218.1s, story_first=189.3s, external_lookups=36.0s, fact_sheets=30.2s, packing=10.4s, intent=2.5s, narration=0.1s, verification=0.0s

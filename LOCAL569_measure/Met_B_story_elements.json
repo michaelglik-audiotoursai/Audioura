@@ -1,0 +1,356 @@
+[
+  {
+    "type": "dedication",
+    "text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to the museum.",
+    "source_sentence": "In 1969, American businessman, philanthropist and then NY Gov. Nelson A. Rockefeller donated his more than 3,000-piece collection to the museum.",
+    "people": [
+      "Nelson A. Rockefeller"
+    ],
+    "dates": [
+      "1969"
+    ],
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "_merge_log": [
+      {
+        "pair": [
+          1,
+          2
+        ],
+        "a_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, unde",
+        "b_text": "The collection shows the cultural and artistic traditions of communities from ac",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          1,
+          3
+        ],
+        "a_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, unde",
+        "b_text": "The museum created the Department of Far Eastern Art in 1915, which was influenc",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          1,
+          9
+        ],
+        "a_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, unde",
+        "b_text": "Curator of African Art Susan Mullin Vogel discussed a famous Benin artifact acqu",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          3
+        ],
+        "a_text": "The collection shows the cultural and artistic traditions of communities from ac",
+        "b_text": "The museum created the Department of Far Eastern Art in 1915, which was influenc",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          9
+        ],
+        "a_text": "The collection shows the cultural and artistic traditions of communities from ac",
+        "b_text": "Curator of African Art Susan Mullin Vogel discussed a famous Benin artifact acqu",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          3,
+          9
+        ],
+        "a_text": "The museum created the Department of Far Eastern Art in 1915, which was influenc",
+        "b_text": "Curator of African Art Susan Mullin Vogel discussed a famous Benin artifact acqu",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          6,
+          7
+        ],
+        "a_text": "In 2000, its permanent collection had over two million works; it currently lists",
+        "b_text": "In December 2021, the Met began its $70 million renovation of The Michael C. Roc",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      }
+    ],
+    "rank_score": 5.0,
+    "id": "se_001"
+  },
+  {
+    "type": "origin",
+    "text": "The Metropolitan Museum of Art was founded in 1870.",
+    "source_sentence": "The Metropolitan Museum of Art was founded in 1870.",
+    "people": [],
+    "dates": [
+      "1870"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 4.5,
+    "id": "se_002"
+  },
+  {
+    "type": "provenance",
+    "text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller Wing'.",
+    "source_sentence": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller Wing'.",
+    "people": [
+      "Michael Rockefeller"
+    ],
+    "dates": [
+      "1982"
+    ],
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 2,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_003"
+  },
+  {
+    "type": "provenance",
+    "text": "The museum created the Department of Far Eastern Art in 1915, which was influenced by early donors like J. Pierpont Morgan and Benjamin Altman.",
+    "source_sentence": "Notable early donors include J. Pierpont Morgan, Benjamin Altman, and the Havemeyer and Rockefeller families.",
+    "people": [
+      "J. Pierpont Morgan",
+      "Benjamin Altman"
+    ],
+    "dates": [
+      "1915"
+    ],
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_004"
+  },
+  {
+    "type": "intention",
+    "text": "The museum was established by a group of Americans, including philanthropists, artists, and businessmen, with the goal of creating a national institution that would inspire and educate the public.",
+    "source_sentence": "The museum was established by a group of Americans, including philanthropists, artists, and businessmen, with the goal of creating a national institution that would inspire and educate the public.",
+    "people": [],
+    "dates": [],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_005"
+  },
+  {
+    "type": "provenance",
+    "text": "Curator of African Art Susan Mullin Vogel discussed a famous Benin artifact acquired by the Metropolitan Museum of Art in 1972.",
+    "source_sentence": "Curator of African Art Susan Mullin Vogel discussed a famous Benin artifact acquired by the Metropolitan Museum of Art in 1972.",
+    "people": [
+      "Susan Mullin Vogel"
+    ],
+    "dates": [
+      "1972"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_006"
+  },
+  {
+    "type": "reference_work",
+    "text": "The collection shows the cultural and artistic traditions of communities from across these regions.",
+    "source_sentence": "The collection shows the cultural and artistic traditions of communities from across these regions.",
+    "people": [],
+    "dates": [],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 3.0,
+    "id": "se_007"
+  },
+  {
+    "type": "provenance",
+    "text": "The collection shows the cultural and artistic traditions of communities from across these regions and contains more than 11,000 pieces.",
+    "source_sentence": "Today, the Met's collection contains more than 11,000 pieces from sub-Saharan Africa, the Pacific Islands, and the Americas and is housed in the 40,000-square-foot (4,000 m2) Rockefeller Wing on the south end of the museum.",
+    "people": [],
+    "dates": [],
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 2.5,
+    "id": "se_008"
+  },
+  {
+    "type": "date",
+    "text": "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 million works.",
+    "source_sentence": "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 million works.",
+    "people": [],
+    "dates": [
+      "2000"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 2.5,
+    "id": "se_009"
+  },
+  {
+    "type": "date",
+    "text": "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's African, ancient American, and Oceanic art galleries.",
+    "source_sentence": "In December 2021, the Met began its $70 million (~$79.7 million in 2024) renovation of The Michael C. Rockefeller Wing's African, ancient American, and Oceanic art galleries, originally planned to begin in 2020 but now set for completion in 2024.",
+    "people": [],
+    "dates": [
+      "2021",
+      "2020",
+      "2024"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art"
+        }
+      ]
+    },
+    "rank_score": 2.5,
+    "id": "se_010"
+  }
+]

@@ -1,0 +1,265 @@
+{
+  "arms": {
+    "A": {},
+    "B": {
+      "STORY_RETRY_KEEP_BEST": "1"
+    },
+    "C": {
+      "STORY_RETRY_KEEP_BEST": "1",
+      "STORY_RETRY_EARLY_STOP": "1"
+    }
+  },
+  "museums": {
+    "Palais": "Palais Lascaris, Nice, France",
+    "MFA": "Museum of Fine Arts, Boston, MA",
+    "Gardner": "Isabella Stewart Gardner Museum, Boston, MA"
+  },
+  "tour_type": "museum",
+  "stops": 4,
+  "openai_budget_usd": 6.0,
+  "gemini": "off (GEMINI_API_KEY removed)",
+  "cells": {
+    "Palais_A": {
+      "cell": "Palais_A",
+      "arm": "A",
+      "museum": "Palais",
+      "location": "Palais Lascaris, Nice, France",
+      "flags": {},
+      "ok": true,
+      "error": null,
+      "wall_s": 604.6,
+      "chars": 7546,
+      "writer_llm_calls": 118,
+      "writer_attempts_logged": 30,
+      "breakdown_llm_usd": 0.845342,
+      "search_usd": 0.0,
+      "grounding_usd": 1.4,
+      "tour_total_cost_usd": 2.245342,
+      "total_cost_llm_usd": 0.845342,
+      "shipped_story_count_by_stop": {
+        "1": 0,
+        "2": 1,
+        "3": 2,
+        "4": 1
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 246
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 251
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 256
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 2,
+            "words": 281
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 0,
+            "words": 260
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 301
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 286
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 282
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 296
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 284
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 239
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 1,
+            "words": 249
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 273
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 296
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 289
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 2,
+            "words": 295
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 253
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 333
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 287
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 4,
+            "words": 305
+          }
+        ],
+        "4": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 274
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 247
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 246
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 244
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 192
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 291
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 252
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 277
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 241
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 1,
+            "words": 220
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [],
+      "story_retries": 22,
+      "score_tour": {
+        "defects": [
+          "thin"
+        ],
+        "defect_detail": {
+          "thin": "3/4 stops delivered"
+        },
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 4,
+          "dates": 19,
+          "named_people": 2,
+          "chars": 7546
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T01:42:33"
+    }
+  },
+  "audio_tours_before": {
+    "total": 198,
+    "non_test": 56
+  },
+  "audio_tours_after": {
+    "total": 198,
+    "non_test": 56
+  }
+}

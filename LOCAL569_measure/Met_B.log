@@ -1,0 +1,911 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_021602.txt'
+
+======================================================================
+CALL #001 | 02:16:02.889 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_B.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_021602.txt'
+
+======================================================================
+CALL #002 | 02:16:02.890 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "New York, NY",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "The Metropolitan Museum of Art",
+    "geographic_scope": "New York, NY",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "USA"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=USA (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: New York, NY
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: The Metropolitan Museum of Art
+  [venue_name sanity] 'The Metropolitan Museum of Art' OK
+  [S15] Forced tour_category=museum from venue_name='The Metropolitan Museum of Art'
+[TIMING] phase=intent elapsed=2.4s cumulative=2.4s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for The Metropolitan Museum of Art, New York, NY - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_021602.txt'
+
+======================================================================
+CALL #003 | 02:16:05.336 | GENERATING_PROMPT
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  user_request: The Metropolitan Museum of Art, New York, NY
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for The Metropolitan Museum of Art, New York, NY...
+  [Museum constraint] Venue from intent='The Metropolitan Museum of Art'
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [S17] no scope_constraint (precision='CITY', scope='New York, NY')
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [venue_cache] HIT for Q160236 (tier=rich, expires=2026-11-02 05:56:51.645727)
+  [venue_resolver] SPARQL: 196 works found for Q160236
+  [LOCAL-30] Deterministic selection: 459 documented works (0 catalogue, 196 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - The Grand Canal above the Rialto [sparql]
+     - Madonna Adoring the Child with the Infant Saint John the Baptist and an Angel [sparql]
+     - Processional Crucifix [sparql]
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [venue_cache] HIT for Q160236 (tier=rich, expires=2026-11-02 05:56:51.645727)
+  [venue_resolver] SPARQL: 196 works found for Q160236
+  [LOCAL-30] Deterministic selection: 459 documented works (0 catalogue, 196 SPARQL)
+  [LOCAL-328] Quality score map: 6 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Bacchante in a Landscape [canonical] (quality=8.0)
+     - Allegory of the Catholic Faith [canonical] (quality=5.0)
+     - A sketch of the Mitsui shop in Suruga street in Edo [canonical] (quality=4.0)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Bacchante in a Landscape
+   - Allegory of the Catholic Faith
+   - A sketch of the Mitsui shop in Suruga street in Edo
+   - A Girl Asleep
+   - An Oriental Family
+   - Anjou Legendarium
+  [venue_resolver] Name variants: ['The Metropolitan Museum of Art']
+  [venue_resolver] Single candidate Q160236 (Metropolitan Museum of Art) failed city validation for 'New York'
+    [venue_resolver] Artist inferred from name: 'Metropolitan'
+  [venue_resolver] Resolved: 'The Metropolitan Museum of Art' → Q160236 (Metropolitan Museum of Art)
+    URL: https://www.metmuseum.org/
+    Coords: 40.779444444444444, -73.96333333333334
+    Language: en
+    Artist: Metropolitan ()
+  [D1v2] Venue resolved: Q160236 → URL=https://www.metmuseum.org/, lang=en
+  [venue_cache] HIT for Q160236 (tier=rich, expires=2026-11-02 05:56:51.645727)
+  [D1v2] Cache HIT: 281 canonical titles (tier=rich), 0 catalogue works, combined_text=88271 chars
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Spring' → 'Spring (1969)'
+  [LOCAL-34] Will enrich bare title at stop-naming: 'posada' → 'posada (2019)'
+  [LOCAL-24] Classification: 281 works, 0 galleries, 0 excluded
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Hippopotamus ("William")' → collapsed into 'William the Hippopotamus'
+  [D1v2-LOCAL24] After filter: 280 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 258 dynamic aliases from 130 works
+  [D1v2] Injected 258 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Bacchante in a Landscape' → canonical: 'Bacchante in a Landscape'
+  [D1v2] VERIFIED 'Allegory of the Catholic Faith' → canonical: 'Allegory of the Catholic Faith'
+  [D1v2] VERIFIED 'A sketch of the Mitsui shop in Suruga street in Edo' → canonical: 'A sketch of the Mitsui shop in Suruga street in Edo'
+  [D1v2] VERIFIED 'A Girl Asleep' → canonical: 'A Girl Asleep'
+  [D1v2] VERIFIED 'An Oriental Family' → canonical: 'An Oriental Family'
+  [D1v2] VERIFIED 'Anjou Legendarium' → canonical: 'Anjou Legendarium'
+  [D1v2] 6/6 works verified — tier: rich
+  [D1] Tier: rich (6 verified works)
+  [R4] Target reached: 6/3 stops
+  [LOCAL-16 GATE] All 6 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for The Metropolitan Museum of Art, New York, NY...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Bacchante in a Landscape=VENUE_ONLY', 'Allegory of the Catholic Faith=VENUE_ONLY', 'A sketch of the Mitsui shop in Suruga street in Edo=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['A Girl Asleep=VENUE_ONLY', 'An Oriental Family=VENUE_ONLY', 'Anjou Legendarium=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Bacchante in a Landscape=8.0', 'Allegory of the Catholic Faith=5.0', 'A sketch of the Mitsui shop in Suruga street in Edo=4.0']
+  [LOCAL-349] Yield scores (dropped):  ['A Girl Asleep=2.0', 'An Oriental Family=1.0', 'Anjou Legendarium=1.0']
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Bacchante in a Landscape' — venue_corpus canonical_title: 'Bacchante in a Landscape' at 'The Metropolitan Mu
+    [VERIFIED] 'Allegory of the Catholic Faith' — venue_corpus canonical_title: 'Allegory of the Catholic Faith' at 'The Metropoli
+    [VERIFIED] 'A sketch of the Mitsui shop in Suruga street in E — venue_corpus canonical_title: 'A sketch of the Mitsui shop in Suruga street in E
+    [VERIFIED] 'A Girl Asleep' — venue_corpus canonical_title: 'A Girl Asleep' at 'The Metropolitan Museum of Art
+    [VERIFIED] 'An Oriental Family' — venue_corpus canonical_title: 'An Oriental Family' at 'The Metropolitan Museum o
+    [VERIFIED] 'Anjou Legendarium' — venue_corpus canonical_title: 'Anjou Legendarium' at 'The Metropolitan Museum of
+    [HARVEST] Summary: 0 harvested, 6 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] 'Bacchante in a Landscape': +1 passages (2 queries)
+    [INTERPRETIVE] 'Allegory of the Catholic Faith': +5 passages (2 queries)
+    [INTERPRETIVE] 'A Girl Asleep': +1 passages (2 queries)
+    [INTERPRETIVE] 'An Oriental Family': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 4 stops enriched, +8 passages, 12 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_021602.txt'
+
+======================================================================
+CALL #004 | 02:17:11.523 | PHASE_3B_REQUEST
+======================================================================
+  location: The Metropolitan Museum of Art, New York, NY
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0005 (638 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 3 stops
+  [LOCAL-35] No visitor info page found for https://www.metmuseum.org/
+  [LOCAL-34] Visitor info extracted from corpus text (main page fallback, no provenance)
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: York, hint: museum)
+  [LOCAL-355] Bacchante in a Landscape: no practical facts in OSM
+  [LOCAL-355] Allegory of the Catholic Faith: no practical facts in OSM
+  [LOCAL-355] A sketch of the Mitsui shop in Suruga street in Edo: no practical facts in OSM
+   Coords cluster detected: 3 stops share '40.7794, -73.9632', refetching...
+   Cluster refetch OK 'Allegory of the Catholic Faith': 40.7794, -73.9626
+   Cluster refetch OK 'Bacchante in a Landscape': 40.7794, -73.9632
+   Cluster refetch OK 'A sketch of the Mitsui shop in Suruga street in Edo': 40.7794, -73.9632
+Extracted first POI coordinates: (40.7794, -73.9632)
+  [D4] Museum single-coordinate: all stops set to (40.7794, -73.9632) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Bacchante in a Landscape
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9632
+   Directions: From the nearest subway station at 86th St (Q train), walk south on 5th Ave for ...
+2. Allegory of the Catholic Faith
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9632
+   Directions: Exit the gallery of Bacchante in a Landscape and head to the right. Walk straigh...
+3. A sketch of the Mitsui shop in Suruga street in Edo
+   Address: 1000 5th Ave, New York, NY 10028
+   Coordinates: 40.7794, -73.9632
+   Directions: Leave the room of Allegory of the Catholic Faith and continue straight ahead, th...
+================================
+
+[TIMING] phase=poi_selection elapsed=153.2s cumulative=155.7s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 1/1 corpus pages for 'The Metropolitan Museum of Art'
+    page[0] score=16125 url=https://en.wikipedia.org/wiki/Metropolitan_Museum_of_Art
+  [§3-adapter] Raw elements: 11 from 1 pages
+  [§3-adapter] After corroboration scoring: 10 elements
+  [§3-adapter] Final: 10 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 10 elements → /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_B_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q160236 (10 elements)
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Elements per stop: s0=7, s1=7, s2=6
+  [SQ-S6b] Entity clusters found: 24 (≥2 stops)
+    → 20th century (eras): 3 stops, 5 elements
+    → the michael (people): 3 stops, 2 elements
+    → rockefeller wing (people): 3 stops, 2 elements
+    → nelson a. rockefeller (people): 2 stops, 1 elements
+    → 1969 (dates): 2 stops, 1 elements
+  [SQ-S6b] Theme naming: $0.0153, 1948 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Rockefeller's Influence on the Met's Collections': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'Development of Cultural Collections at the Met': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'The Met's Expansion in the 20th Century': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+  [SQ-S6b] Blended 3 threads: 'Rockefeller's Influence on the Met's Collections'=0.33, 'Development of Cultural Collections at the Met'=0.33, 'The Met's Expansion in the 20th Century'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Rockefeller's Influence on the Met's Collections': coverage=100%, weight=0.33, elements=['se_001', 'se_003']
+    → 'Development of Cultural Collections at the Met': coverage=100%, weight=0.33, elements=['se_004', 'se_007', 'se_008']
+    → 'The Met's Expansion in the 20th Century': coverage=100%, weight=0.33, elements=['se_002', 'se_003', 'se_009']
+  [§3] Story elements injected into spine prompt (10 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=The Metropolitan Museum of Art model=gpt-4o tokens=2108 (in=1633 out=475) cost=$0.0088 latency=3.8s
+[COST_METER] FRESH | spine_generate | $0.008833 | user=None | job=local569-Met_B
+  [LOCAL-278] Spine cost folded into total: $0.0088
+  [LOCAL-111] Spine quality: 2/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': False, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=found)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (19 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Bacchante in a Landscape' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Allegory of the Catholic Faith' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='A sketch of the Mitsui shop in Suruga street in Edo' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=29.8s cumulative=185.5s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='dedicated to what is now called The Department of Asian Art, which spans 5,000 y'
+
+  [LOCAL-383] Extracted 55 story beats, 55 named people: American, Beckmann, Benin, Bernini, Berry, Beyer Blinder Belle
+[TIMING] phase=narration elapsed=0.1s cumulative=185.5s
+  [D495] venue domain seeded tier1: metmuseum.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 11 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for ocula.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for ocula.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for prod.test.creazilla.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artsandculture.google.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for topimpressionists.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artera.ae: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for artheonmuseum.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for philanthropyroundtable.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for pubhist.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for poulwebb.blogspot.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for wikidata.org: The read operation timed out
+  [LOCAL-441] Batch complete: 12.9s, 1 tier1, 10 unverified, 0 budget-expired
+    [D489] material kind: stop='Bacchante in a Landscape' kind=active volume=COVERED sentences=39 active=5 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The Met object ID · 435965 · image · Bacchante in a Landscape MET ep29.100.598.R.jpg 1,776 × 859; 350 KB. 0 references. title."
+    [LOCAL-489] Stop 1 needs more material (eventless): 23 passages, 3404 chars, verdict=COVERED
+      [LOCAL-489] +7 from: "Bacchante in a Landscape" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3404 -> 4481 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The Met object ID · 435965 · image · Bacchante in a Landscape MET ep29.100.598.R.jpg 1,776 × 859; 350 KB. 0 re"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 1 'Bacchante in a Landscape': queries=3 serp_results=23 snippets=30
+      → Title: Bacchante in a Landscape · Artist: Camille Corot (French, Paris 1796–1875 Paris) · Date: 1865–70 · Medium: Oil on
+      → Summary ; Title. Bacchante in a Landscape ; Object type, painting. object_type QS:P31,Q3305213 ; Genre, nude · Edit this
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 1 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 1 unverified, 0 budget-expired
+    [D489] material kind: stop='Allegory of the Catholic Faith' kind=active volume=COVERED sentences=36 active=5 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "The Met also announced a $10 million gift from Musa and Thomas Mayer."
+    [LOCAL-489] Stop 2 needs more material (eventless): 19 passages, 2852 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Allegory of the Catholic Faith" "The Metropolitan Museum of Art" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2852 -> 4027 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "The Met also announced a $10 million gift from Musa and Thomas Mayer."
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 2 'Allegory of the Catholic Faith': queries=3 serp_results=19 snippets=27
+      → Title: Allegory of the Catholic Faith · Artist: Johannes Vermeer (Dutch, Delft 1632–1675 Delft) · Date: ca. 1670–72 · Me
+      → The Allegory of Faith, also known as The Allegory of the Catholic Faith, is a Dutch Golden Age painting by Johannes Verm
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 7 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 7 unverified, 0 budget-expired
+    [D489] material kind: stop='A sketch of the Mitsui shop in Suruga ' kind=active volume=COVERED sentences=43 active=5 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Met Your support helps sustain the Museum's extraordinary level of programming, conservation, and research, calling 212-570-3753, $10/mo $25"
+    [LOCAL-489] Stop 3 needs more material (eventless): 23 passages, 3379 chars, verdict=COVERED
+      [LOCAL-489] +1 from: "A sketch of the Mitsui shop in Suruga street in Edo" "The Metropolitan Museum
+      [LOCAL-498] after replenishment: kind active -> active, 3379 -> 3536 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Met Your support helps sustain the Museum's extraordinary level of programming, conservation, and research, ca"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 3 'A sketch of the Mitsui shop in Suruga street in Ed': queries=3 serp_results=23 snippets=24
+      → depicts · Mitsui Echigoya · Mount Fuji · digital representation of · A sketch of the Mitsui shop in Suruga street in Edo
+      → A sketch of the Mitsui shop in Suruga street in Edo. woodblock printing by Katsushika Hokusai. Kōto Suruga-chō Mitsui-mi
+
+  [LOCAL-410] SERP search complete: 12 queries, 81 results, 81 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 81 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Bacchante in a Landscape: serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+    Allegory of the Catholic Faith: serp_results=19 elements_extracted=- beats_injected=- (measured post-generation)
+    A sketch of the Mitsui shop in Suruga street in Ed: serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 30 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Bacchante in a Landscape' has 30 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(14) (6 high-confidence) — stop will be labelled aloud
+      [high] The painting 'Bacchante in a Landscape' was created by Camille Corot, a French artist born in Paris in 1796 an
+      [high] The painting was created between 1865 and 1870.
+      [high] The medium used for 'Bacchante in a Landscape' is oil on canvas.
+      [high] The dimensions of the painting are 30.8 x 61.5 cm.
+      [high] The painting is part of the H. O. Havemeyer Collection and was bequeathed to the museum by Mrs. H. O. Havemeye
+      [high] The painting is currently located in the European Paintings section of The Metropolitan Museum of Art.
+  [D534] Stop 2 has 27 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Allegory of the Catholic Faith' has 27 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(14) (6 high-confidence) — stop will be labelled aloud
+      [high] The painting 'Allegory of the Catholic Faith' was created by Johannes Vermeer around 1670–72.
+      [high] The medium of the painting is oil on canvas.
+      [high] The dimensions of the painting are 114.3 x 88.9 cm.
+      [high] The painting is housed in the Metropolitan Museum of Art in New York City.
+      [high] The painting presents an allegory of Vermeer's adopted religion, Catholicism, and was likely made for a privat
+      [high] Vermeer derived some components of the painting from the 1644 Dutch translation of Ceasar Ripa's 'Iconologia'.
+  [D534] Stop 3 has 24 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'A sketch of the Mitsui shop in Suruga street in Ed' has 24 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via openai+web(16) (4 high-confidence) — stop will be labelled aloud
+      [high] The sketch is a woodblock print by Katsushika Hokusai.
+      [high] The print is titled 'A sketch of the Mitsui shop in Suruga street in Edo'.
+      [high] The print is part of the series 'Thirty-Six Views of Mount Fuji'.
+      [high] The print depicts the Mitsui shop in Suruga Street, Edo, with Mount Fuji in the background.
+  [D533] Knowledge fallback filled 3 starved stop(s)
+[TIMING] phase=external_lookups elapsed=38.9s cumulative=224.5s
+
+Generating description for Stop 1: Bacchante in a Landscape by , ...
+
+Generating description for Stop 2: Allegory of the Catholic Faith by , ...
+
+Generating description for Stop 3: A sketch of the Mitsui shop in Suruga street in Edo by , ...
+  [LOCAL-381] stop='A sketch of the Mitsui shop in Suruga street in Edo' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Galerie, Pollock, Cameron Stone
+  [LOCAL-411] Stop 3 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified'), ('36 Views of Mount Fuji by Hokusai | PDF', 11, 'unverified'), ('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 18 required names (no snippet evidence): ['Galerie', 'Pollock', 'Cameron Stone', 'Berry', 'Rockefeller', 'Jayne Wrightsman', 'Robert Lehman', 'Manhattan', 'Bernini', 'Southport', 'Jezebel', 'Din', 'Cypriot', 'Benin', 'Bishop', 'Guire', 'Beyer Blinder Belle', 'Pembroke']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13288 after=28371 (+15083 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28371)
+  [LOCAL-381] stop='Bacchante in a Landscape' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Met, Picasso, Beckmann
+  [LOCAL-411] Stop 1 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Bacchante in a Landscape', 16, ''), ('Bacchante in a Landscape', 11, ''), ('File:Bacchante in a Landscape MET ep29.100.598.R.j', 9, 'tier1')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 18 required names (no snippet evidence): ['Picasso', 'Beckmann', 'American', 'Blasio', 'Tang', 'Montebello', 'Ivins', 'Lauder', 'Hoving', 'Blount', 'Great', 'Evans', 'Hess', 'Michael Gross', 'Moody', 'Diker', 'York', 'Library']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12533 after=29247 (+16714 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29247)
+  [LOCAL-381] stop='Allegory of the Catholic Faith' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Wrightsman, Johns, Weiss
+  [LOCAL-411] Stop 2 snippet ranking: input=33 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Johannes Vermeer - Allegory of the Catholic Faith', 17, ''), ('Where Is Allegory of the Catholic Faith? Museum Lo', 17, ''), ('Allegory of the Catholic Faith', 11, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 33 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 18 required names (no snippet evidence): ['Wrightsman', 'Johns', 'Weiss', 'Steichen', 'British Modernism', 'Charlotte Weber', 'Dillon', 'Clare', 'Rodin', 'Eilenberg', 'Stieglitz', 'Qatar', 'Marquand', 'Velázquez', 'Botticelli', 'Dick', 'Wing', 'Publica']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12837 after=29130 (+16293 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29130)
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0037
+  [LOCAL-490] Stop 2 story pass: ok=False (only 2 sentence(s); the bar is 3), $0.0043
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0047
+    story: "Camille Corot, a French artist born in Paris in 1796, was known for his landscape paintings. Between 1865 and 1870, he created 'Bacchante in a Landsca"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-569/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0361 (7597 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=4 words=255
+Stop 2 description word count: 255 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-569] Stop 2: KEEP-BEST ship — last attempt is best (story_count=4 words=255)
+Stop 3 API call cost: $0.0358 (7531 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=5 words=265
+Stop 3 description word count: 265 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-569] Stop 3: KEEP-BEST ship — last attempt is best (story_count=5 words=265)
+Stop 1 API call cost: $0.0369 (7762 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=4 words=293
+Stop 1 description word count: 293 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-569] Stop 1: KEEP-BEST ship — last attempt is best (story_count=4 words=293)
+  [LOCAL-388] PRE-GATE stop='Bacchante in a Landscape' beats_assigned=19 beats_in_output=1 dropped=['Picasso', 'Beckmann', 'American', 'Blasio', 'Tang', 'Montebello', 'Ivins', 'Lauder', 'Hoving', 'Blount', 'Great', 'Evans', 'Hess', 'Michael Gross', 'Moody', 'Diker', 'York', 'Library']
+  [LOCAL-388] PRE-GATE stop='Allegory of the Catholic Faith' beats_assigned=18 beats_in_output=3 dropped=['Steichen', 'British Modernism', 'Charlotte Weber', 'Dillon', 'Clare', 'Rodin', 'Eilenberg', 'Stieglitz', 'Qatar', 'Marquand', 'Velázquez', 'Botticelli', 'Dick', 'Wing', 'Publica']
+  [LOCAL-388] PRE-GATE stop='A sketch of the Mitsui shop in Suruga street in Edo' beats_assigned=18 beats_in_output=2 dropped=['Galerie', 'Pollock', 'Cameron Stone', 'Berry', 'Jayne Wrightsman', 'Robert Lehman', 'Manhattan', 'Bernini', 'Southport', 'Jezebel', 'Cypriot', 'Benin', 'Bishop', 'Guire', 'Beyer Blinder Belle', 'Pembroke']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Bacchante in a Landscape': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Allegory of the Catholic Faith': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='A sketch of the Mitsui shop in Suruga street in Edo': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.003162 (input=12917, output=2041)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✓ PASS stop='Bacchante in a Landscape': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='in 1796' ← https://www.metmuseum.org/art/collection/search/435965
+        claim='Camille Corot, a French artist born in Paris in' ← https://www.metmuseum.org/art/collection/search/435965
+    ✗ FAIL stop='Allegory of the Catholic Faith': claims=3, sourced=2, unsourced=1, contradicted=0
+      → UNSOURCED: 'a Catholic patron' (location_descriptor) — no snippet contains this assertion
+      evidence (2 sourced claims):
+        claim='in 1931' ← https://en.wikipedia.org/wiki/The_Allegory_of_Faith
+        claim='Collection bequeathed to the museum in 1931' ← https://news.artnet.com/art-world/met-receives-80-donation-m
+    ✗ FAIL stop='A sketch of the Mitsui shop in Suruga street in Edo': claims=1, sourced=0, unsourced=1, contradicted=0
+      → UNSOURCED: 'published by Nishimuraya Yohachi,' (attribution) — no snippet contains this assertion
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'Allegory of the Catholic Faith':
+      ✗ "The decision to create such an explicit allegory was daring in Protestant Holland, suggesting it was"
+    [LOCAL-423] Stripped 1 sentence(s) from 'A sketch of the Mitsui shop in Suruga street in Edo':
+      ✗ "The print was published by Nishimuraya Yohachi, who was known for supporting works that celebrated J"
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 3 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0018 (2276 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Bacchante in a Landscape': 1 rewritten, 0 deleted
+  [LOCAL-255] Stop 3 'A sketch of the Mitsui shop in': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 2 rewritten, 0 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 5
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 4
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Mitsui Store' reason='No concrete link between the Mitsui Store and the mentioned individuals or works.' in: "This woodblock print, created between 1831 and 1834, captures a lively scene at the Mitsui Store at "
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Six Views' reason='No concrete link between "Six Views" and the Mitsui shop is provided.' in: "This woodblock print, created between 1831 and 1834, captures a lively scene at the Mitsui Store at "
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Pierpont Morgan' reason='No concrete link to the Mitsui shop is provided.' in: "This woodblock print, created between 1831 and 1834, captures a lively scene at the Mitsui Store at "
+    [LOCAL-472] UNGROUNDED entity stop='A sketch of the Mitsui shop in Suruga street in Edo' entity='Thirty-Six Views of Mount Fuji,' reason='It does not specify how "Thirty-Six Views of Mount Fuji" relates to the Mitsui shop.' in: "This woodblock print, created between 1831 and 1834, captures a lively scene at the Mitsui Store at "
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/29)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 8
+    Glossed (composed): 2
+    Suppressed (already explained): 1
+    Degraded (name dropped): 3
+    Guard failures: 0
+    Known (skipped): 2
+    Triage: 1283 tokens, $0.0003, 3.7s
+    Gloss: 775 tokens, $0.0002, 2.8s
+    Compose: 1497 tokens, $0.0002, 1.8s
+    Total added cost: $0.0007
+    Stops affected: 2
+    Glosses applied:
+      • Bacchus → "the Roman god of wine and revelry" [source: model]
+      • Friedsam Collection → SUPPRESSED (already explained)
+      • Six Views → DEGRADED (name dropped)
+      • Yohachi → DEGRADED (name dropped)
+      • Pierpont Morgan → "an influential American banker and financier" [source: model]
+      • Asian → DEGRADED (name dropped)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 35
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'The Metropolitan Museum of Art'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 1
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 1
+    Stops affected: 1
+    [3] DELETED: 'This woodblock' in: This woodblock print, created between 1831 and 1834, captures a lively scene at 
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'Bacchante in a Landscape' (index 62) — allowance 5 -> 7 sentences on regeneration, story currently 4 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Bacchante in a Landscape': the longest run (4 sentences, Landscape) has agency=1 stakes=0 — someone is described, but nothing is risked, 
+    stop 2 'Allegory of the Catholic Faith': the longest run (4 sentences, Catholic Faith) has agency=0 stakes=0 — someone is described, but nothing is ris
+    stop 3 'A sketch of the Mitsui shop in Suruga ': the longest run (4 sentences, Hokusai) has agency=0 stakes=0 — someone is described, but nothing is risked, re
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Allegory of the Catholic Faith' (index 43)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Bacchante in a Landscape' — 273w → 222w after gates, 4 sentence(s) removed
+    removed: "The painting is an oil on canvas, measuring approximately 12 1/8 by 24 1/4 inches."
+    removed: "The Bacchante, a follower of Bacchus from Roman mythology, is depicted as part of the landscape itse"
+    removed: "This choice to integrate mythology into a serene landscape allows the viewer to experience an immers"
+    removed: "Corot's technique during this period became more spontaneous and exploratory, characterized by a lig"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Bacchante in a Landscape is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'Allegory of the Catholic Faith' — 222w → 164w after gates, 3 sentence(s) removed
+    removed: "As you ponder this piece, consider the broader mission of the museum to include global cultures, a v"
+    removed: "Rockefeller, whose influence you first encountered with Bacchante in a Landscape."
+    removed: "This ongoing commitment to diverse cultural narratives continues to shape the Met's evolution, invit"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Allegory of the Catholic Faith is held at The Metropolitan Museum of Art."
+
+  [LOCAL-474] PHASE 5.17: retry 'A sketch of the Mitsui shop in Suruga street' — 246w → 169w after gates, 8 sentence(s) removed
+    removed: "This woodblock print, created between 1831 and 1834, captures a lively scene at the Mitsui Store at "
+    removed: "Hokusai's mastery is evident in his use of perspective, which draws the viewer’s eye from the animat"
+    removed: "This technique not only highlights the contrast between human activity and natural grandeur but also"
+    removed: "Yohachi's decision to publish this piece as part of Hokusai's renowned series, "Thirty-Six Views of "
+    removed: "Interestingly, the Met’s extensive Asian collections owe much to early 20th-century donors like J."
+    removed: "Pierpont Morgan and Nelson A."
+    removed: "Rockefeller, in particular, contributed significantly to the diversity of the collection, providing "
+    removed: "In this gallery, the influence of these patrons is palpable, weaving a narrative that connects Edo’s"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "A sketch of the Mitsui shop in Suruga street in Edo is held at The Metropolitan Museum of Art."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: Bacchante in a Landscape by , ...
+
+Generating description for Stop 2: Allegory of the Catholic Faith by , ...
+
+Generating description for Stop 3: A sketch of the Mitsui shop in Suruga street in Edo by , ...
+  [LOCAL-381] stop='A sketch of the Mitsui shop in Suruga street in Edo' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Galerie, Pollock, Cameron Stone
+  [LOCAL-381] stop='Allegory of the Catholic Faith' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Wrightsman, Johns, Weiss
+  [LOCAL-411] Stop 2 snippet ranking: input=33 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Johannes Vermeer - Allegory of the Catholic Faith', 17, ''), ('Where Is Allegory of the Catholic Faith? Museum Lo', 17, ''), ('Allegory of the Catholic Faith', 11, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 33 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 18 required names (no snippet evidence): ['Wrightsman', 'Johns', 'Weiss', 'Steichen', 'British Modernism', 'Charlotte Weber', 'Dillon', 'Clare', 'Rodin', 'Eilenberg', 'Stieglitz', 'Qatar', 'Marquand', 'Velázquez', 'Botticelli', 'Dick', 'Wing', 'Publica']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12837 after=29130 (+16293 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29130)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-411] Stop 3 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified'), ('36 Views of Mount Fuji by Hokusai | PDF', 11, 'unverified'), ('A sketch of the Mitsui shop in Suruga street in Ed', 11, 'unverified')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 18 required names (no snippet evidence): ['Galerie', 'Pollock', 'Cameron Stone', 'Berry', 'Rockefeller', 'Jayne Wrightsman', 'Robert Lehman', 'Manhattan', 'Bernini', 'Southport', 'Jezebel', 'Din', 'Cypriot', 'Benin', 'Bishop', 'Guire', 'Beyer Blinder Belle', 'Pembroke']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13288 after=28371 (+15083 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28371)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Bacchante in a Landscape' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Met, Picasso, Beckmann
+  [LOCAL-411] Stop 1 snippet ranking: input=36 bio_rejected=0 tier3_demoted=0 market_demoted=1 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Bacchante in a Landscape', 16, ''), ('Bacchante in a Landscape', 11, ''), ('File:Bacchante in a Landscape MET ep29.100.598.R.j', 9, 'tier1')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 36 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 18 required names (no snippet evidence): ['Picasso', 'Beckmann', 'American', 'Blasio', 'Tang', 'Montebello', 'Ivins', 'Lauder', 'Hoving', 'Blount', 'Great', 'Evans', 'Hess', 'Michael Gross', 'Moody', 'Diker', 'York', 'Library']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12533 after=29247 (+16714 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29247)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0055
+    story: "In 1931, The Metropolitan Museum of Art acquired Johannes Vermeer's 'Allegory of the Catholic Faith,' a painting created around 1670–72. This acquisit"
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0059
+    story: "The sketch of the Mitsui shop in Suruga street in Edo once resided in Japan, capturing a lively scene of Edo period commerce. Over time, this woodbloc"
+  [LOCAL-490] Stop 1 story pass: ok=True (5 sentences), $0.0060
+    story: "Camille Corot created the painting 'Bacchante in a Landscape' between 1865 and 1870. During this period, Corot was already an established artist, havi"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-569/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0375 (7901 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=4 words=259
+Stop 2 description word count: 259 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-569] Stop 2: KEEP-BEST ship — last attempt is best (story_count=4 words=259)
+Stop 1 API call cost: $0.0388 (8163 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=3 words=306
+Stop 1 description word count: 306 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['invites the viewer', 'a testament to']
+  [LOCAL-569] Stop 1: KEEP-BEST ship — last attempt is best (story_count=3 words=306)
+Stop 3 API call cost: $0.0375 (7901 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=3 words=290
+Stop 3 description word count: 290 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-569] Stop 3: KEEP-BEST ship — last attempt is best (story_count=3 words=290)
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.9s for 3 stop(s) at max_workers=3
+    [D498] step 7c judged on the index, not on length: 62 -> 61, accepted=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 289w (was 169w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 1 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 1.7s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.1s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 6.1s (attempt 3, 25s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 15.8s (attempt 4, 18s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 1.9s (attempt 1, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 5.0s (attempt 2, 26s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — retrying in 10.2s (attempt 3, 21s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-lithograph — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/metmuseum/videos/insider-insightsmaking-prints-and-drawings/1660378830826671/ (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 1.4s (attempt 1, 29s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 3.7s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 6.8s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — retrying in 13.1s (attempt 4, 16s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/materials-and-techniques-printmaking-screenprint — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=VsgC8OCbr80 (attempt 1)
+  [LOCAL-427] HTTP 200 from https://gelpress.com/blogs/art-and-inspiration/printmaking-art-monoprinting?srsltid=AU7gw4VHdbp5CeMlsOB8CZrnlO4cDCLMXeruoW_3h8EyP9Rp4n_IxKhR (attempt 1)
+  [LOCAL-459] R5: Fetched 1218 chars from https://gelpress.com/blogs/art-and-inspiration/pri
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 2.0s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 3.1s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 6.2s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — retrying in 11.2s (attempt 4, 18s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/press-releases/chuck-close-prints--process-and-collaboration-2003-exhibitions — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://blog.dma.org/tag/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1736 chars from https://blog.dma.org/tag/printmaking/
+  [D512] verb discovery: query='The Metropolitan Museum of Art printmaking process how it is mad' -> 3 new verb(s): recognized, coated, covered
+  [D512] _AGENCY_VERB widened by 3 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: Bacchante in a Landscape
+    [D501] no object record for 'Bacchante in a Landscape' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Allegory of the Catholic Faith
+    [D501] no object record for 'Allegory of the Catholic Faith' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: A sketch of the Mitsui shop in Suruga street
+    [D501] no object record for 'A sketch of the Mitsui shop in Suruga street' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/3 stops got a gated story (0 with multiple stories), ~$0.072, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Bacchante in a Landscape                   62    53    38    50
+     2  Allegory of the Catholic Faith             43    35    13    57
+     3  A sketch of the Mitsui shop in Suruga st   56    24    28   100
+    [LOCAL-485] index mean 53.7 over 3 stop(s), range 43-62
+    [LOCAL-485] weakest: 'Allegory of the Catholic Faith' at 43
+[TIMING] phase=story_first elapsed=185.7s cumulative=410.1s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 4 facts found {'architecture': 3, 'founding': 1}
+  [LOCAL-382] Thesis block injected into prolog (338 chars)
+  [R2] Prolog saved for Stop 1 (94 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 94 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 94 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 186
+    Words after:  172
+    Delta: -14
+    Stops affected: 1/3
+    Deletions (1):
+      [Stop 3][R10_UNFULFILLED_PROMISE] "This angle captures the intricate details of daily life and the shop’s architectural elegance."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 3.8s, $0.0079, 1211 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Bacchante in a Landscape] (reversal): Between 1865 and 1870, he created "Bacchante in a Landscape," a painting that ma...
+      [Allegory of the Catholic Faith] (cause): It stands as one of the most programmatic works in his oeuvre, embodying the the...
+      [A sketch of the Mitsui shop in Suruga street in Edo] (cause): This sketch’s journey from Japan to its permanent home at The Metropolitan Museu...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0033 (546 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (41 words):
+      "You will soon see "Bacchante in a Landscape," a departure from his earlier works, and "Allegory of the Catholic Faith," embodying Counter-Reformation tenets, before encountering "A sketch of the Mitsui shop in Suruga street in Edo," a tale of cultural exchange."
+      Stops referenced: 3
+    Part 4 total cost: $0.0033
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through The Metropolitan Museum of Art — next is Al...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in The Metropolitan Museum of Art: A sketch ...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.2s, $0.0026, 439 tokens
+  [LOCAL-280] Recap built: 25 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Bacchante in a Landscape] (reversal): "Between 1865 and 1870, he created "Bacchante in a Landscape," a painting that ma..."
+      → composed: "Bacchante in a Landscape, painted between 1865 and 1870"
+    [Allegory of the Catholic Faith] (cause): "It stands as one of the most programmatic works in his oeuvre, embodying the the..."
+      → composed: "Allegory of the Catholic Faith, a programmatic work embodying Counter-Reformation tenets"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Bacchante in a Landscape, painted between 1865 and 1870 and Allegory of the Catholic Faith, a programmatic work embodying Counter-Reformation tenets."
+  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: nothing verified — no tour offer, no Treat Page
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer fallback (no verification passed)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 2 (1000/york) — sentence not in stop block
+  [D533] REPEATED FACT kept in stop 3 (1000/york) — sentence not in stop block
+  [D533] 0 repeated fact(s) removed, 2 kept
+  [D533] Person-year role guard: no mismatches (91574 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 0
+    Dropped: 1
+    AUDIT: admission | Free admission | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 1 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 5 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to explore The Metropolitan Museum of Art in New York, NY. Encounter the exquisite wor..."
+  [2] "From Bacchante in a Landscape to A sketch of the Mitsui shop in Suruga street in Edo, you have follo..."
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='Bacchante in a Landscape' beats_assigned=19 beats_in_output=2 dropped=['Picasso', 'Beckmann', 'American', 'Blasio', 'Tang', 'Montebello', 'Ivins', 'Lauder', 'Hoving', 'Blount', 'Great', 'Evans', 'Hess', 'Michael Gross', 'Moody', 'Diker', 'Library'] causes=[Picasso=never_written, Beckmann=never_written, American=never_written, Blasio=never_written, Tang=never_written, Montebello=never_written, Ivins=never_written, Lauder=never_written, Hoving=never_written, Blount=never_written, Great=never_written, Evans=never_written, Hess=never_written, Michael Gross=never_written, Moody=never_written, Diker=never_written, Library=never_written]
+    stop='Allegory of the Catholic Faith' beats_assigned=18 beats_in_output=4 dropped=['Steichen', 'British Modernism', 'Charlotte Weber', 'Dillon', 'Clare', 'Rodin', 'Eilenberg', 'Stieglitz', 'Qatar', 'Marquand', 'Velázquez', 'Botticelli', 'Dick', 'Publica'] causes=[Steichen=never_written, British Modernism=never_written, Charlotte Weber=never_written, Dillon=never_written, Clare=never_written, Rodin=never_written, Eilenberg=never_written, Stieglitz=never_written, Qatar=never_written, Marquand=never_written, Velázquez=never_written, Botticelli=never_written, Dick=never_written, Publica=never_written]
+    stop='A sketch of the Mitsui shop in Suruga street in Edo' beats_assigned=18 beats_in_output=3 dropped=['Galerie', 'Pollock', 'Berry', 'Jayne Wrightsman', 'Robert Lehman', 'Manhattan', 'Bernini', 'Southport', 'Jezebel', 'Cypriot', 'Benin', 'Bishop', 'Guire', 'Beyer Blinder Belle', 'Pembroke'] causes=[Galerie=never_written, Pollock=never_written, Berry=never_written, Jayne Wrightsman=never_written, Robert Lehman=never_written, Manhattan=never_written, Bernini=never_written, Southport=never_written, Jezebel=never_written, Cypriot=never_written, Benin=never_written, Bishop=never_written, Guire=never_written, Beyer Blinder Belle=never_written, Pembroke=never_written]
+
+=== Word Count Statistics ===
+Stop 1: Bacchante in a Landscape - 293 words
+Stop 2: Allegory of the Catholic Faith - 255 words
+Stop 3: A sketch of the Mitsui shop in Suruga street in Edo - 265 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (7718 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['dangling_reference']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 1 dangling pronoun reference(s), e.g. 'She is adorned in a blue robe, resting her foot upon a globe'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 2) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1080 tokens, $0.005130 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference'] -> ['thin']
+  [LOCAL-540] retry removed: ['dangling_reference']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+
+Total API cost: $0.2467 (32466 tokens)
+Grounding:      $0.0000 (0 requests)
+Tour total:     $0.2467
+Provenance:     2/39 factual sentences sourced, 37 unsourced (2 corpus, 0 grounded, 37 parametric)
+CACHE STORE: The Metropolitan Museum of Art, New York, NY / museum / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_B.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Met_B_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: The Metropolitan Museum of Art, New York, NY
+Tour-Category: museum
+
+Stop 1: Bacchante in a Landscape
+
+Address: 1000 5th Ave, New York, NY 10028
+
+Coordinates: 40.7794, -73.9632
+
+Orientation: You are about to explore The Metropolitan Museum of Art in New York, NY. Encounter the exquisite works that embody Rockefeller's Influence on the Met's Collections: Camille Corot's "Bacchante in a Landscape," Vermeer's "Allegory of the Catholic Faith," and Hokusai's "A sketch o...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Bacchante in a Landscape: serp_results=23 snippets_injected=30 beats_in_delivered_text=0
+    Allegory of the Catholic Faith: serp_results=19 snippets_injected=27 beats_in_delivered_text=0
+    A sketch of the Mitsui shop in Suruga street in Ed: serp_results=23 snippets_injected=24 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=10.3s cumulative=420.4s
+[TIMING] phase=verification elapsed=0.0s cumulative=420.4s
+[TIMING] TOTAL wall=420.4s phases: story_first=185.7s, poi_selection=153.2s, external_lookups=38.9s, fact_sheets=29.8s, packing=10.3s, intent=2.4s, narration=0.1s, verification=0.0s

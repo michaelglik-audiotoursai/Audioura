@@ -1,0 +1,1233 @@
+{
+  "arms": {
+    "A": {},
+    "B": {
+      "STORY_RETRY_KEEP_BEST": "1"
+    },
+    "C": {
+      "STORY_RETRY_KEEP_BEST": "1",
+      "STORY_RETRY_EARLY_STOP": "1"
+    }
+  },
+  "museums": {
+    "Palais": "Palais Lascaris, Nice, France",
+    "MFA": "Museum of Fine Arts, Boston, MA",
+    "Gardner": "Isabella Stewart Gardner Museum, Boston, MA"
+  },
+  "tour_type": "museum",
+  "stops": 3,
+  "openai_budget_usd": 6.0,
+  "gemini": "off (GEMINI_API_KEY removed)",
+  "cells": {
+    "Palais_A": {
+      "cell": "Palais_A",
+      "arm": "A",
+      "museum": "Palais",
+      "location": "Palais Lascaris, Nice, France",
+      "flags": {},
+      "ok": true,
+      "error": null,
+      "wall_s": 263.5,
+      "chars": 6403,
+      "writer_llm_calls": 81,
+      "writer_attempts_logged": 18,
+      "breakdown_llm_usd": 0.516412,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.516412,
+      "total_cost_llm_usd": 0.516412,
+      "shipped_story_count_by_stop": {
+        "1": 3,
+        "2": 0,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 287
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 311
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 265
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 4,
+            "words": 239
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 307
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 253
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 277
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 3,
+            "words": 247
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 291
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 4,
+            "words": 273
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 325
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 271
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 270
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 282
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 0,
+            "words": 258
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 263
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 265
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 314
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [],
+      "story_retries": 12,
+      "score_tour": {
+        "defects": [],
+        "defect_detail": {},
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 3,
+          "dates": 16,
+          "named_people": 2,
+          "chars": 6403
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T01:48:35"
+    },
+    "MFA_A": {
+      "cell": "MFA_A",
+      "arm": "A",
+      "museum": "MFA",
+      "location": "Museum of Fine Arts, Boston, MA",
+      "flags": {},
+      "ok": true,
+      "error": null,
+      "wall_s": 405.2,
+      "chars": 6440,
+      "writer_llm_calls": 96,
+      "writer_attempts_logged": 19,
+      "breakdown_llm_usd": 0.545042,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.545042,
+      "total_cost_llm_usd": 0.545042,
+      "shipped_story_count_by_stop": {
+        "1": 2,
+        "2": 4,
+        "3": 2
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 333
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 243
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 238
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 0,
+            "words": 243
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 234
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 284
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 251
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 4,
+            "words": 261
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 279
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 345
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 309
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 272
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 266
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 3,
+            "words": 263
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 302
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 299
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 240
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 259
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 261
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [],
+      "story_retries": 12,
+      "score_tour": {
+        "defects": [],
+        "defect_detail": {},
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 3,
+          "dates": 6,
+          "named_people": 3,
+          "chars": 6440
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T01:55:28"
+    },
+    "Met_A": {
+      "cell": "Met_A",
+      "arm": "A",
+      "museum": "Met",
+      "location": "The Metropolitan Museum of Art, New York, NY",
+      "flags": {},
+      "ok": true,
+      "error": null,
+      "wall_s": 486.5,
+      "chars": 7893,
+      "writer_llm_calls": 86,
+      "writer_attempts_logged": 7,
+      "breakdown_llm_usd": 0.234309,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.234309,
+      "total_cost_llm_usd": 0.234309,
+      "shipped_story_count_by_stop": {
+        "1": 4,
+        "2": 3,
+        "3": 4
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 5,
+            "words": 298
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 289
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 249
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 293
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 261
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 4,
+            "words": 256
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 289
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [],
+      "story_retries": 1,
+      "score_tour": {
+        "defects": [
+          "thin",
+          "offsite_entity",
+          "unsourced_person_event"
+        ],
+        "defect_detail": {
+          "thin": "2/3 stops delivered",
+          "offsite_entity": "1 place(s) framed as part of the tour but not a stop/venue, e.g. \"Bacchante\" in: This tour covered Bacchante",
+          "unsourced_person_event": "1 unsourced person-event(s); \"Camille Corot\" placed here in 1969 with no source: \"Encounter a woodcut print by Katsushika Hokusai depicting the Mitsui Store in Edo, followed by Camille Corot's \"Bacchant\""
+        },
+        "metrics": {
+          "stops_delivered": 2,
+          "stops_requested": 3,
+          "dates": 10,
+          "named_people": 4,
+          "chars": 7893
+        },
+        "clean": false
+      },
+      "timestamp": "2026-10-03T02:04:17"
+    },
+    "Palais_B": {
+      "cell": "Palais_B",
+      "arm": "B",
+      "museum": "Palais",
+      "location": "Palais Lascaris, Nice, France",
+      "flags": {
+        "STORY_RETRY_KEEP_BEST": "1"
+      },
+      "ok": true,
+      "error": null,
+      "wall_s": 280.3,
+      "chars": 7210,
+      "writer_llm_calls": 84,
+      "writer_attempts_logged": 22,
+      "breakdown_llm_usd": 0.611121,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.611121,
+      "total_cost_llm_usd": 0.611121,
+      "shipped_story_count_by_stop": {
+        "1": 0,
+        "2": 3,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 255
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 249
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 263
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 3,
+            "words": 251
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 298
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 255
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 237
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 240
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 0,
+            "words": 230
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 329
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 284
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 281
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 276
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 3,
+            "words": 261
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 281
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 283
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 3,
+            "words": 240
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 286
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 253
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 258
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 2,
+            "words": 281
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 3,
+            "words": 291
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [
+        1,
+        2,
+        3
+      ],
+      "story_retries": 16,
+      "score_tour": {
+        "defects": [],
+        "defect_detail": {},
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 3,
+          "dates": 17,
+          "named_people": 3,
+          "chars": 7210
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T02:09:04"
+    },
+    "MFA_B": {
+      "cell": "MFA_B",
+      "arm": "B",
+      "museum": "MFA",
+      "location": "Museum of Fine Arts, Boston, MA",
+      "flags": {
+        "STORY_RETRY_KEEP_BEST": "1"
+      },
+      "ok": true,
+      "error": null,
+      "wall_s": 390.5,
+      "chars": 7190,
+      "writer_llm_calls": 103,
+      "writer_attempts_logged": 15,
+      "breakdown_llm_usd": 0.439922,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.439922,
+      "total_cost_llm_usd": 0.439922,
+      "shipped_story_count_by_stop": {
+        "1": 3,
+        "2": 1,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 263
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 285
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 252
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 194
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 3,
+            "words": 229
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 322
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 247
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 288
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 274
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 270
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 1,
+            "words": 250
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 329
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 294
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 249
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 3,
+            "words": 271
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [
+        1,
+        2,
+        3
+      ],
+      "story_retries": 9,
+      "score_tour": {
+        "defects": [],
+        "defect_detail": {},
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 3,
+          "dates": 6,
+          "named_people": 3,
+          "chars": 7190
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T02:15:52"
+    },
+    "Met_B": {
+      "cell": "Met_B",
+      "arm": "B",
+      "museum": "Met",
+      "location": "The Metropolitan Museum of Art, New York, NY",
+      "flags": {
+        "STORY_RETRY_KEEP_BEST": "1"
+      },
+      "ok": true,
+      "error": null,
+      "wall_s": 420.4,
+      "chars": 7720,
+      "writer_llm_calls": 90,
+      "writer_attempts_logged": 6,
+      "breakdown_llm_usd": 0.2138,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.2138,
+      "total_cost_llm_usd": 0.2138,
+      "shipped_story_count_by_stop": {
+        "1": 3,
+        "2": 4,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 293
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 306
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 255
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 259
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 5,
+            "words": 265
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 290
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [
+        1,
+        2,
+        3
+      ],
+      "story_retries": 0,
+      "score_tour": {
+        "defects": [
+          "thin"
+        ],
+        "defect_detail": {
+          "thin": "2/3 stops delivered"
+        },
+        "metrics": {
+          "stops_delivered": 2,
+          "stops_requested": 3,
+          "dates": 11,
+          "named_people": 2,
+          "chars": 7720
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T02:23:03"
+    },
+    "Palais_C": {
+      "cell": "Palais_C",
+      "arm": "C",
+      "museum": "Palais",
+      "location": "Palais Lascaris, Nice, France",
+      "flags": {
+        "STORY_RETRY_KEEP_BEST": "1",
+        "STORY_RETRY_EARLY_STOP": "1"
+      },
+      "ok": true,
+      "error": null,
+      "wall_s": 225.8,
+      "chars": 5911,
+      "writer_llm_calls": 89,
+      "writer_attempts_logged": 12,
+      "breakdown_llm_usd": 0.34558,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.34558,
+      "total_cost_llm_usd": 0.34558,
+      "shipped_story_count_by_stop": {
+        "1": 1,
+        "2": 2,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 263
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 231
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 307
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 289
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 286
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 222
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 268
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 245
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 295
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 270
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 295
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 237
+          }
+        ]
+      },
+      "early_stops": [
+        1,
+        2,
+        3
+      ],
+      "keep_best_ships": [
+        1,
+        2,
+        3
+      ],
+      "story_retries": 6,
+      "score_tour": {
+        "defects": [],
+        "defect_detail": {},
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 3,
+          "dates": 15,
+          "named_people": 2,
+          "chars": 5911
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T02:26:53"
+    },
+    "MFA_C": {
+      "cell": "MFA_C",
+      "arm": "C",
+      "museum": "MFA",
+      "location": "Museum of Fine Arts, Boston, MA",
+      "flags": {
+        "STORY_RETRY_KEEP_BEST": "1",
+        "STORY_RETRY_EARLY_STOP": "1"
+      },
+      "ok": true,
+      "error": null,
+      "wall_s": 381.1,
+      "chars": 8155,
+      "writer_llm_calls": 96,
+      "writer_attempts_logged": 12,
+      "breakdown_llm_usd": 0.365652,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.365652,
+      "total_cost_llm_usd": 0.365652,
+      "shipped_story_count_by_stop": {
+        "1": 2,
+        "2": 3,
+        "3": 5
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 284
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 273
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 262
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 276
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 0,
+            "words": 204
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 309
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 299
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 296
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 322
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 250
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 332
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 5,
+            "words": 266
+          }
+        ]
+      },
+      "early_stops": [
+        1
+      ],
+      "keep_best_ships": [
+        1,
+        2,
+        3
+      ],
+      "story_retries": 6,
+      "score_tour": {
+        "defects": [
+          "unsourced_person_event"
+        ],
+        "defect_detail": {
+          "unsourced_person_event": "1 unsourced person-event(s); \"Paul Revere\" placed here in 1949 with no source: \"In 1949, the Museum of Fine Arts in Boston sought to acquire the Sons of Liberty Bowl, a significant piece created by Pa\""
+        },
+        "metrics": {
+          "stops_delivered": 3,
+          "stops_requested": 3,
+          "dates": 9,
+          "named_people": 6,
+          "chars": 8155
+        },
+        "clean": true
+      },
+      "timestamp": "2026-10-03T02:34:13"
+    },
+    "Met_C": {
+      "cell": "Met_C",
+      "arm": "C",
+      "museum": "Met",
+      "location": "The Metropolitan Museum of Art, New York, NY",
+      "flags": {
+        "STORY_RETRY_KEEP_BEST": "1",
+        "STORY_RETRY_EARLY_STOP": "1"
+      },
+      "ok": true,
+      "error": null,
+      "wall_s": 438.6,
+      "chars": 7212,
+      "writer_llm_calls": 100,
+      "writer_attempts_logged": 7,
+      "breakdown_llm_usd": 0.239517,
+      "search_usd": 0.0,
+      "grounding_usd": 0.0,
+      "tour_total_cost_usd": 0.239517,
+      "total_cost_llm_usd": 0.239517,
+      "shipped_story_count_by_stop": {
+        "1": 6,
+        "2": 3,
+        "3": 4
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 229
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 6,
+            "words": 260
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 275
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 5,
+            "words": 306
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 273
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 5,
+            "words": 314
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 301
+          }
+        ]
+      },
+      "early_stops": [],
+      "keep_best_ships": [
+        1,
+        2,
+        3
+      ],
+      "story_retries": 1,
+      "score_tour": {
+        "defects": [
+          "thin",
+          "dangling_reference",
+          "offsite_entity",
+          "unsourced_person_event"
+        ],
+        "defect_detail": {
+          "thin": "2/3 stops delivered",
+          "dangling_reference": "1 dangling pronoun reference(s), e.g. 'His bequest, much like the earlier donation from Nelson A. R'",
+          "offsite_entity": "1 place(s) framed as part of the tour but not a stop/venue, e.g. \"Allegory\" in: This tour covered Allegory",
+          "unsourced_person_event": "1 unsourced person-event(s); \"Nelson A. Rockefeller\" placed here in 1969 with no source: \"Delve into the Rockefeller Legacy at The Met, where Nelson A. Rockefeller's donation of over 3,000 pieces in 1969 and th\""
+        },
+        "metrics": {
+          "stops_delivered": 2,
+          "stops_requested": 3,
+          "dates": 9,
+          "named_people": 2,
+          "chars": 7212
+        },
+        "clean": false
+      },
+      "timestamp": "2026-10-03T02:41:36"
+    }
+  },
+  "audio_tours_before": {
+    "total": 198,
+    "non_test": 56
+  },
+  "audio_tours_after": {
+    "total": 198,
+    "non_test": 56
+  }
+}

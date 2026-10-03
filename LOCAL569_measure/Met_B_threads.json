@@ -1,0 +1,237 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "Rockefeller's Influence on the Met's Collections",
+      "description": "This theme explores how Nelson A. Rockefeller and the Rockefeller family significantly contributed to the Metropolitan Museum of Art's collections, particularly in the 20th century. It begins with Nelson A. Rockefeller's donation in 1969, turns with the opening of the Michael C. Rockefeller Wing in 1982, and pays off with the lasting impact of these contributions on the museum's global art collections.",
+      "supporting_elements": [
+        "se_001",
+        "se_003"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_001",
+        "se_003"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "Development of Cultural Collections at the Met",
+      "description": "This theme traces the development of the Metropolitan Museum of Art's cultural collections, influenced by key figures and events. It starts with the establishment of the Department of Far Eastern Art in 1915, turns with the contributions of donors like J. Pierpont Morgan, and concludes with the integration of diverse cultural artifacts, highlighting the museum's dedication to representing global art traditions.",
+      "supporting_elements": [
+        "se_004",
+        "se_007",
+        "se_008"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_004",
+        "se_007",
+        "se_008"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "The Met's Expansion in the 20th Century",
+      "description": "This theme examines the Metropolitan Museum of Art's expansion during the 20th century, marked by significant acquisitions and the establishment of new departments. It begins with the founding of the museum in 1870, turns with the opening of the arts of Africa, Oceania, and the Americas in 1982, and culminates in the museum's vast collection by 2000.",
+      "supporting_elements": [
+        "se_002",
+        "se_003",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_002",
+        "se_003",
+        "se_009"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "Rockefeller's Influence on the Met's Collections",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_003"
+          ],
+          "element_summaries": [
+            "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi"
+          ]
+        },
+        {
+          "name": "Development of Cultural Collections at the Met",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_004",
+            "se_007"
+          ],
+          "element_summaries": [
+            "The museum created the Department of Far Eastern Art in 1915, which was influenced by early donors l",
+            "The collection shows the cultural and artistic traditions of communities from across these regions."
+          ]
+        },
+        {
+          "name": "The Met's Expansion in the 20th Century",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi",
+            "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill"
+          ]
+        }
+      ],
+      "thread_angle": "[Rockefeller's Influence on the Met's Collections] (weight 0.33): In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[Development of Cultural Collections at the Met] (weight 0.33): The museum created the Department of Far Eastern Art in 1915, which was influenced by early donors l; The collection shows the cultural and artistic traditions of communities from across these regions.\n[The Met's Expansion in the 20th Century] (weight 0.33): The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi; In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "Rockefeller's Influence on the Met's Collections",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001"
+          ],
+          "element_summaries": [
+            "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p"
+          ]
+        },
+        {
+          "name": "Development of Cultural Collections at the Met",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_004",
+            "se_007",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The museum created the Department of Far Eastern Art in 1915, which was influenced by early donors l",
+            "The collection shows the cultural and artistic traditions of communities from across these regions.",
+            "The collection shows the cultural and artistic traditions of communities from across these regions a"
+          ]
+        },
+        {
+          "name": "The Met's Expansion in the 20th Century",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002"
+          ],
+          "element_summaries": [
+            "The Metropolitan Museum of Art was founded in 1870."
+          ]
+        }
+      ],
+      "thread_angle": "[Rockefeller's Influence on the Met's Collections] (weight 0.33): In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p\n[Development of Cultural Collections at the Met] (weight 0.33): The museum created the Department of Far Eastern Art in 1915, which was influenced by early donors l; The collection shows the cultural and artistic traditions of communities from across these regions.\n[The Met's Expansion in the 20th Century] (weight 0.33): The Metropolitan Museum of Art was founded in 1870.",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "Rockefeller's Influence on the Met's Collections"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_003",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "Rockefeller's Influence on the Met's Collections"
+        }
+      ]
+    },
+    {
+      "threads_active": [
+        {
+          "name": "Rockefeller's Influence on the Met's Collections",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003"
+          ],
+          "element_summaries": [
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi"
+          ]
+        },
+        {
+          "name": "Development of Cultural Collections at the Met",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_008"
+          ],
+          "element_summaries": [
+            "The collection shows the cultural and artistic traditions of communities from across these regions a"
+          ]
+        },
+        {
+          "name": "The Met's Expansion in the 20th Century",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002",
+            "se_003",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Metropolitan Museum of Art was founded in 1870.",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi",
+            "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill"
+          ]
+        }
+      ],
+      "thread_angle": "[Rockefeller's Influence on the Met's Collections] (weight 0.33): The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[Development of Cultural Collections at the Met] (weight 0.33): The collection shows the cultural and artistic traditions of communities from across these regions a\n[The Met's Expansion in the 20th Century] (weight 0.33): The Metropolitan Museum of Art was founded in 1870.; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "Rockefeller's Influence on the Met's Collections"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_003",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "Rockefeller's Influence on the Met's Collections"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "Rockefeller's Influence on the Met's Collections"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of Rockefeller's Influence on the Met's Collections. This theme explores how Nelson A. Rockefeller and the Rockefeller family significantly contributed to the Metropolitan Museum of Art's collections, particularly in the 20th century. It begins with Nel",
+  "epilog_payoff": "From Bacchante in a Landscape to A sketch of the Mitsui shop in Suruga street in Edo, you have followed the thread of Rockefeller's Influence on the Met's Collections."
+}

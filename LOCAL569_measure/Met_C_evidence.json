@@ -1,0 +1,301 @@
+{
+  "landmarks": {
+    "Bacchante in a Landscape": {
+      "status": "VERIFIED",
+      "canonical_title": "Bacchante in a Landscape",
+      "snippet": "the publisher George Palmer Putnam came on board as its founding superintendent. The artist Eastman Johnson acted as co-founder of the museum, as did landscape painter Frederic Edwin Church. Various other industrialists, artists, and scientists of the age served as co-founders, including Howard Potter, Salem",
+      "method": "canonical_title_match",
+      "qid": "Q18177494"
+    },
+    "Allegory of the Catholic Faith": {
+      "status": "VERIFIED",
+      "canonical_title": "Allegory of the Catholic Faith",
+      "snippet": "",
+      "method": "canonical_title_match",
+      "qid": "Q467359"
+    },
+    "A sketch of the Mitsui shop in Suruga street in Edo": {
+      "status": "VERIFIED",
+      "canonical_title": "A sketch of the Mitsui shop in Suruga street in Edo",
+      "snippet": "ale of a Monet and the construction of small scale galleries ultimately resulted in the acquisition of 220 European paintings (most of them plein-air sketches) from two collections. The Monet was used to purchase a half share of Wheelock \"Lock\" Whitney III's collection in 2003 (the remainder came as a pro",
+      "method": "canonical_title_match",
+      "qid": "Q18173406"
+    },
+    "A Girl Asleep": {
+      "status": "VERIFIED",
+      "canonical_title": "A Girl Asleep",
+      "snippet": "temporary political works on paper called \"Revolution, Resistance, and Activism\", held at the Met in 2021–22. It included such works as the Guerrilla Girls' famous poster Do women have to be naked to get into the Met. Museum?, 1987, Julie Torres' Super Diva!, 2020 (a posthumous image of Supreme Court Ju",
+      "method": "canonical_title_match",
+      "qid": "Q684935"
+    },
+    "An Oriental Family": {
+      "status": "VERIFIED",
+      "canonical_title": "An Oriental Family",
+      "snippet": "mainly 16th century, including woodblocks and many prints by Albrecht Dürer in 1919; Gothic woodcuts and Rembrandt etchings from the Felix M. Warburg family; James Clark McGuire's transformative bequest brought over seven hundred fifteenth-century woodcuts; prints by Rembrandt, Edgar Degas, and Mary Cassa",
+      "method": "canonical_title_match",
+      "qid": "Q18338503"
+    },
+    "Anjou Legendarium": {
+      "status": "VERIFIED",
+      "canonical_title": "Anjou Legendarium",
+      "snippet": "",
+      "method": "canonical_title_match",
+      "qid": "Q338714"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 32,
+      "total": 33,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 32
+    },
+    "per_stop": {
+      "Bacchante in a Landscape": {
+        "sourced": 1,
+        "unsourced": 17,
+        "total": 18
+      },
+      "A sketch of the Mitsui shop in Suruga street in Edo": {
+        "sourced": 0,
+        "unsourced": 15,
+        "total": 15
+      }
+    },
+    "claims": [
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "You are about to explore The Metropolitan Museum of Art in New York.",
+        "class": "corpus",
+        "source": "https://www.pubhist.com/w28384",
+        "evidence": "Jean-Baptiste-Camille Corot - Bacchante in a Landscape. 1865-70, 30.8 x 61.5 cm, Oil on canvas, Metropolitan Museum of Art, New York H.O. Havemeyer ..."
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "In this tour, you will encounter \"Bacchante in a Landscape\" by Camille Corot, \"Allegory of the Catholic Faith\" by Johannes Vermeer, and \"A sketch of the Mitsui shop in Suruga street in Edo\" by Katsushika Hokusai.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "Delve into the Rockefeller Legacy at The Met, where Nelson A. Rockefeller's donation of over 3,000 pieces in 1969 and the subsequent naming of The Michael C. Rockefeller Wing in 1982 highlight the museum's enduring commitment to inspiring and educating the public through art.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "To truly appreciate Camille Corot's \"Bacchante in a Landscape,\" find a spot where the painting's full breadth greets you—its dimensions of 12 1/8 by 24 1/4 inches allow for an intimate yet expansive view.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "This vantage point reveals the melding of human form with the natural world, a dance of myth and nature that Corot captures with his signature style.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "By incorporating mythological themes with his established landscape technique, Corot created this painting between 1865 and 1870, embarking on a novel artistic exploration.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "This piece, housed in The Metropolitan Museum of Art, reflects Corot's unique blend of nature and mythology, capturing the viewer’s curiosity and inviting them into the essence of the Bacchante’s world.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "This technique is evident in \"Bacchante in a Landscape,\" where the surrounding environment seems to embrace the central figure, immersing her—and the observer—in the landscape.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "The painting’s significance is heightened within The Met's collection, which showcases the evolution of artistic styles and cultural exchanges that shaped European art.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "The Met has long been a treasure trove of cultural history, enriched by various contributions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "Stand just a few steps back from the painting \"Allegory of the Catholic Faith\" by Johannes Vermeer, ensuring you can take in its full scale and intricate details.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "In the painting \"Allegory of the Catholic Faith,\" crafted between 1670 and 1672, Vermeer offers a rich tapestry of Catholic symbolism, unusual for Protestant Holland at the time.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "The medium of oil on canvas allows for exquisite detail in elements such as the globe, which represents the reach of the Catholic Church, and the serpent crushed under a woman's feet, symbolizing the triumph of faith over heresy.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "The painting itself resides within the Friedsam Collection, bequeathed to the museum in 1931 by Michael Friedsam.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "Friedsam, a notable art collector and philanthropist, played a crucial role in enriching The Met's holdings with works that spanned a wide array of cultural and historical contexts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "His bequest, much like the earlier donation from Nelson A. Rockefeller, whom you encountered through the Bacchante in a Landscape, underscores the importance of private patronage in shaping the museum's diverse collection.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "The gallery where this work is displayed bears the name of the Rockefeller Tang, whose contributions have furthered the museum's mission to educate and inspire through the arts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bacchante in a Landscape",
+        "text": "The Metropolitan Museum of Art, through the convergence of such works, invites an exploration of the global influences that have shaped its extensive collections.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "Stand to the right of \"A sketch of the Mitsui shop in Suruga street in Edo\" by Katsushika Hokusai to catch the full breadth of its bustling scene.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "From this angle, the depth of the street and the majestic silhouette of Mount Fuji in the background become more vivid, offering insight into both commerce and culture in Edo-period Japan.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "This woodblock print, crafted by Hokusai around 1830, depicts the Mitsui Store at Suruga Street in Edo, a vibrant commercial hub of its time, with the iconic Mount Fuji looming in the distance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "The piece is part of Hokusai's acclaimed series \"Thirty-Six Views of Mount Fuji,\" where each image features the mountain as a focal point, yet each scene varies dramatically in its depiction of everyday life.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "The technique of woodblock printing allowed for the mass production of art, making such scenes accessible to a broader audience, a democratization of art that resonated with the Edo period's rising merchant class.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "Hokusai, renowned for his ability to capture the essence of Japanese life and landscape, utilized fine lines and vivid contrasts in this print to emphasize the bustling activity of Suruga Street and the serene permanence of Mount Fuji.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "The layering technique employed in this print was not merely an artistic choice but a cultural one — it highlighted the coexistence of nature and commerce, an integral aspect of Edo society.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "The Rockefeller family's influence on The Met is echoed in this piece's presence within the museum's collection.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "The Rockefeller legacy has long been intertwined with The Met's global outreach, enhancing its role as a beacon for artistic exchange.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "In this gallery, named in part after the Qatar family, the Mitsui shop scene also connects to earlier stops like the \"Allegory of the Catholic Faith,\" showcasing how The Met's collection spans diverse cultures and histories.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "From Bacchante in a Landscape to A sketch of the Mitsui shop in Suruga street in Edo, you have followed the thread of The Rockefeller Legacy at The Met.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 million works.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "That's 3 stops — Bacchante in a Landscape, he painted en plein air, revolutionizing art and a sketch of the Mitsui shop in Suruga street in Edo, woodblock printing democratized art.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "This tour covered Allegory of the Catholic Faith and A sketch of the Mitsui shop in Suruga street in Edo.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "A sketch of the Mitsui shop in Suruga street in Edo",
+        "text": "Sources: This tour draws on information from www.metmuseum.org and the Wikipedia article on the museum.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
