@@ -222,14 +222,69 @@ _TEMPORARY_MARKERS = (
     re.compile(r'closed for a private event'),
     re.compile(r'fermeture exceptionnelle'),
     re.compile(r'fermé temporairement'),
+    # [LOCAL-570 r2] A time-limited closure is temporary. LEAD's r1 miss:
+    # "Neptune Oyster is closing its doors for two weeks for repairs" bound as a
+    # permanent closure because "closing its doors" was on the permanent list and
+    # nothing in r1 recognised the bounded duration. A marker that sits in the
+    # same clause as a BOUNDED DURATION or a RETURN names a venue that is coming
+    # back — it must never bind. Deterministic and language-aware, as r1.
+    #
+    #   bounded duration: "for two weeks", "for a month", "for 3 days"
+    re.compile(
+        r'\bfor\s+(?:\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|'
+        r'eleven|twelve|several|a few|a couple of)\s+'
+        r'(?:day|days|week|weeks|month|months)\b'),
+    #   dated reopening window: "until January 5", "until next Monday"
+    re.compile(r'\buntil\s+(?:january|february|march|april|may|june|july|'
+               r'august|september|october|november|december|monday|tuesday|'
+               r'wednesday|thursday|friday|saturday|sunday|\d)'),
+    #   "through <month>" — a window with an end
+    re.compile(r'\bthrough\s+(?:january|february|march|april|may|june|july|'
+               r'august|september|october|november|december)'),
+    #   explicit return. "reopens in May", "reopening on the 5th", "will reopen",
+    #   "back on Monday". NOTE: these are only consulted when the clause is NOT a
+    #   NEGATED return ("will not reopen") — _negated_return guards that above.
+    re.compile(r'\breopens?\s+(?:on|in|next|this)\b'),
+    re.compile(r'\breopening\s+(?:on|in|next|this)\b'),
+    re.compile(r'\bwill\s+reopen\b'),
+    re.compile(r'\bback\s+(?:on|in|next)\b'),
+    #   French temporary forms: "pour travaux", "jusqu'au <date>", "réouverture"
+    re.compile(r'\bpour\s+travaux\b'),
+    re.compile(r"\bjusqu'au\b"),
+    re.compile(r'\bréouverture\b'),
 )
+
+
+# [LOCAL-570 r2] A NEGATED return is not a return — it confirms a permanent
+# closure. "will not reopen" / "won't reopen" / "never reopen" each contain
+# "reopen", so the return markers above would wrongly read them as temporary.
+# This guard fires FIRST: when a clause negates the reopening, the temporary
+# exclusion is suppressed and the closure marker is free to bind.
+_NEGATED_RETURN = re.compile(
+    r"\b(?:will\s+not|won't|wo\s*n't|never|not)\s+reopen", re.I)
+
+
+def _negated_return(clause_low):
+    """True when the clause explicitly says the venue will NOT reopen.
+
+    A negated return means the closure is permanent, so the temporary exclusion
+    must be suppressed. Pure, case-insensitive."""
+    return bool(_NEGATED_RETURN.search(clause_low))
 
 
 def _temporarily_closed(clause_low):
     """True when the clause carries a TEMPORARY-closure phrasing (LOCAL-570).
 
     A match means the venue is still operating, so the closure markers in the
-    same clause must not bind. Pure, case-insensitive phrase match."""
+    same clause must not bind. Pure, case-insensitive phrase match.
+
+    [LOCAL-570 r2] A bounded duration ("for two weeks"), a dated reopening window
+    ("until January 5", "through March"), or an explicit return ("reopens in May",
+    "will reopen", "pour travaux", "réouverture") all make the closure temporary.
+    But a NEGATED return ("will not reopen") is permanent — it is checked first
+    and suppresses the exclusion so the closure marker can bind."""
+    if _negated_return(clause_low):
+        return False
     return any(p.search(clause_low) for p in _TEMPORARY_MARKERS)
 
 
