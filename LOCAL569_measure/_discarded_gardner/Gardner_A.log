@@ -1,0 +1,130 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_014843.txt'
+
+======================================================================
+CALL #005 | 01:55:28.370 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Isabella Stewart Gardner Museum, Boston, MA
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Gardner_A.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_014843.txt'
+
+======================================================================
+CALL #006 | 01:55:28.370 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Isabella Stewart Gardner Museum, Boston, MA
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Isabella Stewart Gardner Museum",
+    "geographic_scope": "Boston, MA",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "USA"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=USA (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Isabella Stewart Gardner Museum
+  [venue_name sanity] 'Isabella Stewart Gardner Museum' OK
+  [S15] Forced tour_category=museum from venue_name='Isabella Stewart Gardner Museum'
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Isabella Stewart Gardner Museum, Boston, MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_014843.txt'
+
+======================================================================
+CALL #007 | 01:55:30.248 | GENERATING_PROMPT
+======================================================================
+  location: Isabella Stewart Gardner Museum, Boston, MA
+  user_request: Isabella Stewart Gardner Museum, Boston, MA
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for Isabella Stewart Gardner Museum, Boston, MA...
+  [Museum constraint] Venue from intent='Isabella Stewart Gardner Museum'
+  [venue_resolver] Name variants: ['Isabella Stewart Gardner Museum']
+  [venue_resolver] No Wikidata candidates for 'Isabella Stewart Gardner Museum'
+  [S17] no scope_constraint (precision='CITY', scope='Boston, MA')
+  [venue_resolver] Name variants: ['Isabella Stewart Gardner Museum']
+  [venue_resolver] No Wikidata candidates for 'Isabella Stewart Gardner Museum'
+  [venue_resolver] Name variants: ['Isabella Stewart Gardner Museum']
+  [venue_resolver] No Wikidata candidates for 'Isabella Stewart Gardner Museum'
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_014843.txt'
+
+======================================================================
+CALL #008 | 01:55:30.249 | PHASE_3A_REQUEST
+======================================================================
+  location: Isabella Stewart Gardner Museum, Boston, MA
+  total_stops: 3
+  poi_type_hint: museums
+
+PHASE 3A API call cost: $0.0004 (482 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_014843.txt'
+
+======================================================================
+CALL #009 | 01:55:31.464 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Isabella Stewart Gardner Museum, Boston, MA.
+List exactly 6 specific, real, well-known museums relevant to: Isabella Stewart Gardner Museum, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List 
+  prompt_last_300_chars:  this museum.
+- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.
+- Prefer the museum's most iconic/signature pieces that visitors specifically come to see.
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "The Rape of Europa", "address": "25 Evans Way, Boston, MA 02115"}, {"name": "The Daughters of Edward Darley Boit", "address": "25 Evans Way, Boston, MA 02115"}, {"name": "The Concert", "address": "25 Evans Way, Boston, MA 02115"}]
+
+OK PHASE 3A parsed 3 candidate POI(s):
+   - The Rape of Europa @ 25 Evans Way, Boston, MA 02115
+   - The Daughters of Edward Darley Boit @ 25 Evans Way, Boston, MA 02115
+   - The Concert @ 25 Evans Way, Boston, MA 02115
+  [venue_resolver] Name variants: ['Isabella Stewart Gardner Museum']
+  [venue_resolver] No Wikidata candidates for 'Isabella Stewart Gardner Museum'
+  [D1v2] Venue resolver returned None — falling back to heuristic
+  [D1v2] No official site discovered — will rely on Wikipedia + SPARQL
+  [T0a] Extracted 0 canonical titles, 0 cycle names
+  [story_miner] Corpus: 0 pages, 0 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 0 site/wiki + 0 SPARQL = 0 total
+  [LOCAL-24] Classification: 0 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 0 works, 0 galleries, 0 excluded
+  [D1v2] No canonical titles discovered — tier: unresolvable
+  [D1] Tier: unresolvable — clean fail (entity=False, sparql=0)

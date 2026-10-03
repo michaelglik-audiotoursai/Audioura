@@ -1,0 +1,262 @@
+{
+  "landmarks": {
+    "Artist in his studio": {
+      "status": "DROPPED",
+      "reason": "no canonical match"
+    },
+    "Adam and Eve": {
+      "status": "DROPPED",
+      "reason": "no canonical match"
+    },
+    "April 1957 (Celestial Blue)": {
+      "status": "DROPPED",
+      "reason": "no canonical match"
+    },
+    "Ancient Nubia Now": {
+      "status": "VERIFIED",
+      "canonical_title": "Ancient Nubia Now",
+      "snippet": "eeper into the timeless epic that has captivated audiences for nearly 3,000 years—and artistic depictions often give us our best information on these ancient tales.\n\nOur gallery dedicated to the Homeric epics features works that chart the Trojan War and illustrate scenes from the Iliad and Odyssey. Make yo",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "Sons of Liberty Bowl": {
+      "status": "VERIFIED",
+      "canonical_title": "Sons of Liberty Bowl",
+      "snippet": "ade in Boston around the time of the American Revolution, including John Singleton Copley’s 1768 portrait of Paul Revere, who made the famous Sons of Liberty Bowl (1768); a gallery of art from Colonial Latin America, which offers narratives of colonial life both oppressive and transformative; and galleries",
+      "method": "canonical_title_match",
+      "qid": ""
+    },
+    "John Singer Sargent’s  The Daughters of Edward Darley Boit": {
+      "status": "VERIFIED",
+      "canonical_title": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+      "snippet": "ationhood. Level Two showcases cross-cultural influences in 19th-century decorative arts, sculpture, and painting—including John Singer Sargent’s The Daughters of Edward Darley Boit (1882)—and considers the ways artists grappled with the trauma of the Civil War. Level Three explores 20th-century art, highlig",
+      "method": "canonical_title_match",
+      "qid": ""
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 4,
+      "unsourced": 24,
+      "total": 28,
+      "corpus": 4,
+      "grounded": 0,
+      "parametric": 24
+    },
+    "per_stop": {
+      "Ancient Nubia Now": {
+        "sourced": 2,
+        "unsourced": 9,
+        "total": 11
+      },
+      "Sons of Liberty Bowl": {
+        "sourced": 1,
+        "unsourced": 6,
+        "total": 7
+      },
+      "John Singer Sargent’s  The Daughters of Edward Darley Boit": {
+        "sourced": 1,
+        "unsourced": 9,
+        "total": 10
+      }
+    },
+    "claims": [
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "You are about to explore the Museum of Fine Arts in Boston.",
+        "class": "corpus",
+        "source": "https://www.mfa.org/press-release/nubia",
+        "evidence": "In Ancient Nubia Now, the Museum of Fine Arts, Boston (MFA), presents more than 400 works of art from its collection, made over thousands of ..."
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "Within its walls, you'll encounter the captivating Ancient Nubia Now, the defiant Sons of Liberty Bowl by Paul Revere, and the enchanting The Daughters of Edward Darley Boit by John Singer Sargent.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "The Influence of Francis Bartlett's Donations is the central theme, highlighting the Museum's acquisitions like the two-handled jar and the Mantiklos 'Apollo' statue, showcasing the lasting impact of Bartlett's generosity on this cultural institution dedicated to preserving and celebrating artistic masterpieces.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "At Sons of Liberty Bowl, you'll see a silver bowl honoring Representatives who opposed the Townshend Acts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "Then, explore John Singer Sargent's defiance of traditional portrait norms with The Daughters of Edward Darley Boit.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "This positioning offers a perfect vantage point to appreciate the artistry and detail that define Nubian heritage.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "In 2019, the Museum of Fine Arts, Boston, launched the \"Ancient Nubia Now\" exhibition to challenge prevailing misconceptions about Nubian history.",
+        "class": "corpus",
+        "source": "http://bronzeagecivilizations.org/ancient-egypt-nubia-and-the-near-east.html",
+        "evidence": "The 2019 exhibition “Ancient Nubia Now” looked at highlights from the ... Portraits from the Museum of Fine Arts, Boston. Over the course of some three ..."
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "The exhibition, highlighting over 400 objects, reframed the history of this ancient civilization, offering visitors insights into its true significance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "A pivotal figure behind this transformation was Francis Bartlett, whose generosity played a crucial role in enhancing the museum's collection by donating funds for the acquisition of significant Nubian artifacts, deepening the narrative of Nubia's cultural and historical contributions.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "Among the contributors was Nishimuraya Yohachi, who published related works that brought additional context to the exhibition.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Ancient Nubia Now",
+        "text": "Rubens, too, lent his voice to the narrative by authoring rich texts that accompanied the illustrations, painting a fuller picture of the Nubian legacy.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "Stand just a few feet back from the Sons of Liberty Bowl and let your gaze capture the intricate craftsmanship of this silver masterpiece.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "Here, the details of Paul Revere's silversmithing come alive, revealing both artistry and a profound historical statement.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "In 1768, fifteen members of the Sons of Liberty, a group of Massachusetts rebels, commissioned Paul Revere, the silversmith and midnight rider of 1768, Jr. to create this silver bowl.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "In 1949, the Museum of Fine Arts, Boston acquired the Sons of Liberty Bowl with the help of seven hundred small donations, securing its place as a true icon of their collection.",
+        "class": "corpus",
+        "source": "https://www.mfa.org/article/2025/sons-of-liberty-bowl",
+        "evidence": "The Museum of Fine Arts, Boston acquired the Sons of Liberty Bowl in 1949 with the help of seven hundred small donations."
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "Crafted from silver, a medium chosen for its resilience and reflective beauty, the bowl honors ninety-two members of Representatives who refused to rescind a letter opposing the Townshend Acts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "These Acts imposed taxes on essential goods like tea and paper, fueling revolutionary sentiment.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Sons of Liberty Bowl",
+        "text": "Seven hundred donations from Boston schoolchildren and the public funded its purchase, demonstrating a collective commitment to maintaining cultural heritage.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "By taking a step back, you can see how Sargent uses the vastness of the room to emphasize the solitude and introspective mirroring within the figures themselves.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "In 1882, John Singer Sargent painted The Daughters of Edward Darley Boit, capturing the Boit sisters in a moment of their childhood.",
+        "class": "corpus",
+        "source": "https://ascholarlyskater.com/2018/04/18/mysterious-daughters-of-edward-darley-boit/",
+        "evidence": "This book is about John Singer Sargent's The Daughters of Edward Darley Boit, an unconventional 1882 portrait of Edward and Isa Boit's four ..."
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "This work now resides in the Art of the Americas Wing, named for the Americas due to its dedication to showcasing the cultural and historical richness of the continent.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "The focus on the negative space and the detailed depiction of the interior of the Boit family’s Parisian home highlights the artist's revolutionary approach to portraiture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "The painting is also part of a broader narrative within the museum, connecting to other works acquired through diverse acts of patronage and philanthropy, like the Sons of Liberty Bowl, which you encountered earlier.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "This acquisition, aided by donors and patrons like the Boit sisters, showcases the museum's mission to honor the complexities and breadth of American history through art.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "From Ancient Nubia Now to John Singer Sargent’s  The Daughters of Edward Darley Boit, you have followed the thread of The Influence of Francis Bartlett's Donations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "The museum moved to its current Fenway location in 1909.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "That's 3 stops — John Singer Sargent’s  The Daughters of Edward Darley Boit defied traditional portrait norms and Ancient Nubia Now reframed the history of this ancient civilization with over 400 objects.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+        "text": "Sources: This tour draws on information from www.mfa.org and the Wikipedia article on the museum.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

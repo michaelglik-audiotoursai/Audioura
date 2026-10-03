@@ -1,0 +1,252 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "The Rockefeller Legacy in Art Donation",
+      "description": "This theme explores how Nelson A. Rockefeller's donation of his collection influenced the Met's exhibitions and renovations. It begins with his donation in 1969, turns with the establishment and opening of the Michael C. Rockefeller Wing in 1982, and pays off with the ongoing renovations of the wing in 2021.",
+      "supporting_elements": [
+        "se_001",
+        "se_004",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_001",
+        "se_004",
+        "se_009"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.375
+    },
+    {
+      "name": "The Evolution of The Met's Collection",
+      "description": "This theme traces the growth and transformation of The Met's collection over time. It starts with the founding of The Met in 1870, turns with the expansion to over two million works by 2000, and culminates with the renovation efforts in 2021.",
+      "supporting_elements": [
+        "se_002",
+        "se_008",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_002",
+        "se_008",
+        "se_009"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.375
+    },
+    {
+      "name": "Cultural Representation at The Met",
+      "description": "This theme examines how The Met represents diverse cultures through its exhibitions. It begins with the dedication to exhibiting arts from Africa, Oceania, and the Americas, turns with the separation of exhibitions by geographical locations, and pays off with the renovation of the Michael C. Rockefeller Wing.",
+      "supporting_elements": [
+        "se_003",
+        "se_006",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        2
+      ],
+      "grounded_on": [
+        "se_003",
+        "se_006",
+        "se_009"
+      ],
+      "coverage": 0.667,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 0.7,
+      "total_score": 0.723,
+      "weight": 0.25
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "The Rockefeller Legacy in Art Donation",
+          "weight": 0.375,
+          "elements_here": [
+            "se_001",
+            "se_004",
+            "se_009"
+          ],
+          "element_summaries": [
+            "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi",
+            "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri"
+          ]
+        },
+        {
+          "name": "The Evolution of The Met's Collection",
+          "weight": 0.375,
+          "elements_here": [
+            "se_009"
+          ],
+          "element_summaries": [
+            "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri"
+          ]
+        },
+        {
+          "name": "Cultural Representation at The Met",
+          "weight": 0.25,
+          "elements_here": [
+            "se_003",
+            "se_006",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra",
+            "The collection shows the cultural and artistic traditions of communities from across these regions.",
+            "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri"
+          ]
+        }
+      ],
+      "thread_angle": "[The Rockefeller Legacy in Art Donation] (weight 0.38): In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[The Evolution of The Met's Collection] (weight 0.38): In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri\n[Cultural Representation at The Met] (weight 0.25): The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra; The collection shows the cultural and artistic traditions of communities from across these regions.",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Rockefeller Legacy in Art Donation",
+          "weight": 0.375,
+          "elements_here": [
+            "se_001",
+            "se_004"
+          ],
+          "element_summaries": [
+            "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p",
+            "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi"
+          ]
+        },
+        {
+          "name": "The Evolution of The Met's Collection",
+          "weight": 0.375,
+          "elements_here": [
+            "se_002",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The Metropolitan Museum of Art was founded in 1870.",
+            "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill"
+          ]
+        }
+      ],
+      "thread_angle": "[The Rockefeller Legacy in Art Donation] (weight 0.38): In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-p; The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Mi\n[The Evolution of The Met's Collection] (weight 0.38): The Metropolitan Museum of Art was founded in 1870.; In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_009",
+          "element_text": "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's African, ancient America",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        }
+      ]
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Rockefeller Legacy in Art Donation",
+          "weight": 0.375,
+          "elements_here": [
+            "se_009"
+          ],
+          "element_summaries": [
+            "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri"
+          ]
+        },
+        {
+          "name": "The Evolution of The Met's Collection",
+          "weight": 0.375,
+          "elements_here": [
+            "se_002",
+            "se_008",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Metropolitan Museum of Art was founded in 1870.",
+            "In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill",
+            "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri"
+          ]
+        },
+        {
+          "name": "Cultural Representation at The Met",
+          "weight": 0.25,
+          "elements_here": [
+            "se_003",
+            "se_006",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra",
+            "The collection shows the cultural and artistic traditions of communities from across these regions.",
+            "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri"
+          ]
+        }
+      ],
+      "thread_angle": "[The Rockefeller Legacy in Art Donation] (weight 0.38): In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's Afri\n[The Evolution of The Met's Collection] (weight 0.38): The Metropolitan Museum of Art was founded in 1870.; In 2000, its permanent collection had over two million works; it currently lists a total of 1.5 mill\n[Cultural Representation at The Met] (weight 0.25): The Wing exhibits the arts of Africa, Oceania, and the Americas in an exhibition separated by geogra; The collection shows the cultural and artistic traditions of communities from across these regions.",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_009",
+          "element_text": "In December 2021, the Met began its $70 million renovation of The Michael C. Rockefeller Wing's African, ancient America",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_001",
+          "element_text": "In 1969, American businessman and philanthropist Nelson A. Rockefeller donated his more than 3,000-piece collection to t",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_004",
+          "element_text": "The arts of Africa, Oceania, and the Americas opened to the public in 1982, under the title, 'The Michael C. Rockefeller",
+          "thread_name": "The Rockefeller Legacy in Art Donation"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of The Rockefeller Legacy in Art Donation. This theme explores how Nelson A. Rockefeller's donation of his collection influenced the Met's exhibitions and renovations. It begins with his donation in 1969, turns with the establishment and openi",
+  "epilog_payoff": "From A sketch of the Mitsui shop in Suruga street in Edo to A Girl Asleep, you have followed the thread of The Rockefeller Legacy in Art Donation."
+}

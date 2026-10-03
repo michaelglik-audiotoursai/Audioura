@@ -1,0 +1,188 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "The Influence of the Francis Bartlett Donation",
+      "description": "This theme explores how the Francis Bartlett Donation of 1900 and 1912 facilitated the acquisition of significant artworks across multiple stops, showcasing the impact of philanthropic contributions on the museum's collection.",
+      "supporting_elements": [
+        "se_003",
+        "se_004",
+        "se_005"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_003",
+        "se_004",
+        "se_005"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.5
+    },
+    {
+      "name": "Philanthropy and Artistic Enrichment",
+      "description": "This theme examines the role of various donors and trusts in enriching the museum's collection, illustrating how philanthropy has shaped the diversity and depth of the museum's holdings over time.",
+      "supporting_elements": [
+        "se_006",
+        "se_007",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_006",
+        "se_007",
+        "se_009"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 0.8,
+      "arc_potential": 1.0,
+      "total_score": 0.86,
+      "weight": 0.5
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "The Influence of the Francis Bartlett Donation",
+          "weight": 0.5,
+          "elements_here": [
+            "se_003",
+            "se_004"
+          ],
+          "element_summaries": [
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Philanthropy and Artistic Enrichment",
+          "weight": 0.5,
+          "elements_here": [
+            "se_006",
+            "se_007",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum.",
+            "The Museum purchased a marble statue of Juno with funds donated by George D. and Margo Behrakis.",
+            "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' to the museum."
+          ]
+        }
+      ],
+      "thread_angle": "[The Influence of the Francis Bartlett Donation] (weight 0.50): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don\n[Philanthropy and Artistic Enrichment] (weight 0.50): The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum.; The Museum purchased a marble statue of Juno with funds donated by George D. and Margo Behrakis.",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Influence of the Francis Bartlett Donation",
+          "weight": 0.5,
+          "elements_here": [
+            "se_004",
+            "se_005"
+          ],
+          "element_summaries": [
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Philanthropy and Artistic Enrichment",
+          "weight": 0.5,
+          "elements_here": [
+            "se_007"
+          ],
+          "element_summaries": [
+            "The Museum purchased a marble statue of Juno with funds donated by George D. and Margo Behrakis."
+          ]
+        }
+      ],
+      "thread_angle": "[The Influence of the Francis Bartlett Donation] (weight 0.50): The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don; The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don\n[Philanthropy and Artistic Enrichment] (weight 0.50): The Museum purchased a marble statue of Juno with funds donated by George D. and Margo Behrakis.",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_003",
+          "element_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of the Francis Bartlett Donation"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of the Francis Bartlett Donation"
+        }
+      ]
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Influence of the Francis Bartlett Donation",
+          "weight": 0.5,
+          "elements_here": [
+            "se_003",
+            "se_005"
+          ],
+          "element_summaries": [
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Philanthropy and Artistic Enrichment",
+          "weight": 0.5,
+          "elements_here": [
+            "se_006",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum.",
+            "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' to the museum."
+          ]
+        }
+      ],
+      "thread_angle": "[The Influence of the Francis Bartlett Donation] (weight 0.50): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don\n[Philanthropy and Artistic Enrichment] (weight 0.50): The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum.; W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' to the museum.",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_003",
+          "element_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of the Francis Bartlett Donation"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of the Francis Bartlett Donation"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of the Francis Bartlett Donation"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_005",
+          "element_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Donation of 1912.",
+          "thread_name": "The Influence of the Francis Bartlett Donation"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of The Influence of the Francis Bartlett Donation. This theme explores how the Francis Bartlett Donation of 1900 and 1912 facilitated the acquisition of significant artworks across multiple stops, showcasing the impact of philanthropic contributions o",
+  "epilog_payoff": "From Ancient Nubia Now to John Singer Sargent’s  The Daughters of Edward Darley Boit, you have followed the thread of The Influence of the Francis Bartlett Donation."
+}

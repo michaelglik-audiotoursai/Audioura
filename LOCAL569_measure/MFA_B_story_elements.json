@@ -1,0 +1,577 @@
+[
+  {
+    "type": "dedication",
+    "text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy was gifted to the MFA in 2018.",
+    "source_sentence": "The already strong collection of Song and Yuan dynasty paintings was in 2018 expanded dramatically by the gift of the unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy.",
+    "people": [
+      "Wan-go H. C. Weng"
+    ],
+    "dates": [
+      "2018"
+    ],
+    "source_url": "http://www.mfa.org/collections/asia",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/asia"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_001"
+  },
+  {
+    "type": "dedication",
+    "text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani opaque watercolor on paper.",
+    "source_sentence": "Unknown artist, Maharana Sangram Singh Enjoys the Monsoon (detail), Indian, Rajasthani, about 1720–25. Opaque watercolor on paper. Gift of John Goelet.",
+    "people": [
+      "John Goelet"
+    ],
+    "dates": [
+      "about 1720–25"
+    ],
+    "source_url": "http://www.mfa.org/collections/asia",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/asia"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_002"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+    "source_sentence": "Museum purchase with funds from the Francis Bartlett Donation of 1900.",
+    "people": [
+      "Francis Bartlett"
+    ],
+    "dates": [
+      "1900"
+    ],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_003"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+    "source_sentence": "Museum purchase with funds from the Francis Bartlett Donation of 1900.",
+    "people": [
+      "Francis Bartlett"
+    ],
+    "dates": [
+      "1900"
+    ],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_004"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Donation of 1912.",
+    "source_sentence": "Museum purchase with funds from the Francis Bartlett Donation of 1912.",
+    "people": [
+      "Francis Bartlett"
+    ],
+    "dates": [
+      "1912"
+    ],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_005"
+  },
+  {
+    "type": "dedication",
+    "text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum.",
+    "source_sentence": "Gift of the Loïs Mailou Jones Pierre-Noël Trust.",
+    "people": [
+      "Loïs Mailou Jones Pierre-Noël Trust"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 4.5,
+    "id": "se_006"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a marble statue of Juno with funds donated by George D. and Margo Behrakis.",
+    "source_sentence": "Museum purchase with funds donated by George D. and Margo Behrakis.",
+    "people": [
+      "George D. Behrakis",
+      "Margo Behrakis"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "rank_score": 4.5,
+    "id": "se_007"
+  },
+  {
+    "type": "provenance",
+    "text": "Forsyth Wickes donated the artwork titled 'Laughing Man' as part of The Forsyth Wickes Collection.",
+    "source_sentence": "Bequest of Forsyth Wickes—The Forsyth Wickes Collection.",
+    "people": [
+      "Forsyth Wickes"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "_merge_log": [
+      {
+        "pair": [
+          0,
+          1
+        ],
+        "a_text": "Forsyth Wickes donated the artwork titled 'Laughing Man' as part of The Forsyth ",
+        "b_text": "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' to the mu",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          0,
+          3
+        ],
+        "a_text": "Forsyth Wickes donated the artwork titled 'Laughing Man' as part of The Forsyth ",
+        "b_text": "Ruth S. Pollen bequeathed the etching 'Self-Portrait with Saskia' by Rembrandt t",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          1,
+          3
+        ],
+        "a_text": "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' to the mu",
+        "b_text": "Ruth S. Pollen bequeathed the etching 'Self-Portrait with Saskia' by Rembrandt t",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          4
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to th",
+        "b_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          5
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to th",
+        "b_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          6
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to th",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          7
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to th",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          8
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to th",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          9
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to th",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          4,
+          5
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          4,
+          6
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          4,
+          7
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          4,
+          8
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          4,
+          9
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          5,
+          6
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          5,
+          7
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          5,
+          8
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          5,
+          9
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          6,
+          7
+        ],
+        "a_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          6,
+          8
+        ],
+        "a_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          6,
+          9
+        ],
+        "a_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          7,
+          8
+        ],
+        "a_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          7,
+          9
+        ],
+        "a_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          8,
+          9
+        ],
+        "a_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      }
+    ],
+    "rank_score": 3.0,
+    "id": "se_008"
+  },
+  {
+    "type": "provenance",
+    "text": "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' to the museum.",
+    "source_sentence": "Bequest of W. G. Russell Allen.",
+    "people": [
+      "W. G. Russell Allen"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 3.0,
+    "id": "se_009"
+  },
+  {
+    "type": "provenance",
+    "text": "Ruth S. Pollen bequeathed the etching 'Self-Portrait with Saskia' by Rembrandt to the museum.",
+    "source_sentence": "Bequest of Ruth S. Pollen.",
+    "people": [
+      "Ruth S. Pollen"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 3.0,
+    "id": "se_010"
+  }
+]

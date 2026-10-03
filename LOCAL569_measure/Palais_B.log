@@ -1,0 +1,917 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_020424.txt'
+
+======================================================================
+CALL #001 | 02:04:24.413 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Palais Lascaris, Nice, France
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Palais_B.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_020424.txt'
+
+======================================================================
+CALL #002 | 02:04:24.413 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Palais Lascaris, Nice, France
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='museum' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "museum exhibits",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Palais Lascaris",
+    "geographic_scope": "Nice, France",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "France"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=France (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Palais Lascaris
+  [venue_name sanity] 'Palais Lascaris' OK
+  [S15] Forced tour_category=museum from venue_name='Palais Lascaris'
+[TIMING] phase=intent elapsed=2.0s cumulative=2.0s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Palais Lascaris, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_020424.txt'
+
+======================================================================
+CALL #003 | 02:04:26.434 | GENERATING_PROMPT
+======================================================================
+  location: Palais Lascaris, Nice, France
+  user_request: Palais Lascaris, Nice, France
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for Palais Lascaris, Nice, France...
+  [Museum constraint] Venue from intent='Palais Lascaris'
+  [venue_resolver] Name variants: ['Palais Lascaris']
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [Phase3A] Injected 1 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='CITY', scope='Nice, France')
+  [venue_resolver] Name variants: ['Palais Lascaris']
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] HIT for Q34653010 (tier=exhibit_museum, expires=2026-10-24 15:45:38.638381)
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 10 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Raquel [sparql]
+     - Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) [canonical]
+     - Harpe by Naderman (Paris, 1780) [canonical]
+  [venue_resolver] Name variants: ['Palais Lascaris']
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] HIT for Q34653010 (tier=exhibit_museum, expires=2026-10-24 15:45:38.638381)
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 10 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-328] Quality score map: 11 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Violes gambe by William Turner (Londres, 1652) [canonical] (quality=29.0)
+     - Basse de violon by Paolo Antonio Testore (Milan, 1696) [canonical] (quality=27.0)
+     - Harpe by Naderman (Paris, 1780) [canonical] (quality=26.0)
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Violes gambe by William Turner (Londres, 1652)
+   - Basse de violon by Paolo Antonio Testore (Milan, 1696)
+   - Harpe by Naderman (Paris, 1780)
+   - Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)
+   - Guitar by Antonio de Torres (Almeria, 1884)
+   - Guitare baroque by Giovanni Tesler (Ancona, 1618)
+  [venue_resolver] Name variants: ['Palais Lascaris']
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [D1v2] Venue resolved: Q34653010 → URL=https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais, lang=fr
+  [venue_cache] HIT for Q34653010 (tier=exhibit_museum, expires=2026-10-24 15:45:38.638381)
+  [D1v2] Cache HIT: 10 canonical titles (tier=exhibit_museum), 0 catalogue works, combined_text=46230 chars
+  [LOCAL-34] Will enrich bare title at stop-naming: 'Raquel' → 'Raquel (panneau, fin du XVIe siècle)'
+  [LOCAL-24] Classification: 10 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 10 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 1 dynamic aliases from 1 works
+  [D1v2] Injected 1 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Violes gambe by William Turner (Londres, 1652)' → canonical: 'Violes gambe by William Turner (Londres, 1652)'
+  [D1v2] VERIFIED 'Basse de violon by Paolo Antonio Testore (Milan, 1696)' → canonical: 'Basse de violon by Paolo Antonio Testore (Milan, 1696)'
+  [D1v2] VERIFIED 'Harpe by Naderman (Paris, 1780)' → canonical: 'Harpe by Naderman (Paris, 1780)'
+  [D1v2] VERIFIED 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)' → canonical: 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)'
+  [D1v2] VERIFIED 'Guitar by Antonio de Torres (Almeria, 1884)' → canonical: 'Guitar by Antonio de Torres (Almeria, 1884)'
+  [D1v2] VERIFIED 'Guitare baroque by Giovanni Tesler (Ancona, 1618)' → canonical: 'Guitare baroque by Giovanni Tesler (Ancona, 1618)'
+  [D1v2] Exhibit museum detected: 1 SPARQL QIDs, 10 total titles (mostly from site/wiki sections)
+  [D1v2] 6/6 works verified — tier: exhibit_museum
+  [D1] Tier: exhibit_museum (6 verified works)
+  [R4] Target reached: 6/3 stops
+  [LOCAL-16 GATE] All 6 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Palais Lascaris, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Violes gambe by William Turner (Londres, 1652)=VENUE_ONLY', 'Basse de violon by Paolo Antonio Testore (Milan, 1696)=VENUE_ONLY', 'Harpe by Naderman (Paris, 1780)=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)=VENUE_ONLY', 'Guitar by Antonio de Torres (Almeria, 1884)=VENUE_ONLY', 'Guitare baroque by Giovanni Tesler (Ancona, 1618)=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Violes gambe by William Turner (Londres, 1652)=29.0', 'Basse de violon by Paolo Antonio Testore (Milan, 1696)=27.0', 'Harpe by Naderman (Paris, 1780)=26.0']
+  [LOCAL-349] Yield scores (dropped):  ['Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)=24.0', 'Guitar by Antonio de Torres (Almeria, 1884)=19.0', 'Guitare baroque by Giovanni Tesler (Ancona, 1618)=18.0']
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Violes gambe by William Turner (Londres, 1652)' — venue_corpus canonical_title: 'Violes gambe by William Turner (Londres, 1652)' a
+    [VERIFIED] 'Basse de violon by Paolo Antonio Testore (Milan,  — venue_corpus canonical_title: 'Basse de violon by Paolo Antonio Testore (Milan, 
+    [VERIFIED] 'Harpe by Naderman (Paris, 1780)' — venue_corpus canonical_title: 'Harpe by Naderman (Paris, 1780)' at 'Palais Lasca
+    [VERIFIED] 'Sacqueboute ténor by Anton Schnitzer (Nuremberg,  — venue_corpus canonical_title: 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 
+    [VERIFIED] 'Guitar by Antonio de Torres (Almeria, 1884)' — venue_corpus canonical_title: 'Guitar by Antonio de Torres (Almeria, 1884)' at '
+    [VERIFIED] 'Guitare baroque by Giovanni Tesler (Ancona, 1618) — venue_corpus canonical_title: 'Guitare baroque by Giovanni Tesler (Ancona, 1618)
+    [HARVEST] Summary: 0 harvested, 6 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] DROPPED attributed quote for 'Guitar by Antonio de Torres (Almeria, 1884)': 'with back and sides of papier' — no_primary_source_found_for:with back and sides of papier
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 13 queries issued, 1 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_020424.txt'
+
+======================================================================
+CALL #004 | 02:04:58.000 | PHASE_3B_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice, France
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0006 (725 tokens)
+! PHASE 3B introduced unknown names (ignored): ['Violes gambe by William Turner', 'Basse de violon by Paolo Antonio Testore', 'Harpe by Naderman']
+! PHASE 3B produced no recognisable entries; keeping current order
+  [LOCAL-27] Corpus-sourced metadata applied to 3 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais)
+  [LOCAL-35] Visitor info page found (fr): https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+  [LOCAL-35] Extracted from https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-34] Visitor info extracted from corpus text (main page fallback, no provenance)
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Nice, hint: museum)
+  [LOCAL-355] Violes gambe by William Turner (Londres, 1652): no practical facts in OSM
+  [LOCAL-355] Basse de violon by Paolo Antonio Testore (Milan, 1696): no practical facts in OSM
+  [LOCAL-355] Harpe by Naderman (Paris, 1780): no practical facts in OSM
+
+Coordinates fallback: requesting coords for 3 stop(s) missing them...
+   Coords fallback OK 'Harpe by Naderman (Paris, 1780)': 43.6955, 7.2756
+   Coords fallback OK 'Violes gambe by William Turner (Londres, 1652)': 43.6954, 7.2692
+   Coords fallback OK 'Basse de violon by Paolo Antonio Testore (Milan, 1696)': 43.6954, 7.2652
+Extracted first POI coordinates: (43.6954, 7.2692)
+  [D4] Museum single-coordinate: all stops set to (43.6954, 7.2692) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Violes gambe by William Turner (Londres, 1652)
+   Coordinates: 43.6954, 7.2692
+2. Basse de violon by Paolo Antonio Testore (Milan, 1696)
+   Coordinates: 43.6954, 7.2692
+3. Harpe by Naderman (Paris, 1780)
+   Coordinates: 43.6954, 7.2692
+================================
+
+[TIMING] phase=poi_selection elapsed=88.5s cumulative=90.5s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 3/3 corpus pages for 'Palais Lascaris'
+    page[0] score=12770 url=https://fr.wikipedia.org/wiki/Palais_Lascaris
+    page[1] score=10430 url=https://en.wikipedia.org/wiki/Palais_Lascaris
+    page[2] score=1685 url=https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+  [§3-adapter] Raw elements: 2 from 2 pages
+  [§3-adapter] After corroboration scoring: 1 elements
+  [§3-adapter] Final: 1 ranked elements (top type: origin)
+  [§3-adapter] Persisted 1 elements → /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Palais_B_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q34653010 (1 elements)
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [SQ-S6b] Elements per stop: s0=0, s1=1, s2=0
+  [SQ-S6b] Entity clusters found: 0 (≥2 stops)
+  [SQ-S6b] Theme naming: $0.0022, 445 tokens
+  [SQ-S6b] LLM named 0 candidate themes
+  [SQ-S6b] Scored themes: 0
+  [SQ-S6b] DEGRADATION → mosaic mode (no theme ≥60% coverage)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Palais Lascaris model=gpt-4o tokens=1272 (in=701 out=571) cost=$0.0075 latency=5.2s
+[COST_METER] FRESH | spine_generate | $0.007463 | user=None | job=local569-Palais_B
+  [LOCAL-278] Spine cost folded into total: $0.0075
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (89 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Violes gambe by William Turner (Londres, 1652)' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Basse de violon by Paolo Antonio Testore (Milan, 1696)' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Harpe by Naderman (Paris, 1780)' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=16.5s cumulative=107.0s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=venue_purpose source='bequeathed to the city of Nice in the testament of 26 May 1901 and by a codicil '
+
+  [LOCAL-383] No story beats found in page text (46230 chars)
+[TIMING] phase=narration elapsed=0.1s cumulative=107.0s
+  [D495] venue domain seeded tier1: nice.fr
+
+  [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-441] Batch P856 check: 7 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for rivieraloisirs.com: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for rivieraloisirs.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for questoapp.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for tripadvisor.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for explorenicecotedazur.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for cotedazurfrance.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for thepariseffect.net: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for steveandcaroleinvence.com: The read operation timed out
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 7 unverified, 0 budget-expired
+    [D489] material kind: stop='Violes gambe by William Turner (Londre' kind=active volume=VENUE_ONLY sentences=15 active=2 staked=0 eventful=0 passive=3
+         best: "When was Palais Lascaris built?"
+    [LOCAL-489] Stop 1 needs more material (thin+uncovered+eventless): 8 passages, 1250 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +0 from: "Violes gambe by William Turner (Londres, 1652)" "Palais Lascaris" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 1250 -> 1250 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "When was Palais Lascaris built?"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 1 'Violes gambe by William Turner (Londres, 1652)': queries=3 serp_results=8 snippets=8
+      → The former residence of the Lascaris-Vintimille family, this palace, a listed historical monument since 1946, has been r
+      → Built in the middle of the XVIIᵉ century for the Lascaris-Vintimille family, the palace was acquired by the city of Nice
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+    [D489] material kind: stop='Basse de violon by Paolo Antonio Testo' kind=active volume=VENUE_ONLY sentences=14 active=2 staked=0 eventful=0 passive=2
+         best: "When was Palais Lascaris built?"
+    [LOCAL-489] Stop 2 needs more material (thin+uncovered+eventless): 7 passages, 1095 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +0 from: "Basse de violon by Paolo Antonio Testore (Milan, 1696)" "Palais Lascaris" pro
+      [LOCAL-498] after replenishment: kind active -> active, 1095 -> 1095 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "When was Palais Lascaris built?"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 2 'Basse de violon by Paolo Antonio Testore (Milan, 1': queries=3 serp_results=7 snippets=7
+      → The former residence of the Lascaris-Vintimille family, this palace, a listed historical monument since 1946, has been r
+      → Built in the middle of the XVIIᵉ century for the Lascaris-Vintimille family, the palace was acquired by the city of Nice
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+    [D489] material kind: stop='Harpe by Naderman (Paris, 1780)' kind=active volume=VENUE_ONLY sentences=15 active=2 staked=0 eventful=0 passive=3
+         best: "When was Palais Lascaris built?"
+    [LOCAL-489] Stop 3 needs more material (thin+uncovered+eventless): 8 passages, 1250 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +0 from: "Harpe by Naderman (Paris, 1780)" "Palais Lascaris" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 1250 -> 1250 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "When was Palais Lascaris built?"
+    [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
+    Stop 3 'Harpe by Naderman (Paris, 1780)': queries=3 serp_results=8 snippets=8
+      → The former residence of the Lascaris-Vintimille family, this palace, a listed historical monument since 1946, has been r
+      → Built in the middle of the XVIIᵉ century for the Lascaris-Vintimille family, the palace was acquired by the city of Nice
+
+  [LOCAL-410] SERP search complete: 12 queries, 23 results, 23 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 23 raw → max 15 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Violes gambe by William Turner (Londres, 1652): serp_results=8 elements_extracted=- beats_injected=- (measured post-generation)
+    Basse de violon by Paolo Antonio Testore (Milan, 1: serp_results=7 elements_extracted=- beats_injected=- (measured post-generation)
+    Harpe by Naderman (Paris, 1780): serp_results=8 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 8 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Violes gambe by William Turner (Londres, 1652)' has 8 snippet(s) — asking the knowledge fallback
+  [D533] +2 fact(s) via openai+web(8) (2 high-confidence) — stop will be labelled aloud
+      [high] The violes gambe was made by William Turner in London in 1652.
+      [high] Instruments built by William Turner bear labels from 1647 to 1656.
+  [D534] Stop 2 has 7 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Basse de violon by Paolo Antonio Testore (Milan, 1' has 7 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via openai+web(8) (3 high-confidence) — stop will be labelled aloud
+      [high] The Basse de violon was made by Paolo Antonio Testore in Milan.
+      [low] Paolo Antonio Testore was active as a violin maker from around 1700 to 1767.
+      [high] The instrument is dated to 1696.
+      [low] Paolo Antonio Testore's instruments are known for their strong and inventive qualities.
+      [high] The Basse de violon is part of the collection at Palais Lascaris.
+  [D534] Stop 3 has 8 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'Harpe by Naderman (Paris, 1780)' has 8 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via openai+web(8) (4 high-confidence) — stop will be labelled aloud
+      [high] The harp is a single-action pedal harp made by Jean-Henri Naderman in Paris around 1780.
+      [high] The harp is made of painted and gilded wood and metal.
+      [high] Jean-Henri Naderman was a leading harp-maker in Paris during his time, active from 1735 to 1799.
+      [high] The harp is from the Louis XVI period.
+  [D533] Knowledge fallback filled 3 starved stop(s)
+[TIMING] phase=external_lookups elapsed=34.0s cumulative=141.0s
+
+Generating description for Stop 1: Violes gambe by William Turner (Londres, 1652) by , ...
+
+Generating description for Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) by , ...
+
+Generating description for Stop 3: Harpe by Naderman (Paris, 1780) by , ...
+  [LOCAL-381] stop='Harpe by Naderman (Paris, 1780)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=12 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Category: Palais Lascaris - The Paris Effect', 12, 'unverified'), ('Harpe by Naderman (Paris, 1780)', 8, ''), ('Harpe by Naderman (Paris, 1780)', 8, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 12 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=10701 after=28499 (+17798 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28499)
+  [LOCAL-381] stop='Violes gambe by William Turner (Londres, 1652)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=10 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Violes gambe by William Turner (Londres, 1652)', 10, ''), ('Violes gambe by William Turner (Londres, 1652)', 10, ''), ('Category: Palais Lascaris - The Paris Effect', 8, 'unverified')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 10 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=9932 after=29418 (+19486 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29418)
+  [LOCAL-381] stop='Basse de violon by Paolo Antonio Testore (Milan, 1696)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=12 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Basse de violon by Paolo Antonio Testore (Milan, 1', 11, ''), ('Basse de violon by Paolo Antonio Testore (Milan, 1', 10, ''), ('Basse de violon by Paolo Antonio Testore (Milan, 1', 10, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 12 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10495 after=31003 (+20508 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (31003)
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0034
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0044
+    story: "Jean-Henri Naderman was a leading harp-maker in Paris, active between 1735 and 1799. Around 1780, he crafted a single-action pedal harp made of painte"
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0046
+    story: "In 1942, the city of Nice purchased the former residence of the Lascaris-Vintimille family. This action set in motion a transformation, as the propert"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-569/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0361 (7610 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=281
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0374 (7872 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=255
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0391 (8224 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=249
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0405 (8535 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=2 words=329
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0380 (8007 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=0 words=283
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0411 (8650 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=1 words=263
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0397 (8360 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=3 words=240
+Stop 3 description word count: 240 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+  [LOCAL-569] Stop 3: KEEP-BEST ship — last attempt is best (story_count=3 words=240)
+Stop 2 API call cost: $0.0423 (8901 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=3 words=284
+Stop 2 description word count: 284 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-569] Stop 2: KEEP-BEST ship — last attempt is best (story_count=3 words=284)
+Stop 1 API call cost: $0.0428 (9005 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=3 words=251
+Stop 1 description word count: 251 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+  [LOCAL-569] Stop 1: KEEP-BEST ship — last attempt is best (story_count=3 words=251)
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Violes gambe by William Turner (Londres, 1652)': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=3, deduction=1, total=4
+    ✗ FAIL stop='Basse de violon by Paolo Antonio Testore (Milan, 1696)': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✗ FAIL stop='Harpe by Naderman (Paris, 1780)': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.001573 (input=6575, output=978)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='Violes gambe by William Turner (Londres, 1652)': claims=5, sourced=2, unsourced=3, contradicted=0
+      → UNSOURCED: 'in 1825' (year) — no snippet contains this assertion
+      → UNSOURCED: 'later bequeathed to the city in 1901' (donation) — no snippet contains this assertion
+      → UNSOURCED: 'most important collection of its kind after Paris's Musée de la Musique.' (institutional) — no snippet contains this assertion
+      evidence (2 sourced claims):
+        claim='in 1901' ← https://www.thepariseffect.net/blog/category/palais-lascaris
+        claim='in 1942' ← https://steveandcaroleinvence.com/a-visit-to-the-palais-lasc
+    ✗ FAIL stop='Basse de violon by Paolo Antonio Testore (Milan, 1696)': claims=3, sourced=1, unsourced=2, contradicted=0
+      → UNSOURCED: 'in 2001' (year) — no snippet contains this assertion
+      → UNSOURCED: 'in 2011' (year) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='in 1696' ← 
+    ✗ FAIL stop='Harpe by Naderman (Paris, 1780)': claims=3, sourced=2, unsourced=1, contradicted=0
+      → UNSOURCED: 'in 1825' (year) — no snippet contains this assertion
+      evidence (2 sourced claims):
+        claim='1780' ← 
+        claim='in 1901' ← https://www.thepariseffect.net/blog/category/palais-lascaris
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 3 sentence(s) from 'Violes gambe by William Turner (Londres, 1652)':
+      ✗ "Born in 1825, Gautier was a devoted amateur musician who played the violin and viola."
+      ✗ "His commitment to music led him to assemble an extraordinary collection of instruments, which he lat"
+      ✗ "This bequest laid the foundation for Palais Lascaris' impressive array of musical artifacts, now rec"
+    [LOCAL-423] Stripped 2 sentence(s) from 'Basse de violon by Paolo Antonio Testore (Milan, 1696)':
+      ✗ "The Basse de violon by Testore, originally produced in 1696, found its way into the Palais Lascaris "
+      ✗ "This move was part of a broader project to transform the Palais Lascaris into a dedicated music muse"
+    [LOCAL-423] Stripped 1 sentence(s) from 'Harpe by Naderman (Paris, 1780)':
+      ✗ "François Joseph Naderman, who came from the same esteemed harp-making family, went on to establish t"
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 3 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0016 (1961 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Harpe by Naderman (Paris, 1780': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 3
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 2
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Violes gambe by William Turner (Londres, 1652)' entity='Antoine Gautier' reason='No concrete link to the stop is provided.' in: "The transformation of this grand palace into a revered museum began with the efforts of Antoine Gaut"
+    [LOCAL-472] UNGROUNDED entity stop='Violes gambe by William Turner (Londres, 1652)' entity='Palais Lascaris' reason='No concrete link between Palais Lascaris and the viol by William Turner is established.' in: "The transformation of this grand palace into a revered museum began with the efforts of Antoine Gaut"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/16)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 4
+    Glossed (composed): 1
+    Suppressed (already explained): 0
+    Degraded (name dropped): 3
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 777 tokens, $0.0002, 4.0s
+    Gloss: 357 tokens, $0.0001, 1.4s
+    Compose: 629 tokens, $0.0001, 0.6s
+    Total added cost: $0.0003
+    Stops affected: 2
+    Glosses applied:
+      • Baroque → DEGRADED (name dropped)
+      • Beaumont → DEGRADED (name dropped)
+      • Nice → "the historical instrument collections transferred in 2001" [source: corpus]
+      • Musée Masséna → DEGRADED (name dropped)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 22
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'Violes gambe by William Turner': claim='1946 (in context: "designation as a historical monument in 1' contradicted_by='; Acquisition : Legs Gautier 1904 ; Type : Instrument de musique ...' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 1 group(s) blocked, 1 stop(s) affected
+  [LOCAL-229] Block log (1 entries):
+    stop=1 claim='1946 (in context: "designation as a historical mon' evidence='; Acquisition : Legs Gautier 1904 ; Type : Instrum' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Palais Lascaris'...
+   Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 3 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 1
+    [3] DELETED: 'This generous' in: This generous act preserved musical history and enriched the holdings of now hou
+    [3] DELETED: 'This transition' in: This transition from salons to an academic setting marked a significant evolutio
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Basse de violon by Paolo Antonio Testo' (index 51) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Violes gambe by William Turner (Londre': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Basse de violon by Paolo Antonio Testo': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Harpe by Naderman (Paris, 1780)': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Violes gambe by William Turner (Lo' (index 20)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Violes gambe by William Turner (Londres, 165' — 154w → 37w after gates, 5 sentence(s) removed
+    removed: "The journey of Palais Lascaris into a museum was further propelled when, in 1942, the city of Nice p"
+    removed: "This acquisition initiated the property's restoration, culminating in its 1946 designation as a hist"
+    removed: "Among the collection's highlights is the viol crafted by William Turner, who worked in London's Aldg"
+    removed: "Interestingly, Turner is primarily known for his contributions to painting, making this viol a rare "
+    removed: "As the violas da gamba transition from intimate chamber performances to the grandeur of concert hall"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Violes gambe by William Turner (Londres, 1652) is held at Palais Lascaris."
+
+  [LOCAL-474] PHASE 5.17: retry 'Basse de violon by Paolo Antonio Testore (Mi' — 209w → 174w after gates, 3 sentence(s) removed
+    removed: "This instrument, crafted during a time when Milan was burgeoning as a center for musical innovation,"
+    removed: "Located among other notable pieces such as the Violes gambe by William Turner that you have already "
+    removed: "As you stand here, consider how the rise of public concerts in the late 18th century demanded furthe"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Basse de violon by Paolo Antonio Testore (Milan, 1696) is held at Palais Lascaris."
+
+  [LOCAL-474] PHASE 5.17: retry 'Harpe by Naderman (Paris, 1780)' — 183w → 61w after gates, 7 sentence(s) removed
+    removed: "In 1780, Jean-Henri Naderman crafted this single-action pedal harp in Paris, demonstrating his unpar"
+    removed: "The harp features a wooden and metal construction."
+    removed: "Naderman specialized in creating instruments that not only catered to musical innovation but also em"
+    removed: "This specific harp was a sought-after piece, eventually owned by the Viscountess of Beaumont, linkin"
+    removed: "Intriguingly, the harp made its way into the collection of Antoine Gautier, a passionate music lover"
+    removed: "Gautier's decision to donate these pieces was driven by his desire to preserve musical history, whic"
+    removed: "This move marked a significant evolution for the harp as it transitioned from salons to a formal aca"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Harpe by Naderman (Paris, 1780) is held at Palais Lascaris."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: Violes gambe by William Turner (Londres, 1652) by , ...
+
+Generating description for Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) by , ...
+
+Generating description for Stop 3: Harpe by Naderman (Paris, 1780) by , ...
+  [LOCAL-381] stop='Violes gambe by William Turner (Londres, 1652)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=10 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Violes gambe by William Turner (Londres, 1652)', 10, ''), ('Violes gambe by William Turner (Londres, 1652)', 10, ''), ('Category: Palais Lascaris - The Paris Effect', 8, 'unverified')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 10 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=9932 after=29418 (+19486 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29418)
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Basse de violon by Paolo Antonio Testore (Milan, 1696)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=12 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Basse de violon by Paolo Antonio Testore (Milan, 1', 11, ''), ('Basse de violon by Paolo Antonio Testore (Milan, 1', 10, ''), ('Basse de violon by Paolo Antonio Testore (Milan, 1', 10, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 12 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=10495 after=31003 (+20508 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (31003)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Harpe by Naderman (Paris, 1780)' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=12 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Category: Palais Lascaris - The Paris Effect', 12, 'unverified'), ('Harpe by Naderman (Paris, 1780)', 8, ''), ('Harpe by Naderman (Paris, 1780)', 8, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 12 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=10701 after=28499 (+17798 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28499)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0059
+    story: "In 1942, the city of Nice purchased the Lascaris-Vintimille family's former residence with the intention of transforming it into a museum. This acquis"
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-569/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0056
+    story: "In 1901, Antoine Gautier, a dedicated music lover, decided to bequeath his impressive collection of musical instruments to the city of Nice. This gene"
+  [LOCAL-490] Stop 2 story pass: ok=True (5 sentences), $0.0059
+    story: "The Basse de violon by Paolo Antonio Testore was created in Milan in 1696, a time when Testore was beginning to establish himself as a violin maker. D"
+Stop 1 API call cost: $0.0400 (8420 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=298
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0385 (8104 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=2 words=286
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0418 (8799 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=2 words=281
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0416 (8761 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=255
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 3 API call cost: $0.0400 (8422 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 2/5 story_count=2 words=253
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 2 API call cost: $0.0436 (9168 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 2/5 story_count=1 words=276
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0433 (9126 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=1 words=237
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 4/5)
+Stop 3 API call cost: $0.0420 (8848 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 3/5 story_count=2 words=258
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+Stop 2 API call cost: $0.0454 (9549 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 3/5 story_count=3 words=261
+Stop 2 description word count: 261 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-569] Stop 2: KEEP-BEST ship — last attempt is best (story_count=3 words=261)
+Stop 1 API call cost: $0.0452 (9521 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=1 words=240
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0440 (9253 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 4/5 story_count=2 words=281
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0471 (9906 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=0 words=230
+Stop 1 description word count: 230 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['invites contemplation', 'a testament to']
+  [LOCAL-569] Stop 1: KEEP-BEST ship — shipping story_count=1 words=298 instead of last story_count=0 words=230
+Stop 3 API call cost: $0.0458 (9636 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 5/5 story_count=3 words=291
+Stop 3 description word count: 291 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-569] Stop 3: KEEP-BEST ship — last attempt is best (story_count=3 words=291)
+  [LOCAL-526] PHASE 5.17 regeneration wall: 20.4s for 3 stop(s) at max_workers=3
+    [LOCAL-474] regenerated and re-gated: 298w (was 37w)
+    [LOCAL-474] regenerated and re-gated: 242w (was 174w)
+    [LOCAL-474] regenerated and re-gated: 290w (was 61w)
+      [PERSON-CAP] stop 3: 'lascaris' already carries two stops — cut: This generous action led to the formation of a marvelous collection at Palais La
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 3 improved, 0 kept original
+  [LOCAL-487] triggers: 2 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.thehistoryofart.org/topics/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1874 chars from https://www.thehistoryofart.org/topics/printmaking
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Printmaking (attempt 1)
+  [LOCAL-459] R5: Fetched 2151 chars from https://en.wikipedia.org/wiki/Printmaking
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 1.8s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.8s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 8.5s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 15.0s (attempt 4, 15s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://news.masterworksfineart.com/2021/01/20/printmaking-techniques-defined-and-explained-in-plain-english (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://news.masterworksfineart.com/2021/01/20/pri
+  [LOCAL-427] HTTP 200 from https://www.artzolo.com/blogs/art-logs/printmaking-guide (attempt 1)
+  [LOCAL-459] R5: Fetched 416 chars from https://www.artzolo.com/blogs/art-logs/printmaking
+  [LOCAL-427] HTTP 200 from https://academickids.com/guides/printmaking-for-students (attempt 1)
+  [LOCAL-459] R5: Fetched 1546 chars from https://academickids.com/guides/printmaking-for-st
+  [LOCAL-427] HTTP 200 from https://creativitychronicles.com/what-are-the-basic-steps-in-printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1676 chars from https://creativitychronicles.com/what-are-the-basi
+  [D512] verb discovery: query='Palais Lascaris printmaking process how it is made technique ste' -> 6 new verb(s): raised, inked, mixed, produced, defined, prepared
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: Violes gambe by William Turner (Londres, 165
+    [D501] no object record for 'Violes gambe by William Turner (Londres, 165' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 3s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Basse de violon by Paolo Antonio Testore (Mi
+    [D501] no object record for 'Basse de violon by Paolo Antonio Testore (Mi' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: Harpe by Naderman (Paris, 1780)
+    [D501] no object record for 'Harpe by Naderman (Paris, 1780)' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/3 stops got a gated story (0 with multiple stories), ~$0.072, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Violes gambe by William Turner (Londres,   68    42     0    72
+     2  Basse de violon by Paolo Antonio Testore   40    46     0    60
+     3  Harpe by Naderman (Paris, 1780)            45    40    25    50
+    [LOCAL-485] index mean 51.0 over 3 stop(s), range 40-68
+    [LOCAL-485] weakest: 'Basse de violon by Paolo Antonio Testore' at 40
+[TIMING] phase=story_first elapsed=126.7s cumulative=267.7s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 3 facts found {'architecture': 3}
+  [LOCAL-382] Thesis block injected into prolog (351 chars)
+  [R2] Prolog saved for Stop 1 (80 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 80 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 80 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 116
+    Words after:  116
+    Delta: 0
+    Stops affected: 0/3
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 3.1s, $0.0083, 1239 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Violes gambe by William Turner (Londres, 1652)] (cause): Turner's viol, known for its distinctive heart-shaped motifs, represents a blend...
+      [Basse de violon by Paolo Antonio Testore (Milan, 1696)] (cause): This family tradition of excellence in instrument making, passed from father to ...
+      [Harpe by Naderman (Paris, 1780)] (celebrity_trivia): The harp was once owned by the Viscountess of Beaumont, linking it to the sophis...
+      [LOCAL-276] EXCLUDED (celebrity_trivia): [Harpe by Naderman (Paris, 1780)] The harp was once owned by the Viscountess of Beaumont, link...
+    [LOCAL-276] 2 intriguing / 1 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (2 stops)
+    Part 4 LLM cost: $0.0033 (535 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At the upcoming stops, you'll discover the heart-shaped motifs of Violes gambe by William Turner (Londres, 1652) and the family tradition of excellence in instrument making with the Basse de violon by Paolo Antonio Testore (Milan, 1696)."
+      FAIL: date '1696' attributed to 'Violes gambe by William Turner (Londres, 1652)' but belongs to a different stop
+    Part 4 LLM cost: $0.0033 (536 tokens) [attempt 2]
+    ✗ Part 4 attempt 2 FAILED verification:
+      Candidate: "At the upcoming stops, you'll explore the distinctive heart-shaped motifs of Violes gambe by William Turner (Londres, 1652) and the family tradition of excellence in instrument making with the Basse de violon by Paolo Antonio Testore (Milan, 1696)."
+      FAIL: date '1696' attributed to 'Violes gambe by William Turner (Londres, 1652)' but belongs to a different stop
+    ✗ Part 4 FAILED all 2 attempts — omitting
+      Last candidate: "At the upcoming stops, you'll explore the distinctive heart-shaped motifs of Violes gambe by William Turner (Londres, 1652) and the family tradition of excellence in instrument making with the Basse de violon by Paolo Antonio Testore (Milan, 1696)."
+    Part 4 total cost: $0.0065
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: False
+  [T4] Transition to Stop 2: Continue through Palais Lascaris — next is Basse de violon b...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [T4] Transition to Stop 3: Your final stop in Palais Lascaris: Harpe by Naderman (Paris...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap composition: 1.3s, $0.0027, 462 tokens
+  [LOCAL-280] Recap built: 30 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Violes gambe by William Turner (Londres, 1652)] (cause): "Turner's viol, known for its distinctive heart-shaped motifs, represents a blend..."
+      → composed: "Violes gambe by William Turner, featuring heart-shaped motifs, showcase 17th-century English luthiery"
+    [Basse de violon by Paolo Antonio Testore (Milan, 1696)] (cause): "This family tradition of excellence in instrument making, passed from father to ..."
+      → composed: "Basse de violon by Paolo Antonio Testore, exemplifying Italian craftsmanship spread across Europe"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Violes gambe by William Turner, featuring heart-shaped motifs, showcase 17th-century English luthiery and Basse de violon by Paolo Antonio Testore, exemplifying Italian craftsmanship spread across Europe."
+  [LOCAL-273] Part 1 (museum similar): Musee d Art Moderne et d Art Contemporain (2 km)
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=17 'restaurants tour in old city of Nice, France - Restaurant Tour' (0.1 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 3 (1825/legacy) — next sentence refers back to it ("This founding marked a pivotal moment, a...")
+  [D533] 0 repeated fact(s) removed, 1 kept
+  [D533] ROLE MISMATCH REPAIRED: 'Antoine Gautier' + 1901 — corpus says birth, tour says 'bequeathed'
+      removed: In 1901, Antoine Gautier, a dedicated music lover, bequeathed his impressive collection of musical instruments
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 0
+    Dropped: 2
+    AUDIT: hours | Open 10:00 to 12:00 | (no source) | DROPPED — no source content
+    AUDIT: admission | Admission 7€ (free for under 18, students) | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 2 claim(s) dropped
+  [D523] spoken-text hygiene: 0 template seam(s), 1 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 4 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: Violes gambe by William Turner (Londres, 1652) - 251 words
+Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) - 284 words
+Stop 3: Harpe by Naderman (Paris, 1780) - 240 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (7556 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['fabricated_attribution']
+  [LOCAL-540]   fabricated_attribution [REQUIRED_CLEAN]: 1 attribution(s); unverified attribution: "established in 1825 by Fran" (no source confirms it)
+  [LOCAL-540] REQUIRED_CLEAN defect present (['fabricated_attribution']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 3) for ['fabricated_attribution']
+  [LOCAL-540] retry rewrite: 1261 tokens, $0.005995 (gpt-4o)
+  [LOCAL-540] rescored after retry: defects ['fabricated_attribution'] -> []
+  [LOCAL-540] retry removed: ['fabricated_attribution']
+  [LOCAL-540] retry cleared all REQUIRED_CLEAN defects
+
+Total API cost: $0.3589 (34551 tokens)
+Grounding:      $0.0000 (0 requests)
+Tour total:     $0.3589
+Provenance:     1/33 factual sentences sourced, 32 unsourced (1 corpus, 0 grounded, 32 parametric)
+CACHE STORE: Palais Lascaris, Nice, France / museum / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Palais_B.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-569/LOCAL569_measure/Palais_B_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Palais Lascaris, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Violes gambe by William Turner (Londres, 1652)
+
+Coordinates: 43.6954, 7.2692
+
+Orientation: You are about to explore the Palais Lascaris in Nice, home to a remarkable collection of musical instruments. Encounter the Violes gambe by William Turner, Basse de violon by Paolo Antonio Testore, and Harpe by Naderman. These masterpieces showcase the evolution of musical craftsmanship across differe...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Violes gambe by William Turner (Londres, 1652): serp_results=8 snippets_injected=8 beats_in_delivered_text=0
+    Basse de violon by Paolo Antonio Testore (Milan, 1: serp_results=7 snippets_injected=7 beats_in_delivered_text=1
+    Harpe by Naderman (Paris, 1780): serp_results=8 snippets_injected=8 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=12.7s cumulative=280.3s
+[TIMING] phase=verification elapsed=0.0s cumulative=280.3s
+[TIMING] TOTAL wall=280.3s phases: story_first=126.7s, poi_selection=88.5s, external_lookups=34.0s, fact_sheets=16.5s, packing=12.7s, intent=2.0s, narration=0.1s, verification=0.0s
