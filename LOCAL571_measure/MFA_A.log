@@ -1,0 +1,70 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #005 | 03:00:24.336 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Museum of Fine Arts, Boston, MA
+  tour_type: museum
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/MFA_A.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #006 | 03:00:24.336 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Museum of Fine Arts, Boston, MA
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis failed: 429
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+⚠️ Intent analysis failed, using fallback detection
+[TIMING] phase=intent elapsed=0.2s cumulative=0.2s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Museum of Fine Arts, Boston, MA - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #007 | 03:00:24.557 | GENERATING_PROMPT
+======================================================================
+  location: Museum of Fine Arts, Boston, MA
+  user_request: Museum of Fine Arts, Boston, MA
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for Museum of Fine Arts, Boston, MA...
+  [Museum constraint] No venue_name from intent — single-venue constraint skipped
+  [BLOCKER4a] venue_name from location fallback: 'Museum Of Fine Arts'
+  [venue_resolver] Name variants: ['Museum Of Fine Arts']
+  [venue_resolver] No Wikidata candidates for 'Museum Of Fine Arts'
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] Name variants: ['Museum Of Fine Arts']
+  [venue_resolver] No Wikidata candidates for 'Museum Of Fine Arts'
+  [venue_resolver] Name variants: ['Museum Of Fine Arts']
+  [venue_resolver] No Wikidata candidates for 'Museum Of Fine Arts'
+  [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #008 | 03:00:24.559 | PHASE_3A_REQUEST
+======================================================================
+  location: Museum of Fine Arts, Boston, MA
+  total_stops: 3
+  poi_type_hint: museum stops
+
+X PHASE 3A failed: status 429
+{
+    "error": {
+        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "credit_balance_exhausted"
+    }
+}
+

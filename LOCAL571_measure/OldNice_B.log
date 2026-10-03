@@ -1,0 +1,65 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #030 | 03:00:28.195 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: walking tour of Old Nice, France
+  tour_type: walking
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_B.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #031 | 03:00:28.195 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: walking tour of Old Nice, France
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'walking tour of Old Nice, France' → 'walking  of Old Nice, France'
+  [LOCAL-46] Stripped transport words: 'walking  of Old Nice, France' → 'of Old Nice, France'
+  [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis failed: 429
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+⚠️ Intent analysis failed, using fallback detection
+[TIMING] phase=intent elapsed=0.1s cumulative=0.1s
+[LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
+
+Detected tour category: WALKING
+Using walking template for walking tour of Old Nice, France - walking
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #032 | 03:00:28.313 | GENERATING_PROMPT
+======================================================================
+  location: walking tour of Old Nice, France
+  user_request: walking tour of Old Nice, France
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for walking tour of Old Nice, France...
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #033 | 03:00:28.313 | PHASE_3A_REQUEST
+======================================================================
+  location: walking tour of Old Nice, France
+  total_stops: 3
+  poi_type_hint: walking stops
+
+X PHASE 3A failed: status 429
+{
+    "error": {
+        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "credit_balance_exhausted"
+    }
+}
+

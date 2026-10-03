@@ -1,0 +1,66 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #009 | 03:00:24.720 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: restaurant tour of Boston, MA
+  tour_type: restaurant
+  total_stops_parameter: 3
+  output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/BosRest_A.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #010 | 03:00:24.720 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: restaurant tour of Boston, MA
+  total_stops_final: 3
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Boston, MA' → 'restaurant  of Boston, MA'
+  [LOCAL-46] Stripped transport words: 'restaurant  of Boston, MA' → 'restaurant of Boston, MA'
+  [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis failed: 429
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+⚠️ Intent analysis failed, using fallback detection
+[TIMING] phase=intent elapsed=0.1s cumulative=0.1s
+[LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
+
+Detected tour category: RESTAURANT
+Using restaurant template for restaurant tour of Boston, MA - restaurant
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #011 | 03:00:24.855 | GENERATING_PROMPT
+======================================================================
+  location: restaurant tour of Boston, MA
+  user_request: restaurant tour of Boston, MA
+  total_stops: 3
+
+
+PHASE 3A: Fetching 3 candidate POI(s) for restaurant tour of Boston, MA...
+  [LOCAL-285/329] Restaurant constraint injected for area='restaurant tour of Boston, MA'
+  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+
+======================================================================
+CALL #012 | 03:00:24.855 | PHASE_3A_REQUEST
+======================================================================
+  location: restaurant tour of Boston, MA
+  total_stops: 3
+  poi_type_hint: restaurant stops
+
+X PHASE 3A failed: status 429
+{
+    "error": {
+        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+        "type": "insufficient_quota",
+        "param": null,
+        "code": "credit_balance_exhausted"
+    }
+}
+
