@@ -253,3 +253,89 @@ edit. The change is left in, flag-gated OFF (zero production impact), as the
 cache-ready scaffold for the day the prompt is refactored so the big static block
 no longer says "above" (see §3).
 
+---
+
+## §3 — Proposals for Michael (not implemented)
+
+Ranked by expected $/tour saved. All figures are from the 8 LOCAL-560 recorded
+tours; "writer $" is the gpt-4o stop-description writer only, which is 81% of
+LLM cost. Current writer average = **$0.271/tour** (undiscounted gpt-4o).
+
+### P1 — Cap writer regenerations / earn a better first draft  ⟵ biggest lever
+
+**Evidence.** Writer calls per stop range from 1.2 (sail_loft) to **9.8 (Palais:
+39 calls for 4 stops)**. The retry storm is driven by `[LOCAL-432]` STORY RETRY
+(re-write when `story_count < 3`, up to attempt 5/5) and `[LOCAL-417]`. It is
+concentrated: Palais ($1.014) + Chart House ($0.331) hold most of it; the other
+six tours are already at 1–2 writes/stop.
+
+**Proposal.** Lower the per-stop writer retry ceiling (e.g. attempt cap 5 → 2–3)
+and/or make the retry *cheaper than a full re-write* — the current retry resends
+the entire ~7,100-token prompt to regenerate a whole stop because of ONE missing
+story sentence. Options to blind-test: (a) a hard cap of 2 writer calls/stop;
+(b) a targeted "add one more named-person sentence" micro-prompt (hundreds of
+tokens, not thousands) instead of a full-stop rewrite; (c) raise the first-draft
+hit rate by moving the `STORY REQUIREMENT` reinforcement into the first prompt
+(it already is — so the lever is the *acceptance threshold*, not more prompting).
+
+**Expected saving.** Capping at 2 writes/stop on the recorded set:
+**writer $0.271 → $0.147 per tour (−46%)**; the whole saving is Palais (−$0.82)
+and Chart House (−$0.17). This is **~10× larger than the entire caching upside**
+and the single highest-value change. Risk: fewer retries could lower
+`story_count` on hard stops — blind-test against the LOCAL-563 noise floor
+(named_people, defects) before shipping; keep the retry for stops that are still
+`thin` after draft 1, drop it for stops already clean.
+
+### P2 — Blind-test a cheaper writer model
+
+**Evidence.** Input is 82% of writer cost and 67% of it is already cached, so the
+model's input rate dominates. The writer runs on gpt-4o
+(`TOUR_STORY_MODEL`, default gpt-4o). LOCAL-560 established that gpt-3.5 **cannot**
+sustain a sourced story (0–2 story sentences, gate FAILED) — so the floor is "as
+good as gpt-4o on the story gate", not "cheapest model".
+
+**Proposal & expected $/tour (same recorded token volume, cached input at 50%):**
+
+| Writer model | Writer $/tour | vs gpt-4o | Recommendation |
+|---|---:|---:|---|
+| gpt-4o (today) | $0.196 | — | baseline |
+| **gpt-4.1** | ~$0.157 | **−20%** | **blind-test first** — closest quality, ~20% cheaper input/output |
+| gpt-4o-mini | $0.012 | −94% | test **per-section**: fine for orientation/physical-description, likely fails the story gate on its own — use only where LOCAL-560's recall rule passes |
+| Claude Sonnet | n/a | — | needs an Anthropic account/key (none in repo); defer until provisioned |
+
+Recommended order: **gpt-4.1 for the whole writer** (biggest safe win), then a
+**mixed-model** trial (gpt-4o-mini for the non-story sections, gpt-4o/4.1 for the
+story sentences) measured against the LOCAL-563 noise floor and the LOCAL-560
+story-gate recall rule. gpt-4o-mini's 94% paper saving is only real if it clears
+the gate — treat the number as an upper bound, not a promise.
+
+Note: P1 and P2 **compound** — cap retries first, then switch model, because P2's
+per-call saving multiplies across however many calls P1 leaves.
+
+### P3 — Museum D1 / venue-verification on a cheaper model  ⟵ smallest lever
+
+**Evidence.** The D1/venue-verification path (`stop_knowledge_fallback.py:166`
+`_prose_to_facts`, `TOUR_FALLBACK_MODEL`, default gpt-4o) plus the spine/story
+passes cost **~$0.02–0.05 per museum tour** — cents, not dollars (§1 Q5).
+
+**Proposal.** Set `TOUR_FALLBACK_MODEL=gpt-4o-mini` for `_prose_to_facts`
+(structuring prose into facts is a low-reasoning task) **under the LOCAL-560
+recall rule** — only adopt if mini recovers the same facts the gpt-4o call did on
+the LOCAL-560 museum fixtures. Expected saving **< $0.03/tour**. Worth doing for
+tidiness once P1/P2 land, but it is not where the money is.
+
+### Summary ranking
+
+| # | Proposal | Expected writer $/tour | Saving vs $0.196–0.271 | Risk |
+|---|---|---:|---:|---|
+| **P1** | Cap regenerations at 2/stop | $0.147 | **−46%** (−$0.12/tour avg; −$0.82 on Palais) | medium — guard with noise-floor A/B |
+| **P2** | Writer on gpt-4.1 | $0.157 | −20% | low — blind-test vs story gate |
+| P2b | Mixed gpt-4o-mini sections | →$0.012 (upper bound) | up to −94% | high — must pass story gate |
+| P3 | D1 on gpt-4o-mini | −<$0.03 | marginal | low |
+
+**One-line recommendation:** the caching work (§2) is a dead end for savings;
+spend the effort on **P1 (fewer regenerations)** — it is ~half the writer bill,
+concentrated in a handful of museum tours, and testable against an existing
+noise floor.
+
+
