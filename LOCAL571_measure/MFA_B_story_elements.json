@@ -1,0 +1,900 @@
+[
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+    "source_sentence": "Museum purchase with funds from the Francis Bartlett Donation of 1900.",
+    "people": [
+      "Francis Bartlett"
+    ],
+    "dates": [
+      "1900"
+    ],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "disputed",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "dispute_pair": 14,
+    "rank_score": 5.5,
+    "id": "se_001"
+  },
+  {
+    "type": "dedication",
+    "text": "The second phase of construction built a wing along The Fens to house painting galleries, funded entirely by Maria Antoinette Evans Hunt, and opened in 1915.",
+    "source_sentence": "The second phase of construction built a wing along The Fens to house painting galleries. It was funded entirely by Maria Antoinette Evans Hunt, the wife of wealthy business magnate Robert Dawson Evans, and opened in 1915.",
+    "people": [
+      "Maria Antoinette Evans Hunt",
+      "Robert Dawson Evans"
+    ],
+    "dates": [
+      "1915"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_002"
+  },
+  {
+    "type": "dedication",
+    "text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' created in 1934.",
+    "source_sentence": "Gift of the Loïs Mailou Jones Pierre-Noël Trust.",
+    "people": [
+      "Loïs Mailou Jones Pierre-Noël Trust"
+    ],
+    "dates": [
+      "1934"
+    ],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_003"
+  },
+  {
+    "type": "dedication",
+    "text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy was gifted to the MFA in 2018.",
+    "source_sentence": "The already strong collection of Song and Yuan dynasty paintings was in 2018 expanded dramatically by the gift of the unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy.",
+    "people": [
+      "Wan-go H. C. Weng"
+    ],
+    "dates": [
+      "2018"
+    ],
+    "source_url": "http://www.mfa.org/collections/asia",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/asia"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_004"
+  },
+  {
+    "type": "dedication",
+    "text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani opaque watercolor on paper.",
+    "source_sentence": "Unknown artist, Maharana Sangram Singh Enjoys the Monsoon (detail), Indian, Rajasthani, about 1720–25. Opaque watercolor on paper. Gift of John Goelet.",
+    "people": [
+      "John Goelet"
+    ],
+    "dates": [
+      "about 1720–25"
+    ],
+    "source_url": "http://www.mfa.org/collections/asia",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/asia"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_005"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a marble statue of Juno with funds donated by George D. and Margo Behrakis.",
+    "source_sentence": "Museum purchase with funds donated by George D. and Margo Behrakis.",
+    "people": [
+      "George D. Behrakis",
+      "Margo Behrakis"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "disputed",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "dispute_pair": 16,
+    "rank_score": 5.0,
+    "id": "se_006"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+    "source_sentence": "Museum purchase with funds from the Francis Bartlett Donation of 1900.",
+    "people": [
+      "Francis Bartlett"
+    ],
+    "dates": [
+      "1900"
+    ],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_007"
+  },
+  {
+    "type": "dedication",
+    "text": "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Donation of 1912.",
+    "source_sentence": "Museum purchase with funds from the Francis Bartlett Donation of 1912.",
+    "people": [
+      "Francis Bartlett"
+    ],
+    "dates": [
+      "1912"
+    ],
+    "source_url": "http://www.mfa.org/collections/ancient-greece-and-rome",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/ancient-greece-and-rome"
+        }
+      ]
+    },
+    "rank_score": 5.0,
+    "id": "se_008"
+  },
+  {
+    "type": "origin",
+    "text": "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston Athenæum.",
+    "source_sentence": "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston Athenæum.",
+    "people": [],
+    "dates": [
+      "1870"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "_merge_log": [
+      {
+        "pair": [
+          2,
+          10
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          12
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          13
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          14
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          15
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          16
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          2,
+          17
+        ],
+        "a_text": "The second phase of construction built a wing along The Fens to house painting g",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          6,
+          7
+        ],
+        "a_text": "In November 2020, a significant number of MFA employees voted to unionize due to",
+        "b_text": "MFA staff went on a strike for the first time on November 17, 2021, citing unres",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "en.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          8,
+          9
+        ],
+        "a_text": "Forsyth Wickes donated the artwork titled 'Laughing Man' as part of The Forsyth ",
+        "b_text": "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' around 18",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          8,
+          11
+        ],
+        "a_text": "Forsyth Wickes donated the artwork titled 'Laughing Man' as part of The Forsyth ",
+        "b_text": "Ruth S. Pollen bequeathed the etching 'Self-Portrait with Saskia' created in 163",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          9,
+          11
+        ],
+        "a_text": "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' around 18",
+        "b_text": "Ruth S. Pollen bequeathed the etching 'Self-Portrait with Saskia' created in 163",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          10,
+          12
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "b_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          10,
+          13
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "b_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          10,
+          14
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          10,
+          15
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          10,
+          16
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          10,
+          17
+        ],
+        "a_text": "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' creat",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          12,
+          13
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          12,
+          14
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          12,
+          15
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          12,
+          16
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          12,
+          17
+        ],
+        "a_text": "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and cal",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          13,
+          14
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          13,
+          15
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          13,
+          16
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          13,
+          17
+        ],
+        "a_text": "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', a",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          14,
+          15
+        ],
+        "a_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "b_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          14,
+          16
+        ],
+        "a_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": true,
+        "conflicting": true,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "disputed"
+      },
+      {
+        "pair": [
+          14,
+          17
+        ],
+        "a_text": "The Museum purchased a marble statue of Juno with funds donated by George D. and",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          15,
+          16
+        ],
+        "a_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "b_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          15,
+          17
+        ],
+        "a_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Ba",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      },
+      {
+        "pair": [
+          16,
+          17
+        ],
+        "a_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the ",
+        "b_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the ",
+        "same_subject": false,
+        "conflicting": false,
+        "a_domain": "www.mfa.org",
+        "b_domain": "www.mfa.org",
+        "action": "no_merge"
+      }
+    ],
+    "rank_score": 4.5,
+    "id": "se_009"
+  },
+  {
+    "type": "turning_point",
+    "text": "In 2010, the new Art of the Americas Wing opened with free admission to the public.",
+    "source_sentence": "The wing opened on November 20, 2010, with free admission to the public.",
+    "people": [],
+    "dates": [
+      "2010"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 4.5,
+    "id": "se_010"
+  },
+  {
+    "type": "controversy",
+    "text": "In November 2020, a significant number of MFA employees voted to unionize due to a long history of unaddressed issues related to workplace conditions and compensation inequities.",
+    "source_sentence": "In November 2020 a significant number of MFA employees voted to unionize due to a long history of unaddressed issues related to workplace conditions and compensation inequities.",
+    "people": [],
+    "dates": [
+      "2020"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 4.0,
+    "id": "se_011"
+  },
+  {
+    "type": "controversy",
+    "text": "MFA staff went on a strike for the first time on November 17, 2021, citing unresponsive engagement from MFA management over multiple issues.",
+    "source_sentence": "After over 96% of the union agreed in a vote, MFA staff went on a strike for the first time on November 17, 2021.",
+    "people": [],
+    "dates": [
+      "2021"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 4.0,
+    "id": "se_012"
+  },
+  {
+    "type": "reference_work",
+    "text": "The 12,000-square-foot glass-enclosed courtyard features a 42.5-foot high glass sculpture, titled the Lime Green Icicle Tower, by Dale Chihuly.",
+    "source_sentence": "The 12,000-square-foot (1,100 m2) glass-enclosed courtyard now features a 42.5-foot (13.0 m) high glass sculpture, titled the Lime Green Icicle Tower, by Dale Chihuly.",
+    "people": [
+      "Dale Chihuly"
+    ],
+    "dates": [],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_013"
+  },
+  {
+    "type": "provenance",
+    "text": "W. G. Russell Allen bequeathed the lithograph 'Woman Seated in a Loge' around 1880.",
+    "source_sentence": "Bequest of W. G. Russell Allen.",
+    "people": [
+      "W. G. Russell Allen"
+    ],
+    "dates": [
+      "1880"
+    ],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_014"
+  },
+  {
+    "type": "provenance",
+    "text": "Ruth S. Pollen bequeathed the etching 'Self-Portrait with Saskia' created in 1636.",
+    "source_sentence": "Bequest of Ruth S. Pollen.",
+    "people": [
+      "Ruth S. Pollen"
+    ],
+    "dates": [
+      "1636"
+    ],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 3.5,
+    "id": "se_015"
+  },
+  {
+    "type": "reception",
+    "text": "More than 13,500 visitors attended the opening of the Art of the Americas Wing.",
+    "source_sentence": "Mayor Thomas Menino declared it 'Museum of Fine Arts Day', and more than 13,500 visitors attended the opening.",
+    "people": [
+      "Thomas Menino"
+    ],
+    "dates": [],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 3.0,
+    "id": "se_016"
+  },
+  {
+    "type": "provenance",
+    "text": "Forsyth Wickes donated the artwork titled 'Laughing Man' as part of The Forsyth Wickes Collection.",
+    "source_sentence": "Bequest of Forsyth Wickes—The Forsyth Wickes Collection.",
+    "people": [
+      "Forsyth Wickes"
+    ],
+    "dates": [],
+    "source_url": "http://www.mfa.org/collections/prints-and-drawings",
+    "source_domain": "www.mfa.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "www.mfa.org",
+          "url": "http://www.mfa.org/collections/prints-and-drawings"
+        }
+      ]
+    },
+    "rank_score": 3.0,
+    "id": "se_017"
+  },
+  {
+    "type": "date",
+    "text": "The museum moved to its current Fenway location in 1909.",
+    "source_sentence": "The museum moved to its current Fenway location in 1909.",
+    "people": [],
+    "dates": [
+      "1909"
+    ],
+    "is_satire": false,
+    "source_url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston",
+    "source_domain": "en.wikipedia.org",
+    "corroboration_status": "reported",
+    "independent_source_count": 1,
+    "syndication_log": {
+      "total_in_group": 1,
+      "independent_after_dedup": 1,
+      "sources": [
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston"
+        }
+      ]
+    },
+    "rank_score": 2.5,
+    "id": "se_018"
+  }
+]

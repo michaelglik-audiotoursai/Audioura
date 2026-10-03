@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #027 | 03:10:22.717 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #033 | 17:11:05.035 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: walking tour of Old Nice, France
   tour_type: walking
@@ -9,10 +9,10 @@ CALL #027 | 03:10:22.717 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_B.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #028 | 03:10:22.717 | TOTAL_STOPS_FINALIZED
+CALL #034 | 17:11:05.035 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: walking tour of Old Nice, France
   total_stops_final: 3
@@ -23,18 +23,42 @@ PHASE 1: Analyzing tour intent with AI...
   [BLOCKER1] Stripped 'tour' from location: 'walking tour of Old Nice, France' → 'walking  of Old Nice, France'
   [LOCAL-46] Stripped transport words: 'walking  of Old Nice, France' → 'of Old Nice, France'
   [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
-Intent analysis failed: 429
+Intent analysis response: ```json
+{
+    "poi_type": "landmarks",
+    "location": "Old Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Old Nice, France",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
   [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
-⚠️ Intent analysis failed, using fallback detection
-[TIMING] phase=intent elapsed=0.2s cumulative=0.2s
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Old Nice, France
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.8s cumulative=1.8s
 [LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
 
 Detected tour category: WALKING
 Using walking template for walking tour of Old Nice, France - walking
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #029 | 03:10:22.905 | GENERATING_PROMPT
+CALL #035 | 17:11:06.853 | GENERATING_PROMPT
 ======================================================================
   location: walking tour of Old Nice, France
   user_request: walking tour of Old Nice, France
@@ -42,24 +66,558 @@ CALL #029 | 03:10:22.905 | GENERATING_PROMPT
 
 
 PHASE 3A: Fetching 3 candidate POI(s) for walking tour of Old Nice, France...
-  [S17] no scope_constraint (precision='', scope='')
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Old Nice, France'
   [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #030 | 03:10:22.905 | PHASE_3A_REQUEST
+CALL #036 | 17:11:06.854 | PHASE_3A_REQUEST
 ======================================================================
   location: walking tour of Old Nice, France
   total_stops: 3
-  poi_type_hint: walking stops
+  poi_type_hint: landmarks
 
-X PHASE 3A failed: status 429
-{
-    "error": {
-        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
-        "type": "insufficient_quota",
-        "param": null,
-        "code": "credit_balance_exhausted"
-    }
-}
+PHASE 3A API call cost: $0.0006 (723 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
+======================================================================
+CALL #037 | 17:11:11.263 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for walking tour of Old Nice, France.
+List exactly 6 specific, real, well-known landmarks relevant to: walking tour of Old Nice, France.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Old Nice, France.
+- Do NOT include well-known 
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Cours Saleya Market", "address": "Cours Saleya, 06300 Nice, France", "reason": "A vibrant market known for its fresh produce and flowers, established in the 19th century, it reflects the local culture and culinary traditions."},
+    {"name": "Palais Lascaris", "address": "15 Rue Droite, 06300 Nice, France", "reason": "A baroque palace dating back to the 17th century, it houses a museum of musical instruments and showcases the rich history of the Lascaris family."},
+    {"name": "
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'Promenade des Anglais'
+  [LOCAL-329] Captured 5 substantive selection reason(s)
+OK PHASE 3A parsed 5 candidate POI(s):
+   - Cours Saleya Market @ Cours Saleya, 06300 Nice, France
+   - Palais Lascaris @ 15 Rue Droite, 06300 Nice, France
+   - Église de l'Annonciation @ Rue de la Poissonnerie, 06300 Nice, France
+   - Place Rossetti @ Place Rossetti, 06300 Nice, France
+   - Fenocchio @ 2 Place Rossetti, 06300 Nice, France
+  [area_resolver] Parsed: city='France', neighborhood='Old Nice'
+  [area_resolver] 'France' resolved as country (Q142), swapping: city='Old Nice'
+  [area_resolver] City resolved: Old Nice → Q3558059 (43.6967, 7.2759)
+  [area_resolver] Resolved: center=(43.6967, 7.2759), radius=2.0km, lang=fr
+  [area_cache] HIT for Q3558059: 40 landmarks (tier=rich)
+  [verify_landmarks] 1/5 stops verified against 40 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 1 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for walking tour of Old Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection: 1 COVERED, fallback needed: 2×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Cours Saleya Market=COVERED', 'Fenocchio=VENUE_ONLY', 'Palais Lascaris=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Place Rossetti=VENUE_ONLY', "Église de l'Annonciation=EMPTY"]
+  [LOCAL-349] Yield scores (selected): ['Cours Saleya Market=3.5', 'Fenocchio=7.5', 'Palais Lascaris=5.0']
+  [LOCAL-349] Yield scores (dropped):  ['Place Rossetti=1.0', "Église de l'Annonciation=0.0"]
+  [EXISTENCE-GATE] LOG_ONLY — 0/5 stops verified (0%), 5 would be dropped
+    [UNVERIFIED] 'Cours Saleya Market' — no evidence
+    [UNVERIFIED] 'Fenocchio' — no evidence
+    [UNVERIFIED] 'Palais Lascaris' — no evidence
+    [UNVERIFIED] 'Place Rossetti' — no evidence
+    [UNVERIFIED] "Église de l'Annonciation" — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 1 stops with coordinates — skipping algorithmic routing
+  [LOCAL-329] Persisted 1 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
+
+======================================================================
+CALL #038 | 17:11:20.077 | PHASE_3B_REQUEST
+======================================================================
+  location: walking tour of Old Nice, France
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0007 (919 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Nice, hint: auto)
+  [LOCAL-355] Cours Saleya Market: no practical facts in OSM
+  [LOCAL-355] Fenocchio: no practical facts in OSM
+  [LOCAL-355] Palais Lascaris: no practical facts in OSM
+   GEO-CHECK: all 3 stops within walking distance (max leg 1.02 km, total 1.20 km, limit 12 km)
+Extracted first POI coordinates: (43.6955, 7.2656)
+
+=== Extracted POI Information ===
+1. Cours Saleya Market
+   Address: Cours Saleya, 06300 Nice, France
+   Coordinates: 43.6955, 7.2656
+   Directions: From the Nice Ville train station, head south on Avenue Thiers towards Rue de Fr...
+2. Fenocchio
+   Address: 2 Place Rossetti, 06300 Nice, France
+   Coordinates: 43.6954, 7.2634
+   Directions: From Cours Saleya Market, head northwest on Cours Saleya towards Rue Saint-Franç...
+3. Palais Lascaris
+   Address: 15 Rue Droite, 06300 Nice, France
+   Coordinates: 43.6961, 7.2761
+   Directions: From Fenocchio, head southeast on Place Rossetti towards Rue de la Préfecture. T...
+================================
+
+  [D556] +2 story fact(s) for 'Cours Saleya Market' via openai+web(12) (2 high)
+  [D556] +1 story fact(s) for 'Fenocchio' via openai+web(8) (1 high)
+  [D556] +3 story fact(s) for 'Palais Lascaris' via openai+web(13) (3 high)
+[TIMING] phase=poi_selection elapsed=64.8s cumulative=66.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Cours Saleya Market of Old Nice' → 39192 chars
+  [LOCAL-47] Cours Saleya Market: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Fenocchio of Old Nice' → 542 chars
+  [LOCAL-47] Fenocchio: tier=rich, facts=4
+  [LOCAL-186] Disambiguated fetch hit: 'Palais Lascaris of Old Nice' → 6406 chars
+  [LOCAL-47] Palais Lascaris: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 3}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=walking tour of Old Nice, Fran model=gpt-4o tokens=1405 (in=853 out=552) cost=$0.0077 latency=3.7s
+[COST_METER] FRESH | spine_generate | $0.007653 | user=None | job=local571-OldNice_B
+  [LOCAL-278] Spine cost folded into total: $0.0077
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (95 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Cours Saleya Market' verdict=COVERED action=PASSED
+  [CORPUS-GATE] stop='Fenocchio' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Palais Lascaris' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 1 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 2 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=11.2s cumulative=77.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=77.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=77.8s
+
+Generating description for Stop 1: Cours Saleya Market by , ...
+
+Generating description for Stop 2: Fenocchio by , ...
+
+Generating description for Stop 3: Palais Lascaris by , ...
+  [LOCAL-381] stop='Cours Saleya Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cours Saleya Market', 16, ''), ('Cours Saleya Market', 6, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14442 after=24625 (+10183 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24625)
+  [LOCAL-381] stop='Palais Lascaris' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Palais Lascaris', 17, ''), ('Palais Lascaris', 9, ''), ('Palais Lascaris', 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12910 after=25127 (+12217 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25127)
+  [LOCAL-381] stop='Fenocchio' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=1 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=1 usable=1 (t1t2=0, t3=0, market=0)
+    Top scores: [('Fenocchio', 6, '')]
+  [LOCAL-402] Stop 2: injected 1 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 1 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14076 after=25786 (+11710 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25786)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+Stop 2 API call cost: $0.0254 (6678 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=321
+Stop 2 description word count: 321 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0247 (6503 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=0 words=307
+Stop 3 description word count: 307 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0240 (6311 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=387
+Stop 1 description word count: 387 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Cours Saleya Market': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Fenocchio': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✗ FAIL stop='Palais Lascaris': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002730 (input=11154, output=1761)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 2: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 3 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0018 (2235 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 2 'Fenocchio': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 2 'Fenocchio': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 3 'Palais Lascaris': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 9
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 1
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Cours Saleya Market' entity='Menica Rondelly' reason='It does not specify how Menica Rondelly relates to the Cours Saleya Market.' in: "From 1921 to 1938, Henri Matisse lived at 1 Place Charles Félix, at the market’s eastern edge. The s"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/38)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 15
+    Glossed (composed): 4
+    Suppressed (already explained): 1
+    Degraded (name dropped): 4
+    Guard failures: 0
+    Known (skipped): 6
+    Triage: 1708 tokens, $0.0004, 5.0s
+    Gloss: 754 tokens, $0.0001, 2.7s
+    Compose: 1670 tokens, $0.0003, 1.9s
+    Total added cost: $0.0008
+    Stops affected: 3
+    Glosses applied:
+      • Place Charles Félix → SUPPRESSED (already explained)
+      • Nissa La Bella → DEGRADED (name dropped)
+      • Menica Rondelly → DEGRADED (name dropped)
+      • Place Rossetti → "a family-run ice cream parlour" [source: corpus]
+      • La Gaude → "a family-owned business since 1966" [source: corpus]
+      • Rue de la Poissonnerie → DEGRADED (name dropped)
+      • Charles Emmanuel → DEGRADED (name dropped)
+      • Monument Historique → "a designation for historically significant sites" [source: model]
+      • Musée Masséna → "the city's historical musical instrument collection" [source: corpus]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Old Nice, France'...
+   OK 'Fenocchio' — inside 'Old Nice, France': The address provided is within the bounds of 'Old Nice, France'. (conf=high)
+   OK 'Palais Lascaris' — inside 'Old Nice, France': Palais Lascaris is located within the bounds of Old Nice, France. (conf=high)
+OK PHASE 5.6: 3/3 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 3 'Palais Lascaris' (index 80) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 2 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Cours Saleya Market': the longest run (5 sentences, The Cours Saleya Market) has agency=0 stakes=0 — someone is described, but nothi
+    stop 2 'Fenocchio': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Cours Saleya Market' (index 41)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Cours Saleya Market' — 387w → 327w after gates, 7 sentence(s) removed
+    removed: "Cours Saleya Market thrums with the pulse of Nice, a city whose agglomeration sprawls to nearly one "
+    removed: "Nice stands at the foot of the French Alps, on the Mediterranean’s southeastern edge, and this marke"
+    removed: "The Cours Saleya square first became famous for its bustling flower market in the 17th century, and "
+    removed: "By 1861, the fruit and vegetable market had already taken hold, soon joined by the flower market, as"
+    removed: "The early morning arrivals—growers from the hills carrying armfuls of blooms—became such a fixture t"
+    removed: "The practice of hauling crates of roses, narcissus, and mimosa at dawn gave the city its reputation "
+    removed: "The Cours Saleya Market, recognized as part of Nice’s UNESCO World Heritage designation in 2021, sta"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Fenocchio' — 321w → 261w after gates, 4 sentence(s) removed
+    removed: "When Fenocchio first opened its doors in 1966 on Place Rossetti, it was a family venture."
+    removed: "Local tradition holds that the family’s laboratory, set on the hill in La Gaude, crafted these recip"
+    removed: "The story passed down along these streets is that Fenocchio’s expansion in 1988—when a second shop o"
+    removed: "As you savor the last bite, the air seems to carry a promise—just beyond, music waits in the next sq"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Palais Lascaris' — 307w → 268w after gates, 12 sentence(s) removed
+    removed: "This building was erected in the middle of the 17th century for the Lascaris-Vintimille family—whom "
+    removed: "Ownership passed through the Lascaris-Vintimille line until the Revolution."
+    removed: "In 1802, the palace was sold—its walls and roof left to weather decades of neglect."
+    removed: "By 1942, when the city of Nice purchased the crumbling building, much of its former grandeur had fad"
+    removed: "Yet in 1946, its status as a Monument Historique was secured, saving it from further decay."
+    removed: "Restoration began in earnest in 1962, culminating in the palace’s reopening as a museum eight years "
+    removed: "A second story is written in the objects that now fill these rooms."
+    removed: "In 2001, the city’s historic collection of musical instruments—over 500 in all—was transferred here "
+    removed: "The palace’s salons, once reserved for private concerts and the hum of family life, now shelter Fran"
+    removed: "The faint scent of beeswax from polished wood mingles with the quiet, the strings and brass at rest,"
+    removed: "After the riot of flavors at Fenocchio that you stopped at a moment ago, the palace offers a differe"
+    removed: "As you exit the palace, consider how the echoes of its grandeur reverberate through the narrow stree"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: Cours Saleya Market by , ...
+
+Generating description for Stop 2: Fenocchio by , ...
+
+Generating description for Stop 3: Palais Lascaris by , ...
+  [LOCAL-381] stop='Fenocchio' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=1 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=1 usable=1 (t1t2=0, t3=0, market=0)
+    Top scores: [('Fenocchio', 6, '')]
+  [LOCAL-402] Stop 2: injected 1 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 1 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14076 after=25786 (+11710 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25786)
+  [LOCAL-381] stop='Palais Lascaris' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Palais Lascaris', 17, ''), ('Palais Lascaris', 9, ''), ('Palais Lascaris', 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12910 after=25127 (+12217 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25127)
+  [LOCAL-381] stop='Cours Saleya Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cours Saleya Market', 16, ''), ('Cours Saleya Market', 6, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14442 after=24625 (+10183 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24625)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+Stop 3 API call cost: $0.0267 (7030 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=0 words=265
+Stop 3 description word count: 265 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0271 (7119 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=0 words=343
+Stop 2 description word count: 343 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0256 (6743 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=347
+Stop 1 description word count: 347 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.2s for 3 stop(s) at max_workers=3
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 343w (was 261w)
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 1 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 2 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [D512] _AGENCY_VERB widened by 5 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Cours Saleya Market                        41    42    14    77
+     2  Fenocchio                                  51    24    13    53
+     3  Palais Lascaris                            80    66    36    30
+    [LOCAL-485] index mean 57.3 over 3 stop(s), range 41-80
+    [LOCAL-485] weakest: 'Cours Saleya Market' at 41
+[TIMING] phase=story_first elapsed=79.3s cumulative=157.1s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (97 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 97 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 1 sentence(s) deleted
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 73 words (delta: -24)
+  [LOCAL-244] Prolog deletions (1):
+    [R7_HALLUCINATED_SENSORY] "Along the way, you'll traverse narrow streets lined with ancient architecture, revealing layers of h..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 1 sentence(s) deleted
+    Stop 2 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 228
+    Words after:  138
+    Delta: -90
+    Stops affected: 3/3
+    Deletions (3):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "Beneath the striped awnings, vendors call out the day’s best finds, their voices weaving through the..."
+      [Stop 2][R7_HALLUCINATED_SENSORY] "Standing at the edge of Place Rossetti, the stones beneath your feet warm from decades of sun, you f..."
+      [Stop 3][R7_HALLUCINATED_SENSORY] "Pause at the threshold, where the scent of old wood and polished stone drifts out from the palace’s ..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.3s, $0.0076, 1158 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Cours Saleya Market] (dated_event): In 1897, Nice established the world's first wholesale cut flower market here, so...
+      [Fenocchio] (cause): Today, Fenocchio serves 94 flavors—59 ice creams and 35 sorbets—each one an arch...
+      [Palais Lascaris] (mystery): Each worn marble step and painted ceiling speaks of a family determined to proje...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0031 (519 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Cours Saleya Market, you'll find the world's first wholesale cut flower market established in 1897. Later, at Fenocchio, you can taste 94 flavors of ice creams and sorbets, each an archive of regional ingredients and forgotten recipes."
+      FAIL: date '1897' attributed to 'Fenocchio' but belongs to a different stop
+    Part 4 LLM cost: $0.0029 (505 tokens) [attempt 2]
+    ✗ Part 4 attempt 2 FAILED verification:
+      Candidate: "At Cours Saleya Market, experience the world's first wholesale cut flower market established in 1897. Then, indulge in Fenocchio's 94 flavors, showcasing regional ingredients and forgotten recipes."
+      FAIL: date '1897' attributed to 'Fenocchio' but belongs to a different stop
+    ✗ Part 4 FAILED all 2 attempts — omitting
+      Last candidate: "At Cours Saleya Market, experience the world's first wholesale cut flower market established in 1897. Then, indulge in Fenocchio's 94 flavors, showcasing regional ingredients and forgotten recipes."
+    Part 4 total cost: $0.0061
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: From Cours Saleya Market, walk south on Rue de la Poissonner...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave Fenocchio, walk down Rue de la Préfecture until...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 2.1s, $0.0024, 423 tokens
+  [LOCAL-280] Recap built: 27 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Palais Lascaris] (mystery): "Each worn marble step and painted ceiling speaks of a family determined to proje..."
+      → composed: "Palais Lascaris, a family's power displayed in stone and pigment"
+    [Fenocchio] (cause): "Today, Fenocchio serves 94 flavors—59 ice creams and 35 sorbets—each one an arch..."
+      → composed: "Fenocchio, 94 flavors preserve regional ingredients and forgotten recipes"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops and 1 kilometres — Palais Lascaris, a family's power displayed in stone and pigment and Fenocchio, 94 flavors preserve regional ingredients and forgotten recipes."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=17 'restaurants tour in old city of Nice, France - Restaurant Tour' (0.5 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (45408 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 6
+    Verified: 0
+    Dropped: 6
+    AUDIT: closed_day | Open daily from 6 AM to 1:30 PM, closed on Mondays | (no source) | DROPPED — no source content
+    AUDIT: reservation | no reservations needed | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily from 10 AM to 11 PM | (no source) | DROPPED — no source content
+    AUDIT: reservation | no reservations needed | (no source) | DROPPED — no source content
+    AUDIT: hours | Open Tuesday to Sunday from 10 AM to 6 PM | (no source) | DROPPED — no source content
+    AUDIT: admission | admission is €10 | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 6 claim(s) dropped
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 1 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [WARNING] Part 3: PART3_FLUFF_DOMINANT — Part 3 contains a sourced fact but is dominated by vague language.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Old Nice, France. The route spans approximately..."
+  [2] "The year is 1966. The world beyond these streets is in the midst of change—cities growing, tradition..."
+
+=== Word Count Statistics ===
+Stop 1: Cours Saleya Market - 387 words
+Stop 2: Fenocchio - 321 words
+Stop 3: Palais Lascaris - 307 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8701 chars, 3/3 stops)
+  [LOCAL-540] no defects — tour is clean
+
+Total API cost: $0.1264 (29683 tokens)
+Grounding:      $0.0000 (0 requests)
+Tour total:     $0.1264
+Provenance:     2/33 factual sentences sourced, 31 unsourced (2 corpus, 0 grounded, 31 parametric)
+CACHE STORE: walking tour of Old Nice, France / walking / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_B.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_B_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: walking tour of Old Nice, France
+Tour-Category: walking
+
+Stop 1: Cours Saleya Market
+
+Address: Cours Saleya, 06300 Nice, France
+
+Coordinates: 43.6955, 7.2656
+
+Type/Specialty: Market
+
+Specific Examples: Fresh produce, local flowers, artisanal products
+
+Orientation: You are about to embark on a walking journey through Old Nice, France. The route spans approximately 1 km from the bustling Cours Saleya Market to the historic Palais Lascaris. From the birth of the worl...
+
+[TIMING] phase=packing elapsed=9.5s cumulative=166.6s
+[TIMING] phase=verification elapsed=0.0s cumulative=166.6s
+[TIMING] TOTAL wall=166.6s phases: story_first=79.3s, poi_selection=64.8s, fact_sheets=11.2s, packing=9.5s, intent=1.8s, narration=0.0s, external_lookups=0.0s, verification=0.0s

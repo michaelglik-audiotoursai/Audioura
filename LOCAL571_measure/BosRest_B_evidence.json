@@ -1,0 +1,298 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 3,
+      "unsourced": 35,
+      "total": 38,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 35
+    },
+    "per_stop": {
+      "Union Oyster House": {
+        "sourced": 2,
+        "unsourced": 15,
+        "total": 17
+      },
+      "Cheers Boston": {
+        "sourced": 0,
+        "unsourced": 10,
+        "total": 10
+      },
+      "The Parker House Restaurant": {
+        "sourced": 1,
+        "unsourced": 10,
+        "total": 11
+      }
+    },
+    "claims": [
+      {
+        "stop": "Union Oyster House",
+        "text": "Starting at the historic Union Oyster House and ending at The Parker House Restaurant, your route weaves through the heart of Boston's culinary heritage.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "From the 1826-established Union Oyster House, where history and oysters converge, to The Parker House Restaurant, a family-run gem since 1927, each step reveals a tapestry of tradition and reinvention.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "At Union Oyster House, opened in 1826, you'll learn about America’s oldest continuously operating restaurant.",
+        "class": "corpus",
+        "source": "http://www.unionoysterhouse.com/pages/awards.html",
+        "evidence": "The Union Oyster House, opened in 1826, is America's oldest continuously operating restaurant."
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Cheers Boston, where NBC producers found the Bull & Finch in the early 1980s, is another stop on the tour.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Stand just outside 41 Union Street, where the brickwork catches the light and the windows tilt at angles set by old Boston streets—a patchwork of red and gray that’s held fast for centuries.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Inside Union Oyster House, the air is thick with steam from the oyster bar and the low murmur of diners—noisy in the way that only a place with two centuries of stories can be.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "The Union Oyster House, opened in 1826 as Atwood’s Oyster House, is America’s oldest continuously operating restaurant.",
+        "class": "corpus",
+        "source": "http://www.unionoysterhouse.com/pages/awards.html",
+        "evidence": "The Union Oyster House, opened in 1826, is America's oldest continuously operating restaurant."
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "The building itself, constructed around 1716, predates the United States.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Its angled facade follows the bends of Union and Marshall Streets, a quirk left from the original 18th-century deeds.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "If you slip inside and scan the booths, you’ll find one marked “The Kennedy Booth.” John F. Kennedy, before and during his presidency, was a regular here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Staff have dedicated his favorite seat to his memory, and that simple plaque means you’re sitting where he once did, eating the same local oysters and New England specialties, perhaps thumbing through the news or planning the next move.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "It’s a slice of Boston’s political history, concrete and close.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Another piece that regulars like to whisper about: since its founding in 1826, Union Oyster House has changed hands only three times.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Joseph A. Milano, Jr. has carried on those traditions since 1970, ensuring the menu and atmosphere remain deeply tied to the city’s roots.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "The Union Oyster House is open Sunday through Thursday from 11 in the morning until 9 at night, and until 10 on Fridays and Saturdays.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Expect to spend under $30 for a meal of seafood and New England classics.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "The clam chowder is a must: it’s thick, creamy, and somehow manages to capture not just the flavor, but the very soul of Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Stand on Beacon Street, just across from the Boston Public Garden, and look for the modest brick building with the familiar black-and-gold sign reading “Cheers.” The entrance sits slightly below street level, tucked beneath the grand Hampshire House, just steps from the bustle of Beacon Hill.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Here at 84 Beacon Street, the story begins in 1969 when Thomas Kershaw and his partner found a new purpose for the basement of Hampshire House, which had been little more than storage.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "They opened the Bull & carving out a cozy, wood-paneled refuge for locals and newcomers alike.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "In the early 1980s, NBC producers, searching for the perfect bar exterior for a new sitcom, spotted the Bull & Finch.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Its brick-and-glass entry—modest, inviting, unmistakably Boston—became the face of “Cheers,” the show that would run from 1982 to 1993 and turn this tucked-away pub into a landmark recognized on screens around the world.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "In 2002, after closing a deal with CBS Studios—successors to the show original producers— changed the pub name officially to Cheers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Inside, the bar serves American classics: hearty sandwiches, burgers, small plates, and a wide selection of beers and cocktails.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Cheers Boston welcomes guests every day of the week from 11:00 in the morning until 10:00 at night, with the kitchen closing an hour earlier.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "No booking is needed—just the luck of finding a seat, and the comfort of joining in a ritual that has become a part of Boston’s living pulse.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "The Union Oyster House you stopped at a moment ago was all about the taste of Boston’s past.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "You’ve already felt the wood-paneled comfort of Cheers Boston, but this stop is where the city’s culinary history gets sly, layered, and just a little mischievous.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "The Parker House Restaurant, founded in 1855 and rebuilt into its current form in 1927, is a registered historic landmark—listed on the National Register of Historic Places and a member of Historic Hotels of America.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "In 1856, Harvey D. Parker hired a French chef named Augustine Francois.",
+        "class": "corpus",
+        "source": "https://www.historichotels.org/us/hotels-resorts/omni-parker-house/history",
+        "evidence": "In 1856, the Parker House Restaurant hired French chef Augustine Francois, who created the iconic Boston Cream Pie."
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "Layers of cake, chocolate, and custard were combined in a creative improvisation that became the Boston Cream Pie—a cake, not a pie, and the name stuck.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "Now, it's the official dessert of Massachusetts, the official state dessert, the Boston cream pie, all starting because one Frenchman couldn’t resist making something new with what he had.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "But let me share a secret that’s rarely whispered over the mahogany tables: In the 1910s, a young man named Ho Chi Minh—yes, the same Ho Chi Minh who would later become the leader—worked in the Parker House kitchen.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "He washed dishes and learned the rhythms of a Boston hotel, long before history would write his name in textbooks.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "The kitchen where he worked still turns out Parker House rolls, soft and golden, the same ones that once caught Eleanor Roosevelt’s notice when she dined here with Franklin.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "The menu leans classic American—Boston Cream Pie, those famous rolls, and comforting standards.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "The restaurant opens its doors from 7:00 each morning, so whether you want breakfast or something more decadent, the timing’s on your side.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "The Parker House Restaurant",
+        "text": "They don’t post a required booking or price at the door, but the real draw is the taste of history itself—layered, unexpected, and just a little bit subversive, the way Boston likes it.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

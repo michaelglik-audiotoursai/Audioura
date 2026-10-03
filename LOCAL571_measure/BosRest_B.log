@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #023 | 03:10:22.463 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #027 | 17:06:49.735 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: restaurant tour of Boston, MA
   tour_type: restaurant
@@ -9,10 +9,10 @@ CALL #023 | 03:10:22.463 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/BosRest_B.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #024 | 03:10:22.463 | TOTAL_STOPS_FINALIZED
+CALL #028 | 17:06:49.735 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: restaurant tour of Boston, MA
   total_stops_final: 3
@@ -23,18 +23,42 @@ PHASE 1: Analyzing tour intent with AI...
   [BLOCKER1] Stripped 'tour' from location: 'restaurant tour of Boston, MA' → 'restaurant  of Boston, MA'
   [LOCAL-46] Stripped transport words: 'restaurant  of Boston, MA' → 'restaurant of Boston, MA'
   [Bug2Fix/D536] tour_type='restaurant' not prepended (pre_category='restaurant'); intent sees the ORIGINAL request, not the stripped one
-Intent analysis failed: 429
+Intent analysis response: ```json
+{
+    "poi_type": "restaurants",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston, MA",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
   [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
-⚠️ Intent analysis failed, using fallback detection
-[TIMING] phase=intent elapsed=0.1s cumulative=0.1s
+✅ Intent Analysis Results:
+   POI Type: restaurants
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=2.4s cumulative=2.4s
 [LOCAL-474] tour_type='restaurant' → category='restaurant' (source=explicit)
 
 Detected tour category: RESTAURANT
 Using restaurant template for restaurant tour of Boston, MA - restaurant
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #025 | 03:10:22.577 | GENERATING_PROMPT
+CALL #029 | 17:06:52.184 | GENERATING_PROMPT
 ======================================================================
   location: restaurant tour of Boston, MA
   user_request: restaurant tour of Boston, MA
@@ -42,25 +66,552 @@ CALL #025 | 03:10:22.577 | GENERATING_PROMPT
 
 
 PHASE 3A: Fetching 3 candidate POI(s) for restaurant tour of Boston, MA...
-  [LOCAL-285/329] Restaurant constraint injected for area='restaurant tour of Boston, MA'
-  [S17] no scope_constraint (precision='', scope='')
+  [LOCAL-285/329] Restaurant constraint injected for area='Boston, MA'
+  [S17] no scope_constraint (precision='CITY', scope='Boston, MA')
   [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #026 | 03:10:22.577 | PHASE_3A_REQUEST
+CALL #030 | 17:06:52.185 | PHASE_3A_REQUEST
 ======================================================================
   location: restaurant tour of Boston, MA
   total_stops: 3
-  poi_type_hint: restaurant stops
+  poi_type_hint: restaurants
 
-X PHASE 3A failed: status 429
-{
-    "error": {
-        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
-        "type": "insufficient_quota",
-        "param": null,
-        "code": "credit_balance_exhausted"
-    }
-}
+PHASE 3A API call cost: $0.0006 (768 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
+======================================================================
+CALL #031 | 17:06:56.173 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Boston, MA.
+List exactly 6 specific, real, well-known restaurants relevant to: restaurant tour of Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every stop MUST be a named, real, currently-o
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Union Oyster House", "address": "41 Union St, Boston, MA 02108", "reason": "Established in 1826, it is the oldest continuously operating restaurant in the United States, famous for its clam chowder and historical significance as a meeting place for notable figures like Daniel Webster."},
+    {"name": "Mamma Maria", "address": "3 North Square, Boston, MA 02113", "reason": "Opened in 1973, this North End restaurant is known for its authentic Italian cuisine and has been praised for
+
+   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: 'No. 9 Park'
+  [LOCAL-329] Captured 5 substantive selection reason(s)
+OK PHASE 3A parsed 5 candidate POI(s):
+   - Union Oyster House @ 41 Union St, Boston, MA 02108
+   - Mamma Maria @ 3 North Square, Boston, MA 02113
+   - Legal Sea Foods @ 270 Northern Ave, Boston, MA 02210
+   - Oleana @ 134 Hampshire St, Cambridge, MA 02139
+   - The Capital Grille @ 900 Boylston St, Boston, MA 02115
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: Verifying POIs match requested type 'restaurants' (parallel)...
+   PHASE 4: Verifying 5 POI(s) against type 'restaurants' (parallel)...
+   OK Verified Union Oyster House - Union Oyster House is a historic restaurant in Boston, Massachusetts
+   OK Verified Mamma Maria - Mamma Maria is a restaurant located in Boston, Massachusetts
+   OK Verified Legal Sea Foods - Legal Sea Foods is a well-known chain of seafood restaurants
+   X  Excluded Oleana - There are multiple restaurants named Oleana, please provide more specific details for accurate verification
+   OK Verified The Capital Grille - The Capital Grille is a chain of upscale steakhouses
+
+! PHASE 4 excluded 1 POI(s)
+   PHASE 3C: all 4 stops pass location guard
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Union Oyster House=VENUE_ONLY', 'Legal Sea Foods=VENUE_ONLY', 'The Capital Grille=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Mamma Maria=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Union Oyster House=8.5', 'Legal Sea Foods=6.0', 'The Capital Grille=3.0']
+  [LOCAL-349] Yield scores (dropped):  ['Mamma Maria=2.0']
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Union Oyster House' — wikipedia_summary: 'Union Oyster House' is dining+city
+    [VERIFIED] 'Legal Sea Foods' — wikipedia_summary: 'Legal Sea Foods' is a restaurant
+    [VERIFIED] 'The Capital Grille' — wikipedia_summary: 'The Capital Grille' is a restaurant
+    [VERIFIED] 'Mamma Maria' — nominatim_osm: 'Mamma Maria' found in boston (North Square, boston) [category=am
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 0 verified_no_detail
+    [DINING-HARVEST] Summary: 0 harvested, 4 already had corpus, 0 no facts found
+    [INTERPRETIVE] 'Legal Sea Foods': +1 passages (2 queries)
+    [INTERPRETIVE] Summary: 1 stops enriched, +1 passages, 8 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
+
+======================================================================
+CALL #032 | 17:07:15.636 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Boston, MA
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0007 (902 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-353] Querying OSM for dining operational details (city: Boston)
+  [LOCAL-353] Union Oyster House: no sourceable facts in OSM — omitted
+  [LOCAL-353] Legal Sea Foods: no sourceable facts in OSM — omitted
+  [LOCAL-353] The Capital Grille: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Union Oyster House: no guide price, no OSM facts — silence
+  [LOCAL-354] Legal Sea Foods: no guide price, no OSM facts — silence
+  [LOCAL-354] The Capital Grille: no guide price, no OSM facts — silence
+Extracted first POI coordinates: (42.3601, -71.0573)
+
+=== Extracted POI Information ===
+1. Union Oyster House
+   Address: 41 Union St, Boston, MA 02108
+   Coordinates: 42.3601, -71.0573
+   Directions: From Park Street T station, walk towards Tremont St, then turn left onto Tremont...
+2. Legal Sea Foods
+   Address: 270 Northern Ave, Boston, MA 02210
+   Coordinates: 42.3519, -71.0409
+   Directions: Exit Union Oyster House and head southwest on Union St toward North St. Turn lef...
+3. The Capital Grille
+   Address: 900 Boylston St, Boston, MA 02115
+   Coordinates: 42.3495, -71.0754
+   Directions: Leave Legal Sea Foods and head northwest on Northern Ave toward Seaport Blvd. Tu...
+================================
+
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'Union Oyster House' — kept live: Union Oyster House, a Boston landmark and America's oldest restaurant, is being sold to a Texas family. ; Nina Dodge Boo
+  [D538] 'Union Oyster House' via serp(29)+openai: hours=Sun–Thursday 11:00 am - 9:00 pm, Fri & S, reservation=reservations needed, price_band=$30 and under
+  [LOCAL-564] closure REJECTED (wrong place: names Virginia, stop is in Massachusetts) for 'Legal Sea Foods' — kept live: r/VirginiaBeach - Legal Sea Foods in Virginia Beach permanently closes its doors. 115 upvotes · 122 comments. Who says a
+  [D538] 'Legal Sea Foods' via serp(29)+openai: hours=Sun 11:00-22:00, Mon 11:00-22:00, reservation=Make a reservation, price_band=$30 and under
+  [D538] ⚠️  DROPPED 'Legal Sea Foods' — reported permanently closed: CLOSING ALERT: Confirmation that Legal Sea Foods has closed one of its locations. ... Boston restaurant institution. Corporate expansion ... [https://
+  [LOCAL-564] closure REJECTED (wrong place: names Illinois, stop is in Massachusetts) for 'The Capital Grille' — kept live: Capital Grille closes as Darden cuts 28 more restaurants ... The Capital Grille is closing its Skokie, Illinois locatio.
+  [D538] 'The Capital Grille' via serp(30)+openai: hours=Saturday 4:00 PM – 10:00 PM, reservation=reservations are recommended
+  [D538] ⚠️  DROPPED 'The Capital Grille' — reported permanently closed: Very unceremoniously, it seems that The Capital Grille at the Beverly Center has closed over the weekend. Tipsters send in details of the ... [https:/
+  [D538] 2 restaurant(s) dropped as closed; 1 remain
+  [D545] Replenish round 1: need 2, proposed 4
+  [LOCAL-564] closure REJECTED (closure predicated of another business, not the venue) for 'Cheers Boston' — kept live: The Boston Cheers Bar Has Permanently Closed — FOOD & WINE ... Cheers Boston Ma · Cheers Beacon Hill · Chateau Frontenac
+  [D545]   ADDED 'Cheers Boston' — inspired the iconic TV show 'Cheers' and became a cultural l
+  [D546]     practicals: hours=Monday-Sunday: 11:00-22:00 (kitche, reservation=generally operates on a first-come, cuisine=American classics like sandwiches,
+  [D545]   rejected 'No. 9 Park' — reported permanently closed: After more than two decades in Boston's Beacon Hill
+  [D545]   ADDED 'The Parker House Restaurant' — the birthplace of the Boston Cream Pie and Parker House Roll
+  [D546]     practicals: hours=7:00-, cuisine=classic American with signature Bo
+  [D545] +5 story fact(s) for 'Union Oyster House' via openai+web(23) (5 high)
+        [high] The Union Oyster House, opened in 1826, is America's oldest continuously operating restaurant.
+        [high] John F. Kennedy was a regular patron of the Union Oyster House, and his favorite booth, now known as 'The Kenn
+        [high] Presidential patrons of the Union Oyster House include Calvin Coolidge, Franklin D. Roosevelt, Bill Clinton, a
+  [D545] +3 story fact(s) for 'Cheers Boston' via openai+web(22) (3 high)
+        [high] The original Cheers Boston location, known as the Bull & Finch Pub, was established in 1969 and inspired the i
+        [high] Cheers Boston is located on Beacon Street across from the Boston Public Garden, making it a notable landmark i
+        [high] The bar became world-famous due to its association with the hit television series 'Cheers', which aired from 1
+  [D545] +6 story fact(s) for 'The Parker House Restaurant' via openai+web(19) (6 high)
+        [high] In the 1910s, Ho Chi Minh worked at the Parker House Restaurant, long before becoming the revolutionary leader
+        [high] Malcolm X worked as a busboy at the Parker House Restaurant during his early years.
+        [high] In 1856, the Parker House Restaurant hired French chef Augustine Francois, who created the iconic Boston Cream
+  [D538] Practicals acquired for 3/3 stop(s)
+[TIMING] phase=poi_selection elapsed=177.3s cumulative=179.7s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Union Oyster House restaurant of Boston' → 5213 chars
+  [LOCAL-47] Union Oyster House: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Cheers Boston restaurant of Boston' → 3899 chars
+  [LOCAL-47] Cheers Boston: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'The Parker House Restaurant restaurant of Boston' → 10695 chars
+  [LOCAL-47] The Parker House Restaurant: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 3}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=restaurant venue=restaurant tour of Boston, MA model=gpt-4o tokens=1385 (in=827 out=558) cost=$0.0076 latency=4.0s
+[COST_METER] FRESH | spine_generate | $0.007648 | user=None | job=local571-BosRest_B
+  [LOCAL-278] Spine cost folded into total: $0.0076
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (31 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Union Oyster House' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Cheers Boston' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='The Parker House Restaurant' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['anecdote', 'culture', 'anecdote']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=10.1s cumulative=189.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=189.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=189.8s
+
+Generating description for Stop 1: Union Oyster House by , ...
+
+Generating description for Stop 2: Cheers Boston by , ...
+
+Generating description for Stop 3: The Parker House Restaurant by , ...
+  [LOCAL-381] stop='Cheers Boston' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cheers Boston', 16, ''), ('Cheers Boston', 8, ''), ('Cheers Boston', 6, '')]
+  [LOCAL-402] Stop 2: injected 4 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=14979 after=25553 (+10574 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25553)
+  [LOCAL-381] stop='The Parker House Restaurant' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Parker House Restaurant', 16, ''), ('The Parker House Restaurant', 11, ''), ('The Parker House Restaurant', 11, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15039 after=26252 (+11213 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26252)
+  [LOCAL-381] stop='Union Oyster House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Union Oyster House', 13, ''), ('Union Oyster House', 12, ''), ('Union Oyster House', 9, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14800 after=28330 (+13530 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28330)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0270 (7098 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=3 words=305
+Stop 1 description word count: 305 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0245 (6442 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=327
+Stop 2 description word count: 327 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0253 (6653 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=4 words=356
+Stop 3 description word count: 356 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Union Oyster House': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Cheers Boston': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='The Parker House Restaurant': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=3, deduction=1, total=5
+  [LOCAL-439] Classification cost: $0.000887 (input=3804, output=528)
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 2: retry IMPROVED (3→1 errors)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 3 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0016 (2028 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 12
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 6
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='New England' reason='It does not specify how Joseph A. Milano, Jr. relates to the stop.' in: "Since opening as Atwood’s Oyster House in 1826, this restaurant has had only three owners. That’s a "
+    [LOCAL-472] UNGROUNDED entity stop='Union Oyster House' entity='New England' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "If you’re tempted to step inside, know this: the Union Oyster House is open Sunday through Thursday "
+    [LOCAL-472] UNGROUNDED entity stop='The Parker House Restaurant' entity='Historic Places' reason='No specific individuals or works are linked to the restaurant.' in: "Step in and catch the scent—there’s butter, of course, from rolls that have outlived generations, an"
+    [LOCAL-472] UNGROUNDED entity stop='The Parker House Restaurant' entity='Boston Cream Pie' reason='It does not specify that Francois worked at The Parker House Restaurant.' in: "In 1856, Harvey D. Parker hired a French chef named Augustine Francois. Francois, brought in to elev"
+    [LOCAL-472] UNGROUNDED entity stop='The Parker House Restaurant' entity='Eleanor Roosevelt' reason='It does not specify how Eleanor Roosevelt is concretely linked to the Parker House Restaurant.' in: "But let me share a secret that’s rarely whispered over the mahogany tables: In the 1910s, a young ma"
+    [LOCAL-472] UNGROUNDED entity stop='The Parker House Restaurant' entity='Boston Cream Pie' reason='No concrete link to the stop is provided.' in: "The menu leans classic American—Boston Cream Pie, those famous rolls, and comforting standards. The "
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/46)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 12
+    Glossed (composed): 1
+    Suppressed (already explained): 2
+    Degraded (name dropped): 7
+    Guard failures: 0
+    Known (skipped): 2
+    Triage: 1564 tokens, $0.0004, 6.2s
+    Gloss: 733 tokens, $0.0001, 2.0s
+    Compose: 1049 tokens, $0.0002, 1.1s
+    Total added cost: $0.0007
+    Stops affected: 2
+    Glosses applied:
+      • Atwood → SUPPRESSED (already explained)
+      • Finch Pub → DEGRADED (name dropped)
+      • Kershaw → DEGRADED (name dropped)
+      • National Register → DEGRADED (name dropped)
+      • Historic Places → DEGRADED (name dropped)
+      • Historic Hotels → DEGRADED (name dropped)
+      • America → DEGRADED (name dropped)
+      • Massachusetts → "the official state dessert, the Boston cream pie" [source: model]
+      • Vietnam → DEGRADED (name dropped)
+      • Eleanor Roosevelt → SUPPRESSED (already explained)
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [2] DELETED: 'That decision' in: That decision cemented its new identity, binding the rhythms of Boston’s daily l
+    [3] DELETED: 'This isn’t' in: This isn’t just any dining room.
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Cheers Boston' (index 62) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Union Oyster House': the longest run (3 sentences, The Kennedy Booth) has agency=0 stakes=0 — someone is described, but nothing is 
+    stop 2 'Cheers Boston': the longest run (3 sentences, Cheers Boston) has agency=0 stakes=1 — someone is described, but nothing is risk
+    stop 3 'The Parker House Restaurant': the longest run (3 sentences, Parker House) has agency=1 stakes=0 — someone is described, but nothing is riske
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'The Parker House Restaurant' (index 52)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Union Oyster House' — 305w → 274w after gates, 5 sentence(s) removed
+    removed: "Let me share a secret that regulars will smile about behind their napkins: John F."
+    removed: "Kennedy, before he was president, claimed a favorite booth upstairs."
+    removed: "If you slip into what’s now called “The Kennedy Booth,” you’ll see a small plaque marking the spot w"
+    removed: "The staff dedicated the booth in his memory, so every guest who sits there sits where Kennedy once t"
+    removed: "Another detail that gets quietly passed from old-timers to newcomers—since opening as Atwood’s Oyste"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'The Parker House Restaurant' — 356w → 307w after gates, 8 sentence(s) removed
+    removed: "This isn’t just any dining room."
+    removed: "The Parker House Restaurant, founded in 1855 and rebuilt into its current form in 1927, is a registe"
+    removed: "Now, the story I have for you is almost too delicious."
+    removed: "Francois, brought in to elevate the menu, found himself with extra cake and a little chocolate glaze"
+    removed: "Instead of discarding the leftovers, he assembled layers, poured over the chocolate, and finished wi"
+    removed: "That improvisation became the Boston Cream Pie—though it’s a cake, not a pie, and nobody’s really bo"
+    removed: "The name stuck, and now it’s the official dessert of Massachusetts, but it all started because one F"
+    removed: "But let me share a secret that’s rarely whispered over the mahogany tables: In the 1910s, a young ma"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 2 eligible stop(s) concurrently (max_workers=2)
+
+Generating description for Stop 1: Union Oyster House by , ...
+
+Generating description for Stop 3: The Parker House Restaurant by , ...
+  [LOCAL-381] stop='The Parker House Restaurant' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=7 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('The Parker House Restaurant', 16, ''), ('The Parker House Restaurant', 11, ''), ('The Parker House Restaurant', 11, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 7 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15039 after=26252 (+11213 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26252)
+  [LOCAL-381] stop='Union Oyster House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Union Oyster House', 13, ''), ('Union Oyster House', 12, ''), ('Union Oyster House', 9, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14800 after=28330 (+13530 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (28330)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0286 (7517 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=2 words=330
+Stop 1 description word count: 330 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0271 (7131 tokens, model=gpt-4.1)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=3 words=357
+Stop 3 description word count: 357 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 3.9s for 2 stop(s) at max_workers=2
+    [LOCAL-474] regenerated and re-gated: 330w (was 274w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 2 eligible, 2 retried, 1 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [D512] _AGENCY_VERB widened by 1 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Union Oyster House                         63    48     0    42
+     2  Cheers Boston                              62    59    20    27
+     3  The Parker House Restaurant                52    47    22    69
+    [LOCAL-485] index mean 59.0 over 3 stop(s), range 52-63
+    [LOCAL-485] weakest: 'The Parker House Restaurant' at 52
+[TIMING] phase=story_first elapsed=52.8s cumulative=242.5s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (90 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 90 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 66 words (delta: -24)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Discover the stories of immigrant perseverance that shaped these iconic eateries, offering a taste o..."
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 1 sentence(s) deleted
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 205
+    Words after:  141
+    Delta: -64
+    Stops affected: 2/3
+    Deletions (2):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "You’ll catch briny sea air seeping from the doorway, mingling with the aroma of hot butter and shell..."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "As you stand here at the corner of School Street and Tremont, the entrance to The Parker House Resta..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.4s, $0.0069, 1069 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Union Oyster House] (dated_event): The Union Oyster House, opened in 1826 as Atwood’s Oyster House, is America’s ol...
+      [Cheers Boston] (dated_event): In the early 1980s, NBC producers, searching for the perfect bar exterior for a ...
+      [The Parker House Restaurant] (reversal): The improvisation became the Boston Cream Pie—a cake, not a pie, and the name st...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0029 (486 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (35 words):
+      "At Union Oyster House, opened in 1826, you'll learn about America’s oldest continuously operating restaurant. Cheers Boston, where NBC producers found the Bull & Finch in the early 1980s, is another stop on the tour."
+      Stops referenced: 3
+    Part 4 total cost: $0.0029
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you exit Union Oyster House, head west on Union Street. C...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [T4] Transition to Stop 3: As you leave Cheers Boston, stroll down Beacon Street and co...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [LOCAL-280] Recap composition: 0.7s, $0.0023, 410 tokens
+  [LOCAL-280] Recap built: 25 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [The Parker House Restaurant] (reversal): "The improvisation became the Boston Cream Pie—a cake, not a pie, and the name st..."
+      → composed: "The Parker House Restaurant, birthplace of the Boston Cream Pie"
+    [Union Oyster House] (dated_event): "The Union Oyster House, opened in 1826 as Atwood’s Oyster House, is America’s ol..."
+      → composed: "Union Oyster House, America’s oldest continuously operating restaurant since 1826"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — The Parker House Restaurant, birthplace of the Boston Cream Pie and Union Oyster House, America’s oldest continuously operating restaurant since 1826."
+  [LOCAL-273] No coordinates for last stop — closing offer skipped
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (5623 chars of corpus checked)
+  [D544] Practicals from D538 handed to the gate as source (9 line(s), 18 URL(s))
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 3/3 stop(s), spoken to the listener.
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Boston, MA. Starting at the historic Union Oyst..."
+  [2] "Stand on Beacon Street, just across from the Boston Public Garden, and look for the modest brick bui..."
+
+=== Word Count Statistics ===
+Stop 1: Union Oyster House - 305 words
+Stop 2: Cheers Boston - 327 words
+Stop 3: The Parker House Restaurant - 356 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8560 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['dangling_reference']
+  [LOCAL-540]   dangling_reference [REQUIRED_CLEAN]: 2 dangling pronoun reference(s), e.g. 'He assembled layers, poured over the chocolate, and finished'
+  [LOCAL-540] REQUIRED_CLEAN defect present (['dangling_reference']) — issuing ONE retry over 1 section(s)
+  [LOCAL-540] retry: regenerating stop (stop 3) for ['dangling_reference']
+  [LOCAL-540] retry rewrite: 1278 tokens, $0.004860 (gpt-4.1)
+  [LOCAL-540] rescored after retry: defects ['dangling_reference'] -> ['dangling_reference']
+  [LOCAL-540] retry did NOT remove: ['dangling_reference'] — shipping with defect recorded (D577)
+
+Total API cost: $0.1313 (30070 tokens)
+Grounding:      $0.0000 (0 requests)
+Tour total:     $0.1313
+Provenance:     3/38 factual sentences sourced, 35 unsourced (3 corpus, 0 grounded, 35 parametric)
+CACHE STORE: restaurant tour of Boston, MA / restaurant / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/BosRest_B.txt
+  [C5-5] Evidence (provenance-only) persisted: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/BosRest_B_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: restaurant tour of Boston, MA
+Tour-Category: restaurant
+
+Stop 1: Union Oyster House
+
+Address: 41 Union St, Boston, MA 02108
+
+Coordinates: 42.3601, -71.0573
+
+Type/Specialty: Seafood
+
+Specific Examples: Fresh oysters, clam chowder, lobster rolls
+
+Orientation: You are about to embark on a walking journey through Boston, MA. Starting at the historic Union Oyster House and ending at The Parker House Restaurant, your route weaves through the heart of Boston's culinary h...
+
+[TIMING] phase=packing elapsed=12.0s cumulative=254.6s
+[TIMING] phase=verification elapsed=0.0s cumulative=254.6s
+[TIMING] TOTAL wall=254.6s phases: poi_selection=177.3s, story_first=52.8s, packing=12.0s, fact_sheets=10.1s, intent=2.4s, narration=0.0s, external_lookups=0.0s, verification=0.0s

@@ -1,0 +1,43 @@
+[audio_tours BEFORE] {'total': 198, 'max_id': 384}
+[cumulative OpenAI spend so far] $1.7668
+[skip] Palais_A already done (writer=$0.7242 llm=$0.7317)
+
+========================================================================
+[RUN] MFA_A: Museum of Fine Arts, Boston, MA (museum)  writer=gpt-4o
+========================================================================
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+SPARQL query failed: HTTPSConnectionPool(host='query.wikidata.org', port=443): Read timed out. (read timeout=15)
+SPARQL query failed: HTTPSConnectionPool(host='query.wikidata.org', port=443): Read timed out. (read timeout=15)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:9754. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:9755. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass ReadTimeout for 'Ancient Nubia Now' (attempt 1/2)
+[OSM-VENUE] Overpass HTTP 504 for 'Ancient Nubia Now'
+[OSM-VENUE] Overpass HTTP 504 for 'Sons of Liberty Bowl'
+[OSM-VENUE] Overpass ReadTimeout for 'John Singer Sargent’s  The Daughters of Edward Darley Boit' (attempt 1/2)
+[OSM-VENUE] Overpass ReadTimeout for 'John Singer Sargent’s  The Daughters of Edward Darley Boit' (attempt 2/2)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:10191. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/fact_extractor.py:219. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:14337. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:15735. Caller should supply input_tokens and output_tokens separately.
+[done] MFA_A: ok=True wall=381.9s stops=3 writer_calls=22 writer_usd=$0.3303 llm=$0.3406 retries432=5 clean=True defects=['unsourced_person_event']  cumulativeOpenAI=$2.1074
+[skip] BosRest_A already done (writer=$0.1835 llm=$0.1931)
+[skip] OldNice_A already done (writer=$0.1359 llm=$0.1453)
+
+========================================================================
+[RUN] Palais_B: Palais Lascaris, Nice, France (museum)  writer=gpt-4.1
+========================================================================
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:7946. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:7947. Caller should supply input_tokens and output_tokens separately.
+[done] Palais_B: ok=False wall=3.6s stops=0 writer_calls=0 writer_usd=$0.0000 llm=$0.0004 retries432=0 clean=True defects=['thin', 'no_story']  cumulativeOpenAI=$2.1078
+
+========================================================================
+[RUN] MFA_B: Museum of Fine Arts, Boston, MA (museum)  writer=gpt-4.1
+========================================================================
+[done] MFA_B: ok=False wall=5.6s stops=0 writer_calls=0 writer_usd=$0.0000 llm=$0.0004 retries432=0 clean=True defects=['thin', 'no_story']  cumulativeOpenAI=$2.1083
+[skip] BosRest_B already done (writer=$0.0906 llm=$0.1469)
+[skip] OldNice_B already done (writer=$0.0994 llm=$0.1288)
+
+[audio_tours AFTER] {'total': 198, 'max_id': 384}
+[cumulative OpenAI spend] $1.6873
+[summary] /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/summary.json

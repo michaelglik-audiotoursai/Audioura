@@ -1,0 +1,20 @@
+[audio_tours BEFORE] {'total': 198, 'max_id': 384}
+[cumulative OpenAI spend so far] $1.6873
+
+========================================================================
+[RUN] Palais_B: Palais Lascaris, Nice, France (museum)  writer=gpt-4.1
+========================================================================
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:9754. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:9755. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:10166. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/fact_extractor.py:219. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:14337. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:15735. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:20377. Caller should supply input_tokens and output_tokens separately.
+[done] Palais_B: ok=True wall=243.2s stops=3 writer_calls=17 writer_usd=$0.3388 llm=$0.3951 retries432=10 clean=True defects=[]  cumulativeOpenAI=$2.0824
+
+[audio_tours AFTER] {'total': 198, 'max_id': 384}
+[cumulative OpenAI spend] $2.0820
+[summary] /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/summary.json

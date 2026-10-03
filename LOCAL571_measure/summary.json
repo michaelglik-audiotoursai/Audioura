@@ -281,23 +281,35 @@
       "tour_type": "museum",
       "location": "Museum of Fine Arts, Boston, MA",
       "writer_model": "gpt-4o",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 254.8,
-      "chars": 1055,
-      "stops_delivered": 1,
-      "writer_calls": 4,
-      "writer_usd": 0.03109,
-      "writer_input_tokens": 11028,
-      "writer_output_tokens": 352,
-      "non_writer_llm_by_model": {},
-      "all_llm_calls": 4,
-      "breakdown_llm_usd": 0.03109,
+      "wall_s": 381.9,
+      "chars": 8035,
+      "stops_delivered": 3,
+      "writer_calls": 22,
+      "writer_usd": 0.330285,
+      "writer_input_tokens": 104502,
+      "writer_output_tokens": 6903,
+      "non_writer_llm_by_model": {
+        "gpt-4o-mini-2024-07-18": {
+          "calls": 65,
+          "usd": 0.006744
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 7,
+          "usd": 0.003613
+        }
+      },
+      "all_llm_calls": 94,
+      "breakdown_llm_usd": 0.340642,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.03109,
+      "tour_total_cost_usd": 0.340642,
       "shipped_story_count_by_stop": {
-        "1": 0
+        "1": 0,
+        "2": 3,
+        "3": 3
       },
       "attempts_by_stop": {
         "1": [
@@ -305,20 +317,84 @@
             "attempt": 1,
             "of": 5,
             "story_count": 0,
-            "words": 106
+            "words": 311
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 303
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 252
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 290
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 0,
+            "words": 280
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 0,
+            "words": 319
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 0,
+            "words": 251
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 312
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 356
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 307
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 276
           }
         ]
       },
-      "writer_attempts_logged": 1,
-      "story_retries_432": 0,
+      "writer_attempts_logged": 11,
+      "story_retries_432": 5,
       "gate_235_r10": {
-        "per_stop_deletion_events": 0,
-        "sentences_deleted_total": 0,
-        "summary_reported_total": 0
+        "per_stop_deletion_events": 1,
+        "sentences_deleted_total": 1,
+        "summary_reported_total": 1
       },
       "gate_472_specificity": {
         "paragraphs_removed": 0,
-        "ungrounded_entities": 0
+        "ungrounded_entities": 7
       },
       "gate_229_contradicted": {
         "blocked_stop_lines": 0,
@@ -327,22 +403,20 @@
       "score_tour": {
         "clean": true,
         "defects": [
-          "thin",
-          "no_story"
+          "unsourced_person_event"
         ],
         "defect_detail": {
-          "thin": "1/3 stops delivered",
-          "no_story": "no named people anywhere in the tour"
+          "unsourced_person_event": "1 unsourced person-event(s); \"Edward Darley Boit\" placed here in 1919 with no source: \"In 1919, the Museum of Fine Arts in Boston acquired this painting, forever altering its collection with Sargent's evocat\""
         },
         "metrics": {
-          "stops_delivered": 1,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
-          "named_people": 0,
-          "chars": 1055
+          "dates": 8,
+          "named_people": 6,
+          "chars": 8035
         }
       },
-      "timestamp": "2026-10-03T03:07:24"
+      "timestamp": "2026-10-03T17:20:34"
     },
     "BosRest_A": {
       "cell": "BosRest_A",
@@ -351,38 +425,96 @@
       "tour_type": "restaurant",
       "location": "restaurant tour of Boston, MA",
       "writer_model": "gpt-4o",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 171.4,
-      "chars": 0,
-      "stops_delivered": 0,
-      "writer_calls": 1,
-      "writer_usd": 0.004768,
-      "writer_input_tokens": 1239,
-      "writer_output_tokens": 167,
+      "wall_s": 280.1,
+      "chars": 6679,
+      "stops_delivered": 3,
+      "writer_calls": 16,
+      "writer_usd": 0.183493,
+      "writer_input_tokens": 55373,
+      "writer_output_tokens": 4506,
       "non_writer_llm_by_model": {
         "gpt-4o-mini-2024-07-18": {
-          "calls": 1,
-          "usd": 0.000269
+          "calls": 43,
+          "usd": 0.004654
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 19,
+          "usd": 0.004941
         }
       },
-      "all_llm_calls": 2,
-      "breakdown_llm_usd": 0.005036,
+      "all_llm_calls": 78,
+      "breakdown_llm_usd": 0.193087,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.005036,
-      "shipped_story_count_by_stop": {},
-      "attempts_by_stop": {},
-      "writer_attempts_logged": 0,
+      "tour_total_cost_usd": 0.193087,
+      "shipped_story_count_by_stop": {
+        "1": 2,
+        "2": 3,
+        "3": 1
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 311
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 275
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 311
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 342
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 263
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 297
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 282
+          }
+        ]
+      },
+      "writer_attempts_logged": 7,
       "story_retries_432": 0,
       "gate_235_r10": {
-        "per_stop_deletion_events": 0,
-        "sentences_deleted_total": 0,
-        "summary_reported_total": 0
+        "per_stop_deletion_events": 2,
+        "sentences_deleted_total": 5,
+        "summary_reported_total": 5
       },
       "gate_472_specificity": {
-        "paragraphs_removed": 0,
-        "ungrounded_entities": 0
+        "paragraphs_removed": 1,
+        "ungrounded_entities": 4
       },
       "gate_229_contradicted": {
         "blocked_stop_lines": 0,
@@ -391,22 +523,20 @@
       "score_tour": {
         "clean": true,
         "defects": [
-          "thin",
-          "no_story"
+          "unsourced_person_event"
         ],
         "defect_detail": {
-          "thin": "0/3 stops delivered",
-          "no_story": "no named people anywhere in the tour"
+          "unsourced_person_event": "1 unsourced person-event(s); \"Barack Obama\" placed here in 2010 with no source: \"In fact, Barack Obama's visit in 2010 caused quite a stir; the sitting president enjoyed the clam chowder, a decision th\""
         },
         "metrics": {
-          "stops_delivered": 0,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
-          "named_people": 0,
-          "chars": 0
+          "dates": 6,
+          "named_people": 2,
+          "chars": 6679
         }
       },
-      "timestamp": "2026-10-03T03:10:16"
+      "timestamp": "2026-10-03T17:04:13"
     },
     "OldNice_A": {
       "cell": "OldNice_A",
@@ -415,38 +545,90 @@
       "tour_type": "walking",
       "location": "walking tour of Old Nice, France",
       "writer_model": "gpt-4o",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 3.6,
-      "chars": 0,
-      "stops_delivered": 0,
-      "writer_calls": 0,
-      "writer_usd": 0,
-      "writer_input_tokens": 0,
-      "writer_output_tokens": 0,
+      "wall_s": 146.7,
+      "chars": 7077,
+      "stops_delivered": 3,
+      "writer_calls": 10,
+      "writer_usd": 0.13591,
+      "writer_input_tokens": 40652,
+      "writer_output_tokens": 3428,
       "non_writer_llm_by_model": {
         "gpt-4o-mini-2024-07-18": {
-          "calls": 1,
-          "usd": 0.000324
+          "calls": 56,
+          "usd": 0.005726
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 13,
+          "usd": 0.003647
         }
       },
-      "all_llm_calls": 1,
-      "breakdown_llm_usd": 0.000324,
+      "all_llm_calls": 79,
+      "breakdown_llm_usd": 0.145283,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.000324,
-      "shipped_story_count_by_stop": {},
-      "attempts_by_stop": {},
-      "writer_attempts_logged": 0,
+      "tour_total_cost_usd": 0.145283,
+      "shipped_story_count_by_stop": {
+        "1": 1,
+        "2": 1,
+        "3": 0
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 315
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 287
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 266
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 278
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 281
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 277
+          }
+        ]
+      },
+      "writer_attempts_logged": 6,
       "story_retries_432": 0,
       "gate_235_r10": {
-        "per_stop_deletion_events": 0,
-        "sentences_deleted_total": 0,
-        "summary_reported_total": 0
+        "per_stop_deletion_events": 1,
+        "sentences_deleted_total": 1,
+        "summary_reported_total": 1
       },
       "gate_472_specificity": {
-        "paragraphs_removed": 0,
-        "ungrounded_entities": 0
+        "paragraphs_removed": 1,
+        "ungrounded_entities": 5
       },
       "gate_229_contradicted": {
         "blocked_stop_lines": 0,
@@ -455,22 +637,20 @@
       "score_tour": {
         "clean": true,
         "defects": [
-          "thin",
           "no_story"
         ],
         "defect_detail": {
-          "thin": "0/3 stops delivered",
           "no_story": "no named people anywhere in the tour"
         },
         "metrics": {
-          "stops_delivered": 0,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
+          "dates": 10,
           "named_people": 0,
-          "chars": 0
+          "chars": 7077
         }
       },
-      "timestamp": "2026-10-03T03:10:19"
+      "timestamp": "2026-10-03T17:06:41"
     },
     "Palais_B": {
       "cell": "Palais_B",
@@ -479,25 +659,146 @@
       "tour_type": "museum",
       "location": "Palais Lascaris, Nice, France",
       "writer_model": "gpt-4.1",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 0.2,
-      "chars": 0,
-      "stops_delivered": 0,
-      "writer_calls": 0,
-      "writer_usd": 0,
-      "writer_input_tokens": 0,
-      "writer_output_tokens": 0,
-      "non_writer_llm_by_model": {},
-      "all_llm_calls": 0,
-      "breakdown_llm_usd": 0.0,
+      "wall_s": 243.2,
+      "chars": 7604,
+      "stops_delivered": 3,
+      "writer_calls": 17,
+      "writer_usd": 0.33883,
+      "writer_input_tokens": 138011,
+      "writer_output_tokens": 7851,
+      "non_writer_llm_by_model": {
+        "gpt-4o-mini-2024-07-18": {
+          "calls": 29,
+          "usd": 0.003801
+        },
+        "gpt-4o-2024-08-06": {
+          "calls": 11,
+          "usd": 0.049375
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 5,
+          "usd": 0.003064
+        }
+      },
+      "all_llm_calls": 62,
+      "breakdown_llm_usd": 0.39507,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.0,
-      "shipped_story_count_by_stop": {},
-      "attempts_by_stop": {},
-      "writer_attempts_logged": 0,
-      "story_retries_432": 0,
+      "tour_total_cost_usd": 0.39507,
+      "shipped_story_count_by_stop": {
+        "1": 3,
+        "2": 2,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 343
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 333
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 326
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 3,
+            "words": 310
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 317
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 334
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 279
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 314
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 1,
+            "words": 356
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 269
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 2,
+            "words": 286
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 241
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 340
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 271
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 305
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 343
+          }
+        ]
+      },
+      "writer_attempts_logged": 16,
+      "story_retries_432": 10,
       "gate_235_r10": {
         "per_stop_deletion_events": 0,
         "sentences_deleted_total": 0,
@@ -508,28 +809,22 @@
         "ungrounded_entities": 0
       },
       "gate_229_contradicted": {
-        "blocked_stop_lines": 0,
-        "groups_blocked_summary": 0
+        "blocked_stop_lines": 2,
+        "groups_blocked_summary": 2
       },
       "score_tour": {
         "clean": true,
-        "defects": [
-          "thin",
-          "no_story"
-        ],
-        "defect_detail": {
-          "thin": "0/3 stops delivered",
-          "no_story": "no named people anywhere in the tour"
-        },
+        "defects": [],
+        "defect_detail": {},
         "metrics": {
-          "stops_delivered": 0,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
-          "named_people": 0,
-          "chars": 0
+          "dates": 22,
+          "named_people": 3,
+          "chars": 7604
         }
       },
-      "timestamp": "2026-10-03T03:10:20"
+      "timestamp": "2026-10-03T17:24:58"
     },
     "MFA_B": {
       "cell": "MFA_B",
@@ -538,62 +833,164 @@
       "tour_type": "museum",
       "location": "Museum of Fine Arts, Boston, MA",
       "writer_model": "gpt-4.1",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 2.3,
-      "chars": 0,
-      "stops_delivered": 0,
-      "writer_calls": 0,
-      "writer_usd": 0,
-      "writer_input_tokens": 0,
-      "writer_output_tokens": 0,
+      "wall_s": 332.3,
+      "chars": 7916,
+      "stops_delivered": 3,
+      "writer_calls": 14,
+      "writer_usd": 0.291558,
+      "writer_input_tokens": 114275,
+      "writer_output_tokens": 7876,
       "non_writer_llm_by_model": {
         "gpt-4o-mini-2024-07-18": {
-          "calls": 1,
-          "usd": 0.000326
+          "calls": 59,
+          "usd": 0.006402
+        },
+        "gpt-4o-2024-08-06": {
+          "calls": 11,
+          "usd": 0.06604
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 6,
+          "usd": 0.003174
         }
       },
-      "all_llm_calls": 1,
-      "breakdown_llm_usd": 0.000326,
+      "all_llm_calls": 90,
+      "breakdown_llm_usd": 0.367173,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.000326,
-      "shipped_story_count_by_stop": {},
-      "attempts_by_stop": {},
-      "writer_attempts_logged": 0,
-      "story_retries_432": 0,
+      "tour_total_cost_usd": 0.367173,
+      "shipped_story_count_by_stop": {
+        "1": 2,
+        "2": 3,
+        "3": 4
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 401
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 396
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 354
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 2,
+            "words": 313
+          },
+          {
+            "attempt": 4,
+            "of": 5,
+            "story_count": 1,
+            "words": 374
+          },
+          {
+            "attempt": 5,
+            "of": 5,
+            "story_count": 2,
+            "words": 305
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 6,
+            "words": 434
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 325
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 2,
+            "words": 329
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 3,
+            "words": 306
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 425
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 451
+          },
+          {
+            "attempt": 2,
+            "of": 5,
+            "story_count": 1,
+            "words": 343
+          },
+          {
+            "attempt": 3,
+            "of": 5,
+            "story_count": 4,
+            "words": 364
+          }
+        ]
+      },
+      "writer_attempts_logged": 14,
+      "story_retries_432": 8,
       "gate_235_r10": {
-        "per_stop_deletion_events": 0,
-        "sentences_deleted_total": 0,
-        "summary_reported_total": 0
+        "per_stop_deletion_events": 1,
+        "sentences_deleted_total": 1,
+        "summary_reported_total": 1
       },
       "gate_472_specificity": {
-        "paragraphs_removed": 0,
-        "ungrounded_entities": 0
+        "paragraphs_removed": 1,
+        "ungrounded_entities": 4
       },
       "gate_229_contradicted": {
-        "blocked_stop_lines": 0,
-        "groups_blocked_summary": 0
+        "blocked_stop_lines": 1,
+        "groups_blocked_summary": 1
       },
       "score_tour": {
         "clean": true,
         "defects": [
-          "thin",
-          "no_story"
+          "unsourced_person_event"
         ],
         "defect_detail": {
-          "thin": "0/3 stops delivered",
-          "no_story": "no named people anywhere in the tour"
+          "unsourced_person_event": "2 unsourced person-event(s); \"John Singer Sargent\" placed here in 1882 with no source: \"Orientation: As you stand here, look directly ahead\u2014John Singer Sargent\u2019s The Daughters of Edward Darley Boit (1882) is \""
         },
         "metrics": {
-          "stops_delivered": 0,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
-          "named_people": 0,
-          "chars": 0
+          "dates": 13,
+          "named_people": 3,
+          "chars": 7916
         }
       },
-      "timestamp": "2026-10-03T03:10:22"
+      "timestamp": "2026-10-03T17:30:32"
     },
     "BosRest_B": {
       "cell": "BosRest_B",
@@ -602,24 +999,79 @@
       "tour_type": "restaurant",
       "location": "restaurant tour of Boston, MA",
       "writer_model": "gpt-4.1",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 0.3,
-      "chars": 0,
-      "stops_delivered": 0,
-      "writer_calls": 0,
-      "writer_usd": 0,
-      "writer_input_tokens": 0,
-      "writer_output_tokens": 0,
-      "non_writer_llm_by_model": {},
-      "all_llm_calls": 0,
-      "breakdown_llm_usd": 0.0,
+      "wall_s": 254.6,
+      "chars": 8574,
+      "stops_delivered": 3,
+      "writer_calls": 6,
+      "writer_usd": 0.090628,
+      "writer_input_tokens": 33054,
+      "writer_output_tokens": 3065,
+      "non_writer_llm_by_model": {
+        "gpt-4o-mini-2024-07-18": {
+          "calls": 47,
+          "usd": 0.005086
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 14,
+          "usd": 0.003586
+        },
+        "gpt-4o-2024-08-06": {
+          "calls": 11,
+          "usd": 0.047635
+        }
+      },
+      "all_llm_calls": 78,
+      "breakdown_llm_usd": 0.146935,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.0,
-      "shipped_story_count_by_stop": {},
-      "attempts_by_stop": {},
-      "writer_attempts_logged": 0,
+      "tour_total_cost_usd": 0.146935,
+      "shipped_story_count_by_stop": {
+        "1": 2,
+        "2": 1,
+        "3": 3
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 305
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 2,
+            "words": 330
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 327
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 4,
+            "words": 356
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 3,
+            "words": 357
+          }
+        ]
+      },
+      "writer_attempts_logged": 5,
       "story_retries_432": 0,
       "gate_235_r10": {
         "per_stop_deletion_events": 0,
@@ -628,31 +1080,29 @@
       },
       "gate_472_specificity": {
         "paragraphs_removed": 0,
-        "ungrounded_entities": 0
+        "ungrounded_entities": 6
       },
       "gate_229_contradicted": {
         "blocked_stop_lines": 0,
         "groups_blocked_summary": 0
       },
       "score_tour": {
-        "clean": true,
+        "clean": false,
         "defects": [
-          "thin",
-          "no_story"
+          "dangling_reference"
         ],
         "defect_detail": {
-          "thin": "0/3 stops delivered",
-          "no_story": "no named people anywhere in the tour"
+          "dangling_reference": "1 dangling pronoun reference(s), e.g. 'He washed dishes and learned the rhythms of a Boston hotel, '"
         },
         "metrics": {
-          "stops_delivered": 0,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
-          "named_people": 0,
-          "chars": 0
+          "dates": 15,
+          "named_people": 1,
+          "chars": 8574
         }
       },
-      "timestamp": "2026-10-03T03:10:22"
+      "timestamp": "2026-10-03T17:11:04"
     },
     "OldNice_B": {
       "cell": "OldNice_B",
@@ -661,33 +1111,94 @@
       "tour_type": "walking",
       "location": "walking tour of Old Nice, France",
       "writer_model": "gpt-4.1",
-      "ok": false,
+      "ok": true,
+      "credit_exhausted": false,
       "error": null,
-      "wall_s": 0.3,
-      "chars": 0,
-      "stops_delivered": 0,
-      "writer_calls": 0,
-      "writer_usd": 0,
-      "writer_input_tokens": 0,
-      "writer_output_tokens": 0,
-      "non_writer_llm_by_model": {},
-      "all_llm_calls": 0,
-      "breakdown_llm_usd": 0.0,
+      "wall_s": 166.6,
+      "chars": 8701,
+      "stops_delivered": 3,
+      "writer_calls": 6,
+      "writer_usd": 0.09944,
+      "writer_input_tokens": 37272,
+      "writer_output_tokens": 3112,
+      "non_writer_llm_by_model": {
+        "gpt-4o-mini-2024-07-18": {
+          "calls": 65,
+          "usd": 0.007002
+        },
+        "gpt-4o-2024-08-06": {
+          "calls": 4,
+          "usd": 0.01836
+        },
+        "gpt-3.5-turbo-0125": {
+          "calls": 12,
+          "usd": 0.004044
+        }
+      },
+      "all_llm_calls": 87,
+      "breakdown_llm_usd": 0.128846,
       "search_usd": 0.0,
       "grounding_usd": 0.0,
-      "tour_total_cost_usd": 0.0,
-      "shipped_story_count_by_stop": {},
-      "attempts_by_stop": {},
-      "writer_attempts_logged": 0,
+      "tour_total_cost_usd": 0.128846,
+      "shipped_story_count_by_stop": {
+        "1": 1,
+        "2": 0,
+        "3": 0
+      },
+      "attempts_by_stop": {
+        "1": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 387
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 1,
+            "words": 347
+          }
+        ],
+        "2": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 321
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 343
+          }
+        ],
+        "3": [
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 307
+          },
+          {
+            "attempt": 1,
+            "of": 5,
+            "story_count": 0,
+            "words": 265
+          }
+        ]
+      },
+      "writer_attempts_logged": 6,
       "story_retries_432": 0,
       "gate_235_r10": {
-        "per_stop_deletion_events": 0,
-        "sentences_deleted_total": 0,
-        "summary_reported_total": 0
+        "per_stop_deletion_events": 1,
+        "sentences_deleted_total": 1,
+        "summary_reported_total": 1
       },
       "gate_472_specificity": {
         "paragraphs_removed": 0,
-        "ungrounded_entities": 0
+        "ungrounded_entities": 1
       },
       "gate_229_contradicted": {
         "blocked_stop_lines": 0,
@@ -695,23 +1206,17 @@
       },
       "score_tour": {
         "clean": true,
-        "defects": [
-          "thin",
-          "no_story"
-        ],
-        "defect_detail": {
-          "thin": "0/3 stops delivered",
-          "no_story": "no named people anywhere in the tour"
-        },
+        "defects": [],
+        "defect_detail": {},
         "metrics": {
-          "stops_delivered": 0,
+          "stops_delivered": 3,
           "stops_requested": 3,
-          "dates": 0,
-          "named_people": 0,
-          "chars": 0
+          "dates": 15,
+          "named_people": 1,
+          "chars": 8701
         }
       },
-      "timestamp": "2026-10-03T03:10:23"
+      "timestamp": "2026-10-03T17:13:51"
     }
   },
   "audio_tours_before": {

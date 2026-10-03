@@ -1,0 +1,254 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "Francis Bartlett's Lasting Legacy",
+      "description": "This theme explores the impact of the Francis Bartlett Donation on the Museum of Fine Arts, highlighting how it enabled the acquisition of significant artworks across multiple stops.",
+      "supporting_elements": [
+        "se_003",
+        "se_004",
+        "se_005"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_003",
+        "se_004",
+        "se_005"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "Evolution of Museum Funding and Donations",
+      "description": "This theme traces the evolution of funding sources and donations that have shaped the Museum of Fine Arts, Boston, from its early days to the present.",
+      "supporting_elements": [
+        "se_001",
+        "se_002",
+        "se_007",
+        "se_008"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_001",
+        "se_002",
+        "se_007",
+        "se_008"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "The Museum's Historical Foundations",
+      "description": "This theme examines the historical foundations of the Museum of Fine Arts, focusing on its origins and early acquisitions.",
+      "supporting_elements": [
+        "se_006",
+        "se_003",
+        "se_004"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_006",
+        "se_003",
+        "se_004"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "Francis Bartlett's Lasting Legacy",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003",
+            "se_004"
+          ],
+          "element_summaries": [
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Evolution of Museum Funding and Donations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_007"
+          ],
+          "element_summaries": [
+            "The second phase of construction built a wing along The Fens to house painting galleries, funded ent",
+            "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum."
+          ]
+        },
+        {
+          "name": "The Museum's Historical Foundations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_006",
+            "se_003",
+            "se_004"
+          ],
+          "element_summaries": [
+            "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston",
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don"
+          ]
+        }
+      ],
+      "thread_angle": "[Francis Bartlett's Lasting Legacy] (weight 0.33): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don\n[Evolution of Museum Funding and Donations] (weight 0.33): The second phase of construction built a wing along The Fens to house painting galleries, funded ent; The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum.\n[The Museum's Historical Foundations] (weight 0.33): The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston; The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "Francis Bartlett's Lasting Legacy",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_004",
+            "se_005"
+          ],
+          "element_summaries": [
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Evolution of Museum Funding and Donations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_002",
+            "se_007",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The second phase of construction built a wing along The Fens to house painting galleries, funded ent",
+            "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy was gifted ",
+            "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' to the museum."
+          ]
+        },
+        {
+          "name": "The Museum's Historical Foundations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_004"
+          ],
+          "element_summaries": [
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don"
+          ]
+        }
+      ],
+      "thread_angle": "[Francis Bartlett's Lasting Legacy] (weight 0.33): The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don; The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don\n[Evolution of Museum Funding and Donations] (weight 0.33): The second phase of construction built a wing along The Fens to house painting galleries, funded ent; The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy was gifted \n[The Museum's Historical Foundations] (weight 0.33): The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_003",
+          "element_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "Francis Bartlett's Lasting Legacy"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "Francis Bartlett's Lasting Legacy"
+        }
+      ]
+    },
+    {
+      "threads_active": [
+        {
+          "name": "Francis Bartlett's Lasting Legacy",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003",
+            "se_005"
+          ],
+          "element_summaries": [
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Evolution of Museum Funding and Donations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy was gifted ",
+            "John Goelet donated the artwork titled 'Maharana Sangram Singh Enjoys the Monsoon'."
+          ]
+        },
+        {
+          "name": "The Museum's Historical Foundations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_006",
+            "se_003"
+          ],
+          "element_summaries": [
+            "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston",
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1"
+          ]
+        }
+      ],
+      "thread_angle": "[Francis Bartlett's Lasting Legacy] (weight 0.33): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don\n[Evolution of Museum Funding and Donations] (weight 0.33): The unparalleled Wan-go H. C. Weng Collection of Ming and Qing paintings and calligraphy was gifted ; John Goelet donated the artwork titled 'Maharana Sangram Singh Enjoys the Monsoon'.\n[The Museum's Historical Foundations] (weight 0.33): The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston; The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_003",
+          "element_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "Francis Bartlett's Lasting Legacy"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "Francis Bartlett's Lasting Legacy"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "Francis Bartlett's Lasting Legacy"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_005",
+          "element_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Donation of 1912.",
+          "thread_name": "Francis Bartlett's Lasting Legacy"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of Francis Bartlett's Lasting Legacy. This theme explores the impact of the Francis Bartlett Donation on the Museum of Fine Arts, highlighting how it enabled the acquisition of significant artworks across multiple stops.",
+  "epilog_payoff": "From Ancient Nubia Now to John Singer Sargent’s  The Daughters of Edward Darley Boit, you have followed the thread of Francis Bartlett's Lasting Legacy."
+}

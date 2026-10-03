@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_171412.txt'
 
 ======================================================================
-CALL #001 | 03:03:10.190 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #001 | 17:14:12.608 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: Museum of Fine Arts, Boston, MA
   tour_type: museum
@@ -9,10 +9,10 @@ CALL #001 | 03:03:10.190 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/MFA_A.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_171412.txt'
 
 ======================================================================
-CALL #002 | 03:03:10.191 | TOTAL_STOPS_FINALIZED
+CALL #002 | 17:14:12.609 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: Museum of Fine Arts, Boston, MA
   total_stops_final: 3
@@ -20,18 +20,44 @@ CALL #002 | 03:03:10.191 | TOTAL_STOPS_FINALIZED
 
 
 PHASE 1: Analyzing tour intent with AI...
-Intent analysis failed: 429
-  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
-⚠️ Intent analysis failed, using fallback detection
-[TIMING] phase=intent elapsed=0.2s cumulative=0.2s
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Museum of Fine Arts, Boston",
+    "geographic_scope": null,
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "USA"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=USA (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Boston, MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Museum of Fine Arts, Boston
+  [venue_name sanity] 'Museum of Fine Arts, Boston' OK
+  [S15] Forced tour_category=museum from venue_name='Museum of Fine Arts, Boston'
+[TIMING] phase=intent elapsed=1.6s cumulative=1.6s
 [LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
 
 Detected tour category: MUSEUM
 Using museum template for Museum of Fine Arts, Boston, MA - museum
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_171412.txt'
 
 ======================================================================
-CALL #003 | 03:03:10.417 | GENERATING_PROMPT
+CALL #003 | 17:14:14.230 | GENERATING_PROMPT
 ======================================================================
   location: Museum of Fine Arts, Boston, MA
   user_request: Museum of Fine Arts, Boston, MA
@@ -39,20 +65,17 @@ CALL #003 | 03:03:10.417 | GENERATING_PROMPT
 
 
 PHASE 3A: Fetching 3 candidate POI(s) for Museum of Fine Arts, Boston, MA...
-  [Museum constraint] No venue_name from intent — single-venue constraint skipped
-  [BLOCKER4a] venue_name from location fallback: 'Museum Of Fine Arts'
-  [venue_resolver] Name variants: ['Museum Of Fine Arts']
-  [venue_resolver] City-qualified search hit: 'Museum Of Fine Arts (Boston)' → 1 candidates
-  [venue_resolver] Resolved: 'Museum Of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
+  [Museum constraint] Venue from intent='Museum of Fine Arts, Boston'
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
     URL: http://www.mfa.org/
     Coords: 42.339444444444446, -71.09416666666667
     Language: en
-  [venue_resolver] SPARQL: 99 works found for Q49133
-  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
-  [S17] no scope_constraint (precision='', scope='')
-  [venue_resolver] Name variants: ['Museum Of Fine Arts']
-  [venue_resolver] City-qualified search hit: 'Museum Of Fine Arts (Boston)' → 1 candidates
-  [venue_resolver] Resolved: 'Museum Of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
+  [S17] no scope_constraint (precision='CITY', scope='')
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
     URL: http://www.mfa.org/
     Coords: 42.339444444444446, -71.09416666666667
     Language: en
@@ -67,16 +90,15 @@ PHASE 3A: Fetching 3 candidate POI(s) for Museum of Fine Arts, Boston, MA...
   [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168836
   [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168841
   [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168841
-  [venue_resolver] SPARQL: 99 works found for Q49133
-  [LOCAL-30] Deterministic selection: 253 documented works (10 catalogue, 99 SPARQL)
+  [LOCAL-30] Deterministic selection: 159 documented works (10 catalogue, 0 SPARQL)
   [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
    Stops proposed (deterministic, no GPT):
      - Jean S. and Frederic A. Sharf Visitor Center (130.10) [catalogue]
-     - Still Life in an Architectural Setting [sparql]
-     - Fraternal Love [sparql]
-  [venue_resolver] Name variants: ['Museum Of Fine Arts']
-  [venue_resolver] City-qualified search hit: 'Museum Of Fine Arts (Boston)' → 1 candidates
-  [venue_resolver] Resolved: 'Museum Of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
+     - Valley of the Creuse (Gray Day) [canonical]
+     - Jessica [canonical]
+  [venue_resolver] Name variants: ['Museum of Fine Arts']
+  [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
+  [venue_resolver] Resolved: 'Museum of Fine Arts, Boston' → Q49133 (Museum of Fine Arts Boston)
     URL: http://www.mfa.org/
     Coords: 42.339444444444446, -71.09416666666667
     Language: en
@@ -91,24 +113,24 @@ PHASE 3A: Fetching 3 candidate POI(s) for Museum of Fine Arts, Boston, MA...
   [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168836
   [LOCAL-28] Catalogue page detected: http://www.mfa.org/event/guided-tour/gallery-highlights?event=168841
   [LOCAL-28] Extracted 2 documented works from http://www.mfa.org/event/guided-tour/gallery-highlights?event=168841
-  [venue_resolver] SPARQL: 99 works found for Q49133
-  [LOCAL-30] Deterministic selection: 253 documented works (10 catalogue, 99 SPARQL)
+  [venue_resolver] SPARQL: 199 works found for Q49133
+  [LOCAL-30] Deterministic selection: 346 documented works (10 catalogue, 199 SPARQL)
   [LOCAL-328] Quality score map: 34 objects scored (source-weighted, sludge excluded)
   [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
    Stops proposed (deterministic, quality-score ranked):
-     - The Fog Warning [canonical] (quality=14.0)
-     - Adoration of the Magi [canonical] (quality=11.0)
-     - Ancient Nubia Now [canonical] (quality=11.0)
+     - April 1957 (Celestial Blue) [sparql] (quality=26.0)
+     - Ancient Nubia Now [canonical] (quality=22.0)
+     - Sons of Liberty Bowl [canonical] (quality=19.0)
   [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
 
 PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
 OK PHASE 3A parsed 6 candidate POI(s):
-   - The Fog Warning
-   - Adoration of the Magi
+   - April 1957 (Celestial Blue)
    - Ancient Nubia Now
-   - John Singer Sargent’s  The Daughters of Edward Darley Boit
    - Sons of Liberty Bowl
-   - Arab Horsemen Resting at a Fountain
+   - John Singer Sargent’s  The Daughters of Edward Darley Boit
+   - The Fog Warning
+   - Adoration of the Shepherds
   [venue_resolver] Name variants: ['Museum of Fine Arts']
   [venue_resolver] City-qualified search hit: 'Museum of Fine Arts (Boston)' → 1 candidates
   [venue_resolver] Resolved: 'Museum of Fine Arts' → Q49133 (Museum of Fine Arts Boston)
@@ -135,16 +157,16 @@ OK PHASE 3A parsed 6 candidate POI(s):
   [D1v2] Injected 148 dynamic aliases
   [D1v2] Built bilingual map: 84 word pairs
   [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
-  [D1v2] VERIFIED 'The Fog Warning' → canonical: 'The Fog Warning'
-  [D1v2] VERIFIED 'Adoration of the Magi' → canonical: 'Adoration of the Magi'
+  [D1v2] DROPPED 'April 1957 (Celestial Blue)' — no canonical title match
   [D1v2] VERIFIED 'Ancient Nubia Now' → canonical: 'Ancient Nubia Now'
-  [D1v2] VERIFIED 'John Singer Sargent’s  The Daughters of Edward Darley Boit' → canonical: 'John Singer Sargent’s  The Daughters of Edward Darley Boit'
   [D1v2] VERIFIED 'Sons of Liberty Bowl' → canonical: 'Sons of Liberty Bowl'
-  [D1v2] DROPPED 'Arab Horsemen Resting at a Fountain' — no canonical title match
-  [D1v2] 5/6 works verified — tier: rich
-  [D1] Tier: rich (5 verified works)
-  [R4] Target reached: 5/3 stops
-  [LOCAL-16 GATE] All 5 stops are D1v2-verified ✓
+  [D1v2] VERIFIED 'John Singer Sargent’s  The Daughters of Edward Darley Boit' → canonical: 'John Singer Sargent’s  The Daughters of Edward Darley Boit'
+  [D1v2] VERIFIED 'The Fog Warning' → canonical: 'The Fog Warning'
+  [D1v2] DROPPED 'Adoration of the Shepherds' — no canonical title match
+  [D1v2] 4/6 works verified — tier: rich
+  [D1] Tier: rich (4 verified works)
+  [R4] Target reached: 4/3 stops
+  [LOCAL-16 GATE] All 4 stops are D1v2-verified ✓
 
 PHASE 4.5: Validating AI knowledge for Museum of Fine Arts, Boston, MA...
 OK Knowledge validation passed: Knowledge validation passed
@@ -152,32 +174,28 @@ OK Knowledge validation passed: Knowledge validation passed
 PHASE 4: skipped (tour_category='museum', no type-verification required)
   [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY (not enough covered candidates to fill 3 stops)
   [LOCAL-212] Selected: ['Ancient Nubia Now=VENUE_ONLY', 'Sons of Liberty Bowl=VENUE_ONLY', 'John Singer Sargent’s  The Daughters of Edward Darley Boit=VENUE_ONLY']
-  [LOCAL-212] Dropped:  ['The Fog Warning=VENUE_ONLY', 'Adoration of the Magi=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['The Fog Warning=VENUE_ONLY']
   [LOCAL-349] Yield scores (selected): ['Ancient Nubia Now=22.0', 'Sons of Liberty Bowl=19.0', 'John Singer Sargent’s  The Daughters of Edward Darley Boit=18.0']
-  [LOCAL-349] Yield scores (dropped):  ['The Fog Warning=15.0', 'Adoration of the Magi=11.0']
-  [EXISTENCE-GATE] LOG_ONLY — 5/5 stops verified (100%), 0 would be dropped
+  [LOCAL-349] Yield scores (dropped):  ['The Fog Warning=16.0']
+  [EXISTENCE-GATE] LOG_ONLY — 4/4 stops verified (100%), 0 would be dropped
     [VERIFIED] 'Ancient Nubia Now' — venue_corpus canonical_title: 'Ancient Nubia Now' at 'Museum of Fine Arts, Bosto
     [VERIFIED] 'Sons of Liberty Bowl' — venue_corpus canonical_title: 'Sons of Liberty Bowl' at 'Museum of Fine Arts, Bo
     [VERIFIED] 'John Singer Sargent’s  The Daughters of Edward Da — venue_corpus canonical_title: 'John Singer Sargent’s  The Daughters of Edward Da
     [VERIFIED] 'The Fog Warning' — venue_corpus canonical_title: 'The Fog Warning' at 'Museum of Fine Arts, Boston'
-    [VERIFIED] 'Adoration of the Magi' — venue_corpus canonical_title: 'Adoration of the Magi' at 'Museum of Fine Arts, B
-    [HARVEST] Summary: 0 harvested, 5 already had corpus, 0 verified_no_detail
-    [INTERPRETIVE] 'Sons of Liberty Bowl': +1 passages (2 queries)
-    [INTERPRETIVE] 'John Singer Sargent’s  The Daughters of Edward Darley Boit': +1 passages (2 queries)
-    [INTERPRETIVE] 'The Fog Warning': +2 passages (2 queries)
-    [INTERPRETIVE] 'Adoration of the Magi': +1 passages (2 queries)
-    [INTERPRETIVE] Summary: 4 stops enriched, +5 passages, 10 queries issued, 0 attributions dropped
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 8 queries issued, 0 attributions dropped
 
 PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_171412.txt'
 
 ======================================================================
-CALL #004 | 03:03:35.523 | PHASE_3B_REQUEST
+CALL #004 | 17:15:08.126 | PHASE_3B_REQUEST
 ======================================================================
   location: Museum of Fine Arts, Boston, MA
   stop_count: 3
 
-! PHASE 3B failed (status 429); keeping current order
+PHASE 3B API call cost: $0.0005 (661 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
   [LOCAL-27] Corpus-sourced metadata applied to 3 stops
   [LOCAL-35] No visitor info page found for http://www.mfa.org/
   [LOCAL-91] Corpus fallback: visitor info extracted from http://www.mfa.org/
@@ -187,45 +205,73 @@ CALL #004 | 03:03:35.523 | PHASE_3B_REQUEST
   [LOCAL-355] Ancient Nubia Now: no practical facts in OSM
   [LOCAL-355] Sons of Liberty Bowl: no practical facts in OSM
   [LOCAL-355] John Singer Sargent’s  The Daughters of Edward Darley Boit: no practical facts in OSM
-
-Coordinates fallback: requesting coords for 3 stop(s) missing them...
-   Coords fallback FAILED 'Ancient Nubia Now' — no map pin for this stop
-   Coords fallback FAILED 'Sons of Liberty Bowl' — no map pin for this stop
-   Coords fallback FAILED 'John Singer Sargent’s  The Daughters of Edward Darley Boit' — no map pin for this stop
+   Coords cluster detected: 3 stops share '42.3395, -71.0942', refetching...
+   Cluster refetch OK 'Sons of Liberty Bowl': 42.3396, -71.0942
+   Cluster refetch OK 'Ancient Nubia Now': 42.3392, -71.0942
+   Cluster refetch OK 'John Singer Sargent’s  The Daughters of Edward Darley Boit': 42.3399, -71.0942
+Extracted first POI coordinates: (42.3392, -71.0942)
+  [D4] Museum single-coordinate: all stops set to (42.3392, -71.0942) (source: model (fallback))
 
 === Extracted POI Information ===
 1. Ancient Nubia Now
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3392, -71.0942
+   Directions: From the Museum of Fine Arts parking lot, head southwest on Huntington Ave towar...
 2. Sons of Liberty Bowl
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3392, -71.0942
+   Directions: Exit the 'Ancient Nubia Now' exhibit and head down the main hallway toward the c...
 3. John Singer Sargent’s  The Daughters of Edward Darley Boit
+   Address: 465 Huntington Ave, Boston, MA 02115
+   Coordinates: 42.3392, -71.0942
+   Directions: Leave the 'Sons of Liberty Bowl' and turn right, heading back toward the atrium....
 ================================
 
-[TIMING] phase=poi_selection elapsed=153.0s cumulative=153.2s
+[TIMING] phase=poi_selection elapsed=151.4s cumulative=153.0s
 
 [Storied] STORIED_MODE=true — generating spine + fact sheets...
-  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Museum Of Fine Arts'
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Museum of Fine Arts, Boston'
     page[0] score=11790 url=https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston
     page[1] score=6915 url=http://www.mfa.org/collections/guide-to-searching-the-collections
     page[2] score=5920 url=http://www.mfa.org/collections/prints-and-drawings
-  [W9] Collection provenance extraction failed: HTTP Error 429: Too Many Requests
-  [SQ-S4] LLM extraction failed: HTTP Error 429: Too Many Requests
-  [W9] Collection provenance extraction failed: HTTP Error 429: Too Many Requests
-  [SQ-S4] LLM extraction failed: HTTP Error 429: Too Many Requests
-  [W9] Collection provenance extraction failed: HTTP Error 429: Too Many Requests
-  [W9] Collection provenance extraction failed: HTTP Error 429: Too Many Requests
-  [SQ-S4] LLM extraction failed: HTTP Error 429: Too Many Requests
-  [§3-adapter] No elements extracted from 5 pages
+  [§3-adapter] Raw elements: 19 from 4 pages
+  [§3-adapter] After corroboration scoring: 19 elements
+  [§3-adapter] Final: 19 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 19 elements → /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/MFA_A_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q49133 (19 elements)
   [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
-  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
-  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
-  [§3] No story elements available — spine will use invented arc (mode=invented)
-  [Storied] Spine generation failed — descriptions will proceed without spine
+  [SQ-S6b] Elements per stop: s0=12, s1=12, s2=13
+  [SQ-S6b] Entity clusters found: 44 (≥2 stops)
+    → the museum (people): 3 stops, 5 elements
+    → 20th century (eras): 3 stops, 4 elements
+    → 21th century (eras): 3 stops, 4 elements
+    → francis bartlett donation (people): 3 stops, 3 elements
+    → francis bartlett (people): 3 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0140, 1932 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Francis Bartlett's Lasting Legacy': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'Evolution of Museum Funding and Donations': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+    → 'The Museum's Historical Foundations': coverage=1.00, evidence=0.60, distinct=1.00, arc=1.00, TOTAL=0.900
+  [SQ-S6b] Blended 3 threads: 'Francis Bartlett's Lasting Legacy'=0.33, 'Evolution of Museum Funding and Donations'=0.33, 'The Museum's Historical Foundations'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Francis Bartlett's Lasting Legacy': coverage=100%, weight=0.33, elements=['se_003', 'se_004', 'se_005']
+    → 'Evolution of Museum Funding and Donations': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_007', 'se_008']
+    → 'The Museum's Historical Foundations': coverage=100%, weight=0.33, elements=['se_006', 'se_003', 'se_004']
+  [§3] Story elements injected into spine prompt (19 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Museum of Fine Arts, Boston model=gpt-4o tokens=2275 (in=1786 out=489) cost=$0.0094 latency=3.1s
+[COST_METER] FRESH | spine_generate | $0.009355 | user=None | job=local571-MFA_A
+  [LOCAL-278] Spine cost folded into total: $0.0094
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=found)
   [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (41 total passages)
   [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
   [CORPUS-GATE] stop='Ancient Nubia Now' verdict=VENUE_ONLY action=SHORTENED
   [CORPUS-GATE] stop='Sons of Liberty Bowl' verdict=VENUE_ONLY action=SHORTENED
   [CORPUS-GATE] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' verdict=VENUE_ONLY action=SHORTENED
   [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 3 SHORTENED
-  [Storied] Fact sheets: 0/3 generated
+  [Storied] Fact sheets: 3/3 generated
   [S25] Story types assigned: ['art', 'history', 'anecdote']
   [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
 
@@ -235,14 +281,14 @@ Coordinates fallback: requesting coords for 3 stop(s) missing them...
 
   [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
   [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
-[TIMING] phase=fact_sheets elapsed=5.3s cumulative=158.5s
+[TIMING] phase=fact_sheets elapsed=53.3s cumulative=206.3s
 
 PHASE 5: Generating detailed descriptions for each POI (parallel)...
 
   [LOCAL-382] framing=venue_purpose source='dedicated to the Homeric epics features works that chart the Trojan War and illu'
 
-  [LOCAL-383] Extracted 74 story beats, 74 named people: Africa An, Alfred Stieglitz, Americas, Amorsolo, Ancient Mesoamerica, Angelica Lloyd Russell
-[TIMING] phase=narration elapsed=0.1s cumulative=158.6s
+  [LOCAL-383] Extracted 73 story beats, 73 named people: Africa An, Alfred Stieglitz, Americas, Amorsolo, Ancient Mesoamerica, Angelica Lloyd Russell
+[TIMING] phase=narration elapsed=0.1s cumulative=206.4s
   [D495] venue domain seeded tier1: mfa.org
 
   [LOCAL-410] SERP search wiring — searching for stories on 3 stops...
@@ -250,156 +296,201 @@ PHASE 5: Generating detailed descriptions for each POI (parallel)...
     [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
   [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
 
-  [LOCAL-441] Batch P856 check: 5 domains, budget=20.0s, pool=10
-  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for mfastpete.org: The read operation timed out)
-  [SQ-S2] Wikidata P856 check failed for mfastpete.org: The read operation timed out
+  [LOCAL-441] Batch P856 check: 2 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for patrons.org.es: The read operation timed out)
   [SQ-S2] Wikidata P856 check failed for patrons.org.es: The read operation timed out
-  [SQ-S2] Wikidata P856 check failed for mfah.org: The read operation timed out
-  [SQ-S2] Wikidata P856 check failed for virginiahistory.org: The read operation timed out
   [SQ-S2] Wikidata P856 check failed for ajaonline.org: The read operation timed out
-  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 5 unverified, 0 budget-expired
-    [D489] material kind: stop='Ancient Nubia Now' kind=active volume=COVERED sentences=22 active=1 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
-         best: "The Honorable John Barton Payne donated his collection of 50 paintings to the Commonwealth in 1919."
-    [LOCAL-489] Stop 1 needs more material (eventless): 16 passages, 2444 chars, verdict=COVERED
-      [LOCAL-489] +8 from: "Ancient Nubia Now" "Museum Of Fine Arts" provenance
-      [LOCAL-498] after replenishment: kind active -> active, 2444 -> 3546 chars, eventful=0 (NO CHANGE — the round bought more of the same)
-         best now: "The Honorable John Barton Payne donated his collection of 50 paintings to the Commonwealth in 1919."
+  [LOCAL-441] Batch complete: 8.1s, 0 tier1, 2 unverified, 0 budget-expired
+    [D489] material kind: stop='Ancient Nubia Now' kind=active volume=COVERED sentences=30 active=1 staked=0 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+         best: "Elizabeth Lawrence (1829–1905) gave the largest financial contribution toward the creation of the MFA."
+    [LOCAL-489] Stop 1 needs more material (eventless): 19 passages, 2903 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Ancient Nubia Now" "Museum of Fine Arts, Boston" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2903 -> 4040 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Elizabeth Lawrence (1829–1905) gave the largest financial contribution toward the creation of the MFA."
     [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
-    Stop 1 'Ancient Nubia Now': queries=3 serp_results=16 snippets=24
-      → Through a majestic display of art and objects, “Ancient Nubia Now” confronts past misinterpretations and offers new ways
-      → The exhibition “Ancient Nubia Now” (2019–2020) was a visually spectacular display that was in one sense a fairly traditi
+    Stop 1 'Ancient Nubia Now': queries=3 serp_results=19 snippets=27
+      → Through a majestic display of art and objects, “Ancient Nubia Now ... Through a majestic display of art and objects, “An
+      → Featuring more than 400 objects drawn from the MFA's vast collection of Nubian art ... Ancient Nubia Now” (October 13, 2
     [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
     [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
   [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
 
-  [LOCAL-441] Batch P856 check: 10 domains, budget=20.0s, pool=10
-  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 10 unverified, 0 budget-expired
-    [D489] material kind: stop='Sons of Liberty Bowl' kind=inert volume=COVERED sentences=38 active=0 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
-    [LOCAL-489] Stop 2 needs more material (eventless): 18 passages, 2781 chars, verdict=COVERED
-      [LOCAL-489] +8 from: "Sons of Liberty Bowl" "Museum Of Fine Arts" provenance
-      [LOCAL-498] after replenishment: kind inert -> active, 2781 -> 3996 chars, eventful=0 (CHANGED)
-         best now: "Provenance1768, commissioned by fifteen members of the Sons of Liberty and ..."
+  [LOCAL-441] Batch P856 check: 4 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 4 unverified, 0 budget-expired
+    [D489] material kind: stop='Sons of Liberty Bowl' kind=active volume=COVERED sentences=39 active=1 staked=0 eventful=0 passive=2  <-- DISAGREE: enough material, wrong kind
+         best: "Elizabeth Lawrence (1829–1905) gave the largest financial contribution toward the creation of the MFA."
+    [LOCAL-489] Stop 2 needs more material (eventless): 19 passages, 2946 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Sons of Liberty Bowl" "Museum of Fine Arts, Boston" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2946 -> 4136 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Elizabeth Lawrence (1829–1905) gave the largest financial contribution toward the creation of the MFA."
     [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
-    Stop 2 'Sons of Liberty Bowl': queries=3 serp_results=18 snippets=26
+    Stop 2 'Sons of Liberty Bowl': queries=3 serp_results=19 snippets=27
       → Often described as a national treasure equal in significance to the Declaration of Independence and US Constitution, the
-      → ... the eighteenth century. The Sons of Liberty Bowl was acquired by the Museum of Fine Arts, Boston, in 1949 at the hei
+      → Sons of Liberty bowl. Paul Revere, Jr. (American, 1734–1818). 1768. Object Place: Boston, Massachusetts. Medium/Techniqu
     [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
     [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
   [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
 
-  [LOCAL-441] Batch P856 check: 5 domains, budget=20.0s, pool=10
-  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 5 unverified, 0 budget-expired
-    [D489] material kind: stop='John Singer Sargent’s  The Daughters o' kind=active volume=COVERED sentences=28 active=1 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
-         best: "The museum received one of the largest and most important gifts in its history in 1957, when Ima Hogg donated her twenty-eight-room home, Ba"
-    [LOCAL-489] Stop 3 needs more material (eventless): 15 passages, 2222 chars, verdict=COVERED
-      [LOCAL-489] +2 from: "John Singer Sargent’s The Daughters of Edward Darley Boit" "Museum Of Fine Ar
-      [LOCAL-498] after replenishment: kind active -> active, 2222 -> 2522 chars, eventful=0 (NO CHANGE — the round bought more of the same)
-         best now: "The museum received one of the largest and most important gifts in its history in 1957, when Ima Hogg donated "
+  [LOCAL-441] Batch P856 check: 3 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 3 unverified, 0 budget-expired
+    [D489] material kind: stop='John Singer Sargent’s  The Daughters o' kind=inert volume=COVERED sentences=28 active=0 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 3 needs more material (eventless): 15 passages, 2253 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "John Singer Sargent’s The Daughters of Edward Darley Boit" "Museum of Fine Ar
+      [LOCAL-498] after replenishment: kind inert -> inert, 2253 -> 3410 chars, eventful=0 (NO CHANGE — the round bought more of the same)
     [LOCAL-488] providers ['openai'] span fewer than two model families — cross-model agreement needs two; set GEMINI_API_KEY
-    Stop 3 'John Singer Sargent’s  The Daughters of Edward Dar': queries=3 serp_results=15 snippets=17
+    Stop 3 'John Singer Sargent’s  The Daughters of Edward Dar': queries=3 serp_results=15 snippets=23
       → John Singer Sargent's The Daughters of Edward Darley Boit ... Visit the Art of the Americas Wing, Level 2, to see a gall
       → The Real Story Behind John Singer Sargent's “The Daughters of Edward Darley Boit” ... Museum of Fine Arts, Boston. They 
 
-  [LOCAL-410] SERP search complete: 12 queries, 67 results, 67 total snippets
-  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 67 raw → max 15 injected
+  [LOCAL-410] SERP search complete: 12 queries, 77 results, 77 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 77 raw → max 15 injected
 
   [LOCAL-410] CHAIN INSTRUMENTATION:
-    Ancient Nubia Now: serp_results=16 elements_extracted=- beats_injected=- (measured post-generation)
-    Sons of Liberty Bowl: serp_results=18 elements_extracted=- beats_injected=- (measured post-generation)
+    Ancient Nubia Now: serp_results=19 elements_extracted=- beats_injected=- (measured post-generation)
+    Sons of Liberty Bowl: serp_results=19 elements_extracted=- beats_injected=- (measured post-generation)
     John Singer Sargent’s  The Daughters of Edward Dar: serp_results=15 elements_extracted=- beats_injected=- (measured post-generation)
-  [D534] Stop 1 has 24 snippet(s) but they are VENUE-level only — fetching object-level facts
-  [D533] Stop 1 'Ancient Nubia Now' has 24 snippet(s) — asking the knowledge fallback
+  [D534] Stop 1 has 27 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Ancient Nubia Now' has 27 snippet(s) — asking the knowledge fallback
   [D533] +4 fact(s) via openai+web(16) (4 high-confidence) — stop will be labelled aloud
-      [high] The 'Ancient Nubia Now' exhibition at the Museum of Fine Arts showcased over 400 artifacts from ancient Nubia.
-      [high] The exhibition was on view from October 13, 2019, to January 20, 2020.
-      [high] All artifacts in the 'Ancient Nubia Now' exhibition were from the Museum of Fine Arts' own collection.
-      [high] The Museum of Fine Arts conducted excavations in Nubia, specifically in southern Egypt and northern Sudan, bet
-  [D534] Stop 2 has 26 snippet(s) but they are VENUE-level only — fetching object-level facts
-  [D533] Stop 2 'Sons of Liberty Bowl' has 26 snippet(s) — asking the knowledge fallback
-  [D533] fallback returned nothing: openai HTTP 429+web(16)
-  [D534] Stop 3 has 17 snippet(s) but they are VENUE-level only — fetching object-level facts
-  [D533] Stop 3 'John Singer Sargent’s  The Daughters of Edward Dar' has 17 snippet(s) — asking the knowledge fallback
-  [D533] fallback returned nothing: openai HTTP 429+web(15)
-  [D533] Knowledge fallback filled 1 starved stop(s)
-[TIMING] phase=external_lookups elapsed=34.7s cumulative=193.4s
+      [high] The 'Ancient Nubia Now' exhibition at the Museum of Fine Arts, Boston, featured approximately 400 works of anc
+      [high] The exhibition was on view from August 13, 2019, through January 20, 2020.
+      [high] All the works in the 'Ancient Nubia Now' exhibition were from the MFA's collection.
+      [high] The Museum of Fine Arts, Boston, conducted excavations in southern Egypt and northern Sudan between 1913 and 1
+  [D534] Stop 2 has 27 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Sons of Liberty Bowl' has 27 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via openai+web(16) (6 high-confidence) — stop will be labelled aloud
+      [high] The Sons of Liberty Bowl was made by Paul Revere, Jr. in 1768.
+      [high] The bowl was crafted in Boston, Massachusetts.
+      [high] The material used for the Sons of Liberty Bowl is silver.
+      [high] The dimensions of the bowl are 14 x 27.9 cm.
+      [low] The design of the bowl was probably inspired by the shape of a Delft punch bowl.
+      [high] The bowl was commissioned by fifteen members of the Sons of Liberty and purchased by one of the members, Willi
+  [D534] Stop 3 has 23 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'John Singer Sargent’s  The Daughters of Edward Dar' has 23 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(15) (6 high-confidence) — stop will be labelled aloud
+      [high] The Daughters of Edward Darley Boit was painted by John Singer Sargent in Paris in the autumn of 1882.
+      [high] The painting is an oil on canvas.
+      [high] The dimensions of the painting are approximately 221.93 x 222.57 cm.
+      [high] The painting was acquired by the Museum of Fine Arts, Boston in 1919.
+      [high] The painting is currently exhibited in the Museum of Fine Arts, Boston.
+      [high] The painting was commissioned by Edward Darley Boit, the father of the girls depicted.
+  [D533] Knowledge fallback filled 3 starved stop(s)
+[TIMING] phase=external_lookups elapsed=37.8s cumulative=244.2s
 
 Generating description for Stop 1: Ancient Nubia Now by , ...
 
 Generating description for Stop 2: Sons of Liberty Bowl by , ...
 
 Generating description for Stop 3: John Singer Sargent’s  The Daughters of Edward Darley Boit by , ...
-  [LOCAL-381] stop='Sons of Liberty Bowl' matched_work=False medium='' work_identity_chars=0
-  [LOCAL-383] Stop 2 beats: Koehler, Gail, Bougival
-  [LOCAL-411] Stop 2 snippet ranking: input=26 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
-    Top scores: [("Paul Revere's Sons of Liberty Bowl", 17, 'unverified'), ('Sons of Liberty bowl – Works – Museum of Fine Arts', 12, ''), ('Sons of Liberty Bowl', 10, '')]
-  [LOCAL-402] Stop 2: injected 5 snippets as reference material
-  [D533] Stop 2 corpus-gate restriction LIFTED — 26 source item(s) arrived after the gate ran
-  [LOCAL-417] Stop 2: SUPPRESSED 23 required names (no snippet evidence): ['Koehler', 'Gail', 'Bougival', 'Renoir', 'Carefully', 'Rembrandt', 'William', 'Earth', 'Ancient Mesoamerica', 'Linde', 'Hugh Stubbins', 'Picture', 'Teitelbaum', 'Ming', 'Donatello', 'British', 'Laurence', 'John Goelet', 'West', 'Joseph', 'Ruth', 'Chinese Song Dynasty', 'Kinsaku Nakane']
-  [LOCAL-411] Stop 2 prompt size: before_snippets=11381 after=28655 (+17274 from snippets+instructions, facts_first=yes)
-  [LOCAL-411] WARNING: prompt exceeds 20K chars (28655)
-  [LOCAL-381] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' matched_work=False medium='' work_identity_chars=0
-  [LOCAL-383] Stop 3 beats: Americas, Bowling, Emile Simon
-  [LOCAL-411] Stop 3 snippet ranking: input=17 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
-    Top scores: [('Episode 11: Sargent — The Lonely Palette Podcast', 19, 'unverified'), ('Episode 11: Sargent — The Lonely Palette Podcast', 19, 'unverified'), ("John Singer Sargent's The Daughters of Edward Darl", 10, 'tier1')]
-  [LOCAL-402] Stop 3: injected 5 snippets as reference material
-  [D533] Stop 3 corpus-gate restriction LIFTED — 17 source item(s) arrived after the gate ran
-  [LOCAL-417] Stop 3: SUPPRESSED 22 required names (no snippet evidence): ['Bowling', 'Emile Simon', 'National', 'Pacific', 'Dou', 'Tchaikovsky', 'John Hubbard Sturgis', 'Monet', 'Nubia', 'Herb Ritts', 'Alfred Stieglitz', 'Dallin', 'Newland House Drawing', 'Sharf Information', 'Horticultural', 'Chris', 'Rabbi Howard', 'Jessie', 'Margo Behrakis', 'Loring', 'Japanese Garden', 'Böcklin']
-  [LOCAL-411] Stop 3 prompt size: before_snippets=11546 after=30054 (+18508 from snippets+instructions, facts_first=yes)
-  [LOCAL-411] WARNING: prompt exceeds 20K chars (30054)
   [LOCAL-381] stop='Ancient Nubia Now' matched_work=False medium='' work_identity_chars=0
-  [LOCAL-383] Stop 1 beats: Photographs, It, Landon
-  [LOCAL-411] Stop 1 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
-    Top scores: [('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified')]
+  [LOCAL-383] Stop 1 beats: Americas, Gauguin, Pace
+  [LOCAL-381] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Bougival, Photographs, Linde
+  [LOCAL-411] Stop 1 snippet ranking: input=31 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified'), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified')]
   [LOCAL-402] Stop 1: injected 5 snippets as reference material
-  [D533] Stop 1 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
-  [LOCAL-417] Stop 1: SUPPRESSED 24 required names (no snippet evidence): ['Photographs', 'Landon', 'Gauguin', 'Rajput', 'Japanese', 'Rubens', 'Sharf Visitor', 'Guided Tour', 'Degas', 'Athenæum', 'Angelica Lloyd Russell', 'Nishimuraya Yohachi', 'Conservation', 'Hamilton Palace Dining', 'Pace', 'Musical Instruments', 'Moody', 'Nolan', 'Asiatic', 'Forsyth Wickes', 'Amorsolo', 'Nishida', 'National Portrait', 'Lowell']
-  [LOCAL-411] Stop 1 prompt size: before_snippets=10801 after=28346 (+17545 from snippets+instructions, facts_first=yes)
-  [LOCAL-411] WARNING: prompt exceeds 20K chars (28346)
-  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
-  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D533] Stop 1 corpus-gate restriction LIFTED — 31 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 25 required names (no snippet evidence): ['Americas', 'Gauguin', 'Pace', 'Bowling', 'Dou', 'Earth', 'Monet', 'Emile Simon', 'Moody', 'Asiatic', 'Newland House Drawing', 'Horticultural', 'Chris', 'Tchaikovsky', 'Carefully', 'Japanese Garden', 'Alfred Stieglitz', 'Nolan', 'Athenæum', 'William', 'Ancient Mesoamerica', 'Jessie', 'National', 'Laurence', 'Japanese']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12604 after=29926 (+17322 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29926)
+  [LOCAL-411] Stop 3 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('John Singer Sargent’s  The Daughters of Edward Dar', 19, ''), ("John Singer Sargent's The Daughters of Edward Darl", 12, ''), ('John Singer Sargent’s  The Daughters of Edward Dar', 12, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 22 required names (no snippet evidence): ['Bougival', 'Photographs', 'Linde', 'Rembrandt', 'Rubens', 'Guided Tour', 'Degas', 'Hugh Stubbins', 'Margo Behrakis', 'Hamilton Palace Dining', 'Koehler', 'Dallin', 'Teitelbaum', 'Angelica Lloyd Russell', 'Forsyth Wickes', 'Joseph', 'Sharf Information', 'Böcklin', 'Ruth', 'Herb Ritts', 'Nubia', 'Lowell']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13576 after=31655 (+18079 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (31655)
+  [LOCAL-381] stop='Sons of Liberty Bowl' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Sharf Visitor, Renoir, Picture
+  [LOCAL-411] Stop 2 snippet ranking: input=34 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [("Paul Revere's Sons of Liberty Bowl", 17, 'unverified'), ('Sons of Liberty bowl – Works – Museum of Fine Arts', 12, ''), ('Sons of Liberty Bowl', 10, 'tier1')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 34 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 24 required names (no snippet evidence): ['Sharf Visitor', 'Renoir', 'Picture', 'Chinese Song Dynasty', 'Nishimuraya Yohachi', 'British', 'Donatello', 'Pacific', 'West', 'Nishida', 'Rajput', 'John Hubbard Sturgis', 'John Goelet', 'National Portrait', 'Kinsaku Nakane', 'Gail', 'Amorsolo', 'Musical Instruments', 'Rabbi Howard', 'Conservation', 'Ming', 'Landon', 'Sargent', 'Loring']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13760 after=30696 (+16936 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (30696)
   [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
   [D500] agents 0/3: hero=—, sponsor=—, builder=—
   [D500] agents 0/3: hero=—, sponsor=—, builder=—
   [D500] agents 0/3: hero=—, sponsor=—, builder=—
-  [LOCAL-490] Stop 2 story pass: ok=False (story pass call failed: HTTPError: 429 Client Error: Too Many Requests for url: https://api.openai.com/v1/chat/completions), $0.0000
-  [LOCAL-292] Stop 2: OUT OF API CREDITS — not retrying. Add credits at platform.openai.com/settings/organization/billing
-  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0037
-  [LOCAL-490] Stop 1 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0036
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0044
+    story: "In 1919, the Museum of Fine Arts, Boston acquired John Singer Sargent’s painting, The Daughters of Edward Darley Boit. This acquisition was made possi"
+  [LOCAL-490] Stop 2 story pass: ok=True (3 sentences), $0.0046
+    story: "In 1768, the Sons of Liberty, a group of Massachusetts rebels, commissioned Paul Revere, Jr., a renowned American silversmith, to craft a bowl that wo"
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0047
+    story: "The Museum of Fine Arts, Boston had long housed a vast collection of Nubian art, yet misconceptions about Nubia's history persisted. In an effort to a"
   [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
-  [LOCAL-292] Stop 3: OUT OF API CREDITS — not retrying. Add credits at platform.openai.com/settings/organization/billing
-Stop 1 API call cost: $0.0344 (7238 tokens, model=gpt-4o)
-  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=106
-  [LOCAL-393] Stop 1: WORD FLOOR — 106 words < 120, retrying (attempt 2/5)
-  [LOCAL-292] Stop 1: OUT OF API CREDITS — not retrying. Add credits at platform.openai.com/settings/organization/billing
-  [LOCAL-394] Stop 1: loop exhausted but prior valid description exists (106 words) — kept (never dropped)
-  [LOCAL-388] PRE-GATE stop='Ancient Nubia Now' beats_assigned=25 beats_in_output=3 dropped=['Gauguin', 'Rajput', 'Japanese', 'Rubens', 'Sharf Visitor', 'Guided Tour', 'Degas', 'Athenæum', 'Angelica Lloyd Russell', 'Nishimuraya Yohachi', 'Conservation', 'Hamilton Palace Dining', 'Pace', 'Musical Instruments', 'Moody', 'Nolan', 'Asiatic', 'Forsyth Wickes', 'Amorsolo', 'Nishida', 'National Portrait', 'Lowell']
-  [LOCAL-388] PRE-GATE stop='Sons of Liberty Bowl' beats_assigned=24 beats_in_output=0 dropped=['Koehler', 'Gail', 'Bougival', 'Renoir', 'Carefully', 'Rembrandt', 'William', 'Earth', 'Ancient Mesoamerica', 'Linde', 'Hugh Stubbins', 'Picture', 'Teitelbaum', 'Ming', 'Donatello', 'British', 'Laurence', 'John Goelet', 'West', 'Joseph', 'Ruth', 'Chinese Song Dynasty', 'Africa An', 'Kinsaku Nakane']
-  [LOCAL-388] PRE-GATE stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' beats_assigned=25 beats_in_output=1 dropped=['Americas', 'Bowling', 'Emile Simon', 'National', 'Pacific', 'Dou', 'Tchaikovsky', 'John Hubbard Sturgis', 'Monet', 'Art', 'Nubia', 'Herb Ritts', 'Alfred Stieglitz', 'Dallin', 'Newland House Drawing', 'Sharf Information', 'Horticultural', 'Chris', 'Rabbi Howard', 'Jessie', 'Margo Behrakis', 'Loring', 'Japanese Garden', 'Böcklin']
+Stop 2 API call cost: $0.0371 (7807 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=4 words=312
+Stop 2 description word count: 312 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0368 (7743 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=311
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0389 (8180 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=4 words=307
+Stop 3 description word count: 307 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0386 (8126 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=1 words=252
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0410 (8624 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 3/5 story_count=0 words=280
+  [LOCAL-391] Stop 1: scrubbed 1 unfilled role(s)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0435 (9155 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 4/5 story_count=0 words=319
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 5/5)
+Stop 1 API call cost: $0.0453 (9541 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 5/5 story_count=0 words=251
+Stop 1 description word count: 251 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-388] PRE-GATE stop='Ancient Nubia Now' beats_assigned=25 beats_in_output=3 dropped=['Gauguin', 'Bowling', 'Dou', 'Earth', 'Monet', 'Emile Simon', 'Moody', 'Asiatic', 'Newland House Drawing', 'Horticultural', 'Chris', 'Tchaikovsky', 'Japanese Garden', 'Alfred Stieglitz', 'Nolan', 'Athenæum', 'William', 'Ancient Mesoamerica', 'Jessie', 'National', 'Laurence', 'Japanese']
+  [LOCAL-388] PRE-GATE stop='Sons of Liberty Bowl' beats_assigned=24 beats_in_output=4 dropped=['Renoir', 'Chinese Song Dynasty', 'Nishimuraya Yohachi', 'Donatello', 'Pacific', 'West', 'Nishida', 'Rajput', 'John Hubbard Sturgis', 'John Goelet', 'National Portrait', 'Kinsaku Nakane', 'Gail', 'Amorsolo', 'Musical Instruments', 'Rabbi Howard', 'Conservation', 'Landon', 'Sargent', 'Loring']
+  [LOCAL-388] PRE-GATE stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' beats_assigned=24 beats_in_output=3 dropped=['Bougival', 'Photographs', 'Rembrandt', 'Rubens', 'Guided Tour', 'Degas', 'Hugh Stubbins', 'Margo Behrakis', 'Hamilton Palace Dining', 'Koehler', 'Dallin', 'Teitelbaum', 'Angelica Lloyd Russell', 'Forsyth Wickes', 'Joseph', 'Sharf Information', 'Böcklin', 'Ruth', 'Herb Ritts', 'Nubia', 'Lowell']
 
   [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
-  [LOCAL-439] Story gate error (non-fatal): OpenAI API error 429: {
-    "error": {
-        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
-        "type": "insufficient
+    ✗ FAIL stop='Ancient Nubia Now': story_units=0, entities_ok=True, thesis_ok=False
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+      → thesis_missing: description does not connect to venue's stated purpose
+    ✓ PASS stop='Sons of Liberty Bowl': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='John Singer Sargent’s  The Daughters of Edward Darley Boit': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.002334 (input=9495, output=1517)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
 
   [LOCAL-423] STORY VERIFICATION: checking claims against sources...
-    ✗ FAIL stop='Ancient Nubia Now': claims=1, sourced=0, unsourced=1, contradicted=0
-      → UNSOURCED: '65,000 works' (numeric) — no snippet contains this assertion
+    ✗ FAIL stop='Ancient Nubia Now': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✓ PASS stop='Sons of Liberty Bowl': claims=4, sourced=4, unsourced=0, contradicted=0
+      evidence (4 sourced claims):
+        claim='1768' ← https://collections.mfa.org/objects/39072/sons-of-liberty-bo
+        claim='Liberty, a group of Massachusetts rebels, commissioned Paul' ← https://www.mfa.org/collections/publications/paul-revere
+        claim='1949' ← https://www.americanancestors.org/video-library/forged-revol
+    ✗ FAIL stop='John Singer Sargent’s  The Daughters of Edward Darley Boit': claims=3, sourced=2, unsourced=1, contradicted=0
+      → UNSOURCED: 'Boston acquired John' (attribution) — no snippet contains this assertion
+      evidence (2 sourced claims):
+        claim='1919' ← 
+        claim='in 1882' ← https://ascholarlyskater.com/2018/04/18/mysterious-daughters
   [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
   [LOCAL-423] Unsourced claims will be stripped from delivered text
-    [LOCAL-423] Stripped 1 sentence(s) from 'Ancient Nubia Now':
-      ✗ "This effort enriches the museum's vast collection of over 65,000 works, shedding light on Nubia's of"
-  [LOCAL-394] stop='Ancient Nubia Now' below_floor words=88 — kept (never dropped)
+    [LOCAL-423] Stripped 1 sentence(s) from 'John Singer Sargent’s  The Daughters of Edward Darley Boit':
+      ✗ "In 1919, the Museum of Fine Arts, Boston acquired John Singer Sargent’s painting, The Daughters of E"
 
   [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
-  [LOCAL-192] Style retry summary: 0 paragraphs retried, 0 fixed/improved, 0 kept original
-  [LOCAL-192] Retry cost: $0.0000 (0 tokens)
+  [LOCAL-192] Stop 1 para 3: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 2: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE, R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 2 fixed/improved, 2 kept original
+  [LOCAL-192] Retry cost: $0.0019 (2427 tokens)
 
   [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
-  [LOCAL-255] Stop 2 'Sons of Liberty Bowl': 0 rewritten, 1 deleted
-  [LOCAL-255] Stop 3 'John Singer Sargent’s  The Dau': 0 rewritten, 1 deleted
-  [LOCAL-255] R1 summary: 0 rewritten, 2 deleted, 2 stops affected, LLM tokens: 0 ($0.0000)
-  [LOCAL-255] WARNING: deletion rate 2/2 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
 
   [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
   [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
@@ -420,17 +511,25 @@ Stop 1 API call cost: $0.0344 (7238 tokens, model=gpt-4o)
   [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
 
   [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
-  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+  [LOCAL-235] Stop 2 'Sons of Liberty Bowl': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
 
   [LOCAL-472] PHASE 5.152: Stop-specificity gate...
   [LOCAL-472] Stop-specificity gate summary:
-    Stops checked: 1
-    Paragraphs checked: 1
+    Stops checked: 3
+    Paragraphs checked: 8
     Transferable (high, removed): 0
     Transferable (low conf, kept): 0
     Last-paragraph protected: 0
-    Ungrounded named entities: 0
+    Ungrounded named entities: 7
     Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Ancient Nubia Now' entity='Fine Arts' reason='No concrete link to the stop is provided.' in: "The Museum of Fine Arts, Boston organized the exhibition "Ancient Nubia Now" from October 13, 2019, "
+    [LOCAL-472] UNGROUNDED entity stop='Sons of Liberty Bowl' entity='Paul Revere' reason='It does not specify where Paul Revere crafted the bowl.' in: "In 1768, the Sons of Liberty, a group of Massachusetts rebels, commissioned Paul Revere, Jr., a reno"
+    [LOCAL-472] UNGROUNDED entity stop='Sons of Liberty Bowl' entity='Massachusetts House' reason='It does not specify how Revere is directly linked to the Massachusetts House.' in: "Each curve and etching speaks to the skill of Revere, who was not only a silversmith but also a pass"
+    [LOCAL-472] UNGROUNDED entity stop='Sons of Liberty Bowl' entity='Townshend Acts' reason='It does not specify how Revere relates to the Townshend Acts at this stop.' in: "Each curve and etching speaks to the skill of Revere, who was not only a silversmith but also a pass"
+    [LOCAL-472] UNGROUNDED entity stop='Sons of Liberty Bowl' entity='Sharf Visitor' reason='No concrete link to the Sharf Visitor.' in: "Remarkably, the acquisition of this historic piece was realized through the contributions of seven h"
+    [LOCAL-472] UNGROUNDED entity stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' entity='Mary Louisa' reason='It does not specify how Mary Louisa is directly connected to the painting or stop.' in: "This acquisition was made possible by a gift from Mary Louisa, ensuring the painting found a permane"
+    [LOCAL-472] UNGROUNDED entity stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' entity='Level Three' reason='No specific link between "Level Three" and the painting's creation or display is provided.' in: "This acquisition was made possible by a gift from Mary Louisa, ensuring the painting found a permane"
 
   [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
   [LOCAL-263] Unsupported-claim gate summary:
@@ -439,23 +538,29 @@ Stop 1 API call cost: $0.0344 (7238 tokens, model=gpt-4o)
     By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
     Escalation calls: 0
     Stops affected: 0
-    Deletion rate: 0.0% (0/5)
+    Deletion rate: 0.0% (0/34)
 
   [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
   [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
-    References detected: 1
-    Glossed (composed): 0
+    References detected: 11
+    Glossed (composed): 2
     Suppressed (already explained): 0
-    Degraded (name dropped): 1
+    Degraded (name dropped): 5
     Guard failures: 0
-    Known (skipped): 0
-    Triage: 0 tokens, $0.0000, 0.1s
-    Gloss: 0 tokens, $0.0000, 0.1s
-    Compose: 0 tokens, $0.0000, 0.0s
-    Total added cost: $0.0000
-    Stops affected: 1
+    Known (skipped): 4
+    Triage: 1404 tokens, $0.0003, 3.9s
+    Gloss: 650 tokens, $0.0001, 1.8s
+    Compose: 1085 tokens, $0.0002, 1.2s
+    Total added cost: $0.0006
+    Stops affected: 3
     Glosses applied:
-      • Napatan → DEGRADED (name dropped)
+      • Pace → DEGRADED (name dropped)
+      • George → "the archaeologist active from 1905 to 1942" [source: corpus]
+      • Massachusetts House → DEGRADED (name dropped)
+      • Townshend Acts → DEGRADED (name dropped)
+      • Sharf Visitor → DEGRADED (name dropped)
+      • Donation → "the contributions from local schoolchildren" [source: corpus]
+      • Mary Louisa → DEGRADED (name dropped)
 
   [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
 
@@ -467,7 +572,7 @@ Stop 1 API call cost: $0.0344 (7238 tokens, model=gpt-4o)
 
   [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
   [LOCAL-402] Temporal coherence gate summary:
-    Relations checked: 9
+    Relations checked: 39
     Relations rejected: 0
     Sentences removed: 0
     Stops affected: 0
@@ -478,7 +583,7 @@ Stop 1 API call cost: $0.0344 (7238 tokens, model=gpt-4o)
 PHASE 5.5a: Post-description knowledge validation (all tour types)...
 OK Post-description validation passed: Knowledge validation passed
 
-PHASE 5.5b: Validating descriptions are inside 'Museum Of Fine Arts'...
+PHASE 5.5b: Validating descriptions are inside 'Museum of Fine Arts, Boston'...
    Authority: 2 D1v2-verified (kept unconditionally), 0 unverified (will check)
    Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
 OK PHASE 5.5b: 3 stop(s) passed venue description validation
@@ -486,10 +591,15 @@ OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
 
   [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
   [LOCAL-318] Dangling-demonstrative scrub summary:
-    Detected: 0
+    Detected: 5
     Repaired (name substituted): 0
-    Deleted (unrepairable): 0
-    Stops affected: 0
+    Deleted (unrepairable): 5
+    Stops affected: 3
+    [1] DELETED: 'This initiative' in: This initiative was not merely about showcasing artifacts but correcting longsta
+    [1] DELETED: 'These collections' in: These collections were largely acquired through excavations in Egypt and Sudan l
+    [2] DELETED: 'This action' in: This action led to the creation of the Sons of Liberty Bowl, an early piece of A
+    [3] DELETED: 'This acquisition' in: This acquisition was made possible by a gift ensuring the painting found a perma
+    [3] DELETED: 'This choice' in: This choice of composition underscores Sargent’s innovative approach and highlig
 OK PHASE 5.7b: Dangling-demonstrative scrub complete
 
 PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
@@ -498,40 +608,117 @@ PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
 PHASE 5.9: Audio-native cleanup (LOCAL-41)...
   [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
 
-  [D498] step 7c: most valuable stop is 1 'Ancient Nubia Now' (index 30) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s)
+  [LOCAL-477] stripped markdown from 2 prose field(s) — these are spoken aloud
 
-  [LOCAL-487] step 7a: 1 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
-    stop 1 'Ancient Nubia Now': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+  [D498] step 7c: most valuable stop is 2 'Sons of Liberty Bowl' (index 69) — allowance 5 -> 7 sentences on regeneration, story currently 3 sentence(s)
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Ancient Nubia Now': the longest run (3 sentences, exhibition) has agency=0 stakes=0 — someone is described, but nothing is risked,
+    stop 2 'Sons of Liberty Bowl': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'John Singer Sargent’s  The Daughters o': the longest run (4 sentences, Sargent) has agency=1 stakes=0 — someone is described, but nothing is risked, re
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Ancient Nubia Now' (index 30)
   [D534] No cross-stop repetition in the drafts
 
-  [LOCAL-474] PHASE 5.17: retry 'Ancient Nubia Now' — 88w → 86w after gates, 1 sentence(s) removed
-    removed: "This display includes stunning Kerma pottery, colossal statues of Napatan kings, and exquisite jewel"
+  [LOCAL-474] PHASE 5.17: retry 'Ancient Nubia Now' — 216w → 158w after gates, 4 sentence(s) removed
+    removed: "This initiative was not merely about showcasing artifacts but correcting longstanding misconceptions"
+    removed: "Likewise, Pace contributed significantly, ensuring the preservation and prominence of the collection"
+    removed: "These collections were largely acquired through excavations in Egypt and Sudan led by George A."
+    removed: "Reisner between 1905 and 1942, efforts that formed the bedrock of the museum's Nubian art collection"
     [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
-      focus: "Ancient Nubia Now is held at Museum Of Fine Arts."
+      focus: "Ancient Nubia Now is held at Museum of Fine Arts, Boston."
 
-  [LOCAL-526] PHASE 5.17: regenerating 1 eligible stop(s) concurrently (max_workers=1)
+  [LOCAL-474] PHASE 5.17: retry 'Sons of Liberty Bowl' — 312w → 241w after gates, 6 sentence(s) removed
+    removed: "This action led to the creation of the Sons of Liberty Bowl, an early piece of American protest art "
+    removed: "The bowl itself, forged from gleaming silver, is more than just a container; it embodies a spirit of"
+    removed: "The polished surface, reflecting light with a warm glow, bears witness to the legacy of those ninety"
+    removed: "Such community involvement underlines the bowl’s significance as a symbol of unity and resistance, a"
+    removed: "This spirit of collective endeavor paved the way for future acquisitions, facilitated by funding sou"
+    removed: "This legacy of strategic funding continues to enrich the museum's collection, allowing for the inclu"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Sons of Liberty Bowl is held at Museum of Fine Arts, Boston."
+
+  [LOCAL-474] PHASE 5.17: retry 'John Singer Sargent’s  The Daughters of Edwa' — 288w → 228w after gates, 4 sentence(s) removed
+    removed: "This acquisition was made possible by a gift from Mary Louisa, ensuring the painting found a permane"
+    removed: "This choice of composition underscores Sargent’s innovative approach and highlights the individualit"
+    removed: "The gallery you find yourself in is named for Linde, a patron whose support has been instrumental in"
+    removed: "As you move on, consider how such acquisitions continue to shape the museum's evolution and offering"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "John Singer Sargent’s The Daughters of Edward Darley Boit is held at Museum of Fine Arts, Boston."
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
 
 Generating description for Stop 1: Ancient Nubia Now by , ...
+
+Generating description for Stop 2: Sons of Liberty Bowl by , ...
+
+Generating description for Stop 3: John Singer Sargent’s  The Daughters of Edward Darley Boit by , ...
   [LOCAL-381] stop='Ancient Nubia Now' matched_work=False medium='' work_identity_chars=0
-  [LOCAL-383] Stop 1 beats: Photographs, It, Landon
-  [LOCAL-411] Stop 1 snippet ranking: input=28 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
-    Top scores: [('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified')]
+  [LOCAL-383] Stop 1 beats: Americas, Gauguin, Pace
+  [LOCAL-411] Stop 1 snippet ranking: input=31 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, ''), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified'), ('Exhibiting Ancient Africa at the Museum of Fine Ar', 12, 'unverified')]
   [LOCAL-402] Stop 1: injected 5 snippets as reference material
-  [D533] Stop 1 corpus-gate restriction LIFTED — 28 source item(s) arrived after the gate ran
-  [LOCAL-417] Stop 1: SUPPRESSED 24 required names (no snippet evidence): ['Photographs', 'Landon', 'Gauguin', 'Rajput', 'Japanese', 'Rubens', 'Sharf Visitor', 'Guided Tour', 'Degas', 'Athenæum', 'Angelica Lloyd Russell', 'Nishimuraya Yohachi', 'Conservation', 'Hamilton Palace Dining', 'Pace', 'Musical Instruments', 'Moody', 'Nolan', 'Asiatic', 'Forsyth Wickes', 'Amorsolo', 'Nishida', 'National Portrait', 'Lowell']
-  [LOCAL-411] Stop 1 prompt size: before_snippets=10801 after=28346 (+17545 from snippets+instructions, facts_first=yes)
-  [LOCAL-411] WARNING: prompt exceeds 20K chars (28346)
+  [D533] Stop 1 corpus-gate restriction LIFTED — 31 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 25 required names (no snippet evidence): ['Americas', 'Gauguin', 'Pace', 'Bowling', 'Dou', 'Earth', 'Monet', 'Emile Simon', 'Moody', 'Asiatic', 'Newland House Drawing', 'Horticultural', 'Chris', 'Tchaikovsky', 'Carefully', 'Japanese Garden', 'Alfred Stieglitz', 'Nolan', 'Athenæum', 'William', 'Ancient Mesoamerica', 'Jessie', 'National', 'Laurence', 'Japanese']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12604 after=29926 (+17322 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29926)
   [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
   [D500] agents 0/3: hero=—, sponsor=—, builder=—
-  [LOCAL-490] Stop 1 story pass: ok=False (story pass call failed: HTTPError: 429 Client Error: Too Many Requests for url: https://api.openai.com/v1/chat/completions), $0.0000
+  [LOCAL-381] stop='Sons of Liberty Bowl' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Sharf Visitor, Renoir, Picture
+  [LOCAL-411] Stop 2 snippet ranking: input=34 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [("Paul Revere's Sons of Liberty Bowl", 17, 'unverified'), ('Sons of Liberty bowl – Works – Museum of Fine Arts', 12, ''), ('Sons of Liberty Bowl', 10, 'tier1')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 34 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 24 required names (no snippet evidence): ['Sharf Visitor', 'Renoir', 'Picture', 'Chinese Song Dynasty', 'Nishimuraya Yohachi', 'British', 'Donatello', 'Pacific', 'West', 'Nishida', 'Rajput', 'John Hubbard Sturgis', 'John Goelet', 'National Portrait', 'Kinsaku Nakane', 'Gail', 'Amorsolo', 'Musical Instruments', 'Rabbi Howard', 'Conservation', 'Ming', 'Landon', 'Sargent', 'Loring']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=13760 after=30696 (+16936 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (30696)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: Bougival, Photographs, Linde
+  [LOCAL-411] Stop 3 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('John Singer Sargent’s  The Daughters of Edward Dar', 19, ''), ("John Singer Sargent's The Daughters of Edward Darl", 12, ''), ('John Singer Sargent’s  The Daughters of Edward Dar', 12, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 22 required names (no snippet evidence): ['Bougival', 'Photographs', 'Linde', 'Rembrandt', 'Rubens', 'Guided Tour', 'Degas', 'Hugh Stubbins', 'Margo Behrakis', 'Hamilton Palace Dining', 'Koehler', 'Dallin', 'Teitelbaum', 'Angelica Lloyd Russell', 'Forsyth Wickes', 'Joseph', 'Sharf Information', 'Böcklin', 'Ruth', 'Herb Ritts', 'Nubia', 'Lowell']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=13576 after=31655 (+18079 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (31655)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0052
+    story: "In 1919, the Museum of Fine Arts in Boston did not yet hold John Singer Sargent’s The Daughters of Edward Darley Boit. That changed when the museum ac"
+  [LOCAL-490] Stop 1 story pass: ok=True (4 sentences), $0.0061
+    story: "In 2019, the Museum of Fine Arts in Boston launched the "Ancient Nubia Now" exhibition, a significant undertaking that brought together over 400 objec"
   [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
-  [LOCAL-292] Stop 1: OUT OF API CREDITS — not retrying. Add credits at platform.openai.com/settings/organization/billing
-  [LOCAL-526] PHASE 5.17 regeneration wall: 0.3s for 1 stop(s) at max_workers=1
+  [LOCAL-490] Stop 2 story pass: ok=True (6 sentences), $0.0065
+    story: "In 1768, the Sons of Liberty, a group of Massachusetts rebels, commissioned a silver bowl from the renowned silversmith Paul Revere, Jr. This act was "
+Stop 1 API call cost: $0.0388 (8160 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=0 words=303
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0398 (8382 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=3 words=356
+Stop 2 description word count: 356 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0401 (8446 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=3 words=276
+Stop 3 description word count: 276 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+Stop 1 API call cost: $0.0409 (8608 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 2/5 story_count=3 words=290
+Stop 1 description word count: 290 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 6.9s for 3 stop(s) at max_workers=3
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
     [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [D498] step 7c judged on the index, not on length: 69 -> 72, accepted=True
+    [LOCAL-474] regenerated and re-gated: 333w (was 241w)
+    [LOCAL-474] regenerated and re-gated: 257w (was 228w)
   [D534] no repeated sentences left after the retries
 
-  [LOCAL-474] retry summary: 1 eligible, 1 retried, 0 improved, 1 kept original
-  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 1 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 2 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
   [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
 
 PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
@@ -539,21 +726,28 @@ PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
 
   [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
   [LOCAL-429] Cloudflare challenge on https://www.mfa.org/programs/community-programs/art-making-at-home/printmaking — retries will not help, trying Wayback Machine
-  [LOCAL-430] Wayback snapshot timestamp: 20260520135651 (age: 135 days)
-  [LOCAL-430] ✗ Snapshot too stale (135 days > 90 day limit) — refusing
-  [LOCAL-427] HTTP 200 from https://www.thehistoryofart.org/topics/printmaking/ (attempt 1)
-  [LOCAL-459] R5: Fetched 2024 chars from https://www.thehistoryofart.org/topics/printmaking
-  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.3s (attempt 1, 30s budget remaining)
-  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.0s (attempt 2, 27s budget remaining)
-  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 9.3s (attempt 3, 24s budget remaining)
-  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 11.3s (attempt 4, 14s budget remaining)
+  [LOCAL-430] Wayback snapshot timestamp: 20260520135651 (age: 136 days)
+  [LOCAL-430] ✗ Snapshot too stale (136 days > 90 day limit) — refusing
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 1.6s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.0s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 7.6s (attempt 3, 25s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 10.8s (attempt 4, 17s budget remaining)
   [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
-  [LOCAL-427] HTTP 200 from https://artprof.org/library/learn/tutorials-media/printmaking/ (attempt 1)
-  [LOCAL-459] R5: Fetched 2133 chars from https://artprof.org/library/learn/tutorials-media/
-  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Printmaking (attempt 1)
-  [LOCAL-459] R5: Fetched 1765 chars from https://en.wikipedia.org/wiki/Printmaking
-  [D512] verb discovery: query='Museum Of Fine Arts printmaking process how it is made technique' -> 4 new verb(s): applied, produced, compared, developed
-  [D512] _AGENCY_VERB widened by 4 discovered verb(s)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=9HTyAganCIw (attempt 1)
+  [LOCAL-429] Cloudflare challenge on https://www.mfa.org/beyond-the-gallery/sylvester-koehler-exploring-print-history — retries will not help, trying Wayback Machine
+  [LOCAL-430] Wayback snapshot timestamp: 20260927210720 (age: 6 days)
+  [LOCAL-429] ✓ Wayback Machine success: https://www.mfa.org/beyond-the-gallery/sylvester-koehler-exploring-print-history (16683 chars)
+  [LOCAL-459] R5: Fetched 1955 chars from https://www.mfa.org/beyond-the-gallery/sylvester-k
+  [LOCAL-427] HTTP 200 from https://augustaarts.com/calls-for-artists/printmaking-process-and-possibilities/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1186 chars from https://augustaarts.com/calls-for-artists/printmak
+  [LOCAL-427] HTTP 200 from https://www.tribecaprintworks.com/history-of-printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1724 chars from https://www.tribecaprintworks.com/history-of-print
+  [LOCAL-427] HTTP 200 from https://blog.dma.org/tag/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1736 chars from https://blog.dma.org/tag/printmaking/
+  [LOCAL-427] HTTP 200 from https://www.visualartsbrampton.com/resources/articles-tutorials/printmaking-process (attempt 1)
+  [LOCAL-459] R5: Fetched 1287 chars from https://www.visualartsbrampton.com/resources/artic
+  [D512] verb discovery: query='Museum of Fine Arts, Boston printmaking process how it is made t' -> 12 new verb(s): applied, required, achieved, unparalleled, exceed, raised, coated, exposed, covered, curved, serrated, roughened
+  [D512] _AGENCY_VERB widened by 12 discovered verb(s)
 
   [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
 
@@ -563,39 +757,100 @@ PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
     [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
     [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
 
-  [D511] PHASE 5.20 summary: 0/1 stops got a gated story (0 with multiple stories), ~$0.024, [D518] 0 duplicated prose sentence(s) replaced
+  [D511] stop 2: Sons of Liberty Bowl
+    [D501] no object record for 'Sons of Liberty Bowl' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: John Singer Sargent’s  The Daughters of Edwa
+    [D501] no object record for 'John Singer Sargent’s  The Daughters of Edwa' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 0s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/3 stops got a gated story (0 with multiple stories), ~$0.072, [D518] 0 duplicated prose sentence(s) replaced
 
   [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
      #  stop                                      idx  hist  detl   soc
-     1  Ancient Nubia Now                          30     0     0    42
-    [LOCAL-485] index mean 30.0 over 1 stop(s), range 30-30
+     1  Ancient Nubia Now                          30    24     0    42
+     2  Sons of Liberty Bowl                       72    38    33    69
+     3  John Singer Sargent’s  The Daughters of    38    33     6    72
+    [LOCAL-485] index mean 46.7 over 3 stop(s), range 30-72
     [LOCAL-485] weakest: 'Ancient Nubia Now' at 30
-[TIMING] phase=story_first elapsed=42.7s cumulative=236.1s
+[TIMING] phase=story_first elapsed=111.3s cumulative=355.5s
 
 PHASE 6: Assembling the complete tour...
   [LOCAL-11] Venue-identity mining: 3 facts found {'architecture': 1, 'founding': 2}
+  [LOCAL-382] Thesis block injected into prolog (374 chars)
+  [R2] Prolog saved for Stop 1 (91 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 91 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 1 sentence(s) deleted
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 60 words (delta: -31)
+  [LOCAL-244] Prolog deletions (1):
+    [R10_UNFULFILLED_PROMISE] "Delve into the tour to uncover the enduring legacy of Francis Bartlett, whose generous donation pave..."
 
   [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
   [LOCAL-246] Orientation gating summary:
-    Words before: 42
-    Words after:  42
+    Words before: 172
+    Words after:  172
     Delta: 0
     Stops affected: 0/3
 
-  [LOCAL-270] PHASE 5.96: No prolog — skipping Part 4 composition
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 3.8s, $0.0077, 1152 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Ancient Nubia Now] (reversal): Notably, this exhibition was driven by a commitment to tell a more accurate stor...
+      [Sons of Liberty Bowl] (cause): This act was a bold statement of defiance against British rule, as the bowl was ...
+      [John Singer Sargent’s  The Daughters of Edward Darley Boit] (reversal): Sargent’s use of light and shadow, along with his choice to depict the girls in ...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0034 (550 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (40 words):
+      "At Stop 1: Ancient Nubia Now, you'll learn about Nubia's influence and achievements. Moving on to Stop 3: John Singer Sargent’s The Daughters of Edward Darley Boit, explore Sargent's departure from traditional portraiture with his use of light and shadow."
+      Stops referenced: 2
+    Part 4 total cost: $0.0034
 
-  [LOCAL-292] ⚠️  EMPTY STOP REMOVAL GATE: 2 stop(s) removed for failed/empty description
-    REMOVED: 'Sons of Liberty Bowl' — no narration generated (would ship as empty shell)
-    REMOVED: 'John Singer Sargent’s  The Daughters of Edward Darley Boit' — no narration generated (would ship as empty shell)
-    SUMMARY: requested=3 / generated=1 / failed=2 / delivered=1
-  [LOCAL-394] ⚠️  STOP COUNT INVARIANT VIOLATION: selected=3 delivered=1 — 2 stop(s) lost!
-    [LOCAL-394] LOST: 'Sons of Liberty Bowl'
-    [LOCAL-394] LOST: 'John Singer Sargent’s  The Daughters of Edward Darley Boit'
-  [D536] ⚠️  LISTENER ASKED FOR 3 STOP(S), DELIVERING 1 — category='museum', reason='stops removed by gates or filters'
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
   DEBUG - POI 1 content includes:
     Specific Examples: False
     Operational Details: True
-    Walking Directions: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Museum of Fine Arts, Boston — next is Sons ...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Your final stop in Museum of Fine Arts, Boston: John Singer ...
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.8s, $0.0027, 456 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Ancient Nubia Now] (reversal): "Notably, this exhibition was driven by a commitment to tell a more accurate stor..."
+      → composed: "Ancient Nubia Now, showcases overlooked narratives of Nubia's influence and achievements"
+    [John Singer Sargent’s  The Daughters of Edward Darley Boit] (reversal): "Sargent’s use of light and shadow, along with his choice to depict the girls in ..."
+      → composed: "John Singer Sargent’s The Daughters of Edward Darley Boit, departs from formal portraiture"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Ancient Nubia Now, showcases overlooked narratives of Nubia's influence and achievements and John Singer Sargent’s The Daughters of Edward Darley Boit, departs from formal portraiture."
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=368 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma -  Tour' (2.2 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
   [S27] No cross-stop repetition detected
   [D533] No cross-stop fact repetition detected
   [D533] Person-year role guard: no mismatches (700039 chars of corpus checked)
@@ -607,25 +862,33 @@ PHASE 6: Assembling the complete tour...
     AUDIT: hours | 10:00–05:00 | http://www.mfa.org/ | VERIFIED
     AUDIT: admission | FREE | http://www.mfa.org/ | VERIFIED
   [LOCAL-36] PRACTICAL FACTS GATE: PASSED (2 verified)
+  [D523] spoken-text hygiene: 1 template seam(s), 2 missing space(s), 0 spoken label(s), 0 dangling phrase(s) removed
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 3: PART3_MISSING — Part 3 (Purpose / intrigue with sourced facts) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
 
   [LOCAL-390] FINAL beat verification (measured from delivered text):
-    stop='Ancient Nubia Now' beats_assigned=25 beats_in_output=3 dropped=['Gauguin', 'Rajput', 'Japanese', 'Rubens', 'Sharf Visitor', 'Guided Tour', 'Degas', 'Athenæum', 'Angelica Lloyd Russell', 'Nishimuraya Yohachi', 'Conservation', 'Hamilton Palace Dining', 'Pace', 'Musical Instruments', 'Moody', 'Nolan', 'Asiatic', 'Forsyth Wickes', 'Amorsolo', 'Nishida', 'National Portrait', 'Lowell'] causes=[Gauguin=never_written, Rajput=never_written, Japanese=never_written, Rubens=never_written, Sharf Visitor=never_written, Guided Tour=never_written, Degas=never_written, Athenæum=never_written, Angelica Lloyd Russell=never_written, Nishimuraya Yohachi=never_written, Conservation=never_written, Hamilton Palace Dining=never_written, Pace=never_written, Musical Instruments=never_written, Moody=never_written, Nolan=never_written, Asiatic=never_written, Forsyth Wickes=never_written, Amorsolo=never_written, Nishida=never_written, National Portrait=never_written, Lowell=never_written]
-    stop='Stop 2' beats_assigned=24 beats_in_output=0 dropped=['Koehler', 'Gail', 'Bougival', 'Renoir', 'Carefully', 'Rembrandt', 'William', 'Earth', 'Ancient Mesoamerica', 'Linde', 'Hugh Stubbins', 'Picture', 'Teitelbaum', 'Ming', 'Donatello', 'British', 'Laurence', 'John Goelet', 'West', 'Joseph', 'Ruth', 'Chinese Song Dynasty', 'Africa An', 'Kinsaku Nakane'] causes=[Koehler=never_written, Gail=never_written, Bougival=never_written, Renoir=never_written, Carefully=never_written, Rembrandt=never_written, William=never_written, Earth=never_written, Ancient Mesoamerica=never_written, Linde=never_written, Hugh Stubbins=never_written, Picture=never_written, Teitelbaum=never_written, Ming=never_written, Donatello=never_written, British=never_written, Laurence=never_written, John Goelet=never_written, West=never_written, Joseph=never_written, Ruth=never_written, Chinese Song Dynasty=never_written, Africa An=never_written, Kinsaku Nakane=never_written]
-    stop='Stop 3' beats_assigned=25 beats_in_output=0 dropped=['Americas', 'Bowling', 'Emile Simon', 'National', 'Pacific', 'Dou', 'Tchaikovsky', 'John Hubbard Sturgis', 'Monet', 'Art', 'Nubia', 'Herb Ritts', 'Alfred Stieglitz', 'Dallin', 'Newland House Drawing', 'Sharf Information', 'Sargent', 'Horticultural', 'Chris', 'Rabbi Howard', 'Jessie', 'Margo Behrakis', 'Loring', 'Japanese Garden', 'Böcklin'] causes=[Americas=never_written, Bowling=never_written, Emile Simon=never_written, National=never_written, Pacific=never_written, Dou=never_written, Tchaikovsky=never_written, John Hubbard Sturgis=never_written, Monet=never_written, Art=never_written, Nubia=never_written, Herb Ritts=never_written, Alfred Stieglitz=never_written, Dallin=never_written, Newland House Drawing=never_written, Sharf Information=never_written, Sargent=never_written, Horticultural=never_written, Chris=never_written, Rabbi Howard=never_written, Jessie=never_written, Margo Behrakis=never_written, Loring=never_written, Japanese Garden=never_written, Böcklin=never_written]
+    stop='Ancient Nubia Now' beats_assigned=25 beats_in_output=3 dropped=['Gauguin', 'Bowling', 'Dou', 'Earth', 'Monet', 'Emile Simon', 'Moody', 'Asiatic', 'Newland House Drawing', 'Horticultural', 'Chris', 'Tchaikovsky', 'Japanese Garden', 'Alfred Stieglitz', 'Nolan', 'Athenæum', 'William', 'Ancient Mesoamerica', 'Jessie', 'National', 'Laurence', 'Japanese'] causes=[Gauguin=never_written, Bowling=never_written, Dou=never_written, Earth=never_written, Monet=never_written, Emile Simon=never_written, Moody=never_written, Asiatic=never_written, Newland House Drawing=never_written, Horticultural=never_written, Chris=never_written, Tchaikovsky=never_written, Japanese Garden=never_written, Alfred Stieglitz=never_written, Nolan=never_written, Athenæum=never_written, William=never_written, Ancient Mesoamerica=never_written, Jessie=never_written, National=never_written, Laurence=never_written, Japanese=never_written]
+    stop='Sons of Liberty Bowl' beats_assigned=24 beats_in_output=3 dropped=['Sharf Visitor', 'Renoir', 'Picture', 'Chinese Song Dynasty', 'Nishimuraya Yohachi', 'Donatello', 'Pacific', 'West', 'Nishida', 'Rajput', 'John Hubbard Sturgis', 'John Goelet', 'National Portrait', 'Kinsaku Nakane', 'Gail', 'Amorsolo', 'Musical Instruments', 'Rabbi Howard', 'Conservation', 'Landon', 'Loring'] causes=[Sharf Visitor=never_written, Renoir=never_written, Picture=never_written, Chinese Song Dynasty=never_written, Nishimuraya Yohachi=never_written, Donatello=never_written, Pacific=never_written, West=never_written, Nishida=never_written, Rajput=never_written, John Hubbard Sturgis=never_written, John Goelet=never_written, National Portrait=never_written, Kinsaku Nakane=never_written, Gail=never_written, Amorsolo=never_written, Musical Instruments=never_written, Rabbi Howard=never_written, Conservation=never_written, Landon=never_written, Loring=never_written]
+    stop='John Singer Sargent’s  The Daughters of Edward Darley Boit' beats_assigned=24 beats_in_output=6 dropped=['Bougival', 'Photographs', 'Rembrandt', 'Rubens', 'Degas', 'Hugh Stubbins', 'Margo Behrakis', 'Hamilton Palace Dining', 'Koehler', 'Dallin', 'Teitelbaum', 'Angelica Lloyd Russell', 'Forsyth Wickes', 'Joseph', 'Böcklin', 'Ruth', 'Herb Ritts', 'Lowell'] causes=[Bougival=never_written, Photographs=never_written, Rembrandt=never_written, Rubens=never_written, Degas=never_written, Hugh Stubbins=never_written, Margo Behrakis=never_written, Hamilton Palace Dining=never_written, Koehler=never_written, Dallin=never_written, Teitelbaum=never_written, Angelica Lloyd Russell=never_written, Forsyth Wickes=never_written, Joseph=never_written, Böcklin=never_written, Ruth=never_written, Herb Ritts=never_written, Lowell=never_written]
 
 === Word Count Statistics ===
-Stop 1: Ancient Nubia Now - 106 words
+Stop 1: Ancient Nubia Now - 251 words
+Stop 2: Sons of Liberty Bowl - 312 words
+Stop 3: John Singer Sargent’s  The Daughters of Edward Darley Boit - 307 words
 ===========================
 
-  [LOCAL-540] scorer ran on assembled tour (1055 chars, 1/1 stops)
-  [LOCAL-540] defects seen: ['no_story']
-  [LOCAL-540]   no_story [advisory]: no named people anywhere in the tour
+  [LOCAL-540] scorer ran on assembled tour (8035 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Edward Darley Boit" placed here in 1919 with no source: "In 1919, the Museum of Fine Arts in Boston acquired this painting, foreve
 
-Total API cost: $0.0584 (7238 tokens)
+Total API cost: $0.2969 (33713 tokens)
 Grounding:      $0.0000 (0 requests)
-Tour total:     $0.0584
-Provenance:     1/7 factual sentences sourced, 6 unsourced (1 corpus, 0 grounded, 6 parametric)
-CACHE STORE: Museum of Fine Arts, Boston, MA / museum / 1
+Tour total:     $0.2969
+Provenance:     2/33 factual sentences sourced, 31 unsourced (2 corpus, 0 grounded, 31 parametric)
+CACHE STORE: Museum of Fine Arts, Boston, MA / museum / 3
 
 Tour text generated successfully!
   [LOCAL-230] Network failures: 0 (all API calls succeeded)
@@ -639,20 +902,22 @@ Tour-Category: museum
 
 Stop 1: Ancient Nubia Now
 
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Coordinates: 42.3392, -71.0942
+
 Museum Information: 10:00–05:00. FREE
 
-Orientation: In the heart of the Museum of Fine Arts, Boston, "Ancient Nubia Now" unfolds a mesmerizing tapestry of history and culture. Stand before the intricately carved royal statues and gleaming jewelry to appreciate the artistry of a civilization that once rivaled Egypt.
-
-The "Ancient Nubia Now" exhibition at the Museum of Fine Arts, Bosto...
+Orientation: You are about to explore the Museum of Fine Arts in Boston. Within its walls, you will encounter three captivating works: Ancient Nubia Now, Sons of Liberty Bowl by Paul Revere, and John Singer Sargent’s The Daughters of Edward Darley Boit. These pieces s...
 
 
 ========================================================================
   [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
 ========================================================================
-    Ancient Nubia Now: serp_results=16 snippets_injected=24 beats_in_delivered_text=0
-    Sons of Liberty Bowl: serp_results=18 snippets_injected=26 beats_in_delivered_text=0
-    John Singer Sargent’s  The Daughters of Edward Dar: serp_results=15 snippets_injected=17 beats_in_delivered_text=0
+    Ancient Nubia Now: serp_results=19 snippets_injected=27 beats_in_delivered_text=0
+    Sons of Liberty Bowl: serp_results=19 snippets_injected=27 beats_in_delivered_text=0
+    John Singer Sargent’s  The Daughters of Edward Dar: serp_results=15 snippets_injected=23 beats_in_delivered_text=0
 ========================================================================
-[TIMING] phase=packing elapsed=18.7s cumulative=254.8s
-[TIMING] phase=verification elapsed=0.0s cumulative=254.8s
-[TIMING] TOTAL wall=254.8s phases: poi_selection=153.0s, story_first=42.7s, external_lookups=34.7s, packing=18.7s, fact_sheets=5.3s, intent=0.2s, narration=0.1s, verification=0.0s
+[TIMING] phase=packing elapsed=26.4s cumulative=381.8s
+[TIMING] phase=verification elapsed=0.0s cumulative=381.8s
+[TIMING] TOTAL wall=381.8s phases: poi_selection=151.4s, story_first=111.3s, fact_sheets=53.3s, external_lookups=37.8s, packing=26.4s, intent=1.6s, narration=0.1s, verification=0.0s

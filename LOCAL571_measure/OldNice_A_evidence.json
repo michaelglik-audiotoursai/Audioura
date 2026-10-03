@@ -1,0 +1,228 @@
+{
+  "landmarks": {
+    "Cours Saleya Market": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Palais Lascaris": {
+      "status": "VERIFIED",
+      "canonical_name": "Palais Lascaris",
+      "qid": "Q3360882",
+      "type": "",
+      "coordinates": "43.697700, 7.277300"
+    },
+    "Église de la Miséricorde": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Place Rossetti": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Chapelle de la Miséricorde": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    },
+    "Vieux Nice": {
+      "status": "UNVERIFIED",
+      "reason": "not in discovered landmarks"
+    }
+  },
+  "claim_provenance": {
+    "counts": {
+      "sourced": 3,
+      "unsourced": 21,
+      "total": 24,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 21
+    },
+    "per_stop": {
+      "Cours Saleya Market": {
+        "sourced": 1,
+        "unsourced": 12,
+        "total": 13
+      },
+      "Palais Lascaris": {
+        "sourced": 1,
+        "unsourced": 7,
+        "total": 8
+      },
+      "Vieux Nice": {
+        "sourced": 1,
+        "unsourced": 2,
+        "total": 3
+      }
+    },
+    "claims": [
+      {
+        "stop": "Cours Saleya Market",
+        "text": "The tour spans from Cours Saleya Market to Vieux Nice, covering a mere 696 meters of historic cobblestone streets and baroque facades.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "Old Nice, a tapestry of vibrant markets and narrow alleys, whispers forgotten tales of power and artistry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "From the birth of Cours Saleya Market in 1861 to the UNESCO World Heritage designation in 2021, this journey weaves the visible vibrancy of the past with the invisible threads of community history, connecting the resilience of the present to its colorful past.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "At Cours Saleya Market, you'll discover its historical and cultural significance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "In Vieux Nice, explore how the old town's alleys provided refuge during World War II.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "From the Nice Ville train station, head southeast on Avenue Thiers toward Rue de la Buffa, then turn left onto Rue de la Buffa.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "In 1873, the modern layout of the market was established, transforming it into a pivotal hub for commerce in Old Nice.",
+        "class": "corpus",
+        "source": "https://www.instagram.com/reel/DZJiRJFu03W/",
+        "evidence": "In 1873, the modern layout of the Cours Saleya Market was established, transforming it into a central hub for commerce in Old Nice."
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "This shift marked a new era for the market, allowing it to flourish as a central gathering place where locals and visitors alike could experience the essence of Nice through its fresh produce and vibrant flower displays.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "The Cours Saleya Market is more than just a place of commerce; it is a reflection of Nice's cultural tapestry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "Situated on the southeastern coast of France on the Mediterranean Sea, at the foot of the French Alps, Nice is the second-largest city on the Mediterranean coast and holds a unique position in the Provence-Alpes-Côte d'Azur region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "This geographical advantage has allowed Nice to develop a distinct identity, celebrated in the nickname \"Nice la Belle,\" meaning \"Nice the Beautiful.\"",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "In 2021, the city of Nice, along with its heritage sites including the Cours Saleya Market, was designated as a UNESCO World Heritage Site.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cours Saleya Market",
+        "text": "The market embodies the spirit of Nice, where the past and present blend seamlessly in a vibrant tableau of sights, sounds, and scents.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "The Palais Lascaris, constructed in the mid-17th century, was a symbol of affluence and power for the Lascaris-Vintimille family, one of Nice's most distinguished noble lineages.",
+        "class": "corpus",
+        "source": "https://www.rivieraloisirs.com/en/activities/palais-lascaris/",
+        "evidence": "The Palais Lascaris was constructed in the middle of the 17th century for the Lascaris-Vintimille family, one of Nice's most prominent noble families."
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "This residence remained under the family's ownership until 1802, when it was sold following the French Revolution, a period that brought significant changes and turmoil to the region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "The building fell into disrepair until the city of Nice acquired it in 1942 to preserve its historical significance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "Listed as a Historical Monument in 1946, the Palais Lascaris underwent extensive restorations that concluded in 1970.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "Today, the Palais is home to a remarkable collection of over 500 historical musical instruments, making it France's second most important collection after the Musée de la Musique de la Philharmonie in Paris.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "In 2001, these instruments were transferred from the Musée Masséna to find a fitting home within these hallowed walls.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "Each instrument, with its intricate craftsmanship, tells a story of artistic endeavor and the cultural exchanges that shaped European music.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Palais Lascaris",
+        "text": "As you step back onto the cobblestones, the narrow lanes beckon you to explore the heart of Vieux Nice, where history and daily life entwine, revealing stories of a city that has embraced change, yet cherishes its roots.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vieux Nice",
+        "text": "This district became the focal point of the city in 1543, when the Turks and Franks besieged the Chateau.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vieux Nice",
+        "text": "During World War II, the old town’s maze-like alleys provided refuge to those living clandestinely, offering safety from occupying forces.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Vieux Nice",
+        "text": "The area is also associated with Joseph-François Desmorest, the official city executioner, who conducted historical tours of the alleys, connecting the past to human experiences.",
+        "class": "corpus",
+        "source": "https://en.wikipedia.org/wiki/Nice",
+        "evidence": "Joseph-François Desmorest, the official city executioner, is noted for guiding historical tours through the alleys of Old Nice, highlighting its storied past."
+      }
+    ]
+  }
+}

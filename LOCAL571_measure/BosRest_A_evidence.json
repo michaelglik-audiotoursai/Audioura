@@ -1,0 +1,221 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 1,
+      "unsourced": 26,
+      "total": 27,
+      "corpus": 1,
+      "grounded": 0,
+      "parametric": 26
+    },
+    "per_stop": {
+      "Union Oyster House": {
+        "sourced": 1,
+        "unsourced": 12,
+        "total": 13
+      },
+      "Neptune Oyster": {
+        "sourced": 0,
+        "unsourced": 9,
+        "total": 9
+      },
+      "Cheers Boston": {
+        "sourced": 0,
+        "unsourced": 5,
+        "total": 5
+      }
+    },
+    "claims": [
+      {
+        "stop": "Union Oyster House",
+        "text": "This tour will cover approximately 585 meters from Union Oyster House to Cheers Boston, showcasing Boston's rich seafood culture.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Explore the personal journeys of chefs and restaurateurs intertwined with time-honored seafood traditions as you delve into the vibrant tapestry of Boston's culinary heritage.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "As you continue your tour, you will learn that Wilson visited Neptune Oyster during a challenging period at Neptune Oyster and that Cheers Boston officially embraced its pop culture legacy in 2002 at Cheers Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "As you step onto Union Street, the rich, savory aroma of fresh oysters greets you, drawing you toward the storied entrance of the Union Oyster House at numbers 41–43.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Established in 1826, the Union Oyster House holds the title of America's oldest continuously operating restaurant.",
+        "class": "corpus",
+        "source": "http://www.unionoysterhouse.com/pages/awards.html",
+        "evidence": "The Union Oyster House, opened in 1826, is the oldest continuously operating restaurant in the United States."
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Nestled in a building originally constructed for Capen's Dry Goods in the early 1700s, this landmark retains an unmistakable sense of history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "The Union Oyster House is not just a relic but a living part of Boston culture where history and gastronomy converge.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "The restaurant's patrons have included esteemed figures such as Calvin Coolidge, Franklin D. Roosevelt, Bill Clinton, and Barack Obama—each perhaps drawn by the promise of classic New England seafood served with a side of tradition.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "In fact, Barack Obama's visit in 2010 caused quite a stir; the sitting president enjoyed the clam chowder, a decision that resonates with locals proud of their regional cuisine.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Today, the Union Oyster House is a cornerstone of Boston's Blackstone Block Historic District.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "Open Sunday through Thursday from 11:00 am to 9:00 pm, and until 10:00 pm on Fridays and Saturdays, this iconic establishment invites you to savor classic dishes at prices under $30.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "And while you might not leave with a presidential seal of approval, you'll certainly find a taste of Boston's enduring seafood tradition.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Union Oyster House",
+        "text": "As you carry the flavor of this timeless experience with you, know that the next stop on our tour promises to take you further into the evolution of Boston's seafood delights.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "The restaurant's tight-knit, 37-seat interior mirrors the intimate oyster bars of Paris, a direct nod to its founders' inspiration.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "Jeff, who spent twelve years as a beverage manager at Todd English's Olives, brought his expertise to this intimate spot, transforming it into a pioneering force in Boston's dining scene.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "Such dishes have become staples in Boston's culinary landscape, with Neptune Oyster frequently cited as a must-visit for seafood enthusiasts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "One notable story that highlights Neptune’s impact involves writer Korsha Wilson.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "In a personal narrative, Wilson shared that she visited Neptune Oyster during a challenging period when both she and her partner had lost their jobs.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "This story underscores Neptune's role beyond just a dining spot—it serves as a haven for those seeking comfort and connection through food.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "In 2022, Food & Wine magazine named Neptune Oyster one of America's Best Oyster Bars, acknowledging its significant contribution to the culinary arts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "With its no-reservations policy, Neptune remains accessible to all who are willing to wait in line, eager to experience the flavors that have made it a beloved Boston institution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Neptune Oyster",
+        "text": "As you enjoy the fresh seafood, consider the stories—like Wilson's—that each dish might tell.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "The story of Cheers Boston begins in 1969, when and a partner transformed a basement storage space in the Hampshire House into the Bull & Finch Pub.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "The Bull & Finch Pub officially embraced its pop culture legacy in 2002, renaming itself Cheers after a successful deal with CBS Studios, the show’s rights holder.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Unlike the seafood feasts you enjoyed at Union Oyster House and Neptune Oyster earlier on this tour, Cheers Boston offers a hearty menu of American staples, best washed down with a cold beer or a carefully crafted cocktail.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "While you may not find Sam Malone pouring drinks behind the bar, the camaraderie and warmth that Cheers embodied on screen are palpable here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cheers Boston",
+        "text": "Cheers operates from 11:00 to 22:00 daily, with the kitchen closing at 21:00.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}

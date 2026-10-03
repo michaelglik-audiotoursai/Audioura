@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #011 | 03:10:16.360 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #011 | 17:04:14.270 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: walking tour of Old Nice, France
   tour_type: walking
@@ -9,10 +9,10 @@ CALL #011 | 03:10:16.360 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_A.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #012 | 03:10:16.360 | TOTAL_STOPS_FINALIZED
+CALL #012 | 17:04:14.270 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: walking tour of Old Nice, France
   total_stops_final: 3
@@ -36,13 +36,13 @@ Intent analysis response: ```json
     "venue_name": null,
     "geographic_scope": "Old Nice, France",
     "named_places": [],
-    "scope_precision": "CITY",
+    "scope_precision": "DISTRICT",
     "transport_mode": "on_foot",
-    "country_scope": "France"
+    "country_scope": null
 }
 ```
   [INTENT] Stripped LLM fences from response
-  [TRANSPORT] mode=on_foot, country_scope=France (keyword=on_foot, intent=on_foot)
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
 ✅ Intent Analysis Results:
    POI Type: landmarks
    Location: Old Nice, France
@@ -50,15 +50,15 @@ Intent analysis response: ```json
    Business Hours Relevant: False
    Accessibility Mentioned: False
    Venue Name: None
-[TIMING] phase=intent elapsed=3.4s cumulative=3.4s
+[TIMING] phase=intent elapsed=1.9s cumulative=1.9s
 [LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
 
 Detected tour category: WALKING
 Using walking template for walking tour of Old Nice, France - walking
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #013 | 03:10:19.796 | GENERATING_PROMPT
+CALL #013 | 17:04:16.164 | GENERATING_PROMPT
 ======================================================================
   location: walking tour of Old Nice, France
   user_request: walking tour of Old Nice, France
@@ -66,24 +66,618 @@ CALL #013 | 03:10:19.796 | GENERATING_PROMPT
 
 
 PHASE 3A: Fetching 3 candidate POI(s) for walking tour of Old Nice, France...
-  [S17] no scope_constraint (precision='CITY', scope='Old Nice, France')
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Old Nice, France'
   [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
 ======================================================================
-CALL #014 | 03:10:19.796 | PHASE_3A_REQUEST
+CALL #014 | 17:04:16.164 | PHASE_3A_REQUEST
 ======================================================================
   location: walking tour of Old Nice, France
   total_stops: 3
   poi_type_hint: landmarks
 
-X PHASE 3A failed: status 429
-{
-    "error": {
-        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
-        "type": "insufficient_quota",
-        "param": null,
-        "code": "credit_balance_exhausted"
-    }
-}
+PHASE 3A API call cost: $0.0005 (648 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
 
+======================================================================
+CALL #015 | 17:04:20.013 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for walking tour of Old Nice, France.
+List exactly 6 specific, real, well-known landmarks relevant to: walking tour of Old Nice, France.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Old Nice, France.
+- Do NOT include well-known 
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [{"name": "Cours Saleya Market", "address": "Cours Saleya, 06300 Nice, France", "reason": "A vibrant market since the 18th century, famous for its flowers and local produce."},{"name": "Palais Lascaris", "address": "15 Rue Droite, 06300 Nice, France", "reason": "Built in the 17th century, this baroque palace showcases a rich collection of musical instruments."},{"name": "Église de la Miséricorde", "address": "7 Rue de la Miséricorde, 06300 Nice, France", "reason": "An exquisite example of Baroqu
+
+  [LOCAL-329] Captured 6 substantive selection reason(s)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Cours Saleya Market @ Cours Saleya, 06300 Nice, France
+   - Palais Lascaris @ 15 Rue Droite, 06300 Nice, France
+   - Église de la Miséricorde @ 7 Rue de la Miséricorde, 06300 Nice, France
+   - Place Rossetti @ Place Rossetti, 06300 Nice, France
+   - Chapelle de la Miséricorde @ Rue de la Miséricorde, 06300 Nice, France
+   - Vieux Nice @ Vieux Nice, 06300 Nice, France
+  [area_resolver] Parsed: city='France', neighborhood='Old Nice'
+  [area_resolver] 'France' resolved as country (Q142), swapping: city='Old Nice'
+  [area_resolver] City resolved: Old Nice → Q3558059 (43.6967, 7.2759)
+  [area_resolver] Resolved: center=(43.6967, 7.2759), radius=2.0km, lang=fr
+  [LOCAL-294] P31 type filter: excluded 10 entities:
+    EXCLUDED: Canton of Nice-9 (Q941430) — P31=Q18524218
+    EXCLUDED: Métropole Nice Côte d'Azur (Q3333866) — P31=Q18706073
+    EXCLUDED: County of Nice (Q706553) — P31=Q1620908
+    EXCLUDED: Arrondissement of Nice (Q701950) — P31=Q194203
+    EXCLUDED: Canton of Nice-6 (Q1125305) — P31=Q18524218
+    EXCLUDED: Nice (Q33959) — P31=Q484170
+    EXCLUDED: Canton of Nice-1 (Q1726500) — P31=Q18524218
+    EXCLUDED: Nice-Ville station (Q738970) — P31=Q55488
+    EXCLUDED: Nice-Riquier station (Q975315) — P31=Q55488
+    EXCLUDED: Gare du Sud (Q2676458) — P31=Q55488
+  [LOCAL-294] Unknown P31 types encountered (kept, not excluded):
+    UNKNOWN TYPE: Q56242215 — first seen on: Nice Cathedral
+    UNKNOWN TYPE: Q120560 — first seen on: Nice Cathedral
+    UNKNOWN TYPE: Q1365179 — first seen on: Palais d'York
+    UNKNOWN TYPE: Q11755959 — first seen on: Palais Hongran
+    UNKNOWN TYPE: Q153562 — first seen on: Opéra de Nice
+    UNKNOWN TYPE: Q17715832 — first seen on: Castle of Nice
+    UNKNOWN TYPE: Q13226383 — first seen on: Hôtel de Ville, Nice
+    UNKNOWN TYPE: Q188055 — first seen on: Siege of Nice (1705)
+    UNKNOWN TYPE: Q2977 — first seen on: Cimiez Cathedral
+    UNKNOWN TYPE: Q12162186 — first seen on: Nice tramway
+    UNKNOWN TYPE: Q575759 — first seen on: Monument to the Dead of Rauba-Capeu
+    UNKNOWN TYPE: Q868557 — first seen on: Nice Jazz Festival
+    UNKNOWN TYPE: Q34627 — first seen on: Nice Synagogue
+    UNKNOWN TYPE: Q11183017 — first seen on: Théâtre de Verdure de Nice
+    UNKNOWN TYPE: Q2031836 — first seen on: Saint Nicholas and Saint Alexandra Church
+    UNKNOWN TYPE: Q7543083 — first seen on: Avenue Jean Médecin
+    UNKNOWN TYPE: Q1378975 — first seen on: Palais des Congrès Acropolis
+    UNKNOWN TYPE: Q1060829 — first seen on: Palais des Congrès Acropolis
+    UNKNOWN TYPE: Q27686 — first seen on: Palais de la Méditerranée
+    UNKNOWN TYPE: Q4618 — first seen on: Nice Carnival
+    UNKNOWN TYPE: Q74817647 — first seen on: Nice Carnival
+    UNKNOWN TYPE: Q11483816 — first seen on: Nice Carnival
+    UNKNOWN TYPE: Q200614 — first seen on: Notre-Dame de Nice
+    UNKNOWN TYPE: Q56320584 — first seen on: Terra Amata (archaeological site)
+    UNKNOWN TYPE: Q1076486 — first seen on: Palais des sports Jean-Bouin
+    UNKNOWN TYPE: Q35509 — first seen on: Grotte du Lazaret
+    UNKNOWN TYPE: Q3950 — first seen on: Villa La Belle Époque
+    UNKNOWN TYPE: Q17431399 — first seen on: Musée Marc Chagall
+    UNKNOWN TYPE: Q455403 — first seen on: Hotel Negresco
+    UNKNOWN TYPE: Q750215 — first seen on: 2016 Nice truck attack
+    UNKNOWN TYPE: Q18711682 — first seen on: 2016 Nice truck attack
+    UNKNOWN TYPE: Q2223653 — first seen on: 2016 Nice truck attack
+    UNKNOWN TYPE: Q3199915 — first seen on: 2016 Nice truck attack
+    UNKNOWN TYPE: Q123705 — first seen on: Cimiez
+  [LOCAL-294] P31 filter result: 50 → 40 kept, 10 excluded, 34 unknown types logged
+  [landmark_discovery] SPARQL coordinate query: 40 landmarks
+  [landmark_discovery] Wikipedia extraction: +0 new names (total: 40)
+  [area_cache] STORED Q3558059: 40 landmarks (tier=rich, TTL=30d)
+  [verify_landmarks] 1/6 stops verified against 40 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 1 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for walking tour of Old Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection: 1 COVERED, fallback needed: 2×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Cours Saleya Market=COVERED', 'Palais Lascaris=VENUE_ONLY', 'Vieux Nice=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Chapelle de la Miséricorde=VENUE_ONLY', 'Place Rossetti=VENUE_ONLY', 'Église de la Miséricorde=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Cours Saleya Market=3.5', 'Palais Lascaris=5.0', 'Vieux Nice=2.5']
+  [LOCAL-349] Yield scores (dropped):  ['Chapelle de la Miséricorde=1.5', 'Place Rossetti=1.0', 'Église de la Miséricorde=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 0/6 stops verified (0%), 6 would be dropped
+    [UNVERIFIED] 'Cours Saleya Market' — no evidence
+    [UNVERIFIED] 'Palais Lascaris' — no evidence
+    [UNVERIFIED] 'Vieux Nice' — no evidence
+    [UNVERIFIED] 'Chapelle de la Miséricorde' — no evidence
+    [UNVERIFIED] 'Place Rossetti' — no evidence
+    [UNVERIFIED] 'Église de la Miséricorde' — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Only 1 stops with coordinates — skipping algorithmic routing
+  [LOCAL-329] Persisted 3 selection reason(s) to stop_corpus
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_165313.txt'
+
+======================================================================
+CALL #016 | 17:04:31.033 | PHASE_3B_REQUEST
+======================================================================
+  location: walking tour of Old Nice, France
+  stop_count: 3
+
+PHASE 3B API call cost: $0.0007 (913 tokens)
+OK PHASE 3B: ordered 3 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Nice, hint: auto)
+  [LOCAL-355] Cours Saleya Market: no practical facts in OSM
+  [LOCAL-355] OSM venue facts for 'Palais Lascaris' (kind=museum): Admission charged, open We-Mo 10:00-18:00
+  [LOCAL-355] Palais Lascaris: sourced → Admission charged, open We-Mo 10:00-18:00
+  [LOCAL-355] Vieux Nice: no practical facts in OSM
+   GEO-CHECK: all 3 stops within walking distance (max leg 0.64 km, total 0.70 km, limit 12 km)
+Extracted first POI coordinates: (43.6951, 7.2676)
+
+=== Extracted POI Information ===
+1. Cours Saleya Market
+   Address: Cours Saleya, 06300 Nice, France
+   Coordinates: 43.6951, 7.2676
+   Directions: From the Nice Ville train station, head southeast on Avenue Thiers toward Rue de...
+2. Palais Lascaris
+   Address: 15 Rue Droite, 06300 Nice, France
+   Coordinates: 43.6964, 7.2753
+   Directions: From Cours Saleya, head northwest on Cours Saleya toward Rue Saint-François de P...
+3. Vieux Nice
+   Address: Vieux Nice, 06300 Nice, France
+   Coordinates: 43.6959, 7.2750
+   Directions: From Palais Lascaris, exit onto Rue Droite and turn left. Continue straight unti...
+================================
+
+  [D556] +2 story fact(s) for 'Cours Saleya Market' via openai+web(12) (2 high)
+  [D556] +3 story fact(s) for 'Palais Lascaris' via openai+web(13) (3 high)
+  [D556] +3 story fact(s) for 'Vieux Nice' via openai+web(15) (1 high)
+[TIMING] phase=poi_selection elapsed=51.2s cumulative=53.1s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Cours Saleya Market of Old Nice' → 39192 chars
+  [LOCAL-47] Cours Saleya Market: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Palais Lascaris of Old Nice' → 6406 chars
+  [LOCAL-47] Palais Lascaris: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Vieux Nice of Old Nice' → 39192 chars
+  [LOCAL-47] Vieux Nice: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 3 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 3}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=3)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=walking tour of Old Nice, Fran model=gpt-4o tokens=1459 (in=853 out=606) cost=$0.0082 latency=5.3s
+[COST_METER] FRESH | spine_generate | $0.008193 | user=None | job=local571-OldNice_A
+  [LOCAL-278] Spine cost folded into total: $0.0082
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 3 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/3 stops have per-stop passages (88 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Cours Saleya Market' verdict=COVERED action=PASSED
+  [CORPUS-GATE] stop='Palais Lascaris' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Vieux Nice' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 1 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 2 SHORTENED
+  [Storied] Fact sheets: 3/3 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=13.2s cumulative=66.2s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=66.2s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=66.2s
+
+Generating description for Stop 1: Cours Saleya Market by , ...
+
+Generating description for Stop 2: Palais Lascaris by , ...
+
+Generating description for Stop 3: Vieux Nice by , ...
+  [LOCAL-381] stop='Vieux Nice' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Vieux Nice', 8, ''), ('Vieux Nice', 6, ''), ('Vieux Nice', 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15073 after=25089 (+10016 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25089)
+  [LOCAL-381] stop='Cours Saleya Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cours Saleya Market', 16, ''), ('Cours Saleya Market', 6, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14475 after=24696 (+10221 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24696)
+  [LOCAL-381] stop='Palais Lascaris' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Palais Lascaris', 9, ''), ('Palais Lascaris', 8, ''), ('Palais Lascaris', 6, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12911 after=25115 (+12204 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25115)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0291 (6115 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=315
+Stop 1 description word count: 315 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0304 (6396 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=3 words=266
+Stop 2 description word count: 266 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0294 (6193 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=1 words=281
+Stop 3 description word count: 281 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Cours Saleya Market': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Palais Lascaris': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Vieux Nice': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+  [LOCAL-439] Classification cost: $0.002117 (input=8739, output=1344)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 5: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 3: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 5 paragraphs retried, 4 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0019 (2323 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 3 'Vieux Nice': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] Stop 1 'Cours Saleya Market': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-261] R3 summary: 1 sentences deleted, 1 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 3 'Vieux Nice': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 3
+    Paragraphs checked: 10
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 5
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Vieux Nice' conf=high reason='Generic scene-setting applicable to any historic church.': "As you pause, consider how these layers of history, art, and resilience converge here, inviting you to look deeper at wh"
+    [LOCAL-472] UNGROUNDED entity stop='Cours Saleya Market' entity='Nice la Belle' reason='No concrete link to the stop is provided.' in: "The city's nickname, Nice la Belle, meaning 'Nice the Beautiful,' is reflected in the vibrant hues o"
+    [LOCAL-472] UNGROUNDED entity stop='Palais Lascaris' entity='Charles Emmanuel' reason='It does not specify that Charles Emmanuel lived or stayed at Palais Lascaris.' in: "Charles Emmanuel II, Duke of Savoy, regarded this family as the "principalissima" of the local nobil"
+    [LOCAL-472] UNGROUNDED entity stop='Palais Lascaris' entity='principalissima' reason='It does not specify how Charles Emmanuel II directly relates to Palais Lascaris.' in: "Charles Emmanuel II, Duke of Savoy, regarded this family as the "principalissima" of the local nobil"
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='Castle Hill' reason='No specific person or work is mentioned with a concrete link to Castle Hill.' in: "Vieux Nice is the soul of the city, a compelling labyrinth of history and culture. Its origins date "
+    [LOCAL-472] UNGROUNDED entity stop='Vieux Nice' entity='François Desmorest' reason='It does not specify where Desmorest conducted his tours.' in: "During World War II, the old town’s maze-like alleys provided refuge to those living clandestinely, "
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 1
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/27)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 7
+    Glossed (composed): 3
+    Suppressed (already explained): 0
+    Degraded (name dropped): 3
+    Guard failures: 0
+    Known (skipped): 1
+    Triage: 1224 tokens, $0.0003, 4.6s
+    Gloss: 703 tokens, $0.0001, 2.6s
+    Compose: 1106 tokens, $0.0002, 1.5s
+    Total added cost: $0.0006
+    Stops affected: 3
+    Glosses applied:
+      • Old Town → DEGRADED (name dropped)
+      • Charles Emmanuel → DEGRADED (name dropped)
+      • Musée de la Musique de la Philharmonie in Paris → "home to over 7,000 musical instruments" [source: model]
+      • Musée Masséna → "the source of Nice's historical collections" [source: corpus]
+      • Castle Hill → DEGRADED (name dropped)
+      • Franks → "a group of Germanic tribes in Europe" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Old Nice, France'...
+   OK 'Palais Lascaris' — inside 'Old Nice, France': The Palais Lascaris is located within the bounds of Old Nice, France. (conf=high)
+   OK 'Vieux Nice' — inside 'Old Nice, France': The stop name 'Vieux Nice' translates to 'Old Nice' and the description provided confirms that it is located within the historical district of Old Nice, France. (conf=high)
+OK PHASE 5.6: 3/3 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (3 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [1] DELETED: 'This creative' in: This creative influence continues to be felt, imbuing the market with a tangible
+    [3] DELETED: 'These very' in: These very streets, with their hidden alcoves and tight corners, provided sanctu
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Palais Lascaris' (index 55) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 3 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Cours Saleya Market': the longest run (5 sentences, Cours Saleya Market) has agency=0 stakes=0 — someone is described, but nothing i
+    stop 2 'Palais Lascaris': the longest run (3 sentences, Vieux Nice) has agency=0 stakes=0 — someone is described, but nothing is risked,
+    stop 3 'Vieux Nice': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 3 'Vieux Nice' (index 23)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Cours Saleya Market' — 315w → 203w after gates, 9 sentence(s) removed
+    removed: "Established in its current form in 1873, this market has evolved into a central hub of commerce in t"
+    removed: "The market’s history is deeply interwoven with the artistic legacy of Nice."
+    removed: "Between 1921 and 1938, the famed artist Henri Matisse resided at 1 Place Charles Félix, located at t"
+    removed: "Matisse found daily inspiration in the vibrant colors and dynamic scenes outside his window, capturi"
+    removed: "This creative energy still resonates, infusing the market with a palpable sense of artistic heritage"
+    removed: "The city's nickname, Nice la Belle, meaning 'Nice the Beautiful,' is echoed in the vibrant hues of t"
+    removed: "This market is more than just a place to shop; it is where the essence of Nice's cultural identity b"
+    removed: "As you move through the market, you’re not just witnessing a marketplace; you're experiencing a slic"
+    removed: "Just beyond, the grandeur of the Palais Lascaris awaits, continuing this journey through the layers "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Palais Lascaris' — 245w → 254w after gates, 3 sentence(s) removed
+    removed: "Charles Emmanuel II, Duke of Savoy, regarded this family as the "principalissima" of the local nobil"
+    removed: "Within these walls lies a treasury of sonic history: the Palais Lascaris hosts France’s second most "
+    removed: "Since 2001, over 500 instruments have found sanctuary here, transferred from the Musée Masséna."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Vieux Nice' — 262w → 120w after gates, 9 sentence(s) removed
+    removed: "This district became the focal point of the city in 1543, when the Turks and Franks besieged the Cha"
+    removed: "These very streets, with their hidden alcoves and tight corners, provided sanctuary in times of turm"
+    removed: "During World War II, the old town’s maze-like alleys offered refuge to those living clandestinely."
+    removed: "These narrow passages became a lifeline for individuals seeking safety from the watchful eyes of occ"
+    removed: "Imagine the tension of such a time, where every shadow held the potential for danger or salvation.Th"
+    removed: "Desmorest's stories would weave through the old town's storied past, connecting each stone to the hu"
+    removed: "His unique perspective offered a glimpse into the lives of those who once walked these streets, brid"
+    removed: "As you pause, consider how these layers of history, art, and resilience converge here, inviting you "
+    removed: "Vieux Nice is more than a collection of streets; it is a living chronicle of survival, adaptation, a"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 3 eligible stop(s) concurrently (max_workers=3)
+
+Generating description for Stop 1: Cours Saleya Market by , ...
+
+Generating description for Stop 2: Palais Lascaris by , ...
+
+Generating description for Stop 3: Vieux Nice by , ...
+  [LOCAL-381] stop='Palais Lascaris' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Palais Lascaris', 9, ''), ('Palais Lascaris', 8, ''), ('Palais Lascaris', 6, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12911 after=25115 (+12204 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25115)
+  [LOCAL-381] stop='Vieux Nice' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Vieux Nice', 8, ''), ('Vieux Nice', 6, ''), ('Vieux Nice', 6, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=15073 after=25089 (+10016 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25089)
+  [LOCAL-381] stop='Cours Saleya Market' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=2 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=2 usable=2 (t1t2=0, t3=0, market=0)
+    Top scores: [('Cours Saleya Market', 16, ''), ('Cours Saleya Market', 6, '')]
+  [LOCAL-402] Stop 1: injected 2 snippets as reference material
+  [LOCAL-411] Stop 1 prompt size: before_snippets=14475 after=24696 (+10221 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (24696)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+Stop 1 API call cost: $0.0313 (6592 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 1 attempt 1/5 story_count=1 words=287
+Stop 1 description word count: 287 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+Stop 2 API call cost: $0.0319 (6713 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 2 attempt 1/5 story_count=1 words=278
+Stop 2 description word count: 278 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 3 API call cost: $0.0323 (6810 tokens, model=gpt-4o)
+  [LOCAL-569] Stop 3 attempt 1/5 story_count=0 words=277
+Stop 3 description word count: 277 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+  [LOCAL-414] Stop 3: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.4s for 3 stop(s) at max_workers=3
+    [LOCAL-474] regenerated and re-gated: 230w (was 203w)
+    [LOCAL-474] regenerated and re-gated: 278w (was 254w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+      [PERSON-CAP] stop 3: 'nice' already carries two stops — cut: Vieux Nice is the soul of the city, a compelling labyrinth of history and cultur
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 3 eligible, 3 retried, 2 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 3 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/yosdenyz/videos/day-2-part-one-nice-started-with-a-spanish-walking-tour-through-old-nice-learned/1069694489373747/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://curiousrambler.com/walking-tour-of-the-old-town-of-nice-france/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1154 chars from https://curiousrambler.com/walking-tour-of-the-old
+  [LOCAL-427] HTTP 200 from https://perfectlyprovence.co/walking-tour-of-old-nice-tours-with-a-lovely-guide/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1780 chars from https://perfectlyprovence.co/walking-tour-of-old-n
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=nYRMPZ_Fmag (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.explorenicecotedazur.com/app/uploads/2026/03/en-nice-practical-guide.pdf (attempt 1)
+  [D512] verb discovery: query='walking tour of Old Nice, France construction process how it was' -> 5 new verb(s): guided, decapitated, surrounded, walked, overview
+  [D512] _AGENCY_VERB widened by 5 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Cours Saleya Market                        28    34     8    72
+     2  Palais Lascaris                            66    50     7    45
+     3  Vieux Nice                                 20    47     0     0
+    [LOCAL-485] index mean 38.0 over 3 stop(s), range 20-66
+    [LOCAL-485] weakest: 'Vieux Nice' at 20
+[TIMING] phase=story_first elapsed=70.7s cumulative=137.0s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (95 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 95 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 95 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 2 sentence(s) deleted
+    Stop 1 orientation: COLLAPSED — using fallback
+    Stop 2 orientation R10: 1 sentence(s) deleted
+    Stop 2 orientation: COLLAPSED — using fallback
+    Stop 3 orientation R10: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 137
+    Words after:  39
+    Delta: -98
+    Stops affected: 3/3
+    Deletions (4):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "As you step into the Cours Saleya Market, the vibrant aroma of fresh produce and blossoming flowers ..."
+      [Stop 1][R7_HALLUCINATED_SENSORY] "The sounds of vendors calling out their daily specials and the gentle clatter of market stalls being..."
+      [Stop 2][R10_UNFULFILLED_PROMISE] "As you step away from the bustling Cours Saleya Market, your path leads you to the serene Rue Droite..."
+      [Stop 3][R10_UNFULFILLED_PROMISE] "As you stand here, in the heart of Vieux Nice, let your eyes follow the cobblestone streets, twistin..."
+  [LOCAL-246] ⚠️  WARNING: Orientation collapsed to 28% of original — listener may not know where to stand
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 3/3
+    [LOCAL-276] Intrigue ranking completed: 2.7s, $0.0073, 1125 tokens
+    [LOCAL-276] Ranked 3 stops:
+      [Cours Saleya Market] (cause): This recognition underscores the market's historical and cultural significance, ...
+      [Palais Lascaris] (dated_event): This residence remained under the family's ownership until 1802, when it was sol...
+      [Vieux Nice] (cause): During World War II, the old town’s maze-like alleys provided refuge to those li...
+    [LOCAL-276] 3 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (3 stops)
+    Part 4 LLM cost: $0.0028 (493 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (26 words):
+      "At Cours Saleya Market, you'll discover its historical and cultural significance. In Vieux Nice, explore how the old town's alleys provided refuge during World War II."
+      Stops referenced: 2
+    Part 4 total cost: $0.0028
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 3 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)
+  [D536] Listener asked for 3 stop(s), delivering 3 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave the bustling Cours Saleya Market, stroll down R...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave Palais Lascaris, head south on Rue Droite towar...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 1.2s, $0.0024, 418 tokens
+  [LOCAL-280] Recap built: 26 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Cours Saleya Market] (cause): "This recognition underscores the market's historical and cultural significance, ..."
+      → composed: "Cours Saleya Market, a living pulse of the community with historical significance"
+    [Vieux Nice] (cause): "During World War II, the old town’s maze-like alleys provided refuge to those li..."
+      → composed: "Vieux Nice, alleys provided refuge during World War II"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 3 stops — Cours Saleya Market, a living pulse of the community with historical significance and Vieux Nice, alleys provided refuge during World War II."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=17 'restaurants tour in old city of Nice, France - Restaurant Tour' (0.4 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 3 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+REPETITION WARN: Stop 2 and Stop 3 share near-identical sentence (sim=0.83)
+  [S27] 1 repetition pair(s) found (log only, no rewrite)
+  [S29] Sentence not found in Stop 3 block — skipping
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (44316 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 4
+    Verified: 2
+    Dropped: 2
+    AUDIT: hours | Open daily from 6 AM to 1:30 PM | https://www.openstreetmap.org/node/578023554 | DROPPED — not supported by source
+    AUDIT: admission | free entry | https://www.openstreetmap.org/node/578023554 | DROPPED — not supported by source
+    AUDIT: hours | Open Tuesday to Sunday from 10 AM to 6 PM | https://www.openstreetmap.org/node/578023554 | VERIFIED
+    AUDIT: admission | entry fee €10 | https://www.openstreetmap.org/node/578023554 | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: 2 claim(s) dropped
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 4: PARTS_OUT_OF_ORDER — Part 4 appears before Part 3 (sentence 5 vs 6).
+
+=== Word Count Statistics ===
+Stop 1: Cours Saleya Market - 315 words
+Stop 2: Palais Lascaris - 266 words
+Stop 3: Vieux Nice - 281 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (7077 chars, 3/3 stops)
+  [LOCAL-540] defects seen: ['no_story']
+  [LOCAL-540]   no_story [advisory]: no named people anywhere in the tour
+
+Total API cost: $0.1741 (27239 tokens)
+Grounding:      $0.0000 (0 requests)
+Tour total:     $0.1741
+Provenance:     3/24 factual sentences sourced, 21 unsourced (3 corpus, 0 grounded, 21 parametric)
+CACHE STORE: walking tour of Old Nice, France / walking / 3
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_A.txt
+  [C5-5] Evidence persisted: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_A_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: walking tour of Old Nice, France
+Tour-Category: walking
+
+Stop 1: Cours Saleya Market
+
+Address: Cours Saleya, 06300 Nice, France
+
+Coordinates: 43.6951, 7.2676
+
+Type/Specialty: Market
+
+Specific Examples: Fresh produce, local flowers, artisanal goods
+
+Operational Details: Open Tuesday to Sunday from 10 AM to 6 PM. entry fee €10
+
+Orientation: You are about to embark on a walking journey through Old Nice, France. The tour spans from Cours Saleya Market to Vieux Nice, c...
+
+[TIMING] phase=packing elapsed=9.8s cumulative=146.7s
+[TIMING] phase=verification elapsed=0.0s cumulative=146.7s
+[TIMING] TOTAL wall=146.7s phases: story_first=70.7s, poi_selection=51.2s, fact_sheets=13.2s, packing=9.8s, intent=1.9s, narration=0.0s, external_lookups=0.0s, verification=0.0s

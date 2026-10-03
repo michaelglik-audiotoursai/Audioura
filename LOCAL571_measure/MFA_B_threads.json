@@ -1,0 +1,219 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "Evolution of the Museum's Physical Space",
+      "description": "This theme traces the development of the Museum of Fine Arts' physical space, beginning with its founding location, turning with significant expansions funded by patrons, and culminating in its current status as a cultural landmark. The narrative highlights the museum's growth from modest beginnings to a major institution.",
+      "supporting_elements": [
+        "se_002",
+        "se_009"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_002",
+        "se_009"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.9,
+      "weight": 0.333
+    },
+    {
+      "name": "Francis Bartlett's Legacy of Donations",
+      "description": "This theme explores the impact of Francis Bartlett's donations on the Museum of Fine Arts, Boston, highlighting how his contributions have shaped the museum's collection over time. The narrative begins with the purchase of significant artifacts using Bartlett's funds, turns with the continued influence of his donations in acquiring diverse works, and pays off with the enduring legacy of his generosity in the museum's growth.",
+      "supporting_elements": [
+        "se_001",
+        "se_007",
+        "se_008"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_001",
+        "se_007",
+        "se_008"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.533,
+      "distinctiveness": 1.0,
+      "arc_potential": 1.0,
+      "total_score": 0.883,
+      "weight": 0.333
+    },
+    {
+      "name": "Cultural Contributions of the 20th Century",
+      "description": "This theme examines the cultural contributions made to the Museum of Fine Arts during the 20th century, focusing on the diverse artworks and collections donated during this period. It begins with the acquisition of 'Negro Student' in 1934, turns with the donation of Indian Rajasthani art, and pays off with the museum's enriched cultural tapestry.",
+      "supporting_elements": [
+        "se_003",
+        "se_005"
+      ],
+      "stops_covered": [
+        0,
+        1,
+        2
+      ],
+      "grounded_on": [
+        "se_003",
+        "se_005"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 0.8,
+      "arc_potential": 1.0,
+      "total_score": 0.86,
+      "weight": 0.333
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "Evolution of the Museum's Physical Space",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_009"
+          ],
+          "element_summaries": [
+            "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston"
+          ]
+        },
+        {
+          "name": "Francis Bartlett's Legacy of Donations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_007"
+          ],
+          "element_summaries": [
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1"
+          ]
+        },
+        {
+          "name": "Cultural Contributions of the 20th Century",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003"
+          ],
+          "element_summaries": [
+            "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' created in 1934."
+          ]
+        }
+      ],
+      "thread_angle": "[Evolution of the Museum's Physical Space] (weight 0.33): The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston\n[Francis Bartlett's Legacy of Donations] (weight 0.33): The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don; The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1\n[Cultural Contributions of the 20th Century] (weight 0.33): The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' created in 1934.",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "Evolution of the Museum's Physical Space",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002"
+          ],
+          "element_summaries": [
+            "The second phase of construction built a wing along The Fens to house painting galleries, funded ent"
+          ]
+        },
+        {
+          "name": "Francis Bartlett's Legacy of Donations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_001",
+            "se_007",
+            "se_008"
+          ],
+          "element_summaries": [
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Cultural Contributions of the 20th Century",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_005"
+          ],
+          "element_summaries": [
+            "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani "
+          ]
+        }
+      ],
+      "thread_angle": "[Evolution of the Museum's Physical Space] (weight 0.33): The second phase of construction built a wing along The Fens to house painting galleries, funded ent\n[Francis Bartlett's Legacy of Donations] (weight 0.33): The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don; The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1\n[Cultural Contributions of the 20th Century] (weight 0.33): John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani ",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_009",
+          "element_text": "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston Athenæum.",
+          "thread_name": "Evolution of the Museum's Physical Space"
+        }
+      ]
+    },
+    {
+      "threads_active": [
+        {
+          "name": "Evolution of the Museum's Physical Space",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_002",
+            "se_009"
+          ],
+          "element_summaries": [
+            "The second phase of construction built a wing along The Fens to house painting galleries, funded ent",
+            "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston"
+          ]
+        },
+        {
+          "name": "Francis Bartlett's Legacy of Donations",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_008"
+          ],
+          "element_summaries": [
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        },
+        {
+          "name": "Cultural Contributions of the 20th Century",
+          "weight": 0.3333333333333333,
+          "elements_here": [
+            "se_003",
+            "se_005"
+          ],
+          "element_summaries": [
+            "The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' created in 1934.",
+            "John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani "
+          ]
+        }
+      ],
+      "thread_angle": "[Evolution of the Museum's Physical Space] (weight 0.33): The second phase of construction built a wing along The Fens to house painting galleries, funded ent; The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston\n[Francis Bartlett's Legacy of Donations] (weight 0.33): The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don\n[Cultural Contributions of the 20th Century] (weight 0.33): The Loïs Mailou Jones Pierre-Noël Trust gifted the artwork 'Negro Student' created in 1934.; John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani ",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_009",
+          "element_text": "The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston Athenæum.",
+          "thread_name": "Evolution of the Museum's Physical Space"
+        },
+        {
+          "from_stop": 1,
+          "element_id": "se_002",
+          "element_text": "The second phase of construction built a wing along The Fens to house painting galleries, funded entirely by Maria Antoi",
+          "thread_name": "Evolution of the Museum's Physical Space"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of Evolution of the Museum's Physical Space. This theme traces the development of the Museum of Fine Arts' physical space, beginning with its founding location, turning with significant expansions funded by patrons, and culminating in its curren",
+  "epilog_payoff": "From Ancient Nubia Now to John Singer Sargent’s  The Daughters of Edward Darley Boit, you have followed the thread of Evolution of the Museum's Physical Space."
+}

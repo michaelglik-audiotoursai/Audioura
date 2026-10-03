@@ -1,0 +1,72 @@
+[audio_tours BEFORE] {'total': 198, 'max_id': 384}
+[cumulative OpenAI spend so far] $0.7684
+[skip] Palais_A already done (writer=$0.7242 llm=$0.7317)
+
+========================================================================
+[RUN] MFA_A: Museum of Fine Arts, Boston, MA (museum)  writer=gpt-4o
+========================================================================
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:9754. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:9755. Caller should supply input_tokens and output_tokens separately.
+[OSM-VENUE] Overpass ReadTimeout for 'Ancient Nubia Now' (attempt 1/2)
+[OSM-VENUE] Overpass HTTP 504 for 'Ancient Nubia Now'
+[OSM-VENUE] Overpass ReadTimeout for 'Sons of Liberty Bowl' (attempt 1/2)
+[OSM-VENUE] Overpass HTTP 504 for 'Sons of Liberty Bowl'
+[OSM-VENUE] Overpass 429 for 'John Singer Sargent’s  The Daughters of Edward Darley Boit' (attempt 1/2)
+[OSM-VENUE] Overpass ReadTimeout for 'John Singer Sargent’s  The Daughters of Edward Darley Boit' (attempt 2/2)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:10191. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/fact_extractor.py:219. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:14337. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:15735. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:20377. Caller should supply input_tokens and output_tokens separately.
+[done] MFA_A: ok=False wall=379.6s stops=2 writer_calls=26 writer_usd=$0.4102 llm=$0.4201 retries432=8 clean=True defects=['thin']  cumulativeOpenAI=$1.1885
+
+========================================================================
+[RUN] BosRest_A: restaurant tour of Boston, MA (restaurant)  writer=gpt-4o
+========================================================================
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:7946. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:7947. Caller should supply input_tokens and output_tokens separately.
+[OSM-DINING] Overpass HTTP 504 for 'Union Oyster House'
+[OSM-DINING] Overpass ReadTimeout for 'Neptune Oyster' (attempt 1/2)
+[OSM-DINING] Overpass ReadTimeout for 'Neptune Oyster' (attempt 2/2)
+[OSM-DINING] Overpass ReadTimeout for 'Legal Sea Foods' (attempt 1/2)
+[OSM-DINING] Overpass HTTP 504 for 'Legal Sea Foods'
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:19532. Caller should supply input_tokens and output_tokens separately.
+[done] BosRest_A: ok=True wall=280.1s stops=3 writer_calls=16 writer_usd=$0.1835 llm=$0.1931 retries432=0 clean=True defects=['unsourced_person_event']  cumulativeOpenAI=$1.3816
+
+========================================================================
+[RUN] OldNice_A: walking tour of Old Nice, France (walking)  writer=gpt-4o
+========================================================================
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /Users/micha/audioura-worktrees/LOCAL-571/generate_tour_text.py:19709. Caller should supply input_tokens and output_tokens separately.
+[done] OldNice_A: ok=True wall=146.7s stops=3 writer_calls=10 writer_usd=$0.1359 llm=$0.1453 retries432=0 clean=True defects=['no_story']  cumulativeOpenAI=$1.5269
+
+========================================================================
+[RUN] Palais_B: Palais Lascaris, Nice, France (museum)  writer=gpt-4.1
+========================================================================
+[done] Palais_B: ok=False wall=3.6s stops=0 writer_calls=0 writer_usd=$0.0000 llm=$0.0004 retries432=0 clean=True defects=['thin', 'no_story']  cumulativeOpenAI=$1.5273
+
+========================================================================
+[RUN] MFA_B: Museum of Fine Arts, Boston, MA (museum)  writer=gpt-4.1
+========================================================================
+[done] MFA_B: ok=False wall=3.3s stops=0 writer_calls=0 writer_usd=$0.0000 llm=$0.0004 retries432=0 clean=True defects=['thin', 'no_story']  cumulativeOpenAI=$1.5278
+
+========================================================================
+[RUN] BosRest_B: restaurant tour of Boston, MA (restaurant)  writer=gpt-4.1
+========================================================================
+[OSM-DINING] Overpass HTTP 504 for 'Union Oyster House'
+[OSM-DINING] Overpass HTTP 504 for 'Legal Sea Foods'
+[OSM-DINING] Overpass ReadTimeout for 'The Capital Grille' (attempt 1/2)
+[OSM-DINING] Overpass ReadTimeout for 'The Capital Grille' (attempt 2/2)
+[done] BosRest_B: ok=True wall=254.6s stops=3 writer_calls=6 writer_usd=$0.0906 llm=$0.1469 retries432=0 clean=False defects=['dangling_reference']  cumulativeOpenAI=$1.6747
+
+========================================================================
+[RUN] OldNice_B: walking tour of Old Nice, France (walking)  writer=gpt-4.1
+========================================================================
+[OSM-VENUE] Overpass HTTP 504 for 'Fenocchio'
+[OSM-VENUE] Overpass HTTP 504 for 'Palais Lascaris'
+[done] OldNice_B: ok=True wall=166.6s stops=3 writer_calls=6 writer_usd=$0.0994 llm=$0.1288 retries432=0 clean=True defects=[]  cumulativeOpenAI=$1.8035
+
+[audio_tours AFTER] {'total': 198, 'max_id': 384}
+[cumulative OpenAI spend] $1.7668
+[summary] /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/summary.json
