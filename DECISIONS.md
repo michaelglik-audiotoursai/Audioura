@@ -24292,3 +24292,32 @@ Polly call is plain text Joanna neural, so sample A is a fair stand-in. Polly ha
 voice: Russian tours today play Polly standard. Blind 3-way (Polly neural / Kokoro / OpenAI tts-1,
 letters reshuffled per stop) at `~/Desktop/Audioura_voice_samples/BLIND_AB/`. No switch without
 Michael's ear verdict.
+
+## D597 — Story retry ships the last draft, not the best; fix behind flags, then blind test (2026-10-03, LEAD)
+
+LOCAL-568 (offline, n=42 museum stop-episodes, 35 Palais + 7 MFA) ACCEPTED as evidence, with one
+correction. LEAD confirmed in code: the LOCAL-432 retry rewrites the whole stop at rising temperature
+and ships the LAST attempt; `_best_description` keeps the longest draft, fallback paths only. 12/42
+shipped stops had fewer story sentences than an earlier draft; 25/42 never reach 3. **Correction:**
+"attempt 5 never pays" is a logging artefact (the final attempt's count is never printed), so the
+claimed cap-4 = cap-5 equality is unproven. Decision: LOCAL-569 adds always-on per-attempt logging,
+`STORY_RETRY_KEEP_BEST` and `STORY_RETRY_EARLY_STOP` (both default off), measures 3 museums × 3 arms,
+and writes a blind P/Q pack. Flags flip only after Michael's blind read; keep-best alone cannot lower
+the shipped story_count, so it is the first candidate to flip. 568 projection: up to ~$0.4 per 4-stop
+museum tour (directional, small n).
+
+## D598 — LOCAL-569 merged to subscribed, flags OFF; blind P/Q pack awaits Michael (2026-10-03, LEAD)
+
+Merged `subscribed` @ 006f727. Always-on: `[LOCAL-569] Stop N attempt K/5 story_count=C` logging
+(regex counter, the same `extract_story_sentences` the LOCAL-432 trigger uses, so no LLM cost).
+Default OFF: `STORY_RETRY_KEEP_BEST`, `STORY_RETRY_EARLY_STOP` (hard cap 3, stop on no improvement).
+LEAD verified: 18 tests green, red when keep-best is forced to ship-last (3 fail); diff vs subscribed
+purely additive (0 removed lines); sq4 + palais fixtures green; orchestrator-wiring failure is
+pre-existing on the base (container name).
+Measured, 3 museums × 3 arms, one run each, $3.51: early-stop cut writer $ by 33% on Palais
+(0.516→0.346) and MFA (0.545→0.366), ≈ no change on the Met control. Live logs show keep-best
+rescuing a richer earlier draft (Palais_C stop 2: shipped 2 where ship-last gives 1). Per-stop
+story counts are inside run-to-run noise, so quality is decided by Michael's blind read:
+`~/Desktop/Audioura_story_blind/` (P/Q per museum, key after 60 blank lines in KEY.md).
+**Plan:** flip KEEP_BEST first (cannot lower the shipped count); flip EARLY_STOP only if Michael
+does not prefer the A texts. Neither flips before his verdict.
