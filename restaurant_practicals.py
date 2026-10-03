@@ -194,6 +194,19 @@ _CLOSED_MARKERS = (
 )
 
 
+# [LOCAL-564 r3] Tokens that begin or belong to a closure-marker phrase and so can
+# never CONTINUE a venue name when they follow it. Closure headlines are routinely
+# Title Case ("Neptune Oyster Has Permanently Closed"), so the capitalised word
+# right after the venue ("Has") would otherwise be misread as part of the name and
+# the whole-name match would fail. Derived from the existing closure markers so the
+# two stay in lock-step, plus the grammatical auxiliaries that join a venue to a
+# closure predicate (is/was/will/closes/closing) which are forms of the same verbs
+# but do not appear verbatim in the marker phrases.
+_CLOSURE_AUX_TOKENS = frozenset(
+    w for m in _CLOSED_MARKERS for w in m.split()
+) | {'is', 'was', 'will', 'closes', 'closing'}
+
+
 # [D540] A REBRAND IS NOT A CLOSURE, AND THE CHECK ONLY KNEW THE WORD "CLOSED".
 #
 # Michael, 2026-08-28: "Le Vistamar no longer exists under that name ... The space
@@ -368,12 +381,466 @@ def venue_still_operating(name, city, timeout=45):
     return True, ''
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-564] A CLOSURE REPORTED FOR A DIFFERENT PLACE OR A DIFFERENT SUBJECT
+# MUST NOT DROP A LIVE VENUE.
+#
+# D543 (city) and D544 (same sentence) each closed one leak and left the next.
+# Two live Boston restaurants were still dropped (LOCAL-563 Gemini baseline):
+#
+#   Chart House, Boston     dropped on  "Chart House, a riverfront staple in
+#                                         Weehawken, New Jersey, has closed as of
+#                                         May 14. A Mastro's Steakhouse is planned
+#                                         for the site."
+#   Buttermilk & Bourbon,   dropped on  "BarLola in Boston's Back Bay Has Closed;
+#   Boston                                Buttermilk & Bourbon to Replace It ..."
+#
+#   Chart House:  WRONG CITY. The notice is about Weehawken, New Jersey; the stop
+#                 is Boston, Massachusetts. D543's city key was the LAST WORD of
+#                 the location, and the location the pipeline passes is the whole
+#                 request — "restaurant tour of Chart House, Boston, MA" — so the
+#                 key became "house", which is in "Chart House". The guard checked
+#                 the venue's own name, not its city.
+#   Buttermilk:   WRONG SUBJECT. City matches (Boston) and the marker shares the
+#                 sentence with the name (D544 satisfied), but the thing that
+#                 closed is BarLola; "to Replace It" binds the closure to BarLola
+#                 and names Buttermilk as its SUCCESSOR — the opposite of closed.
+#
+# Fix: accept a closure only when BOTH hold. The place must not be CONTRADICTED
+# (a US state or country named in the snippet that is not the stop's), and the
+# venue must be the SUBJECT that closed (before the marker in its clause, with no
+# other business name between them, and no successor phrasing pointing elsewhere).
+# The state/country vocabulary is taken from pycountry, not a hand list (D476).
+# ---------------------------------------------------------------------------
+
+# Successor/replacement phrasing. When the closure sentence carries any of these,
+# the venue named AFTER it is the one taking over — "X has closed; Y to replace
+# it" closes X, not Y. These bind the closure to the OTHER name.
+_SUCCESSOR_MARKERS = (
+    'to replace', 'will replace', 'replaces', 'replaced by', 'to take over',
+    'taking over', 'takes over', 'took over', 'in the former', 'in the former home of',
+    'in place of', 'will open in its place', 'open in its place', 'moving into',
+    'moves into', 'set to open', 'opening in the space', 'in the space',
+)
+
+_GEO_CACHE = None
+
+
+def _geo_vocab():
+    """US states + countries from pycountry, lowercased, for place contradiction.
+
+    Returns (states, countries) where each maps a lowercase surface form (full
+    name and, for states, the two-letter abbreviation) to a canonical key. Built
+    once. If pycountry is missing the maps are empty and place-match degrades to
+    "no contradiction found", which keeps a stop rather than dropping it — the
+    safe direction (D541: absence of evidence never deletes a stop).
+    """
+    global _GEO_CACHE
+    if _GEO_CACHE is not None:
+        return _GEO_CACHE
+    states, countries = {}, {}
+    try:
+        import pycountry
+        for sub in pycountry.subdivisions:
+            if sub.country_code == 'US':
+                name = sub.name.strip()
+                states[name.lower()] = name
+                # Code is like "US-NJ"; the 2-letter abbrev is what press uses.
+                abbr = sub.code.split('-')[-1].lower()
+                if len(abbr) == 2:
+                    states[abbr] = name
+        for c in pycountry.countries:
+            countries[c.name.lower()] = c.name
+            if getattr(c, 'official_name', None):
+                countries[c.official_name.lower()] = c.name
+            # "common_name" (e.g. names people actually type) when present.
+            if getattr(c, 'common_name', None):
+                countries[c.common_name.lower()] = c.name
+    except Exception:
+        pass
+    _GEO_CACHE = (states, countries)
+    return _GEO_CACHE
+
+
+def _parse_stop_place(city):
+    """Pull the stop's intended city + region (state/country) out of the location.
+
+    The pipeline passes the user's whole request as `city` —
+    "restaurant tour of Chart House, Boston, MA" — not a clean city. The region
+    is the trailing comma-segment that pycountry recognises as a US state or a
+    country; the city is the segment just before it. Returns
+    (city_token, state_canonical, country_canonical), any of which may be ''.
+    """
+    states, countries = _geo_vocab()
+    # Drop a leading "<something> tour of/in" framing and bracketed asides.
+    raw = re.sub(r'\s*\([^)]*\)\s*', ' ', city or '').strip()
+    raw = re.sub(r'^.*?\btour\s+(?:of|in|around|through)\s+', '', raw, flags=re.I).strip()
+    segs = [s.strip() for s in raw.split(',') if s.strip()]
+    state_c = country_c = ''
+    city_tok = ''
+    # Walk from the end: trailing segments are region, the first non-region is city.
+    for i in range(len(segs) - 1, -1, -1):
+        s_low = segs[i].lower()
+        if not state_c and s_low in states:
+            state_c = states[s_low]
+            continue
+        if not country_c and s_low in countries:
+            country_c = countries[s_low]
+            continue
+        # First segment from the right that is not a region token is the city.
+        # Strip a trailing venue descriptor after a dash ("… - Back Bay").
+        city_tok = re.split(r'\s+[-–—]\s+', segs[i])[-1].strip()
+        break
+    # A bare "Monaco" is both a city and a country; keep it as the city token too.
+    if not city_tok and country_c:
+        city_tok = country_c
+    return city_tok, state_c, country_c
+
+
+def _place_contradicted(text, stop_city, stop_state, stop_country):
+    """True if `text` names a US state or country that is NOT the stop's.
+
+    This is the Chart House guard: a Weehawken / New Jersey notice names New
+    Jersey, the stop is Massachusetts, so the places contradict and the closure
+    does not apply here. A snippet that names no region, or only the stop's own
+    region, is NOT contradicted.
+    """
+    states, countries = _geo_vocab()
+    low = text.lower()
+    found_states, found_countries = set(), set()
+    for surface, canon in states.items():
+        if len(surface) == 2:
+            # A two-letter abbreviation only counts in PRESS FORM: uppercase and
+            # standalone, as in "Boston, MA" or "Weehawken, NJ". Lowercase "or"
+            # / "in" / "me" / "la" in ordinary prose is not Oregon / Indiana /
+            # Maine / Louisiana, and matching them deletes live venues.
+            if re.search(rf'(?<![A-Za-z]){surface.upper()}(?![A-Za-z])', text):
+                found_states.add(canon)
+        else:
+            # Full state name: match as whole words, case-insensitive.
+            if re.search(rf'(?<![a-z]){re.escape(surface)}(?![a-z])', low):
+                found_states.add(canon)
+    for surface, canon in countries.items():
+        if re.search(rf'(?<![a-z]){re.escape(surface)}(?![a-z])', low):
+            found_countries.add(canon)
+    if stop_state and found_states and stop_state not in found_states:
+        return True, f"names {sorted(found_states)[0]}, stop is in {stop_state}"
+    if stop_country and found_countries and stop_country not in found_countries:
+        # The stop's own city appearing is fine; only a different COUNTRY counts.
+        return True, f"names {sorted(found_countries)[0]}, stop is in {stop_country}"
+    return False, ''
+
+# Articles that may lead a proper name and are not part of the "capitalised word
+# joined to the name" test — "La Marée" stays allowed, as in r1.
+_NAME_ARTICLES = ('the', 'le', 'la', 'les', 'el')
+
+
+# [LOCAL-564 r3] Short connective words that a Title Case headline leaves in
+# lowercase ("Del Toro Has Closed In Back Bay" keeps "in"/"of"/… lower). They do
+# not count against the "most words are capitalised" test below.
+_TITLE_CASE_MINOR = frozenset({
+    'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into',
+    'nor', 'of', 'on', 'or', 'the', 'to', 'with', 'vs',
+})
+
+
+def _is_title_case(text_orig):
+    """True when `text_orig` reads as a Title Case headline: most of its
+    significant words (ignoring minor connectives) start with a capital letter.
+
+    Closure headlines from Eater, the Boston Globe and Patch are Title Case, and
+    in that register the capitalisation of the word AFTER a venue carries no name
+    signal — every word is capitalised. When this holds, `_whole_name_spans`
+    stops reading a capitalised FOLLOWING word as a name continuation (it keeps
+    the preceding-word test, so "Del Toro ..." still rejects a bare "Toro").
+    """
+    words = re.findall(r"[A-Za-z][A-Za-z'’]*", text_orig or '')
+    significant = [w for w in words if w.lower() not in _TITLE_CASE_MINOR]
+    if len(significant) < 2:
+        return False
+    capped = sum(1 for w in significant if w[0].isupper())
+    # "Most" = a clear majority; require at least ~70% so an ordinary sentence
+    # with one or two proper nouns ("Del Toro has closed.") is NOT title case.
+    return capped >= max(2, (len(significant) * 7 + 9) // 10)
+
+
+def _whole_name_spans(text_low, text_orig, venue_low, allow_after=()):
+    """Yield (start, end) spans where `venue_low` occurs as the COMPLETE proper
+    name in `text_low` — not as a substring of a longer name.
+
+    [LOCAL-564 r2] The Boston miss was a substring match: venue `Toro` matched
+    inside `Del Toro has closed` and `Toro Mexican Street Food`. A whole-name
+    match requires:
+
+      * the token DIRECTLY BEFORE the name is not a capitalised word joined to
+        it (`Del Toro`, `El Toro`) — i.e. not `[A-Z]\\w*` abutting the name,
+        unless that word is a leading article of the venue itself; and
+      * the token DIRECTLY AFTER the name does not continue it
+        (`Toro Mexican Street Food`, `Toro Toro`) — i.e. not another capitalised
+        word abutting the name.
+
+    `allow_after` holds place tokens (the stop's own city/state/country) that
+    are LOCATORS, not name continuations: "Chart House Boston" and "La Marée
+    Monaco" are the venue plus its city, so a following word in `allow_after`
+    does not disqualify the span.
+
+    Deterministic, no keyword list. `text_orig` carries the original casing so
+    the capitalisation test is meaningful; `text_low` is where we search.
+    """
+    if not venue_low:
+        return
+    allow_after = {a.lower() for a in allow_after if a}
+    # [LOCAL-564 r3] In a Title Case headline every word is capitalised, so a
+    # capitalised word AFTER the venue carries no name signal; skip the
+    # following-word capitalisation test for the whole span in that register. The
+    # preceding-word test stays, so "Del Toro Has Closed" still rejects "Toro".
+    title_case = _is_title_case(text_orig)
+    vlen = len(venue_low)
+    start = 0
+    while True:
+        at = text_low.find(venue_low, start)
+        if at < 0:
+            return
+        end = at + vlen
+        start = at + 1  # advance for the next search regardless of outcome
+
+        # --- preceding token: a capitalised word joined to the name? ---------
+        # Walk back over whitespace; if the char immediately before the name is a
+        # letter, the name is glued into a longer token (reject). If separated by
+        # a space, inspect the preceding word: a capitalised word that is not a
+        # leading article of the venue means the real name is "<Word> <venue>".
+        i = at - 1
+        if i >= 0 and (text_orig[i].isalpha()):
+            # Letter directly abutting (no space): part of a longer token.
+            continue
+        # Skip a single run of spaces to find the preceding word.
+        j = i
+        while j >= 0 and text_orig[j].isspace():
+            j -= 1
+        if j >= 0:
+            k = j
+            while k >= 0 and (text_orig[k].isalpha() or text_orig[k] == "'"):
+                k -= 1
+            prev_word = text_orig[k + 1:j + 1]
+            if prev_word:
+                # A capitalised word before the name joins into it — UNLESS the
+                # venue name itself begins with that article (handled below).
+                venue_first = venue_low.split()[0] if venue_low.split() else ''
+                if prev_word[0].isupper() and prev_word.lower() not in _NAME_ARTICLES:
+                    # "Del Toro", "El Toro" — the capitalised predecessor is part
+                    # of the real name. Reject this span.
+                    continue
+                # A leading article that is actually the venue's own first token
+                # (e.g. venue "La Marée", text "La Marée") is fine and already
+                # inside the matched span, so a separate preceding "La" would be a
+                # DIFFERENT article in front — treat a capitalised article the same
+                # as any capitalised word only when it is NOT the venue's own lead.
+                if (prev_word.lower() in _NAME_ARTICLES
+                        and prev_word[0].isupper()
+                        and prev_word.lower() != venue_first):
+                    continue
+
+        # --- following token: a capitalised word continuing the name? --------
+        n = end
+        if n < len(text_orig) and text_orig[n].isalpha():
+            # Letter directly abutting (no space): part of a longer token.
+            continue
+        m = n
+        while m < len(text_orig) and text_orig[m].isspace():
+            m += 1
+        if m < len(text_orig):
+            p = m
+            while p < len(text_orig) and (text_orig[p].isalpha() or text_orig[p] == "'"):
+                p += 1
+            next_word = text_orig[m:p]
+            if (next_word and next_word[0].isupper()
+                    and next_word.lower() not in allow_after
+                    and next_word.lower() not in _CLOSURE_AUX_TOKENS
+                    and not (title_case and next_word.lower() in _TITLE_CASE_MINOR)):
+                # "Toro Mexican", "Toro Toro" — the capitalised successor continues
+                # the name. ("Chart House Boston", "La Marée Monaco" are exempt:
+                # the successor is the stop's own city/region, a locator.) Reject.
+                #
+                # [LOCAL-564 r3] Exemptions that let a Title Case closure headline
+                # (Eater/Globe/Patch) bind without reading its capitalisation as a
+                # name signal:
+                #  * `_CLOSURE_AUX_TOKENS`: a following word that begins/belongs to
+                #    the closure phrase never continues a name — "Neptune Oyster
+                #    Has Permanently Closed" ("Has" is the verb, not the venue).
+                #  * in a `title_case` clause, a following MINOR connective
+                #    (in/of/at/…) is likewise not a continuation; the headline
+                #    capitalises it only by convention ("Neptune Oyster In Boston
+                #    Has Closed"). A real name continuation ("Toro Mexican") is a
+                #    non-minor, non-closure word and is still rejected, and the
+                #    preceding-word test keeps "Del Toro ..." from matching a bare
+                #    "Toro" even in Title Case.
+                continue
+
+        yield (at, end)
+
+
+def _whole_name_at(text_low, text_orig, venue_low, allow_after=()):
+    """First whole-name span start, or -1. See `_whole_name_spans`."""
+    for s, _e in _whole_name_spans(text_low, text_orig, venue_low, allow_after):
+        return s
+    return -1
+
+
+def _title_starts_with_venue(title, venue_low):
+    """True when `title` STARTS with the venue as a whole name (leading article
+    allowed). Used for the bare-status-fragment Yelp case."""
+    if not title or not venue_low:
+        return False
+    t_low = title.lower()
+    head = re.sub(r'^(the|le|la|les|el)\s+', '', t_low.strip())
+    v = re.sub(r'^(the|le|la|les|el)\s+', '', venue_low.strip())
+    if not head.startswith(v):
+        return False
+    # The character after the matched venue must not continue the name.
+    after_at = len(t_low) - len(head) + len(v)
+    if after_at < len(t_low):
+        ch = t_low[after_at]
+        if ch.isalpha():
+            return False
+        # A capitalised word immediately following continues the name.
+        rest = title[after_at:].lstrip()
+        if rest and rest[0].isalpha() and rest[0].isupper():
+            # Allow a separator (dash/comma) between venue and city; only reject
+            # when the venue is directly glued to another capitalised word with
+            # just a space, e.g. "Toro Mexican".
+            if title[after_at:after_at + 1] == ' ':
+                return False
+    return True
+
+
+def _closure_binds(snippet, title, url, venue, city):
+    """Does this snippet report THIS venue, in THIS place, as the thing that closed?
+
+    Pure function over text — no network — so it is unit-testable from the exact
+    snippets that shipped the defect. Returns (binds: bool, reason: str). When it
+    returns False the reason explains which check rejected it, for the
+    `[LOCAL-564] closure REJECTED (<reason>)` log.
+    """
+    text = f"{title or ''}. {snippet or ''}".strip()
+    low = text.lower()
+    v_low = (venue or '').lower().strip()
+    if not v_low or not low:
+        return False, 'empty'
+
+    city_tok, stop_state, stop_country = _parse_stop_place(city)
+    city_low = (city_tok or '').lower()
+    # Place tokens that may follow the venue as a LOCATOR, not a name
+    # continuation: "Chart House Boston", "La Marée Monaco". Split multi-word
+    # cities ("Newton Centre") into their words so each is exempt individually.
+    place_tokens = set()
+    for part in (city_low, (stop_state or '').lower(), (stop_country or '').lower()):
+        for w in part.split():
+            if w:
+                place_tokens.add(w)
+
+    # --- PLACE MATCH -------------------------------------------------------
+    # Reject outright if the snippet names a US state or country that is not the
+    # stop's. This is the Chart House / Weehawken guard — and the ONLY place
+    # gate. [LOCAL-564 r2] The old "closure names no place matching the stop"
+    # rejection is gone: it regressed the case that matters most (Neptune Oyster
+    # "has permanently closed" named no place, so it was kept live and a listener
+    # was sent to a shuttered restaurant). No contradiction plus a subject match
+    # now means bound; the subject match is the gate.
+    contradicted, why = _place_contradicted(text, city_tok, stop_state, stop_country)
+    if contradicted:
+        return False, f"wrong place: {why}"
+
+    # --- SUBJECT MATCH -----------------------------------------------------
+    # The closure marker must be PREDICATED OF THIS VENUE, not merely co-occur
+    # with it. Split into clauses on sentence punctuation AND semicolons — a
+    # semicolon joins two independent businesses ("BarLola ... Has Closed;
+    # Buttermilk & Bourbon to Replace It") and each side must be judged alone.
+    #
+    # [LOCAL-564 r2] Split the ORIGINAL-cased text too and carry it alongside each
+    # lowercase clause, so the whole-name test (`_whole_name_at`) can read the
+    # capitalisation that distinguishes "Del Toro" from a standalone "Toro".
+    _splitter = r'(?<=[.!?;])\s+|;'
+    clauses = [c for c in re.split(_splitter, low) if c.strip()]
+    clauses_orig = [c for c in re.split(_splitter, text) if c.strip()]
+    for idx, clause in enumerate(clauses):
+        clause_orig = clauses_orig[idx] if idx < len(clauses_orig) else clause
+        marker = next((m for m in _CLOSED_MARKERS if m in clause), None)
+        if not marker:
+            continue
+        m_at = clause.find(marker)
+        # Whole-name position of the venue in THIS clause (not a substring of a
+        # longer proper name). -1 when the venue is not present as a whole name.
+        v_at = _whole_name_at(clause, clause_orig, v_low, place_tokens)
+
+        # Successor phrasing in the marker clause binds the closure to the OTHER
+        # name: "X Has Closed; Y to Replace It" closes X. If our venue is named
+        # with successor phrasing, it is the replacement, not the closed thing.
+        succ = next((s for s in _SUCCESSOR_MARKERS if s in clause), None)
+        if succ and v_at >= 0:
+            succ_at = clause.find(succ)
+            # Venue sits after the marker as the thing replacing it.
+            if v_at > m_at and succ_at >= 0:
+                return False, (f"successor phrasing '{succ}': venue is the "
+                               f"replacement, not closed")
+
+        if v_at >= 0:
+            # Venue named in the marker clause as a whole name. It must be the
+            # SUBJECT — before the marker. A name only AFTER the marker (a list
+            # item, a successor) is not what closed.
+            if v_at > m_at:
+                return False, "venue named after the closure marker, not its subject"
+            return True, 'bound'
+
+        # Venue NOT a whole name in the marker clause. Two possibilities remain:
+        #  (a) the marker clause is a bare STATUS fragment and the subject is in
+        #      the immediately preceding clause ("<Venue>. Permanently closed.");
+        #  (b) the marker clause is a bare STATUS fragment and the subject is in
+        #      the TITLE/URL ("Permanently closed." + title "Neptune Oyster -
+        #      Boston - Yelp", slug naming Boston).
+        before_marker = clause[:m_at].strip()
+        before_marker = re.sub(r'^(the|a|an)\s+', '', before_marker)
+        if before_marker:
+            # The marker clause names its own subject — not our venue.
+            return False, "closure predicated of another business, not the venue"
+
+        # (a) look back one clause for the venue as its head.
+        prev = clauses[idx - 1] if idx > 0 else ''
+        prev_orig = clauses_orig[idx - 1] if idx > 0 and (idx - 1) < len(clauses_orig) else ''
+        if prev and _whole_name_at(prev, prev_orig, v_low, place_tokens) >= 0:
+            # Require the venue to START the preceding clause (allowing a leading
+            # article), so "La Marée Monaco" heads it but a list does not.
+            head = re.sub(r'^(the|le|la|les|el)\s+', '', prev.strip())
+            if head.startswith(re.sub(r'^(the|le|la|les|el)\s+', '', v_low)):
+                # And the preceding clause must not itself be successor phrasing.
+                if any(s in prev for s in _SUCCESSOR_MARKERS):
+                    return False, "preceding clause is successor phrasing, not a closure"
+                return True, 'bound'
+            return False, "venue is not the subject of the closure notice"
+
+        # (b) bare status fragment, snippet names no subject: accept when the
+        #     TITLE starts with the venue (whole-name) AND the title or URL slug
+        #     names the stop's city, and nothing contradicts the place (already
+        #     checked above). This is the Yelp listing case.
+        snip_low = (snippet or '').lower()
+        snippet_names_subject = _whole_name_at(snip_low, snippet or '', v_low, place_tokens) >= 0
+        if not snippet_names_subject and _title_starts_with_venue(title, v_low):
+            city_in_title = bool(city_low and city_low in (title or '').lower())
+            city_in_url = bool(city_low and url and city_low in url.lower())
+            if city_in_title or city_in_url:
+                return True, 'bound (title subject + city in title/url)'
+
+    return False, 'no closure marker predicated of the venue'
+
+
 def closure_scan(name, city):
     """A dedicated closure probe, run across spelling variants.
 
     Deterministic string matching over search snippets — not an LLM judgement.
     The LLM half already proved it will believe whichever page it is shown; this
     asks one narrow question of the raw text instead.
+
+    [LOCAL-564] A match now requires BOTH a place that is not contradicted and
+    the venue being the SUBJECT that closed. See `_closure_binds`.
 
     Returns (is_closed: bool, evidence: str).
     """
@@ -385,52 +852,23 @@ def closure_scan(name, city):
     folded = ''.join(c for c in unicodedata.normalize('NFKD', core)
                      if not unicodedata.combining(c))
     place = (city or '').split(',')[0].strip()
-    # [D543] Last word of the location is the city in practice —
-    # 'Restaurant tour in Monaco' -> 'monaco'.
-    _place_key = (place.split()[-1].lower() if place.split() else '')
     variants = [v for v in dict.fromkeys([core, folded, bare]) if v]
     for v in variants:
         for q in (f'"{v}" {place} permanently closed',
                   f'"{v}" {place} closed down'):
             for item in _serp(q, max_results=8):
-                low = item['snippet'].lower()
-                # [D543] The snippet must be about a venue IN THIS CITY. Without
-                # this, "La Salière" Monaco returned "The Bevy in Old Naples
-                # permanently closed this summer, and a new concept, La Salière
-                # Naples, will open in its place" — a restaurant in Florida — and
-                # an open Monaco restaurant was deleted from the tour. Same
-                # subject-binding flaw that made the rebrand markers unusable
-                # (D541); here the city is the binding that works, because a
-                # closure notice names where.
-                if _place_key and _place_key not in low:
-                    continue
-                # [D544] The closure must be PREDICATED OF THIS VENUE, not merely
-                # co-occur with it. D543 bound the snippet to a city and stopped a
-                # Florida closure deleting a Monaco restaurant; the same flaw survived
-                # one level down, for the venue name itself.
-                #
-                # 2026-09-24, Michael's own test: Sycamore in Newton Centre -- open,
-                # 755 Beacon St, 354 reviews -- was DROPPED as permanently closed and
-                # silently replaced. The evidence was a listicle:
-                #
-                #   "Newton restaurant permanently closed after 10 years. Alison ...
-                #    Sycamore in Newton Center: Cook in Newtonville; Fiorella's in
-                #    Newtonville."
-                #
-                # The headline is about a DIFFERENT restaurant. Sycamore is simply one
-                # of several named further down. City matched, marker matched, and a
-                # live business was deleted from the listener's own request. Any
-                # round-up of local closures condemns every restaurant it lists.
-                #
-                # The binding that works is the sentence: a closure notice says
-                # "<venue> has permanently closed". Require the name and the marker in
-                # the SAME sentence. A listicle separates them; a real notice does not.
-                _sentences = re.split(r'(?<=[.!?])\s+', low)
-                _v_low = v.lower()
-                _bound = any(_v_low in _sent and any(m in _sent for m in _CLOSED_MARKERS)
-                             for _sent in _sentences)
-                if _bound:
+                binds, reason = _closure_binds(
+                    item.get('snippet', ''), item.get('title', ''),
+                    item.get('url', ''), v, city)
+                if binds:
                     return True, f"{item['snippet'][:160]} [{item.get('url','')}]"
+                # [LOCAL-564] Say WHY a co-occurring closure was not applied, so a
+                # kept-live venue is auditable instead of silent. Only log when a
+                # closure marker was actually present but rejected.
+                if reason and reason not in ('empty', 'no closure marker predicated of the venue'):
+                    _snip = (item.get('snippet', '') or '')[:120]
+                    print(f"  [LOCAL-564] closure REJECTED ({reason}) for '{v[:40]}' "
+                          f"— kept live: {_snip}")
     return False, ''
 
 

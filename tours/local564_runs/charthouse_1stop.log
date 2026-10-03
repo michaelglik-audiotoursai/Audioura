@@ -1,0 +1,18 @@
+Detected tour category: RESTAURANT
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Chart House' — kept live: Chart House will permanently close on May 14 as the space undergoes a major rebrand. Following renovations, the restaura
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Chart House' — kept live: After months of rumors circulating locally, we can confirm it's true: the Chart House in Weehawken has officially closed
+  [LOCAL-564] closure REJECTED (wrong place: names New Jersey, stop is in Massachusetts) for 'Chart House' — kept live: The Chart House permanently closed on May 14th as the space prepares for a major transformation. According to NJ Monthly
+  [LOCAL-564] closure REJECTED (wrong place: names New Jersey, stop is in Massachusetts) for 'Chart House' — kept live: CHART HOUSE - CLOSED - Try Our New Menu - 1700 Harbor Blvd, Weehawken, NJ 07086, 3711 Photos, (201) 348-6628, Mon - Clos
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Chart House' — kept live: Chart House is closing their doors for good after 38 years in the business. · The Chart House is closing! · Breaking New
+  [LOCAL-564] closure REJECTED (wrong place: names New Jersey, stop is in Massachusetts) for 'Chart House' — kept live: Chart House, a riverfront staple in Weehawken, New Jersey, has closed as of May 14. A Mastro's Steakhouse is planned for
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Chart House' — kept live: The Lincoln Harbor location closed Friday, according to online listings and local reports. Google now lists Chart House 
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Chart House' — kept live: Chart House will permanently close on May 14 as the space undergoes a major rebrand. Following renovations, the restaura
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Chart House' — kept live: After months of rumors circulating locally, we can confirm it's true: the Chart House in Weehawken has officially closed
+  [LOCAL-564] closure REJECTED (wrong place: names New Jersey, stop is in Massachusetts) for 'Chart House' — kept live: The Chart House permanently closed on May 14th as the space prepares for a major transformation. According to NJ Monthly
+  [LOCAL-564] closure REJECTED (wrong place: names New Jersey, stop is in Massachusetts) for 'Chart House' — kept live: Chart House, a riverfront staple in Weehawken, New Jersey, has closed as of May 14. A Mastro's Steakhouse is planned for
+  [D538] 'Chart House' via serp(32)+openai: hours=Daily 4:00 PM - 6:00 PM | Brunch: Sunday, reservation=reservations are available online or by , price_band=$30 and under
+  [D538] Practicals acquired for 1/1 stop(s)
+  [D544] Practicals from D538 handed to the gate as source (4 line(s), 6 URL(s))
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 1/1 stop(s), spoken to the listener.
+Stop 1: Chart House - 134 words
+Stop 1: Chart House

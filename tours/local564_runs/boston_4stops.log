@@ -1,0 +1,25 @@
+Detected tour category: RESTAURANT
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'Union Oyster House' — kept live: Union Oyster House, a Boston landmark and America's oldest restaurant, is being sold to a Texas family. ... Janet McLaug
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'Union Oyster House' — kept live: Union Oyster House, a Boston landmark and America's oldest restaurant, is being sold to a Texas family. ; Nina Dodge Boo
+  [D538] 'Union Oyster House' via serp(27)+openai: hours=Sun–Thursday 11:00 am - 9:00 pm, Fri & S, reservation=walk-in possible, but it does get crowde, price_band=Chilled Shrimp Cocktail $19.95
+  [LOCAL-564] closure REJECTED (wrong place: names Illinois, stop is in Massachusetts) for 'The Capital Grille' — kept live: The Capital Grille is closing its Skokie, Illinois locatio... 1 ... permanently close 14 Bahama Breeze locations by Apri
+  [LOCAL-564] closure REJECTED (wrong place: names California, stop is in Massachusetts) for 'The Capital Grille' — kept live: THE CAPITAL GRILLE - CLOSED - Try Our New Menu - 700 W 9th St, Unit B, Los Angeles, CA 90015, 663 Photos, (213) 228-4730
+  [LOCAL-564] closure REJECTED (wrong place: names New York, stop is in Massachusetts) for 'The Capital Grille' — kept live: Open seven days a week, The Capital Grille is best known for our expertly prepared steaks, which are dry aged in house f
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'The Capital Grille' — kept live: Very unceremoniously, it seems that The Capital Grille at the Beverly Center has closed over the weekend.
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'The Capital Grille' — kept live: THE CAPITAL GRILLE - Try Our New Menu - 117 W 4th St, Austin, TX 78701, 638 Photos, (512) 322-2005, Mon - 11:00 am - 9:0
+  [LOCAL-564] closure REJECTED (wrong place: names Illinois, stop is in Massachusetts) for 'The Capital Grille' — kept live: Capital Grille closes as Darden cuts 28 more restaurants ... The Capital Grille is closing its Skokie, Illinois locatio.
+  [LOCAL-564] closure REJECTED (wrong place: names New York, stop is in Massachusetts) for 'The Capital Grille' — kept live: Open seven days a week, The Capital Grille is best known for our expertly prepared steaks, which are dry aged in house f
+  [D538] 'The Capital Grille' via serp(30)+openai+gemini: hours=11:30-22:00, reservation=reservations recommended, price_band=main courses 73-93 USD
+  [LOCAL-564] closure REJECTED (wrong place: names District of Columbia, stop is in Massachusetts) for 'Toro' — kept live: TORO TORO - CLOSED - Try Our New Menu - 1300 I Eye St NW, Washington, DC 20005, 1368 Photos, (202) 682-9500, Mon - 12:00
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Toro' — kept live: Toro Mexican Street Food, located on Raymond Road near Whole Foods in West Hartford, has permanently closed.
+  [LOCAL-564] closure REJECTED (closure names no place matching the stop) for 'Toro' — kept live: Less than two years after opening, Del Toro has closed. Restaurants close all the time, but usually it's understandable,
+  [D538] 'Toro' via serp(31)+openai+gemini: hours=Sunday-Thursday: 17:00-22:00, Friday-Sat, reservation=accepted; recommended for weekend evenin, price_band=pintxos and tapas $6-$26, paella $36-$92
+  [D538] 'Neptune Oyster' via serp(31)+openai: hours=Everyday at 11:00 AM Weekdays / Kitchen , reservation=No Reservations. Walk-ins only., price_band=lobster roll market price
+  [D538] Practicals acquired for 4/4 stop(s)
+  [D544] Practicals from D538 handed to the gate as source (16 line(s), 24 URL(s))
+  [LOCAL-36/D544] No claims in the structured fields — expected: this gate reads `Operational Details:` lines, and D538 puts practicals in the narration. Acquired for 4/4 stop(s), spoken to the listener.
+Stop 1: Union Oyster House - 140 words
+Stop 2: The Capital Grille - 160 words
+Stop 3: Toro - 174 words
+Stop 4: Neptune Oyster - 122 words
+Stop 1: Union Oyster House
