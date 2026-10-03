@@ -23,12 +23,31 @@ _log = logging.getLogger(__name__)
 #
 # Note: gpt-3.5-turbo was delisted from OpenAI's active pricing page ~July 2026,
 # but remains available via API at the last published rate.
+#
+# [LOCAL-571] gpt-4o and gpt-4.1 — standard (short-context) rates per 1M tokens.
+# Source: https://platform.openai.com/docs/pricing
+# Read: 2026-10-03
+#   gpt-4o : input $2.50,  cached input $1.25, output $10.00
+#   gpt-4.1: input $2.00,  cached input $0.50, output $8.00
+# gpt-4.1 is ~20% cheaper than gpt-4o on both input (2.00 vs 2.50) and output
+# (8.00 vs 10.00); its cached-input rate is also lower (0.50 vs 1.25). We do not
+# price prompt-cache hits separately anywhere in the pipeline (the accumulator
+# tracks only input/output tokens), so cached_input_per_1m is recorded here for
+# provenance but is NOT consumed by llm_cost() — the two active keys below keep
+# the existing cost math unchanged.
 
 LLM_RATES = {
-    # model-family -> {input_per_1m, output_per_1m}
+    # model-family -> {input_per_1m, output_per_1m}  (cached_input_per_1m is
+    # informational only; see note above — llm_cost() reads input/output only.)
     "gpt-4o": {
         "input_per_1m": 2.50,
         "output_per_1m": 10.00,
+        "cached_input_per_1m": 1.25,
+    },
+    "gpt-4.1": {
+        "input_per_1m": 2.00,
+        "output_per_1m": 8.00,
+        "cached_input_per_1m": 0.50,
     },
     "gpt-4o-mini": {
         "input_per_1m": 0.15,
