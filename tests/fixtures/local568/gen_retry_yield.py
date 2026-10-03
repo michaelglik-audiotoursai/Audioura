@@ -98,6 +98,33 @@ for e in eps:
         if last < best:
             shipped_worse += 1
 
+# ---------- LOCAL-563 noise floor ----------
+# Run-to-run variability of attempt-1 story_count for the SAME tour/stop across
+# the two local563 gemini-baseline runs = the floor below which a story_count
+# change is indistinguishable from re-running the identical request.
+nf_runs = {'local563_run1': {}, 'local563_run2': {}}
+for e in parsed['episodes_all']:
+    if e['tour'] == 'palais_lascaris' and e['source'] in nf_runs:
+        a1 = e['story_count_by_attempt'].get('1')
+        if a1 is not None:
+            nf_runs[e['source']].setdefault(e['stop'], a1)
+nf_diffs = []
+for stop in set(nf_runs['local563_run1']) & set(nf_runs['local563_run2']):
+    nf_diffs.append(abs(nf_runs['local563_run1'][stop] - nf_runs['local563_run2'][stop]))
+within_swings = []
+for e in eps:
+    vals = [v for v in e['story_count_by_attempt'].values() if v is not None]
+    if len(vals) >= 2:
+        within_swings.append(max(vals) - min(vals))
+noise_floor = {
+    'definition': 'mean |run1-run2| attempt-1 story_count for identical requests (local563 gemini-baseline), Palais stops',
+    'mean_run_to_run_attempt1_diff': round(st.mean(nf_diffs), 3) if nf_diffs else None,
+    'max_run_to_run_attempt1_diff': max(nf_diffs) if nf_diffs else None,
+    'n_stops_compared': len(nf_diffs),
+    'mean_within_episode_swing_max_minus_min': round(st.mean(within_swings), 3) if within_swings else None,
+    'max_within_episode_swing': max(within_swings) if within_swings else None,
+}
+
 summary = {
     'n_story_retry_stop_episodes': N,
     'threshold_min_story_sentences': THRESHOLD,
@@ -139,15 +166,13 @@ doc = {
         ],
     },
     'summary': summary,
+    'local563_noise_floor': noise_floor,
     'yield_table_per_stop': rows,
     'marginal_value_per_attempt': marginal,
     'counterfactual_caps_keep_best_so_far': counterfactual,
 }
 
-outdir = os.path.join(os.path.dirname(__file__), 'tests', 'fixtures', 'local568')
-# When run from repo root this writes into the worktree.
-outdir = 'tests/fixtures/local568'
-os.makedirs(outdir, exist_ok=True)
+outdir = os.path.dirname(os.path.abspath(__file__))
 outpath = os.path.join(outdir, 'retry_yield.json')
 with open(outpath, 'w', encoding='utf-8') as fh:
     json.dump(doc, fh, indent=2, ensure_ascii=False)

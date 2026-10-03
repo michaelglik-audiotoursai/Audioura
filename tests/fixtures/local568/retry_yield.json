@@ -44,6 +44,14 @@
     "regression_episodes_a_retry_scored_lower_than_prior": 24,
     "episodes_where_shipped_last_attempt_below_observed_peak": 12
   },
+  "local563_noise_floor": {
+    "definition": "mean |run1-run2| attempt-1 story_count for identical requests (local563 gemini-baseline), Palais stops",
+    "mean_run_to_run_attempt1_diff": 1.5,
+    "max_run_to_run_attempt1_diff": 2,
+    "n_stops_compared": 4,
+    "mean_within_episode_swing_max_minus_min": 1.429,
+    "max_within_episode_swing": 3
+  },
   "yield_table_per_stop": [
     {
       "tour": "palais_lascaris",
