@@ -186,6 +186,97 @@ ALL_CASES = (
 )
 
 
+# ============================================================================
+# [LOCAL-570 r2] A TIME-LIMITED CLOSURE IS TEMPORARY.
+#
+# LEAD's r1 miss was a spec error, not a code error: "closing its doors" is on the
+# PERMANENT list, so
+#
+#     "Neptune Oyster is closing its doors for two weeks for repairs"  -> closed
+#
+# dropped a live venue. The fix: a permanent marker that sits in the same clause
+# as a BOUNDED DURATION ("for two weeks"), a dated reopening window ("until
+# January 5", "through March"), or an explicit RETURN ("reopens in May", "will
+# reopen", French "pour travaux" / "jusqu'au" / "réouverture") must NOT bind — the
+# venue is coming back. A NEGATED return ("will not reopen" / "won't reopen" /
+# "never reopen") is the opposite: it confirms the closure is permanent and must
+# still BIND.
+#
+# Neptune Oyster and Toro are both placed in Boston, MA — real Boston venues, and
+# the subject/place binding is exercised exactly as in r1.
+# ============================================================================
+NEPTUNE = "restaurant tour of Neptune Oyster, Boston, MA"
+TORO = "restaurant tour of Toro, Boston, MA"
+
+R2_CASES = [
+    # (group, label, snippet, title, url, venue, city, expect_closed)
+
+    # KEPT — bounded duration. The r1 miss itself.
+    ("R2-KEEP",
+     "'closing its doors for two weeks' — the r1 miss (bounded duration)",
+     "Neptune Oyster is closing its doors for two weeks for repairs.",
+     "", "", "Neptune Oyster", NEPTUNE, False),
+
+    # KEPT — explicit return ("reopens in May").
+    ("R2-KEEP",
+     "'has shuttered and reopens in May' (return named)",
+     "Neptune Oyster has shuttered and reopens in May.",
+     "", "", "Neptune Oyster", NEPTUNE, False),
+
+    # KEPT — dated reopening window ("until January 5").
+    ("R2-KEEP",
+     "'closing its doors until January 5' (dated window)",
+     "Toro closing its doors until January 5.",
+     "", "", "Toro", TORO, False),
+
+    # CLOSED — negated return. "will not reopen" must still bind.
+    ("R2-BIND",
+     "'shuttered since March, will not reopen' (negated return -> closed)",
+     "Neptune Oyster, shuttered since March, will not reopen.",
+     "", "", "Neptune Oyster", NEPTUNE, True),
+
+    # CLOSED — "after 20 years" is NOT a bounded future duration or a return.
+    ("R2-BIND",
+     "'closing its doors after 20 years' (permanent, no return) -> closed",
+     "Neptune Oyster is closing its doors after 20 years.",
+     "", "", "Neptune Oyster", NEPTUNE, True),
+
+    # --- extra coverage of each new surface, both languages -----------------
+    ("R2-KEEP",
+     "French 'pour travaux' (closed for works) keeps the venue",
+     "Neptune Oyster ferme ses portes pour travaux.",
+     "", "", "Neptune Oyster", NEPTUNE, False),
+
+    ("R2-KEEP",
+     "French 'jusqu'au <date>' keeps the venue",
+     "Neptune Oyster ferme ses portes jusqu'au 5 janvier.",
+     "", "", "Neptune Oyster", NEPTUNE, False),
+
+    ("R2-KEEP",
+     "'through March' (window with an end) keeps the venue",
+     "Neptune Oyster is closing its doors through March for a refit.",
+     "", "", "Neptune Oyster", NEPTUNE, False),
+
+    ("R2-KEEP",
+     "'will reopen' keeps the venue",
+     "Neptune Oyster has shut its doors but will reopen next spring.",
+     "", "", "Neptune Oyster", NEPTUNE, False),
+
+    ("R2-BIND",
+     "negated return \"won't reopen\" still binds -> closed",
+     "Neptune Oyster has shuttered and won't reopen.",
+     "", "", "Neptune Oyster", NEPTUNE, True),
+
+    ("R2-BIND",
+     "negated return 'never reopen' still binds -> closed",
+     "Neptune Oyster is closing its doors and will never reopen.",
+     "", "", "Neptune Oyster", NEPTUNE, True),
+]
+
+ALL_CASES = ALL_CASES + [(g, l, s, t, u, v, c, e)
+                         for (g, l, s, t, u, v, c, e) in R2_CASES]
+
+
 def _run_binds():
     failures = []
     print("  -- _closure_binds: new permanent markers / temporary exclusion --")
