@@ -46,6 +46,21 @@ New r2 cases (RED on 678a0a8, GREEN after):
     "Del Toro has closed" vs venue Toro             -> kept (preceding word joins)
     "Toro Mexican Street Food ... has closed"        -> kept (following word continues)
     "TORO TORO - CLOSED - ... Washington, DC"        -> kept (place contradiction)
+
+[r3] r2 read a capitalised word AFTER the venue as continuing the name, but
+closure headlines are routinely Title Case (Eater, Boston Globe, Patch), so the
+closure verb right after the venue ("Neptune Oyster Has Permanently Closed")
+was misread as part of the name and the whole-name match failed — the shuttered
+venue was kept live again. r3 stops the following-word capitalisation test from
+firing on a closure-marker auxiliary (derived from the markers: has/permanently/
+closed/… plus is/was/will/closes/closing) and, in a Title Case clause, on a
+minor connective. The preceding-word test is untouched, so "Del Toro" still
+rejects a bare "Toro" even in Title Case. New r3 cases (RED on fed8eee, GREEN
+after):
+
+    "Neptune Oyster Has Permanently Closed" (title)      -> closed
+    "Neptune Oyster Has Permanently Closed After 20 ..." -> closed
+    "Del Toro Has Closed In Back Bay" vs venue Toro      -> kept
 """
 import os
 import sys
@@ -121,6 +136,27 @@ CASES = [
      "TORO TORO - CLOSED",
      "https://www.yelp.com/biz/toro-toro-washington",
      "Toro", "restaurant tour of Toro, Boston, MA", False),
+
+    # ---- [r3] Title Case closure headlines (Eater/Globe/Patch) must BIND ----
+    #           The capitalised word after the venue ("Has") is the closure verb,
+    #           not a name continuation; r2 read it as one and kept the venue live.
+    ("Neptune Oyster — Title Case Eater headline (r3)",
+     "Neptune Oyster Has Permanently Closed",
+     "Neptune Oyster Has Permanently Closed",
+     "https://boston.eater.com/x",
+     "Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True),
+
+    ("Neptune Oyster — Title Case headline in snippet, trailing detail (r3)",
+     "Neptune Oyster Has Permanently Closed After 20 Years in the North End",
+     "", "",
+     "Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True),
+
+    # ---- [r3] Title Case negative: 'Del Toro' heads the headline, venue is Toro.
+    #           The preceding capitalised word 'Del' still joins the name, so a
+    #           bare 'Toro' must NOT bind even though the clause is Title Case ----
+    ("Toro vs 'Del Toro Has Closed In Back Bay' — Title Case, preceding word joins (r3)",
+     "", "Del Toro Has Closed In Back Bay", "",
+     "Toro", "restaurant tour of Toro, Boston, MA", False),
 ]
 
 
@@ -180,6 +216,13 @@ def _run_scan():
         ("Toro", "restaurant tour of Toro, Boston, MA", False, [
             {"snippet": "Less than two years after opening, Del Toro has closed.",
              "title": "", "url": "https://example.com/del-toro"},
+        ]),
+        # [r3] Title Case Eater headline must close Neptune Oyster end-to-end.
+        ("Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True, [
+            {"snippet": "Neptune Oyster Has Permanently Closed After 20 Years in "
+                        "the North End",
+             "title": "Neptune Oyster Has Permanently Closed",
+             "url": "https://boston.eater.com/x"},
         ]),
     ]
 
