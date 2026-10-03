@@ -256,3 +256,72 @@ blanket "no place named" drop. Out of r2 scope; raising it rather than shipping 
   `_closure_binds` reworked (whole-name subject match, line-621 removed, title/URL subject branch).
 - `tests/test_local564_closure_binding.py` — Neptune + Toro cases, r2 docstring.
 - `tours/local564_runs/r2_boston_closure_probe.log` — live evidence.
+
+## r3 — Title Case closure headlines must still bind
+
+### Why it bounced
+r2 passed its own 17 cases and both restaurant suites, but `_whole_name_spans` read a capitalised
+word *after* the venue as continuing the name. Closure headlines are routinely Title Case (Eater,
+Boston Globe, Patch), so for venue `Neptune Oyster, Boston, MA` the stop was kept live on its own
+closure notice — a regression against the pre-564 code:
+
+| input | r2 | r3 |
+|---|---|---|
+| title `Neptune Oyster Has Permanently Closed`, url boston.eater.com/… | kept ✗ | **closed** ✓ |
+| snippet `Neptune Oyster Has Permanently Closed After 20 Years in the North End` | kept ✗ | **closed** ✓ |
+
+Measured RED on `fed8eee`: `_closure_binds` returned `False` with reason
+`closure predicated of another business, not the venue` — because `_whole_name_at` found no
+whole-name span for the venue. The venue `Neptune Oyster` is at the head of the clause, but the
+following word `Has` is capitalised, so the r2 following-word test rejected the span and the code
+fell through to the "another business" branch.
+
+### Fix (deterministic, no page-specific keywords)
+Two independent relaxations of the *following-word* capitalisation test in `_whole_name_spans`
+(the *preceding*-word test is untouched, so `Del Toro …` still rejects a bare `Toro`):
+
+1. **Closure-marker auxiliaries never continue a name.** A new frozenset `_CLOSURE_AUX_TOKENS` is
+   derived from the existing `_CLOSED_MARKERS` (`has`, `permanently`, `closed`, `now`, `down`,
+   `doors`, …) plus the grammatical variants that join a venue to a closure predicate but do not
+   appear verbatim in the marker phrases (`is`, `was`, `will`, `closes`, `closing`). A following
+   word in this set is the closure verb, not part of the venue, so it does not disqualify the span.
+   This is what binds `Neptune Oyster Has Permanently Closed`.
+2. **Title Case clause → a following minor connective carries no name signal.** `_is_title_case`
+   flags a clause whose significant words (ignoring minor connectives in `_TITLE_CASE_MINOR`) are
+   mostly capitalised (≥70%). In that register a following *minor* word (`in`, `of`, `at`, …) is a
+   headline convention, not a continuation. A real name continuation (`Toro Mexican`) is a
+   non-minor, non-closure word and is **still rejected**.
+
+The auxiliary set is derived from the markers so the two stay in lock-step, exactly as the brief
+asked ("derive the auxiliaries from the existing closure markers where possible").
+
+### Tests — RED on fed8eee, GREEN after
+Added to `tests/test_local564_closure_binding.py` (every r1/r2 row retained):
+- positive: `Neptune Oyster Has Permanently Closed` (title) → closed
+- positive: `Neptune Oyster Has Permanently Closed After 20 Years in the North End` (snippet) → closed
+- negative: `Del Toro Has Closed In Back Bay` for venue `Toro` → kept (Title Case, but the preceding
+  `Del` still joins the name)
+- plus an end-to-end `closure_scan` scenario for the Eater headline.
+
+The r2 KEPT cases are explicitly preserved and verified: `Del Toro has closed`,
+`Toro Mexican Street Food … has closed`, `Toro Toro has closed.` (venue `Toro`), and
+`Union Oyster House is open daily; nearby Bell in Hand has closed.`
+
+```
+RED  on fed8eee: python3 tests/test_local564_closure_binding.py  -> exit 1
+     FAIL Neptune Oyster — Title Case Eater headline (r3)
+     FAIL Neptune Oyster — Title Case headline in snippet, trailing detail (r3)
+     FAIL closure_scan('Neptune Oyster') -> closed=False expect=True
+
+GREEN after fix:
+     python3 tests/test_local564_closure_binding.py          -> exit 0  ALL TESTS PASSED
+     python3 tests/test_d538_restaurant_practicals.py        -> exit 0  ALL TESTS PASSED
+     python3 tests/test_d539_closure_regression.py           -> exit 0  ALL TESTS PASSED
+```
+
+### Changed files (r3)
+- `restaurant_practicals.py` — `_CLOSURE_AUX_TOKENS`, `_TITLE_CASE_MINOR`, `_is_title_case`; the
+  following-word test in `_whole_name_spans` now exempts closure auxiliaries and (in a Title Case
+  clause) minor connectives.
+- `tests/test_local564_closure_binding.py` — two Title Case positive rows, one Title Case negative,
+  an end-to-end headline scenario, and an r3 docstring note.
