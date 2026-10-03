@@ -33,6 +33,19 @@ RED BEFORE / GREEN AFTER: against the pre-fix closure_scan, Chart House bound
 (city key was the venue's own last word "house") and Buttermilk bound (name and
 marker shared a sentence). `_closure_binds` did not exist. This suite is the
 executable statement of the fix.
+
+[r2] The r1 fix ended `_closure_binds` with a "closure names no place matching
+the stop" rejection that REGRESSED the case that matters most: Neptune Oyster
+"has permanently closed" named no place, so it was kept live and a listener was
+sent to a shuttered restaurant. r2 deletes that rule and fixes the real defect
+it was covering — a substring match (`Del Toro has closed` matched venue `Toro`).
+New r2 cases (RED on 678a0a8, GREEN after):
+
+    Neptune "has permanently closed after 20 years" -> closed (named no place)
+    Neptune Yelp bare "Permanently closed." fragment -> closed (title+slug subject)
+    "Del Toro has closed" vs venue Toro             -> kept (preceding word joins)
+    "Toro Mexican Street Food ... has closed"        -> kept (following word continues)
+    "TORO TORO - CLOSED - ... Washington, DC"        -> kept (place contradiction)
 """
 import os
 import sys
@@ -80,6 +93,34 @@ CASES = [
     ("La Marée Monaco — real 2020 closure",
      "La Marée Monaco. Permanently closed. 1615 votes.",
      "", "", "La Marée", "restaurant tour of La Marée restaurant, Monaco", True),
+
+    # ---- [r2] the regression that mattered most: a shuttered restaurant that
+    #           named no place was being KEPT LIVE by the old line-621 rule ----
+    ("Neptune Oyster — plain closure, names no place (r2 regression fix)",
+     "Neptune Oyster has permanently closed after 20 years.",
+     "", "", "Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True),
+
+    # ---- [r2] bare status fragment: subject comes from the title + city in slug ----
+    ("Neptune Oyster — Yelp listing, bare 'Permanently closed.' fragment",
+     "63 Salem St. Permanently closed.",
+     "Neptune Oyster - Boston - Yelp",
+     "https://www.yelp.com/biz/neptune-oyster-boston",
+     "Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True),
+
+    # ---- [r2] substring matches that must NOT bind: whole-name match ----
+    ("Toro vs 'Del Toro has closed' — preceding capitalised word joins the name",
+     "Less than two years after opening, Del Toro has closed.",
+     "", "", "Toro", "restaurant tour of Toro, Boston, MA", False),
+
+    ("Toro vs 'Toro Mexican Street Food ... has closed' — following word continues the name",
+     "Toro Mexican Street Food, located on Raymond Road in West Hartford, has closed.",
+     "", "", "Toro", "restaurant tour of Toro, Boston, MA", False),
+
+    ("Toro vs 'TORO TORO - CLOSED - Washington, DC' — place contradiction",
+     "TORO TORO - CLOSED - 1300 I Eye St NW, Washington, DC",
+     "TORO TORO - CLOSED",
+     "https://www.yelp.com/biz/toro-toro-washington",
+     "Toro", "restaurant tour of Toro, Boston, MA", False),
 ]
 
 
@@ -123,6 +164,22 @@ def _run_scan():
         ("La Marée", "restaurant tour of La Marée restaurant, Monaco", True, [
             {"snippet": "La Marée Monaco. Permanently closed. 1615 votes.",
              "title": "", "url": "https://restaurantguru.com/la-maree"},
+        ]),
+        # [r2] the shuttered restaurant that was kept live on r1 — must close now.
+        ("Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True, [
+            {"snippet": "Neptune Oyster has permanently closed after 20 years.",
+             "title": "", "url": "https://boston.eater.com/neptune"},
+        ]),
+        # [r2] Yelp bare-fragment listing: subject from title, city in slug.
+        ("Neptune Oyster", "restaurant tour of Neptune Oyster, Boston, MA", True, [
+            {"snippet": "63 Salem St. Permanently closed.",
+             "title": "Neptune Oyster - Boston - Yelp",
+             "url": "https://www.yelp.com/biz/neptune-oyster-boston"},
+        ]),
+        # [r2] substring guard end-to-end: a Del Toro notice must NOT close Toro.
+        ("Toro", "restaurant tour of Toro, Boston, MA", False, [
+            {"snippet": "Less than two years after opening, Del Toro has closed.",
+             "title": "", "url": "https://example.com/del-toro"},
         ]),
     ]
 
