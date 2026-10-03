@@ -5667,6 +5667,37 @@ def r4_scope_cap(exhibition_scope, poi_list_len, total_stops):
 _STUB_TAIL = "A detailed narration could not be generated for this stop."
 
 
+def _l569_story_count(text):
+    """[LOCAL-569] Count story sentences in a draft using the real story gate.
+    Returns 0 for empty / placeholder-bracketed text, or if the gate is
+    unavailable. Never raises — instrumentation and keep-best must not alter
+    generation control flow."""
+    try:
+        if not text or text.startswith('['):
+            return 0
+        from story_gate import extract_story_sentences
+        return len(extract_story_sentences(text))
+    except Exception:
+        return 0
+
+
+def _l569_select_best_story(candidates):
+    """[LOCAL-569] Given a list of story-retry draft candidates, return the one
+    to ship under STORY_RETRY_KEEP_BEST: the draft with the most story
+    sentences, ties broken by the most words.
+
+    Each candidate is a tuple (story_count, word_count, orientation,
+    description, tokens_used, call_cost). Returns None for an empty list.
+
+    This is the keep-best decision in one place so it can be unit-tested with
+    the real trajectory (LOCAL-568's 1 -> 0 -> 2 -> 1), independent of the
+    HTTP/writer plumbing. Today's ship-last behaviour corresponds to returning
+    candidates[-1]; keep-best returns the max by (story_count, word_count)."""
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: (c[0], c[1]))
+
+
 def _is_stub_text(text):
     """[LOCAL-420] Return True if text is the empty-stop stub that must never ship."""
     if not text:
@@ -14236,6 +14267,37 @@ Write the story FIRST, then add physical description if space allows.
         _max_retries = 4
         _best_description = None  # (orientation, description, word_count, tokens_used, call_cost)
         _attempts_for_resolution = []  # [LOCAL-422] Accumulated for resolve_final_description
+
+        # [LOCAL-569] Keep-best / early-stop for the LOCAL-432 story retry.
+        # Both flags default OFF — behaviour is byte-for-byte unchanged unless opted in.
+        #   STORY_RETRY_KEEP_BEST=1  — among the drafts the story retry produced,
+        #       ship the one with the most story sentences (ties → most words),
+        #       instead of whichever happened to be last. A draft is only ever a
+        #       keep-best candidate once it has already passed the placeholder /
+        #       refusal / LOCAL-417 positive gate / word-floor / beat gates, so a
+        #       gate-failing draft can never win over a passing one.
+        #   STORY_RETRY_EARLY_STOP=1 — (requires keep-best) stop the story retry
+        #       once an attempt fails to beat the running-best story_count, with a
+        #       hard cap of 3 story attempts. Only the LOCAL-432 story branch is
+        #       affected; LOCAL-417/393/391/98 retries keep their full budget.
+        _l569_keep_best_on = os.environ.get("STORY_RETRY_KEEP_BEST", "") == "1"
+        _l569_early_stop_on = (os.environ.get("STORY_RETRY_EARLY_STOP", "") == "1"
+                               and _l569_keep_best_on)
+        # (story_count, word_count, orientation, description, tokens_used, call_cost)
+        _l569_best_story = None
+        _l569_story_attempts = 0  # number of story-retry rewrites requested so far
+
+        def _l569_consider(_sc, _wc, _o, _d, _tok, _cost):
+            """Record a gate-passing draft as a keep-best candidate. Best = highest
+            story_count, ties broken by word_count. Non-fatal."""
+            nonlocal _l569_best_story
+            try:
+                _cand = (_sc, _wc, _o, _d, _tok, _cost)
+                if _l569_best_story is None or (_sc, _wc) > (_l569_best_story[0], _l569_best_story[1]):
+                    _l569_best_story = _cand
+            except Exception:
+                pass
+
         for _attempt in range(_max_retries + 1):
             try:
                 description_response = requests.post(
@@ -14290,15 +14352,9 @@ Write the story FIRST, then add physical description if space allows.
                     # Defensive: never let instrumentation raise or alter control flow.
                     try:
                         _l569_words = len(description.split()) if description else 0
-                        _l569_story_count = 0
-                        if description and not description.startswith('['):
-                            try:
-                                from story_gate import extract_story_sentences as _l569_ess
-                                _l569_story_count = len(_l569_ess(description))
-                            except Exception:
-                                _l569_story_count = 0
+                        _l569_story_count_val = _l569_story_count(description)
                         print(f"  [LOCAL-569] Stop {stop_num} attempt {_attempt+1}/{_max_retries+1} "
-                              f"story_count={_l569_story_count} words={_l569_words}")
+                              f"story_count={_l569_story_count_val} words={_l569_words}")
                     except Exception as _l569_err:
                         print(f"  [LOCAL-569] Stop {stop_num} attempt {_attempt+1}/{_max_retries+1} "
                               f"instrumentation error (non-fatal): {_l569_err}")
@@ -14597,6 +14653,31 @@ Write the story FIRST, then add physical description if space allows.
                             _l431_story_sents = extract_story_sentences(description)
                             _l431_story_count = len(_l431_story_sents)
                             if _l431_story_count < 3:
+                                # [LOCAL-569] This draft already passed the placeholder /
+                                # refusal / LOCAL-417 / word-floor / beat gates (those gates
+                                # `continue` earlier and never reach here). It merely lacks
+                                # story sentences, so it is a legitimate keep-best candidate.
+                                if _l569_keep_best_on:
+                                    _l569_consider(
+                                        _l431_story_count, len(description.split()),
+                                        orientation, description, tokens_used, call_cost)
+                                # [LOCAL-569] Early stop (requires keep-best): once a rewrite
+                                # stops helping — this attempt did not beat the running-best
+                                # story_count — or we have already spent the 3-attempt story
+                                # cap, stop retrying the story branch and ship the best so
+                                # far. This changes ONLY the LOCAL-432 story branch.
+                                if _l569_early_stop_on:
+                                    _l569_prev_best_sc = (_l569_best_story[0]
+                                                          if _l569_best_story else -1)
+                                    _l569_no_improvement = _l431_story_count < _l569_prev_best_sc
+                                    _l569_hit_cap = _l569_story_attempts >= 3
+                                    if _l569_no_improvement or _l569_hit_cap:
+                                        print(f"  [LOCAL-569] Stop {stop_num}: EARLY STOP story "
+                                              f"retry — story_count={_l431_story_count}, "
+                                              f"best={_l569_prev_best_sc}, "
+                                              f"story_attempts={_l569_story_attempts} "
+                                              f"({'no improvement' if _l569_no_improvement else 'hit 3-attempt cap'})")
+                                        break  # stop the loop; ship keep-best below
                                 # [LOCAL-432] Build a retry supplement that:
                                 # 1. Names the exact deficit count
                                 # 2. Shows rejected sentences with reasons
@@ -14682,6 +14763,7 @@ Write the story FIRST, then add physical description if space allows.
                                 print(f"  [LOCAL-432] Stop {stop_num}: STORY RETRY — "
                                       f"story_count={_l431_story_count} < 3, need {_l431_needed} more, "
                                       f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                                _l569_story_attempts += 1  # [LOCAL-569] count story rewrites requested
                                 continue  # retry within the _attempt loop
                         except ImportError:
                             pass  # story_gate not available
@@ -14999,10 +15081,34 @@ Write the story FIRST, then add physical description if space allows.
                                 description = _pattern.sub('', description).strip()
                             print(f"  [LOCAL-414] Stop {stop_num}: SCRUBBED banned phrases from output: {_414_banned_found}")
 
+                    # [LOCAL-569] Keep-best ship point. By the time we reach here the
+                    # current attempt has passed every hard gate (placeholder, refusal,
+                    # LOCAL-417, word-floor, beat, metadata) — the gates `continue` well
+                    # before this line. When keep-best is OFF this returns the current
+                    # attempt unchanged (today's ship-last). When ON, we add the current
+                    # attempt to the candidate set and ship the one with the most story
+                    # sentences (ties → most words). The candidate set already holds every
+                    # earlier story-retry draft, so a strong-but-not-last draft wins.
+                    if _l569_keep_best_on:
+                        try:
+                            _l569_cur_sc = _l569_story_count(description)
+                            _l569_consider(_l569_cur_sc, word_count, orientation,
+                                           description, tokens_used, call_cost)
+                            if _l569_best_story is not None:
+                                _bsc, _bwc, _bo, _bd, _bt, _bc = _l569_best_story
+                                if (_bsc, _bwc) > (_l569_cur_sc, word_count):
+                                    print(f"  [LOCAL-569] Stop {stop_num}: KEEP-BEST ship — "
+                                          f"shipping story_count={_bsc} words={_bwc} instead of "
+                                          f"last story_count={_l569_cur_sc} words={word_count}")
+                                    return idx, _bo, _bd, _bwc, _bt, _bc
+                                print(f"  [LOCAL-569] Stop {stop_num}: KEEP-BEST ship — "
+                                      f"last attempt is best (story_count={_l569_cur_sc} "
+                                      f"words={word_count})")
+                        except Exception as _l569_ship_err:
+                            print(f"  [LOCAL-569] Stop {stop_num}: keep-best ship error "
+                                  f"(non-fatal, shipping current): {_l569_ship_err}")
+
                     return idx, orientation, description, word_count, tokens_used, call_cost
-                else:
-                    # [LOCAL-292] Retry transient failures following _PROLOG_MAX_RETRIES pattern (LOCAL-119)
-                    _DESC_TRANSIENT_CODES = {429, 500, 502, 503, 504}
                     if description_response.status_code in _DESC_TRANSIENT_CODES and _attempt < _max_retries:
                         # [2026-09-22] A 429 is not a 500. The old backoff capped at
                         # 8s and gave up after three tries, which is far too quick
@@ -15095,6 +15201,17 @@ Write the story FIRST, then add physical description if space allows.
                 # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
                 _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                 return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
+
+        # [LOCAL-569] Keep-best ship after loop exit. Reached when early-stop broke
+        # out of the retry loop (and, defensively, any other natural loop exit). The
+        # candidate set holds gate-passing story-retry drafts, so prefer the best of
+        # those over the word-count-only LOCAL-394 fallback. Only active when the
+        # keep-best flag is on, so default behaviour is unchanged.
+        if _l569_keep_best_on and _l569_best_story is not None:
+            _bsc, _bwc, _bo, _bd, _bt, _bc = _l569_best_story
+            print(f"  [LOCAL-569] Stop {stop_num}: KEEP-BEST ship (post-loop) — "
+                  f"story_count={_bsc} words={_bwc}")
+            return idx, _bo, _bd, _bwc, _bt, _bc
 
         # [LOCAL-394] Safety fallback — use best description if we have one (never drop a stop)
         if _best_description:
