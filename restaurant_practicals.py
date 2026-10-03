@@ -194,6 +194,19 @@ _CLOSED_MARKERS = (
 )
 
 
+# [LOCAL-564 r3] Tokens that begin or belong to a closure-marker phrase and so can
+# never CONTINUE a venue name when they follow it. Closure headlines are routinely
+# Title Case ("Neptune Oyster Has Permanently Closed"), so the capitalised word
+# right after the venue ("Has") would otherwise be misread as part of the name and
+# the whole-name match would fail. Derived from the existing closure markers so the
+# two stay in lock-step, plus the grammatical auxiliaries that join a venue to a
+# closure predicate (is/was/will/closes/closing) which are forms of the same verbs
+# but do not appear verbatim in the marker phrases.
+_CLOSURE_AUX_TOKENS = frozenset(
+    w for m in _CLOSED_MARKERS for w in m.split()
+) | {'is', 'was', 'will', 'closes', 'closing'}
+
+
 # [D540] A REBRAND IS NOT A CLOSURE, AND THE CHECK ONLY KNEW THE WORD "CLOSED".
 #
 # Michael, 2026-08-28: "Le Vistamar no longer exists under that name ... The space
@@ -522,6 +535,35 @@ def _place_contradicted(text, stop_city, stop_state, stop_country):
 _NAME_ARTICLES = ('the', 'le', 'la', 'les', 'el')
 
 
+# [LOCAL-564 r3] Short connective words that a Title Case headline leaves in
+# lowercase ("Del Toro Has Closed In Back Bay" keeps "in"/"of"/… lower). They do
+# not count against the "most words are capitalised" test below.
+_TITLE_CASE_MINOR = frozenset({
+    'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into',
+    'nor', 'of', 'on', 'or', 'the', 'to', 'with', 'vs',
+})
+
+
+def _is_title_case(text_orig):
+    """True when `text_orig` reads as a Title Case headline: most of its
+    significant words (ignoring minor connectives) start with a capital letter.
+
+    Closure headlines from Eater, the Boston Globe and Patch are Title Case, and
+    in that register the capitalisation of the word AFTER a venue carries no name
+    signal — every word is capitalised. When this holds, `_whole_name_spans`
+    stops reading a capitalised FOLLOWING word as a name continuation (it keeps
+    the preceding-word test, so "Del Toro ..." still rejects a bare "Toro").
+    """
+    words = re.findall(r"[A-Za-z][A-Za-z'’]*", text_orig or '')
+    significant = [w for w in words if w.lower() not in _TITLE_CASE_MINOR]
+    if len(significant) < 2:
+        return False
+    capped = sum(1 for w in significant if w[0].isupper())
+    # "Most" = a clear majority; require at least ~70% so an ordinary sentence
+    # with one or two proper nouns ("Del Toro has closed.") is NOT title case.
+    return capped >= max(2, (len(significant) * 7 + 9) // 10)
+
+
 def _whole_name_spans(text_low, text_orig, venue_low, allow_after=()):
     """Yield (start, end) spans where `venue_low` occurs as the COMPLETE proper
     name in `text_low` — not as a substring of a longer name.
@@ -548,6 +590,11 @@ def _whole_name_spans(text_low, text_orig, venue_low, allow_after=()):
     if not venue_low:
         return
     allow_after = {a.lower() for a in allow_after if a}
+    # [LOCAL-564 r3] In a Title Case headline every word is capitalised, so a
+    # capitalised word AFTER the venue carries no name signal; skip the
+    # following-word capitalisation test for the whole span in that register. The
+    # preceding-word test stays, so "Del Toro Has Closed" still rejects "Toro".
+    title_case = _is_title_case(text_orig)
     vlen = len(venue_low)
     start = 0
     while True:
@@ -607,10 +654,26 @@ def _whole_name_spans(text_low, text_orig, venue_low, allow_after=()):
                 p += 1
             next_word = text_orig[m:p]
             if (next_word and next_word[0].isupper()
-                    and next_word.lower() not in allow_after):
+                    and next_word.lower() not in allow_after
+                    and next_word.lower() not in _CLOSURE_AUX_TOKENS
+                    and not (title_case and next_word.lower() in _TITLE_CASE_MINOR)):
                 # "Toro Mexican", "Toro Toro" — the capitalised successor continues
                 # the name. ("Chart House Boston", "La Marée Monaco" are exempt:
                 # the successor is the stop's own city/region, a locator.) Reject.
+                #
+                # [LOCAL-564 r3] Exemptions that let a Title Case closure headline
+                # (Eater/Globe/Patch) bind without reading its capitalisation as a
+                # name signal:
+                #  * `_CLOSURE_AUX_TOKENS`: a following word that begins/belongs to
+                #    the closure phrase never continues a name — "Neptune Oyster
+                #    Has Permanently Closed" ("Has" is the verb, not the venue).
+                #  * in a `title_case` clause, a following MINOR connective
+                #    (in/of/at/…) is likewise not a continuation; the headline
+                #    capitalises it only by convention ("Neptune Oyster In Boston
+                #    Has Closed"). A real name continuation ("Toro Mexican") is a
+                #    non-minor, non-closure word and is still rejected, and the
+                #    preceding-word test keeps "Del Toro ..." from matching a bare
+                #    "Toro" even in Title Case.
                 continue
 
         yield (at, end)
