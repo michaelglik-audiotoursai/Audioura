@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #017 | 03:00:25.431 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #015 | 03:10:19.970 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: Palais Lascaris, Nice, France
   tour_type: museum
@@ -9,10 +9,10 @@ CALL #017 | 03:00:25.431 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/Palais_B.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #018 | 03:00:25.431 | TOTAL_STOPS_FINALIZED
+CALL #016 | 03:10:19.970 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: Palais Lascaris, Nice, France
   total_stops_final: 3
@@ -29,10 +29,10 @@ Intent analysis failed: 429
 
 Detected tour category: MUSEUM
 Using museum template for Palais Lascaris, Nice, France - museum
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #019 | 03:00:25.548 | GENERATING_PROMPT
+CALL #017 | 03:10:20.079 | GENERATING_PROMPT
 ======================================================================
   location: Palais Lascaris, Nice, France
   user_request: Palais Lascaris, Nice, France
@@ -50,10 +50,10 @@ PHASE 3A: Fetching 3 candidate POI(s) for Palais Lascaris, Nice, France...
   [venue_resolver] Name variants: ['Palais Lascaris']
   [venue_resolver] No Wikidata candidates for 'Palais Lascaris'
   [R4] Museum tour: asking for 6 candidates (2x for D1v2 filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #020 | 03:00:25.548 | PHASE_3A_REQUEST
+CALL #018 | 03:10:20.079 | PHASE_3A_REQUEST
 ======================================================================
   location: Palais Lascaris, Nice, France
   total_stops: 3

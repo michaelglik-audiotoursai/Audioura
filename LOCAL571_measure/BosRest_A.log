@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #009 | 03:00:24.720 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #005 | 03:07:24.961 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: restaurant tour of Boston, MA
   tour_type: restaurant
@@ -9,10 +9,10 @@ CALL #009 | 03:00:24.720 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/BosRest_A.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #010 | 03:00:24.720 | TOTAL_STOPS_FINALIZED
+CALL #006 | 03:07:24.961 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: restaurant tour of Boston, MA
   total_stops_final: 3
@@ -31,10 +31,10 @@ Intent analysis failed: 429
 
 Detected tour category: RESTAURANT
 Using restaurant template for restaurant tour of Boston, MA - restaurant
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #011 | 03:00:24.855 | GENERATING_PROMPT
+CALL #007 | 03:07:25.091 | GENERATING_PROMPT
 ======================================================================
   location: restaurant tour of Boston, MA
   user_request: restaurant tour of Boston, MA
@@ -45,22 +45,287 @@ PHASE 3A: Fetching 3 candidate POI(s) for restaurant tour of Boston, MA...
   [LOCAL-285/329] Restaurant constraint injected for area='restaurant tour of Boston, MA'
   [S17] no scope_constraint (precision='', scope='')
   [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #012 | 03:00:24.855 | PHASE_3A_REQUEST
+CALL #008 | 03:07:25.091 | PHASE_3A_REQUEST
 ======================================================================
   location: restaurant tour of Boston, MA
   total_stops: 3
   poi_type_hint: restaurant stops
 
-X PHASE 3A failed: status 429
-{
-    "error": {
-        "message": "You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
-        "type": "insufficient_quota",
-        "param": null,
-        "code": "credit_balance_exhausted"
-    }
-}
+PHASE 3A API call cost: $0.0006 (744 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
+======================================================================
+CALL #009 | 03:07:30.323 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 3
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for restaurant tour of Boston, MA.
+List exactly 6 specific, real, well-known restaurant stops relevant to: restaurant tour of Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every stop MUST be a named, real, curren
+  prompt_last_300_chars: ists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Union Oyster House", "address": "41 Union St, Boston, MA 02108", "reason": "Established in 1826, it is the oldest continuously operating restaurant in the United States, famous for its clam chowder and lobster dishes."},
+    {"name": "Neptune Oyster", "address": "63 Salem St, Boston, MA 02113", "reason": "Known for its fresh oysters and lobster rolls, this restaurant has been a staple in the North End since it opened in 2004."},
+    {"name": "Legal Sea Foods", "address": "26 Park
+
+  [LOCAL-329] Captured 6 substantive selection reason(s)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Union Oyster House @ 41 Union St, Boston, MA 02108
+   - Neptune Oyster @ 63 Salem St, Boston, MA 02113
+   - Legal Sea Foods @ 26 Park Plaza, Boston, MA 02116
+   - Mamma Maria @ 3 North Square, Boston, MA 02113
+   - The Capital Grille @ 900 Boylston St, Boston, MA 02115
+   - Oleana @ 134 Hampshire St, Cambridge, MA 02139
+
+PHASE 4.5: Validating AI knowledge for restaurant tour of Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='restaurant', no type-verification required)
+   PHASE 3C: REMOVED 'Oleana' -- address '134 Hampshire St, Cambridge, MA 02139' not in 'restaurant tour of Boston, MA'
+   PHASE 3C: 1 out-of-area stop(s) removed; 5 remain
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY (not enough covered candidates to fill 3 stops)
+  [LOCAL-212] Selected: ['Union Oyster House=VENUE_ONLY', 'Legal Sea Foods=VENUE_ONLY', 'The Capital Grille=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Mamma Maria=VENUE_ONLY', 'Neptune Oyster=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Union Oyster House=8.0', 'Legal Sea Foods=6.0', 'The Capital Grille=3.0']
+  [LOCAL-349] Yield scores (dropped):  ['Mamma Maria=2.0', 'Neptune Oyster=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 5/5 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Union Oyster House' — wikipedia_summary: 'Union Oyster House' is dining+city
+    [VERIFIED] 'Legal Sea Foods' — wikipedia_summary: 'Legal Sea Foods' is a restaurant
+    [VERIFIED] 'The Capital Grille' — wikipedia_summary: 'The Capital Grille' is a restaurant
+    [VERIFIED] 'Mamma Maria' — nominatim_osm: 'Mamma Maria' found in boston (North Square, boston) [category=am
+    [VERIFIED] 'Neptune Oyster' — wikipedia_summary: 'Neptune Oyster' is dining+city
+    [HARVEST] 'Neptune Oyster': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 4 already had corpus, 1 verified_no_detail
+    [DINING-HARVEST] 'Union Oyster House': +9 passages from ['http://unionoysterhouse.com/pages/history.html', 'https://en.wikipedia.org/wiki/Locke-Ober', 'https://en.wikipedia.org/wiki/Union_Oyster_House', 'https://fr.wikipedia.org/wiki/Union_Oyster_House', 'https://www.boston.com/food/restaurants/2026/07/03/union-oyster-house-americas-oldest-restaurant/', 'https://www.facebook.com/wcvb5/posts/bostons-iconic-union-oyster-house-is-getting-new-owners/1636754335147315/', 'https://www.instagram.com/popular/union-oyster-house-history/', 'https://www.visitma.com/blog/culinary-corner-executive-chef-americo-rico-difronzo-union-oyster-house-boston-massachusetts/']
+    [DINING-HARVEST] 'Legal Sea Foods': +7 passages from ['https://boston.eater.com/2015/8/20/9181971/legal-sea-foods-chestnut-hill-roger-berkowitz-40-years', 'https://en.wikipedia.org/wiki/Legal_Sea_Foods', 'https://historycambridge.org/articles/legal-seafoods/', 'https://www.facebook.com/NBC10Boston/posts/roger-berkowitz-the-former-longtime-leader-and-owner-of-legal-sea-foods-is-dippi/1354466800047002/', 'https://www.legalseafoods.com/about-us/', 'https://www.legalseafoods.com/our-team/', 'https://www.linkedin.com/company/legal-sea-foods']
+    [DINING-HARVEST] 'The Capital Grille': +3 passages from ['https://en.wikipedia.org/wiki/The_Capital_Grille', 'https://fesmag.com/topics/project-profiles/chain-profile/5028-freshii-chain-profile-september-2010', 'https://www.zippia.com/the-capital-grille-careers-40923/']
+    [DINING-HARVEST] 'Mamma Maria': +4 passages from ['https://getscopeapp.pro/blog/success-story-mamma-maria', 'https://www.facebook.com/mammamarianorthend/posts/our-featured-staff-member-of-the-week-is-julio-he-is-one-of-our-chefs-and-has-wo/328164685555585/', 'https://www.linkedin.com/in/ruben-maciel-77356a36/en', 'https://www.wcvb.com/article/family-is-at-the-heart-of-this-north-end-restaurant-and-a-local-musician-1687471425/44308424']
+    [DINING-HARVEST] 'Neptune Oyster': +7 passages from ['https://en.wikipedia.org/wiki/Encore_Boston_Harbor', 'https://en.wikipedia.org/wiki/Jeff_Nace', 'https://en.wikipedia.org/wiki/Neptune_Oyster', 'https://tinyurbankitchen.com/select-oyster-bar/', 'https://www.instagram.com/p/Cue-n5SMp3T/', 'https://www.neptuneoyster.com/press']
+    [DINING-HARVEST] Summary: 5 harvested, 0 already had corpus, 0 no facts found
+    [INTERPRETIVE] 'Union Oyster House': +2 passages (2 queries)
+    [INTERPRETIVE] 'Legal Sea Foods': +1 passages (2 queries)
+    [INTERPRETIVE] 'The Capital Grille': +1 passages (2 queries)
+    [INTERPRETIVE] 'Neptune Oyster': +3 passages (2 queries)
+    [INTERPRETIVE] Summary: 4 stops enriched, +7 passages, 10 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 3 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
+
+======================================================================
+CALL #010 | 03:08:07.435 | PHASE_3B_REQUEST
+======================================================================
+  location: restaurant tour of Boston, MA
+  stop_count: 3
+
+! PHASE 3B failed (status 429); keeping current order
+  [LOCAL-353] Querying OSM for dining operational details (city: Boston)
+  [LOCAL-353] Union Oyster House: no sourceable facts in OSM — omitted
+  [LOCAL-353] Legal Sea Foods: no sourceable facts in OSM — omitted
+  [LOCAL-353] The Capital Grille: no sourceable facts in OSM — omitted
+  [LOCAL-354] Sourcing price bands from dining guides
+  [LOCAL-354] Union Oyster House: no guide price, no OSM facts — silence
+  [LOCAL-354] Legal Sea Foods: no guide price, no OSM facts — silence
+  [LOCAL-354] The Capital Grille: no guide price, no OSM facts — silence
+
+Coordinates fallback: requesting coords for 3 stop(s) missing them...
+   Coords fallback FAILED 'Union Oyster House' — no map pin for this stop
+   Coords fallback FAILED 'The Capital Grille' — no map pin for this stop
+   Coords fallback FAILED 'Legal Sea Foods' — no map pin for this stop
+
+=== Extracted POI Information ===
+1. Union Oyster House
+   Address: 41 Union St, Boston, MA 02108
+2. Legal Sea Foods
+   Address: 26 Park Plaza, Boston, MA 02116
+3. The Capital Grille
+   Address: 900 Boylston St, Boston, MA 02115
+================================
+
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'Union Oyster House' — kept live: Union Oyster House, a Boston landmark and America's oldest restaurant, is being sold to a Texas family. ; Nina Dodge Boo
+  [D538] 'Union Oyster House' via none: nothing actionable
+  [LOCAL-564] closure REJECTED (wrong place: names Virginia, stop is in Massachusetts) for 'Legal Sea Foods' — kept live: r/VirginiaBeach - Legal Sea Foods in Virginia Beach permanently closes its doors. 115 upvotes · 122 comments. Who says a
+  [D538] 'Legal Sea Foods' via none: nothing actionable
+  [D538] ⚠️  DROPPED 'Legal Sea Foods' — reported permanently closed: CLOSING ALERT: Confirmation that Legal Sea Foods has closed one of its locations. ... Boston restaurant institution. Corporate expansion ... [https://
+  [LOCAL-564] closure REJECTED (wrong place: names Illinois, stop is in Massachusetts) for 'The Capital Grille' — kept live: Capital Grille closes as Darden cuts 28 more restaurants ... The Capital Grille is closing its Skokie, Illinois locatio.
+  [LOCAL-564] closure REJECTED (wrong place: names California, stop is in Massachusetts) for 'The Capital Grille' — kept live: The Capital Grille restaurant in Costa Mesa, CA. Costa Mesa. 3333 Bristol St. Costa Mesa, CA 92626 (714) 432-1140 OPENS 
+  [D538] 'The Capital Grille' via none: nothing actionable
+  [D538] ⚠️  DROPPED 'The Capital Grille' — reported permanently closed: Very unceremoniously, it seems that The Capital Grille at the Beverly Center has closed over the weekend. Tipsters send in details of the ... [https:/
+  [D538] 2 restaurant(s) dropped as closed; 1 remain
+  [D545] Replenish round 1: need 2, proposed 0
+  [D545] ⚠️  Still short: 1/3 after 1 round(s)
+  [D545] +5 story fact(s) for 'Union Oyster House' via openai+web(24) (5 high)
+        [high] Union Oyster House, established in 1826, is America's oldest continuously operating restaurant.
+        [high] John F. Kennedy was a frequent patron of the Union Oyster House, and his favorite booth, now known as 'The Ken
+        [high] The Kennedy family, including presidents and senators, were regular guests at the Union Oyster House.
+  [D538] Practicals acquired for 0/1 stop(s)
+[TIMING] phase=poi_selection elapsed=163.9s cumulative=164.1s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Union Oyster House restaurant of Boston' → 5213 chars
+  [LOCAL-47] Union Oyster House: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 1 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 1}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=1)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+  [Storied] Spine generation failed — descriptions will proceed without spine
+  [LOCAL-183] stop_corpus: 1/1 stops have per-stop passages (20 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Union Oyster House' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 0/1 generated
+  [S25] Story types assigned: ['anecdote']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=1.7s cumulative=165.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=165.8s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=165.8s
+
+Generating description for Stop 1: Union Oyster House by , ...
+  [LOCAL-381] stop='Union Oyster House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=5 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Union Oyster House', 16, ''), ('Union Oyster House', 12, ''), ('Union Oyster House', 9, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 5 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12966 after=26588 (+13622 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26588)
+  [LOCAL-408] Prompt dump written to: /Users/micha/audioura-worktrees/LOCAL-571/prompt_dump_stop1.txt
+  [LOCAL-292] Stop 1: OUT OF API CREDITS — not retrying. Add credits at platform.openai.com/settings/organization/billing
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+  [LOCAL-439] STORY GATE: ALL STOPS PASSED
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Style retry summary: 0 paragraphs retried, 0 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0000 (0 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Union Oyster House': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 0
+    Paragraphs checked: 0
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 0
+    Stops affected: 0
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 0
+    Glossed (composed): 0
+    Suppressed (already explained): 0
+    Degraded (name dropped): 0
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 0 tokens, $0.0000, 0.0s
+    Gloss: 0 tokens, $0.0000, 0.0s
+    Compose: 0 tokens, $0.0000, 0.0s
+    Total added cost: $0.0000
+    Stops affected: 0
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+OK PHASE 5.7: Dangling-reference scrub complete (1 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+  [D534] No cross-stop repetition in the drafts
+  [D534] no repeated sentences left after the retries
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.secretfoodtours.com/boston/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1953 chars from https://www.secretfoodtours.com/boston/
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=4rJI705Nifo (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=TXaBkkAKco4 (attempt 1)
+  [D512] verb discovery: query='restaurant tour of Boston, MA how the dish is prepared cooking t' -> 2 new verb(s): guided, booked
+  [D512] _AGENCY_VERB widened by 2 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+  [LOCAL-485] PHASE 5.21: no scorable stops
+[TIMING] phase=story_first elapsed=5.6s cumulative=171.4s
+
+PHASE 6: Assembling the complete tour...
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 0
+    Words after:  0
+    Delta: 0
+    Stops affected: 0/1
+
+  [LOCAL-270] PHASE 5.96: No prolog — skipping Part 4 composition
+
+  [LOCAL-292] ⚠️  EMPTY STOP REMOVAL GATE: 1 stop(s) removed for failed/empty description
+    REMOVED: 'Union Oyster House' — no narration generated (would ship as empty shell)
+    SUMMARY: requested=1 / generated=0 / failed=1 / delivered=0
+  [LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour

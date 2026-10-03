@@ -290,6 +290,13 @@ def run_cell(arm, rkey, tour_type, location):
     if stops_delivered == 0:
         stops_delivered = len(re.findall(r"Stop\s+\d+\s*:", text or ""))
 
+    # Credit exhaustion / quota 429 anywhere in the run makes the cell INCOMPLETE
+    # (a credit-starved tour still returns text but is degraded) — so it must not
+    # be treated as a finished cell and must be retried when credits return.
+    credit_exhausted = ("credit_balance_exhausted" in log_text
+                        or "no credits remaining" in log_text
+                        or "insufficient_quota" in log_text)
+
     score = {}
     try:
         import tour_quality as tq
@@ -306,7 +313,10 @@ def run_cell(arm, rkey, tour_type, location):
     rec = {
         "cell": cell_id, "arm": arm, "request": rkey, "tour_type": tour_type,
         "location": location, "writer_model": ARMS[arm]["TOUR_STORY_MODEL"],
-        "ok": bool(text) and err is None, "error": err,
+        "ok": (bool(text) and err is None
+               and not credit_exhausted and stops_delivered >= STOPS),
+        "credit_exhausted": credit_exhausted,
+        "error": err,
         "wall_s": round(wall, 1), "chars": len(text or ""),
         "stops_delivered": stops_delivered,
         # writer isolation
@@ -335,6 +345,30 @@ def run_cell(arm, rkey, tour_type, location):
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
     return rec
+
+
+def _openai_credits_ok():
+    """Cheap probe: True if a 1-token completion succeeds, False on 429/quota.
+
+    The account under test has repeatedly exhausted credits mid-run; probing
+    before each cell avoids burning minutes on OSM/gate work for a tour that
+    cannot call the writer. Returns (ok, detail)."""
+    import requests
+    key = os.environ.get("OPENAI_API_KEY", "")
+    if not key:
+        return False, "no OPENAI_API_KEY"
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"model": "gpt-4o", "messages": [{"role": "user", "content": "ping"}],
+                  "max_tokens": 1},
+            timeout=30)
+        if r.status_code == 200:
+            return True, "200"
+        return False, f"{r.status_code} {r.json().get('error', {}).get('code', '')}"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
 
 
 def _openai_spend(summary):
@@ -392,6 +426,15 @@ def main():
                 return
             print(f"\n{'='*72}\n[RUN] {cell_id}: {location} ({tour_type})  "
                   f"writer={ARMS[arm]['TOUR_STORY_MODEL']}\n{'='*72}", flush=True)
+            _ok, _detail = _openai_credits_ok()
+            if not _ok:
+                print(f"[BLOCKED] OpenAI not usable ({_detail}) — skipping {cell_id} "
+                      f"and aborting run; resume when credits are available.", flush=True)
+                summary["blocked"] = {"before": cell_id, "detail": _detail,
+                                      "at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                json.dump(summary, open(SUMMARY, "w"), indent=2, default=str)
+                _finish(summary)
+                return
             rec = run_cell(arm, rkey, tour_type, location)
             summary["cells"][cell_id] = rec
             cumulative += rec.get("breakdown_llm_usd", 0.0) or 0.0

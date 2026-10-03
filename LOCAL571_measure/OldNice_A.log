@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #013 | 03:00:25.042 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #011 | 03:10:16.360 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: walking tour of Old Nice, France
   tour_type: walking
@@ -9,10 +9,10 @@ CALL #013 | 03:00:25.042 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/OldNice_A.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #014 | 03:00:25.042 | TOTAL_STOPS_FINALIZED
+CALL #012 | 03:10:16.360 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: walking tour of Old Nice, France
   total_stops_final: 3
@@ -23,18 +23,42 @@ PHASE 1: Analyzing tour intent with AI...
   [BLOCKER1] Stripped 'tour' from location: 'walking tour of Old Nice, France' → 'walking  of Old Nice, France'
   [LOCAL-46] Stripped transport words: 'walking  of Old Nice, France' → 'of Old Nice, France'
   [Bug2Fix/D536] tour_type='walking' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
-Intent analysis failed: 429
-  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
-⚠️ Intent analysis failed, using fallback detection
-[TIMING] phase=intent elapsed=0.2s cumulative=0.2s
+Intent analysis response: ```json
+{
+    "poi_type": "landmarks",
+    "location": "Old Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Old Nice, France",
+    "named_places": [],
+    "scope_precision": "CITY",
+    "transport_mode": "on_foot",
+    "country_scope": "France"
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=France (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Old Nice, France
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=3.4s cumulative=3.4s
 [LOCAL-474] tour_type='walking' → category='walking' (source=explicit)
 
 Detected tour category: WALKING
 Using walking template for walking tour of Old Nice, France - walking
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #015 | 03:00:25.241 | GENERATING_PROMPT
+CALL #013 | 03:10:19.796 | GENERATING_PROMPT
 ======================================================================
   location: walking tour of Old Nice, France
   user_request: walking tour of Old Nice, France
@@ -42,16 +66,16 @@ CALL #015 | 03:00:25.241 | GENERATING_PROMPT
 
 
 PHASE 3A: Fetching 3 candidate POI(s) for walking tour of Old Nice, France...
-  [S17] no scope_constraint (precision='', scope='')
+  [S17] no scope_constraint (precision='CITY', scope='Old Nice, France')
   [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #016 | 03:00:25.241 | PHASE_3A_REQUEST
+CALL #014 | 03:10:19.796 | PHASE_3A_REQUEST
 ======================================================================
   location: walking tour of Old Nice, France
   total_stops: 3
-  poi_type_hint: walking stops
+  poi_type_hint: landmarks
 
 X PHASE 3A failed: status 429
 {

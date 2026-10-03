@@ -1,7 +1,7 @@
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #026 | 03:00:27.907 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+CALL #023 | 03:10:22.463 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
 ======================================================================
   location: restaurant tour of Boston, MA
   tour_type: restaurant
@@ -9,10 +9,10 @@ CALL #026 | 03:00:27.907 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
   output_file: /Users/micha/audioura-worktrees/LOCAL-571/LOCAL571_measure/BosRest_B.txt
 
   [LOCAL-245] Stop-existence gate mode: LOG_ONLY
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #027 | 03:00:27.907 | TOTAL_STOPS_FINALIZED
+CALL #024 | 03:10:22.463 | TOTAL_STOPS_FINALIZED
 ======================================================================
   location: restaurant tour of Boston, MA
   total_stops_final: 3
@@ -31,10 +31,10 @@ Intent analysis failed: 429
 
 Detected tour category: RESTAURANT
 Using restaurant template for restaurant tour of Boston, MA - restaurant
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #028 | 03:00:28.048 | GENERATING_PROMPT
+CALL #025 | 03:10:22.577 | GENERATING_PROMPT
 ======================================================================
   location: restaurant tour of Boston, MA
   user_request: restaurant tour of Boston, MA
@@ -45,10 +45,10 @@ PHASE 3A: Fetching 3 candidate POI(s) for restaurant tour of Boston, MA...
   [LOCAL-285/329] Restaurant constraint injected for area='restaurant tour of Boston, MA'
   [S17] no scope_constraint (precision='', scope='')
   [LOCAL-290] Asking for 6 candidates (N=3 + margin for gate filtering)
-[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_025548.txt'
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_030310.txt'
 
 ======================================================================
-CALL #029 | 03:00:28.048 | PHASE_3A_REQUEST
+CALL #026 | 03:10:22.577 | PHASE_3A_REQUEST
 ======================================================================
   location: restaurant tour of Boston, MA
   total_stops: 3
