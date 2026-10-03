@@ -1592,9 +1592,23 @@ def story_first_pipeline_batch(
         executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=STORY_FIRST_TOUR_POOL_SIZE
         )
+        # [LOCAL-572] Capture the current context so each stop's worker thread sees
+        # the active tour's dead-host cold set. Worker threads do NOT inherit
+        # context vars automatically, so without this a cold mark made in one
+        # stop's thread would land in the module-level default set instead of this
+        # tour's set — breaking "cold stays cold across stops within a tour".
+        try:
+            import dead_host_breaker
+            _dhb_ctx = dead_host_breaker.copy_tour_context()
+            _submit_single = lambda entry: executor.submit(
+                dead_host_breaker.run_in_tour_context, _dhb_ctx, _run_single, entry
+            )
+        except ImportError:
+            _submit_single = lambda entry: executor.submit(_run_single, entry)
+
         try:
             future_to_name = {
-                executor.submit(_run_single, stop_entry): stop_entry['name']
+                _submit_single(stop_entry): stop_entry['name']
                 for stop_entry in stops
             }
 

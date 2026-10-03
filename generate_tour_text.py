@@ -5895,6 +5895,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     except ImportError:
         pass
 
+    # [LOCAL-572] Start a fresh dead-host cold scope for THIS tour. Michael's rule
+    # marks a host cold "for the remainder of the run" = the remainder of one tour.
+    # The tour-generator container and Cloud Run instances are long-lived, so
+    # without this a single Wikimedia 429 in an earlier tour would disable
+    # Wikipedia + Wikidata for every later tour served by the same process until
+    # restart (museum tours then clean-fail as "unresolvable"). The scope lives in
+    # a contextvars.ContextVar, so two tours generated concurrently in one
+    # container each get their own cold set and never leak into each other. Worker
+    # threads spawned for per-stop / per-resolver parallelism copy this context
+    # (dead_host_breaker.copy_tour_context) so marks made off-thread stay in this
+    # tour's set.
+    try:
+        import dead_host_breaker
+        dead_host_breaker.begin_tour_scope()
+    except ImportError:
+        pass
+
     # [D536] The listener's ask, captured at the top of the function, before any
     # gate, scope check, dedupe or filter can touch it. Every other stop-count
     # variable in this function is downstream of something that can reduce it —

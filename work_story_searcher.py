@@ -383,9 +383,21 @@ def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
           f"budget={budget_seconds}s, pool={pool_size}")
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=pool_size)
+    # [LOCAL-572] Propagate the active tour's dead-host cold set into worker
+    # threads. Within one tour, the first 429/timeout on Wikidata must keep the
+    # host cold for every remaining domain in this batch; worker threads do not
+    # inherit context vars, so capture and run inside the current context.
+    try:
+        import dead_host_breaker
+        _dhb_ctx = dead_host_breaker.copy_tour_context()
+        _submit_p856 = lambda dom: executor.submit(
+            dead_host_breaker.run_in_tour_context, _dhb_ctx, _check_wikidata_p856, dom
+        )
+    except ImportError:
+        _submit_p856 = lambda dom: executor.submit(_check_wikidata_p856, dom)
     try:
         future_to_domain = {
-            executor.submit(_check_wikidata_p856, domain): domain
+            _submit_p856(domain): domain
             for domain in domains
         }
 
