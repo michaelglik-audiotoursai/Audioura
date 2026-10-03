@@ -14281,6 +14281,28 @@ Write the story FIRST, then add physical description if space allows.
                     if orientation:
                         orientation = re.sub(r'^Description:\s*\n?', '', orientation, count=1, flags=re.IGNORECASE).strip()
 
+                    # [LOCAL-569] Per-attempt instrumentation (always on, logging only).
+                    # LOCAL-568 found the LOCAL-432 story retry ships the LAST attempt and
+                    # that the final attempt's story_count was never printed — so whether a
+                    # rewrite helped was unknown, not zero. Log story_count + word_count for
+                    # EVERY attempt that produced parseable prose, including the one that
+                    # ships. This runs before any gate/continue so no attempt is skipped.
+                    # Defensive: never let instrumentation raise or alter control flow.
+                    try:
+                        _l569_words = len(description.split()) if description else 0
+                        _l569_story_count = 0
+                        if description and not description.startswith('['):
+                            try:
+                                from story_gate import extract_story_sentences as _l569_ess
+                                _l569_story_count = len(_l569_ess(description))
+                            except Exception:
+                                _l569_story_count = 0
+                        print(f"  [LOCAL-569] Stop {stop_num} attempt {_attempt+1}/{_max_retries+1} "
+                              f"story_count={_l569_story_count} words={_l569_words}")
+                    except Exception as _l569_err:
+                        print(f"  [LOCAL-569] Stop {stop_num} attempt {_attempt+1}/{_max_retries+1} "
+                              f"instrumentation error (non-fatal): {_l569_err}")
+
                     # [LOCAL-26] [LOCAL-295] Validate: classify description as placeholder/short/normal
                     _leak_class, _leak_detail = _classify_placeholder_leak(description)
                     if _leak_class == "placeholder":
