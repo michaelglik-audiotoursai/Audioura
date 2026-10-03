@@ -7,6 +7,7 @@ Syndication detection is deterministic (character-shingle Jaccard, R3).
 import json, os, re, time, urllib.request, urllib.parse, hashlib
 from typing import Dict, List, Optional, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dead_host_breaker import tour_executor  # LOCAL-572 r2: run workers in tour scope
 
 from work_story_searcher import normalize_work_key, work_stories_put, synthesize_fact_targeted_queries
 
@@ -776,7 +777,7 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
     fetch_log = []
     fetched_pages = []
     
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with tour_executor(max_workers=3) as executor:
         futures = {executor.submit(fetch_page_text, r['url']): r for r in eligible}
         for future in as_completed(futures):
             result_meta = futures[future]
