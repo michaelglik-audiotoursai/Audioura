@@ -191,7 +191,46 @@ _CLOSED_MARKERS = (
     'closed down', 'définitivement fermé', 'fermé définitivement',
     'ferme definitivement', 'closed its doors', 'ceased trading',
     'no longer in business', 'no longer open', 'out of business',
+    # [LOCAL-570] A vocabulary gap that predates 564: "closing for good" and its
+    # kin never bound, so "The Capital Grille Boston Is Closing For Good" kept the
+    # venue live. These are PERMANENT-closure phrasings — each can only mean the
+    # business is ending, so they go through the same 564 subject/place binding as
+    # the markers above. Deliberately NOT here: bare "is closing", "closed", "to
+    # close" — those are ambiguous (early close, closed-on-Monday, closing time)
+    # and are handled by the temporary exclusion below.
+    'closing for good', 'closed for good', 'shutting down for good',
+    'has shut down', 'shut its doors', 'shuttered', 'will close permanently',
+    'is closing permanently', 'closing its doors',
+    'ferme ses portes', 'a fermé ses portes',
 )
+
+
+# [LOCAL-570] TEMPORARY closure phrasings must NEVER bind. A venue that is
+# "temporarily closed", "closed for renovations" or "closed on Mondays" is still
+# in business — sending the listener past it is correct, dropping it is the harm.
+# These are checked against each clause BEFORE a closure marker can bind: a clause
+# carrying any temporary phrasing is skipped. Some are regexes because the surface
+# varies — "renovation" / "renovations", any weekday, the French forms. Matched
+# case-insensitively, as phrases, against the lowercased clause.
+_TEMPORARY_MARKERS = (
+    re.compile(r'temporarily closed'),
+    re.compile(r'closed for renovations?'),
+    re.compile(r'closing early'),
+    re.compile(r'closed on (?:monday|tuesday|wednesday|thursday|friday|'
+               r'saturday|sunday)s?'),
+    re.compile(r'closed for the season'),
+    re.compile(r'closed for a private event'),
+    re.compile(r'fermeture exceptionnelle'),
+    re.compile(r'fermé temporairement'),
+)
+
+
+def _temporarily_closed(clause_low):
+    """True when the clause carries a TEMPORARY-closure phrasing (LOCAL-570).
+
+    A match means the venue is still operating, so the closure markers in the
+    same clause must not bind. Pure, case-insensitive phrase match."""
+    return any(p.search(clause_low) for p in _TEMPORARY_MARKERS)
 
 
 # [LOCAL-564 r3] Tokens that begin or belong to a closure-marker phrase and so can
@@ -766,6 +805,12 @@ def _closure_binds(snippet, title, url, venue, city):
         clause_orig = clauses_orig[idx] if idx < len(clauses_orig) else clause
         marker = next((m for m in _CLOSED_MARKERS if m in clause), None)
         if not marker:
+            continue
+        # [LOCAL-570] A clause that is really a TEMPORARY-closure notice
+        # ("temporarily closed", "closed for renovations", "closed on Mondays",
+        # "fermé temporairement") must never bind, even though it contains a
+        # closure-marker substring. The venue is still in business; skip it.
+        if _temporarily_closed(clause):
             continue
         m_at = clause.find(marker)
         # Whole-name position of the venue in THIS clause (not a substring of a
