@@ -134,6 +134,7 @@ services:
     ports:
       - "5030:5030"
     environment:
+      - TRANSLATION_ENGINE=llm   # D595: guidebook translation (LOCAL-561), Michael approved 2026-10-03; 'aws' to roll back
       - DB_HOST=postgres-2
       - DB_NAME=audiotours
       - DB_USER=admin
