@@ -23,6 +23,28 @@ Public API:
   - extract_host(url) -> str — normalise URL to host
   - WIKIMEDIA_HOSTS — the set of hosts sharing one bucket
 
+LOCAL-572 (2026-10-03, BINDING clarification of Michael's rule):
+  "the remainder of the run" means the remainder of ONE TOUR, not the lifetime
+  of the long-lived container/Cloud-Run process. The module used to keep a single
+  process-level cold set, so one Wikimedia 429 disabled Wikipedia + Wikidata for
+  every later tour served by that process until restart (museum tours then
+  clean-failed as "unresolvable"). The cold set is now scoped to a single
+  top-level tour generation.
+
+  Scoping is done with a contextvars.ContextVar holding the active tour's cold
+  set. generate_tour_text() calls begin_tour_scope() at entry, installing a fresh
+  set for that tour. Concurrency: the container may generate two tours at once;
+  because the active set lives in a ContextVar, two concurrent tours each see
+  their own set and a cold mark in one never leaks into the other. Worker threads
+  spawned inside a tour do NOT inherit context vars automatically, so the
+  per-stop/per-resolver thread pools capture the current context
+  (copy_tour_context()) and run each task inside it, so a cold mark made in a
+  worker thread is visible to the rest of that tour.
+
+  When no tour scope is active (e.g. direct unit-test calls, or a caller that
+  never enters a tour) the API transparently falls back to a module-level default
+  set, so mark/is/get/reset behave exactly as before for those callers.
+
 Content fallback chain (for fetches whose output becomes tour content):
   1. Institution's own site (tier1)
   2. POP/Joconde (tier2, French holdings)
@@ -33,7 +55,10 @@ Content fallback chain (for fetches whose output becomes tour content):
 For lookups whose only output is a tier/identity decision (e.g. _check_wikidata_p856):
   Take the existing failure value immediately (tier3). There is no substitute site.
 """
+import concurrent.futures
+import contextvars
 import threading
+import time
 from typing import FrozenSet, Optional, Set
 from urllib.parse import urlparse
 
@@ -62,9 +87,69 @@ WIKIMEDIA_HOSTS: FrozenSet[str] = frozenset({
 # Canonical name for the Wikimedia group
 _WIKIMEDIA_GROUP = 'wikimedia'
 
-# --- Module-scope state (process-level, persists for the run) ---
-_cold_hosts: Set[str] = set()
-_cold_lock = threading.Lock()
+# --- Cold-set state ---
+# LOCAL-572: the cold set is scoped to one tour. The active set lives in a
+# ContextVar so concurrent tours (and their worker threads, which copy the
+# context) each see their own set. When no tour scope is active, callers fall
+# back to the module-level default set below — this preserves the original
+# process-level behaviour for direct unit-test calls and any caller that never
+# enters a tour scope.
+# The module-level default set is a dict host -> monotonic mark time so that
+# entries can EXPIRE. This is the LOCAL-572 r2 safety net: any pool reachable
+# from a tour that was somehow not converted to tour_executor/tour_thread falls
+# back to this default set, and without expiry a single stray 429 recorded here
+# would again poison the whole long-lived process. Entries older than
+# _DEFAULT_COLD_TTL_SECONDS are treated as expired (purged on next read/write).
+#
+# IMPORTANT: expiry applies ONLY to this module-level default set. Inside a tour
+# scope the cold set is a plain set() and nothing expires — Michael's rule is
+# unchanged: the first 429/timeout keeps a host cold for the REST OF THE TOUR,
+# with no time-based recovery mid-tour.
+_DEFAULT_COLD_TTL_SECONDS: float = 15 * 60  # 15 minutes
+_default_cold_hosts: "dict[str, float]" = {}
+_cold_lock = threading.RLock()
+
+# Holds the active tour's cold set, or None when no tour scope is active.
+_tour_cold_hosts: "contextvars.ContextVar[Optional[Set[str]]]" = contextvars.ContextVar(
+    'dead_host_breaker_tour_cold_hosts', default=None
+)
+
+
+def _now() -> float:
+    """Monotonic clock for TTL math (immune to wall-clock jumps)."""
+    return time.monotonic()
+
+
+def _purge_expired_default_locked() -> None:
+    """Drop expired entries from the module-level default set. Caller holds lock.
+
+    No-op semantics for tour sets: this only ever touches _default_cold_hosts.
+    """
+    if not _default_cold_hosts:
+        return
+    cutoff = _now() - _DEFAULT_COLD_TTL_SECONDS
+    expired = [h for h, t in _default_cold_hosts.items() if t < cutoff]
+    for h in expired:
+        del _default_cold_hosts[h]
+
+
+def _active_cold_set():
+    """Return the cold set in effect for the current context.
+
+    Inside a tour scope (begin_tour_scope / tour_scope), this is that tour's
+    private plain set(). Otherwise it is the module-level default dict (host ->
+    mark time). Returning either type is fine because the public API functions
+    branch on whether a tour scope is active before touching it.
+    """
+    s = _tour_cold_hosts.get()
+    if s is None:
+        return _default_cold_hosts
+    return s
+
+
+def _in_tour_scope() -> bool:
+    """True when a per-tour cold set is installed in the current context."""
+    return _tour_cold_hosts.get() is not None
 
 
 def extract_host(url: str) -> str:
@@ -121,8 +206,17 @@ def mark_host_cold(host_or_url: str, reason: str = '') -> str:
         return ''
 
     with _cold_lock:
-        if host not in _cold_hosts:
-            _cold_hosts.add(host)
+        if _in_tour_scope():
+            # Tour set: plain set, never expires. Michael's rule within a tour.
+            cold = _active_cold_set()
+            is_new = host not in cold
+            cold.add(host)
+        else:
+            # Module-level default set: timestamped dict with 15-min TTL.
+            _purge_expired_default_locked()
+            is_new = host not in _default_cold_hosts
+            _default_cold_hosts[host] = _now()
+        if is_new:
             print(f"  [DEAD-HOST] Marked cold: {host}"
                   f"{f' ({reason})' if reason else ''}")
 
@@ -140,16 +234,202 @@ def is_host_cold(host_or_url: str) -> bool:
         return False
 
     with _cold_lock:
-        return host in _cold_hosts
+        if _in_tour_scope():
+            return host in _active_cold_set()
+        # Default set: expire stale entries first, then check.
+        _purge_expired_default_locked()
+        return host in _default_cold_hosts
 
 
 def get_cold_hosts() -> Set[str]:
     """Return a copy of the current cold-host set (for diagnostics)."""
     with _cold_lock:
-        return set(_cold_hosts)
+        if _in_tour_scope():
+            return set(_active_cold_set())
+        _purge_expired_default_locked()
+        return set(_default_cold_hosts.keys())
 
 
 def reset_cold_hosts() -> None:
-    """Clear all cold hosts. For test teardown ONLY."""
+    """Clear the cold hosts in effect for the current context.
+
+    Inside a tour scope this clears only that tour's set; otherwise it clears
+    the module-level default set. Used by test teardown and begin_tour_scope().
+    """
     with _cold_lock:
-        _cold_hosts.clear()
+        _active_cold_set().clear()
+
+
+# --- LOCAL-572: per-tour scoping ---
+
+def begin_tour_scope() -> "contextvars.Token":
+    """Start a fresh cold-host scope for one top-level tour generation.
+
+    Installs a new, empty cold set in the active context and returns the
+    ContextVar token. Callers at the top-level tour entry (generate_tour_text)
+    call this so a 429 in a previous tour served by the same long-lived process
+    does not disable hosts for this tour. Concurrent tours each get their own
+    set because the set lives in a ContextVar.
+
+    The returned token may be passed to end_tour_scope() for symmetric cleanup,
+    but is optional: when the tour's call stack unwinds the context var simply
+    goes out of scope.
+    """
+    return _tour_cold_hosts.set(set())
+
+
+def end_tour_scope(token: "contextvars.Token") -> None:
+    """Restore the cold-host scope that was active before begin_tour_scope().
+
+    Optional symmetric cleanup for begin_tour_scope(). Safe to skip when the
+    tour runs in its own call stack.
+    """
+    try:
+        _tour_cold_hosts.reset(token)
+    except (ValueError, LookupError):
+        # Token belongs to a different context (e.g. set in another thread);
+        # nothing to restore here.
+        pass
+
+
+class tour_scope:
+    """Context manager form of begin_tour_scope()/end_tour_scope().
+
+    Usage:
+        with tour_scope():
+            ... generate one tour ...
+    """
+
+    def __enter__(self) -> "tour_scope":
+        self._token = begin_tour_scope()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        end_tour_scope(self._token)
+        return False
+
+
+def copy_tour_context() -> Optional[Set[str]]:
+    """Capture the active tour's cold set for propagation to worker threads.
+
+    Worker threads and ThreadPoolExecutor workers do NOT inherit context vars
+    automatically. A thread pool created inside a tour captures the active cold
+    set here and re-binds it in each worker (run_in_tour_context) so that cold
+    marks made in a worker thread land in — and are visible to — the active
+    tour's set rather than the module-level default.
+
+    Returns the active tour's cold set object, or None when no tour scope is
+    active (in which case workers fall back to the module-level default set,
+    preserving the pre-LOCAL-572 behaviour). The returned object is the shared,
+    lock-guarded set itself: binding the same object in every worker is what
+    makes a mark in one worker visible tour-wide.
+    """
+    return _tour_cold_hosts.get()
+
+
+def run_in_tour_context(cold_set: Optional[Set[str]], fn, *args, **kwargs):
+    """Run fn(*args, **kwargs) with the captured tour cold set re-bound.
+
+    Helper for thread-pool submissions:
+        snap = copy_tour_context()
+        executor.submit(run_in_tour_context, snap, worker, arg)
+
+    Each worker thread binds the ContextVar to the SAME shared set object the
+    tour is using, so marks made here are visible to the rest of the tour. When
+    cold_set is None (no tour scope active) the worker leaves the ContextVar at
+    its default and uses the module-level set, exactly as before LOCAL-572.
+
+    Unlike sharing a single contextvars.Context (which cannot be entered by more
+    than one thread at a time), re-binding the ContextVar per worker is safe for
+    an arbitrary number of concurrent workers.
+    """
+    if cold_set is None:
+        return fn(*args, **kwargs)
+    token = _tour_cold_hosts.set(cold_set)
+    try:
+        return fn(*args, **kwargs)
+    finally:
+        _tour_cold_hosts.reset(token)
+
+
+# --- LOCAL-572 r2: one helper used on the entire tour path ---
+#
+# r1 propagated the context by hand at three fan-out points. r2 makes that the
+# default for EVERY pool/thread reachable from generate_tour_text(): any worker
+# that does not copy the context falls back to the process-level default set,
+# which is exactly the leak this task removes. These two helpers capture the
+# active tour's cold set at construction time and re-bind it inside every
+# worker, so a cold mark made off-thread lands in — and is visible to — the
+# current tour's set.
+
+
+class TourExecutor(concurrent.futures.ThreadPoolExecutor):
+    """ThreadPoolExecutor whose submit()/map() run each callable inside the
+    active tour's dead-host cold-set context.
+
+    Drop-in replacement for ThreadPoolExecutor on the tour path:
+
+        with tour_executor(max_workers=5) as ex:
+            futs = [ex.submit(worker, item) for item in items]
+
+    The active tour's cold set is captured ONCE, when the executor is created
+    (which happens on the tour's own thread, inside the tour scope). Every task
+    submitted afterwards — regardless of which thread calls submit() — re-binds
+    that captured set in the worker, so a 429 marked by any worker stays cold
+    for the rest of this tour and never touches the module-level default set.
+
+    When no tour scope is active at construction time (captured context is
+    None), submit()/map() behave exactly like a plain ThreadPoolExecutor and
+    callables fall through to the module-level default set — preserving
+    pre-LOCAL-572 behaviour for callers that never enter a tour.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Capture at construction: the constructor runs on the tour thread.
+        self._dhb_cold_set = copy_tour_context()
+
+    def submit(self, fn, /, *args, **kwargs):
+        return super().submit(
+            run_in_tour_context, self._dhb_cold_set, fn, *args, **kwargs
+        )
+
+    def map(self, fn, *iterables, timeout=None, chunksize=1):
+        def _wrapped(*call_args):
+            return run_in_tour_context(self._dhb_cold_set, fn, *call_args)
+        return super().map(_wrapped, *iterables, timeout=timeout, chunksize=chunksize)
+
+
+def tour_executor(max_workers=None, **kwargs) -> "TourExecutor":
+    """Create a TourExecutor (see class docstring).
+
+    Preferred over `ThreadPoolExecutor(...)` for any pool reachable from
+    `generate_tour_text()`. Accepts the same keyword arguments as
+    ThreadPoolExecutor (max_workers, thread_name_prefix, …).
+    """
+    return TourExecutor(max_workers=max_workers, **kwargs)
+
+
+def tour_thread(target=None, args=(), kwargs=None, **thread_kwargs) -> "threading.Thread":
+    """threading.Thread whose target runs inside the active tour's cold-set
+    context.
+
+    Drop-in replacement for `threading.Thread(target=..., args=..., ...)` on the
+    tour path. The active tour's cold set is captured now (on the calling
+    thread, inside the tour scope) and re-bound inside the new thread, so a cold
+    mark made by the thread lands in this tour's set.
+
+    When no tour scope is active, the target runs with the module-level default
+    set, exactly like a plain threading.Thread.
+    """
+    cold_set = copy_tour_context()
+    kwargs = kwargs or {}
+
+    if target is None:
+        # No target: nothing to wrap; behave like a bare Thread.
+        return threading.Thread(args=args, kwargs=kwargs, **thread_kwargs)
+
+    def _run():
+        return run_in_tour_context(cold_set, target, *args, **kwargs)
+
+    return threading.Thread(target=_run, **thread_kwargs)

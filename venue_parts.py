@@ -667,6 +667,7 @@ def venue_story_chain(venue_name, location, ask_grounded, links=None, workers=5,
     `strip_cross_stop_repeats` remove anything that still repeats across stops.
     """
     from concurrent.futures import ThreadPoolExecutor
+    from dead_host_breaker import tour_executor  # LOCAL-572 r2: run workers in tour scope
     where = f' in {location}' if location else ''
     pairs = list(links or STORY_CHAIN)
 
@@ -706,7 +707,7 @@ def venue_story_chain(venue_name, location, ask_grounded, links=None, workers=5,
             return key, {"text": "", "sources": [], "error": str(e)}
 
     out = {}
-    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(pairs)))) as pool:
+    with tour_executor(max_workers=max(1, min(workers, len(pairs)))) as pool:
         for key, payload in pool.map(_one, pairs):
             out[key] = payload
     return {k: out[k] for k, _ in pairs if k in out}   # stable order

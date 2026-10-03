@@ -167,6 +167,7 @@ def generate_fact_sheets_parallel(
         List of fact_sheet dicts (or None for failed POIs), in original order.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    from dead_host_breaker import tour_executor  # LOCAL-572 r2: run workers in tour scope
     from rag_retriever import fetch_poi_rag_context
 
     if per_work_contexts is None:
@@ -232,7 +233,7 @@ def generate_fact_sheets_parallel(
 
     # Submit all in parallel
     results = [None] * len(poi_list)
-    with ThreadPoolExecutor(max_workers=min(max_workers, len(poi_list))) as executor:
+    with tour_executor(max_workers=min(max_workers, len(poi_list))) as executor:
         futures = {
             executor.submit(_process_one, (i, poi)): i
             for i, poi in enumerate(poi_list)

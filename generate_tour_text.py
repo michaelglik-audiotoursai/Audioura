@@ -224,6 +224,11 @@ if not _import_logger.handlers:
     _import_logger.addHandler(_h)
     _import_logger.setLevel(logging.DEBUG)
 from concurrent.futures import ThreadPoolExecutor, as_completed
+# [LOCAL-572 r2] Every pool on the tour path must run its workers inside the
+# active tour's dead-host cold set, so a 429 marked by a worker stays cold for
+# this tour only and never poisons later tours in the long-lived process.
+# tour_executor is a ThreadPoolExecutor whose submit()/map() do exactly that.
+from dead_host_breaker import tour_executor
 # [2026-09-23] MODULE level, deliberately. LOCAL-3498 imported this inside
 # generate_tour_text(), which left `_sfp` undefined for the LOCAL-472 and LOCAL-479
 # wiring tests -- they exec a block of this file's source in isolation to prove the
@@ -1602,7 +1607,7 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
 
     survivors = []
     if candidates:
-        with ThreadPoolExecutor(max_workers=min(len(candidates), 5)) as ex:
+        with tour_executor(max_workers=min(len(candidates), 5)) as ex:
             futures = {ex.submit(_check_one, p): p for p in candidates}
             results = [f.result() for f in as_completed(futures)]
         results.sort(key=lambda x: candidates.index(x[0]))
@@ -2966,7 +2971,7 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     # Run OpenAI checks only on suspect stops (parallel)
     checked_survivors = []
     if suspect:
-        with ThreadPoolExecutor(max_workers=min(len(suspect), 5)) as executor:
+        with tour_executor(max_workers=min(len(suspect), 5)) as executor:
             futures = {executor.submit(_check_one, poi): poi for poi in suspect}
             results = [future.result() for future in as_completed(futures)]
         results.sort(key=lambda x: suspect.index(x[0]))
@@ -6058,6 +6063,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     except ImportError:
         pass
 
+    # [LOCAL-572] Start a fresh dead-host cold scope for THIS tour. Michael's rule
+    # marks a host cold "for the remainder of the run" = the remainder of one tour.
+    # The tour-generator container and Cloud Run instances are long-lived, so
+    # without this a single Wikimedia 429 in an earlier tour would disable
+    # Wikipedia + Wikidata for every later tour served by the same process until
+    # restart (museum tours then clean-fail as "unresolvable"). The scope lives in
+    # a contextvars.ContextVar, so two tours generated concurrently in one
+    # container each get their own cold set and never leak into each other. Worker
+    # threads spawned for per-stop / per-resolver parallelism copy this context
+    # (dead_host_breaker.copy_tour_context) so marks made off-thread stay in this
+    # tour's set.
+    try:
+        import dead_host_breaker
+        dead_host_breaker.begin_tour_scope()
+    except ImportError:
+        pass
+
     # [D536] The listener's ask, captured at the top of the function, before any
     # gate, scope check, dedupe or filter can touch it. Every other stop-count
     # variable in this function is downstream of something that can reduce it —
@@ -6533,7 +6555,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             return poi, verify_poi_matches_type(poi["name"], poi_type_val, api_key)
 
         results = []
-        with ThreadPoolExecutor(max_workers=min(len(stops), 5)) as executor:
+        with tour_executor(max_workers=min(len(stops), 5)) as executor:
             futures = {executor.submit(_verify_one, poi): poi for poi in stops}
             for future in as_completed(futures):
                 results.append(future.result())
@@ -10156,7 +10178,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         missing_coords = [p for p in poi_list if not p.get('coordinates')]
         if missing_coords:
             print(f"\nCoordinates fallback: requesting coords for {len(missing_coords)} stop(s) missing them...")
-            with ThreadPoolExecutor(max_workers=min(len(missing_coords), 5)) as executor:
+            with tour_executor(max_workers=min(len(missing_coords), 5)) as executor:
                 futures = {executor.submit(_fetch_coords, p): p for p in missing_coords}
                 for future in as_completed(futures):
                     poi, coords, tokens_used = future.result()
@@ -10181,7 +10203,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     p['coordinates'] = ''
                 missing_coords2 = [p for p in poi_list if not p.get('coordinates')]
                 if missing_coords2:
-                    with ThreadPoolExecutor(max_workers=min(len(missing_coords2), 5)) as executor:
+                    with tour_executor(max_workers=min(len(missing_coords2), 5)) as executor:
                         futures2 = {executor.submit(_fetch_coords, p): p for p in missing_coords2}
                         for future in as_completed(futures2):
                             poi, coords, tokens_used = future.result()
@@ -10293,7 +10315,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     missing_geo = [p for p in poi_list if not p.get('coordinates')]
                     if missing_geo:
                         print(f"   GEO-CHECK: fetching coords for {len(missing_geo)} replacement stop(s)...")
-                        with ThreadPoolExecutor(max_workers=min(len(missing_geo), 5)) as executor:
+                        with tour_executor(max_workers=min(len(missing_geo), 5)) as executor:
                             futures_geo = {executor.submit(_fetch_coords, p): p for p in missing_geo}
                             for future in as_completed(futures_geo):
                                 poi_r, coords_r, tok_r = future.result()
@@ -10793,7 +10815,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     if _gp_coord_fn:
                         print(f"  [D558] Fetching coordinates for {len(_gp_nocoord)} "
                               f"replenished stop(s) so the route can place them...")
-                        with ThreadPoolExecutor(max_workers=min(len(_gp_nocoord), 5)) as _gp_ex:
+                        with tour_executor(max_workers=min(len(_gp_nocoord), 5)) as _gp_ex:
                             _gp_futs = {_gp_ex.submit(_gp_coord_fn, _p): _p for _p in _gp_nocoord}
                             for _fut in as_completed(_gp_futs):
                                 _pr, _cr, _tok = _fut.result()
@@ -10921,7 +10943,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                     except NameError:
                                         _cc_coord_fn = None
                                     if _cc_new and _cc_coord_fn:
-                                        with ThreadPoolExecutor(max_workers=min(len(_cc_new), 5)) as _cc_ex:
+                                        with tour_executor(max_workers=min(len(_cc_new), 5)) as _cc_ex:
                                             _cc_futs = {_cc_ex.submit(_cc_coord_fn, _p): _p for _p in _cc_new}
                                             for _cf in as_completed(_cc_futs):
                                                 _cp, _ccoord, _ctok = _cf.result()
@@ -15253,7 +15275,7 @@ Write the story FIRST, then add physical description if space allows.
     max_workers = min(len(poi_list), 5)
     _phase5_ceiling_breached = False  # [LOCAL-326] Track mid-Phase5 breach
     _sfp.sub_start('description_generation')
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with tour_executor(max_workers=max_workers) as executor:
         # [S9/S10/S11] Pass spine_stop and fact_sheet per stop (None when not in Storied mode)
         _spine_arc = _storied_spine.get("arc", []) if _storied_mode and _storied_spine else []
         _fact_sheets_list = _storied_fact_sheets if _storied_mode and _storied_fact_sheets else []
@@ -17394,7 +17416,7 @@ REWRITE RULES (all mandatory):
             print(f"\n  [LOCAL-526] PHASE 5.17: regenerating {len(_retry_work)} "
                   f"eligible stop(s) concurrently (max_workers={_retry_max_workers})")
             _retry_gen_t0 = time.time()
-            with ThreadPoolExecutor(max_workers=_retry_max_workers) as _retry_ex:
+            with tour_executor(max_workers=_retry_max_workers) as _retry_ex:
                 _retry_futures = {
                     _retry_ex.submit(_generate_description, _w['args']): _w['ri']
                     for _w in _retry_work
