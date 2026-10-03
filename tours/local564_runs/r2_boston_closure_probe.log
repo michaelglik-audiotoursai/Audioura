@@ -1,0 +1,15 @@
+=== LOCAL-564 r2 live closure probe (Serper only, no OpenAI narration) ===
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'Union Oyster House' — kept live: Union Oyster House, a Boston landmark and America's oldest restaurant, is being sold to a Texas family. ; Nina Dodge Boo
+  [LOCAL-564] closure REJECTED (wrong place: names Texas, stop is in Massachusetts) for 'Union Oyster House' — kept live: Union Oyster House, a Boston landmark and America's oldest restaurant, is being sold to a Texas family. ; Nina Dodge Boo
+RESULT Union Oyster House: closed=False
+  [LOCAL-564] closure REJECTED (wrong place: names Illinois, stop is in Massachusetts) for 'The Capital Grille' — kept live: The Capital Grille is closing its Skokie, Illinois locatio... 1 ... permanently close 14 Bahama Breeze locations by Apri
+  [LOCAL-564] closure REJECTED (wrong place: names Kansas, stop is in Massachusetts) for 'The Capital Grille' — kept live: Masterfully prepared dry-aged steaks, fresh seafood, and world-class wines await at The Capital Grille in Kansas City. E
+RESULT The Capital Grille: closed=True  evidence=Very unceremoniously, it seems that The Capital Grille at the Beverly Center has closed over the weekend. Tipsters send in details of the ... [https://la.eater.
+  [LOCAL-564] closure REJECTED (closure predicated of another business, not the venue) for 'Toro' — kept live: ... Toro, Coppa, and Little Donkey. Travelers, game-goers, BU professors ... iHop restaurants at two locations in Boston
+  [LOCAL-564] closure REJECTED (venue is not the subject of the closure notice) for 'Toro' — kept live: A collaboration between noteworthy Boston chefs Ken Oringer and Jamie Bissonnette, Toro ... Permanently Closed. North En
+  [LOCAL-564] closure REJECTED (closure predicated of another business, not the venue) for 'Toro' — kept live: We went to Toro for our anniversary, and it was very nice. Good ... they're permanently closed ☹️. [deleted]. •. 10mo ag
+  [LOCAL-564] closure REJECTED (wrong place: names New York, stop is in Massachusetts) for 'Toro' — kept live: This spot is Permanently Closed. Chris Stang. Written by. Chris Stang ... If you've ever been to the Toro in Boston, you
+RESULT Toro: closed=False
+RESULT Neptune Oyster: closed=False
+  [LOCAL-564] closure REJECTED (closure predicated of another business, not the venue) for 'Chart House' — kept live: We loved it so much we were always looking to find other Chart House restaurants when we traveled. ... Boston Cream Pie,
+RESULT Chart House: closed=True  evidence=Chart House, a longtime Scottsdale staple since 1984, has permanently closed. The new restaurant is expected to open in Fall 2026. [https://whatnow.com/phoenix/

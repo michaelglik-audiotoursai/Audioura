@@ -159,3 +159,100 @@ environmental, none on this change's surface:
 ## Must-not — honoured
 No GCloud deploy. No edits to DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md,
 .continuous_dev/STATUS.md. Nothing deleted from audio_tours.
+
+---
+
+## r2 — whole-name match replaces the "no place named" rejection
+
+### Why r1 bounced
+r1 ended `_closure_binds` with `return False, 'closure names no place matching the stop'`
+(restaurant_practicals.py:621). That rule **regressed the case that matters most**: a shuttered
+restaurant whose closure notice named no place was *kept live*, sending a listener to a closed
+door.
+
+| stop | snippet | r1 | r2 |
+|---|---|---|---|
+| `Neptune Oyster, Boston, MA` | `Neptune Oyster has permanently closed after 20 years.` | kept live ✗ | **closed ✓** |
+| same | title `Neptune Oyster - Boston - Yelp`, url `yelp.com/biz/neptune-oyster-boston`, snippet `63 Salem St. Permanently closed.` | kept ✗ | **closed ✓** |
+
+In the Boston live log, line 621 was actually covering a **substring** match: `Del Toro has closed`
+and `Toro Mexican Street Food … West Hartford` both matched the venue `Toro`. r2 fixes the
+substring match itself and removes 621.
+
+### What changed (restaurant_practicals.py)
+1. **Whole-name match** — `_whole_name_spans` / `_whole_name_at`. The venue matches only as the
+   complete proper name: the token directly before must not be a capitalised word joined to it
+   (`Del Toro`, `El Toro`), and the token directly after must not continue it (`Toro Mexican Street
+   Food`, `Toro Toro`). Leading articles (`the/le/la/les/el`) stay allowed. The stop's own
+   city/state/country words are exempt as *locators*, so `Chart House Boston` and `La Marée Monaco`
+   still match. Deterministic, no keyword list.
+2. **Line-621 deleted.** No place contradiction + a subject match now binds. The place gate is the
+   Chart House / Weehawken state-contradiction only.
+3. **Title/URL as subject for a bare status fragment** — `_title_starts_with_venue` + a new branch:
+   when the marker clause is a bare fragment (`Permanently closed.`) and the snippet names no
+   subject, bind when the **title starts with the venue** (whole-name) AND the title or URL slug
+   names the stop's city, with nothing contradicting the place. Binds the Yelp case.
+
+### Tests — `tests/test_local564_closure_binding.py`
+Added, over the existing cases:
+- Neptune `has permanently closed after 20 years` → closed (Boston, MA)
+- Neptune Yelp listing (bare fragment + title/slug subject) → closed
+- `Del Toro has closed` vs venue `Toro` → kept (preceding capitalised word joins the name)
+- `Toro Mexican Street Food … West Hartford, has closed` vs `Toro` → kept (following word continues)
+- `TORO TORO - CLOSED - … Washington, DC` vs `Toro` → kept (place contradiction)
+
+**RED on r1 (678a0a8)** for the two Neptune cases, run against `git show 678a0a8:restaurant_practicals.py`:
+```
+RED (regression): Neptune plain (expect closed) -> binds=False expect=True | closure names no place matching the stop
+RED (regression): Neptune Yelp  (expect closed) -> binds=False expect=True | no closure marker predicated of the venue
+```
+**GREEN after** — `python3 tests/test_local564_closure_binding.py` → `ALL TESTS PASSED` (exit 0),
+all 11 `_closure_binds` cases + 6 stubbed-SERP `closure_scan` scenarios (incl. Neptune plain,
+Neptune Yelp, and `Del Toro`→Toro kept).
+
+### Regression suites (step 5) — both exit 0
+```
+python3 tests/test_d538_restaurant_practicals.py   → ALL TESTS PASSED   (D538_EXIT=0)
+python3 tests/test_d539_closure_regression.py      → ALL TESTS PASSED   (D539_EXIT=0)
+```
+D539 still closes `La Marée Monaco. Permanently closed.`; D538 still keeps the open Cipriani Monte
+Carlo whose snippet carried a co-occurring "Permanently closed" about another business.
+
+### Live check (step 6) — Serper only, no OpenAI narration (well under the $1 cap)
+`closure_scan` on the Boston 4 stops (`GENERATION_TIER=plus`, `SERP_API_KEY` set,
+`SERPER`/OpenAI narration not invoked). Log: `tours/local564_runs/r2_boston_closure_probe.log`.
+The two substring cases from the brief appear in live form and are correctly rejected:
+```
+[LOCAL-564] closure REJECTED (venue is not the subject of the closure notice) for 'Toro' — kept live: … Toro ... Permanently Closed. North End …
+[LOCAL-564] closure REJECTED (closure predicated of another business, not the venue) for 'Toro' — kept live: … they're permanently closed ☹️ …
+RESULT Union Oyster House: closed=False
+RESULT The Capital Grille: closed=False
+RESULT Toro: closed=False
+RESULT Neptune Oyster: closed=False
+```
+(Neptune is open in reality — live SERP returns no closure for it; the Neptune "permanently closed"
+snippets in the suite are the regression fixtures from the brief.)
+
+### Finding for LEAD — a consequence of deleting line 621 (not in the r2 test matrix)
+Deleting 621 means **any whole-name subject closure that names only a *town* (no US state / no
+country token) now binds**, including a *different-city branch of a chain*. The place gate is
+state/country contradiction only, and these snippets carry no state token, so nothing contradicts:
+
+```
+RESULT The Capital Grille: closed=True  evidence=The Capital Grille at the Beverly Center has closed …   (Beverly Center = Los Angeles; no state token)
+RESULT Chart House:        closed=True  evidence=Chart House, a longtime Scottsdale staple since 1984, has permanently closed …   (Scottsdale = Arizona; no state token)
+```
+Serper ordering is non-deterministic, so a given live run may or may not surface such a snippet
+first — i.e. the brief-as-specified can still drop a live Boston chain restaurant, the exact failure
+class LOCAL-564 exists to prevent. The two *headline defect* snippets are still safely rejected
+(the Weehawken **New Jersey** snippet by state contradiction; verified). I implemented 621's
+deletion exactly as instructed and did **not** reintroduce it (that would re-break Neptune). Flagging
+for a decision: the durable fix is a town→region signal so a town that is not the stop's — paired
+with the stop's city being absent — contradicts the place, without a keyword list and without the
+blanket "no place named" drop. Out of r2 scope; raising it rather than shipping it silently.
+
+### Changed files (r2)
+- `restaurant_practicals.py` — `_whole_name_spans`, `_whole_name_at`, `_title_starts_with_venue`;
+  `_closure_binds` reworked (whole-name subject match, line-621 removed, title/URL subject branch).
+- `tests/test_local564_closure_binding.py` — Neptune + Toro cases, r2 docstring.
+- `tours/local564_runs/r2_boston_closure_probe.log` — live evidence.
