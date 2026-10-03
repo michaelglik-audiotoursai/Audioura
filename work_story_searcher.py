@@ -382,19 +382,14 @@ def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
     print(f"  [LOCAL-441] Batch P856 check: {len(domains)} domains, "
           f"budget={budget_seconds}s, pool={pool_size}")
 
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=pool_size)
-    # [LOCAL-572] Propagate the active tour's dead-host cold set into worker
-    # threads. Within one tour, the first 429/timeout on Wikidata must keep the
-    # host cold for every remaining domain in this batch; worker threads do not
-    # inherit context vars, so capture and run inside the current context.
-    try:
-        import dead_host_breaker
-        _dhb_ctx = dead_host_breaker.copy_tour_context()
-        _submit_p856 = lambda dom: executor.submit(
-            dead_host_breaker.run_in_tour_context, _dhb_ctx, _check_wikidata_p856, dom
-        )
-    except ImportError:
-        _submit_p856 = lambda dom: executor.submit(_check_wikidata_p856, dom)
+    # [LOCAL-572 r2] tour_executor runs every P856 worker inside the active
+    # tour's dead-host cold set. Within one tour, the first 429/timeout on
+    # Wikidata keeps the host cold for every remaining domain in this batch; and
+    # the mark never leaks to the module-level default set. Worker threads do NOT
+    # inherit context vars automatically — tour_executor captures/re-binds them.
+    import dead_host_breaker
+    executor = dead_host_breaker.tour_executor(max_workers=pool_size)
+    _submit_p856 = lambda dom: executor.submit(_check_wikidata_p856, dom)
     try:
         future_to_domain = {
             _submit_p856(domain): domain

@@ -393,7 +393,8 @@ def seek_stories_for_stop(stop_data: Dict, anchor_facts: Dict,
     queries_issued = 0
 
     # Execute queries concurrently within budget
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=STORY_SEEKING_POOL_SIZE)
+    import dead_host_breaker  # LOCAL-572 r2: workers run in the tour's cold-set scope
+    executor = dead_host_breaker.tour_executor(max_workers=STORY_SEEKING_POOL_SIZE)
     try:
         future_to_query = {
             executor.submit(_serp_search, q): q for q in queries
@@ -627,7 +628,8 @@ def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict
     results = []
 
     # Concurrent fetch (LOCAL-441 pattern: thread pool + wall-budget)
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=FULLPAGE_FETCH_POOL_SIZE)
+    import dead_host_breaker  # LOCAL-572 r2: workers run in the tour's cold-set scope
+    executor = dead_host_breaker.tour_executor(max_workers=FULLPAGE_FETCH_POOL_SIZE)
     try:
         future_to_url = {
             executor.submit(_fetch_single_page, url): url for url in urls
@@ -956,7 +958,8 @@ def evaluate_candidates_concurrent(candidates: List[str], snippets: List[Dict],
 
     # Phase 1: Concurrent classification
     classifications = [None] * len(candidates)
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=CLASSIFY_POOL_SIZE)
+    import dead_host_breaker  # LOCAL-572 r2: workers run in the tour's cold-set scope
+    executor = dead_host_breaker.tour_executor(max_workers=CLASSIFY_POOL_SIZE)
     try:
         future_to_idx = {
             executor.submit(_classify_single_candidate, text, i): i
@@ -1588,23 +1591,17 @@ def story_first_pipeline_batch(
             name, result = _run_single(stop_entry)
             results[name] = result
     else:
-        # Parallel: thread pool with tour-level budget as the controlling limit
-        executor = concurrent.futures.ThreadPoolExecutor(
+        # Parallel: thread pool with tour-level budget as the controlling limit.
+        # [LOCAL-572 r2] tour_executor runs every stop worker inside the active
+        # tour's dead-host cold set, so a cold mark made in one stop's thread is
+        # visible to the rest of this tour (and never leaks to the module-level
+        # default set). Worker threads do NOT inherit context vars automatically;
+        # tour_executor captures and re-binds the tour's set for us.
+        import dead_host_breaker
+        executor = dead_host_breaker.tour_executor(
             max_workers=STORY_FIRST_TOUR_POOL_SIZE
         )
-        # [LOCAL-572] Capture the current context so each stop's worker thread sees
-        # the active tour's dead-host cold set. Worker threads do NOT inherit
-        # context vars automatically, so without this a cold mark made in one
-        # stop's thread would land in the module-level default set instead of this
-        # tour's set — breaking "cold stays cold across stops within a tour".
-        try:
-            import dead_host_breaker
-            _dhb_ctx = dead_host_breaker.copy_tour_context()
-            _submit_single = lambda entry: executor.submit(
-                dead_host_breaker.run_in_tour_context, _dhb_ctx, _run_single, entry
-            )
-        except ImportError:
-            _submit_single = lambda entry: executor.submit(_run_single, entry)
+        _submit_single = lambda entry: executor.submit(_run_single, entry)
 
         try:
             future_to_name = {
