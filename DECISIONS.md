@@ -24261,3 +24261,13 @@ Storied is about to become Stable and Subscribed Preview (D593's plan). From now
 - **`storied` receives only fixes to what is being released**, such as the Preview deploy wdvrdayqby and defects Michael finds while testing it. Every such fix is forward-merged into `subscribed`.
 - `subscribed` is 1,485 commits behind `storied` (183 of its own: wallet, billing, RevenueCat, single-pass translation). **LOCAL-558, the forward-merge, comes before any new Subscribed work.**
 - The production translation fix lives only on `kiro/gcs-tr1` (overlay deploy). Subscribed work on `translation_service.py` starts from that file, not from either line's copy.
+
+## D595 — New translation approved; Gemini optimisation dropped
+
+**Michael, 2026-10-03 (night):** (1) *"I approve the new translation way; assuming it covers all the
+languages we translate to."* It does: the app offers de, es, fr, it, ja, ko, ru, zh, and LOCAL-561's
+structure word list covers 16 languages. Subscribed now runs `TRANSLATION_ENGINE=llm` (compose, rollback
+= `aws`). Cloud deploy waits for Subscribed's Preview deploy. (2) *"We drop optimization from Gemini."*
+Real Gemini cost is ≈ $0.04 per tour (Cloud Billing: $0.82 for 20 runs); the $41.87 spike of
+2026-09-23 was the runaway dispatch fixed by D587. Serper work (LOCAL-565) stays on its branch,
+unmerged, as a record.
