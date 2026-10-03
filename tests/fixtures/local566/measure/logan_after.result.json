@@ -1,0 +1,42 @@
+{
+  "tour": "logan",
+  "arm": "after",
+  "writer_cache_prefix": "1",
+  "ok": true,
+  "error": null,
+  "wall_s": 188.0,
+  "chars": 8057,
+  "openai_calls_recorded": 120,
+  "writer": {
+    "calls": 23,
+    "cold": 5,
+    "warm": 18,
+    "input_tok": 92227,
+    "output_tok": 4395,
+    "cached_tok": 65920,
+    "cached_pct": 71.5,
+    "cost_full_usd": 0.2745,
+    "cost_cache_discounted_usd": 0.1921
+  },
+  "tour_total_openai_cost": 0.29332045000000007,
+  "grounding_requests": 4,
+  "named_people": 3,
+  "story_defect_count": 1,
+  "stops_delivered": 4,
+  "story_score": {
+    "clean": true,
+    "defects": [
+      "unsourced_person_event"
+    ],
+    "defect_detail": {
+      "unsourced_person_event": "1 unsourced person-event(s); \"Cox\" placed here in 1922 with no source: \"Tracing its lineage back to 1922 when Governor Cox signed legislation for its creation, the airport's history is layered\""
+    },
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 10,
+      "named_people": 3,
+      "chars": 8057
+    }
+  }
+}

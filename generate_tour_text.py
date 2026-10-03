@@ -197,6 +197,102 @@ def story_pass_model() -> str:
     return os.environ.get("TOUR_STORY_MODEL", "gpt-4o")
 
 
+# ─── [LOCAL-566] Writer prompt-cache prefix (OFF by default) ──────────────────
+# LOCAL-566 profiled the gpt-4o stop-description writer (generate_tour_text.py,
+# the call below) and found it is 81% of all LLM cost, of which 82% is INPUT
+# (prompt) tokens. OpenAI auto-caches a repeated prompt PREFIX (>=1,024 tokens)
+# at half price, but the writer's prompt begins with the per-stop exhibit name,
+# so EACH stop starts a brand-new prefix: the recordings show exactly 4 cold
+# (0%-cached) writer calls per 4-stop tour — one per stop — while every retry of
+# the SAME stop then hits 85-95% cache. The 3 avoidable cold starts per tour are
+# the cost this change targets.
+#
+# The fix is byte-order only and does NOT change what the writer is asked: the
+# universal, position-independent rule block (AUDIO RULES + NO PREACHING — the
+# same text already sent in the user message, with no "above/below" cross-
+# references) is RELOCATED verbatim from the user message into the SYSTEM
+# message. The system message then becomes a long, byte-identical prefix shared
+# by every stop in a tour, so stops 2..N reuse stop 1's warmed prefix instead of
+# each paying a cold start. Because the relocation is a verbatim move (same
+# instruction text, merely carried by the system role), the model is asked for
+# the same thing. If the exact block is not found in the prompt (defensive), the
+# function is a no-op and the original messages are sent unchanged.
+#
+# Gated behind WRITER_CACHE_PREFIX=1 so the production default path is byte-for-
+# byte unchanged; it is enabled only for LOCAL-566 before/after measurement.
+_WRITER_SYSTEM_BASE = ("You are a knowledgeable museum guide with expertise in "
+                       "art, architecture, and history.")
+
+# The two writer base templates (museum path and generic/outdoor path) each
+# carry a self-contained AUDIO RULES + NO PREACHING block. These are the exact
+# byte strings as emitted; whichever is present verbatim in a given prompt is
+# the one relocated. Order: most specific first.
+_WRITER_RELOCATABLE_BLOCKS = [
+    # museum-path block (generate_tour_text.py base template ~line 12700)
+    ("AUDIO RULES (this will be heard, not read):\n"
+     "- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.\n"
+     "- NEVER list more than three items in a row. Listeners lose track after three.\n"
+     "- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.\n"
+     "\n"
+     "NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):\n"
+     "- NEVER end by telling the listener to consider, reflect, imagine, or feel something.\n"
+     '  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."\n'),
+    # generic/outdoor-path block (base template ~line 12843)
+    ("AUDIO RULES (this will be heard, not read):\n"
+     "- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.\n"
+     "- NEVER list more than three items in a row. Listeners lose track after three.\n"
+     "- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.\n"
+     "\n"
+     "NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):\n"
+     "- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,\n"
+     "  or carry away. End on a FACT or an OBSERVATION, not an instruction.\n"
+     '- BANNED CLOSINGS: "Consider what other..." / "Let the whispers guide..."\n'
+     '  "Take a moment to..." / "Allow yourself to..." / "Reflect on..." / "Ponder..."\n'
+     '  "Imagine..." / "Let this be a reminder..." / "Carry this with you as..."\n'
+     '- The listener is an adult. Do NOT tell them what they "should" feel or do.\n'
+     "- A stop ends when you run out of things to SAY, not when you have issued a command.\n"),
+]
+
+
+def writer_cache_prefix_enabled() -> bool:
+    """True when the LOCAL-566 writer system-prefix relocation is enabled."""
+    return os.environ.get("WRITER_CACHE_PREFIX", "0").strip().lower() in ("1", "true", "yes")
+
+
+def build_writer_messages(description_prompt: str) -> list:
+    """Build the writer chat `messages`.
+
+    Default (flag off): the original two messages, byte-for-byte unchanged.
+
+    Flag on (WRITER_CACHE_PREFIX=1): relocate the universal AUDIO RULES + NO
+    PREACHING block VERBATIM from the user message into the system message,
+    producing a long byte-stable system prefix shared across stops. This is a
+    pure relocation — the same instruction text is sent, just carried by the
+    system role — so the writer is asked the same thing. If no known block is
+    found in the prompt, returns the original messages unchanged (no-op).
+    """
+    if not writer_cache_prefix_enabled():
+        return [
+            {"role": "system", "content": _WRITER_SYSTEM_BASE},
+            {"role": "user", "content": description_prompt},
+        ]
+    for _block in _WRITER_RELOCATABLE_BLOCKS:
+        if _block in description_prompt:
+            # Remove exactly one occurrence from the user message and carry the
+            # identical text in the system message instead.
+            _new_user = description_prompt.replace(_block, "", 1)
+            _system = _WRITER_SYSTEM_BASE + "\n" + _block.rstrip("\n")
+            return [
+                {"role": "system", "content": _system},
+                {"role": "user", "content": _new_user},
+            ]
+    # Defensive no-op: unknown template — change nothing.
+    return [
+        {"role": "system", "content": _WRITER_SYSTEM_BASE},
+        {"role": "user", "content": description_prompt},
+    ]
+
+
 def _tour_llm_cost(tokens: int, model: str = None) -> float:
     """Cost of a call at the model actually in use.
 
@@ -14183,10 +14279,10 @@ Write the story FIRST, then add physical description if space allows.
 
         description_data = {
             "model": story_pass_model(),  # D370 — story pass only, not the pipeline default
-            "messages": [
-                {"role": "system", "content": "You are a knowledgeable museum guide with expertise in art, architecture, and history."},
-                {"role": "user", "content": description_prompt}
-            ],
+            # [LOCAL-566] Default: original system+user messages, byte-for-byte.
+            # With WRITER_CACHE_PREFIX=1: universal rules are relocated verbatim
+            # into the system message to form a cacheable cross-stop prefix.
+            "messages": build_writer_messages(description_prompt),
             "temperature": 0.7,
             "max_tokens": 1000
         }

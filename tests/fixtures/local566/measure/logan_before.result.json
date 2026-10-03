@@ -1,0 +1,44 @@
+{
+  "tour": "logan",
+  "arm": "before",
+  "writer_cache_prefix": "0",
+  "ok": true,
+  "error": null,
+  "wall_s": 182.4,
+  "chars": 8494,
+  "openai_calls_recorded": 108,
+  "writer": {
+    "calls": 21,
+    "cold": 4,
+    "warm": 17,
+    "input_tok": 83763,
+    "output_tok": 4428,
+    "cached_tok": 62464,
+    "cached_pct": 74.6,
+    "cost_full_usd": 0.2537,
+    "cost_cache_discounted_usd": 0.1756
+  },
+  "tour_total_openai_cost": 0.27779405000000007,
+  "grounding_requests": 4,
+  "named_people": 3,
+  "story_defect_count": 2,
+  "stops_delivered": 3,
+  "story_score": {
+    "clean": true,
+    "defects": [
+      "thin",
+      "unsourced_person_event"
+    ],
+    "defect_detail": {
+      "thin": "3/4 stops delivered",
+      "unsourced_person_event": "1 unsourced person-event(s); \"John Paul\" placed here in 1979 with no source: \"Years later, in 1979, Pope John Paul II's arrival brought a sense of spiritual renewal to gathered crowds.\""
+    },
+    "metrics": {
+      "stops_delivered": 3,
+      "stops_requested": 4,
+      "dates": 10,
+      "named_people": 3,
+      "chars": 8494
+    }
+  }
+}

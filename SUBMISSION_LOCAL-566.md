@@ -166,3 +166,90 @@ low-priority item.
 abs-delta mean 1.4 / max 4 (lascaris 0, logan 2); story_defect_count mean 0.6 /
 max 2 (lascaris 2); stops_delivered mean 0.3 / max 1. A change is "same quality"
 if its deltas stay inside these bands.
+
+---
+
+## §2 — The cheapest safe win, implemented and measured
+
+### The change
+
+`generate_tour_text.py`: a flag-gated, **output-neutral** relocation of the
+writer's universal rule block (`AUDIO RULES` + `NO PREACHING`) from the **user**
+message into the **system** message, so the system message becomes a longer,
+byte-stable prefix. New module-level helper `build_writer_messages()` + constants
+`_WRITER_SYSTEM_BASE`, `_WRITER_RELOCATABLE_BLOCKS`; the single writer
+`messages=[...]` assembly now calls it.
+
+Why this and not the other candidates (from §1):
+- The large (~1,157-token) static block **cannot** be relocated safely — it
+  contains "the reference material **above**", which would become a dangling
+  back-reference once moved before the user message. That changes what the writer
+  is asked, so it is forbidden.
+- There is **no intra-prompt duplicated rule block** to dedup (the only
+  within-prompt repeats are corpus facts — content, not instructions).
+- The `AUDIO RULES` + `NO PREACHING` block is the largest block that is both
+  **self-contained** (no "above/below" references) and **position-independent**,
+  so moving it is a pure relocation: the writer is asked the same thing.
+
+**Safety properties (unit-tested, `tests/fixtures/local566/` + inline):**
+1. Flag **off** (production default): messages are byte-for-byte the original —
+   zero production risk.
+2. Flag **on**: the relocated text is removed from the user message and carried
+   verbatim in the system message; the **line multiset of (system+user) is
+   identical** to the original (proved in `test_relocate.py`). Same instructions.
+3. Unknown template (block not found): **no-op**, original messages sent.
+
+Enabled only for measurement via `WRITER_CACHE_PREFIX=1`.
+
+### Measurement (live, Palais Lascaris + Logan, one run per arm)
+
+Both arms run under **identical** conditions with **Gemini disabled**
+(`GEMINI_API_KEY` unset → `story_leads._gemini()` returns `''`, no grounded
+request, **no Gemini cost** — the task's "Gemini: none"). OpenAI usage captured
+per call by the LOCAL-560 recorder; cost via `cost_rates.llm_cost`; quality via
+`tour_quality.score_tour` on the saved text. Harness:
+`tests/fixtures/local566/measure_prefix.py`. **Total OpenAI spend for all four
+runs ≈ $2.08 (full) / ~$1.43 (cache-discounted) — within the $6 cap.**
+
+| Metric (before → after) | Logan | Palais |
+|---|---|---|
+| writer system-msg length (chars) | 86 → **1029** | 86 → **664** |
+| writer calls | 21 → 23 | 34 → 37 |
+| **cold starts** (0%-cached) | 4 → 5 | **12 → 12** |
+| cached % | 74.6 → 71.5 | 74.9 → 76.5 |
+| writer $ (undiscounted) | 0.254 → 0.275 | 0.742 → 0.823 |
+| writer $ (cache-discounted) | 0.176 → 0.192 | 0.507 → 0.557 |
+| **named_people** | 3 → 3 | 2 → 5 |
+| **story_defect_count** | 2 → 1 | 0 → 0 |
+| **stops_delivered** | 3 → 4 | 4 → 4 |
+| story clean | True → True | True → True |
+
+### What the measurement shows (honest result)
+
+**Quality: unchanged or better, inside the noise floor.** Logan named_people
+delta 0 (floor max 2), defects 2→1, stops 3→4. Palais named_people delta +3
+(global floor max 4; both runs clean, 0 defects, 4/4 stops). No arm regressed;
+both stayed clean.
+
+**Caching: no measurable win — as §1 predicted.** The cold-start count is
+**unchanged** (Palais 12→12; Logan 4→5 is retry-count noise). The cached-% moves
+(74.6→71.5, 74.9→76.5) are run-to-run noise driven by differing retry counts, not
+by the relocation. The writer-$ differences track the differing number of writer
+calls between runs (23 vs 21; 37 vs 34), not a per-call price change.
+
+**Why:** OpenAI prefix caching requires a **≥1,024-token** identical prefix. The
+relocated block is ~166–257 tokens — it lengthened the system message (86 → 664/
+1029 chars, confirmed in the recordings) but stayed **below the threshold**, and
+the user message still begins with the per-stop exhibit name, so each stop still
+starts its own prefix. The only block large enough to cross the threshold is the
+~1,157-token one bound to "reference material above", which cannot move safely.
+
+**Bottom line for §2:** the maximal *safe* caching change is real, correct, and
+output-neutral, but its measured savings are ~0 because a ≥1,024-token
+byte-stable prefix is not safely available in this writer. This is itself the
+finding: **prompt-caching is not the lever here.** The lever is retries (§1 Q4),
+which is a content/policy change and therefore a proposal (§3), not a safe §2
+edit. The change is left in, flag-gated OFF (zero production impact), as the
+cache-ready scaffold for the day the prompt is refactored so the big static block
+no longer says "above" (see §3).
+

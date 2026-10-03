@@ -1,0 +1,38 @@
+{
+  "tour": "palais",
+  "arm": "after",
+  "writer_cache_prefix": "1",
+  "ok": true,
+  "error": null,
+  "wall_s": 565.8,
+  "chars": 9115,
+  "openai_calls_recorded": 126,
+  "writer": {
+    "calls": 37,
+    "cold": 12,
+    "warm": 25,
+    "input_tok": 277924,
+    "output_tok": 12824,
+    "cached_tok": 212736,
+    "cached_pct": 76.5,
+    "cost_full_usd": 0.8231,
+    "cost_cache_discounted_usd": 0.5571
+  },
+  "tour_total_openai_cost": 0.8505621000000003,
+  "grounding_requests": 38,
+  "named_people": 5,
+  "story_defect_count": 0,
+  "stops_delivered": 4,
+  "story_score": {
+    "clean": true,
+    "defects": [],
+    "defect_detail": {},
+    "metrics": {
+      "stops_delivered": 4,
+      "stops_requested": 4,
+      "dates": 24,
+      "named_people": 5,
+      "chars": 9115
+    }
+  }
+}

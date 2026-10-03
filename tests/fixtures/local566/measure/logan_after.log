@@ -1,0 +1,652 @@
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_003959.txt'
+
+======================================================================
+CALL #001 | 00:39:59.047 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  tour_type: facility
+  total_stops_parameter: 4
+  output_file: None
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_003959.txt'
+
+======================================================================
+CALL #002 | 00:39:59.048 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix/D536] tour_type='facility' not prepended (pre_category='facility'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "airports",
+    "location": "Boston MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Boston Logan International Airport, Boston MA",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: airports
+   Location: Boston MA
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=2.0s cumulative=2.0s
+[LOCAL-474] tour_type='facility' → category='facility' (source=explicit)
+
+Detected tour category: FACILITY
+Using facility template for Boston Logan International Airport, Boston MA - facility
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_003959.txt'
+
+======================================================================
+CALL #003 | 00:40:01.003 | GENERATING_PROMPT
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  user_request: Boston Logan International Airport, Boston MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for Boston Logan International Airport, Boston MA...
+  [S17] no scope_constraint (precision='BUILDING', scope='Boston Logan International Airport, Boston MA')
+  [D571] pinned 4 building part(s) to the venue anchor 42.3632, -71.0136
+  [D571] seeded 24 story fact(s) from the causal chain onto 4 stop(s)
+  [D571] VENUE-PARTS FILL: kind='international airport' → 4 stop(s), Phase 3A GPT SKIPPED
+  [D571]   story rank: ['Terminal A', 'Terminal A Departures Curb', 'Terminal A Departures', 'Departure Gate', 'Boarding Bridge', 'Terminal A Arrivals', 'Terminal A Baggage Claim', 'Flight Information Display Board']
+  [D571]   stops: ['Terminal A Departures Curb', 'Terminal A', 'Terminal A Departures', 'Departure Gate']
+  [D571]   precondition: some stops are past the security checkpoint, so you will need a boarding pass
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+PHASE 3A: SKIPPED (facility need-spine fill from 4 need slot(s))
+OK PHASE 3A parsed 4 candidate facility POI(s):
+   - Terminal A Departures Curb [?]
+   - Terminal A [?]
+   - Terminal A Departures [?]
+   - Departure Gate [?]
+
+PHASE 4.5: Validating AI knowledge for Boston Logan International Airport, Boston MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='facility', no type-verification required)
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: WARN address empty -- cannot verify location
+   PHASE 3C: all 4 stops pass location guard
+  [EXISTENCE-GATE] LOG_ONLY — 0/4 stops verified (0%), 4 would be dropped
+    [UNVERIFIED] 'Terminal A Departures Curb' — no evidence
+    [UNVERIFIED] 'Terminal A' — no evidence
+    [UNVERIFIED] 'Terminal A Departures' — no evidence
+    [UNVERIFIED] 'Departure Gate' — no evidence
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 0 verified_no_detail
+    [INTERPRETIVE] Summary: 0 stops enriched, +0 passages, 0 queries issued, 0 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20261003_003959.txt'
+
+======================================================================
+CALL #004 | 00:40:44.756 | PHASE_3B_REQUEST
+======================================================================
+  location: Boston Logan International Airport, Boston MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0007 (923 tokens)
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+   Coords cluster detected: 4 stops share '42.3656, -71.0205', refetching...
+   Cluster refetch OK 'Terminal A Departures Curb': 42.3656, -71.0202
+   Cluster refetch OK 'Terminal A Departures': 42.3656, -71.0204
+   Cluster refetch OK 'Terminal A': 42.3656, -71.0202
+   Cluster refetch OK 'Departure Gate': 42.3704, -71.0204
+Extracted first POI coordinates: (42.3656, -71.0202)
+
+=== Extracted POI Information ===
+1. Terminal A Departures Curb
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0202
+   Directions: From the MBTA Blue Line Airport Station, take the free Silver Line bus to Termin...
+2. Terminal A
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0202
+   Directions: Enter through the main doors and proceed straight to the check-in area. The spac...
+3. Terminal A Departures
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3656, -71.0204
+   Directions: After checking in, follow the signs to the security checkpoint, then proceed to ...
+4. Departure Gate
+   Address: 1 Harborside Dr, Boston, MA 02128
+   Coordinates: 42.3704, -71.0204
+   Directions: Once in the departures area, locate your gate number on the screens and walk tow...
+================================
+
+[TIMING] phase=poi_selection elapsed=51.7s cumulative=53.7s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal A Departures Curb Boston Logan International Airport' → 56777 chars
+  [LOCAL-47] Terminal A Departures Curb: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal A Boston Logan International Airport' → 36411 chars
+  [LOCAL-47] Terminal A: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Terminal A Departures Boston Logan International Airport' → 36411 chars
+  [LOCAL-47] Terminal A Departures: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Departure Gate Boston Logan International Airport' → 36411 chars
+  [LOCAL-47] Departure Gate: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=facility venue=Boston Logan International Air model=gpt-4o tokens=1225 (in=650 out=575) cost=$0.0074 latency=5.1s
+[COST_METER] FRESH | spine_generate | $0.007375 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0074
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 1/4 stops have per-stop passages (1 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Terminal A Departures Curb' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Terminal A' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Terminal A Departures' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Departure Gate' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 3 EMPTY, 1 SHORTENED
+  [Storied] Fact sheets: 2/4 generated
+  [S25] Story types assigned: ['history', 'anecdote', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=13.5s cumulative=67.2s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=67.2s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=67.2s
+
+Generating description for Stop 1: Terminal A Departures Curb by , ...
+
+Generating description for Stop 2: Terminal A by , ...
+
+Generating description for Stop 3: Terminal A Departures by , ...
+
+Generating description for Stop 4: Departure Gate by , ...
+  [D571] re-attached 6 chain fact(s) to 'Terminal A Departures Curb' (lost in a poi_list rebuild)
+  [D571] re-attached 6 chain fact(s) to 'Terminal A' (lost in a poi_list rebuild)
+  [D571] re-attached 6 chain fact(s) to 'Terminal A Departures' (lost in a poi_list rebuild)
+  [D571] re-attached 6 chain fact(s) to 'Departure Gate' (lost in a poi_list rebuild)
+  [LOCAL-381] stop='Terminal A Departures Curb' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Terminal A Departures' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Terminal A' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Departure Gate' matched_work=False medium='' work_identity_chars=0
+Stop 3 API call cost: $0.0183 (3852 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "The terminal is a gateway to history and future journeys alike. Logan Airport, encompassing 2,384 acres and employing around 16,000 people, connects Boston to global destinations. This terminal, part of the airport's extensive network of flights, continues the legacy of aviation pioneers who once em"
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+Stop 1 API call cost: $0.0176 (3711 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 80 words < 120, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0176 (3699 tokens, model=gpt-4o)
+  [LOCAL-415] Stop 1: LLM REFUSAL DETECTED — matched: 'I'm unable to'
+  [LOCAL-415]   verbatim (66 words): 'I\'m sorry for any confusion, but I\'m unable to expand beyond the 80-word placeholder limitation due to the lack of specific, verifiable information about the "Terminal A Departures Curb" at Boston Logan International Airport. The guidelines restrict me from inventing or asserting specific historical'
+  [LOCAL-415] Stop 1: refusal detected (attempt 2), retrying with anti-refusal reinforcement (temp=1.00)...
+Stop 4 API call cost: $0.0213 (4492 tokens, model=gpt-4o)
+Stop 4 description word count: 214 words
+Stop 3 API call cost: $0.0184 (3867 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 74 words < 120, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0176 (3695 tokens, model=gpt-4o)
+  [LOCAL-295] Stop 1: SHORT BUT VALID — keeping (18 words, corpus likely thin)
+  [LOCAL-295]   verbatim: "I'm sorry, there seems to be a misunderstanding. Please let me know how I can assist you today!"
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ["subject not named (expected 'Terminal A Departures Curb' or significant word)", 'no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: "I'm sorry, there seems to be a misunderstanding. Please let me know how I can assist you today!"
+  [LOCAL-417] Stop 1: retrying (attempt 3, temp=1.00)...
+Stop 2 API call cost: $0.0193 (4063 tokens, model=gpt-4o)
+Stop 2 description word count: 255 words
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to']
+Stop 3 API call cost: $0.0189 (3969 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 108 words < 120, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0188 (3958 tokens, model=gpt-4o)
+Stop 1 description word count: 225 words
+Stop 3 API call cost: $0.0190 (4005 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 90 words < 120, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0195 (4103 tokens, model=gpt-4o)
+Stop 3 description word count: 122 words
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='Terminal A Departures Curb': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Terminal A': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Terminal A Departures': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Departure Gate': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.003331 (input=13336, output=2217)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry IMPROVED (4→1 errors)
+  [LOCAL-192] Stop 1 para 2: retry FAILED — keeping original (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 3: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 6 paragraphs retried, 5 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0021 (2675 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Terminal A Departures Curb': 0 rewritten, 1 deleted
+  [LOCAL-255] R1 summary: 0 rewritten, 1 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+  [LOCAL-255] WARNING: deletion rate 1/1 = 100.0% exceeds 10% — rewriter may be failing and quietly shortening tours
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Terminal A Departures Curb': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] Stop 4 'Departure Gate': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] Stop 4 'Departure Gate': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-216] R9 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] Stop 1 'Terminal A Departures Curb': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-235] Stop 4 'Departure Gate': 1 sentence(s) deleted, 1 paragraph(s) emptied
+  [LOCAL-235] R10 summary: 2 sentences deleted, 1 paragraphs emptied, 2 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 9
+    Transferable (high, removed): 1
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 8
+    Stops affected: 1
+    [LOCAL-472] REMOVED transferable paragraph stop='Terminal A' conf=high reason='Generic claims about design and evolution apply to any historic church.': "The design choices here, both in sustainability and style, prepare travelers for their next adventure, whether it's a sh"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Departures Curb' entity='Public Works' reason='It does not specify how Public Works relates to the stop.' in: "The transformation was orchestrated under the careful direction of engineers from the Massachusetts "
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A' entity='Boston Logan International Airport' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Terminal A at Boston Logan International Airport is more than just a gateway; it's a landmark in sus"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A' entity='Logan Airport' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "The Terminal A Departures Curb you visited earlier offers insight into the airport's logistics, mana"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Departures' entity='Boston Logan International Airport' reason='No concrete link between named individuals and the stop is provided.' in: "Terminal A Departures is a key part of Boston Logan International Airport, a facility steeped in avi"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Departures' entity='Charles Lindbergh' reason='It does not specify a direct link between Lindbergh and Terminal A Departures.' in: "Terminal A Departures is a key part of Boston Logan International Airport, a facility steeped in avi"
+    [LOCAL-472] UNGROUNDED entity stop='Terminal A Departures' entity='Boston Logan' reason='No concrete link between named individuals and Terminal A Departures.' in: "Terminal A Departures is a key part of Boston Logan International Airport, a facility steeped in avi"
+    [LOCAL-472] UNGROUNDED entity stop='Departure Gate' entity='Wood Island Park' reason='It does not specify how Olmsted's design relates to the Departure Gate.' in: "In the physical present, the Departure Gate is a microcosm of this global connectivity. The late 196"
+    [LOCAL-472] UNGROUNDED entity stop='Departure Gate' entity='Frederick Law Olmsted' reason='It does not specify how Olmsted is directly related to the Departure Gate.' in: "In the physical present, the Departure Gate is a microcosm of this global connectivity. The late 196"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 2
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/32)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 19
+    Glossed (composed): 6
+    Suppressed (already explained): 1
+    Degraded (name dropped): 9
+    Guard failures: 0
+    Known (skipped): 3
+    Triage: 2189 tokens, $0.0005, 7.5s
+    Gloss: 1416 tokens, $0.0003, 4.9s
+    Compose: 1807 tokens, $0.0003, 1.9s
+    Total added cost: $0.0012
+    Stops affected: 4
+    Glosses applied:
+      • Boston Logan International Airport → DEGRADED (name dropped)
+      • Boston Mayor James Michael Curley → "the mayor who served four terms" [source: model]
+      • Massachusetts Governor Channing → DEGRADED (name dropped)
+      • Jeffries Point → DEGRADED (name dropped)
+      • Boston → DEGRADED (name dropped)
+      • Massachusetts Department → DEGRADED (name dropped)
+      • Public Works → DEGRADED (name dropped)
+      • Logan Airport → DEGRADED (name dropped)
+      • Massport → DEGRADED (name dropped)
+      • Charles Lindbergh → "the first solo nonstop transatlantic flight" [source: model]
+      • Boston Logan → "the largest airport in New England" [source: model]
+      • By July → DEGRADED (name dropped)
+      • Colonial Air Transport → "the first airline for airmail flights" [source: model]
+      • Wood Island Park → "a park in East Boston" [source: model]
+      • Frederick Law Olmsted → SUPPRESSED (already explained)
+      • Massport → "the authority managing Boston Logan Airport" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: Validating stops are within 'Boston Logan International Airport, Boston MA'...
+   OK 'Terminal A' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Terminal A Departures' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+   OK 'Departure Gate' — inside 'Boston Logan International Airport, Boston MA': [D578] part of the venue by construction (conf=high)
+OK PHASE 5.6: 4/4 stop(s) within scope
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 3
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 3
+    Stops affected: 3
+    [1] DELETED: 'This effort' in: This effort marked the beginning the aviation journey, with $35,000 in appropria
+    [2] DELETED: 'This accolade' in: This accolade highlights its commitment to environmentally sustainable practices
+    [4] DELETED: 'This decision' in: This decision underscores the airport's relentless growth to accommodate increas
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 4 'Departure Gate' (index 42) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Terminal A Departures Curb': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Terminal A': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Terminal A Departures': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Departure Gate': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 2 'Terminal A' (index 28)
+  [D534] Stop 3 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: Terminal A at Boston Logan International Airport is more than just a gateway; it's a landmark in sus
+  [D534] Stop 4 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: Boston Logan, the largest airport in New England, now spreads over 2,384 acres and serves millions y
+      already told: Pioneering aviators like Charles Lindbergh, the first solo nonstop transatlantic flight, played role
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal A Departures Curb' — 225w → 125w after gates, 10 sentence(s) removed
+    removed: "I'm sorry for any misunderstanding."
+    removed: "Let’s delve into the history that enriches our current location at the Terminal A Departures Curb of"
+    removed: "As you stand here, consider the legacy of a place born from ambition and necessity."
+    removed: "In March 1922, Boston Mayor James Michael Curley petitioned Massachusetts Governor Channing H."
+    removed: "Cox for joint state and federal funding to transform these once-intertidal flats and marshland, know"
+    removed: "This effort marked the beginning of Boston's aviation journey, laying a foundation with $35,000 in a"
+    removed: "The transformation was orchestrated under the careful direction of engineers from the Massachusetts "
+    removed: "The echoes of history linger in every engine's roar and distant baggage cart rumble, grounding today"
+    removed: "Each element of the airport, from the curb to the vast runways, carries a story beneath the surface."
+    removed: "As you prepare to enter the terminal, remember the hands and minds that turned marshland into this g"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal A' — 236w → 148w after gates, 6 sentence(s) removed
+    removed: "This accolade highlights its commitment to environmentally sustainable practices, from energy-effici"
+    removed: "Not far from here, the Terminal A Departures Curb you visited earlier provides a glimpse into the ai"
+    removed: "Logan Airport itself spans 2,384 acres and employs around 16,000 people, underscoring its role as a "
+    removed: "It connects Boston to destinations worldwide, facilitating a flow of people and cultures that enrich"
+    removed: "The design choices here—both in sustainability and style—prepare travelers for their next adventure,"
+    removed: "As you stand amidst the bustle, consider how this space reflects not just Boston's history, but its "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Terminal A Departures' — 122w → 133w after gates, 3 sentence(s) removed
+    removed: "Officially opening in 1959 when Massport took control, this terminal reflects the airport’s strategi"
+    removed: "Pioneering aviators like Charles Lindbergh played roles in shaping this space, as his 1927 tour insp"
+    removed: "Boston Logan now spreads over 2,384 acres and serves millions yearly."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Departure Gate' — 214w → 139w after gates, 7 sentence(s) removed
+    removed: "The airfield officially opened on September 8, 1923, primarily serving military purposes."
+    removed: "By July 1, 1927, Colonial Air Transport had inaugurated scheduled commercial airmail and passenger f"
+    removed: "The hum of conversations in various languages mixes with the rolling of suitcase wheels and the dist"
+    removed: "Each gate is a portal to a different corner of the world, echoing the airport's history of expansion"
+    removed: "The late 1960s saw the controversial expansion when Massport bulldozed Wood Island Park, designed by"
+    removed: "This decision underscores the airport's relentless growth to accommodate increasing demand, which sa"
+    removed: "Next time you prepare to board, think of the stories and connections that unfold in this gateway to "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Terminal A Departures Curb by , ...
+
+Generating description for Stop 2: Terminal A by , ...
+
+Generating description for Stop 3: Terminal A Departures by , ...
+
+Generating description for Stop 4: Departure Gate by , ...
+  [LOCAL-381] stop='Terminal A' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Terminal A Departures Curb' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Terminal A Departures' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Departure Gate' matched_work=False medium='' work_identity_chars=0
+Stop 1 API call cost: $0.0200 (4216 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 1: WORD FLOOR — 89 words < 120, retrying (attempt 2/5)
+Stop 3 API call cost: $0.0207 (4357 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 103 words < 120, retrying (attempt 2/5)
+Stop 4 API call cost: $0.0240 (5061 tokens, model=gpt-4o)
+Stop 4 description word count: 173 words
+Stop 2 API call cost: $0.0220 (4623 tokens, model=gpt-4o)
+Stop 2 description word count: 273 words
+  [LOCAL-414] Stop 2: SCRUBBED banned phrases from output: ['a testament to', 'stands as a testament']
+Stop 3 API call cost: $0.0209 (4398 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Boston Logan International Airport, covering 2,384 acres, serves as a vital hub for millions of passengers each year. This terminal sits within a landscape marked by significant historical transformations. In the post-World War II era, Boston Harbor expanded over 1,800 acres, leveling islands like G'
+  [LOCAL-417] Stop 3: retrying (attempt 2, temp=1.00)...
+Stop 1 API call cost: $0.0207 (4356 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ["subject not named (expected 'Terminal A Departures Curb' or significant word)"]
+  [LOCAL-417]   verbatim: "Here at Boston Logan International Airport, history and modern engineering intersect. The airport's origins date back to early 20th-century efforts to establish a significant airfield in Boston. This began with Boston Mayor James Michael Curley's 1922 petition to Governor Channing H. Cox for joint s"
+  [LOCAL-417] Stop 1: retrying (attempt 2, temp=1.00)...
+Stop 3 API call cost: $0.0210 (4420 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 100 words < 120, retrying (attempt 4/5)
+Stop 1 API call cost: $0.0205 (4308 tokens, model=gpt-4o)
+  [LOCAL-417] Stop 1: POSITIVE GATE FAILED — ["subject not named (expected 'Terminal A Departures Curb' or significant word)"]
+  [LOCAL-417]   verbatim: "In 1922, Mayor James Michael Curley petitioned Governor Channing H. Cox for funding to transform Boston Harbor's Jeffries Point flats into an airfield. This held pivotal importance for Boston, marking its bold step into aviation. The venture secured shared funding, with Massachusetts shouldering 60%"
+  [LOCAL-417] Stop 1: retrying (attempt 3, temp=1.00)...
+Stop 1 API call cost: $0.0196 (4118 tokens, model=gpt-4o)
+  [LOCAL-415] Stop 1: LLM REFUSAL DETECTED — matched: 'I'm sorry, I'
+  [LOCAL-415]   verbatim (6 words): "I'm sorry, I can't do that."
+  [LOCAL-415] Stop 1: refusal detected (attempt 4), retrying with anti-refusal reinforcement (temp=1.00)...
+Stop 3 API call cost: $0.0213 (4474 tokens, model=gpt-4o)
+  [LOCAL-393] Stop 3: WORD FLOOR — 102 words < 120, retrying (attempt 5/5)
+Stop 3 API call cost: $0.0215 (4523 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Terminal A Departures' below_floor words=86 — kept (never dropped)
+Stop 3 description word count: 86 words
+Stop 1 API call cost: $0.0207 (4354 tokens, model=gpt-4o)
+  [LOCAL-394] stop='Terminal A Departures Curb' below_floor words=99 — kept (never dropped)
+Stop 1 description word count: 99 words
+  [LOCAL-414] Stop 1: SCRUBBED banned phrases from output: ['a testament to']
+  [LOCAL-526] PHASE 5.17 regeneration wall: 9.7s for 4 stop(s) at max_workers=4
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 173w (was 139w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 1 improved, 3 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 2 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://www.massport.com/logan-airport/at-the-airport (attempt 1)
+  [LOCAL-459] R5: Fetched 1736 chars from https://www.massport.com/logan-airport/at-the-airp
+  [LOCAL-427] HTTP 200 from https://www.meetboston.com/plan/getting-here/logan-airport/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1964 chars from https://www.meetboston.com/plan/getting-here/logan
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Logan_International_Airport (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://en.wikipedia.org/wiki/Logan_International_
+  [LOCAL-427] HTTP 200 from https://aecom.com/projects/boston-logan-international-airports-terminal-e/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://aecom.com/projects/boston-logan-internatio
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=nrZz8WG8GGg (attempt 1)
+  [LOCAL-427] HTTP 200 from https://airportscouncil.org/2023/09/13/customizing-common-use-at-boston-logan-international/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://airportscouncil.org/2023/09/13/customizing
+  [LOCAL-427] HTTP 200 from https://luisvidal.com/en/proyecto/boston-logan-international-airport-terminal-e-modernization/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://luisvidal.com/en/proyecto/boston-logan-int
+  [D512] verb discovery: query='Boston Logan International Airport, Boston MA how it is made pro' -> 6 new verb(s): united, focused, overview, expanded, entailed, worked
+  [D512] _AGENCY_VERB widened by 6 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Terminal A Departures Curb                 30    24     0    45
+     2  Terminal A                                 28    25     0    12
+     3  Terminal A Departures                      32    35    14    42
+     4  Departure Gate                             40    51     0    60
+    [LOCAL-485] index mean 32.5 over 4 stop(s), range 28-40
+    [LOCAL-485] weakest: 'Terminal A' at 28
+[TIMING] phase=story_first elapsed=110.5s cumulative=177.7s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (87 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 87 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 87 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 3 orientation R9: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 126
+    Words after:  112
+    Delta: -14
+    Stops affected: 1/4
+    Deletions (1):
+      [Stop 3][R9_GENERIC] "The energy in this space is palpable, fueled by the anticipation of new adventures."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 3.4s, $0.0086, 1243 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Terminal A Departures Curb] (cause): Boston Mayor James Michael Curley, the mayor who served four terms, petitioned M...
+      [Terminal A] (dated_event): In 2005, this terminal became the first airport terminal worldwide to receive a ...
+      [Terminal A Departures] (dated_event): Tracing its lineage back to 1922 when Governor Cox signed legislation for its cr...
+      [Departure Gate] (reversal): Back in the 1920s, civic and military founders transformed harbor mudflats into ...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0032 (542 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At Terminal A Departures Curb, Boston Mayor James Michael Curley petitioned for funding, while Terminal A received LEED certification in 2005. Explore the airport's history dating back to 1922 at Terminal A Departures."
+      FAIL: date '1922' attributed to 'Terminal A' but belongs to a different stop
+    Part 4 LLM cost: $0.0032 (543 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (35 words):
+      "At Terminal A Departures Curb, Boston Mayor James Michael Curley petitioned for state and federal funding. Stop by the Departure Gate, where harbor mudflats were transformed into a regional flight gateway back in the 1920s."
+      Stops referenced: 4
+    Part 4 total cost: $0.0064
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: As you leave the Terminal A Departures Curb, head towards th...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you exit Terminal A, walk towards the ticketing area and ...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you exit Terminal A Departures, head towards the main con...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap: D177 FAILED for 'Terminal A': fact not in delivered text
+    Fact: "In 2005, this terminal became the first airport terminal worldwide to receive a ..."
+  [LOCAL-280] Recap: D177 FAILED for 'Terminal A Departures': fact not in delivered text
+    Fact: "Tracing its lineage back to 1922 when Governor Cox signed legislation for its cr..."
+  [LOCAL-280] Recap composition: 1.0s, $0.0026, 451 tokens
+  [LOCAL-280] Recap built: 26 words, 2 composed clauses (2 D177 rejected, 0 navigation rejected)
+    [Departure Gate] (reversal): "Back in the 1920s, civic and military founders transformed harbor mudflats into ..."
+      → composed: "Departure Gate, harbor mudflats transformed into flight gateway in 1920s"
+    [Terminal A Departures Curb] (cause): "Boston Mayor James Michael Curley, the mayor who served four terms, petitioned M..."
+      → composed: "Terminal A Departures Curb, Curley petitioned for funding to create airfield"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Departure Gate, harbor mudflats transformed into flight gateway in 1920s and Terminal A Departures Curb, Curley petitioned for funding to create airfield."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=370 'restaurant tour, Boston, MA -  Tour' (2.7 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] REPEATED FACT kept in stop 4 (1927/flights) — next sentence refers back to it ("This connection to New York laid the gro...")
+  [D533] 0 repeated fact(s) removed, 1 kept
+  [D533] Person-year role guard: no mismatches (42 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='facility')
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 4: PART4_MISSING — Part 4 (Forward connection to stops) is not present.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Boston Logan International Airport, Boston MA. ..."
+  [2] "To truly appreciate Terminal A, position yourself at the entrance, where the sweeping glass facade o..."
+  [3] "Terminal A at Boston Logan International Airport is more than just a gateway; it's a landmark in sus..."
+
+=== Word Count Statistics ===
+Stop 1: Terminal A Departures Curb - 225 words
+Stop 2: Terminal A - 255 words
+Stop 3: Terminal A Departures - 122 words
+Stop 4: Departure Gate - 214 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (8057 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Cox" placed here in 1922 with no source: "Tracing its lineage back to 1922 when Governor Cox signed legislation for its creation, 
+
+Total API cost: $0.1296 (28284 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.2696
+Provenance:     0/30 factual sentences sourced, 30 unsourced (0 corpus, 0 grounded, 30 parametric)
+CACHE STORE: Boston Logan International Airport, Boston MA / facility / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: Boston_Logan_International_Airport__Boston_MA_facility_tour_20261003_004307.txt
+  [C5-5] Evidence (provenance-only) persisted: Boston_Logan_International_Airport__Boston_MA_facility_tour_20261003_004307_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Boston Logan International Airport, Boston MA - Facility Tour
+Tour-Category: facility
+
+Stop 1: Terminal A Departures Curb
+
+Address: 1 Harborside Dr, Boston, MA 02128
+
+Coordinates: 42.3656, -71.0202
+
+Type/Specialty: Airport Curbside Pickup
+
+Specific Examples: Passenger drop-off, taxi stands, shuttle bus pickups
+
+Operational Details: Open 24/7; no fees for drop-off; may be busy during peak flight times.
+
+Orientation: You are about to embark on a walking journey thro...
+
+[TIMING] phase=packing elapsed=10.3s cumulative=188.0s
+[TIMING] phase=verification elapsed=0.0s cumulative=188.0s
+[TIMING] TOTAL wall=188.0s phases: story_first=110.5s, poi_selection=51.7s, fact_sheets=13.5s, packing=10.3s, intent=2.0s, narration=0.0s, external_lookups=0.0s, verification=0.0s
