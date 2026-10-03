@@ -23,7 +23,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from generate_tour_text import _l569_select_best_story, _l569_story_count  # noqa: E402
+from generate_tour_text import (  # noqa: E402
+    _l569_select_best_story,
+    _l569_story_count,
+    _l569_should_early_stop,
+    _L569_STORY_ATTEMPT_CAP,
+)
 
 
 # --- The LOCAL-568 trajectory, built from real passing / non-passing sentences ---
@@ -127,6 +132,92 @@ class TestSelectionSemantics:
     def test_single_candidate_returned(self):
         only = (0, 50, "o", "d", 10, 0.0)
         assert _l569_select_best_story([only]) == only
+
+
+class TestEarlyStopDecision:
+    """STORY_RETRY_EARLY_STOP: stop once a rewrite stops helping, hard cap 3."""
+
+    def test_improvement_does_not_stop(self):
+        # current beats prior best -> keep going
+        stop, _ = _l569_should_early_stop(current_sc=2, prev_best_sc=1, story_attempts=1)
+        assert stop is False
+
+    def test_first_attempt_never_stops(self):
+        # prev_best_sc = -1 sentinel (no prior attempt) -> any count keeps going
+        stop, _ = _l569_should_early_stop(current_sc=0, prev_best_sc=-1, story_attempts=0)
+        assert stop is False
+
+    def test_no_improvement_stops(self):
+        stop, reason = _l569_should_early_stop(current_sc=0, prev_best_sc=1, story_attempts=1)
+        assert stop is True
+        assert "no improvement" in reason
+
+    def test_tie_stops(self):
+        # a tie "fails to beat" the running best
+        stop, reason = _l569_should_early_stop(current_sc=1, prev_best_sc=1, story_attempts=1)
+        assert stop is True
+        assert "no improvement" in reason
+
+    def test_hard_cap_stops_even_on_improvement(self):
+        stop, reason = _l569_should_early_stop(
+            current_sc=5, prev_best_sc=1, story_attempts=_L569_STORY_ATTEMPT_CAP)
+        assert stop is True
+        assert "cap" in reason
+
+    def test_cap_is_three(self):
+        assert _L569_STORY_ATTEMPT_CAP == 3
+
+
+class TestEarlyStopTrajectory:
+    """Replay LOCAL-568's 1 -> 0 -> 2 -> 1 through the real decision helpers to
+    show early-stop halts the story branch and what it ships. This mirrors the
+    production loop: capture a candidate, then decide stop vs rewrite."""
+
+    def _simulate(self, drafts, early_stop):
+        best = None            # (sc, wc, ...)
+        story_attempts = 0
+        writer_calls = 0
+        for d in drafts:
+            writer_calls += 1
+            sc = _l569_story_count(d)
+            wc = len(d.split())
+            if sc >= 3:
+                # would pass LOCAL-432 and ship immediately
+                cand = (sc, wc, "o", d, 10, 0.0)
+                if best is None or (sc, wc) > (best[0], best[1]):
+                    best = cand
+                break
+            prev_best_sc = best[0] if best else -1
+            cand = (sc, wc, "o", d, 10, 0.0)
+            if best is None or (sc, wc) > (best[0], best[1]):
+                best = cand
+            if early_stop:
+                stop, _ = _l569_should_early_stop(sc, prev_best_sc, story_attempts)
+                if stop:
+                    break
+            story_attempts += 1  # a rewrite is requested
+        return best, writer_calls
+
+    def test_keep_best_only_uses_all_attempts_ships_2(self):
+        best, calls = self._simulate(_TRAJECTORY_DRAFTS, early_stop=False)
+        assert best[0] == 2, "keep-best should ship story_count 2"
+        assert calls == len(_TRAJECTORY_DRAFTS), "keep-best alone makes every call"
+
+    def test_early_stop_halts_after_second_attempt(self):
+        best, calls = self._simulate(_TRAJECTORY_DRAFTS, early_stop=True)
+        # attempt0 sc=1 (prev=-1 keep going), attempt1 sc=0 <= 1 -> STOP
+        assert calls == 2, f"early stop should halt after 2 writer calls, got {calls}"
+        assert best[0] == 1, "ships the best seen so far (story_count 1)"
+
+    def test_early_stop_respects_hard_cap(self):
+        # A trajectory that keeps improving by 0 every time would otherwise run
+        # forever; the cap bounds it. Build strictly-improving-then-flat counts
+        # that never reach 3: 1,2,2,2,2 -> cap stops the rewrites.
+        drafts = [_DRAFT_0, _DRAFT_2, _DRAFT_2, _DRAFT_2, _DRAFT_2]
+        best, calls = self._simulate(drafts, early_stop=True)
+        # a0 sc1(prev-1 go,att1) a1 sc2>1 go att2, a2 sc2<=2 STOP at call 3
+        assert calls == 3
+        assert best[0] == 2
 
 
 if __name__ == "__main__":

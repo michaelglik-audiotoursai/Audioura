@@ -5698,6 +5698,25 @@ def _l569_select_best_story(candidates):
     return max(candidates, key=lambda c: (c[0], c[1]))
 
 
+# [LOCAL-569] Hard cap on story-retry rewrites under early stop.
+_L569_STORY_ATTEMPT_CAP = 3
+
+
+def _l569_should_early_stop(current_sc, prev_best_sc, story_attempts):
+    """[LOCAL-569] Decide whether the LOCAL-432 story retry should stop early.
+
+    Stop when a rewrite stops helping — the current attempt fails to beat the
+    best story_count from PRIOR attempts (<=, so a tie also stops) — or once the
+    3-attempt story cap has been spent. `prev_best_sc` must be the best over
+    earlier attempts only (use -1 when none yet). Returns (stop: bool,
+    reason: str). Only governs the story branch; other retries are untouched."""
+    if story_attempts >= _L569_STORY_ATTEMPT_CAP:
+        return True, "hit 3-attempt cap"
+    if current_sc <= prev_best_sc:
+        return True, "no improvement over prior best"
+    return False, ""
+
+
 def _is_stub_text(text):
     """[LOCAL-420] Return True if text is the empty-stop stub that must never ship."""
     if not text:
@@ -14653,6 +14672,12 @@ Write the story FIRST, then add physical description if space allows.
                             _l431_story_sents = extract_story_sentences(description)
                             _l431_story_count = len(_l431_story_sents)
                             if _l431_story_count < 3:
+                                # [LOCAL-569] Running best from PRIOR attempts only —
+                                # captured before we fold in the current draft, so
+                                # "fails to beat the running best" compares this attempt
+                                # against earlier ones, not against itself.
+                                _l569_prev_best_sc = (_l569_best_story[0]
+                                                      if _l569_best_story else -1)
                                 # [LOCAL-569] This draft already passed the placeholder /
                                 # refusal / LOCAL-417 / word-floor / beat gates (those gates
                                 # `continue` earlier and never reach here). It merely lacks
@@ -14667,16 +14692,15 @@ Write the story FIRST, then add physical description if space allows.
                                 # cap, stop retrying the story branch and ship the best so
                                 # far. This changes ONLY the LOCAL-432 story branch.
                                 if _l569_early_stop_on:
-                                    _l569_prev_best_sc = (_l569_best_story[0]
-                                                          if _l569_best_story else -1)
-                                    _l569_no_improvement = _l431_story_count < _l569_prev_best_sc
-                                    _l569_hit_cap = _l569_story_attempts >= 3
-                                    if _l569_no_improvement or _l569_hit_cap:
+                                    _l569_stop, _l569_reason = _l569_should_early_stop(
+                                        _l431_story_count, _l569_prev_best_sc,
+                                        _l569_story_attempts)
+                                    if _l569_stop:
                                         print(f"  [LOCAL-569] Stop {stop_num}: EARLY STOP story "
                                               f"retry — story_count={_l431_story_count}, "
-                                              f"best={_l569_prev_best_sc}, "
+                                              f"prev_best={_l569_prev_best_sc}, "
                                               f"story_attempts={_l569_story_attempts} "
-                                              f"({'no improvement' if _l569_no_improvement else 'hit 3-attempt cap'})")
+                                              f"({_l569_reason})")
                                         break  # stop the loop; ship keep-best below
                                 # [LOCAL-432] Build a retry supplement that:
                                 # 1. Names the exact deficit count
