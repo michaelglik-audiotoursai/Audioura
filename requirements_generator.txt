@@ -7,3 +7,4 @@ markupsafe==1.1.1
 itsdangerous==1.1.0
 jinja2==2.11.3
 psycopg2-binary==2.9.9
+pycountry==24.6.1

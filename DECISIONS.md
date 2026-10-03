@@ -24261,3 +24261,34 @@ Storied is about to become Stable and Subscribed Preview (D593's plan). From now
 - **`storied` receives only fixes to what is being released**, such as the Preview deploy wdvrdayqby and defects Michael finds while testing it. Every such fix is forward-merged into `subscribed`.
 - `subscribed` is 1,485 commits behind `storied` (183 of its own: wallet, billing, RevenueCat, single-pass translation). **LOCAL-558, the forward-merge, comes before any new Subscribed work.**
 - The production translation fix lives only on `kiro/gcs-tr1` (overlay deploy). Subscribed work on `translation_service.py` starts from that file, not from either line's copy.
+
+## D595 — New translation approved; Gemini optimisation dropped
+
+**Michael, 2026-10-03 (night):** (1) *"I approve the new translation way; assuming it covers all the
+languages we translate to."* It does: the app offers de, es, fr, it, ja, ko, ru, zh, and LOCAL-561's
+structure word list covers 16 languages. Subscribed now runs `TRANSLATION_ENGINE=llm` (compose, rollback
+= `aws`). Cloud deploy waits for Subscribed's Preview deploy. (2) *"We drop optimization from Gemini."*
+Real Gemini cost is ≈ $0.04 per tour (Cloud Billing: $0.82 for 20 runs); the $41.87 spike of
+2026-09-23 was the runaway dispatch fixed by D587. Serper work (LOCAL-565) stays on its branch,
+unmerged, as a record.
+
+## D596 — Writer cost: retries are the money, caching is not; voice pack accepted (2026-10-03, LEAD)
+
+**LOCAL-566 (writer cost profile) — ACCEPTED as evidence, code NOT merged.** LEAD recomputed from the
+LOCAL-560 recordings: total LLM $2.664 over 8 tours, writer (`generate_tour_text.py` stop writer, gpt-4o)
+$2.165 = 81.3%; Palais Lascaris alone 39 writer calls for 4 stops = $1.014 (47% of all writer cost).
+82% of writer cost is INPUT; OpenAI auto-caching already covers 66.8% of it. The safe relocation
+(`WRITER_CACHE_PREFIX`, flag-gated) measured ≈ $0 saving because no ≥1,024-token byte-stable prefix
+can move without changing instructions. **Not merged:** a flag that saves nothing is dead code
+(the "green tests over orphaned modules" lesson, D2xx). It stays on `LOCAL-566-writer-cost`.
+
+**The lever is `[LOCAL-432] STORY RETRY`** (full ~7k-token rewrite of a stop when story_count < 3,
+up to 5 attempts). In the Palais log most stops reach attempt 5/5 still at story_count 1–2, so late
+retries largely buy nothing. Next: LOCAL-568 measures retry YIELD offline before any cap is chosen.
+A retry cap changes output, so it ships only after a blind comparison inside the LOCAL-563 noise floor.
+
+**LOCAL-567 (voice samples) — ACCEPTED, not merged** (16 MB of MP3, stays on its branch). Production
+Polly call is plain text Joanna neural, so sample A is a fair stand-in. Polly has no neural Russian
+voice: Russian tours today play Polly standard. Blind 3-way (Polly neural / Kokoro / OpenAI tts-1,
+letters reshuffled per stop) at `~/Desktop/Audioura_voice_samples/BLIND_AB/`. No switch without
+Michael's ear verdict.

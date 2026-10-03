@@ -116,6 +116,10 @@ guard 120 "$CD/verify_deliverables.sh"
 
 guard 120 "$CD/prune_worktrees.sh"
 
+# --- Disk guard (2026-10-03). Swap lives on this disk; full disk = Docker dies. ---
+# Cleans only regenerable caches below 20G free; urgent alert below 8G.
+guard 300 "$CD/disk_guard.sh"
+
 # --- Dispatch any unclaimed task files. ---
 # The dispatcher is idempotent: already-claimed files are skipped, and
 # MAX_CONCURRENT bounds the worker count. Safe to run every 5 minutes.
