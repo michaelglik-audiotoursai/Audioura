@@ -79,3 +79,72 @@ do not exist on storied. The temporary and negative cases already pass on storie
 Offline. No API calls. No DB writes. No GCloud. No DELETE anywhere.
 DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md and .continuous_dev/STATUS.md
 were not touched.
+
+## r2 — a time-limited closure is temporary
+
+### Why r1 bounced (LEAD review, 2026-10-03 03:0x)
+r1 was green on all four suites and 8/9 LEAD probes passed. The miss was a spec
+error in r1 itself: `closing its doors` is on the PERMANENT list, so
+
+    "Neptune Oyster is closing its doors for two weeks for repairs"  -> closed
+
+dropped a LIVE venue. A permanent marker that sits in the same clause as a bounded
+duration or a stated return is not a permanent closure.
+
+### Fix — extend the TEMPORARY exclusion (`_TEMPORARY_MARKERS` + a negated-return guard)
+`restaurant_practicals.py`. All deterministic and language-aware, matched
+case-insensitively against the lowercased clause, exactly as r1. A clause carrying
+any of these keeps the venue even though it also carries a permanent marker:
+
+- **bounded duration** — `for <N|a|an|one|two|…|several|a few|a couple of>
+  (day|days|week|weeks|month|months)`
+- **dated reopening window** — `until <month|weekday|digit>`, `through <month>`
+- **explicit return** — `reopen(s)? (on|in|next|this)`, `reopening (on|in|next|this)`,
+  `will reopen`, `back (on|in|next)`
+- **French** — `pour travaux`, `jusqu'au`, `réouverture`
+
+A **negated return is still a permanent closure** and must BIND. A new
+`_negated_return` guard (`will not reopen` / `won't reopen` / `never reopen`) is
+checked FIRST inside `_temporarily_closed`; when it fires the temporary exclusion
+is suppressed and the closure marker is free to bind. This is why
+`shuttered … will not reopen` closes while `reopens in May` keeps.
+
+Note `after 20 years` is deliberately NOT a bounded future duration (no time unit
+in `day/week/month`, and `after`, not `for`), so `closing its doors after 20 years`
+still binds — a venue ending after a long run is permanently closed.
+
+### Tests — rows added to `tests/test_local570_closure_markers.py`
+The five ticket rows plus coverage of each new surface and both languages:
+
+| row | verdict |
+|-----|---------|
+| `Neptune Oyster is closing its doors for two weeks for repairs` | kept |
+| `Neptune Oyster has shuttered and reopens in May` | kept |
+| `Toro closing its doors until January 5` | kept |
+| `Neptune Oyster, shuttered since March, will not reopen` | **closed** |
+| `Neptune Oyster is closing its doors after 20 years` | **closed** |
+| `… ferme ses portes pour travaux` / `… jusqu'au 5 janvier` | kept |
+| `… through March` / `… will reopen next spring` | kept |
+| `… won't reopen` / `… will never reopen` | **closed** |
+
+### Results — all four suites green
+
+```
+tests/test_local570_closure_markers.py      ALL TESTS PASSED (exit 0)
+tests/test_local564_closure_binding.py       ALL TESTS PASSED (exit 0)
+tests/test_d538_restaurant_practicals.py      ALL TESTS PASSED (exit 0)
+tests/test_d539_closure_regression.py         ALL TESTS PASSED (exit 0)
+```
+
+### Red on cc4ba23
+Running the seven new KEPT rows against the un-patched `cc4ba23` source
+(`git show cc4ba23:restaurant_practicals.py`) exits **1**: every one binds=True
+(wrongly closed) because r1 has no notion of a bounded duration or a return —
+`7/7 new kept rows are RED on cc4ba23`. The negated-return rows already bind on
+cc4ba23 (they are permanent on both trees), so the executable statement of the
+r2 gap is precisely those seven kept rows.
+
+### Scope / safety (r2)
+Offline. No API calls. No DB writes. No GCloud. No DELETE anywhere.
+DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md and .continuous_dev/STATUS.md
+were not touched.
