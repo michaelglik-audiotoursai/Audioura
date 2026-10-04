@@ -1121,7 +1121,8 @@ _WAYPOINT_RE = re.compile(
     re.IGNORECASE)
 
 
-def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
+def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None,
+                           anchor_names=None):
     """[LOCAL-547] Mark or insert the stops the listener named, whatever built poi_list.
 
     D536 owned this and lived inside `if not _deterministic_fill_used and not
@@ -1138,8 +1139,18 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
 
     Idempotent: a stop already flagged user_explicit is left alone, so calling it
     twice on the same list changes nothing.
+
+    [LOCAL-576] `anchor_names` are route anchors from "from X to Y via A & B"/"loop
+    from X". They get the SAME user_explicit protection as waypoints AND an
+    additional `_anchor=True` flag, so the scope check (PHASE 5.6) can exempt them:
+    a place the listener named as the START/END/VIA of the route cannot be "outside"
+    that route. Pass them pre-reversed by the caller — like `extra`, they are
+    inserted at index 0 one at a time, so reversing preserves the request's order.
     """
-    wps = named_waypoints(location) + [e for e in (extra or []) if e]
+    anchor_set = {_norm_place(a) for a in (anchor_names or []) if a}
+    wps = (named_waypoints(location)
+           + [e for e in (extra or []) if e]
+           + [a for a in (anchor_names or []) if a])
     if not wps:
         return poi_list, []
     inserted = []
@@ -1147,22 +1158,33 @@ def _apply_named_waypoints(poi_list, location, _new_poi_fn, extra=None):
         wpn = _norm_place(wp)
         if not wpn:
             continue
+        _is_anchor = wpn in anchor_set
+        _tag = 'LOCAL-576 anchor' if _is_anchor else 'LOCAL-547'
         already = [p for p in poi_list
                    if (lambda q: q and (wpn == q or wpn in q or q in wpn))(
                        _norm_place(p.get('name', '')))]
         if already:
             for p in already:
+                _changed = False
                 if not p.get('user_explicit'):
                     p['user_explicit'] = True
-                    print(f"  [LOCAL-547] Requested stop '{wp}' is already a candidate "
-                          f"— marked user_explicit on '{p.get('name')}'")
+                    _changed = True
+                if _is_anchor and not p.get('_anchor'):
+                    p['_anchor'] = True
+                    _changed = True
+                if _changed:
+                    print(f"  [{_tag}] Requested stop '{wp}' is already a candidate "
+                          f"— marked user_explicit{'/_anchor' if _is_anchor else ''} "
+                          f"on '{p.get('name')}'")
             continue
         poi = _new_poi_fn(wp)
         poi['user_explicit'] = True
+        if _is_anchor:
+            poi['_anchor'] = True
         poi_list.insert(0, poi)
         inserted.append(wp)
-        print(f"  [LOCAL-547] Requested stop '{wp}' was NOT among the candidates "
-              f"— INSERTED as a user-explicit stop")
+        print(f"  [{_tag}] Requested stop '{wp}' was NOT among the candidates "
+              f"— INSERTED as a user-explicit{'/_anchor' if _is_anchor else ''} stop")
     return poi_list, inserted
 
 
@@ -1310,6 +1332,115 @@ def named_waypoints(request_text):
         if w and len(w) > 2:
             out.append(w)
     return out
+
+
+# [LOCAL-576] A listener who says "from X to Y via A & B" or "loop from X" has
+# NAMED the stops of the route, and named the point it starts from. Those are
+# anchors: the route is built around them, not filtered against them.
+#
+# Field test, tour 388 (2026-10-04): "biking tour in a loop from Crystal Lake to
+# Paul Revere via Commonwealth Avenue Mall & Boston Common, MA", 5 stops.
+# Delivered 4, starting at the Massachusetts State House. Crystal Lake (the start
+# the listener named) was deleted by PHASE 3C because its address geocodes to
+# Newton, MA and the request string said "MA" not "Newton"; Commonwealth Avenue
+# Mall was dropped by LOCAL-212 for having no corpus coverage; North End was
+# written in full and then removed by PHASE 5.6 with no replacement.
+#
+# named_waypoints() already owns "with a stop at X". This owns the ROUTE forms
+# "from X to Y", "X to Y", "via/through A & B", and "loop/round trip from X".
+# It is deterministic on purpose (D526/D528): the structure of the phrasing, not
+# a list of place names, is what tells us these are stops. The transport/tour-type
+# prefix ("biking tour in a loop") and the trailing region (", MA") are stripped
+# so they are never mistaken for a place.
+
+# Words that mark the START of a route ("from X ...", "starting at X ...").
+_ANCHOR_START_RE = re.compile(
+    r'\b(?:from|start(?:ing)?(?:\s+(?:at|from))?|begin(?:ning)?(?:\s+(?:at|from))?)\s+',
+    re.IGNORECASE)
+# "to Y" marks the route's END / turnaround.
+_ANCHOR_TO_RE = re.compile(r'\bto\s+', re.IGNORECASE)
+# "via A & B", "through A and B" — the ordered via-points.
+_ANCHOR_VIA_RE = re.compile(r'\b(?:via|through|through to|by\s+way\s+of)\s+', re.IGNORECASE)
+# A loop/round-trip returns to its start; its start is also effectively its end.
+_ANCHOR_LOOP_RE = re.compile(r'\b(?:loop|round[\s-]?trip|circular|circuit)\b', re.IGNORECASE)
+# Boundaries at which a captured anchor phrase ends.
+_ANCHOR_STOP_WORDS_RE = re.compile(
+    r'\s*(?:,|\.|;|$|\bvia\b|\bthrough\b|\bto\b|\bfrom\b|\bstarting\b|\bbeginning\b'
+    r'|\bending\b|\bthen\b|\band\s+back\b)',
+    re.IGNORECASE)
+
+
+def _anchor_split_via(segment):
+    """Split a via-segment into ordered places on '&', 'and', ',' — keeping order."""
+    parts = re.split(r'\s*(?:&|\band\b|,|\+)\s*', segment or '', flags=re.IGNORECASE)
+    return [p.strip(' ,.;') for p in parts if p and len(p.strip(' ,.;')) > 2]
+
+
+def _anchor_trim(raw):
+    """Trim a captured phrase at the first route keyword / clause boundary."""
+    if not raw:
+        return ''
+    m = _ANCHOR_STOP_WORDS_RE.search(raw)
+    phrase = raw[:m.start()] if m else raw
+    return phrase.strip(' ,.;')
+
+
+def named_anchors(request_text):
+    """[LOCAL-576] Extract the route the listener NAMED, structurally.
+
+    Returns a dict:
+        {'anchors': [ordered place strings], 'start': str|None, 'end': str|None,
+         'is_loop': bool}
+    `anchors` is in the order the listener gave: start first, then via-points in
+    order, then end. For a loop the start is repeated conceptually as the return;
+    callers close the ring, this does not duplicate the name in `anchors`.
+
+    Empty anchors list when the request has no "from X to Y"/"loop from X" shape.
+    No place-name list is used — only the grammar of the request decides.
+    """
+    text = (request_text or '').strip()
+    if not text:
+        return {'anchors': [], 'start': None, 'end': None, 'is_loop': False}
+
+    is_loop = bool(_ANCHOR_LOOP_RE.search(text))
+
+    start = end = None
+    vias = []
+
+    # 1) START: the first "from/starting at X" after any tour-type/transport prefix.
+    m_start = _ANCHOR_START_RE.search(text)
+    after_start = text[m_start.end():] if m_start else ''
+    if m_start:
+        start = _anchor_trim(after_start)
+
+    # 2) END: "to Y" that follows the start (a loop's "to Y" is the turnaround).
+    search_region = after_start if m_start else text
+    m_to = _ANCHOR_TO_RE.search(search_region)
+    if m_to:
+        end = _anchor_trim(search_region[m_to.end():])
+
+    # 3) VIA: "via/through A & B" — ordered via-points.
+    m_via = _ANCHOR_VIA_RE.search(text)
+    if m_via:
+        via_seg = _anchor_trim(text[m_via.end():])
+        vias = _anchor_split_via(via_seg)
+
+    def _clean(x):
+        return x.strip(' ,.;') if x and len(x.strip(' ,.;')) > 2 else None
+    start, end = _clean(start), _clean(end)
+    vias = [v for v in vias if _clean(v)]
+
+    anchors, seen = [], set()
+    for a in [start] + vias + [end]:
+        if not a:
+            continue
+        key = _norm_place(a)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        anchors.append(a)
+
+    return {'anchors': anchors, 'start': start, 'end': end, 'is_loop': is_loop}
 
 
 def _norm_place(s):
@@ -1625,6 +1756,18 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                 survivors.append(poi)
                 print(f"   OK '{poi['name']}' — part of '{scope_name}' by construction "
                       f"(D578: scope check does not apply to building parts)")
+            elif poi.get('_anchor') or poi.get('user_explicit'):
+                # [LOCAL-576] A place the listener NAMED as the start, end, or a
+                # via-point of the route cannot be "outside" the route it defines.
+                # Tour 388: North End (a candidate WE chose) was correctly removed
+                # here, but Crystal Lake / Commonwealth Avenue Mall / Boston Common
+                # / Paul Revere Park were the listener's own anchors — removing any
+                # of them is the swap the listener never agreed to. The scope check
+                # judges stops WE picked, never the ones the listener did.
+                survivors.append(poi)
+                _why = 'anchor' if poi.get('_anchor') else 'user-named stop'
+                print(f"   OK '{poi['name']}' — {_why}; the scope check does not "
+                      f"remove a stop the listener named (LOCAL-576)")
             elif inside or conf in ("low", "medium"):
                 survivors.append(poi)
                 print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason} (conf={conf})")
@@ -6877,7 +7020,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # and none of his three works appeared among the candidates at all.
                 # Mark them here, on the list venue-parts just built.
                 poi_list, _vp_wp_inserted = _apply_named_waypoints(
-                    poi_list, location, _new_poi)
+                    poi_list, location, _new_poi,
+                    anchor_names=list(reversed(named_anchors(user_request)['anchors'])))
                 if _vp_wp_inserted:
                     print(f"  [LOCAL-547] {len(_vp_wp_inserted)} requested stop(s) "
                           f"added to the venue-parts list: {_vp_wp_inserted}")
@@ -7964,9 +8108,22 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         if _named_venues:
             print(f"  [LOCAL-557] Restaurant request names {_named_venues} "
                   f"— the listener's stops, not a theme")
+        # [LOCAL-576] Route anchors from "from X to Y via A & B" / "loop from X".
+        # Extracted from the ORIGINAL request (user_request), not the stripped
+        # location — the structure and the region (", MA") live in the sentence
+        # the listener typed. Marked user_explicit AND _anchor so PHASE 5.6 cannot
+        # remove them: a start/end/via the listener named is not "outside" the
+        # route it defines.
+        _lr576 = named_anchors(user_request)
+        _lr576_anchors = _lr576['anchors']
+        if _lr576_anchors:
+            print(f"  [LOCAL-576] named anchors: {_lr576_anchors} "
+                  f"start={_lr576['start']!r} end={_lr576['end']!r} "
+                  f"is_loop={_lr576['is_loop']}")
         # Inserted at index 0 one by one, so reverse to keep the request's order.
         poi_list, _wp_inserted = _apply_named_waypoints(
-            poi_list, location, _new_poi, extra=list(reversed(_named_venues)))
+            poi_list, location, _new_poi, extra=list(reversed(_named_venues)),
+            anchor_names=list(reversed(_lr576_anchors)))
         if _wp_inserted:
             print(f"  [LOCAL-547] {len(_wp_inserted)} requested stop(s) were missing "
                   f"from every fill path and were inserted: {_wp_inserted}")
@@ -8717,6 +8874,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # he named by hand had no protection from either gate.
         for _wp in named_waypoints(location):
             _explicit_stop_names.add(_normalize_name(_wp))
+        # [LOCAL-576] Route anchors ("from X to Y via A & B" / "loop from X") are
+        # user-explicit too. Crystal Lake was deleted here on tour 388 because its
+        # address geocodes to "Newton, MA" and the request string said "MA": a place
+        # the listener NAMED as the start of the route was removed by a locality
+        # string test. Anchors are extracted from the original request.
+        for _a in named_anchors(user_request)['anchors']:
+            _explicit_stop_names.add(_normalize_name(_a))
         if _explicit_stop_names:
             print(f"   [D536] User-explicit stops from waypoint phrasing: {_explicit_stop_names}")
         _explicit_match = re.search(r'(?:with\s+)?stops\s+(?:at|:)\s*(.+?)(?:,\s*(?:[A-Z]{2})\s*$|$)', location, re.IGNORECASE)
@@ -8745,8 +8909,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             for p in poi_list:
                 p_norm = _normalize_name(p['name'])
                 # Skip address check for user-explicit stops
-                if p_norm in _explicit_stop_names:
-                    print(f"   PHASE 3C: KEPT '{p['name']}' (user-explicit stop, address check bypassed)")
+                # [LOCAL-576] Honour the flag on the POI as well as the name set:
+                # an inserted anchor carries user_explicit/_anchor directly, and a
+                # candidate whose name differs slightly from the request wording
+                # (e.g. "Crystal Lake Park" vs the request's "Crystal Lake") is
+                # protected by the flag even if the normalized name does not match.
+                if p.get('user_explicit') or p.get('_anchor') or p_norm in _explicit_stop_names:
+                    _why = 'anchor' if p.get('_anchor') else 'user-explicit'
+                    print(f"   PHASE 3C: KEPT '{p['name']}' ({_why} stop, address check bypassed)")
                     continue
                 if not _address_matches_location(p.get('address', ''), location):
                     location_rejects.append(p)
