@@ -10,6 +10,14 @@ import uuid
 import zipfile
 import shutil
 import requests
+# [LOCAL-573] text-sized /synthesize timeout (30 + 0.05*len, cap 180). Soft
+# import so a missing module never breaks the caller.
+try:
+    from tts_timeout import synthesize_timeout
+except Exception:  # noqa: BLE001
+    def synthesize_timeout(text):
+        n = len(text) if isinstance(text, str) else int(text or 0)
+        return min(180.0, 30.0 + 0.05 * max(0, n))
 import psycopg2
 import re
 import html
@@ -1230,7 +1238,7 @@ def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, 
                 "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
                 "format": "mp3",
             },
-            timeout=30,
+            timeout=synthesize_timeout(tts_text),  # [LOCAL-573] text-sized
         )
 
         if tts_response.status_code == 200:

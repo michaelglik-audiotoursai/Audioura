@@ -11,6 +11,14 @@ import uuid
 import zipfile
 import base64
 import requests
+# [LOCAL-573] text-sized /synthesize timeout (30 + 0.05*len, cap 180). Soft
+# import so a missing module never breaks the caller.
+try:
+    from tts_timeout import synthesize_timeout
+except Exception:  # noqa: BLE001
+    def synthesize_timeout(text):
+        n = len(text) if isinstance(text, str) else int(text or 0)
+        return min(180.0, 30.0 + 0.05 * max(0, n))
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -381,7 +389,7 @@ def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchest
                     f"{POLLY_TTS_URL}/synthesize",
                     headers=tts_headers,
                     json=tts_payload,
-                    timeout=30
+                    timeout=synthesize_timeout(tts_payload["text"])
                 )
                 
                 if tts_response.status_code == 200:
