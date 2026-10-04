@@ -26,6 +26,18 @@ try:
 except ImportError:  # pragma: no cover - cost_rates lives at repo root; present in the image
     cost_rates = None
 
+# [LOCAL-578] Cost ledger writer. The translation service previously only LOGGED
+# its LLM cost ([TRANSLATE-LLM] … cost=$…) and never wrote a cost_ledger row, and
+# its direct-boto3 Polly audio was wholly unmetered — so per-tour price reports
+# undercounted every translation (D605). record_operation lets us write ONE
+# translation_generate row per job plus one tts_generate row per synthesized stop,
+# matching polly-tts's LOCAL-323 rows. Imported softly so a missing module can
+# never break a translation (metering is always best-effort, never fatal).
+try:
+    from cost_meter import record_operation as _record_operation
+except Exception:  # pragma: no cover - cost_meter ships in the image via the Dockerfile COPY
+    _record_operation = None
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -135,6 +147,10 @@ class TranslationService:
         # path resets at the start of each translation to report a per-tour total.
         self._llm_cost_total = 0.0
         self._llm_tour_cost = 0.0
+        # [LOCAL-578] Per-tour LLM cost split BY MODEL (e.g. {'gpt-4o': .., 'gpt-4o-mini': ..})
+        # so the translation_generate ledger row can carry a models:{} breakdown. Reset at
+        # the start of each tour alongside _llm_tour_cost. Guarded by _cost_lock.
+        self._llm_tour_cost_by_model = {}
         # [LOCAL-559R] Stops are now translated concurrently (bounded pool), so the
         # cost accumulators are mutated from worker threads — guard them with a lock.
         self._cost_lock = threading.Lock()
@@ -644,6 +660,11 @@ class TranslationService:
         with self._cost_lock:
             self._llm_cost_total += cost
             self._llm_tour_cost += cost
+            # [LOCAL-578] Keep a per-model running total for this tour so the ledger row
+            # can report models:{gpt-4o: $, gpt-4o-mini: $}.
+            self._llm_tour_cost_by_model[_model] = (
+                self._llm_tour_cost_by_model.get(_model, 0.0) + cost
+            )
         logging.info(
             f"[TRANSLATE-LLM] model={_model} tokens_in={input_tokens} "
             f"tokens_out={output_tokens} cost=${cost:.6f}"
@@ -671,8 +692,25 @@ class TranslationService:
         
         return translated_text
     
-    def generate_audio(self, text, target_language):
-        """Generate audio using AWS Polly"""
+    # [LOCAL-578] Polly neural voices — these bill at the neural rate ($16/1M chars);
+    # every other voice is standard ($4/1M chars). The direct-boto3 translation path uses
+    # standard voices (e.g. Russian 'Tatyana'), so engine is 'standard' in practice, but we
+    # detect it from the voice so a future neural voice is priced correctly. Kept in sync
+    # with polly_tts_service.py's NEURAL_VOICES (LOCAL-323).
+    _POLLY_NEURAL_VOICES = frozenset(['Joanna', 'Matthew', 'Amy', 'Brian'])
+
+    def generate_audio(self, text, target_language, job_id=None, user_id=None,
+                       source_tour_id=None):
+        """Generate audio using AWS Polly.
+
+        [LOCAL-578] This is the translation service's OWN direct-boto3 Polly client (the
+        tour translation path never goes through polly-tts), so its audio was previously
+        unmetered. We now write ONE tts_generate cost_ledger row per synthesized stop —
+        matching the shape polly-tts emits under LOCAL-323 (operation_type='tts_generate',
+        breakdown={chars, engine, voice_id}) — and accumulate the per-tour TTS char count,
+        cost and engine so the translation_generate row can report its tts totals. Metering
+        is best-effort and never breaks audio generation.
+        """
         voice_map = {
             'en': 'Joanna',
             'es': 'Lucia',
@@ -682,17 +720,143 @@ class TranslationService:
             'zh': 'Zhiyu',
             'ko': 'Seoyeon'
         }
-        
+        voice_id = voice_map.get(target_language, 'Joanna')
+        # Polly's synthesize_speech here caps Text at 3000 chars, so the characters we are
+        # actually billed for are len(text[:3000]).
+        submitted_text = text[:3000] if text else ''
+        char_count = len(submitted_text)
+        engine = 'neural' if voice_id in self._POLLY_NEURAL_VOICES else 'standard'
+
         try:
             response = self.polly_client.synthesize_speech(
-                Text=text[:3000],  # AWS limit
+                Text=submitted_text,  # AWS limit
                 OutputFormat='mp3',
-                VoiceId=voice_map.get(target_language, 'Joanna')
+                VoiceId=voice_id
             )
-            return response['AudioStream'].read()
+            audio_bytes = response['AudioStream'].read()
         except Exception as e:
             logging.error(f"Audio generation error: {e}")
             return None
+
+        # [LOCAL-578] Meter this stop's TTS cost — non-fatal, in its own try block.
+        # One row per synthesized stop in the direct-boto3 path.
+        self._meter_tts_cost(char_count, engine, voice_id, target_language,
+                             job_id=job_id, user_id=user_id,
+                             source_tour_id=source_tour_id)
+        return audio_bytes
+
+    def _reset_tts_tour_accumulators(self):
+        """[LOCAL-578] Zero the per-tour TTS accumulators at the start of a translation so
+        the translation_generate row reports only THIS tour's synthesis totals."""
+        with self._cost_lock:
+            self._tts_tour_cost = 0.0
+            self._tts_tour_chars = 0
+            self._tts_tour_engine = None
+            self._tts_tour_stops = 0
+
+    def _meter_tts_cost(self, char_count, engine, voice_id, target_language,
+                        job_id=None, user_id=None, source_tour_id=None):
+        """[LOCAL-578] Write one tts_generate ledger row for a synthesized stop and add it
+        to the per-tour TTS accumulators. Mirrors polly-tts (LOCAL-323): the Polly price
+        comes from cost_rates.tts_cost (engine-aware), the breakdown carries chars/engine/
+        voice_id. Everything here is best-effort; a metering failure never breaks audio."""
+        try:
+            if cost_rates is not None:
+                tts_cost = cost_rates.tts_cost(char_count, engine=engine)
+            else:  # pragma: no cover - cost_rates ships in the image
+                tts_cost = char_count * (16.0 if engine == 'neural' else 4.0) / 1_000_000
+        except Exception as e:  # pragma: no cover - defensive
+            logging.warning(f"[LOCAL-578] tts_cost compute failed (non-fatal): {e}")
+            return
+
+        # Accumulate per-tour totals (guarded; _gen_audio runs on a worker pool).
+        with self._cost_lock:
+            self._tts_tour_cost = getattr(self, '_tts_tour_cost', 0.0) + tts_cost
+            self._tts_tour_chars = getattr(self, '_tts_tour_chars', 0) + char_count
+            self._tts_tour_stops = getattr(self, '_tts_tour_stops', 0) + 1
+            self._tts_tour_engine = engine
+
+        if _record_operation is None:
+            logging.warning("[LOCAL-578] cost_meter unavailable — tts_generate row not written")
+            return
+        try:
+            _record_operation(
+                operation_type="tts_generate",
+                our_cost_usd=tts_cost,
+                cache_hit=False,
+                user_id=user_id,
+                job_id=job_id,
+                breakdown={
+                    "chars": char_count,
+                    "engine": engine,
+                    "voice_id": voice_id,
+                    "language": target_language,
+                    "source_tour_id": source_tour_id,
+                },
+                description=f"Translation TTS ({target_language}, {voice_id})",
+            )
+            logging.info(
+                f"[LOCAL-578] TTS metered: {char_count} chars, voice={voice_id}, "
+                f"engine={engine}, cost=${tts_cost:.6f}"
+            )
+        except Exception as e:
+            logging.warning(f"[LOCAL-578] tts_generate metering failed (non-fatal): {e}")
+
+    def _meter_translation_row(self, source_tour_id, translated_tour_id, target_language,
+                               n_stops, job_id=None, user_id=None):
+        """[LOCAL-578] Write the single translation_generate cost_ledger row for a job.
+
+        our_cost_usd is the sum of this tour's LLM cost (all passes, all models) and its
+        direct-boto3 Polly TTS cost (summed from the per-stop tts_generate rows). The
+        breakdown carries the shape the ticket (D605) asked for:
+            {llm, models:{gpt-4o-mini: $, gpt-4o: $}, tts, tts_engine, chars}
+        plus the source tour id, target language and translated tour id for traceability.
+        AWS Translate chars are not summed here (the LLM engine is the deployed path and the
+        AWS fallback is per-call and rare); llm reflects the actual OpenAI spend logged by
+        _meter_llm_cost. Best-effort: a metering failure never fails the translation.
+        """
+        with self._cost_lock:
+            llm_cost = self._llm_tour_cost
+            models = dict(self._llm_tour_cost_by_model)
+            tts_cost = getattr(self, '_tts_tour_cost', 0.0)
+            tts_chars = getattr(self, '_tts_tour_chars', 0)
+            tts_engine = getattr(self, '_tts_tour_engine', None)
+        total_cost = llm_cost + tts_cost
+
+        if _record_operation is None:
+            logging.warning(
+                "[LOCAL-578] cost_meter unavailable — translation_generate row not written"
+            )
+            return
+        try:
+            _record_operation(
+                operation_type="translation_generate",
+                our_cost_usd=total_cost,
+                cache_hit=False,
+                user_id=user_id,
+                job_id=job_id,
+                breakdown={
+                    "llm": round(llm_cost, 6),
+                    "models": {m: round(c, 6) for m, c in models.items()},
+                    "tts": round(tts_cost, 6),
+                    "tts_engine": tts_engine,
+                    "chars": tts_chars,
+                    "source_tour_id": source_tour_id,
+                    "translated_tour_id": translated_tour_id,
+                    "target_language": target_language,
+                    "stops": n_stops,
+                },
+                description=f"Translation to {target_language} (tour {source_tour_id})",
+            )
+            logging.info(
+                f"[LOCAL-578] translation_generate metered: tour={source_tour_id}→"
+                f"{translated_tour_id} lang={target_language} llm=${llm_cost:.6f} "
+                f"tts=${tts_cost:.6f} total=${total_cost:.6f} models={models}"
+            )
+        except Exception as e:
+            logging.warning(
+                f"[LOCAL-578] translation_generate metering failed (non-fatal): {e}"
+            )
 
     # ─────────────────────────────────────────────────────────────────────────
     # [LOCAL-561] GUIDEBOOK PIPELINE
@@ -1101,9 +1265,15 @@ class TranslationService:
             logging.error(f"Error translating stop {i+1}: {e}")
             return stop_text, stop_text  # Keep original on error
 
-    def translate_tour_with_audio(self, original_tour_id, target_language):
+    def translate_tour_with_audio(self, original_tour_id, target_language,
+                                  job_id=None, user_id=None):
         """Translate a tour with full audio generation preserving original HTML structure.
-        
+
+        [LOCAL-578] job_id/user_id are threaded in from the orchestrator so the cost_ledger
+        rows this job writes (one translation_generate + one tts_generate per synthesized
+        stop) carry the same job id the orchestrator used for the English generation and
+        its own translation charge, letting per-tour price reports sum the whole job.
+
         Returns:
             tuple: (translated_tour_id or None, cache_hit: bool)
                    cache_hit=True when a translation already existed and was returned as-is.
@@ -1111,6 +1281,11 @@ class TranslationService:
         # [LOCAL-559] Reset the per-tour LLM cost accumulator so we can report a
         # per-tour total at the end (engine='aws' leaves this at 0.0).
         self._llm_tour_cost = 0.0
+        # [LOCAL-578] Reset the per-tour per-model LLM accumulator and the per-tour TTS
+        # accumulators so the translation_generate row reports only THIS tour.
+        with self._cost_lock:
+            self._llm_tour_cost_by_model = {}
+        self._reset_tts_tour_accumulators()
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
@@ -1262,7 +1437,11 @@ class TranslationService:
             def _gen_audio(args):
                 i, txt = args
                 try:
-                    audio_bytes = self.generate_audio(txt, target_language)
+                    audio_bytes = self.generate_audio(
+                        txt, target_language,
+                        job_id=job_id, user_id=user_id,
+                        source_tour_id=original_tour_id,
+                    )
                     if audio_bytes:
                         logging.info(f"Generated audio for stop {i+1}/{len(tts_texts)}")
                         return audio_bytes
@@ -1341,6 +1520,18 @@ class TranslationService:
             logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops (track={_track!r})")
             if self.translation_engine == 'llm':
                 logging.info(f"[TRANSLATE-LLM] tour {new_tour_id} ({target_language}) total cost=${self._llm_tour_cost:.6f}")
+            # [LOCAL-578] Write ONE translation_generate cost_ledger row for this job,
+            # summing the LLM cost by model and the direct-boto3 TTS cost just metered per
+            # stop. This is the row that was missing (D605): the service logged per-call LLM
+            # cost but never wrote the ledger, and its Polly audio was unmetered.
+            self._meter_translation_row(
+                source_tour_id=original_tour_id,
+                translated_tour_id=new_tour_id,
+                target_language=target_language,
+                n_stops=len(translated_stops),
+                job_id=job_id,
+                user_id=user_id,
+            )
             return new_tour_id, False  # [LOCAL-60] Fresh translation, cache_hit=False
             
         except TranslationArtifactError:
@@ -2801,6 +2992,11 @@ def translate_content_with_audio():
     content_id = data.get('content_id')
     content_type = data.get('content_type')  # 'tour' or 'article'
     languages = data.get('languages', ['en'])
+    # [LOCAL-578] Attribution for the cost_ledger rows this translation writes. The
+    # orchestrator (and worker) forward the same job_id/user_id they used for the English
+    # generation and the translation wallet charge, so per-tour reports can sum the job.
+    job_id = data.get('job_id')
+    user_id = data.get('user_id')
     
     results = {}
     had_artifact_failure = False
@@ -2816,7 +3012,8 @@ def translate_content_with_audio():
         _cache_hit = False
         try:
             if content_type == 'tour':
-                translated_id, _cache_hit = translation_service.translate_tour_with_audio(content_id, lang)
+                translated_id, _cache_hit = translation_service.translate_tour_with_audio(
+                    content_id, lang, job_id=job_id, user_id=user_id)
             elif content_type == 'article':
                 translated_id = translation_service.translate_article(content_id, lang)
             else:
