@@ -1,0 +1,31 @@
+# docker-compose.subscribed-local.yml — run the LOCAL Mac Mini stack on `subscribed` code with every
+# cost switch ON (Michael 2026-10-03/04, D600/D601/D604). Overrides docker-compose-master.yml.
+#
+# UP:    cd ~/Audioura && docker compose -p audioura -f docker-compose-master.yml \
+#          -f docker-compose.subscribed-local.yml up -d --build tour-generator tour-orchestrator \
+#          polly-tts-1 translation-service tour-generation-modernized-1
+# BACK TO STORIED: the same command WITHOUT the second -f (rebuilds from ~/Audioura = storied).
+#
+# Code comes from the detached checkout ~/audioura-subscribed-local (git -C … checkout --detach
+# origin/subscribed to update). Volumes (./tours …) stay relative to ~/Audioura, the compose dir.
+# English voice: Kokoro on the HOST (launchd com.audioura.kokoro, port 5181).
+services:
+  tour-generator:
+    build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.generator}
+    environment:
+      - STORY_RETRY_KEEP_BEST=1
+      - STORY_RETRY_EARLY_STOP=1
+      - TOUR_STORY_MODEL=gpt-4.1
+  tour-orchestrator:
+    build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.orchestrator}
+  tour-generation-modernized-1:
+    build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.modernized}
+  polly-tts-1:
+    build: {context: /Users/micha/audioura-subscribed-local, dockerfile: Dockerfile.polly-tts}
+    environment:
+      - TTS_ENGINE=kokoro
+      - KOKORO_URL=http://host.docker.internal:5181/render
+  translation-service:
+    build: {context: /Users/micha/audioura-subscribed-local/translation-service, dockerfile: Dockerfile}
+    environment:
+      - TRANSLATION_ENGINE=llm
