@@ -32,6 +32,13 @@ os.environ["DATABASE_URL"] = get_database_url()
 
 from cost_meter import record_operation
 from cost_rates import tts_cost, CACHE_HIT_COST_USD
+# [LOCAL-573] text-sized /synthesize timeout (30 + 0.05*len, cap 180).
+try:
+    from tts_timeout import synthesize_timeout
+except Exception:  # noqa: BLE001
+    def synthesize_timeout(text):
+        n = len(text) if isinstance(text, str) else int(text or 0)
+        return min(180.0, 30.0 + 0.05 * max(0, n))
 
 POLLY_TTS_URL = "http://localhost:5018"
 TEST_USER = f"verify_local323_{uuid.uuid4().hex[:8]}"
@@ -52,7 +59,7 @@ def verify_neural_tts():
     resp = requests.post(
         f"{POLLY_TTS_URL}/synthesize",
         json={"text": text, "voice_id": voice_id, "output_format": "mp3"},
-        timeout=30,
+        timeout=synthesize_timeout(text),  # [LOCAL-573] text-sized
     )
     assert resp.status_code == 200, f"TTS failed: {resp.status_code} {resp.text}"
     print(f"  TTS response: {resp.status_code}, audio size: {len(resp.content)} bytes")
@@ -86,7 +93,7 @@ def verify_standard_tts():
     resp = requests.post(
         f"{POLLY_TTS_URL}/synthesize",
         json={"text": text, "voice_id": voice_id, "output_format": "mp3"},
-        timeout=30,
+        timeout=synthesize_timeout(text),  # [LOCAL-573] text-sized
     )
     assert resp.status_code == 200, f"TTS failed: {resp.status_code} {resp.text}"
     print(f"  TTS response: {resp.status_code}, audio size: {len(resp.content)} bytes")

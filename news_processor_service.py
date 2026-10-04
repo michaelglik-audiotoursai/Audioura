@@ -15,6 +15,14 @@ import json
 from datetime import datetime
 # Removed gTTS import - using Polly exclusively
 import requests
+# [LOCAL-573] text-sized /synthesize timeout (30 + 0.05*len, cap 180). Soft
+# import so a missing module never breaks the caller.
+try:
+    from tts_timeout import synthesize_timeout
+except Exception:  # noqa: BLE001
+    def synthesize_timeout(text):
+        n = len(text) if isinstance(text, str) else int(text or 0)
+        return min(180.0, 30.0 + 0.05 * max(0, n))
 import asyncio
 from datetime import datetime
 
@@ -201,7 +209,7 @@ def generate_audio_with_polly(text, output_path):
                 'output_format': 'mp3'
             },
             headers=_get_auth_headers(POLLY_TTS_URL),
-            timeout=300  # 5 minutes for very long articles
+            timeout=synthesize_timeout(clean_text)  # [LOCAL-573] text-sized (was 300)
         )
         
         if response.status_code == 200:

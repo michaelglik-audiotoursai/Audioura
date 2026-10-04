@@ -13,6 +13,14 @@ import zipfile
 import tempfile
 import re
 import requests
+# [LOCAL-573] text-sized /synthesize timeout (30 + 0.05*len, cap 180). Soft
+# import so a missing module never breaks the caller.
+try:
+    from tts_timeout import synthesize_timeout
+except Exception:  # noqa: BLE001
+    def synthesize_timeout(text):
+        n = len(text) if isinstance(text, str) else int(text or 0)
+        return min(180.0, 30.0 + 0.05 * max(0, n))
 from io import BytesIO
 from datetime import datetime
 import flask
@@ -831,7 +839,7 @@ def update_tour_stop(tour_id):
                         "voice_id": "Joanna",
                         "output_format": "mp3"
                     },
-                    timeout=30
+                    timeout=synthesize_timeout(new_text)  # [LOCAL-573] text-sized
                 )
                 
                 if tts_response.status_code == 200:
@@ -930,7 +938,7 @@ def create_custom_tour(tour_id):
                             "voice_id": "Joanna",
                             "output_format": "mp3"
                         },
-                        timeout=30
+                        timeout=synthesize_timeout(new_text)  # [LOCAL-573] text-sized
                     )
                     
                     if tts_response.status_code == 200:

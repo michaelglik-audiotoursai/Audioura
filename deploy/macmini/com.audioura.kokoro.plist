@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  [LOCAL-573] launchd agent for the host-native Kokoro TTS service.
+  Install: copy to ~/Library/LaunchAgents/com.audioura.kokoro.plist
+           launchctl load -w ~/Library/LaunchAgents/com.audioura.kokoro.plist
+  Runs ~/kokoro-venv/bin/python ~/Audioura/kokoro_host_service.py on port 5181.
+  KeepAlive restarts it if it exits; logs go to ~/Audioura/.continuous_dev/kokoro.log.
+  NOTE: launchd does not expand '~' — the absolute paths below assume the
+  user is 'micha' (home /Users/micha). Adjust the paths if deploying as a
+  different user.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.audioura.kokoro</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/micha/kokoro-venv/bin/python</string>
+        <string>/Users/micha/audioura-services/kokoro/kokoro_host_service.py</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>KOKORO_PORT</key>
+        <string>5181</string>
+        <key>HF_HOME</key>
+        <string>/Users/micha/.cache/huggingface</string>
+        <!-- launchd's default PATH lacks /opt/homebrew/bin, where ffmpeg lives (LEAD r3 review). -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/micha/audioura-services/kokoro</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/micha/Audioura/.continuous_dev/kokoro.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/micha/Audioura/.continuous_dev/kokoro.log</string>
+</dict>
+</plist>

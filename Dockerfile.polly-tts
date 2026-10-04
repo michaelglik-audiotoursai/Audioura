@@ -1,10 +1,25 @@
+# [LOCAL-573 r3] polly-tts image — Polly-only, small (~312 MB).
+# Kokoro no longer runs inside this container. It runs host-native on the Mac
+# (launchd agent com.audioura.kokoro, ~/kokoro-venv) and the service calls it
+# over KOKORO_URL (default http://host.docker.internal:5181/render) when
+# TTS_ENGINE=kokoro, falling back to Polly on any error. So the image stays the
+# original lean Polly-only build (r1's torch/kokoro/weights bake is reverted).
 FROM python:3.9-slim
 
 WORKDIR /app
 
-RUN pip install flask boto3
+RUN pip install flask boto3 requests psycopg2-binary
 
 COPY polly_tts_service.py .
+# Lightweight modules kept in the image (no heavy deps imported at module load):
+#  - kokoro_engine.py: English-voice routing predicate (should_use_kokoro) +
+#    the in-process encoder used only as a code fallback when KOKORO_URL is unset.
+#    numpy/kokoro are imported lazily inside functions, so the module import is cheap.
+#  - cost_meter.py / cost_rates.py: so the LOCAL-323 TTS metering row actually
+#    records (engine=kokoro/$0, Polly cost). psycopg2-binary lets it write the ledger.
+COPY kokoro_engine.py .
+COPY cost_meter.py .
+COPY cost_rates.py .
 COPY build_manifest.py .
 
 # Build-time manifest: record checksums of all Python sources + git SHA

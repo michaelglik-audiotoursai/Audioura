@@ -39,6 +39,59 @@ send_file = _compat_send_file
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
+# [LOCAL-573] TTS engine selector. Default 'polly' = today's behaviour, byte-for-byte.
+# With TTS_ENGINE=kokoro, requests whose voice is an English Polly voice render on the
+# local Kokoro-82M model; every other language stays on Polly. Any Kokoro failure falls
+# back to Polly so a tour never loses its audio.
+TTS_ENGINE = os.getenv('TTS_ENGINE', 'polly').strip().lower()
+if TTS_ENGINE not in ('polly', 'kokoro'):
+    logging.warning(f"[LOCAL-573] Unknown TTS_ENGINE={TTS_ENGINE!r}; defaulting to 'polly'")
+    TTS_ENGINE = 'polly'
+logging.info(f"[LOCAL-573] TTS_ENGINE={TTS_ENGINE}")
+
+# [LOCAL-573 r3] Kokoro now runs *host-native* (16.5 s/stop vs 48 s in Docker).
+# This container no longer carries the Kokoro model; instead, when
+# TTS_ENGINE=kokoro and the voice is English, it calls the host service at
+# KOKORO_URL (default http://host.docker.internal:5181/render). On any
+# connection error / timeout / non-200 it falls back to Polly for that request
+# so a tour never loses its audio. KOKORO_URL may be set to an empty string to
+# force the in-process code fallback (r1 behaviour) — useful off-container where
+# the kokoro model is importable in-process.
+KOKORO_URL = os.getenv('KOKORO_URL', 'http://host.docker.internal:5181/render')
+if KOKORO_URL is not None:
+    KOKORO_URL = KOKORO_URL.strip()
+logging.info(f"[LOCAL-573] KOKORO_URL={KOKORO_URL or '(unset — in-process fallback)'}")
+
+# requests is used to call the host service. It is a dep of the callers and is
+# available in the container; import softly so the Polly default never breaks.
+try:
+    import requests as _requests
+except Exception as _req_imp_err:  # noqa: BLE001
+    _requests = None
+    logging.warning(f"[LOCAL-573] requests unavailable (host Kokoro disabled): {_req_imp_err}")
+
+# Kokoro helper is imported lazily/softly: a missing module must not break the
+# Polly default path. It provides the English-voice routing predicate
+# (should_use_kokoro) used on every path, and the in-process encoder used only
+# as a code fallback when KOKORO_URL is unset.
+try:
+    import kokoro_engine
+except Exception as _ke_imp_err:  # noqa: BLE001
+    kokoro_engine = None
+    logging.warning(f"[LOCAL-573] kokoro_engine import unavailable: {_ke_imp_err}")
+
+# Only pre-load the in-process model when we will actually render in-process
+# (KOKORO_URL unset). With a host service, the container must NOT load the model.
+if TTS_ENGINE == 'kokoro' and kokoro_engine is not None and not KOKORO_URL:
+    kokoro_engine.warmup()
+
+
+def _render_text_timeout(char_count):
+    """[LOCAL-573 r3] Request timeout (seconds) sized to text length for the
+    host Kokoro call: 30 + 0.05 * len(text), capped at 180. A 2,300-char stop
+    (~16.5 s native) gets 145 s of headroom; nothing waits past 3 minutes."""
+    return min(180.0, 30.0 + 0.05 * max(0, int(char_count)))
+
 # Initialize Polly client
 try:
     polly_client = boto3.client(
@@ -57,13 +110,69 @@ def health_check():
     return jsonify({
         "status": "healthy" if polly_client else "unhealthy",
         "service": "polly_tts",
-        "polly_available": polly_client is not None
+        "polly_available": polly_client is not None,
+        "tts_engine": TTS_ENGINE,
+        "kokoro_url": (KOKORO_URL or None) if TTS_ENGINE == 'kokoro' else None,
     })
 
 @app.route('/synthesize', methods=['POST'])
 def synthesize_speech():
     # [LOCAL-323] Neural voice list — must match Engine selection below
     NEURAL_VOICES = frozenset(['Joanna', 'Matthew', 'Amy', 'Brian'])
+
+    # [LOCAL-573] Render a single chunk. Returns (audio_bytes, engine_label).
+    # Routing: TTS_ENGINE=kokoro + English voice -> Kokoro. With KOKORO_URL set
+    # (default), Kokoro means the HOST service (http://host.docker.internal:5181);
+    # with KOKORO_URL unset, Kokoro means the in-process encoder (r1 code
+    # fallback). On ANY Kokoro failure we log and use Polly so the tour never
+    # loses audio.
+    def _render_chunk(chunk_text, voice_id, output_format, polly_engine):
+        want_kokoro = (
+            TTS_ENGINE == 'kokoro'
+            and kokoro_engine is not None
+            and output_format == 'mp3'
+            and kokoro_engine.should_use_kokoro(voice_id, engine='kokoro')
+        )
+        if want_kokoro:
+            if KOKORO_URL:
+                # Host-native path: call the Mac host service.
+                if _requests is None:
+                    logging.warning(
+                        "[LOCAL-573] kokoro host unavailable — Polly (requests not installed)"
+                    )
+                else:
+                    try:
+                        resp = _requests.post(
+                            KOKORO_URL,
+                            json={'text': chunk_text, 'voice': voice_id},
+                            timeout=_render_text_timeout(len(chunk_text)),
+                        )
+                        if resp.status_code == 200 and resp.content:
+                            return resp.content, 'kokoro'
+                        logging.warning(
+                            f"[LOCAL-573] kokoro host unavailable — Polly "
+                            f"(status {resp.status_code})"
+                        )
+                    except Exception as _host_err:  # noqa: BLE001 - conn/timeout/etc.
+                        logging.warning(
+                            f"[LOCAL-573] kokoro host unavailable — Polly ({_host_err})"
+                        )
+            else:
+                # In-process code fallback (KOKORO_URL unset).
+                try:
+                    audio = kokoro_engine.synthesize_to_mp3(chunk_text, voice_id)
+                    return audio, 'kokoro'
+                except Exception as _k_err:  # noqa: BLE001 - fall back on anything
+                    logging.warning(
+                        f"[LOCAL-573] kokoro failed — falling back to Polly ({_k_err})"
+                    )
+        response = polly_client.synthesize_speech(
+            Text=chunk_text,
+            OutputFormat=output_format,
+            VoiceId=voice_id,
+            Engine=polly_engine,
+        )
+        return response['AudioStream'].read(), 'polly'
 
     try:
         if not polly_client:
@@ -85,6 +194,8 @@ def synthesize_speech():
         
         # Track total characters actually submitted to Polly
         total_chars_submitted = 0
+        # [LOCAL-573] Which engine actually rendered the audio (for metering).
+        render_engines = set()
 
         # Split text if too long (use 2000 char limit for safety)
         if len(text) > 2000:
@@ -128,33 +239,42 @@ def synthesize_speech():
             for i, chunk in enumerate(chunks):
                 logging.info(f"Processing chunk {i+1}/{len(chunks)} ({len(chunk)} chars)")
                 total_chars_submitted += len(chunk)
-                response = polly_client.synthesize_speech(
-                    Text=chunk,
-                    OutputFormat=output_format,
-                    VoiceId=voice_id,
-                    Engine=engine
-                )
-                audio_segments.append(response['AudioStream'].read())
+                _audio, _used = _render_chunk(chunk, voice_id, output_format, engine)
+                render_engines.add(_used)
+                audio_segments.append(_audio)
             
             # Combine all audio segments
             combined_audio = b''.join(audio_segments)
         else:
             # Single request for short text
             total_chars_submitted = len(text)
-            response = polly_client.synthesize_speech(
-                Text=text,
-                OutputFormat=output_format,
-                VoiceId=voice_id,
-                Engine=engine
-            )
-            combined_audio = response['AudioStream'].read()
+            combined_audio, _used = _render_chunk(text, voice_id, output_format, engine)
+            render_engines.add(_used)
         
         # [LOCAL-323] Meter TTS cost — non-fatal, in its own try block.
         # Pattern matches generate_tour_text_service.py: metering must never break delivery.
+        # [LOCAL-573] Report the engine that ACTUALLY rendered. Kokoro = $0 (local CPU);
+        # Polly = its character cost. If a tour fell back mid-way (mixed), meter the
+        # Polly chars at Polly cost and label engine 'kokoro+polly' so the fallback is
+        # visible; pure Kokoro is $0, pure Polly is today's cost.
         try:
             from cost_meter import record_operation
             from cost_rates import tts_cost
-            _tts_cost = tts_cost(total_chars_submitted, engine=engine)
+
+            used_kokoro = 'kokoro' in render_engines
+            used_polly = 'polly' in render_engines
+            if used_kokoro and not used_polly:
+                meter_engine = 'kokoro'
+                _tts_cost = 0.0  # local CPU render — no per-char cost
+            elif used_kokoro and used_polly:
+                meter_engine = 'kokoro+polly'
+                # Charge only for the Polly engine's per-char rate; conservative
+                # (bills all chars at Polly) since per-chunk split isn't tracked.
+                _tts_cost = tts_cost(total_chars_submitted, engine=engine)
+            else:
+                meter_engine = engine  # 'neural' or 'standard' (Polly)
+                _tts_cost = tts_cost(total_chars_submitted, engine=engine)
+
             record_operation(
                 operation_type="tts_generate",
                 our_cost_usd=_tts_cost,
@@ -163,11 +283,11 @@ def synthesize_speech():
                 job_id=job_id,
                 breakdown={
                     "chars": total_chars_submitted,
-                    "engine": engine,
+                    "engine": meter_engine,
                     "voice_id": voice_id,
                 },
             )
-            logging.info(f"[LOCAL-323] TTS metered: {total_chars_submitted} chars, engine={engine}, cost=${_tts_cost:.6f}")
+            logging.info(f"[LOCAL-323] TTS metered: {total_chars_submitted} chars, engine={meter_engine}, cost=${_tts_cost:.6f}")
         except Exception as _meter_err:
             logging.warning(f"[LOCAL-323] TTS cost metering failed (non-fatal): {_meter_err}")
 

@@ -121,6 +121,10 @@ services:
         GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5018:5018"
+    environment:
+      # [LOCAL-573] polly (default) = today's behaviour; kokoro = render English
+      # voices locally on Kokoro-82M. Non-English always stays on Polly.
+      - TTS_ENGINE=${TTS_ENGINE:-polly}
     env_file:
       - .env
     restart: unless-stopped
