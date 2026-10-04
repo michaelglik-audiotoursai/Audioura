@@ -1357,7 +1357,13 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 translation_data = {
                     "content_id": english_tour_id,
                     "content_type": "tour",
-                    "languages": [language]
+                    "languages": [language],
+                    # [LOCAL-578] Forward attribution so the translation service writes its
+                    # cost_ledger rows (translation_generate + per-stop tts_generate) under
+                    # the same job_id/user_id used for the English generation and the
+                    # translation wallet charge below.
+                    "job_id": job_id,
+                    "user_id": user_id,
                 }
                 
                 print(f"Calling translation service with data: {translation_data}")
