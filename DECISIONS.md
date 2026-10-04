@@ -24337,3 +24337,15 @@ step is a 3-run confirmation on 4 more venues, then flip the default on `subscri
 **Measurement lesson:** the harness ran all cells in one process; a Wikimedia 429 in one cell
 cold-marked Wikidata for the following cells (museum B cells failed in ~4 s with no writer call).
 That is the production bug LOCAL-572 fixes. Re-run in separate processes, the cells were valid.
+
+## D600 — 30% bar: met only with the voice; Kokoro switch built before the local rebuild (2026-10-03, LEAD)
+
+Michael: rebuild local to Subscribed with every switch on **if** the total saving is ≥ 30%.
+Projection from measured runs (n=1, separate, not combined), against his baseline table:
+biking ≈ $0.38 → $0.35 (−8%), typical museum ≈ $0.38 → $0.33 (−13%), story-poor museum ≈ $1.10 →
+$0.65 (−41%) with keep-best + early-stop + gpt-4.1. The writer is no longer the big cost; Polly
+neural ($0.15) is. With Kokoro for English: biking ≈ $0.20 (−47%), museum ≈ $0.18 (−52%).
+**Decision:** do not rebuild yet (bar not met by existing switches). LOCAL-573 builds
+`TTS_ENGINE=kokoro` on subscribed (English only, Polly fallback, local container). Rebuild local
+with all four switches on as soon as LOCAL-573 is approved AND Michael's blind voice read does not
+reject Kokoro.
