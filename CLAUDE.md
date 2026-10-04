@@ -204,6 +204,19 @@ adds one before replying.
 release, and each one is forward-merged into `subscribed`. Before any Subscribed task, check
 that `subscribed` contains `origin/storied` (LOCAL-558 is the forward-merge).
 
+**Machines and tracks (Michael, 2026-10-03):**
+
+| track | machine | runs where | status |
+|---|---|---|---|
+| Beta (`main`) | Windows Laptop Claude | GCloud | frozen; rare bug fixes only |
+| Storied (`storied`) | Windows Laptop Claude deploys | GCloud Preview → test | a passing test makes Storied **Stable** and Subscribed **Preview** |
+| Subscribed (`subscribed`) | Mac Mini (Storied_Tours) | **local only — never GCloud** until Michael says | will change a lot; Michael's design thoughts pending |
+
+**A Storied fix reaches GCloud only through ClickUp:** merge + push `storied` here, then create a
+task in Storied space → Development → **🟦 Services — Kiro** (`1000410000000733`) starting
+`**Agent:** GCloud_Storied`, naming the exact commit. Windows Laptop Claude works that queue when
+Michael asks it to. First one: [wdvrdayrdp](https://app.clickup.com/t/wdvrdayrdp) (storied @ 5fda8bc).
+
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
 
 **Michael's request, 2026-08-16.** He asked where a tester's bug was filed while we
