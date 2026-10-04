@@ -41,7 +41,8 @@ RUN pip install --no-cache-dir \
     pydub==0.25.1 \
     python-dotenv \
     lxml==4.9.3 \
-    cryptography>=41.0.0
+    cryptography>=41.0.0 \
+    pycountry==24.6.1
 
 # Copy all service files
 COPY *.py /app/
