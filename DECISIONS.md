@@ -24376,3 +24376,27 @@ Michael: *"Please keep Polly as it is significantly cheaper."* Russian (and ever
 language) stays on Polly standard (≈ $0.04 per 4-stop tour vs ≈ $0.14 for tts-1). LOCAL-574 as
 described in D602 is cancelled. Voice plan: English → Kokoro (LOCAL-573B), everything else →
 Polly unchanged.
+
+## D604 — Local Mac Mini stack runs `subscribed` with every cost switch ON (2026-10-04, LEAD)
+
+Michael (2026-10-03): rebuild local to Subscribed with all switches on once the saving is ≥ 30%.
+D601 (Kokoro passes his ear) met the bar. Running now, from the detached checkout
+`~/audioura-subscribed-local` (origin/subscribed dc504b2) via `docker-compose.subscribed-local.yml`:
+tour-generator (STORY_RETRY_KEEP_BEST=1, STORY_RETRY_EARLY_STOP=1, TOUR_STORY_MODEL=gpt-4.1),
+orchestrator (wallet API), polly-tts (TTS_ENGINE=kokoro → host service :5181, Polly fallback;
+non-English stays Polly per D603), translation (TRANSLATION_ENGINE=llm, D595), modernized
+(text-sized TTS timeouts). Other services unchanged. audio_tours 198/56 before and after.
+
+**Found and fixed on the way:**
+- **Docker hangs were the keychain.** `docker-credential-desktop get` blocked on the macOS keychain
+  (7 stuck helpers), so every pull/build hung, including the LOCAL-573B/C Kiro runs. Not logged in to
+  Docker Hub, so `credsStore` was removed from `~/.docker/config.json` (backup `.bak-20261004`).
+  Docker Desktop restart ~02:3x: about 20 min local downtime, all 21 containers back.
+- **Dockerfile.orchestrator omitted 5 imported modules** (user_stops_flag → crash-loop on any rebuild;
+  quality_guardrails, swipe_preference_service, tour_scoring_service, user_quality_index → silently
+  off). Fixed on storied 6ed47c9, forward-merged. GCloud unaffected (Dockerfile.cloudrun copies *.py).
+- **Kokoro host service** ran without ffmpeg on launchd's PATH (every render 503 → silent Polly) and
+  from untracked copies in ~/Audioura. Fixed; service lives in `~/audioura-services/kokoro/`.
+
+Measured voice: 4-stop English tour 58 s total on Kokoro, $0 (Polly ≈ $0.12). Writer and total
+cost/time per tour: to be measured from Michael's real phone tours (cost_ledger).
