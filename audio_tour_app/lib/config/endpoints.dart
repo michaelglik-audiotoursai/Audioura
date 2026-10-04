@@ -5,6 +5,7 @@ import '../config.dart';
 import '../services/app_attestation_service.dart';
 
 enum Service {
+  generator,       // :5000  (tour-generator; hosts POST /tour/share — LOCAL-579)
   orchestrator,    // :5002
   userDb,          // :5003
   mapDelivery,     // :5005
@@ -25,6 +26,7 @@ class Endpoints {
   static const _walletDebugPort = int.fromEnvironment('WALLET_DEBUG_PORT');
 
   static final _localPorts = {
+    Service.generator: 5000,
     Service.orchestrator: _walletDebugPort > 0 ? _walletDebugPort : 5002,
     Service.userDb: 5003,
     Service.mapDelivery: 5005,
@@ -41,6 +43,7 @@ class Endpoints {
   // Path prefix appended to cloud_base_url for each service.
   // Used when a single gateway/domain routes all services.
   static const _cloudPaths = {
+    Service.generator: '/generator',
     Service.orchestrator: '/orchestrator',
     Service.userDb: '/user',
     Service.mapDelivery: '/map-delivery',
@@ -197,6 +200,8 @@ class Endpoints {
 
   /// Services that incur cost and require attestation in production.
   static bool _isProtectedService(Service s) {
-    return s == Service.orchestrator || s == Service.translation;
+    return s == Service.orchestrator ||
+        s == Service.translation ||
+        s == Service.generator;
   }
 }

@@ -31,6 +31,11 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   crypto: ^3.0.3
   pointycastle: ^3.7.3
+  # LOCAL-579: OS share sheet for sharing a tour's 8-char code. Pinned (no
+  # caret) deliberately — 11.x+ raises the min Dart SDK above this project's
+  # 3.5 floor, so an unpinned range would break `flutter pub get`. 10.1.4
+  # requires Dart >=3.4.0, Flutter >=3.22.0.
+  share_plus: 10.1.4
 
 dev_dependencies:
   flutter_test:
