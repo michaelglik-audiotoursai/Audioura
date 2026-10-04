@@ -18,7 +18,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/Users/micha/kokoro-venv/bin/python</string>
-        <string>/Users/micha/Audioura/kokoro_host_service.py</string>
+        <string>/Users/micha/audioura-services/kokoro/kokoro_host_service.py</string>
     </array>
 
     <key>EnvironmentVariables</key>
@@ -27,10 +27,13 @@
         <string>5181</string>
         <key>HF_HOME</key>
         <string>/Users/micha/.cache/huggingface</string>
+        <!-- launchd's default PATH lacks /opt/homebrew/bin, where ffmpeg lives (LEAD r3 review). -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
 
     <key>WorkingDirectory</key>
-    <string>/Users/micha/Audioura</string>
+    <string>/Users/micha/audioura-services/kokoro</string>
 
     <key>RunAtLoad</key>
     <true/>

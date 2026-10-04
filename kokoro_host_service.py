@@ -35,6 +35,7 @@ Encoding is delegated to ``kokoro_engine.synthesize_to_mp3`` so the host service
 and the container's in-process fallback produce identical MP3s.
 """
 
+import shutil
 import json
 import logging
 import os
@@ -106,10 +107,15 @@ class KokoroHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802
         if self.path.rstrip("/") == "/health":
+            # A pipeline without ffmpeg cannot produce MP3: every /render would 503 and
+            # silently fall back to Polly. Report it here so health means "can render".
+            ffmpeg = shutil.which("ffmpeg")
+            ok = _pipeline_ready and ffmpeg is not None
             self._send_json(
-                200,
+                200 if ok else 503,
                 {
-                    "status": "healthy" if _pipeline_ready else "loading",
+                    "status": "healthy" if ok else ("no_ffmpeg" if _pipeline_ready else "loading"),
+                    "ffmpeg": ffmpeg,
                     "service": "kokoro_host",
                     "pipeline_ready": _pipeline_ready,
                     "error": _pipeline_error,

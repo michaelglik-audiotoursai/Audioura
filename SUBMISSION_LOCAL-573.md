@@ -195,3 +195,34 @@ mono — unchanged from today's Polly standard. English synth at ~4.6 s for a 18
   job_ids `lc573-en`, `lc573-ru`. No other writes, no DELETE, no GCloud.
 - Polly spend for the live check: **$0.000296** total — far under the $0.10 cap.
 - Test container removed after the run.
+
+## r3 step 5 — finished by LEAD (2026-10-04 03:0x)
+
+Kiro's r3 run stopped at step 5: its `docker build` hung for 44 min. **Root cause, and the cause of
+every hung build that night:** Docker's credential helper (`docker-credential-desktop get`) blocked
+on the macOS keychain. 7 helpers were stuck, one per build. Michael is not logged in to Docker
+Hub, so LEAD removed `credsStore` from `~/.docker/config.json` (backup
+`config.json.bak-20261004`). Builds work again. Docker Desktop was also restarted, about 20 min of
+local downtime at 02:3x; all 21 containers came back and audio_tours stayed at 198/56.
+
+Two defects in r3, fixed on this branch by LEAD:
+1. **launchd PATH has no `/opt/homebrew/bin`**, so the host service could not find ffmpeg and
+   **every** `/render` returned 503. Every "Kokoro" stop silently fell back to Polly, and `/health`
+   still said healthy. Fix: PATH in the plist, and `/health` returns 503 `no_ffmpeg` when ffmpeg is
+   missing.
+2. The service ran from **untracked copies in `~/Audioura`**. Moved to `~/audioura-services/kokoro/`
+   (plist ProgramArguments + WorkingDirectory); stray copies removed.
+
+**Live end to end** (image `polly-tts:573c`, 353 MB, port 5118, `TTS_ENGINE=kokoro`, 4 Lascaris stops,
+sequential like the pipeline):
+
+| stop | chars | seconds | audio | ledger |
+|---|---|---|---|---|
+| 1 | 2326 | 17.2 | 128.5 s | engine=kokoro $0 |
+| 2 | 1936 | 14.7 | 135.8 s | engine=kokoro $0 |
+| 3 | 1947 | 14.3 | 127.9 s | engine=kokoro $0 |
+| 4 | 1558 | 11.9 | 107.2 s | engine=kokoro $0 |
+| **total** | | **58.1 s** | | **$0** |
+
+Host service stopped: English stop → Polly neural (0.2 s, 24 kHz). Russian → Polly standard Tatyana
+(22.05 kHz). Polly spend for all checks ≈ $0.16 (it includes the run where Kokoro silently fell back).
