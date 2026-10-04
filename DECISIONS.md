@@ -24359,3 +24359,13 @@ one that pronounces names correctly in English such as Nice [nes] vs. [nais] in 
 from `subscribed` with all four switches on. Follow-up (LOCAL-574): fix place-name pronunciation in
 Kokoro, which takes per-word phoneme overrides, rather than paying for OpenAI's voice. Source the
 pronunciations from data (Wikidata IPA, P898), not from a hand list (D476).
+
+## D602 — Russian voice: OpenAI tts-1 / tts-1-hd beat Polly standard (Michael, 2026-10-03)
+
+Michael heard one Russian stop (tour 383, stop 1) in Polly standard (Tatyana) and OpenAI tts-1,
+gpt-4o-mini-tts and tts-1-hd: *"tts1 and tts hd are the best."* Prices: tts-1 $15 / 1M chars
+(≈ $0.028 per Russian stop, ≈ $0.14 per 4-stop tour), tts-1-hd $30 / 1M (≈ $0.056 / ≈ $0.29).
+Polly standard today: ≈ $0.0075 / ≈ $0.04. **LEAD decision: tts-1** for non-English languages Kokoro
+cannot speak (he rated both best; hd doubles the price for a difference he did not single out).
+Built after LOCAL-573B lands (same service), as LOCAL-574. It must also cover the direct-boto3
+translation path (`translation-service/translation_service.py:687`), which LOCAL-573 left on Polly.
