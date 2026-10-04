@@ -228,6 +228,13 @@ Kokoro service (launchd `com.audioura.kokoro`, :5181; `curl localhost:5181/healt
 **Docker builds hang?** Check for stuck `docker-credential-desktop get`: `credsStore` was removed
 from `~/.docker/config.json` for exactly this.
 
+**External SSD (2026-10-04):** SanDisk 1 TB, APFS, mounted at `/Volumes/AudiouraSSD`.
+`~/audioura-worktrees` is a **symlink** into it, so every task worktree lives on the SSD. **If the SSD
+is unplugged, the dispatcher and every worktree break**; check `ls /Volumes/AudiouraSSD` first when
+git or Kiro fail strangely. Docker's 11 GB `Docker.raw` is still internal: move it with Docker
+Desktop → Settings → Resources → Advanced → Disk image location (GUI, with Michael present),
+never by editing settings files. Pre-move DB backup: `/Volumes/AudiouraSSD/pre_migration_*.sql.gz`.
+
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
 
 **Michael's request, 2026-08-16.** He asked where a tester's bug was filed while we
