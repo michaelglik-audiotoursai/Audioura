@@ -11742,10 +11742,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
     #
     # Museums keep their own venue guard (PHASE 5.5b) and are excluded, exactly as
     # _resolve_scope_for_check already decides.
+    _lr576_prewrite_ran = False
     if tour_category not in ('museum', 'facility'):
         _lr576_scope = _resolve_scope_for_check(intent, location, tour_category,
                                                 _museum_venue_name, quiet=True)
         if _lr576_scope and poi_list:
+            _lr576_prewrite_ran = True
             _lr576_want = _requested_stop_count_original or len(poi_list)
             _lr576_before = len(poi_list)
             print(f"\n  [LOCAL-576] Pre-writing scope check against '{_lr576_scope}' "
@@ -16838,7 +16840,16 @@ REWRITE RULES (all mandatory):
         print(f"OK PHASE 5.5b: {len(poi_list)} stop(s) passed venue description validation")
 
     # PHASE 5.6: Geographic-scope containment — only when the museum guard did NOT run
-    if not (tour_category == 'museum' and _museum_venue_name):
+    # [LOCAL-576] If the PRE-WRITING scope check already ran (non-museum/facility),
+    # do NOT run it again here. Re-running the same containment check after the
+    # descriptions are written is exactly the too-late removal that cost tour 388
+    # its 5th stop: Fenway Park passed the pre-writing check, was written in full,
+    # and this post-writing pass then removed it with no replacement -> 4 of 5. The
+    # pre-writing check (with replenishment) is authoritative; a second pass here
+    # can only delete a stop after the money is spent and after the pool can no
+    # longer refill it. Anchors are exempt in both passes regardless.
+    if (not (tour_category == 'museum' and _museum_venue_name)
+            and not _lr576_prewrite_ran):
         # [D558] Same resolver the replenishment loop uses — "validated the same
         # way as the original" has to mean the same code, not a second copy.
         _scope_for_check = _resolve_scope_for_check(intent, location, tour_category,
@@ -16851,6 +16862,10 @@ REWRITE RULES (all mandatory):
             if len(poi_list) <= max(1, _before // 2):
                 print(f"  [PHASE 5.6] >50% of stops were outside '{_scope_for_check}' — "
                       f"scope is likely a small single venue; delivering {len(poi_list)} verified stop(s).")
+    elif _lr576_prewrite_ran:
+        print(f"\nPHASE 5.6: skipped — the pre-writing scope check already ran "
+              f"(LOCAL-576; a second pass after writing can only remove a stop too "
+              f"late to replace).")
 
     _sfp.sub_start('dangling_ref_5_7')
     # -------- PHASE 5.7: Dangling-reference scrub --------
