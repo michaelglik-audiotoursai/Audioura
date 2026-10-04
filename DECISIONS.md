@@ -24400,3 +24400,16 @@ non-English stays Polly per D603), translation (TRANSLATION_ENGINE=llm, D595), m
 
 Measured voice: 4-stop English tour 58 s total on Kokoro, $0 (Polly ≈ $0.12). Writer and total
 cost/time per tour: to be measured from Michael's real phone tours (cost_ledger).
+
+## D605 — Tour 388 field test: three defects, two follow-ups (2026-10-04, LEAD)
+
+Fix now: LOCAL-575 (Kokoro multi-chunk MP3 header: subscribed/local only), LOCAL-576 (named places
+are anchors exempt from locality/coverage/scope removal; route starts at the named start; scope check
+before writing plus replenishment; storied release fix → ClickUp deploy after review).
+Follow-ups, queued after: (a) **translation-service is unmetered**: no cost_ledger rows for
+translation LLM or its direct-boto3 Polly audio, so "real price" undercounts translations;
+(b) **Russian Polly mispronounces names and landmarks** (Michael: future concern; candidates are an
+SSML phoneme/lexicon layer fed from Wikidata IPA, so it stays Polly-cheap per D603).
+Per-stop writer cost on this biking tour was flat versus baseline (≈ $0.049/stop): no story retries to
+save on outdoor tours, and gpt-4.1's per-token saving was offset by a 25k-char prompt. The biking
+saving is the voice ($0.15 → $0).
