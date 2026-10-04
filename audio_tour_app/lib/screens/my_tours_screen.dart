@@ -10,6 +10,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
 import '../utils/tour_path_healer.dart';
+import '../widgets/share_tour_sheet.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'tour_player_screen.dart';
@@ -1018,6 +1019,15 @@ class _MyToursScreenState extends State<MyToursScreen> {
     }
   }
 
+  /// [LOCAL-579] Share this tour by code. Resolves the tour's numeric id and
+  /// delegates to the shared flow (progress → POST /tour/share → result sheet
+  /// with the 8-char code, Copy, and OS Share…). The share service rejects
+  /// non-numeric ids and surfaces server/offline errors as a SnackBar.
+  void _shareTour(Map<String, dynamic> tour) {
+    final title = (tour['title'] ?? 'this tour').toString();
+    shareTour(context, audioTourId: tour['tour_id'], tourName: title);
+  }
+
   void _editTour(Map<String, dynamic> tour) {
     Navigator.push(
       context,
@@ -1416,6 +1426,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                           constraints: const BoxConstraints(minWidth: 36),
                           onSelected: (value) {
                             switch (value) {
+                              case 'share': _shareTour(tour); break;
                               case 'translate': _showTranslateDialog(tour); break;
                               case 'edit': _editTour(tour); break;
                               case 'delete': _deleteTour(index); break;
@@ -1424,6 +1435,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                             }
                           },
                           itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share, color: Color(0xFF3498db)), title: Text('Share'), dense: true)),
                             if (!TourTranslationHelper.isTranslation(tour))
                               const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
                             const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
@@ -1449,6 +1461,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                           builder: (context) => TourPlayerScreen(
                             tourPath: tour['path'],
                             tourTitle: tour['title'],
+                            tourId: tour['tour_id']?.toString(),
                             track: tour['track'] as String?,
                             buildNumber: tour['build_number'] is int
                                 ? tour['build_number'] as int

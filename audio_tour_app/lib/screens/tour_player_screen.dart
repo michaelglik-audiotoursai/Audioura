@@ -10,6 +10,7 @@ import 'tour_map_screen.dart';
 import '../widgets/swipe_feedback_widget.dart';
 import '../config/endpoints.dart';
 import '../services/webview_console_logger.dart';
+import '../widgets/share_tour_sheet.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -102,6 +103,11 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
             icon: Icon(Icons.help_outline),
             onPressed: _showTourHelpDialog,
             tooltip: 'Voice Commands Help',
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share),
+            onPressed: _shareTour,
+            tooltip: 'Share this tour',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -295,6 +301,14 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   String _deriveTourId() {
     final segments = widget.tourPath.split('/');
     return segments.isNotEmpty ? segments.last : 'unknown';
+  }
+
+  /// [LOCAL-579] Share the tour currently open in the player. Uses the tour's
+  /// numeric id (passed in as [widget.tourId]); the share service rejects a
+  /// null/non-numeric id with a clear message and maps server/offline errors to
+  /// a SnackBar, so this never crashes the player.
+  void _shareTour() {
+    shareTour(context, audioTourId: widget.tourId, tourName: widget.tourTitle);
   }
 
   void _showTourHelpDialog() {
