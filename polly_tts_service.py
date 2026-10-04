@@ -49,16 +49,48 @@ if TTS_ENGINE not in ('polly', 'kokoro'):
     TTS_ENGINE = 'polly'
 logging.info(f"[LOCAL-573] TTS_ENGINE={TTS_ENGINE}")
 
+# [LOCAL-573 r3] Kokoro now runs *host-native* (16.5 s/stop vs 48 s in Docker).
+# This container no longer carries the Kokoro model; instead, when
+# TTS_ENGINE=kokoro and the voice is English, it calls the host service at
+# KOKORO_URL (default http://host.docker.internal:5181/render). On any
+# connection error / timeout / non-200 it falls back to Polly for that request
+# so a tour never loses its audio. KOKORO_URL may be set to an empty string to
+# force the in-process code fallback (r1 behaviour) — useful off-container where
+# the kokoro model is importable in-process.
+KOKORO_URL = os.getenv('KOKORO_URL', 'http://host.docker.internal:5181/render')
+if KOKORO_URL is not None:
+    KOKORO_URL = KOKORO_URL.strip()
+logging.info(f"[LOCAL-573] KOKORO_URL={KOKORO_URL or '(unset — in-process fallback)'}")
+
+# requests is used to call the host service. It is a dep of the callers and is
+# available in the container; import softly so the Polly default never breaks.
+try:
+    import requests as _requests
+except Exception as _req_imp_err:  # noqa: BLE001
+    _requests = None
+    logging.warning(f"[LOCAL-573] requests unavailable (host Kokoro disabled): {_req_imp_err}")
+
 # Kokoro helper is imported lazily/softly: a missing module must not break the
-# Polly default path. When TTS_ENGINE=kokoro we try to pre-load the model.
+# Polly default path. It provides the English-voice routing predicate
+# (should_use_kokoro) used on every path, and the in-process encoder used only
+# as a code fallback when KOKORO_URL is unset.
 try:
     import kokoro_engine
 except Exception as _ke_imp_err:  # noqa: BLE001
     kokoro_engine = None
     logging.warning(f"[LOCAL-573] kokoro_engine import unavailable: {_ke_imp_err}")
 
-if TTS_ENGINE == 'kokoro' and kokoro_engine is not None:
+# Only pre-load the in-process model when we will actually render in-process
+# (KOKORO_URL unset). With a host service, the container must NOT load the model.
+if TTS_ENGINE == 'kokoro' and kokoro_engine is not None and not KOKORO_URL:
     kokoro_engine.warmup()
+
+
+def _render_text_timeout(char_count):
+    """[LOCAL-573 r3] Request timeout (seconds) sized to text length for the
+    host Kokoro call: 30 + 0.05 * len(text), capped at 180. A 2,300-char stop
+    (~16.5 s native) gets 145 s of headroom; nothing waits past 3 minutes."""
+    return min(180.0, 30.0 + 0.05 * max(0, int(char_count)))
 
 # Initialize Polly client
 try:
@@ -80,6 +112,7 @@ def health_check():
         "service": "polly_tts",
         "polly_available": polly_client is not None,
         "tts_engine": TTS_ENGINE,
+        "kokoro_url": (KOKORO_URL or None) if TTS_ENGINE == 'kokoro' else None,
     })
 
 @app.route('/synthesize', methods=['POST'])
@@ -88,8 +121,11 @@ def synthesize_speech():
     NEURAL_VOICES = frozenset(['Joanna', 'Matthew', 'Amy', 'Brian'])
 
     # [LOCAL-573] Render a single chunk. Returns (audio_bytes, engine_label).
-    # When Kokoro routing applies, try Kokoro; on ANY failure log the fallback
-    # line and use Polly so the tour never loses audio.
+    # Routing: TTS_ENGINE=kokoro + English voice -> Kokoro. With KOKORO_URL set
+    # (default), Kokoro means the HOST service (http://host.docker.internal:5181);
+    # with KOKORO_URL unset, Kokoro means the in-process encoder (r1 code
+    # fallback). On ANY Kokoro failure we log and use Polly so the tour never
+    # loses audio.
     def _render_chunk(chunk_text, voice_id, output_format, polly_engine):
         want_kokoro = (
             TTS_ENGINE == 'kokoro'
@@ -98,11 +134,38 @@ def synthesize_speech():
             and kokoro_engine.should_use_kokoro(voice_id, engine='kokoro')
         )
         if want_kokoro:
-            try:
-                audio = kokoro_engine.synthesize_to_mp3(chunk_text, voice_id)
-                return audio, 'kokoro'
-            except Exception as _k_err:  # noqa: BLE001 - fall back on anything
-                logging.warning(f"[LOCAL-573] kokoro failed — falling back to Polly ({_k_err})")
+            if KOKORO_URL:
+                # Host-native path: call the Mac host service.
+                if _requests is None:
+                    logging.warning(
+                        "[LOCAL-573] kokoro host unavailable — Polly (requests not installed)"
+                    )
+                else:
+                    try:
+                        resp = _requests.post(
+                            KOKORO_URL,
+                            json={'text': chunk_text, 'voice': voice_id},
+                            timeout=_render_text_timeout(len(chunk_text)),
+                        )
+                        if resp.status_code == 200 and resp.content:
+                            return resp.content, 'kokoro'
+                        logging.warning(
+                            f"[LOCAL-573] kokoro host unavailable — Polly "
+                            f"(status {resp.status_code})"
+                        )
+                    except Exception as _host_err:  # noqa: BLE001 - conn/timeout/etc.
+                        logging.warning(
+                            f"[LOCAL-573] kokoro host unavailable — Polly ({_host_err})"
+                        )
+            else:
+                # In-process code fallback (KOKORO_URL unset).
+                try:
+                    audio = kokoro_engine.synthesize_to_mp3(chunk_text, voice_id)
+                    return audio, 'kokoro'
+                except Exception as _k_err:  # noqa: BLE001 - fall back on anything
+                    logging.warning(
+                        f"[LOCAL-573] kokoro failed — falling back to Polly ({_k_err})"
+                    )
         response = polly_client.synthesize_speech(
             Text=chunk_text,
             OutputFormat=output_format,
