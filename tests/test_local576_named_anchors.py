@@ -172,23 +172,38 @@ class _StubbedJudge:
         return _Resp()
 
 
-class TestScopeCheckRemovesOnlyWhatWeChose(unittest.TestCase):
-    """[LOCAL-576] Steps 2+4 — PHASE 5.6 exempts anchors and removes only North End.
+class _ScopeJudgeStubbed(unittest.TestCase):
+    """Shared setup: deterministic scope judge + corpus write suppressed.
 
-    Because the fix runs this BEFORE PHASE 5, a stop removed here is removed
-    before any description is written: the 'writer call' for North End never
-    happens, which is the $0.03 the field test wasted.
-    """
+    _validate_stops_within_scope calls scope_memory.record_out_of_scope on a
+    high-confidence removal; left alone, a TEST verdict would be written into the
+    real tests/known_out_of_scope.json corpus. Suppress it so the test is a pure
+    read of behaviour, never a mutation of shipped data."""
 
     def setUp(self):
         if scope_memory:
             scope_memory.reset_cache()
+            self._real_record = scope_memory.record_out_of_scope
+            scope_memory.record_out_of_scope = lambda *a, **k: (False, None)
+        else:
+            self._real_record = None
         self._real_post = gtt.requests.post
         self.judge = _StubbedJudge()
         gtt.requests.post = self.judge
 
     def tearDown(self):
         gtt.requests.post = self._real_post
+        if scope_memory and self._real_record is not None:
+            scope_memory.record_out_of_scope = self._real_record
+
+
+class TestScopeCheckRemovesOnlyWhatWeChose(_ScopeJudgeStubbed):
+    """[LOCAL-576] Steps 2+4 — PHASE 5.6 exempts anchors and removes only North End.
+
+    Because the fix runs this BEFORE PHASE 5, a stop removed here is removed
+    before any description is written: the 'writer call' for North End never
+    happens, which is the $0.03 the field test wasted.
+    """
 
     def test_anchors_survive_north_end_removed(self):
         pois = [dict(p) for p in RECORDED_CANDIDATES]
@@ -258,7 +273,7 @@ class TestOrderIsPinnedToTheRoute(unittest.TestCase):
         self.assertEqual(len(ordered), 5)
 
 
-class TestFiveStopsEndToEndPieces(unittest.TestCase):
+class TestFiveStopsEndToEndPieces(_ScopeJudgeStubbed):
     """[LOCAL-576] The whole chain on the recorded candidates: mark -> scope-check
     (anchors exempt, North End out) -> order. Result is 5 would-be stops? No —
     North End is correctly gone, leaving the FOUR anchors; the real pipeline then
@@ -266,15 +281,6 @@ class TestFiveStopsEndToEndPieces(unittest.TestCase):
     and is proven in the live run; here we prove the deterministic core: the four
     NAMED stops all survive and are correctly ordered, and the ONE removal is the
     stop we chose, not one the listener named."""
-
-    def setUp(self):
-        if scope_memory:
-            scope_memory.reset_cache()
-        self._real_post = gtt.requests.post
-        gtt.requests.post = _StubbedJudge()
-
-    def tearDown(self):
-        gtt.requests.post = self._real_post
 
     def test_named_stops_all_present_and_ordered(self):
         pois = [dict(p) for p in RECORDED_CANDIDATES]

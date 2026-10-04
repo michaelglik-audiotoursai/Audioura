@@ -1,0 +1,364 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 5,
+      "unsourced": 41,
+      "total": 46,
+      "corpus": 5,
+      "grounded": 0,
+      "parametric": 41
+    },
+    "per_stop": {
+      "Crystal Lake": {
+        "sourced": 0,
+        "unsourced": 7,
+        "total": 7
+      },
+      "Commonwealth Avenue Mall": {
+        "sourced": 1,
+        "unsourced": 8,
+        "total": 9
+      },
+      "Boston Common": {
+        "sourced": 1,
+        "unsourced": 11,
+        "total": 12
+      },
+      "Boston Public Garden": {
+        "sourced": 3,
+        "unsourced": 5,
+        "total": 8
+      },
+      "Paul Revere House": {
+        "sourced": 0,
+        "unsourced": 10,
+        "total": 10
+      }
+    },
+    "claims": [
+      {
+        "stop": "Crystal Lake",
+        "text": "The route spans approximately 14 km from the serene waters of Crystal Lake to the historic Paul Revere House.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Crystal Lake",
+        "text": "As you pedal through coastal paths and urban gardens, each stop unveils the evolution of Boston, from the oldest city park in the U.S. at Boston Common to the colonial home of American patriot Paul Revere.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Crystal Lake",
+        "text": "Uncover over 300 years of history, from Puritan settlers to revolutionary heroes, in a city where past and present intertwine in a delicate dance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Crystal Lake",
+        "text": "In the mid-19th century, this picturesque body of water underwent a transformation from its original name, Baptist Pond, to the more enticing Crystal Lake.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Crystal Lake",
+        "text": "Socialites, targeted for their wealth, fell victim to armed robbers who used the speed of the burgeoning automobile age to their advantage, making their getaways toward the Newton town line.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Crystal Lake",
+        "text": "Reflecting on these stories, Crystal Lake and Commonwealth Avenue reveal a dynamic past that contrasts sharply with their peaceful present.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Crystal Lake",
+        "text": "As you pedal away, the lively heart of Boston beckons, promising further tales of the people and events that have shaped this vibrant region.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "In 1887, a notable chapter of this grand boulevard's history was written when Eben Norton Horsford, a chemist with a fascination for Norse lore, commissioned a statue of Leif Erikson.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "Horsford was convinced that the legendary Viking settlement of Norumbega was located along the Charles River.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1887, Eben Norton Horsford commissioned a statue of Leif Erikson at Comm Ave Mall at Charlesgate East, based on his belief that the Viking settlement of Norumbega was located along the Charles Rive"
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "This belief led him to commemorate Erikson, who he regarded as a significant figure in America's pre-Columbian history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "The statue stands proudly at Charlesgate East, capturing Erikson’s adventurous spirit and Horsford's dream to cement Viking history within the American narrative.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "Commonwealth Avenue Mall holds more than just tales of distant voyages.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "In June 1962, the tranquility of this promenade was shattered by the chilling presence of the 'Boston Strangler'.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "Two victims, Mary Mullen and Nina Nichols, were found along this very stretch, sparking fear and hysteria throughout Boston.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "The avenue, inspired by the great boulevards of Paris, is more than a path through the city; it is a corridor through time, lined with statues that silently witness the unfolding of Boston's history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Commonwealth Avenue Mall",
+        "text": "Pedal onwards, and the stories of Boston Common await—older than the city itself, they promise to deepen your journey's narrative.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "This park is part of the Emerald Necklace, a chain of parks that extends through Boston, connecting urban life with nature.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Boston Common is more than just a park; it is a historical canvas woven with tales of profound significance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Established in 1634, it holds the title of the oldest city park in the United States.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Among its storied past is the tragic duel that occurred here on the night of July 3, 1728.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Henry Phillips and Benjamin Woodbridge, two men embroiled in conflict, met under the veil of night.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Their disagreement ended with Woodbridge's death, causing Phillips to flee to France.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Another poignant episode unfolded on June 1, 1660, when Mary Dyer was publicly hanged on these grounds for her Quaker beliefs.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Her execution was not just a local event but echoed across the Atlantic, prompting King Charles II to intervene, ultimately halting further executions of Quakers in the colony.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Dyer's sacrifice became a pivotal moment in the struggle for religious freedom, sparking changes that would eventually shape the core values of what would become the United States.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "The Common also witnessed a grim discovery in 1895.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Common",
+        "text": "As construction crews worked on North America's first underground subway system at Boylston and Tremont streets, they unearthed over 900 skeletal remains, a reminder of the many lives that have intersected with this historic land.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1895, construction crews unearthed over 900 skeletal remains while building North America's first underground subway system at Boylston and Tremont streets."
+      },
+      {
+        "stop": "Boston Common",
+        "text": "Today, Boston Common continues to serve as a vital green space, where history and modern life converge.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "As your bike glides off the bustling Commonwealth Avenue Mall, where you paused earlier, you enter the serene embrace of the Boston Public Garden.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "This verdant expanse, once a muddy expanse of Back Bay, is bounded by the historic streets of Charles, Beacon, Arlington, and Boylston, forming a botanical sanctuary that speaks to both nature and history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "In the heart of this garden stands the Ether Monument, erected in 1867.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1867, the Ether Monument was erected in the Boston Public Garden amid a feud between Dr. William Morton and Dr. Charles Jackson over the discovery of ether as an anesthetic."
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "Dr. William Morton and Dr. Charles Jackson engaged in a bitter feud over the claim to this transformative medical advance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "Morton's public demonstrations of ether's effectiveness revolutionized surgical practice, but Jackson insisted on his own role in the discovery.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "The garden also bore witness to the determined spirit of Julia Paget in 1878.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "Following her husband's death, Julia fought to retain the Swan Boats concession despite resistance from city commissioners.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In 1878, Julia Paget fought to keep the Swan Boats concession in the Boston Public Garden after her husband's death, despite opposition from city commissioners."
+      },
+      {
+        "stop": "Boston Public Garden",
+        "text": "In the 1910s, Mayor James Michael Curley proposed the garden's subdivision for private development, sparking an uproar among the residents of Beacon Hill and Back Bay.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "In the 1910s, Mayor James Michael Curley proposed subdividing the Boston Public Garden to sell to private developers, causing outrage among Beacon Hill and Back Bay residents."
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "As you pedal into the North End, you'll reach 19 North Square, where the Paul Revere House stands as a testament to American history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "The Paul Revere House, a National Historic Landmark and part of the Boston National Historical Park, serves as a living museum, preserving the legacy of its most famous occupant, Paul Revere.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "Built around 1680, it is the oldest house in downtown Boston and once served as the residence of Paul Revere, a notable American patriot.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "During his time here, Revere, a silversmith by trade, became entangled in the fervor of revolution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "This bold act not only fueled anti-British sentiments but also lined his pockets, showcasing his keen entrepreneurial spirit.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "The house's history extends beyond the American Revolution.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "Before Revere's time, the site belonged to the Second Church of Boston's parsonage, which was destroyed in the Great Fire of 1676.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "After Revere sold the property in 1800, the house transitioned into a sailors' boarding house and later, an immigrant tenement, reflecting the evolving community of the North End.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "As you stand in its small courtyard, you might imagine Revere preparing for his legendary midnight ride on April 18, 1775.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Paul Revere House",
+        "text": "This detail, while small, humanizes the man behind the legend and connects us to the everyday rhythms of life during Boston's revolutionary past.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
