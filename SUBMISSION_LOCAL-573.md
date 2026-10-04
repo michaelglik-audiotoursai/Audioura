@@ -92,3 +92,41 @@ would use** (24000 Hz for Joanna/Matthew/Amy/Brian, 22050 Hz for standard Englis
 mono, matching Polly's MP3 bitrate. Measured bitrate/sample-rate are reported in Step 5.
 Long text keeps the existing 2000-char sentence/word chunking; Kokoro renders per chunk and
 the MP3 segments are concatenated, identical to the Polly chunk-concat behaviour.
+
+---
+
+## Step 3 — Container
+
+`Dockerfile.polly-tts` now installs Kokoro CPU-only for arm64 with model weights baked at
+**build** time (not per request):
+
+- Base bumped `python:3.9-slim` → `python:3.11-slim` (kokoro 0.9.4 requires Python
+  ≥3.10,<3.13).
+- System dep `ffmpeg` (Kokoro PCM → MP3). `misaki[en]` bundles espeak-ng via
+  `espeakng-loader`, so no system espeak package is needed.
+- Pinned: `flask==3.0.3`, `boto3==1.34.162`, `torch==2.6.0` (CPU index
+  `https://download.pytorch.org/whl/cpu`, aarch64 wheel — avoids the multi-GB CUDA
+  wheels), `kokoro==0.9.4`, `misaki[en]==0.9.4`, `transformers==4.47.1`,
+  `soundfile==0.12.1`.
+- `download_kokoro_weights.py` runs during build: it instantiates `KPipeline(lang_code='a')`
+  and does one tiny synthesis for **both** `af_heart` and `am_michael`, forcing the HF
+  snapshot + both voice packs into the image layer (`HF_HOME=/app/.cache/huggingface`).
+  Build fails loudly if the bake fails.
+
+**Image size (measured on this Mac, `docker images`):**
+
+| image | size |
+|-------|------|
+| `polly-tts:before` (today's Polly-only Dockerfile) | **312 MB** |
+| `polly-tts:after` (Kokoro baked in) | **2.98 GB** |
+
+The growth is torch + spacy/transformers + the baked weights/voice packs. CPU-only wheels
+keep it off the multi-GB CUDA path. Disk at build time: 25 GB free, so it fits with room.
+
+`docker-compose-master.yml` polly-tts-1 now passes `TTS_ENGINE=${TTS_ENGINE:-polly}`, so
+the deployed default is unchanged and the switch flips by setting one env var.
+
+**Verified:** image builds clean; weight bake prints
+`[LOCAL-573] Kokoro weights + voice packs baked into image.`; container started on spare
+port 5118 with `TTS_ENGINE=kokoro` returns
+`{"status":"healthy","service":"polly_tts","polly_available":true,"tts_engine":"kokoro"}`.

@@ -1,11 +1,55 @@
-FROM python:3.9-slim
+# [LOCAL-573] polly-tts image.
+# Default behaviour (TTS_ENGINE=polly) is unchanged: a Flask app that calls AWS
+# Polly. With TTS_ENGINE=kokoro the same image renders English voices locally on
+# Kokoro-82M (CPU, arm64). Model weights are downloaded at BUILD time, not per
+# request, so the first synthesis is fast and the container needs no network for
+# the model.
+#
+# kokoro 0.9.4 requires Python >=3.10,<3.13 — base bumped from 3.9 to 3.11-slim.
+FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install flask boto3
+# ── System deps ──────────────────────────────────────────────────────────────
+# ffmpeg: encode Kokoro PCM -> MP3 (match Polly's mono MP3 shape).
+# misaki[en] bundles espeak-ng via espeakng-loader, so no system espeak needed.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Python deps ──────────────────────────────────────────────────────────────
+# Flask + boto3 are the Polly-path deps (unchanged).
+RUN pip install --no-cache-dir \
+      flask==3.0.3 \
+      boto3==1.34.162
+
+# Torch CPU-only wheel (keeps the image lean — the default index pulls CUDA
+# wheels that are multiple GB). Pinned, CPU index, arm64 (aarch64) wheel.
+# torch>=2.5 is required by the transformers version kokoro 0.9.4 pulls in.
+RUN pip install --no-cache-dir \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch==2.6.0
+
+# Kokoro + its English phonemiser stack. Pinned to the LOCAL-567 version.
+# transformers pinned to a version compatible with torch 2.6 + kokoro 0.9.4.
+RUN pip install --no-cache-dir \
+      kokoro==0.9.4 \
+      "misaki[en]==0.9.4" \
+      transformers==4.47.1 \
+      soundfile==0.12.1
 
 COPY polly_tts_service.py .
+COPY kokoro_engine.py .
 COPY build_manifest.py .
+
+# ── Bake model weights at build time ─────────────────────────────────────────
+# Instantiate the pipeline and run one tiny synthesis so the Hugging Face
+# snapshot (model + config) and the af_heart / am_michael voice packs are
+# cached inside the image layer. HF_HOME points the cache at /app so it is
+# captured in the image, not a per-container volume.
+ENV HF_HOME=/app/.cache/huggingface
+COPY download_kokoro_weights.py .
+RUN python download_kokoro_weights.py
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown
@@ -14,4 +58,5 @@ RUN python build_manifest.py /app /app/.build_manifest.json
 
 EXPOSE 5018
 
+# TTS_ENGINE defaults to polly inside the app; docker-compose passes it through.
 CMD ["python", "polly_tts_service.py"]
