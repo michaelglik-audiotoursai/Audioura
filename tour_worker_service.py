@@ -394,7 +394,10 @@ def run_generation(job_id, location, tour_type, total_stops, user_id=None, reque
             try:
                 tr_resp = _authenticated_request("POST", f"{TRANSLATION_URL}/translate-with-audio",
                     headers={"Content-Type": "application/json"},
-                    json={"content_id": english_tour_id, "content_type": "tour", "languages": [language]},
+                    json={"content_id": english_tour_id, "content_type": "tour", "languages": [language],
+                          # [LOCAL-578] Forward attribution so the translation service's
+                          # cost_ledger rows are tied to this job/user.
+                          "job_id": job_id, "user_id": user_id},
                     timeout=120)
                 if tr_resp.status_code == 200:
                     tr_data = tr_resp.json()

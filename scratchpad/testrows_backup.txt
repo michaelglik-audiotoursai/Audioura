@@ -25,3 +25,11 @@
 53 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
 54 | 43.6881 | 7.2679 | Musée Matisse, Nice, France
 55 | 43.6782 | 7.2280 | Musée des Arts Asiatiques, Nice, France
+ id  |                        tour_name                         | lat | lng | content_language | original_tour_id 
+-----+----------------------------------------------------------+-----+-----+------------------+------------------
+ 390 | LOCAL49 Тест регрессии 1790219302 - Пешеходная экскурсия |     |     | ru               |              363
+(1 row)
+
+
+--- LOCAL-578 live test 2026-10-04T18:18:39Z ---
+Test row: audio_tours id=390 (ru translation of tour 363), original lat/lng were already NULL (regression-test source tour 363 has no coords); no map pin, nothing to restore. job_id=local578-live-1791137879. Never deleted.
