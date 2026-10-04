@@ -8,6 +8,13 @@ COPY cost_ceiling_monitor.py /app/
 COPY cost_meter.py /app/
 COPY cost_rates.py /app/
 COPY build_manifest.py /app/
+# Every local module tour_orchestrator_service.py imports (LEAD 2026-10-04: user_stops_flag was
+# missing, so any rebuild crash-looped; the others degraded silently).
+COPY quality_guardrails.py /app/
+COPY swipe_preference_service.py /app/
+COPY tour_scoring_service.py /app/
+COPY user_quality_index.py /app/
+COPY user_stops_flag.py /app/
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown
