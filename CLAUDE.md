@@ -217,6 +217,17 @@ task in Storied space → Development → **🟦 Services — Kiro** (`100041000
 `**Agent:** GCloud_Storied`, naming the exact commit. Windows Laptop Claude works that queue when
 Michael asks it to. First one: [wdvrdayrdp](https://app.clickup.com/t/wdvrdayrdp) (storied @ 5fda8bc).
 
+**⚠️ The LOCAL Mac Mini stack runs `subscribed`, not `storied` (D604, 2026-10-04).** Five services
+(tour-generator, orchestrator, polly-tts, translation, modernized) are built from
+`~/audioura-subscribed-local` with every cost switch on. **Rebuild them only with the override:**
+`docker compose -p audioura -f docker-compose-master.yml -f docker-compose.subscribed-local.yml up -d --no-deps --build <svc>`.
+A plain `docker-compose -f docker-compose-master.yml build/up` silently puts them back on storied,
+and so does recreating a dependent service (that happened once on 2026-10-04). Update the code:
+`git -C ~/audioura-subscribed-local checkout --detach origin/subscribed`. English TTS needs the host
+Kokoro service (launchd `com.audioura.kokoro`, :5181; `curl localhost:5181/health` must say ffmpeg).
+**Docker builds hang?** Check for stuck `docker-credential-desktop get`: `credsStore` was removed
+from `~/.docker/config.json` for exactly this.
+
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
 
 **Michael's request, 2026-08-16.** He asked where a tester's bug was filed while we
