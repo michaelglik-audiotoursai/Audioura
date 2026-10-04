@@ -24369,3 +24369,10 @@ Polly standard today: ≈ $0.0075 / ≈ $0.04. **LEAD decision: tts-1** for non-
 cannot speak (he rated both best; hd doubles the price for a difference he did not single out).
 Built after LOCAL-573B lands (same service), as LOCAL-574. It must also cover the direct-boto3
 translation path (`translation-service/translation_service.py:687`), which LOCAL-573 left on Polly.
+
+## D603 — REVERSES D602: Russian stays on Polly standard (Michael, 2026-10-03)
+
+Michael: *"Please keep Polly as it is significantly cheaper."* Russian (and every non-English
+language) stays on Polly standard (≈ $0.04 per 4-stop tour vs ≈ $0.14 for tts-1). LOCAL-574 as
+described in D602 is cancelled. Voice plan: English → Kokoro (LOCAL-573B), everything else →
+Polly unchanged.
