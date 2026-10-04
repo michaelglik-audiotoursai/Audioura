@@ -126,6 +126,11 @@ def synthesize_speech():
     # with KOKORO_URL unset, Kokoro means the in-process encoder (r1 code
     # fallback). On ANY Kokoro failure we log and use Polly so the tour never
     # loses audio.
+    #
+    # [LOCAL-575] This renders ONE chunk only. For the HOST path the whole stop
+    # is sent to the host in a single /render call (see _render_whole_via_host)
+    # so Kokoro's internal PCM concat yields one MP3 with one correct header;
+    # _render_chunk is used for the Polly split and the in-process fallback.
     def _render_chunk(chunk_text, voice_id, output_format, polly_engine):
         want_kokoro = (
             TTS_ENGINE == 'kokoro'
@@ -133,39 +138,17 @@ def synthesize_speech():
             and output_format == 'mp3'
             and kokoro_engine.should_use_kokoro(voice_id, engine='kokoro')
         )
-        if want_kokoro:
-            if KOKORO_URL:
-                # Host-native path: call the Mac host service.
-                if _requests is None:
-                    logging.warning(
-                        "[LOCAL-573] kokoro host unavailable — Polly (requests not installed)"
-                    )
-                else:
-                    try:
-                        resp = _requests.post(
-                            KOKORO_URL,
-                            json={'text': chunk_text, 'voice': voice_id},
-                            timeout=_render_text_timeout(len(chunk_text)),
-                        )
-                        if resp.status_code == 200 and resp.content:
-                            return resp.content, 'kokoro'
-                        logging.warning(
-                            f"[LOCAL-573] kokoro host unavailable — Polly "
-                            f"(status {resp.status_code})"
-                        )
-                    except Exception as _host_err:  # noqa: BLE001 - conn/timeout/etc.
-                        logging.warning(
-                            f"[LOCAL-573] kokoro host unavailable — Polly ({_host_err})"
-                        )
-            else:
-                # In-process code fallback (KOKORO_URL unset).
-                try:
-                    audio = kokoro_engine.synthesize_to_mp3(chunk_text, voice_id)
-                    return audio, 'kokoro'
-                except Exception as _k_err:  # noqa: BLE001 - fall back on anything
-                    logging.warning(
-                        f"[LOCAL-573] kokoro failed — falling back to Polly ({_k_err})"
-                    )
+        if want_kokoro and not KOKORO_URL:
+            # In-process code fallback (KOKORO_URL unset). Returns a per-chunk
+            # MP3; the chunked branch recombines these at the PCM level so the
+            # final file has one correct header (never byte-concatenated).
+            try:
+                audio = kokoro_engine.synthesize_to_mp3(chunk_text, voice_id)
+                return audio, 'kokoro'
+            except Exception as _k_err:  # noqa: BLE001 - fall back on anything
+                logging.warning(
+                    f"[LOCAL-573] kokoro failed — falling back to Polly ({_k_err})"
+                )
         response = polly_client.synthesize_speech(
             Text=chunk_text,
             OutputFormat=output_format,
@@ -173,6 +156,36 @@ def synthesize_speech():
             Engine=polly_engine,
         )
         return response['AudioStream'].read(), 'polly'
+
+    # [LOCAL-575] Host path: render the ENTIRE stop text in a single call to the
+    # Mac host service. The host (kokoro_engine.synthesize_to_mp3) renders every
+    # internal Kokoro chunk to PCM, concatenates the PCM, and encodes ONE MP3 —
+    # one Xing/Info header for the whole duration. This is why the host path does
+    # not reuse polly_tts's 2,000-char split (that split exists only for Polly's
+    # per-request character limit; the host has no such limit). Returns MP3 bytes
+    # on success, or None to signal "fall back to Polly for the whole request".
+    def _render_whole_via_host(full_text, voice_id):
+        if _requests is None:
+            logging.warning(
+                "[LOCAL-573] kokoro host unavailable — Polly (requests not installed)"
+            )
+            return None
+        try:
+            resp = _requests.post(
+                KOKORO_URL,
+                json={'text': full_text, 'voice': voice_id},
+                timeout=_render_text_timeout(len(full_text)),
+            )
+            if resp.status_code == 200 and resp.content:
+                return resp.content
+            logging.warning(
+                f"[LOCAL-573] kokoro host unavailable — Polly (status {resp.status_code})"
+            )
+        except Exception as _host_err:  # noqa: BLE001 - conn/timeout/etc.
+            logging.warning(
+                f"[LOCAL-573] kokoro host unavailable — Polly ({_host_err})"
+            )
+        return None
 
     try:
         if not polly_client:
@@ -197,8 +210,32 @@ def synthesize_speech():
         # [LOCAL-573] Which engine actually rendered the audio (for metering).
         render_engines = set()
 
+        # [LOCAL-575] Host-native Kokoro: render the WHOLE stop in one host call
+        # so the output is a single MP3 with one correct header (the host
+        # concatenates its internal PCM chunks and encodes once). This replaces
+        # the old per-chunk host calls whose byte-concatenated MP3s carried one
+        # Xing header per chunk — the player trusted the first, so the timer ran
+        # out early (tour 388). On any host failure, _render_whole_via_host
+        # returns None and we fall through to the Polly split below.
+        want_kokoro_request = (
+            TTS_ENGINE == 'kokoro'
+            and kokoro_engine is not None
+            and output_format == 'mp3'
+            and KOKORO_URL
+            and kokoro_engine.should_use_kokoro(voice_id, engine='kokoro')
+        )
+        combined_audio = None
+        if want_kokoro_request:
+            _host_mp3 = _render_whole_via_host(text, voice_id)
+            if _host_mp3 is not None:
+                combined_audio = _host_mp3
+                render_engines.add('kokoro')
+                total_chars_submitted = len(text)
+
+        if combined_audio is not None:
+            pass  # Rendered whole-text on the host; skip splitting.
         # Split text if too long (use 2000 char limit for safety)
-        if len(text) > 2000:
+        elif len(text) > 2000:
             logging.info(f"Text too long ({len(text)} chars), splitting by sentences")
             
             import re
@@ -243,8 +280,36 @@ def synthesize_speech():
                 render_engines.add(_used)
                 audio_segments.append(_audio)
             
-            # Combine all audio segments
-            combined_audio = b''.join(audio_segments)
+            # [LOCAL-575] Combine the chunks into one deliverable.
+            #  * If ANY chunk was rendered by Kokoro, each chunk MP3 has its own
+            #    Xing/Info header (ffmpeg writes one per encode). Byte-concat
+            #    would leave the player trusting the first header's duration, so
+            #    we recombine at the PCM level: decode every chunk (Kokoro AND
+            #    Polly) to PCM, concatenate, and encode ONE MP3 with one correct
+            #    header (handles the mixed-fallback case too). This path only
+            #    runs in-process (KOKORO_URL unset), where ffmpeg is available.
+            #  * Pure-Polly chunks are raw MP3 frames with no Xing header, so a
+            #    byte-concat is already correct and is kept byte-for-byte.
+            if 'kokoro' in render_engines:
+                try:
+                    combined_audio = kokoro_engine.combine_mp3_chunks(audio_segments, voice_id)
+                except Exception as _combine_err:  # noqa: BLE001
+                    # Combine needs ffmpeg; if it is unavailable, do not ship a
+                    # broken multi-header file. Re-render the whole stop on Polly
+                    # (raw frames, no Xing bug) so delivery stays correct.
+                    logging.warning(
+                        f"[LOCAL-575] PCM combine failed ({_combine_err}); "
+                        f"re-rendering whole stop on Polly"
+                    )
+                    _resp = polly_client.synthesize_speech(
+                        Text=text, OutputFormat=output_format,
+                        VoiceId=voice_id, Engine=engine,
+                    )
+                    combined_audio = _resp['AudioStream'].read()
+                    render_engines = {'polly'}
+                    total_chars_submitted = len(text)
+            else:
+                combined_audio = b''.join(audio_segments)
         else:
             # Single request for short text
             total_chars_submitted = len(text)

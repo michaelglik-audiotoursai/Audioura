@@ -227,3 +227,113 @@ def synthesize_to_mp3(text, voice_id):
             return f.read()
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ── [LOCAL-575] Single-header multi-chunk combine ────────────────────────────
+# Defect: a stop over 2,000 chars is split into chunks by polly_tts_service, and
+# each Kokoro chunk is encoded to its own MP3 (ffmpeg writes a Xing/Info header
+# describing THAT chunk only). Byte-concatenating those MP3s yields a file whose
+# FIRST header claims the first chunk's duration — so a player's timer trusts a
+# duration far shorter than the real audio (tour 388: audio_1 header 121 s, real
+# 204 s). Polly's raw MP3 frames carry no Xing header, which is why Polly tours
+# never showed this.
+#
+# Fix: when a request renders in chunks, decode every chunk's MP3 back to raw
+# PCM, concatenate the PCM, and encode ONE MP3 (one correct Xing header for the
+# whole duration). Mixed fallback (some chunks rendered by Polly) is handled the
+# same way: Polly's MP3 decodes to PCM just like Kokoro's, so the single output
+# header is correct regardless of which engine produced each chunk.
+#
+# This lives in kokoro_engine (shared) so the in-process fallback path and the
+# offline tour-repair tool use the exact same encoder as the host service.
+
+# ffmpeg writes a Xing/Info header for CBR/VBR MP3 it encodes from a container
+# input (wav/mp3) but NOT when the input is raw PCM piped as -f s16le and copied
+# frame-by-frame. We always go PCM -> MP3 here, so exactly one Xing header is
+# emitted for the whole stream.
+
+
+def _mp3_bitrate_for(sample_rate):
+    """Match the per-chunk encoder: 48k for >=24 kHz, 32k otherwise."""
+    return "48k" if sample_rate >= 24000 else "32k"
+
+
+def decode_mp3_to_pcm(mp3_bytes, sample_rate):
+    """Decode MP3 bytes to raw signed-16-bit little-endian mono PCM at
+    ``sample_rate`` using ffmpeg. Returns the PCM byte string.
+
+    Used to turn already-encoded chunks (Kokoro or Polly) back into PCM so they
+    can be concatenated and re-encoded as a single MP3 with one correct header.
+    Raises KokoroUnavailable if ffmpeg is missing, KokoroSynthesisError on a
+    decode failure.
+    """
+    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    cmd = [
+        ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+        "-i", "pipe:0",
+        "-f", "s16le", "-acodec", "pcm_s16le",
+        "-ac", "1", "-ar", str(sample_rate),
+        "pipe:1",
+    ]
+    try:
+        proc = subprocess.run(cmd, input=mp3_bytes, check=True, capture_output=True)
+    except FileNotFoundError as e:
+        raise KokoroUnavailable(f"ffmpeg not found: {e}") from e
+    except subprocess.CalledProcessError as e:
+        raise KokoroSynthesisError(
+            f"ffmpeg decode failed: {e.stderr.decode('utf-8', 'ignore')[:300]}"
+        ) from e
+    return proc.stdout
+
+
+def encode_pcm_to_mp3(pcm_bytes, sample_rate):
+    """Encode raw s16le mono PCM at ``sample_rate`` to a single MP3 (one Xing
+    header for the whole stream) using ffmpeg. Returns the MP3 byte string.
+
+    Bitrate mirrors the per-chunk encoder (48k at >=24 kHz, else 32k) so the
+    combined file matches today's shape. Raises KokoroUnavailable if ffmpeg is
+    missing, KokoroSynthesisError on an encode failure.
+    """
+    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    bitrate = _mp3_bitrate_for(sample_rate)
+    cmd = [
+        ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "s16le", "-ac", "1", "-ar", str(sample_rate),
+        "-i", "pipe:0",
+        "-ac", "1", "-ar", str(sample_rate), "-b:a", bitrate,
+        "-f", "mp3", "pipe:1",
+    ]
+    try:
+        proc = subprocess.run(cmd, input=pcm_bytes, check=True, capture_output=True)
+    except FileNotFoundError as e:
+        raise KokoroUnavailable(f"ffmpeg not found: {e}") from e
+    except subprocess.CalledProcessError as e:
+        raise KokoroSynthesisError(
+            f"ffmpeg encode failed: {e.stderr.decode('utf-8', 'ignore')[:300]}"
+        ) from e
+    return proc.stdout
+
+
+def combine_mp3_chunks(chunks, voice_id):
+    """Combine already-encoded MP3 ``chunks`` into ONE MP3 with a single, correct
+    header, by decoding each chunk to PCM, concatenating, and re-encoding once.
+
+    ``chunks`` is a non-empty iterable of MP3 byte strings (each may be a Kokoro
+    or a Polly chunk — both decode to PCM identically). ``voice_id`` picks the
+    target sample rate (24 kHz neural English, 22050 Hz otherwise), the same
+    rate the per-chunk encoder used, so the combine is lossless in shape.
+
+    A single chunk is returned unchanged (nothing to combine, no re-encode) to
+    stay byte-for-byte with today when no splitting happened.
+    """
+    chunk_list = [c for c in chunks if c]
+    if not chunk_list:
+        raise KokoroSynthesisError("no chunks to combine")
+    if len(chunk_list) == 1:
+        return chunk_list[0]
+    sample_rate = target_sample_rate_for(voice_id)
+    pcm_parts = [decode_mp3_to_pcm(c, sample_rate) for c in chunk_list]
+    combined_pcm = b"".join(pcm_parts)
+    if not combined_pcm:
+        raise KokoroSynthesisError("combined PCM is empty")
+    return encode_pcm_to_mp3(combined_pcm, sample_rate)
