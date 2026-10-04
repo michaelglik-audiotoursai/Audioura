@@ -11706,6 +11706,24 @@ Exempt: navigation directions ("Turn left", "Continue past").
         return _partial_tour, output_file, first_poi_coordinates
 
     # ============================================================
+    # [LOCAL-576] Pin the delivered order to the route the listener named FIRST,
+    # so the start anchor sits at index 0 before the scope check runs: PHASE 5.6
+    # keeps stop 0 unconditionally for graceful degradation, and that protected
+    # slot must be the stop the LISTENER named as the start, never a stop WE chose
+    # that happens to be first in the candidate list. loop/from-X starts at X,
+    # from-X-to-Y ends at Y, via-points keep the listener's order. Position-only —
+    # never adds or drops.
+    _lr576_order_info = named_anchors(user_request)
+    if _lr576_order_info.get('anchors'):
+        _lr576_pre = [p.get('name', '') for p in poi_list]
+        poi_list = _order_by_anchors(poi_list, _lr576_order_info)
+        _lr576_post = [p.get('name', '') for p in poi_list]
+        if _lr576_pre != _lr576_post:
+            print(f"  [LOCAL-576] Route order pinned to named anchors "
+                  f"(start={_lr576_order_info['start']!r}, end={_lr576_order_info['end']!r}, "
+                  f"loop={_lr576_order_info['is_loop']}): {_lr576_post}")
+
+    # ============================================================
     # [LOCAL-576] SCOPE CHECK **BEFORE WRITING**, then REPLENISH.
     # ============================================================
     # Tour 388 delivered 4 of 5 because North End was SELECTED, written in full
@@ -11752,25 +11770,16 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     print(f"  [LOCAL-576] Replenished {_lr576_added} stop(s) in "
                           f"{_lr576_rounds} round(s); {_lr576_rej} rejected for scope. "
                           f"Now {len(poi_list)}/{_lr576_want}.")
+                    # Replenished stops were appended to the end — re-pin the order so
+                    # the end anchor stays last and the start anchor stays first.
+                    if _lr576_added:
+                        poi_list = _order_by_anchors(poi_list, _lr576_order_info)
                 except Exception as _lr576_e:
                     print(f"  [LOCAL-576] Replenishment unavailable ({_lr576_e}) — "
                           f"delivering {len(poi_list)} verified stop(s).")
             else:
                 print(f"  [LOCAL-576] Pre-writing scope check: all {_lr576_before} "
                       f"stop(s) within '{_lr576_scope}'.")
-
-    # [LOCAL-576] Pin the delivered order to the route the listener named, now that
-    # the stop set is final: loop/from-X starts at X, from-X-to-Y ends at Y,
-    # via-points keep the listener's order. Position-only — never adds or drops.
-    _lr576_order_info = named_anchors(user_request)
-    if _lr576_order_info.get('anchors'):
-        _lr576_pre = [p.get('name', '') for p in poi_list]
-        poi_list = _order_by_anchors(poi_list, _lr576_order_info)
-        _lr576_post = [p.get('name', '') for p in poi_list]
-        if _lr576_pre != _lr576_post:
-            print(f"  [LOCAL-576] Route order pinned to named anchors "
-                  f"(start={_lr576_order_info['start']!r}, end={_lr576_order_info['end']!r}, "
-                  f"loop={_lr576_order_info['is_loop']}): {_lr576_post}")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     _phase_timer.start('narration')
