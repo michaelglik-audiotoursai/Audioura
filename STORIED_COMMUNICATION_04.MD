@@ -167,3 +167,7 @@ separating the two needs one, and Kiro writes it, not LEAD.
 **LEAD:** Rule recorded in CLAUDE.md (dd929f4). First ClickUp deploy task: wdvrdayrdp (storied @ 5fda8bc: LOCAL-572 Wikidata-per-process bug + LOCAL-564/570 closures; needs pycountry).
 (1) Nothing has changed cost by default yet — every saving is behind a switch awaiting Michael's blind reads. Today: biking 4-stop ≈ $0.38 (OpenAI $0.19–0.20 + Gemini ≈ $0.04 + Polly ≈ $0.15), 5.5–6.2 min; museum 4-stop ≈ $0.38 typical (Our Lady, 3.8–5.2 min) and ≈ $1.05–1.15 story-poor (Palais, ≈10 min). Measured options (n=1, 3 stops, Gemini off): museum early-stop −33% OpenAI; gpt-4.1 −26% across 4 tours; time barely moves (±10%). Kokoro voice is the biggest biking lever (−$0.15 of ≈$0.38). No biking tour was measured with options.
 (2) Not yet. Local :5000/:5002 runs storied; Subscribed's options are off by default; the app's port is fixed at 5002, so a phone test of Subscribed means rebuilding the local stack from `subscribed` with the switches on (reversible).
+
+### 2026-10-03 23:2x — voice verdict
+**Michael:** "Kokoro is good, no worse than Polly. OpenAI is a bit worse as far as tone goes, but it is the only one that pronounces names correctly in English such as Nice [nes] vs. [nais] in Polly and Kokoro. What are their costs?"
+**LEAD:** Per 4-stop tour: Kokoro ≈ $0 local (≈ $0.002 on Cloud Run), Polly neural $0.152, OpenAI tts-1 $0.143 (tts-1-hd $0.285). Plan: Kokoro + a pronunciation fix for place names (LOCAL-574), which keeps the free voice and fixes "Nice". D601.

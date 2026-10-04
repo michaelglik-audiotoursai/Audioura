@@ -24349,3 +24349,13 @@ neural ($0.15) is. With Kokoro for English: biking ≈ $0.20 (−47%), museum �
 `TTS_ENGINE=kokoro` on subscribed (English only, Polly fallback, local container). Rebuild local
 with all four switches on as soon as LOCAL-573 is approved AND Michael's blind voice read does not
 reject Kokoro.
+
+## D601 — Michael's ear verdict: Kokoro ≥ Polly; OpenAI tone weaker but pronounces place names right (2026-10-03)
+
+Michael, blind A/B (BLIND_AB, 2 stops × Polly neural / Kokoro af_heart / OpenAI tts-1), verbatim:
+*"Kokoro is good, no worse than Polly. OpenAI is a bit worse as far as tone goes, but it is the only
+one that pronounces names correctly in English such as Nice [nes] vs. [nais] in Polly and Kokoro."*
+→ The D600 condition is met: Kokoro passes the ear. After LOCAL-573 is approved, rebuild local
+from `subscribed` with all four switches on. Follow-up (LOCAL-574): fix place-name pronunciation in
+Kokoro, which takes per-word phoneme overrides, rather than paying for OpenAI's voice. Source the
+pronunciations from data (Wikidata IPA, P898), not from a hand list (D476).
