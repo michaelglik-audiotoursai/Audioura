@@ -118,10 +118,12 @@ the MP3 segments are concatenated, identical to the Polly chunk-concat behaviour
 | image | size |
 |-------|------|
 | `polly-tts:before` (today's Polly-only Dockerfile) | **312 MB** |
-| `polly-tts:after` (Kokoro baked in) | **2.98 GB** |
+| `polly-tts:after` (Kokoro baked in) | **~3.0 GB** |
 
 The growth is torch + spacy/transformers + the baked weights/voice packs. CPU-only wheels
 keep it off the multi-GB CUDA path. Disk at build time: 25 GB free, so it fits with room.
+(The image also now carries `cost_meter.py` / `cost_rates.py` + `psycopg2-binary` so TTS
+metering actually records — see Step 4.)
 
 `docker-compose-master.yml` polly-tts-1 now passes `TTS_ENGINE=${TTS_ENGINE:-polly}`, so
 the deployed default is unchanged and the switch flips by setting one env var.
@@ -130,3 +132,66 @@ the deployed default is unchanged and the switch flips by setting one env var.
 `[LOCAL-573] Kokoro weights + voice packs baked into image.`; container started on spare
 port 5118 with `TTS_ENGINE=kokoro` returns
 `{"status":"healthy","service":"polly_tts","polly_available":true,"tts_engine":"kokoro"}`.
+
+---
+
+## Step 4 — Metering
+
+The TTS cost row now records the engine that **actually rendered**:
+
+- **Kokoro render** → `breakdown.engine = "kokoro"`, `our_cost_usd = 0.0` (local CPU).
+- **Polly render** → `breakdown.engine = "neural" | "standard"`, Polly per-char cost (today).
+- **Mid-tour fallback** (some chunks Kokoro, some Polly) → `engine = "kokoro+polly"`, charged
+  at the Polly per-char rate (conservative) so the fallback is visible and never under-bills.
+
+To make this real I also had the image COPY `cost_meter.py` / `cost_rates.py` and install
+`psycopg2-binary` — the old Dockerfile never copied them, so the LOCAL-323 metering block
+silently no-op'd (`No module named 'cost_meter'`). Now it writes a ledger row.
+
+**Live ledger rows written during the Step 5 check** (`cost_ledger`, shared postgres-2):
+
+| job_id | operation_type | engine | voice | chars | our_cost_usd |
+|--------|----------------|--------|-------|-------|--------------|
+| lc573-en | tts_generate | **kokoro** | Joanna | 185 | **$0.000000** |
+| lc573-ru | tts_generate | **standard** | Tatyana | 74 | **$0.000296** |
+
+So Michael sees `engine=kokoro` at $0 for English and the real Polly price for Russian.
+
+---
+
+## Step 5 — Tests + live check
+
+**Unit tests** — `tests/test_local573_kokoro_routing.py`, **10 passed**:
+
+- Routing: English voices → Kokoro; Russian/Lucia/Celine/Marlene/Zhiyu/Seoyeon → Polly;
+  switch off (`TTS_ENGINE=polly`) → Polly.
+- Voice mapping: female → `af_heart`, male (Matthew/Brian) → `am_michael`.
+- Sample-rate mapping: neural English → 24000, standard English → 22050.
+- Service `/synthesize` (boto3 + kokoro mocked): English renders via Kokoro and meters
+  `engine=kokoro`/$0; a Kokoro exception falls back to Polly and meters `engine=neural`/>$0;
+  Russian never calls Kokoro; default `polly` engine never touches Kokoro.
+
+```
+$ python3 -m pytest tests/test_local573_kokoro_routing.py -v
+... 10 passed in 0.19s
+```
+
+**Live check** — image built, container on spare port **5118** (NOT the shared 5018),
+`TTS_ENGINE=kokoro`, `.env` AWS creds for the Polly path, attached to the compose network
+so metering reached postgres-2:
+
+| stop | voice → engine | synth seconds | duration | sample rate | bitrate | channels |
+|------|----------------|---------------|----------|-------------|---------|----------|
+| English | Joanna → **Kokoro `af_heart`** | **4.63 s** | 11.925 s | **24000 Hz** | ~48.4 kbps | mono |
+| Russian | Tatyana → **Polly standard** | **0.48 s** | 5.094 s | **22050 Hz** | ~48.1 kbps | mono |
+
+The English MP3 is 24000 Hz mono — the Polly-neural MP3 shape; the Russian MP3 is 22050 Hz
+mono — unchanged from today's Polly standard. English synth at ~4.6 s for a 185-char /
+~12 s stop is well inside Michael's ~15 s/stop expectation on this Mac's CPU.
+
+**Guardrails observed:**
+- Shared `audioura-polly-tts-1-1` on port 5018 untouched (still "Up 2 days").
+- DB writes: exactly **2** `tts_generate` metering rows (the rows normal synthesis writes),
+  job_ids `lc573-en`, `lc573-ru`. No other writes, no DELETE, no GCloud.
+- Polly spend for the live check: **$0.000296** total — far under the $0.10 cap.
+- Test container removed after the run.
