@@ -1104,6 +1104,160 @@ Example: For "Paul Revere House" and poi_type "restaurant":
         return {"matches": True, "reason": "verification failed", "confidence": "low"}
 
 
+def _norm_name_for_refill(name):
+    """Normalization used by the LOCAL-577 refill/gate helpers.
+
+    Prefer story_miner._normalize (the same accent-folding + punctuation-stripping
+    the D1v2 path uses, so a title the gate renamed matches its evidence key); fall
+    back to a local NFKD fold if story_miner cannot be imported."""
+    try:
+        from story_miner import _normalize as _sm_norm
+        return _sm_norm(name or "")
+    except Exception:
+        n = unicodedata.normalize('NFKD', (name or '').lower())
+        n = ''.join(c for c in n if not unicodedata.combining(c))
+        return re.sub(r'\s+', ' ', re.sub(r"[^\w\s]", ' ', n)).strip()
+
+
+# [LOCAL-577] A real stop dropped by D1v2 on a canonical-TITLE mismatch is still a
+# real stop. D592: a thin stop is acceptable, a MISSING one is not.
+#
+# Field defect (job b5982123, tour 431): Palais Lascaris, 4 stops → 3. Four works
+# passed the existence gate; D1v2 then dropped "The Adoration of the Magi" with
+# `reason: "no canonical match"` — not non-existence, not a wrong venue, just a
+# title our Wikidata/site corpus could not line up. R4 re-prompted but its fresh
+# candidates also failed the canonical match, so the count was never restored, and
+# the LOCAL-16 GATE stripped every verified=False pad for being unverified.
+#
+# The acceptable last-resort refill is NARROW on purpose: only the candidates D1v2
+# dropped for a title mismatch, never REJECTED (located at another venue), never a
+# theme/book word or cycle name (prolog material, not a stop), never non-existence.
+# Each returns verified=False and tagged _title_mismatch_refill so the narration
+# hedges exactly as unverified exhibits already do (D592), and so the gate can
+# exempt it the same way it exempts a stop the listener named (LOCAL-547).
+_TITLE_MISMATCH_REASONS = ("no canonical match",)
+
+
+def _is_title_mismatch_drop(evidence_entry):
+    """True only when D1v2 dropped a candidate for a canonical-TITLE mismatch.
+
+    A DROPPED status alone is not enough — theme-word, cycle-name and
+    normalized-duplicate drops are also DROPPED but are NOT real stops. Match on
+    the reason D1v2 writes for a pure title mismatch."""
+    if not isinstance(evidence_entry, dict):
+        return False
+    if evidence_entry.get('status') != 'DROPPED':
+        return False
+    _reason = (evidence_entry.get('reason') or '').strip().lower()
+    return _reason in _TITLE_MISMATCH_REASONS
+
+
+def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
+                                current_poi_list, venue_name=None):
+    """[LOCAL-577] Return the candidates D1v2 dropped for a title mismatch ONLY,
+    as hedged refill POIs, in the order they appeared in pre_d1v2_candidates.
+
+    Each returned POI is a copy marked:
+      - verified=False            → narration hedges (D592)
+      - _title_mismatch_refill=True → exempt from the LOCAL-16 GATE strip
+
+    Excluded, never refilled:
+      - anything NOT dropped for "no canonical match" (REJECTED wrong-venue,
+        theme/book word, cycle name, non-existence, normalized duplicate)
+      - a candidate already present in current_poi_list (by normalized name)
+      - a candidate whose evidence entry is VERIFIED (already in the list)
+      - a work the LOCAL-24 corpus classifier excludes (programs/workshops)
+    """
+    evidence_log = evidence_log or {}
+    _current_norm = {_norm_name_for_refill(p.get('name', '')) for p in (current_poi_list or [])}
+    _verified_norm = {
+        _norm_name_for_refill(k)
+        for k, v in evidence_log.items()
+        if isinstance(v, dict) and v.get('status') == 'VERIFIED'
+    }
+    try:
+        from story_miner import classify_corpus_entry as _classify
+    except Exception:
+        _classify = None
+
+    _pool = []
+    _seen = set()
+    for p in (pre_d1v2_candidates or []):
+        _name = p.get('name', '')
+        _norm = _norm_name_for_refill(_name)
+        if not _norm or _norm in _seen:
+            continue
+        # Only a pure title-mismatch drop qualifies.
+        if not _is_title_mismatch_drop(evidence_log.get(_name)):
+            continue
+        # Never duplicate a stop already in the list or already verified.
+        if _norm in _current_norm or _norm in _verified_norm:
+            continue
+        # LOCAL-24: do not re-admit a program/workshop/non-work the classifier excludes.
+        if _classify is not None:
+            try:
+                _cls = _classify(title=_name, venue_name=venue_name)
+                if isinstance(_cls, dict) and _cls.get('kind') == 'excluded':
+                    print(f"  [LOCAL-577 REFILL] LOCAL-24 blocked: '{_name}' ({_cls.get('rule')})")
+                    continue
+            except Exception:
+                pass  # classifier is advisory; never let it crash the refill
+        _rp = dict(p)
+        _rp['verified'] = False
+        _rp['_title_mismatch_refill'] = True
+        _pool.append(_rp)
+        _seen.add(_norm)
+    return _pool
+
+
+def _local16_gate_survivors(poi_list, evidence_log):
+    """[LOCAL-16 + LOCAL-577] The museum verified-only choke-point, as a pure
+    function so it can be tested directly (D277).
+
+    Keeps, in order:
+      - a stop the listener NAMED (user_explicit)                     [LOCAL-547]
+      - a title-mismatch refill (_title_mismatch_refill)              [LOCAL-577]
+      - a D1v2-verified stop (verified is not False)
+    and deduplicates verified stops by canonical title (round-3 finding).
+
+    Strips any other verified=False stop. Returns (survivors, removed_names)."""
+    evidence_log = evidence_log or {}
+
+    def _find_canonical_for_poi(poi_name):
+        ev = evidence_log.get(poi_name, {})
+        if isinstance(ev, dict) and ev.get('canonical_title'):
+            return ev['canonical_title']
+        _poi_norm = _norm_name_for_refill(poi_name)
+        for _key, _val in evidence_log.items():
+            if isinstance(_val, dict) and _val.get('status') == 'VERIFIED':
+                _ct = _val.get('canonical_title', '')
+                if _ct and _norm_name_for_refill(_ct) == _poi_norm:
+                    return _ct
+        return None
+
+    _seen_canonical = set()
+    _survivors = []
+    _removed = []
+    for p in (poi_list or []):
+        # Exemptions: a named stop or a title-mismatch refill is announced, never
+        # dropped — it carries verified=False so the narration hedges (D592).
+        if p.get('user_explicit') or p.get('_title_mismatch_refill'):
+            _survivors.append(p)
+            continue
+        if not p.get('verified', True):
+            _removed.append(p['name'])
+            continue
+        _canon = _find_canonical_for_poi(p['name'])
+        if _canon:
+            _canon_norm = _norm_name_for_refill(_canon)
+            if _canon_norm in _seen_canonical:
+                _removed.append(f"{p['name']} (dup canonical: {_canon})")
+                continue
+            _seen_canonical.add(_canon_norm)
+        _survivors.append(p)
+    return _survivors, _removed
+
+
 # [D536] "with a stop at X" makes X a WAYPOINT, not the tour's boundary.
 #
 # The 2026-08-27 Riviera run: the request was "Biking tour in French Riviera with
@@ -8767,7 +8921,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     break
             
             if len(poi_list) < total_stops:
-                print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
+                # [LOCAL-577] R4 re-runs until the count is met or the pool is truly
+                # exhausted — say WHICH, so a shortfall is never silent.
+                if _r4_suppressed_by_scope:
+                    _r4_why = "suppressed by exhibition scope (D275 — no venue-wide backfill)"
+                elif _r4_round >= _R4_MAX_ROUNDS:
+                    _r4_why = f"hit the {_R4_MAX_ROUNDS}-round cap"
+                elif len(_r4_all_tried_names) >= _R4_MAX_CANDIDATES:
+                    _r4_why = f"tried the {_R4_MAX_CANDIDATES}-candidate ceiling"
+                else:
+                    _r4_why = "the model returned no further new, verifiable works"
+                print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops "
+                      f"(stop_count_warning) — stopped because {_r4_why}; "
+                      f"{len(_r4_all_dropped_pois)} R4 candidate(s) failed canonical match")
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
@@ -8866,63 +9032,43 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                               f"(tier={_verification_tier}, {_tier_label}, "
                               f"total now {len(poi_list)}/{total_stops})")
 
+            # -------- [LOCAL-577] Title-mismatch refill (hedged, last resort) --------
+            # After R4 and both fills, a museum tour can still be short because D1v2
+            # dropped a REAL stop on a canonical-TITLE mismatch ("no canonical match")
+            # — a work the existence gate accepted but our Wikidata/site corpus could
+            # not line a title up for — and every ordinary fill is verified=False, so
+            # the LOCAL-16 GATE below strips it. Re-admit ONLY those title-mismatch
+            # drops, hedged (verified=False) and tagged _title_mismatch_refill so the
+            # gate exempts them, exactly as a listener-named stop is exempt (LOCAL-547).
+            # Never REJECTED (wrong venue), never theme/cycle words, never non-existence.
+            if tour_category == 'museum' and len(poi_list) < total_stops:
+                _tm_needed = total_stops - len(poi_list)
+                _tm_pool = _title_mismatch_refill_pool(
+                    _d1_evidence_log, _pre_d1v2_candidates, poi_list,
+                    venue_name=_museum_venue_name)
+                _tm_added = _tm_pool[:_tm_needed]
+                if _tm_added:
+                    poi_list = list(poi_list) + _tm_added
+                    print(f"  [LOCAL-577 REFILL] Re-admitted {len(_tm_added)} stop(s) D1v2 dropped "
+                          f"on a canonical-title mismatch (hedged, verified=False, "
+                          f"total now {len(poi_list)}/{total_stops}):")
+                    for _tp in _tm_added:
+                        print(f"      ↩ {_tp['name']} — real stop, title not in canonical corpus (D592 hedge)")
+                else:
+                    print(f"  [LOCAL-577 REFILL] No title-mismatch drops available to refill "
+                          f"({len(poi_list)}/{total_stops} stops — pool truly exhausted)")
+
             # -------- [LOCAL-16 GATE] D1v2-verified-only filter for museum tours --------
             # No unverified stop may reach Phase 5 for museum tours. This is the
             # centralized choke-point: after ALL candidate-gathering (R4, UNIFIED-FILL,
-            # POST-R4-FILL), strip anything not D1v2-verified. Accept honest shortfall.
-            # Also deduplicates by canonical title (round 3 finding).
+            # POST-R4-FILL, LOCAL-577 title-mismatch refill), strip anything not
+            # D1v2-verified EXCEPT the listener-named (user_explicit) and the hedged
+            # title-mismatch refill (_title_mismatch_refill). Also dedups by canonical
+            # title. Implemented as the module-level _local16_gate_survivors() so the
+            # exact survivor logic is unit-tested directly (D277).
             if tour_category == 'museum':
                 _pre_gate_count = len(poi_list)
-                _seen_canonical = set()
-                _gate_survivors = []
-                _gate_removed = []
-
-                # Build a reverse lookup: normalized poi name → canonical_title
-                # D1v2 renames poi['name'] to the canonical form, so the evidence_log
-                # key (original GPT name) differs from poi['name']. We need to find
-                # the canonical_title for each poi by checking:
-                #   1. Direct key lookup (works for R4 stops)
-                #   2. Canonical_title match (works for D1v2 renamed stops)
-                def _find_canonical_for_poi(poi_name):
-                    """Find the canonical title for a poi by any method."""
-                    # Direct lookup (R4 uses poi name as key)
-                    ev = _d1_evidence_log.get(poi_name, {})
-                    if isinstance(ev, dict) and ev.get('canonical_title'):
-                        return ev['canonical_title']
-                    # Reverse lookup: poi was renamed TO canonical, so check if
-                    # any evidence entry has canonical_title matching poi_name
-                    _poi_norm = _normalize_name(poi_name)
-                    for _key, _val in _d1_evidence_log.items():
-                        if isinstance(_val, dict) and _val.get('status') == 'VERIFIED':
-                            _ct = _val.get('canonical_title', '')
-                            if _ct and _normalize_name(_ct) == _poi_norm:
-                                return _ct
-                    return None
-
-                for p in poi_list:
-                    # [LOCAL-547] A stop the listener NAMED is exempt from the
-                    # verified-only gate. LOCAL-546's restore puts it back with
-                    # verified=False precisely so the narration hedges; this gate
-                    # would then delete it again one screen later, and Igor would
-                    # once more be told what he wanted to see. Michael, 2026-09-21:
-                    # state the precondition, never drop the stop.
-                    if p.get('user_explicit'):
-                        _gate_survivors.append(p)
-                        continue
-                    # Check verification status
-                    if not p.get('verified', True):
-                        _gate_removed.append(p['name'])
-                        continue
-                    # Canonical-title dedup: if two stops map to the same canonical,
-                    # keep only the first one encountered
-                    _canon = _find_canonical_for_poi(p['name'])
-                    if _canon:
-                        _canon_norm = _normalize_name(_canon)
-                        if _canon_norm in _seen_canonical:
-                            _gate_removed.append(f"{p['name']} (dup canonical: {_canon})")
-                            continue
-                        _seen_canonical.add(_canon_norm)
-                    _gate_survivors.append(p)
+                _gate_survivors, _gate_removed = _local16_gate_survivors(poi_list, _d1_evidence_log)
 
                 if _gate_removed:
                     print(f"  [LOCAL-16 GATE] D1v2-verified-only filter for museum tour")
@@ -8930,7 +9076,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     for _rm in _gate_removed:
                         print(f"      ✗ {_rm}")
                     poi_list = _gate_survivors
-                    print(f"    After: {len(poi_list)} verified stop(s)")
+                    print(f"    After: {len(poi_list)} stop(s) survive "
+                          f"(verified + hedged refill + named)")
                     if len(poi_list) < total_stops:
                         print(f"    [LOCAL-16 GATE] Accepting honest shortfall: {len(poi_list)}/{total_stops} stops")
                         # Cap total_stops to prevent Part C and other downstream loops
@@ -8945,7 +9092,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         })
                         return None, None, (None, None)
                 else:
-                    print(f"  [LOCAL-16 GATE] All {len(poi_list)} stops are D1v2-verified ✓")
+                    poi_list = _gate_survivors
+                    print(f"  [LOCAL-16 GATE] All {len(poi_list)} stops cleared the gate ✓")
 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
