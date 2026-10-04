@@ -16,7 +16,7 @@ Acceptance proven here (boto3 + the LLM fully stubbed, no network, no real DB):
     * 4 tts_generate rows — one per synthesized stop, each with
       breakdown={chars, engine, voice_id} and the Polly price from cost_rates.
   And the sums line up: sum(tts rows) == translation_generate.breakdown['tts'];
-  translation_generate.our_cost_usd == llm + tts.
+  translation_generate.our_cost_usd == llm (tts is charged by the tts_generate rows).
 
 Also:
   * job_id/user_id are threaded through onto every row.
@@ -230,8 +230,12 @@ def test_four_stop_russian_translation_writes_one_translation_and_four_tts_rows(
     assert tb['tts'] == pytest.approx(round(tts_sum, 6))
     assert tb['chars'] == sum(r['breakdown']['chars'] for r in tts_rows)
 
-    # our_cost_usd on the translation row == llm + tts.
-    assert tr['our_cost_usd'] == pytest.approx(tb['llm'] + tb['tts'])
+    # our_cost_usd on the translation row == llm ONLY: the tts_generate rows charge the audio,
+    # so a per-job ledger sum counts every cent exactly once (LEAD review, no double billing).
+    assert tr['our_cost_usd'] == pytest.approx(tb['llm'])
+    assert tb.get('tts_metered_separately') is True
+    job_total = tr['our_cost_usd'] + sum(r['our_cost_usd'] for r in tts_rows)
+    assert job_total == pytest.approx(tb['llm'] + tts_sum)
 
     print(
         f"PASS: 1 translation_generate (llm=${tb['llm']:.6f} over {n_calls} calls, "

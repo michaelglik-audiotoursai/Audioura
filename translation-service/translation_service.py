@@ -821,7 +821,10 @@ class TranslationService:
             tts_cost = getattr(self, '_tts_tour_cost', 0.0)
             tts_chars = getattr(self, '_tts_tour_chars', 0)
             tts_engine = getattr(self, '_tts_tour_engine', None)
-        total_cost = llm_cost + tts_cost
+        # LEAD review: the per-stop tts_generate rows already charge the audio. Charging it here
+        # too would bill every translated tour's voice twice in any per-job sum. Same convention as
+        # tour_generate (breakdown.tts informational; tts_generate rows carry the money).
+        total_cost = llm_cost
 
         if _record_operation is None:
             logging.warning(
@@ -839,6 +842,7 @@ class TranslationService:
                     "llm": round(llm_cost, 6),
                     "models": {m: round(c, 6) for m, c in models.items()},
                     "tts": round(tts_cost, 6),
+                    "tts_metered_separately": True,
                     "tts_engine": tts_engine,
                     "chars": tts_chars,
                     "source_tour_id": source_tour_id,
