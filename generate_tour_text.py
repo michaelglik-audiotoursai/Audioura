@@ -1449,6 +1449,75 @@ def _norm_place(s):
     return re.sub(r'\s+', ' ', re.sub(r"[^\w\s]", ' ', n)).strip()
 
 
+def _match_anchor_poi(poi_list, anchor_name):
+    """Find the poi that corresponds to a named anchor, by normalized name
+    containment either way. Returns the first match or None."""
+    an = _norm_place(anchor_name)
+    if not an:
+        return None
+    for p in poi_list:
+        pn = _norm_place(p.get('name', ''))
+        if pn and (pn == an or an in pn or pn in an):
+            return p
+    return None
+
+
+def _order_by_anchors(poi_list, anchor_info):
+    """[LOCAL-576] Pin the route to the order the listener named.
+
+      loop from X          -> stop 1 is X; the loop returns to it (X first closes
+                              the ring, so a loop "ends heading back to X").
+      from X to Y          -> stop 1 is X, last stop is Y.
+      ... via A & B ...    -> via-points keep the listener's order, between start
+                              and end.
+    Non-anchor stops (the ones WE chose to fill the route) keep their existing
+    relative order and occupy the slots between the via-points and the end.
+
+    Deterministic and position-only: it never adds or drops a stop, so it is safe
+    to run after selection and after _compute_route_order. Returns a new list.
+    """
+    if not poi_list or not anchor_info or not anchor_info.get('anchors'):
+        return poi_list
+
+    start = anchor_info.get('start')
+    end = anchor_info.get('end')
+    is_loop = anchor_info.get('is_loop')
+    anchors = anchor_info.get('anchors') or []
+    # Via-points are the anchors that are neither the start nor the end, in order.
+    vias = [a for a in anchors if a not in (start, end)]
+
+    start_poi = _match_anchor_poi(poi_list, start) if start else None
+    end_poi = _match_anchor_poi(poi_list, end) if end else None
+    via_pois, _seen = [], set()
+    for v in vias:
+        vp = _match_anchor_poi(poi_list, v)
+        if vp is not None and id(vp) not in _seen:
+            via_pois.append(vp)
+            _seen.add(id(vp))
+
+    pinned_ids = set()
+    for p in ([start_poi] + via_pois + [end_poi]):
+        if p is not None:
+            pinned_ids.add(id(p))
+    middle = [p for p in poi_list if id(p) not in pinned_ids]
+
+    # A loop whose turnaround (end) equals the start has no distinct end poi; the
+    # ring closes on the start, so the end slot is left to a filler/via.
+    ordered = []
+    if start_poi is not None:
+        ordered.append(start_poi)
+    ordered.extend(via_pois)
+    ordered.extend(middle)
+    if end_poi is not None and end_poi is not start_poi:
+        ordered.append(end_poi)
+
+    # Safety: never drop or duplicate a stop. If anything went sideways, fall back
+    # to the input untouched.
+    if len(ordered) != len(poi_list) or {id(p) for p in ordered} != {id(p) for p in poi_list}:
+        return poi_list
+    return ordered
+
+
 def scope_is_a_waypoint(scope_name, request_text):
     """True when the proposed geographic scope is merely a named stop.
 
@@ -11635,6 +11704,73 @@ Exempt: navigation directions ("Turn left", "Continue past").
             with open(output_file, "w", encoding="utf-8") as _pf:
                 _pf.write(_partial_tour)
         return _partial_tour, output_file, first_poi_coordinates
+
+    # ============================================================
+    # [LOCAL-576] SCOPE CHECK **BEFORE WRITING**, then REPLENISH.
+    # ============================================================
+    # Tour 388 delivered 4 of 5 because North End was SELECTED, written in full
+    # (gpt-4.1, $0.03), and only then removed by PHASE 5.6 — far too late to be
+    # replaced, so the tour just got shorter. The scope verdict was right; it ran
+    # after the money was spent. Michael, 2026-10-04: "the scope verdict is right;
+    # it runs too late."
+    #
+    # Run the SAME containment check (same resolver, same function) here, before a
+    # single description is written, so a stop we chose that is out of scope is
+    # dropped while it is still cheap, and the replenishment loop refills the count
+    # from the candidate pool. Anchors are exempt inside _validate_stops_within_scope
+    # (a place the listener named cannot be "outside" the route it defines), so this
+    # never touches Crystal Lake, Commonwealth Avenue Mall, Boston Common or Paul
+    # Revere Park — only the stops WE picked.
+    #
+    # Museums keep their own venue guard (PHASE 5.5b) and are excluded, exactly as
+    # _resolve_scope_for_check already decides.
+    if tour_category not in ('museum', 'facility'):
+        _lr576_scope = _resolve_scope_for_check(intent, location, tour_category,
+                                                _museum_venue_name, quiet=True)
+        if _lr576_scope and poi_list:
+            _lr576_want = _requested_stop_count_original or len(poi_list)
+            _lr576_before = len(poi_list)
+            print(f"\n  [LOCAL-576] Pre-writing scope check against '{_lr576_scope}' "
+                  f"({_lr576_before} stop(s), want {_lr576_want})...")
+            poi_list = _validate_stops_within_scope(poi_list, _lr576_scope, headers)
+            _lr576_removed = _lr576_before - len(poi_list)
+            if _lr576_removed > 0:
+                print(f"  [LOCAL-576] Pre-writing scope check removed {_lr576_removed} "
+                      f"out-of-scope stop(s) BEFORE any description was written — "
+                      f"replenishing to {_lr576_want}.")
+                try:
+                    from restaurant_practicals import propose_replacements as _lr576_propose_fn
+                    _lr576_seen = {(p.get('name') or '').lower() for p in poi_list}
+
+                    def _lr576_propose(_need, _seen):
+                        return _lr576_propose_fn(location, list(_seen), _need, api_key,
+                                                 kind='places to visit')
+
+                    _lr576_added, _lr576_rej, _lr576_rounds = replenish_to_count(
+                        poi_list, _lr576_want, _lr576_scope, headers,
+                        propose=_lr576_propose, make_poi=_new_poi, seen=_lr576_seen)
+                    print(f"  [LOCAL-576] Replenished {_lr576_added} stop(s) in "
+                          f"{_lr576_rounds} round(s); {_lr576_rej} rejected for scope. "
+                          f"Now {len(poi_list)}/{_lr576_want}.")
+                except Exception as _lr576_e:
+                    print(f"  [LOCAL-576] Replenishment unavailable ({_lr576_e}) — "
+                          f"delivering {len(poi_list)} verified stop(s).")
+            else:
+                print(f"  [LOCAL-576] Pre-writing scope check: all {_lr576_before} "
+                      f"stop(s) within '{_lr576_scope}'.")
+
+    # [LOCAL-576] Pin the delivered order to the route the listener named, now that
+    # the stop set is final: loop/from-X starts at X, from-X-to-Y ends at Y,
+    # via-points keep the listener's order. Position-only — never adds or drops.
+    _lr576_order_info = named_anchors(user_request)
+    if _lr576_order_info.get('anchors'):
+        _lr576_pre = [p.get('name', '') for p in poi_list]
+        poi_list = _order_by_anchors(poi_list, _lr576_order_info)
+        _lr576_post = [p.get('name', '') for p in poi_list]
+        if _lr576_pre != _lr576_post:
+            print(f"  [LOCAL-576] Route order pinned to named anchors "
+                  f"(start={_lr576_order_info['start']!r}, end={_lr576_order_info['end']!r}, "
+                  f"loop={_lr576_order_info['is_loop']}): {_lr576_post}")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     _phase_timer.start('narration')
