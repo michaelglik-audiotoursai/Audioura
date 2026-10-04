@@ -233,8 +233,12 @@ from `~/.docker/config.json` for exactly this.
 and every worktree break**; check `ls /Volumes/AudiouraSSD` first when git or Kiro fail strangely.
 launchd jobs need **Full Disk Access for `/bin/zsh`** to touch the SSD (macOS blocks removable volumes:
 `Operation not permitted`). Michael granted it 2026-10-04, proven by a launchd probe that ran
-`git worktree add` through the symlink. Docker's disk image is moved via Docker Desktop → Settings →
-**Resources** → Disk image location (GUI only). Pre-move DB backup:
+`git worktree add` through the symlink. Docker's disk image stays **internal**: on 2026-10-04 Michael chose `/Volumes/AudiouraSSD/DockerData`
+in Settings → Resources → Disk image location and clicked Apply & restart. Docker restarted, but saved
+no new location and kept using the internal `Docker.raw`, most likely because Docker Desktop has no
+removable-volume permission. Not worth more of Michael's time: the worktrees, the main growth, are
+on the SSD and the internal disk has 30 GB free. If it is ever needed, grant Docker Desktop Full Disk
+Access first. Pre-move DB backup:
 `/Volumes/AudiouraSSD/pre_migration_*.sql.gz`.
 
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
