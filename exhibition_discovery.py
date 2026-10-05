@@ -37,7 +37,7 @@ from html import unescape
 from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
-__all__ = ['extract_current_exhibitions']
+__all__ = ['extract_current_exhibitions', 'is_chrome_title', 'reject_chrome_titles']
 
 
 # Headings that carry an exhibition title on a listing page.
@@ -119,6 +119,150 @@ _GENERIC_HEADING_LABELS = frozenset({
 
 def _collapse_ws(text: str) -> str:
     return re.sub(r'\s+', ' ', (text or '')).strip()
+
+
+# ─── Title-level chrome rejection (LOCAL-583) ────────────────────────────────
+# The DOM-structural rejection above needs HTML. But the venue_corpus cache
+# stores canonical TITLES as bare strings — and the old plaintext extractor
+# (story_miner.extract_canonical_titles) wrote site chrome into them: "Our Team",
+# "Calls For Entry", "Terms Conditions", "Griffin Museum Board Of Directors 2",
+# "Membership Levels" … These are page furniture (navigation / account /
+# membership / legal / institutional-governance / support labels), the string
+# residue of the SAME <nav>/<footer>/widget structure the DOM pass rejects.
+#
+# This is a vocabulary of PAGE FURNITURE, deliberately NOT a blocklist of show
+# names. An exhibition title names a show ("Intertidal : Field Notes",
+# "Earth, Wind & Fire", "TLC"); it does not read like a site-chrome label.
+# Matching is on whole-title generic labels and on chrome LEXICON tokens, so a
+# real show whose title happens to contain an ordinary word is not caught.
+
+# A title that is ONLY one of these generic labels is page furniture, never a
+# show. Whole-title match (case-insensitive, punctuation-insensitive), not a
+# substring blocklist. Extends _GENERIC_HEADING_LABELS with the account /
+# membership / legal / governance / support labels seen in the cache residue.
+_CHROME_EXACT_LABELS = frozenset({
+    'our team', 'terms conditions', 'terms and conditions', 'privacy policy',
+    'membership levels', 'membership account', 'members bulletin',
+    'member bulletin', 'calls for entry', 'call for entry', 'function rentals',
+    'leave a legacy', 'your support matters', 'portfolio development',
+    'exhibition closed', 'exhibition archive', 'contact us', 'about us',
+    'hours admission', 'hours and admission', 'donate', 'support us',
+    'newsletter', 'sign up', 'log in', 'login', 'my account', 'cart',
+    'board of directors', 'staff', 'press', 'shop', 'store',
+})
+
+# Chrome LEXICON tokens. A title whose words are DOMINATED by these (and carry no
+# distinctive content word) is a navigation / account / membership / legal /
+# governance label, not a show. These are site-furniture words, generic across
+# museum sites — not any specific exhibition's name.
+_CHROME_TOKENS = frozenset({
+    'membership', 'member', 'members', 'account', 'login', 'signup',
+    'subscribe', 'newsletter', 'donate', 'donation', 'legacy', 'bequest',
+    'rentals', 'rental', 'rent', 'directors', 'director', 'board', 'trustees',
+    'trustee', 'staff', 'team', 'volunteer', 'volunteers', 'policy', 'policies',
+    'terms', 'conditions', 'privacy', 'copyright', 'sitemap', 'faq', 'faqs',
+    'contact', 'about', 'press', 'media', 'careers', 'jobs', 'support',
+    'sponsor', 'sponsors', 'sponsorship', 'cart', 'checkout', 'shop', 'store',
+    'tickets', 'admission', 'hours', 'directions', 'parking', 'accessibility',
+    'calls', 'entry', 'entries', 'submission', 'submissions', 'review',
+    'reviews', 'scheduled', 'bulletin', 'salon', 'travel', 'archive',
+    'governance', 'bylaws', 'rentals',
+})
+
+# Words that mark a title as PAGE FURNITURE even alongside institutional nouns —
+# the question-form and marketing-slogan residue ("When Are The … Scheduled",
+# "Your Support Matters").
+_CHROME_FUNCTION_WORDS = frozenset({
+    'when', 'how', 'why', 'where', 'what', 'who', 'are', 'is', 'do', 'does',
+    'your', 'our', 'my', 'the', 'a', 'an', 'to', 'for', 'of', 'and', 'in',
+    'on', 'at', 'be', 'this', 'that', 'matters', 'scheduled',
+})
+
+_CHROME_PUNCT_RE = re.compile(r'[^\w\s]')
+
+
+def _chrome_norm(title: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace for whole-title match."""
+    t = _CHROME_PUNCT_RE.sub(' ', (title or '').lower())
+    return ' '.join(t.split())
+
+
+def is_chrome_title(title: str, venue_name: str = "") -> bool:
+    """True when a bare title string is site chrome, not an exhibition.
+
+    Pure function, no network, no HTML. Rejects:
+      * an empty / 1-char title,
+      * a whole-title generic label (nav/account/membership/legal/governance),
+      * a title whose content words are ALL chrome-lexicon, venue-name, or
+        function words (e.g. "Membership Levels", "Our Team",
+        "Griffin Museum Board Of Directors 2", "Griffin Travel").
+
+    `venue_name`, when supplied, lets the venue's own name words count as
+    non-distinctive filler, so a venue-branded chrome label ("Griffin Travel")
+    is caught while a venue-branded SHOW carrying a further distinctive word is
+    not.
+
+    Does NOT reject a title that carries a distinctive content word — a real
+    show name ("Intertidal Field Notes", "Earth Wind Fire", "Lua Kobayashi")
+    survives, so this is safe to run over a mixed canonical union.
+    """
+    norm = _chrome_norm(title)
+    if not norm or len(norm) < 2:
+        return True
+    if norm in _GENERIC_HEADING_LABELS or norm in _CHROME_EXACT_LABELS:
+        return True
+    words = norm.split()
+    # FAQ / help-text residue: a title that READS AS A QUESTION — it begins with
+    # an interrogative word ("When Are The Member Portfolio Reviews Scheduled",
+    # "How Do I Join") — is page help text, not a show title. Structural (opening
+    # function word), not a blocklist of question topics.
+    _INTERROGATIVES = {'when', 'how', 'why', 'where', 'what', 'who', 'can', 'do',
+                       'does', 'is', 'are', 'should', 'will'}
+    if len(words) >= 3 and words[0] in _INTERROGATIVES:
+        return True
+    _venue_words = set(_chrome_norm(venue_name).split()) if venue_name else set()
+    # A title is chrome when EVERY word is a chrome-lexicon token, a venue-name
+    # word, or a function/filler word AND at least one chrome-lexicon token is
+    # present. Numbers alone (e.g. a year) count as filler, not distinctive
+    # content, so "Membership Levels 2026" is still chrome.
+    has_chrome_token = False
+    for w in words:
+        if w in _CHROME_TOKENS:
+            has_chrome_token = True
+            continue
+        if w in _CHROME_FUNCTION_WORDS:
+            continue
+        if w in _venue_words:
+            continue
+        if w.isdigit():
+            continue
+        # A distinctive content word → not chrome.
+        return False
+    return has_chrome_token
+
+
+def reject_chrome_titles(titles, venue_name: str = ""):
+    """Filter site chrome out of a canonical-title union.
+
+    Accepts any iterable of strings (set, list). Returns a NEW list in input
+    order with chrome removed and blanks dropped. `venue_name` (optional) lets
+    venue-branded chrome labels be caught. Used before writing the
+    canonical-title union to venue_corpus (LOCAL-583 D2) so the cache can never
+    again store "Our Team" / "Calls For Entry" / "Terms Conditions" as a work.
+    """
+    out = []
+    seen = set()
+    for t in (titles or []):
+        if not isinstance(t, str):
+            continue
+        s = t.strip()
+        if not s or is_chrome_title(s, venue_name):
+            continue
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
 
 
 def _same_domain(href_url: str, base_url: str) -> bool:

@@ -4852,11 +4852,22 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
             from venue_resolver import cache_put
+            # [LOCAL-583 D2] Run the canonical-title union through structural
+            # chrome rejection BEFORE it is written to venue_corpus, so the cache
+            # never stores site furniture as a "work". (cache_put also filters as
+            # defense-in-depth.) SPARQL works are left untouched — Wikidata-
+            # verified, not site-scraped.
+            from exhibition_discovery import reject_chrome_titles as _reject_chrome
+            _canon_in = len(canonical_titles) if canonical_titles else 0
+            _canonical_clean = _reject_chrome(canonical_titles, venue_name)
+            if _canon_in != len(_canonical_clean):
+                print(f"  [D1v2] [LOCAL-583] chrome rejected from canonical union before cache write: "
+                      f"{_canon_in} → {len(_canonical_clean)}")
             cache_put(
                 qid=_venue_entity.qid,
                 venue_name=venue_name,
                 official_url=_base_site_url or '',
-                canonical_titles=canonical_titles,
+                canonical_titles=_canonical_clean,
                 story_elements=corpus_result.get('story_elements'),
                 sparql_works=sparql_works,
                 pages=corpus_result.get('pages'),
