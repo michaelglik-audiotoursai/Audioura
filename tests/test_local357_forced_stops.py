@@ -142,10 +142,16 @@ class TestForcedStopsOutputMarking:
     """Forced tours must be clearly marked in the output."""
 
     def test_banner_written_to_output(self):
-        """Output file must contain FORCED STOPS banner when forced_stops used."""
+        """Output file must contain FORCED STOPS banner when forced_stops used.
+
+        [LOCAL-586] The banner is now built in the module-level helper
+        _build_harness_banner (so the implicit-concat *70 repetition cannot
+        return and so it can be unit-tested). Inspect the whole module, not just
+        the generate_tour_text body, since the banner literal lives in the helper.
+        """
         import inspect
-        from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        import generate_tour_text as _gtt
+        source = inspect.getsource(_gtt)
 
         assert 'FORCED STOPS — VERIFICATION HARNESS' in source, (
             "Output must contain 'FORCED STOPS — VERIFICATION HARNESS' banner"
@@ -155,10 +161,14 @@ class TestForcedStopsOutputMarking:
         )
 
     def test_banner_warns_not_natural_selection(self):
-        """Banner must warn that this is not a naturally-selected tour."""
+        """Banner must warn that this is not a naturally-selected tour.
+
+        [LOCAL-586] Banner literal now lives in _build_harness_banner; inspect the
+        module so this intent is preserved across the refactor.
+        """
         import inspect
-        from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        import generate_tour_text as _gtt
+        source = inspect.getsource(_gtt)
 
         assert 'NOT a naturally-selected tour' in source, (
             "Banner must clearly state tour is NOT naturally-selected"
