@@ -24413,3 +24413,14 @@ SSML phoneme/lexicon layer fed from Wikidata IPA, so it stays Polly-cheap per D6
 Per-stop writer cost on this biking tour was flat versus baseline (≈ $0.049/stop): no story retries to
 save on outdoor tours, and gpt-4.1's per-token saving was offset by a 25k-char prompt. The biking
 saving is the voice ($0.15 → $0).
+
+## D606 — Curator tour sharing ships on Subscribed as app 2.4.1+27 (2026-10-04)
+
+Michael's version rule: tour sharing on **Subscribed = 2.4.1+27** (on Storied it would be 2.3.3+27).
+It is on Subscribed (LOCAL-579, merged b6350ec; version commit 00805de). Installed on Michael's
+iPhone 16 by **in-place upgrade** (`xcrun devicectl device install app`) over 2.3.2 (26), same bundle
+`com.audioura.audiotours`, same team, so app data was kept. `install_to_iphone.sh` uses `flutter install`,
+which **uninstalls first** and wipes app data (downloaded tours, prefs, possibly the user id that
+GCloud's tester plan is keyed to); prefer devicectl for upgrades. Sharing access decision (LEAD,
+reversible): a code is public: anyone with it can open that tour, no account gate (fine for
+Kostya's team; revisit if tours become paid).
