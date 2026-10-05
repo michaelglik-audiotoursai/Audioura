@@ -3259,7 +3259,54 @@ def _build_unclassifiable_evidence(location, tour_type):
 
 
 
-def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
+def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
+    """[LOCAL-582] Render a museum OVERVIEW (rung 3) as a finished, single-stop tour.
+
+    The venue resolved and its own site was reachable, but no works/exhibitions
+    could be verified. Rather than clean-fail, we deliver ONE honest orientation
+    stop built entirely from the venue's own pages (museum_overview.build_museum_
+    overview). This function wraps that narration in the same tour envelope the
+    rest of the pipeline emits — a title header, a Tour-Category line, and a
+    `Stop 1:` block — so downstream delivery/TTS/DB handle it unchanged.
+
+    The practical facts (hours/admission) are ALREADY sourced-and-dated inside
+    overview.narration (D538 contract, enforced in museum_overview). We also mirror
+    the verified facts onto a `Museum Information:` line when present, so the
+    LOCAL-36 practical_facts_gate downstream recognises them as sourced claims
+    rather than flagging them as invented.
+
+    Returns the complete tour text (str).
+    """
+    _vn = (venue_name or location or 'this museum').strip()
+    _display_category = 'Museum'
+    tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Overview"
+    lines = [tour_title, "Tour-Category: Museum", ""]
+
+    # The single orientation stop. Keep the "Stop 1:" shape the whole pipeline
+    # (and the live runner's `^\s*Stop\s+\d+\s*[:\-]` regex) expects.
+    lines.append(f"Stop 1: {_vn} — Overview")
+    lines.append("")
+    lines.append(overview.narration.strip())
+    lines.append("")
+
+    # Mirror the sourced practical sentence onto a Museum Information line so the
+    # practical-facts gate sees it as a sourced claim (it already lives in the
+    # narration verbatim; this is the gate's expected location).
+    if overview.facts_line:
+        lines.append(f"Museum Information: {overview.facts_line}")
+        lines.append("")
+
+    # Sources — venue-own-domain only, so the overview is auditable.
+    if overview.sources:
+        lines.append("Sources (the museum's own pages):")
+        for _u in overview.sources:
+            lines.append(f"  - {_u}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
 
@@ -3390,6 +3437,24 @@ from typing import Optional, List, Dict, Any
 
 # Module-level: populated on unresolvable clean-fail for structured error response
 _LAST_CLEAN_FAIL_EVIDENCE = {}
+
+# [LOCAL-582] Module-level: how the LAST generation was delivered.
+#   'full'     — a normal multi-stop tour (default; LOCAL-580 and before).
+#   'overview' — rung 3: the venue resolved and its own site was reachable, but
+#                no works/exhibitions could be verified, so we delivered a single
+#                sourced ORIENTATION stop from the venue's own pages instead of
+#                clean-failing. The service/DB label the row honestly from this.
+# Declared so the service layer can read tour_kind without changing the engine's
+# return signature — the same pattern as _LAST_GENERATION_COST / _LAST_CLEAN_FAIL_EVIDENCE.
+_LAST_TOUR_KIND = 'full'
+
+# [LOCAL-582] Module-level: the LOCAL-580 actionable suggestion carried on an
+# overview job (the locality walking-tour alternative). Empty dict when none.
+_LAST_TOUR_SUGGESTION = {}
+
+# [LOCAL-582] Module-level: the venue-own-domain source URLs the overview was
+# built from (for the job result / audit). Empty on a non-overview generation.
+_LAST_OVERVIEW_SOURCES = []
 
 # [B1b] Module-level: populated after successful generation with final poi_list (including verified flags)
 _LAST_POI_LIST = []
@@ -6399,8 +6464,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # [LOCAL-60] Declare global for cost exposure
     global _LAST_GENERATION_COST
     global _LAST_CLEAN_FAIL_EVIDENCE  # [LOCAL-474] clean-fail evidence set from multiple points
+    global _LAST_TOUR_KIND  # [LOCAL-582] 'full' or 'overview' — declared default below
+    global _LAST_TOUR_SUGGESTION  # [LOCAL-582] actionable suggestion carried on an overview
+    global _LAST_OVERVIEW_SOURCES  # [LOCAL-582] venue-own-domain source URLs for an overview
     global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
     global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
+
+    # [LOCAL-582] Reset per-generation delivery kind. Defaults to 'full'; only the
+    # rung-3 overview path flips it to 'overview'. Reset here so a prior overview
+    # cannot leak into the next request's job result.
+    _LAST_TOUR_KIND = 'full'
+    _LAST_TOUR_SUGGESTION = {}
+    _LAST_OVERVIEW_SOURCES = []
 
     # [LOCAL-533] Zero the grounded-request counter for this generation. Grounding
     # (Gemini + Google Search) bills per request and was absent from the printed
@@ -8564,8 +8639,87 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _verification_tier = _d1v2_result.tier
                     _LAST_VERIFICATION_TIER = _verification_tier
                     if _d1v2_result.tier == 'unresolvable':
-                        # Clean fail with structured error
-                        print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
+                        # [LOCAL-582] RUNG 3 OF THE LADDER (D607). The venue resolved
+                        # and its own site is reachable, but no works/exhibitions
+                        # could be verified. This used to clean-fail. Michael,
+                        # 2026-10-05: "if there is no information at all we should
+                        # still generate a summary with the information available on
+                        # the museum link." So, when entity_resolved AND
+                        # site_reachable, deliver ONE sourced orientation stop built
+                        # from the venue's OWN pages (home / visit / current
+                        # exhibitions). Hours and admission are stated ONLY with a
+                        # source on the venue's domain, dated — the D538 contract,
+                        # enforced inside museum_overview. If the overview cannot be
+                        # built (no usable site), we fall through to rung 4: the
+                        # LOCAL-580 structured error + locality suggestion, unchanged.
+                        print(f"  [D1] Tier: unresolvable (entity={_d1v2_result.entity_resolved}, "
+                              f"site_reachable={_d1v2_result.site_reachable}, "
+                              f"sparql={_d1v2_result.sparql_count})")
+                        _overview = None
+                        _rung3_eligible = bool(_d1v2_result.entity_resolved
+                                               and _d1v2_result.site_reachable
+                                               and _museum_site_url)
+                        if _rung3_eligible:
+                            try:
+                                from museum_overview import build_museum_overview
+                                print(f"  [LOCAL-582] RUNG 3 — building museum overview from "
+                                      f"'{_museum_site_url}' (0 verified works, site reachable)")
+                                _overview = build_museum_overview(
+                                    venue_name=_museum_venue_name or location,
+                                    base_site_url=_museum_site_url,
+                                    locality=_museum_resolved_locality,
+                                    venue_language=_museum_site_language,
+                                )
+                            except Exception as _ov_err:
+                                print(f"  [LOCAL-582] overview build failed (falling to rung 4): {_ov_err}")
+                                import traceback
+                                traceback.print_exc()
+                                _overview = None
+
+                        if _overview is not None and not _overview.is_empty():
+                            # Deliver the overview as a finished, single-stop tour.
+                            _ov_text = _assemble_overview_tour_text(
+                                _museum_venue_name or location, location, tour_type, _overview)
+                            _LAST_TOUR_KIND = 'overview'
+                            _LAST_OVERVIEW_SOURCES = list(_overview.sources)
+                            # Carry the LOCAL-580 locality suggestion on the job so the
+                            # app can still offer the walking-tour alternative (D4).
+                            try:
+                                from actionable_failure import _walking_suggestion, derive_locality
+                                _ov_locality = _museum_resolved_locality or derive_locality(location)
+                                _LAST_TOUR_SUGGESTION = _walking_suggestion(_ov_locality) or {}
+                            except Exception:
+                                _LAST_TOUR_SUGGESTION = {}
+                            # [D536] Report requested vs delivered: the listener asked
+                            # for N stops; an overview delivers 1 (an honest orientation).
+                            _set_stop_count_notice(
+                                _requested_stop_count_original or total_stops, 1, 'overview',
+                                'works could not be verified; delivered a sourced museum '
+                                'overview from the venue\'s own site instead of failing')
+                            print(f"  [LOCAL-582] OVERVIEW delivered (tour_kind='overview'): "
+                                  f"1 stop, {len(_overview.sources)} source(s), "
+                                  f"hours={_overview.has_hours} admission={_overview.has_admission}; "
+                                  f"requested {_requested_stop_count_original or total_stops} / delivered 1")
+                            # Clear any clean-fail evidence — this is NOT a failure.
+                            _LAST_CLEAN_FAIL_EVIDENCE = {}
+                            _LAST_GENERATION_COST = {
+                                "total_cost": 0.0,
+                                "total_tokens": 0,
+                                "cache_hit": False,
+                                "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                            }
+                            if output_file:
+                                try:
+                                    with open(output_file, "w", encoding="utf-8") as _ovf:
+                                        _ovf.write(_ov_text)
+                                except Exception as _ovw_err:
+                                    print(f"  [LOCAL-582] could not write overview to "
+                                          f"{output_file}: {_ovw_err}")
+                            return _ov_text, output_file, (None, None)
+
+                        # RUNG 4: no usable site (or overview empty) — clean fail with
+                        # the LOCAL-580 structured error + locality suggestion.
+                        print(f"  [D1] Tier: unresolvable — clean fail (rung 4; no usable site)")
                         _LAST_CLEAN_FAIL_EVIDENCE = {
                             "error_type": "thin_evidence",
                             "entity_resolved": _d1v2_result.entity_resolved,

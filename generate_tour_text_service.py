@@ -572,10 +572,42 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
                 print(f"[LOCAL-311] Non-fatal scoring error (direct generate): {_scoring_err}")
 
+        # [LOCAL-582] Declare how the tour was delivered. 'overview' means the
+        # venue resolved and its own site was reachable, but no works could be
+        # verified, so the engine delivered ONE sourced orientation stop from the
+        # venue's own pages (rung 3 of the ladder) instead of clean-failing. The
+        # job carries tour_kind, the LOCAL-580 locality suggestion, and the
+        # requested-vs-delivered stop counts (D536) so the app can label it
+        # honestly and still offer the walking-tour alternative.
+        _l582_extra = {}
+        try:
+            import generate_tour_text as _gtt_kind
+            _tour_kind = getattr(_gtt_kind, "_LAST_TOUR_KIND", "full") or "full"
+            _l582_extra["tour_kind"] = _tour_kind
+            if _tour_kind == "overview":
+                _ov_suggestion = getattr(_gtt_kind, "_LAST_TOUR_SUGGESTION", {}) or {}
+                if _ov_suggestion:
+                    _l582_extra["suggestion"] = _ov_suggestion
+                _ov_sources = getattr(_gtt_kind, "_LAST_OVERVIEW_SOURCES", []) or []
+                if _ov_sources:
+                    _l582_extra["overview_sources"] = list(_ov_sources)
+                _notice = getattr(_gtt_kind, "_LAST_STOP_COUNT_NOTICE", {}) or {}
+                _l582_extra["requested_stops"] = _notice.get("requested", total_stops)
+                _l582_extra["delivered_stops"] = _notice.get("delivered", 1)
+                _svc_logger.info(
+                    f"[LOCAL-582] overview delivered: requested="
+                    f"{_l582_extra.get('requested_stops')} delivered="
+                    f"{_l582_extra.get('delivered_stops')} "
+                    f"suggestion={_l582_extra.get('suggestion')} "
+                    f"sources={len(_ov_sources)}")
+        except Exception as _kind_err:
+            _svc_logger.error(f"[LOCAL-582] tour_kind surfacing failed (non-fatal): {_kind_err}")
+
         ACTIVE_JOBS.update(job_id, status="completed",
                           progress="Tour text generation completed successfully!",
                           output_file=output_filename,
                           coordinates=coordinates,
+                          **_l582_extra,
                           **({"tour_content": tour_content_str} if tour_content_str else {}),
                           **({"i_con_avg": _icon_result["tour_avg"]} if _icon_result else {}))
         
