@@ -4496,7 +4496,32 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     _gallery_titles = _filter_result['galleries']
     _excluded_titles = _filter_result['excluded']
     _cross_lang_aliases = _filter_result['aliases']
-    
+
+    # [LOCAL-589 D3] ONE CHROME FILTER, APPLIED TO THE CANONICAL SET EVERYONE
+    # VERIFIES AGAINST. LOCAL-583 ran reject_chrome_titles only on a LOCAL copy
+    # just before the cache write, so the in-memory canonical set that D1v2
+    # verification (match_candidate_to_canonical), R4 replenishment, UNIFIED-FILL,
+    # POST-R4-FILL and LOCAL-577's title-mismatch refill all check against still
+    # held site chrome. That is how the Griffin field run (tour 394) "VERIFIED"
+    # Function Rentals / Calls For Entry / Griffin Salon / Exhibitions Closed /
+    # Arthur Griffin Archive as exhibition stops. Filtering HERE — right after the
+    # LOCAL-24 work/non-work filter and BEFORE corpus_result['canonical_titles']
+    # is set — means the chrome-free set propagates to every one of those paths
+    # from a single point. SPARQL works are inside this union but are themselves
+    # Wikidata-verified show/collection labels and do not read as chrome, so they
+    # are untouched.
+    if canonical_titles:
+        from exhibition_discovery import reject_chrome_titles as _reject_chrome_canon
+        _canon_before = len(canonical_titles)
+        _canonical_kept = _reject_chrome_canon(canonical_titles, venue_name)
+        if len(_canonical_kept) != _canon_before:
+            _canonical_dropped = sorted(set(canonical_titles) - set(_canonical_kept))
+            print(f"  [D1v2] [LOCAL-589] chrome rejected from the canonical SET "
+                  f"(verified-against) : {_canon_before} → {len(_canonical_kept)} "
+                  f"— dropped {_canonical_dropped}")
+        # Preserve set type (downstream does set algebra on canonical_titles).
+        canonical_titles = set(_canonical_kept)
+
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
     # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
