@@ -22,6 +22,7 @@ import '../screens/tour_player_screen.dart';
 import '../screens/news_player_screen.dart';
 import '../widgets/language_selector.dart';
 import '../utils/tour_request_parser.dart';
+import '../utils/tour_error_resolver.dart';
 import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
 import 'main_screen.dart';
@@ -52,6 +53,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // The user's own ordered stop list, once they have named and reviewed it.
   List<Map<String, dynamic>> _userStops = [];
 
+  // [LOCAL-581] Snapshot of the last tour request submitted this session, so
+  // "Try again" can re-submit the IDENTICAL request (location text, tour type,
+  // stop count, user stops, language) instead of silently doing nothing
+  // (defect #2). Captured at submit time; null until the first submit.
+  _LastTourRequest? _lastRequest;
+
+  // [LOCAL-581] Handle to the 10s background-status refresh timer, cancelled
+  // in dispose() so it does not outlive the screen.
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -62,7 +73,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     BackgroundTourMonitor.checkStalledTours();
     
     // Auto-refresh background status every 10 seconds
-    Timer.periodic(const Duration(seconds: 10), (timer) {
+    // [LOCAL-581] Keep a handle so dispose() can cancel it — an uncancelled
+    // periodic timer outlives the screen (a leak, and it makes widget tests
+    // fail with "A Timer is still pending").
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted) {
         // Check for stalled tours
         BackgroundTourMonitor.checkStalledTours();
@@ -194,6 +208,18 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final confirmed = await _showDuplicateDialog();
       if (!confirmed) return;
     }
+
+    // [LOCAL-581] Snapshot the exact, validated request so "Try again" replays
+    // it identically (location text, tour type, stop count, user stops,
+    // language). Taken here — after validation and the duplicate gate — so a
+    // retry never re-triggers the duplicate dialog or revalidation surprises.
+    _lastRequest = _LastTourRequest(
+      rawInput: _tourRequestController.text,
+      stopMode: _stopMode,
+      userStops: List<Map<String, dynamic>>.from(_userStops),
+      stopCountText: _stopCountController.text,
+      languages: List<String>.from(_selectedLanguages),
+    );
 
     setState(() {
       _isGenerating = true;
@@ -375,53 +401,59 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
               done = true;
               await TourStatusService.updateTourStatus(jobId, 'failed');
 
-              String errorMessage = 'Tour generation failed';
-              String userFriendlyMessage = 'Unable to generate tour. Please try again.';
-              List<String> suggestions = [];
+              // [LOCAL-581] Resolve the server's own words first. The resolver
+              // (message precedence error > message > user_error.message >
+              // user_message) is why Michael's actionable message now reaches
+              // the user instead of a generic string (defect #1). It also
+              // surfaces the LOCAL-580 suggestion and the retryability signal.
+              ResolvedTourError resolved = resolveTourError(status);
 
-              if (status['error'] != null) {
-                errorMessage = status['error'].toString();
+              // When the server sent NO message, fall back to the long-standing
+              // error_type / "no stops" heuristics (richer than the generic
+              // string) rather than the bare fallback.
+              if (!resolved.isServerMessage) {
+                final rawError = status['error']?.toString() ?? '';
+                String legacy = resolved.message;
+                List<String> legacySuggestions = resolved.suggestions;
+                if (rawError.contains('no stops could be generated') ||
+                    rawError.contains('knowledge insufficient')) {
+                  legacy = 'No stops could be found for that location. Try a broader area, a different tour type, or a more well-known destination.';
+                  legacySuggestions = ['Try a larger city or neighborhood', 'Use "walking tour" instead of specific types', 'Check the spelling of the location'];
+                } else if (status['error_type'] != null) {
+                  switch (status['error_type']) {
+                    case 'knowledge_validation_failed':
+                    case 'ai_knowledge_insufficient':
+                      legacy = 'Unable to find sufficient information about this location. Please try a more specific or well-known location.';
+                      break;
+                    case 'location_not_found':
+                      legacy = 'Location not found. Please check the spelling and try a more specific address.';
+                      break;
+                    case 'insufficient_content':
+                      legacy = 'Not enough information available to create a tour for this location. Please try a different location.';
+                      break;
+                    case 'service_unavailable':
+                      legacy = 'Tour generation service is temporarily unavailable. Please try again in a few minutes.';
+                      break;
+                    default:
+                      legacy = status['error_type'].toString().replaceAll('_', ' ');
+                  }
+                }
+                resolved = ResolvedTourError(
+                  message: legacy,
+                  isServerMessage: false,
+                  suggestions: legacySuggestions,
+                  suggestion: resolved.suggestion,
+                  errorCode: resolved.errorCode,
+                  canRetry: resolved.canRetry,
+                );
               }
 
-              if (status['user_error'] != null) {
-                final userError = status['user_error'];
-                if (userError['message'] != null) {
-                  userFriendlyMessage = userError['message'].toString();
-                }
-                if (userError['suggestions'] != null && userError['suggestions'] is List) {
-                  suggestions = List<String>.from(userError['suggestions']);
-                }
-              } else if (status['user_message'] != null) {
-                userFriendlyMessage = status['user_message'].toString();
-              } else if (errorMessage.contains('no stops could be generated') || errorMessage.contains('knowledge insufficient')) {
-                userFriendlyMessage = 'No stops could be found for that location. Try a broader area, a different tour type, or a more well-known destination.';
-                suggestions = ['Try a larger city or neighborhood', 'Use "walking tour" instead of specific types', 'Check the spelling of the location'];
-              } else if (status['error_type'] != null) {
-                switch (status['error_type']) {
-                  case 'knowledge_validation_failed':
-                  case 'ai_knowledge_insufficient':
-                    userFriendlyMessage = 'Unable to find sufficient information about this location. Please try a more specific or well-known location.';
-                    break;
-                  case 'location_not_found':
-                    userFriendlyMessage = 'Location not found. Please check the spelling and try a more specific address.';
-                    break;
-                  case 'insufficient_content':
-                    userFriendlyMessage = 'Not enough information available to create a tour for this location. Please try a different location.';
-                    break;
-                  case 'service_unavailable':
-                    userFriendlyMessage = 'Tour generation service is temporarily unavailable. Please try again in a few minutes.';
-                    break;
-                  default:
-                    userFriendlyMessage = status['error_type'].toString().replaceAll('_', ' ');
-                }
-              }
-
-              await DebugLogHelper.addDebugLog('TOUR_ERROR: Services returned error - Type: ${status['error_type']}, Message: $errorMessage');
+              await DebugLogHelper.addDebugLog('TOUR_ERROR: code=${resolved.errorCode} serverMsg=${resolved.isServerMessage} canRetry=${resolved.canRetry} msg=${resolved.message}');
               await DebugLogHelper.addDebugLog('TOUR_ERROR: Full status response: ${jsonEncode(status)}');
 
               if (mounted) {
                 setState(() { _isGenerating = false; _progress = ''; });
-                _showServicesErrorDialog(userFriendlyMessage, suggestions);
+                _showTourErrorDialog(resolved);
               }
               return;
 
@@ -920,15 +952,26 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     return count > 0 ? '$baseTitle (v${count + 1})' : baseTitle;
   }
 
-  void _showServicesErrorDialog(String message, List<String> suggestions) {
+  // [LOCAL-581] Actionable failure dialog.
+  //  • Shows the server's resolved message (defect #1).
+  //  • When the server offered a one-tap alternative (LOCAL-580 suggestion),
+  //    shows a button that STARTS that generation with the same stop count.
+  //    Until LOCAL-580 lands, suggestion is null and the button is absent.
+  //  • The primary action re-submits the identical request ("Try again"), or —
+  //    for error_codes a plain retry cannot fix (venue_no_verifiable_content) —
+  //    becomes "Edit request" and returns the user to the form with text kept
+  //    (defect #2). The action is disabled while a job is already running.
+  void _showTourErrorDialog(ResolvedTourError resolved) {
+    final suggestion = resolved.suggestion;
+    final canRetry = resolved.canRetry;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Row(
           children: [
             Icon(Icons.error_outline, color: Colors.red, size: 28),
             SizedBox(width: 8),
-            Text('Tour Generation Failed'),
+            Expanded(child: Text('Tour Generation Failed')),
           ],
         ),
         content: SingleChildScrollView(
@@ -937,41 +980,123 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                message,
+                resolved.message,
                 style: const TextStyle(fontSize: 16),
               ),
-              if (suggestions.isNotEmpty) ...[
+              if (resolved.suggestions.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 const Text(
                   'Suggestions:',
                   style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
                 ),
                 const SizedBox(height: 8),
-                ...suggestions.map((suggestion) => Padding(
+                ...resolved.suggestions.map((s) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
-                    '• $suggestion',
+                    '• $s',
                     style: const TextStyle(fontSize: 14, color: Colors.blue),
                   ),
                 )),
+              ],
+              // One-tap server suggestion (LOCAL-580). Null-safe: absent until
+              // the server sends it.
+              if (suggestion != null) ...[
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isGenerating
+                        ? null
+                        : () {
+                            Navigator.pop(dialogContext);
+                            _startSuggestedTour(suggestion);
+                          },
+                    icon: const Icon(Icons.lightbulb_outline),
+                    label: Text(suggestion.label),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF27ae60),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
               ],
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Dismiss'),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Clear the input and let user try again
-              _tourRequestController.clear();
-            },
-            child: const Text('Try Again', style: TextStyle(color: Colors.blue)),
-          ),
+          if (canRetry)
+            TextButton(
+              // "Try again" re-submits the identical request. Disabled while a
+              // job runs so a double-tap can't launch two generations.
+              onPressed: (_isGenerating || _lastRequest == null)
+                  ? null
+                  : () {
+                      Navigator.pop(dialogContext);
+                      _retryLastTour();
+                    },
+              child: const Text('Try again', style: TextStyle(color: Colors.blue)),
+            )
+          else
+            TextButton(
+              // A plain retry cannot succeed — send the user back to the form
+              // with their text intact so they can broaden the request.
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _editRequest();
+              },
+              child: const Text('Edit request', style: TextStyle(color: Colors.blue)),
+            ),
         ],
+      ),
+    );
+  }
+
+  /// [LOCAL-581] Re-submit the identical request captured at the last submit.
+  /// Restores the form state from the snapshot, then runs the normal generate
+  /// path so validation and request-building are byte-for-byte the same.
+  Future<void> _retryLastTour() async {
+    final last = _lastRequest;
+    if (last == null || _isGenerating) return;
+    setState(() {
+      _tourRequestController.text = last.rawInput;
+      _stopMode = last.stopMode;
+      _userStops = List<Map<String, dynamic>>.from(last.userStops);
+      _stopCountController.text = last.stopCountText;
+      _selectedLanguages = List<String>.from(last.languages);
+    });
+    await _generateTour();
+  }
+
+  /// [LOCAL-581] Start the server-suggested alternative. Uses the SAME stop
+  /// count as the failed request (per the contract) and the suggested request
+  /// text / tour type. Runs the normal generate path.
+  Future<void> _startSuggestedTour(TourErrorSuggestion suggestion) async {
+    if (_isGenerating) return;
+    setState(() {
+      _tourRequestController.text = suggestion.request;
+      // The suggestion is a free-text request; keep the current stop count and
+      // let Audioura suggest the stops (the suggested request is a location,
+      // not a named-stop list).
+      _stopMode = 'suggest';
+      _userStops = [];
+    });
+    await _generateTour();
+  }
+
+  /// [LOCAL-581] For non-retryable failures: return the user to the form with
+  /// their text kept and the keyboard focused so they can edit and resubmit.
+  void _editRequest() {
+    if (!mounted) return;
+    FocusScope.of(context).requestFocus(FocusNode());
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Edit your request and tap Generate to try again.'),
+        backgroundColor: Colors.blueGrey,
+        duration: Duration(seconds: 6),
       ),
     );
   }
@@ -2348,8 +2473,29 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tourRequestController.dispose();
     _stopCountController.dispose();
     super.dispose();
   }
+}
+
+/// [LOCAL-581] Immutable snapshot of a submitted tour request, so "Try again"
+/// re-submits the identical request. Captures everything that shapes the
+/// request body and generation: the raw request text, the stop mode and the
+/// user's named stops, the stop-count field, and the selected languages.
+class _LastTourRequest {
+  final String rawInput;
+  final String stopMode;
+  final List<Map<String, dynamic>> userStops;
+  final String stopCountText;
+  final List<String> languages;
+
+  const _LastTourRequest({
+    required this.rawInput,
+    required this.stopMode,
+    required this.userStops,
+    required this.stopCountText,
+    required this.languages,
+  });
 }
