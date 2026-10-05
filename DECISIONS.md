@@ -24424,3 +24424,13 @@ which **uninstalls first** and wipes app data (downloaded tours, prefs, possibly
 GCloud's tester plan is keyed to); prefer devicectl for upgrades. Sharing access decision (LEAD,
 reversible): a code is public: anyone with it can open that tour, no account gate (fine for
 Kostya's team; revisit if tours become paid).
+
+## D607 — Museums with no verifiable works: a degradation ladder ending in an honest overview (2026-10-05, LEAD)
+
+Michael proposed that when nothing is known about a venue's works, we still give a summary from its own
+site (hours, exhibitions, entry price). Adopted as a ladder: (1) verified works or current exhibitions →
+full tour (LOCAL-580); (2) named but thin → short, hedged stops (D592); (3) venue resolved and site
+reachable but nothing verifiable on display → **museum overview**, one stop, from the venue's own pages
+only, with hours and price stated only with a dated source on the venue's domain (LOCAL-582, parked
+until LOCAL-580 merges); (4) no usable site → structured error + suggestion (LOCAL-580/581). Rule at
+every rung: only what the venue's pages say; never invent (the Griffin failure was GPT inventing 5 shows).
