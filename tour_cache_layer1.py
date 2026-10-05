@@ -45,6 +45,30 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+# ── Cache version (LOCAL-588 / D359) ─────────────────────────────────────────
+#
+# The cache key is (normalised location, tour_type, stop bucket) with NO code
+# version, so a repeated request forever gets the tour made by the code of the
+# day it was first stored. Concretely, the 16:40 row for the Griffin Museum held
+# junk tour 391 (website menu items as stops) and would have been served to the
+# next 4–6-stop Griffin request with none of LOCAL-580/583/584 applied.
+#
+# TOUR_CACHE_VERSION folds a code generation into the key hash (mirrors
+# venue_resolver.CORPUS_VERSION). Bumping it changes the key, so every row
+# written at an older version becomes unreachable — a cache MISS that forces a
+# fresh generation under current code. Old rows are NEVER deleted; they simply
+# stop being found and age out naturally.
+#
+# BUMP THIS whenever a change to stop selection, gates, or narration changes
+# what a listener would actually HEAR — i.e. whenever a cached tour made by the
+# old code would now be considered wrong or stale. (A pure refactor that cannot
+# change the delivered tour text does not require a bump.)
+TOUR_CACHE_VERSION = 2  # LOCAL-588: version added to the key. v2 retires every
+                        # row written before 2026-10-05 (pre LOCAL-580/583/584),
+                        # including Michael's Griffin junk tour, as misses.
+
+
 # Punctuation that carries no venue-identity meaning. Commas, periods and
 # apostrophes (both ASCII and typographic) only ever separate or decorate; they
 # never distinguish two different venues. Stripped to spaces (not deleted) so
@@ -126,24 +150,31 @@ def _stop_bucket(total_stops: int) -> int:
 
 
 def _cache_key(location: str, tour_type: str, total_stops: int) -> str:
-    """Deterministic key: accent-folded location + tour_type + stop BUCKET.
+    """Deterministic key: cache version + accent-folded location + tour_type + stop BUCKET.
 
-    Both fixes apply, and they multiply rather than add:
+    Three independent inputs, all multiplying into one key:
+      * LOCAL-588 prefixes TOUR_CACHE_VERSION, so a bump makes every older row a
+        miss (the tour made by old code is no longer served — D359).
       * LOCAL-500 normalises the location string, so "Miró" and "Miro" are one venue.
       * LOCAL-494 buckets the stop count, so 4 and 6 stops are one generation.
     """
     bucket = _stop_bucket(total_stops)
-    raw = f"{_normalize_location(location)}|{tour_type.strip().lower()}|{bucket}"
+    raw = (f"v{TOUR_CACHE_VERSION}|{_normalize_location(location)}"
+           f"|{tour_type.strip().lower()}|{bucket}")
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _legacy_cache_key(location: str, tour_type: str, total_stops: int) -> str:
     """The pre-LOCAL-500/494 key: `.strip().lower()` and the EXACT stop count.
 
-    Read-only fallback so entries written before either change still resolve
-    (migration-by-fallback — see get_cached_tour). Never used for writes.
+    Read-only fallback so entries written before the normalisation/bucketing
+    changes still resolve (migration-by-fallback — see get_cached_tour). It is
+    version-prefixed too (LOCAL-588): a TOUR_CACHE_VERSION bump makes even the
+    legacy path unreachable, so no tour made by old code can be served through
+    it. Never used for writes.
     """
-    raw = f"{location.strip().lower()}|{tour_type.strip().lower()}|{total_stops}"
+    raw = (f"v{TOUR_CACHE_VERSION}|{location.strip().lower()}"
+           f"|{tour_type.strip().lower()}|{total_stops}")
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -371,6 +402,7 @@ def get_cached_tour(
         if row:
             content, cached_stops = row[0], row[1]
             bucket = _stop_bucket(total_stops)
+            logger.info(f"[S20] cache v{TOUR_CACHE_VERSION} HIT key={key[:12]}")
             if cached_stops and total_stops and total_stops < cached_stops:
                 # Bucket hit for a smaller count: trim down and repair the seam.
                 trimmed = trim_tour_to_stops(content, total_stops)
@@ -383,6 +415,7 @@ def get_cached_tour(
                 f"Cache HIT (bucket={bucket}): {location} / {tour_type} / {total_stops}"
             )
             return content
+        logger.info(f"[S20] cache v{TOUR_CACHE_VERSION} MISS key={key[:12]}")
         logger.info(
             f"Cache MISS (bucket={_stop_bucket(total_stops)}): "
             f"{location} / {tour_type} / {total_stops}"
