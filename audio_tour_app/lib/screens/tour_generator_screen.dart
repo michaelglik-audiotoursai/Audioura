@@ -59,6 +59,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   // (defect #2). Captured at submit time; null until the first submit.
   _LastTourRequest? _lastRequest;
 
+  // [LOCAL-581] Handle to the 10s background-status refresh timer, cancelled
+  // in dispose() so it does not outlive the screen.
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +73,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     BackgroundTourMonitor.checkStalledTours();
     
     // Auto-refresh background status every 10 seconds
-    Timer.periodic(const Duration(seconds: 10), (timer) {
+    // [LOCAL-581] Keep a handle so dispose() can cancel it — an uncancelled
+    // periodic timer outlives the screen (a leak, and it makes widget tests
+    // fail with "A Timer is still pending").
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted) {
         // Check for stalled tours
         BackgroundTourMonitor.checkStalledTours();
@@ -2466,6 +2473,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tourRequestController.dispose();
     _stopCountController.dispose();
     super.dispose();
