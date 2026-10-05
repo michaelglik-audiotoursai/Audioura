@@ -225,6 +225,15 @@ A plain `docker-compose -f docker-compose-master.yml build/up` silently puts the
 and so does recreating a dependent service (that happened once on 2026-10-04). Update the code:
 `git -C ~/audioura-subscribed-local checkout --detach origin/subscribed`. English TTS needs the host
 Kokoro service (launchd `com.audioura.kokoro`, :5181; `curl localhost:5181/health` must say ffmpeg).
+**⛔ Tasks never replace the shared containers (2026-10-05).** The `audioura-*` containers on ports
+5000/5002/5005/5018/5030 are what Michael's phone uses. A task's live test must build and run its
+OWN container (`docker run --rm --name <task>-<svc> -p <spare port>` or a separate compose project,
+`-p <task>`), never `docker compose -p audioura … up` and never a rename of an `audioura-*` container.
+Cause: LOCAL-586 (2026-10-05), following LEAD's own instruction to "rebuild generator with the
+override… through port 5002", swapped `audioura-tour-generator:local586` (storied code) into the shared
+container and renamed the original orchestrator. The phone silently lost every Subscribed switch, and
+LEAD's Griffin timing measured the wrong code. **Every task file's live-test step must say this.**
+
 **Docker builds hang?** Check for stuck `docker-credential-desktop get`: `credsStore` was removed
 from `~/.docker/config.json` for exactly this.
 
