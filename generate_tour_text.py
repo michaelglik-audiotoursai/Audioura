@@ -1150,7 +1150,7 @@ def _is_title_mismatch_drop(evidence_entry):
 
 
 def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
-                                current_poi_list, venue_name=None):
+                                current_poi_list, venue_name=None, exists_fn=None):
     """[LOCAL-577] Return the candidates D1v2 dropped for a title mismatch ONLY,
     as hedged refill POIs, in the order they appeared in pre_d1v2_candidates.
 
@@ -1164,6 +1164,26 @@ def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
       - a candidate already present in current_poi_list (by normalized name)
       - a candidate whose evidence entry is VERIFIED (already in the list)
       - a work the LOCAL-24 corpus classifier excludes (programs/workshops)
+      - [LOCAL-580] a candidate whose existence is DEFINITIVELY disproven by
+        exists_fn (a GPT-invented title that does not exist anywhere).
+
+    [LOCAL-580 FABRICATION GUARD]
+    "no canonical match" means only "this title did not line up with THIS venue's
+    canonical corpus". That is true both for a real work the corpus simply never
+    named (Palais Lascaris's "The Adoration of the Magi" — LOCAL-577's whole
+    point) AND for a title GPT invented out of nothing (Griffin's "The American
+    Dream", "The Human Condition" — the LOCAL-580 field defect). LOCAL-577 as
+    shipped could re-admit the second kind: a fabrication, hedged, would ship as
+    a stop. That is the exact failure LOCAL-577 was meant to end, not cause.
+
+    The distinguishing signal is EXISTENCE. `exists_fn(name)` returns:
+        True   → the work exists (keep it eligible — the Adoration case)
+        False  → the work was checked and does NOT exist (DROP — a fabrication)
+        None   → inconclusive / not checked / search failed
+    D162 governs the None case: a search that did not really run is never
+    evidence of absence, so None does NOT disqualify — only an explicit False
+    does. When exists_fn is None (legacy callers), the guard is inert and
+    behaviour is exactly LOCAL-577's.
     """
     evidence_log = evidence_log or {}
     _current_norm = {_norm_name_for_refill(p.get('name', '')) for p in (current_poi_list or [])}
@@ -1199,6 +1219,19 @@ def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
                     continue
             except Exception:
                 pass  # classifier is advisory; never let it crash the refill
+        # [LOCAL-580] FABRICATION GUARD: a title-mismatch drop is only a real
+        # stop if it actually exists. An invented title whose existence check
+        # DEFINITIVELY fails is never re-admitted. Inconclusive (None) is not a
+        # failure (D162) — only an explicit False blocks.
+        if exists_fn is not None:
+            try:
+                _exists = exists_fn(_name)
+            except Exception:
+                _exists = None  # a crashing check is inconclusive, never absence
+            if _exists is False:
+                print(f"  [LOCAL-580 FABRICATION GUARD] NOT re-admitting '{_name}' — "
+                      f"title mismatch AND existence check failed (invented, does not exist)")
+                continue
         _rp = dict(p)
         _rp['verified'] = False
         _rp['_title_mismatch_refill'] = True
@@ -7035,6 +7068,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # This is the ONLY path that guarantees reproducibility.
     # [LOCAL-362] SUPPRESSED when a scoped request (exhibition/artist filter) is detected.
     _deterministic_fill_used = False
+    # [LOCAL-580] Site-first exhibition capture. When the venue resolves but has
+    # 0 catalogued/SPARQL works (an exhibition museum), we read its CURRENT
+    # EXHIBITIONS from its own site and use those as the candidate stops instead
+    # of letting Phase 3A invent generic shows. Captured here (venue already
+    # resolved for the LOCAL-30 fill) and consumed just below, where
+    # _exhibition_stops_source exists.
+    _museum_site_first_eligible = False  # True only when 0 documented works
+    _museum_site_url = ''
+    _museum_site_language = 'en'
+    _museum_resolved_locality = ''       # for the D4 actionable-failure suggestion
     # Pre-compute scope detection for the early block (full detection runs below)
     _early_scope_detected = False
     if intent and intent.get('venue_name') and tour_category == 'museum':
@@ -7106,7 +7149,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 
                 print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
                       f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
-                
+
+                # [LOCAL-580] An EXHIBITION MUSEUM resolves but has 0 catalogued
+                # works. Capture its site URL + locality so the block below can
+                # read its CURRENT EXHIBITIONS from its own site (site-first
+                # candidates) instead of Phase 3A inventing generic shows, and so
+                # a clean fail can suggest a locality-based alternative (D4).
+                if len(_det_documented) == 0:
+                    _museum_site_first_eligible = True
+                    _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
+                    _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
+                    # [LOCAL-580 D4] Remember the locality (city hint from the
+                    # request tail) so a clean fail can suggest a locality-based
+                    # walking tour instead of a dead end.
+                    _museum_resolved_locality = _det_city_hint or ''
+                    print(f"  [LOCAL-580] 0 documented works for '{_museum_venue_name}' — "
+                          f"exhibition-museum site-first path ELIGIBLE "
+                          f"(site='{_museum_site_url}')")
+
                 # If documented works >= total_stops, fill deterministically
                 if len(_det_documented) >= total_stops:
                     # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
@@ -7499,6 +7559,48 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']} [FORCED]")
+    elif (_museum_site_first_eligible and _exhibition_scope is None
+          and not _deterministic_fill_used):
+        # ──── [LOCAL-580] SITE-FIRST EXHIBITION CANDIDATES ────────────────────
+        # The venue resolved but has 0 catalogued works (an exhibition museum).
+        # Read its CURRENT EXHIBITIONS from its own site and use those as the
+        # candidate stops — one stop per show, each sourced from its own detail
+        # page. GPT never invents here. Each POI is page_sourced=True so the
+        # exhibit-museum grounding path (not the permanent-collection D1v2 check)
+        # verifies it against the site text it came from.
+        _phase_timer.start('site_first_exhibitions')
+        try:
+            from exhibition_site_first import build_site_first_candidates, SiteFirstResult
+            _sf_candidates = build_site_first_candidates(
+                base_site_url=_museum_site_url,
+                venue_language=_museum_site_language,
+                total_stops=total_stops,
+            )
+            if _sf_candidates:
+                poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
+                for _poi, _c in zip(poi_list, _sf_candidates):
+                    _poi['detail_url'] = _c.get('detail_url', '')
+                    _poi['source'] = 'site_exhibition'
+                _exhibition_stops_source = 'site_exhibition'
+                _deterministic_fill_used = True   # Phase 3A GPT is bypassed
+                # Build a minimal result carrying the combined site text so the
+                # grounding path can confirm each title appears on the site.
+                _exhibition_checklist_result = SiteFirstResult(
+                    page_text='\n\n'.join(c.get('page_text', '') for c in _sf_candidates)
+                )
+                print(f"\nPHASE 3A: SKIPPED (LOCAL-580 site-first — "
+                      f"{len(poi_list)} current exhibition(s) from the venue site)")
+                for _poi in poi_list:
+                    print(f"   - {_poi['name']} [SITE EXHIBITION {_poi.get('detail_url','')}]")
+            else:
+                print(f"  [LOCAL-580] Site-first found no current exhibitions "
+                      f"on '{_museum_site_url}' — falling through to Phase 3A")
+        except Exception as _sf_err:
+            print(f"  [LOCAL-580] Site-first path failed (falling through): {_sf_err}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            _phase_timer.end('site_first_exhibitions')
     elif _exhibition_scope is not None:
         # ──── [LOCAL-364] EXHIBITION CHECKLIST RETRIEVAL ──────────────────────
         _phase_timer.start('exhibition_checklist')
@@ -8362,7 +8464,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # exhibition page. These works are already grounded by their source — 
             # verifying them against SPARQL/Wikidata would reject exhibition-specific
             # works that aren't individually catalogued in the museum's permanent collection.
-            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
+            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm', 'site_exhibition'):
                 # [D532] The condition no longer includes `_deterministic_fill_used`.
                 # That flag describes the RUN, so one appended Phase 3A candidate used
                 # to drag the venue's own works into the permanent-collection check
@@ -8475,6 +8577,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             # [LOCAL-485] Name the venue so the service layer can say
                             # WHICH venue lacked material, instead of a catch-all.
                             "venue": _museum_venue_name or location,
+                            # [LOCAL-580 D4] Locality for the actionable suggestion.
+                            "locality": _museum_resolved_locality,
                         }
                         return None, None, (None, None)
                     # Extract fields from VerificationResult
@@ -8591,6 +8695,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         "tier": "unresolvable",
                         # [LOCAL-485] Name the venue so the service layer can say which.
                         "venue": _museum_venue_name or location,
+                        # [LOCAL-580 D4] Locality for the actionable suggestion.
+                        "locality": _museum_resolved_locality,
                     })
                     return None, None, (None, None)
 
@@ -8880,9 +8986,34 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # Never REJECTED (wrong venue), never theme/cycle words, never non-existence.
             if tour_category == 'museum' and len(poi_list) < total_stops:
                 _tm_needed = total_stops - len(poi_list)
+                # [LOCAL-580] FABRICATION GUARD: a title-mismatch drop is only a
+                # real stop if it actually exists. Build an existence check so an
+                # invented title (Griffin's "The American Dream") is never
+                # re-admitted, while a real work the corpus just didn't name
+                # (Palais's "The Adoration of the Magi") still is. Definitive
+                # absence (verified=False, not a search failure) blocks; anything
+                # inconclusive returns None and does NOT block (D162).
+                def _tm_exists_fn(_cand_name):
+                    try:
+                        from stop_existence_gate import (get_gate_mode as _eg_mode,
+                                                         verify_stop_existence as _eg_verify)
+                        if _eg_mode() == 'off':
+                            return None  # gate disabled → inconclusive, never absence
+                        try:
+                            from venue_resolver import _get_db_connection as _eg_conn_fn
+                            _eg_conn = _eg_conn_fn()
+                        except Exception:
+                            return None  # no DB → inconclusive
+                        _v = _eg_verify(_cand_name, _museum_venue_name or location,
+                                        _eg_conn, tour_type=tour_type)
+                        if _v.get('search_failed'):
+                            return None  # D162: a search that did not run is not absence
+                        return bool(_v.get('verified'))
+                    except Exception:
+                        return None  # any failure → inconclusive, never block a real stop
                 _tm_pool = _title_mismatch_refill_pool(
                     _d1_evidence_log, _pre_d1v2_candidates, poi_list,
-                    venue_name=_museum_venue_name)
+                    venue_name=_museum_venue_name, exists_fn=_tm_exists_fn)
                 _tm_added = _tm_pool[:_tm_needed]
                 if _tm_added:
                     poi_list = list(poi_list) + _tm_added
