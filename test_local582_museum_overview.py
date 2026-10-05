@@ -134,7 +134,7 @@ class TestOverviewWithSourcedHours(unittest.TestCase):
         # The honesty signal: facts are stamped "as listed on <domain>, <month year>".
         self.assertIn('griffinmuseum.org', self.ov.facts_line)
         self.assertIn(_AS_OF, self.ov.facts_line)
-        self.assertIn('As listed on griffinmuseum.org', self.ov.narration)
+        self.assertIn("According to the museum's website (griffinmuseum.org", self.ov.narration)
 
     def test_exhibition_names_present_names_only(self):
         self.assertTrue(self.ov.exhibitions, "no exhibition names surfaced")
@@ -235,7 +235,7 @@ class TestEngineOverviewEnvelope(unittest.TestCase):
 
     def test_has_sourced_museum_information_line(self):
         self.assertRegex(self.text, r'(?mi)^Museum Information:\s*.+')
-        self.assertIn('As listed on griffinmuseum.org', self.text)
+        self.assertIn("According to the museum's website (griffinmuseum.org", self.text)
 
     def test_lists_venue_domain_sources(self):
         self.assertIn('Sources', self.text)
@@ -308,3 +308,24 @@ class TestLiveRunHardening(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+
+class TestLeadPartialHoursWording(unittest.TestCase):
+    """LEAD review (Fitchburg live run): a closed-day-only fact must not read as the whole schedule,
+    and the sentence must read naturally aloud."""
+
+    def _vi(self, formatted, source):
+        from types import SimpleNamespace
+        return SimpleNamespace(formatted_info=formatted, source_text=source,
+                               source_url='https://www.example-museum.org/visit')
+
+    def test_closed_day_only_adds_check_hours(self):
+        import museum_overview as mo
+        vi = self._vi('Closed on Monday', 'Plan your visit. The museum is Closed on Monday.')
+        sentence, has_hours, has_adm, _ = mo._verified_facts_line(vi, 'October 2026', 'example-museum.org')
+        if not sentence:
+            self.skipTest('gate did not parse this fixture shape')
+        self.assertTrue(sentence.startswith("According to the museum's website (example-museum.org, October 2026)"))
+        self.assertIn('Check example-museum.org for opening hours before you go.', sentence)
+        self.assertNotIn('As listed on', sentence)

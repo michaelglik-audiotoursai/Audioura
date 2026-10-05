@@ -291,6 +291,7 @@ def _verified_facts_line(visitor_info, as_of: str, domain: str) -> Tuple[str, bo
         return '', False, False, source_url
 
     verified_hours: List[str] = []
+    _has_open_hours = False   # an actual opening time, not just a closed day
     verified_admission: List[str] = []
     _source_lower = source_text.lower()
     for claim in _parse_info_text_into_claims(formatted):
@@ -308,6 +309,8 @@ def _verified_facts_line(visitor_info, as_of: str, domain: str) -> Tuple[str, bo
             continue
         if claim.claim_type in ('hours', 'closed_day'):
             verified_hours.append(val)
+            if claim.claim_type == 'hours':
+                _has_open_hours = True
         elif claim.claim_type in ('admission', 'price_band'):
             verified_admission.append(val)
 
@@ -317,8 +320,16 @@ def _verified_facts_line(visitor_info, as_of: str, domain: str) -> Tuple[str, bo
         return '', False, False, source_url
 
     bits = verified_hours + verified_admission
-    # One dated, attributed sentence — the dateline is the honesty signal.
-    sentence = (f"As listed on {domain}, {as_of}, " + '; '.join(bits) + '.')
+    # One dated, attributed sentence that reads naturally aloud; the dateline is the honesty signal.
+    # Facts are kept verbatim (lower-cased first letter so they continue the sentence).
+    facts = '; '.join(b[:1].lower() + b[1:] if b[:1].isupper() and not b[:2].isupper() else b for b in bits)
+    sentence = f"According to the museum's website ({domain}, {as_of}): {facts}."
+    if has_hours and not _has_open_hours:
+        # Only closed days are known. Say so, or a listener reads "closed Monday" as the whole
+        # schedule (LEAD review, LOCAL-582 live run on Fitchburg Art Museum).
+        sentence += f" Check {domain} for opening hours before you go."
+    if not has_admission:
+        sentence += " Admission prices were not listed."
     return sentence, has_hours, has_admission, source_url
 
 
