@@ -12671,6 +12671,115 @@ Exempt: navigation directions ("Turn left", "Continue past").
             _local410_total_results = 0
             _worthiness_skipped = 0  # [LOCAL-486] step 2
 
+            # [LOCAL-587] The SERP loop ran its five stops back to back (~120s of
+            # the 159s external_lookups phase) even though the primary search for
+            # each stop is independent: `search_stories_for_stop` reads only this
+            # stop's matrix and already caches by normalized work key. So the slow
+            # part — the SERP network wait — is prefetched for every worthy stop at
+            # once, into a memo keyed by work key, and the loop below reads its
+            # stop's result from the memo instead of waiting on it inline.
+            #
+            # EVERYTHING that follows the primary search — worthiness logging, the
+            # D489 replenishment round (which issues its OWN dependent queries), the
+            # LOCAL-488 second-model fan-out, snippet injection, the accumulators and
+            # every print — stays in the sequential loop, in stop order, byte for
+            # byte unchanged. The memo returns exactly the dict the inline call would
+            # have returned (same stop matrix in, same work-key cache behind it), so
+            # downstream snippet counts, gates and story counts are identical; only
+            # the order the primary SERP waits happen in changes.
+            #
+            # tour_executor (dead_host_breaker.TourExecutor) keeps both scopes
+            # correct in the workers: LOCAL-562 per-tour cost accumulation (global
+            # ThreadPoolExecutor.submit contextvar patch) and LOCAL-572 dead-host
+            # cold set (captured on this tour thread, re-bound per worker — which is
+            # exactly where the SERP P856 dead-host checks run).
+            def _s587_build_stop_data(_s_idx, _s_poi):
+                """Build the search matrix for one stop. Pure: reads _s_poi, no
+                prints, no cross-stop state. Identical construction to the loop
+                below, so the memoized search result equals the inline one."""
+                _n = _s_poi.get('name', '')
+                _a = _s_poi.get('artist', '')
+                _pub = _s_poi.get('publisher', '')
+                _cl = _s_poi.get('credit_line', '')
+                _med = _s_poi.get('medium', '')
+                _et = _s_poi.get('english_title', _n)
+                if (not _pub or not _cl) and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _mw = match_work_for_stop(_n, _exhibition_checklist_result.works)
+                    if _mw:
+                        _pub = _pub or _mw.get('publisher', '')
+                        _cl = _cl or _mw.get('credit_line', '')
+                        _med = _med or _mw.get('medium', '')
+                        _a = _a or _mw.get('artist', '')
+                        if _et == _n:
+                            _et = _mw.get('english_title', _n) or _n
+                from text_fold import is_placeholder as _ph
+                _pub = '' if _ph(_pub) else _pub
+                _cl = '' if _ph(_cl) else _cl
+                _med = '' if _ph(_med) else _med
+                _a = '' if _ph(_a) else _a
+                _pr = _s_poi.get('printed_by', '') or _s_poi.get('printer', '') or ''
+                if _ph(_pr):
+                    _pr = ''
+                _co = _s_poi.get('collaborator', '') or ''
+                if _ph(_co):
+                    _co = ''
+                _do = _s_poi.get('donor', '') or ''
+                if _ph(_do):
+                    _do = ''
+                return {
+                    'canonical_title': _n,
+                    'artist': _a,
+                    'venue_city': location.split(',')[1].strip() if ',' in location else '',
+                    'venue_lang': 'en',
+                    'venue_name': _museum_venue_name or location.split(',')[0].strip(),
+                    'publisher': _pub,
+                    'credit_line': _cl,
+                    'medium': _med,
+                    'english_title': _et,
+                    'exhibition_name': _exh_name_resolved,
+                    'printer': _pr,
+                    'printed_by': _pr,
+                    'collaborator': _co,
+                    'local_title': _s_poi.get('local_title', ''),
+                    'donor': _do,
+                }
+
+            # Prefetch the primary search for every worthy stop, concurrently.
+            _s587_prefetch = {}  # stop_index -> search result dict
+            try:
+                from story_worthiness import assess_stop_worthiness as _s587_worth
+                _s587_jobs = []
+                for _pi, _ppoi in enumerate(poi_list):
+                    try:
+                        _pdata = _s587_build_stop_data(_pi, _ppoi)
+                        _pw = _s587_worth(_pdata)
+                    except Exception:
+                        _pw = {'worth_mining': True}
+                        _pdata = _s587_build_stop_data(_pi, _ppoi)
+                    if _pw.get('worth_mining', True):
+                        _s587_jobs.append((_pi, _pdata))
+
+                def _s587_search_one(_job):
+                    _pi, _pdata = _job
+                    return _pi, search_stories_for_stop(
+                        _pdata, tour_type='contained',
+                        generation_tier=os.environ.get('GENERATION_TIER', 'plus'),
+                    )
+
+                if _s587_jobs:
+                    with tour_executor(max_workers=min(len(_s587_jobs), 5)) as _s587_ex:
+                        _s587_futs = {_s587_ex.submit(_s587_search_one, _j): _j[0]
+                                      for _j in _s587_jobs}
+                        for _s587_fut in as_completed(_s587_futs):
+                            _ri, _rres = _s587_fut.result()
+                            _s587_prefetch[_ri] = _rres
+            except Exception as _s587_err:
+                # Prefetch is a pure optimisation; on any failure the loop below
+                # falls back to the inline live search, unchanged.
+                print(f"  [LOCAL-587] search prefetch skipped (non-fatal, loop runs "
+                      f"inline): {type(_s587_err).__name__}: {_s587_err}")
+                _s587_prefetch = {}
+
             for _s_idx, _s_poi in enumerate(poi_list):
                 _s_name = _s_poi.get('name', '')
                 _s_artist = _s_poi.get('artist', '')
@@ -12841,10 +12950,15 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     _worthiness_skipped += 1
                     continue
 
-                _s_result = search_stories_for_stop(
-                    _s_stop_data, tour_type='contained',
-                    generation_tier=os.environ.get('GENERATION_TIER', 'plus'),
-                )
+                # [LOCAL-587] Use the concurrently-prefetched result for this stop
+                # when available; otherwise fall back to the inline live search so
+                # behaviour is identical if the prefetch was skipped or missed.
+                _s_result = _s587_prefetch.get(_s_idx)
+                if _s_result is None:
+                    _s_result = search_stories_for_stop(
+                        _s_stop_data, tour_type='contained',
+                        generation_tier=os.environ.get('GENERATION_TIER', 'plus'),
+                    )
                 _s_raw = _s_result.get('results', [])
                 _s_query_log = _s_result.get('query_log', [])
                 _s_queries_issued = len(_s_query_log)
@@ -18749,13 +18863,31 @@ REWRITE RULES (all mandatory):
                 _d511_stats = {'stops': 0, 'accepted': 0, 'cost': 0.0,
                                'replaced': 0, 'multi': 0}
                 from story_production_loop import MAX_STORIES as _d466_max, SECOND_MIN as _d466_second_min
+
+                # [LOCAL-587] The credit_line loop was 190s of the Griffin baseline
+                # because it ran the five stops back to back (26+46+26+38+54s) even
+                # though each stop's `run_for_stop` is independent: it takes a
+                # per-stop matrix built below (a fresh dict), keeps only local
+                # state, and appends to story_loop_candidates.jsonl, which its own
+                # docstring guarantees is safe for "concurrent stops in the same
+                # run" (append-only, one line per candidate).
+                #
+                # So the EXPENSIVE, independent part — the Gemini/Serper
+                # `run_for_stop` call — fans out across a TourExecutor, while every
+                # byte of the result-merge, the D518 merge, the stats and the prints
+                # stays on THIS thread, in stop order, untouched. tour_executor
+                # (dead_host_breaker.TourExecutor) is what keeps the two scopes
+                # correct in the workers: LOCAL-562 (the per-tour cost accumulator,
+                # via the global ThreadPoolExecutor.submit contextvar patch) and
+                # LOCAL-572 (the dead-host cold set, captured at construction on
+                # this tour thread and re-bound inside each worker). Nothing about
+                # the gate, the floor, keep-best or publish-count changes — only the
+                # order the network waits happen in.
+                _d511_eligible = []  # (stop_index, poi, matrix, desc)
                 for _d511_i, _d511_poi in enumerate(poi_list):
                     _d511_desc = _d511_poi.get('description') or ''
                     if not _d511_desc or _d511_desc.startswith('['):
                         continue
-                    _d511_stats['stops'] += 1
-                    print(f"\n  [D511] stop {_d511_i+1}: "
-                          f"{_d511_poi.get('name','')[:44]}")
                     _d511_matrix = {
                         'canonical_title': _d511_poi.get('name', ''),
                         'english_title': _d511_poi.get('english_title', ''),
@@ -18768,11 +18900,38 @@ REWRITE RULES (all mandatory):
                         'medium': _d511_poi.get('medium', ''),
                         'venue_name': _museum_venue_name or '',
                     }
-                    _d511_res = _d511_run(
-                        _d511_matrix, _d511_desc,
+                    _d511_eligible.append((_d511_i, _d511_poi, _d511_matrix, _d511_desc))
+
+                def _d511_run_one(_item):
+                    """[LOCAL-587] One stop's Gemini/Serper loop. Pure w.r.t. shared
+                    state: reads only its own matrix/desc, returns the result dict.
+                    Verbose prints inside run_for_stop still fire, interleaved like
+                    the already-parallel writer loop (LOCAL-440/569)."""
+                    _i, _poi, _matrix, _desc = _item
+                    return _i, _d511_run(
+                        _matrix, _desc,
                         exhibition=_exh_name_resolved or location,
                         venue_url=_d511_venue_url,
-                        extra_entities=[_d511_poi.get('artist', '')])
+                        extra_entities=[_poi.get('artist', '')])
+
+                _d511_results = {}  # stop_index -> result dict
+                if _d511_eligible:
+                    with tour_executor(max_workers=min(len(_d511_eligible), 5)) as _d511_ex:
+                        _d511_futures = {_d511_ex.submit(_d511_run_one, _it): _it[0]
+                                         for _it in _d511_eligible}
+                        for _d511_fut in as_completed(_d511_futures):
+                            _ri, _rres = _d511_fut.result()
+                            _d511_results[_ri] = _rres
+
+                # Sequential, ordered result-merge — unchanged logic, main thread
+                # only. Every mutation of total_cost / _d511_stats / the POI and
+                # every print happens here, in stop order, exactly as before.
+                for _d511_i, _d511_poi, _d511_matrix, _d511_desc in _d511_eligible:
+                    _d511_stats['stops'] += 1
+                    print(f"\n  [D511] stop {_d511_i+1}: "
+                          f"{_d511_poi.get('name','')[:44]}")
+                    _d511_res = _d511_results.get(_d511_i) or {'story': '', 'stories': [],
+                                                               'cost_usd': 0.0}
                     _d511_stats['cost'] += _d511_res.get('cost_usd', 0.0)
                     total_cost += _d511_res.get('cost_usd', 0.0)
                     _d511_poi['_d511'] = _d511_res
