@@ -273,9 +273,10 @@ def _compose_narration(
     sentences: List[str] = []
     # Honest orientation (this is WHY it is an overview, not a full tour).
     sentences.append(
-        f"Welcome to {_vn}{where}. We could not independently verify the specific "
-        f"works on display right now, so this is a short orientation drawn from the "
-        f"museum's own pages on {domain}, as published in {as_of}.")
+        f"Welcome to {_vn}{where}. This is a short overview, not a full tour: we "
+        f"could not independently verify the specific works on display right now, "
+        f"so it is drawn entirely from the museum's own pages on {domain}, as "
+        f"published in {as_of}.")
     if place_sentence:
         sentences.append(place_sentence)
     # What is on now — names only.
@@ -420,12 +421,24 @@ def build_museum_overview(
     )
 
     # Sources: the pages we actually used, venue-domain only, deduped in order.
+    # Dedupe by normalized URL (ignore a trailing slash) so '/x' and '/x/' — which
+    # a server usually serves identically — do not both appear.
     sources: List[str] = []
+    _seen_norm = set()
+
+    def _add_source(u: str):
+        if not u or _domain_of(u) != domain:
+            return
+        norm = u.rstrip('/')
+        if norm in _seen_norm:
+            return
+        _seen_norm.add(norm)
+        sources.append(u)
+
     for _, url in fetched:
-        if url and url not in sources and _domain_of(url) == domain:
-            sources.append(url)
-    if facts_source and facts_source not in sources and _domain_of(facts_source) == domain:
-        sources.append(facts_source)
+        _add_source(url)
+    _add_source(facts_source)
+    sources = sources[:6]
 
     return MuseumOverview(
         narration=narration,
