@@ -297,6 +297,24 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 _svc_logger.error(f"[LOCAL-146] MISSING: generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE — degradation evidence unavailable: {_cfe_err}")
             except AttributeError as _cfe_err:
                 _svc_logger.error(f"[LOCAL-146] generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE not defined: {_cfe_err}")
+            # [LOCAL-580 D4] Attach an ACTIONABLE structured failure: a stable
+            # error_code, a plain-language message, and a machine-usable
+            # suggestion object derived from the venue's resolved locality (so
+            # the mobile app, LOCAL-581, can offer a one-tap alternative such as
+            # "Walking tour of Winchester, MA"). The old human string stays in
+            # `error` verbatim for pre-LOCAL-581 app builds.
+            try:
+                from actionable_failure import build_actionable_failure
+                _af = build_actionable_failure(
+                    _error_extra.get("evidence_summary"), location, _error_msg)
+                _error_extra["error_code"] = _af["error_code"]
+                _error_extra["message"] = _af["message"]
+                _error_extra["suggestion"] = _af["suggestion"]
+                _svc_logger.info(
+                    f"[LOCAL-580] clean-fail error_code={_af['error_code']} "
+                    f"suggestion={_af['suggestion']}")
+            except Exception as _af_err:
+                _svc_logger.error(f"[LOCAL-580] actionable-failure build failed (non-fatal): {_af_err}")
             ACTIVE_JOBS.update(job_id, status="error", error=_error_msg, **_error_extra)
             if os.path.exists(temp_path):
                 os.unlink(temp_path)

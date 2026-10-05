@@ -228,16 +228,17 @@ Kokoro service (launchd `com.audioura.kokoro`, :5181; `curl localhost:5181/healt
 **Docker builds hang?** Check for stuck `docker-credential-desktop get`: `credsStore` was removed
 from `~/.docker/config.json` for exactly this.
 
-**External SSD (2026-10-04):** SanDisk 1 TB, APFS, mounted at `/Volumes/AudiouraSSD`. **Worktrees are
-NOT on it yet:** macOS blocks launchd jobs from removable volumes (`Operation not permitted`,
-proven with a one-shot launchd probe), so the dispatcher could not create worktrees there and
-LOCAL-577/578 failed twice. Worktrees were moved back to the internal `~/audioura-worktrees` the
-same hour. **Before moving them again,** Michael must grant Full Disk Access to `/bin/zsh` (the
-launchd tick's interpreter; add `/usr/bin/python3` and `/opt/homebrew/bin/kiro-cli` if a probe still
-fails), then re-run the launchd probe (`com.audioura.ssdprobe`: touch + `git worktree add` on the SSD).
-A stale copy sits at `/Volumes/AudiouraSSD/audioura-worktrees.copy_20261004`. Docker's 11 GB
-`Docker.raw`: move with Docker Desktop → Settings → Resources → Advanced → Disk image location
-(GUI, Michael present), never by editing settings files. Pre-move DB backup:
+**External SSD (2026-10-04):** SanDisk 1 TB, APFS, `/Volumes/AudiouraSSD`. `~/audioura-worktrees` is a
+**symlink** into it: every task worktree lives on the SSD. **If the SSD is unplugged, the dispatcher
+and every worktree break**; check `ls /Volumes/AudiouraSSD` first when git or Kiro fail strangely.
+launchd jobs need **Full Disk Access for `/bin/zsh`** to touch the SSD (macOS blocks removable volumes:
+`Operation not permitted`). Michael granted it 2026-10-04, proven by a launchd probe that ran
+`git worktree add` through the symlink. Docker's disk image stays **internal**: on 2026-10-04 Michael chose `/Volumes/AudiouraSSD/DockerData`
+in Settings → Resources → Disk image location and clicked Apply & restart. Docker restarted, but saved
+no new location and kept using the internal `Docker.raw`, most likely because Docker Desktop has no
+removable-volume permission. Not worth more of Michael's time: the worktrees, the main growth, are
+on the SSD and the internal disk has 30 GB free. If it is ever needed, grant Docker Desktop Full Disk
+Access first. Pre-move DB backup:
 `/Volumes/AudiouraSSD/pre_migration_*.sql.gz`.
 
 # ASKING A SIDE QUESTION WITHOUT DERAILING THE SESSION
