@@ -7159,6 +7159,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _museum_site_first_eligible = True
                     _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
                     _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
+                    # [LOCAL-580 D4] Remember the locality (city hint from the
+                    # request tail) so a clean fail can suggest a locality-based
+                    # walking tour instead of a dead end.
+                    _museum_resolved_locality = _det_city_hint or ''
                     print(f"  [LOCAL-580] 0 documented works for '{_museum_venue_name}' — "
                           f"exhibition-museum site-first path ELIGIBLE "
                           f"(site='{_museum_site_url}')")
@@ -8573,6 +8577,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             # [LOCAL-485] Name the venue so the service layer can say
                             # WHICH venue lacked material, instead of a catch-all.
                             "venue": _museum_venue_name or location,
+                            # [LOCAL-580 D4] Locality for the actionable suggestion.
+                            "locality": _museum_resolved_locality,
                         }
                         return None, None, (None, None)
                     # Extract fields from VerificationResult
@@ -8689,6 +8695,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         "tier": "unresolvable",
                         # [LOCAL-485] Name the venue so the service layer can say which.
                         "venue": _museum_venue_name or location,
+                        # [LOCAL-580 D4] Locality for the actionable suggestion.
+                        "locality": _museum_resolved_locality,
                     })
                     return None, None, (None, None)
 
