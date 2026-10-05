@@ -120,6 +120,56 @@ def _normalize_time(time_str: str) -> str:
     return time_str
 
 
+# ============================================================
+# [LOCAL-584] Currency is what the page says — never a default
+# ============================================================
+
+# Symbols/codes we recognise, mapped to the display symbol we emit. The € default
+# that LOCAL-35 baked in rewrote a US museum's "$12" to "€12" (tour 391, Griffin
+# Museum of Photography). Currency MUST be derived from the matched text itself —
+# from the venue's language or a hard-coded default, NEVER.
+_CURRENCY_SYMBOLS = ['€', '£', '$', '¥', '₩', '₹', '₽', 'CHF', 'kr', 'zł']
+_CURRENCY_CODE_TO_SYMBOL = {
+    'EUR': '€', 'GBP': '£', 'USD': '$', 'JPY': '¥', 'CNY': '¥',
+    'CHF': 'CHF', 'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr', 'PLN': 'zł',
+}
+
+
+def _format_price(symbol: str, amount: str) -> str:
+    """Render a price using the currency the page actually used.
+
+    `symbol` is whatever was captured next to the amount (a symbol like '$'/'€',
+    an ISO code like 'USD', or ''). An empty/None symbol means the page gave a
+    bare number with no currency marker — we must NOT invent one, so we return the
+    amount alone rather than guessing €. Codes are mapped to their symbol; a
+    code/word currency (e.g. CHF) is written before the amount with a space.
+    """
+    s = (symbol or '').strip()
+    if not s:
+        # No currency marker on the page → state the number without a symbol.
+        # Downstream the literal-token gate still requires the digits in source.
+        return amount
+    up = s.upper()
+    if up in _CURRENCY_CODE_TO_SYMBOL:
+        sym = _CURRENCY_CODE_TO_SYMBOL[up]
+    else:
+        sym = s
+    # Multi-char/code currencies read better before the number with a space.
+    if len(sym) > 1 or sym.isalpha():
+        return f"{sym} {amount}"
+    return f"{sym}{amount}"
+
+
+# A price in ANY currency, used for scoring/merging (not just €). "$12", "€5",
+# "£8", "12€", "CHF 10", or a bare "12" preceded by an admission context all count.
+_ANY_PRICE_RE = re.compile(r'(?:€|£|\$|¥|₩|₹|₽|CHF|USD|GBP|EUR)\s*\d+|\d+\s*(?:€|£|\$|¥|EUR|USD|GBP|CHF)')
+
+
+def _has_price(admission: str) -> bool:
+    """True iff an admission string carries a numeric price in some currency."""
+    return bool(_ANY_PRICE_RE.search(admission or ''))
+
+
 def _parse_date_range_fr(text: str) -> str:
     """Parse a French date range like 'du 1er septembre au 30 juin' → '1 Sep–30 Jun'."""
     # Pattern: du Xer/X month au Y month
@@ -323,8 +373,10 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
         # Check for a GENERAL ENTRY price — must be near keywords that indicate
         # it's the main ticket, not a guided tour or workshop.
         # "Tarif normal/plein/unique" or "Entrée unique" are the key markers.
+        # [LOCAL-584] Capture the currency symbol/code the page used — never assume €.
         _price_match = re.search(
-            r'(?:[Tt]arif\s+(?:normal|plein|unique)|[Ee]ntr[eé]e\s+unique)\s*[:\s]*(\d+)\s*(?:€|EUR)',
+            r'(?:[Tt]arif\s+(?:normal|plein|unique)|[Ee]ntr[eé]e\s+unique)\s*[:\s]*'
+            r'(?:(€|£|\$|¥|CHF)\s*)?(\d+)\s*(€|£|\$|¥|EUR|CHF)?',
             page_text
         )
         # Do NOT use the generic "X€" pattern if we already found "Entrée gratuite"
@@ -332,7 +384,8 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
         if not _price_match and not _libre_gratuit:
             # Fallback: look for standalone price near "tarif" or "billet"
             _price_match = re.search(
-                r'(?:[Tt]arif|[Bb]illet)\s+[^.]{0,30}?(\d+)\s*(?:€|EUR)',
+                r'(?:[Tt]arif|[Bb]illet)\s+[^.]{0,30}?'
+                r'(?:(€|£|\$|¥|CHF)\s*)?(\d+)\s*(€|£|\$|¥|EUR|CHF)?',
                 page_text
             )
 
@@ -361,7 +414,12 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
             # Truly free general entry (like Asian Arts Museum départemental)
             _is_unconditionally_free = True
         elif _price_match:
-            _general_price = f"€{_price_match.group(1)}"
+            # [LOCAL-584] Symbol comes from the page: a leading symbol (group 1) or a
+            # trailing symbol/code (group 3). The amount is group 2. If the page gave
+            # no currency marker at all, _format_price emits the bare number — we do
+            # NOT substitute €.
+            _sym = _price_match.group(1) or _price_match.group(3) or ''
+            _general_price = _format_price(_sym, _price_match.group(2))
             _has_general_price = True
         if _metropole_free or _pass_free:
             _has_free_condition = True
@@ -369,14 +427,18 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
 
     else:
         # English admission extraction
-        # Look for individual entry price
+        # Look for individual entry price.
+        # [LOCAL-584] Capture the currency symbol/code from the page — never assume €.
+        # Griffin Museum (Winchester, MA) writes "General Admission: $12 for adults",
+        # and the old pattern discarded the '$' then re-stamped '€' → "€12".
         _price_match = re.search(
-            r'(?:Mus[eé]e\s+\w+|single|entry|admission|ticket)\s*[-–:]\s*(?:€|£|\$)?(\d+)(?:\s*€)?',
+            r'(?:Mus[eé]e\s+\w+|single|entry|admission|ticket)\s*[-–:]\s*'
+            r'(?:(€|£|\$|¥|CHF|USD|GBP|EUR)\s*)?(\d+)\s*(€|£|\$|¥|EUR|USD|GBP|CHF)?',
             page_text, re.IGNORECASE
         )
         if not _price_match:
             _price_match = re.search(
-                r'(\d+)\s*€\s*(?:per\s+person)?',
+                r'(?:(€|£|\$|¥|CHF)\s*)?(\d+)\s*(€|£|\$|¥|EUR|USD|GBP|CHF)\s*(?:per\s+person)?',
                 page_text, re.IGNORECASE
             )
 
@@ -413,7 +475,10 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
         if _free_match and not _price_match:
             _is_unconditionally_free = True
         elif _price_match:
-            _general_price = f"€{_price_match.group(1)}"
+            # [LOCAL-584] Symbol from the page (leading group 1 or trailing group 3);
+            # amount is group 2. No marker ⇒ bare number, never a € default.
+            _sym = _price_match.group(1) or _price_match.group(3) or ''
+            _general_price = _format_price(_sym, _price_match.group(2))
             _has_general_price = True
         if _metropole_free:
             _has_free_condition = True
@@ -535,7 +600,7 @@ def _extract_best_facts(fetched_pages: list) -> Optional[VisitorFacts]:
         s += min(len(f.hours), 2) * 2
         if f.admission:
             s += 3
-            if re.search(r'€\d+|\d+€', f.admission):
+            if _has_price(f.admission):
                 s += 2
         if f.closed_days:
             s += 1
@@ -550,8 +615,8 @@ def _extract_best_facts(fetched_pages: list) -> Optional[VisitorFacts]:
         if len(other.hours) > len(best.hours):
             best.hours = other.hours
         # If best has no admission or no price, prefer other's admission if it has a price
-        if other.admission and re.search(r'€\d+|\d+€', other.admission):
-            if not best.admission or not re.search(r'€\d+|\d+€', best.admission):
+        if other.admission and _has_price(other.admission):
+            if not best.admission or not _has_price(best.admission):
                 best.admission = other.admission
         # If best has no closed_days, take from other
         if not best.closed_days and other.closed_days:
