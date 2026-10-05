@@ -10718,20 +10718,49 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _osm_city = _extract_city(location)
                 if _osm_city:
                     _venue_hint = 'museum' if tour_category == 'museum' else ''
-                    print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                    # [LOCAL-583 D3] Exhibit-museum stops are EXHIBITIONS, not
+                    # mappable OSM objects. OpenStreetMap has no node for a
+                    # temporary show ("Intertidal : Field Notes") any more than it
+                    # has one for a pulpit (the D569 church-tour defect: N Overpass
+                    # calls, every one a 504/timeout, ~200s wasted). The practical
+                    # facts a listener needs here — admission, hours — belong to
+                    # the MUSEUM BUILDING, so we query OSM ONCE for the venue and
+                    # share its facts across the exhibition stops, instead of
+                    # firing one doomed Overpass query per show name.
+                    _stops_are_exhibitions = (
+                        _exhibition_stops_source in ('site_exhibition', 'checklist', 'partial')
+                        or any(p.get('source') == 'site_exhibition' for p in poi_list)
+                    )
                     _osm_source_texts_355 = []
                     _osm_source_urls_355 = []
-                    for poi in poi_list:
-                        _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
-                        if not _osm_facts.is_empty():
-                            # Only replace if no visitor info was already sourced (LOCAL-34/39)
-                            if not poi.get('operational_details'):
-                                poi['operational_details'] = _osm_facts.format_practical_sentence()
-                            _osm_source_texts_355.append(_osm_facts.source_text)
-                            _osm_source_urls_355.append(_osm_facts.source_url)
-                            print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                    if _stops_are_exhibitions:
+                        _venue_query_name = _museum_venue_name or venue_name
+                        print(f"  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the "
+                              f"museum building '{_venue_query_name}' (not per-exhibition — a show has no OSM node)")
+                        _venue_osm = fetch_osm_venue_facts(_venue_query_name, _osm_city, venue_hint='museum')
+                        if not _venue_osm.is_empty():
+                            _venue_sentence = _venue_osm.format_practical_sentence()
+                            for poi in poi_list:
+                                if not poi.get('operational_details'):
+                                    poi['operational_details'] = _venue_sentence
+                            _osm_source_texts_355.append(_venue_osm.source_text)
+                            _osm_source_urls_355.append(_venue_osm.source_url)
+                            print(f"  [LOCAL-355] museum building: sourced → {_venue_sentence}")
                         else:
-                            print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
+                            print(f"  [LOCAL-355] museum building: no practical facts in OSM")
+                    else:
+                        print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                        for poi in poi_list:
+                            _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
+                            if not _osm_facts.is_empty():
+                                # Only replace if no visitor info was already sourced (LOCAL-34/39)
+                                if not poi.get('operational_details'):
+                                    poi['operational_details'] = _osm_facts.format_practical_sentence()
+                                _osm_source_texts_355.append(_osm_facts.source_text)
+                                _osm_source_urls_355.append(_osm_facts.source_url)
+                                print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                            else:
+                                print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
                     if _osm_source_texts_355:
                         # Append to existing source text (don't overwrite LOCAL-34 website sources)
                         _osm_355_combined = "\n\n".join(_osm_source_texts_355)
