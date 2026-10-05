@@ -88,7 +88,7 @@ class TestForcedStopsInjection:
         source = inspect.getsource(generate_tour_text)
 
         # Verify the code creates poi_list from forced_stops
-        assert "poi_list = [_new_poi(name) for name in forced_stops]" in source, (
+        assert re.search(r'poi_list = \[_new_poi\(name\) for name in (forced_stops|_forced_titles)\]', source), (
             "forced stops must create poi_list via _new_poi(name) for each stop"
         )
 
