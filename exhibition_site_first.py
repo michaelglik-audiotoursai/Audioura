@@ -24,12 +24,22 @@ discovery/extraction logic is unit-testable by injecting a fake fetcher.
 from __future__ import annotations
 
 import re
+import time
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 from exhibition_discovery import extract_current_exhibitions
 
 __all__ = ['discover_site_exhibitions', 'build_site_first_candidates', 'SiteFirstResult']
+
+# [LOCAL-589] Timeouts. The field defect was a swallowed ReadTimeout: a 15 s
+# listing fetch timed out, the error was discarded, and the run reported an empty
+# site. The listing fetch now retries once with a LONGER timeout before giving up.
+_LISTING_TIMEOUT = 15
+_LISTING_RETRY_TIMEOUT = 30
+_DETAIL_TIMEOUT = 15
+# HTTP statuses worth a retry: a transient server/network failure, not a 404.
+_RETRYABLE_STATUSES = frozenset({0, 408, 429, 500, 502, 503, 504})
 
 
 class SiteFirstResult:
@@ -67,23 +77,100 @@ _LISTING_SEEDS_EN = [
 ]
 
 
-def _default_fetcher(url: str) -> Tuple[str, List[Tuple[str, str]]]:
-    """Fetch a page via exhibition_checklist's polite/cached fetcher.
+def _default_fetcher(url: str, timeout: int = _LISTING_TIMEOUT):
+    """Fetch a page and LOG the attempt (URL, status, bytes, seconds, exception).
 
-    Returns (html_or_text, links). We ask for RAW HTML because the structural
-    extractor needs the DOM, not stripped text. exhibition_checklist._fetch_page
-    returns visible text + links; to get HTML we do our own request here and
-    fall back to the shared fetcher's links.
+    Returns a 3-tuple ``(html, links, meta)`` where ``meta`` is
+    ``{'status': int, 'error': str, 'bytes': int, 'seconds': float}``. The meta
+    lets the caller tell a FETCH FAILURE (timeout / 5xx / exception → status 0 or
+    5xx, non-empty error) from a page that was fetched fine but held nothing.
+
+    status == 0 means the request never produced an HTTP response (timeout,
+    DNS/connection error) — the exact Griffin ReadTimeout case that used to be
+    swallowed. We ask for RAW HTML because the structural extractor needs the DOM.
     """
     import requests
+    status = 0
+    error = ''
+    html = ''
+    _t0 = time.time()
     try:
         resp = requests.get(url, headers={'User-Agent': 'Audioura/2.4 (+exhibitions)'},
-                            timeout=15, allow_redirects=True)
+                            timeout=timeout, allow_redirects=True)
+        status = resp.status_code
         if resp.status_code == 200 and resp.text:
-            return resp.text, []
-    except Exception:
-        pass
-    return '', []
+            html = resp.text
+    except Exception as _e:
+        error = f"{type(_e).__name__}: {_e}"
+    seconds = time.time() - _t0
+    nbytes = len(html.encode('utf-8', 'ignore')) if html else 0
+    print(f"  [LOCAL-589][fetch] {url} -> status={status} bytes={nbytes} "
+          f"{seconds:.2f}s{(' EXC=' + error) if error else ''}")
+    return html, [], {'status': status, 'error': error, 'bytes': nbytes,
+                      'seconds': round(seconds, 3)}
+
+
+def _normalize_fetch(result) -> Tuple[str, list, dict]:
+    """Accept a legacy 2-tuple ``(html, links)`` or a 3-tuple ``(html, links,
+    meta)`` and always return the 3-tuple. For a legacy fetcher we synthesize a
+    meta: status 200 when HTML came back, else status 0 (treated as a failure
+    only when NO html — a legacy fetcher cannot distinguish timeout from empty).
+    """
+    if isinstance(result, tuple) and len(result) == 3:
+        html, links, meta = result
+        meta = dict(meta or {})
+        meta.setdefault('status', 200 if html else 0)
+        meta.setdefault('error', '')
+        meta.setdefault('bytes', len(html.encode('utf-8', 'ignore')) if html else 0)
+        meta.setdefault('seconds', 0.0)
+        return html or '', links or [], meta
+    if isinstance(result, tuple) and len(result) == 2:
+        html, links = result
+        return (html or '', links or [],
+                {'status': 200 if html else 0, 'error': '', 'seconds': 0.0,
+                 'bytes': len(html.encode('utf-8', 'ignore')) if html else 0})
+    # Defensive: a fetcher that returned something unexpected.
+    return '', [], {'status': 0, 'error': 'bad_fetcher_return', 'bytes': 0, 'seconds': 0.0}
+
+
+def _fetch_with_retry(url: str, fetch, diagnostics: dict,
+                      is_listing: bool = False) -> Tuple[str, list, dict]:
+    """Call ``fetch`` and, for a LISTING fetch, retry ONCE on a transient failure
+    (timeout / 5xx) with a longer timeout. Records every attempt in
+    ``diagnostics['fetches']``. Returns the normalized ``(html, links, meta)``.
+
+    The retry is the fix for the Griffin intermittent ReadTimeout: a single
+    network hiccup no longer looks like an empty site.
+    """
+    try:
+        html, links, meta = _normalize_fetch(fetch(url))
+    except TypeError:
+        # Legacy fetcher with a strict 1-arg signature and no timeout kw — call
+        # bare. (_default_fetcher accepts timeout; injected fakes may not.)
+        html, links, meta = _normalize_fetch(fetch(url))
+    if diagnostics is not None:
+        diagnostics.setdefault('fetches', []).append({
+            'url': url, 'status': meta.get('status', 0),
+            'bytes': meta.get('bytes', 0), 'seconds': meta.get('seconds', 0.0),
+            'error': meta.get('error', ''), 'kind': 'listing' if is_listing else 'detail',
+            'attempt': 1,
+        })
+    failed = (not html) and (meta.get('status', 0) in _RETRYABLE_STATUSES)
+    if is_listing and failed:
+        print(f"  [LOCAL-589] listing fetch failed (status={meta.get('status')} "
+              f"err='{meta.get('error','')}') — RETRYING once with longer timeout")
+        try:
+            retry = fetch(url, _LISTING_RETRY_TIMEOUT)
+        except TypeError:
+            retry = fetch(url)
+        html, links, meta = _normalize_fetch(retry)
+        if diagnostics is not None:
+            diagnostics.setdefault('fetches', []).append({
+                'url': url, 'status': meta.get('status', 0),
+                'bytes': meta.get('bytes', 0), 'seconds': meta.get('seconds', 0.0),
+                'error': meta.get('error', ''), 'kind': 'listing', 'attempt': 2,
+            })
+    return html, links, meta
 
 
 def _candidate_listing_urls(base_site_url: str, venue_language: str = 'en') -> List[str]:
@@ -117,31 +204,68 @@ def _candidate_listing_urls(base_site_url: str, venue_language: str = 'en') -> L
 def discover_site_exhibitions(
     base_site_url: str,
     venue_language: str = 'en',
-    fetcher: Optional[Callable[[str], Tuple[str, List[Tuple[str, str]]]]] = None,
+    fetcher: Optional[Callable] = None,
     max_listing_tries: int = 6,
+    diagnostics: Optional[Dict] = None,
 ) -> Tuple[List[Dict], str]:
     """Find the venue's current exhibitions from its own site.
 
     Returns (exhibitions, listing_url) where exhibitions is a list of
     {'title', 'detail_url'} (from exhibition_discovery) and listing_url is the
     page they were found on ('' if none found).
+
+    When ``diagnostics`` is given it is populated with:
+      * ``reason``        — 'ok' / 'parsed_zero' / 'no_listing_found' /
+                            'fetch_failed'
+      * ``fetch_failed``  — True when EVERY attempted listing fetch failed
+                            (timeout/5xx/exception) and none returned usable HTML.
+      * ``fetches``       — per-attempt records (URL, status, bytes, seconds).
+    This is what lets the caller refuse to fall through to GPT invention on a
+    transient network failure (the Griffin field defect).
     """
+    if diagnostics is None:
+        diagnostics = {}
+    diagnostics.setdefault('fetches', [])
     if not base_site_url:
+        diagnostics['reason'] = 'no_listing_found'
+        diagnostics['fetch_failed'] = False
         return [], ''
     fetch = fetcher or _default_fetcher
     tried = 0
+    _any_html = False          # at least one seed returned usable HTML
+    _any_fetch_failure = False  # at least one seed failed to fetch (timeout/5xx)
     for url in _candidate_listing_urls(base_site_url, venue_language):
         if tried >= max_listing_tries:
             break
         tried += 1
-        html, _links = fetch(url)
+        html, _links, meta = _fetch_with_retry(url, fetch, diagnostics, is_listing=True)
         if not html or len(html) < 100:
+            if meta.get('status', 0) in _RETRYABLE_STATUSES and not html:
+                _any_fetch_failure = True
             continue
+        _any_html = True
         exhibitions = extract_current_exhibitions(html, url)
         if exhibitions:
             print(f"  [LOCAL-580] Site exhibitions found on {url}: "
                   f"{len(exhibitions)} show(s)")
+            diagnostics['reason'] = 'ok'
+            diagnostics['fetch_failed'] = False
+            diagnostics['listing_url'] = url
             return exhibitions, url
+    # Nothing returned — say WHY.
+    if _any_html:
+        # A listing page was fetched but held no structural exhibitions.
+        diagnostics['reason'] = 'parsed_zero'
+        diagnostics['fetch_failed'] = False
+    elif _any_fetch_failure:
+        # Every seed that could carry the listing failed to fetch.
+        diagnostics['reason'] = 'fetch_failed'
+        diagnostics['fetch_failed'] = True
+    else:
+        diagnostics['reason'] = 'no_listing_found'
+        diagnostics['fetch_failed'] = False
+    print(f"  [LOCAL-589] discover_site_exhibitions: reason={diagnostics['reason']} "
+          f"(tried {tried} seed(s), {len(diagnostics['fetches'])} fetch attempt(s))")
     return [], ''
 
 
@@ -149,8 +273,9 @@ def build_site_first_candidates(
     base_site_url: str,
     venue_language: str = 'en',
     total_stops: int = 5,
-    fetcher: Optional[Callable[[str], Tuple[str, List[Tuple[str, str]]]]] = None,
+    fetcher: Optional[Callable] = None,
     fetch_detail_pages: bool = True,
+    diagnostics: Optional[Dict] = None,
 ) -> List[Dict]:
     """Build site-first candidate stops for an exhibition museum.
 
@@ -158,20 +283,25 @@ def build_site_first_candidates(
     detail page (fetched for the description). Returns up to ``total_stops * 2``
     candidates (headroom for grounding) in the site's published order.
 
-    Returns [] when the site yields no exhibitions — the caller then falls back
-    to its existing paths (never turns a working tour into no tour, D577).
+    Returns [] when the site yields no exhibitions. When ``diagnostics`` is
+    given it carries the honest reason (see discover_site_exhibitions) so the
+    caller can distinguish 'fetch_failed' (retry / overview rung, NEVER GPT
+    invention) from 'parsed_zero'/'no_listing_found'.
     """
+    if diagnostics is None:
+        diagnostics = {}
     fetch = fetcher or _default_fetcher
     exhibitions, listing_url = discover_site_exhibitions(
-        base_site_url, venue_language, fetcher=fetch)
+        base_site_url, venue_language, fetcher=fetch, diagnostics=diagnostics)
     if not exhibitions:
+        # reason/fetch_failed already set by discover_site_exhibitions.
         return []
 
     # Fetch the listing page text once so a show with a thin detail page still
     # has SOME grounding text (its blurb on the listing).
     listing_text = ''
     if listing_url:
-        _html, _ = fetch(listing_url)
+        _html, _, _ = _fetch_with_retry(listing_url, fetch, diagnostics, is_listing=False)
         listing_text = _visible_text(_html)
 
     cap = max(total_stops * 2, total_stops)
@@ -183,7 +313,7 @@ def build_site_first_candidates(
             continue
         page_text = ''
         if fetch_detail_pages and detail_url:
-            _html, _ = fetch(detail_url)
+            _html, _, _ = _fetch_with_retry(detail_url, fetch, diagnostics, is_listing=False)
             page_text = _visible_text(_html)
         if not page_text:
             page_text = listing_text
@@ -193,6 +323,9 @@ def build_site_first_candidates(
             'page_text': page_text,
             'source': 'site_exhibition',
         })
+    diagnostics['reason'] = 'ok'
+    diagnostics['fetch_failed'] = False
+    diagnostics['candidate_count'] = len(candidates)
     return candidates
 
 
