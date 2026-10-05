@@ -10552,11 +10552,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if _best_corpus_facts and not _best_corpus_facts.is_empty():
                         _formatted = _best_corpus_facts.format_en()
                         if _formatted and len(_formatted) >= 10:
-                            _sourced_visitor_info = _formatted
-                            _visitor_info_source_url = _best_corpus_page_url
-                            _visitor_info_source_text = _best_corpus_page_text[:10000]
-                            print(f"  [LOCAL-91] Corpus fallback: visitor info extracted from {_best_corpus_page_url}")
-                            print(f"  [LOCAL-91] Corpus fallback Museum Information: {_formatted}")
+                            # [LOCAL-584] ONE gate for every path. The corpus fallback
+                            # used to write format_en() straight onto Museum Information
+                            # with NO verification — that is how tour 391 (Griffin Museum,
+                            # Winchester MA) shipped "08:00–20:00. €12", neither on its
+                            # $-priced, AM/PM page. Route the formatted facts through the
+                            # shared literal gate (verify_claim_against_source +
+                            # claim_tokens_in_source); unsupported segments are DROPPED and
+                            # LOGGED. Only what the page literally supports survives.
+                            _gated = _formatted
+                            try:
+                                from practical_facts_gate import gate_formatted_facts
+                                _gated, _dropped = gate_formatted_facts(
+                                    _formatted,
+                                    _best_corpus_page_text[:10000],
+                                    source_url=_best_corpus_page_url,
+                                    log=lambda m: print(f"  {m}"),
+                                )
+                            except Exception as _gate_err:
+                                print(f"  [LOCAL-584] gate unavailable, dropping corpus facts "
+                                      f"to stay safe (non-fatal): {_gate_err}")
+                                _gated = ''
+                            if _gated and len(_gated) >= 10:
+                                _sourced_visitor_info = _gated
+                                _visitor_info_source_url = _best_corpus_page_url
+                                _visitor_info_source_text = _best_corpus_page_text[:10000]
+                                print(f"  [LOCAL-91] Corpus fallback: visitor info extracted from {_best_corpus_page_url}")
+                                print(f"  [LOCAL-91] Corpus fallback Museum Information: {_gated}")
+                            else:
+                                print(f"  [LOCAL-584] Corpus fallback facts did not survive the "
+                                      f"literal gate — Museum Information OMITTED (was: {_formatted!r})")
                 except ImportError:
                     print(f"  [LOCAL-91] visitor_facts_extractor not available for corpus fallback")
                 except Exception as _cf_err:

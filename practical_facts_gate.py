@@ -503,6 +503,141 @@ def _verify_price_band(claim_lower: str, source_lower: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# [LOCAL-584] ONE literal-token gate for every practical-facts path
+# ---------------------------------------------------------------------------
+# The LOCAL-91 corpus fallback used to write visitor_facts_extractor.format_en()
+# straight onto the Museum Information line with no verification; LOCAL-39 and the
+# LOCAL-582 overview went through verify_claim_against_source + a literal-token
+# check, but the corpus fallback did not. That is how tour 391 (Griffin Museum,
+# Winchester MA) shipped "Museum Information: 08:00–20:00. €12" — a 24h schedule
+# and a euro price that appear NOWHERE on a US museum's AM/PM, $-priced page.
+#
+# claim_tokens_in_source is the shared, tighter literal check (moved here from
+# museum_overview so there is exactly ONE copy). gate_formatted_facts runs the
+# WHOLE formatted facts string through both verify_claim_against_source AND the
+# literal check, dropping — and logging — any segment that is not supported by the
+# source. Every path (LOCAL-35/39, LOCAL-91 corpus fallback, the overview) calls
+# the same gate.
+
+_DROP_LOG_PREFIX = "[LOCAL-584] dropped unsupported practical fact:"
+
+
+def claim_tokens_in_source(claim_value: str, source_lower: str) -> bool:
+    """Require a practical claim's DISTINCTIVE content to appear literally in source.
+
+    The LOCAL-35 extractor sometimes emits a normalised/synthetic label whose own
+    words are not in the page it was extracted from (e.g. a Nice price table rewritten
+    as "free for Métropole residents", or a currency the page never used). Every
+    distinctive token the claim carries — a day name, a numeric amount, a currency
+    symbol, or a condition word like "métropole"/"resident" — must appear verbatim
+    (digit / word-stem / symbol) in the source. Generic words ("free"/"admission")
+    are not required to be literal, but any CONDITION or amount on them is.
+    """
+    cl = (claim_value or '').lower()
+    cv = source_lower or ''
+
+    # Day names present in the claim must be present in the source.
+    for day in ('monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+                'saturday', 'sunday'):
+        if day in cl and day not in cv:
+            return False
+
+    # Any numeric amount in the claim (hours like 10, price like 12) must be
+    # present as a number in the source.
+    for num in re.findall(r'\d+', cl):
+        if num not in cv:
+            return False
+
+    # [LOCAL-584] Any currency symbol in the claim must appear in the source. This
+    # is the direct guard against "$12"→"€12": a € claim on a $-only page is dropped.
+    for sym in ('€', '£', '$', '¥', '₩', '₹', '₽'):
+        if sym in (claim_value or '') and sym not in (source_lower or ''):
+            return False
+
+    # Condition words the extractor may synthesise — require them literally.
+    for cond in ('métropole', 'metropole', 'resident', 'residents', 'member',
+                 'students', 'senior', 'child', 'children'):
+        if cond in cl and cond not in cv:
+            return False
+
+    return True
+
+
+def _facts_segment_claim(segment: str) -> Optional[PracticalClaim]:
+    """Classify ONE formatted-facts segment into a claim, or None if not practical.
+
+    Reuses _parse_info_text_into_claims, then falls back to a bare time-range
+    detector so a page-literal span like "8 AM–8 PM" (which the sentence-oriented
+    parser skips because of the space before AM) is still treated as an hours claim
+    and verified — never passed through unchecked.
+    """
+    seg = (segment or '').strip().rstrip('.')
+    if not seg:
+        return None
+    parsed = _parse_info_text_into_claims(seg)
+    if parsed:
+        return parsed[0]
+    # Fallback: a bare clock range with AM/PM or 24h, e.g. "8 AM–8 PM", "10:00–18:00".
+    if re.search(r'\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?',
+                 seg, re.IGNORECASE):
+        return PracticalClaim(claim_type='hours', value=seg)
+    return None
+
+
+def gate_formatted_facts(
+    formatted_info: str,
+    source_text: str,
+    source_url: str = "",
+    log=None,
+) -> Tuple[str, List[str]]:
+    """[LOCAL-584] The ONE gate. Return (surviving_facts, dropped_segments).
+
+    Splits a visitor_facts_extractor.format_en() string into its segments (top-level
+    parts joined by '. ', seasonal hour ranges by '; '), and keeps a segment ONLY if
+    it (a) classifies as a practical claim, (b) passes verify_claim_against_source,
+    and (c) passes claim_tokens_in_source. Anything else is dropped and logged with
+    the standard prefix. The surviving facts are re-joined with '. ' so the output is
+    a valid Museum Information value (or '' when nothing survives — silence is correct).
+    """
+    _log = log if log is not None else logger.warning
+    dropped: List[str] = []
+    if not formatted_info or not formatted_info.strip():
+        return '', dropped
+    if not source_text or not source_text.strip():
+        # No source to verify against → drop everything (provenance, not plausibility).
+        for seg in re.split(r'\.\s+|;\s+', formatted_info):
+            seg = seg.strip().rstrip('.')
+            if seg:
+                dropped.append(seg)
+                _log(f"{_DROP_LOG_PREFIX} {seg!r} (no source text to verify against)"
+                     + (f" [{source_url}]" if source_url else ""))
+        return '', dropped
+
+    source_lower = source_text.lower()
+    survivors: List[str] = []
+    for seg in re.split(r'\.\s+|;\s+', formatted_info):
+        seg = seg.strip().rstrip('.')
+        if not seg:
+            continue
+        claim = _facts_segment_claim(seg)
+        reason = ''
+        if claim is None:
+            reason = 'not a recognised practical claim'
+        elif not verify_claim_against_source(claim, source_text):
+            reason = 'not supported by source (gate)'
+        elif not claim_tokens_in_source(seg, source_lower):
+            reason = 'distinctive token (price/day/currency/condition) absent from source'
+        if reason:
+            dropped.append(seg)
+            _log(f"{_DROP_LOG_PREFIX} {seg!r} — {reason}"
+                 + (f" [{source_url}]" if source_url else ""))
+        else:
+            survivors.append(seg)
+
+    return ('. '.join(survivors), dropped)
+
+
+# ---------------------------------------------------------------------------
 # Main gate function
 # ---------------------------------------------------------------------------
 

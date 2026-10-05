@@ -230,15 +230,17 @@ def _collect_exhibitions(pages: List[Tuple[str, str]]) -> List[str]:
 def _claim_tokens_in_source(claim_value: str, source_lower: str) -> bool:
     """Require a practical claim's DISTINCTIVE content to appear literally in source.
 
-    The LOCAL-35 extractor sometimes emits a normalised/synthetic label whose own
-    words are not in the page it was extracted from (e.g. it rewrites a Nice price
-    table into "free for Métropole residents"). That phrase passed the gate's
-    fuzzy admission check on a Massachusetts museum in the first live run. This is
-    a tighter gate for the OVERVIEW: every distinctive token the claim carries —
-    a day name, a numeric amount, or a condition word like "métropole"/"resident"
-    — must appear verbatim (digits/word-stem) in the source. "free"/"admission"
-    alone are generic and not required to be literal, but any CONDITION on them is.
+    [LOCAL-584] This is now a thin delegate to the ONE shared implementation in
+    practical_facts_gate.claim_tokens_in_source, so the overview, the LOCAL-91
+    corpus fallback, and LOCAL-35/39 all enforce the SAME literal check. The local
+    fallback below is kept only for the (test-time) case where the gate module is
+    unavailable; it must stay behaviourally identical to the shared copy.
     """
+    try:
+        from practical_facts_gate import claim_tokens_in_source as _shared
+        return _shared(claim_value, source_lower)
+    except Exception:
+        pass
     cl = claim_value.lower()
     cv = source_lower
 
@@ -252,6 +254,11 @@ def _claim_tokens_in_source(claim_value: str, source_lower: str) -> bool:
     # present as a number in the source.
     for num in re.findall(r'\d+', cl):
         if num not in cv:
+            return False
+
+    # [LOCAL-584] Any currency symbol in the claim must appear in the source too.
+    for sym in ('€', '£', '$', '¥', '₩', '₹', '₽'):
+        if sym in (claim_value or '') and sym not in cv:
             return False
 
     # Condition words the extractor may synthesise — require them literally.
