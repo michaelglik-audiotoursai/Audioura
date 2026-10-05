@@ -3381,6 +3381,33 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
     return ov_text
 
 
+def _site_first_empty_action(reason, fetch_failed):
+    """[LOCAL-589 D2] Decide what to do when site-first returned NO candidates
+    for a resolved exhibition museum (0 catalogue/SPARQL works).
+
+    This is the no-invention contract, as a pure function so it is unit-testable:
+
+      * A FETCH FAILURE (``fetch_failed`` True, reason 'fetch_failed') — the
+        venue's own site could not be read (timeout/5xx/exception), even after
+        the one retry build_site_first_candidates already performed. We must NOT
+        fall through to Phase 3A, where GPT would INVENT shows. Return
+        ``'overview'`` so the caller takes the LOCAL-582 sourced-overview rung
+        (and, if that is impossible, clean-fails) — GPT may only ever CHOOSE
+        among real site exhibitions, never originate them.
+
+      * reason 'parsed_zero' / 'no_listing_found' — the site WAS reachable and
+        genuinely published no structural exhibitions. Falling through to the
+        existing paths is correct (D577: never turn a working tour into no tour);
+        downstream GPT candidates are still gated by D1v2 against the LOCAL-589
+        chrome-free canonical set. Return ``'fall_through'``.
+
+    Returns 'overview' or 'fall_through'.
+    """
+    if fetch_failed or reason == 'fetch_failed':
+        return 'overview'
+    return 'fall_through'
+
+
 def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
@@ -7816,10 +7843,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _phase_timer.start('site_first_exhibitions')
         try:
             from exhibition_site_first import build_site_first_candidates, SiteFirstResult
+            _sf_diagnostics = {}
             _sf_candidates = build_site_first_candidates(
                 base_site_url=_museum_site_url,
                 venue_language=_museum_site_language,
                 total_stops=total_stops,
+                diagnostics=_sf_diagnostics,
             )
             if _sf_candidates:
                 poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
@@ -7838,8 +7867,62 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 for _poi in poi_list:
                     print(f"   - {_poi['name']} [SITE EXHIBITION {_poi.get('detail_url','')}]")
             else:
+                _sf_reason = _sf_diagnostics.get('reason', 'no_listing_found')
+                _sf_fetch_failed = bool(_sf_diagnostics.get('fetch_failed'))
                 print(f"  [LOCAL-580] Site-first found no current exhibitions "
-                      f"on '{_museum_site_url}' — falling through to Phase 3A")
+                      f"on '{_museum_site_url}' — reason={_sf_reason}")
+                # ──── [LOCAL-589 D2] NO INVENTION FOR EXHIBITION MUSEUMS ────────
+                # The Griffin field defect: a swallowed ReadTimeout made a
+                # transient FETCH FAILURE look like "the site has no shows", and
+                # the run fell through to Phase 3A where GPT INVENTED seven shows
+                # ("The Still Life Collection", "The Annual Juried Exhibition"…),
+                # six of which D1v2 rightly dropped. For a resolved exhibition
+                # museum (0 catalogue/SPARQL works), a fetch failure must NEVER
+                # become GPT invention. The listing fetch has ALREADY been retried
+                # once with a longer timeout inside build_site_first_candidates
+                # (LOCAL-589 D1); if it STILL failed, we take the LOCAL-582 museum
+                # overview rung — a sourced orientation from the venue's own site —
+                # instead of falling through to invention. GPT may only ever CHOOSE
+                # among real site exhibitions, never originate them.
+                _sf_action = _site_first_empty_action(_sf_reason, _sf_fetch_failed)
+                if _sf_action == 'overview':
+                    print(f"  [LOCAL-589] site-first fetch FAILED (reason={_sf_reason}) for "
+                          f"exhibition museum '{_museum_venue_name}' — NOT falling through to "
+                          f"Phase 3A GPT invention; taking the LOCAL-582 overview rung")
+                    _ov_text = _try_deliver_museum_overview(
+                        venue_name=_museum_venue_name, location=location,
+                        tour_type=tour_type, site_url=_museum_site_url,
+                        locality=_museum_resolved_locality,
+                        site_language=_museum_site_language,
+                        requested_stops=_requested_stop_count_original or total_stops,
+                        output_file=output_file,
+                        entity_resolved=True, site_reachable=True)
+                    if _ov_text is not None:
+                        return _ov_text, output_file, (None, None)
+                    # Overview could not be built either (site truly unreachable).
+                    # Clean-fail with structured evidence — still no invention.
+                    print(f"  [LOCAL-589] overview rung also failed — clean-fail "
+                          f"(no GPT-invented stops) for '{_museum_venue_name}'")
+                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                        "error_type": "thin_evidence",
+                        "entity_resolved": True,
+                        "qid": "",
+                        "sparql_works": 0,
+                        "site_reachable": False,
+                        "wikipedia_available": False,
+                        "tier": "unresolvable",
+                        "venue": _museum_venue_name or location,
+                        "locality": _museum_resolved_locality,
+                        "reason": f"site-first {_sf_reason}; overview unavailable",
+                    }
+                    return None, None, (None, None)
+                # reason in {parsed_zero, no_listing_found}: the site WAS reachable
+                # and genuinely published no structural exhibitions. Falling through
+                # to the existing paths is correct here (D577 — never turn a working
+                # tour into no tour); GPT invention is still gated downstream by
+                # D1v2 + the LOCAL-589 chrome-free canonical set.
+                print(f"  [LOCAL-580] reason={_sf_reason} (site reachable, 0 shows) "
+                      f"— falling through to Phase 3A")
         except Exception as _sf_err:
             print(f"  [LOCAL-580] Site-first path failed (falling through): {_sf_err}")
             import traceback
