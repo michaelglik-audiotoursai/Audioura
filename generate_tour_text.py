@@ -1150,7 +1150,7 @@ def _is_title_mismatch_drop(evidence_entry):
 
 
 def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
-                                current_poi_list, venue_name=None):
+                                current_poi_list, venue_name=None, exists_fn=None):
     """[LOCAL-577] Return the candidates D1v2 dropped for a title mismatch ONLY,
     as hedged refill POIs, in the order they appeared in pre_d1v2_candidates.
 
@@ -1164,6 +1164,26 @@ def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
       - a candidate already present in current_poi_list (by normalized name)
       - a candidate whose evidence entry is VERIFIED (already in the list)
       - a work the LOCAL-24 corpus classifier excludes (programs/workshops)
+      - [LOCAL-580] a candidate whose existence is DEFINITIVELY disproven by
+        exists_fn (a GPT-invented title that does not exist anywhere).
+
+    [LOCAL-580 FABRICATION GUARD]
+    "no canonical match" means only "this title did not line up with THIS venue's
+    canonical corpus". That is true both for a real work the corpus simply never
+    named (Palais Lascaris's "The Adoration of the Magi" — LOCAL-577's whole
+    point) AND for a title GPT invented out of nothing (Griffin's "The American
+    Dream", "The Human Condition" — the LOCAL-580 field defect). LOCAL-577 as
+    shipped could re-admit the second kind: a fabrication, hedged, would ship as
+    a stop. That is the exact failure LOCAL-577 was meant to end, not cause.
+
+    The distinguishing signal is EXISTENCE. `exists_fn(name)` returns:
+        True   → the work exists (keep it eligible — the Adoration case)
+        False  → the work was checked and does NOT exist (DROP — a fabrication)
+        None   → inconclusive / not checked / search failed
+    D162 governs the None case: a search that did not really run is never
+    evidence of absence, so None does NOT disqualify — only an explicit False
+    does. When exists_fn is None (legacy callers), the guard is inert and
+    behaviour is exactly LOCAL-577's.
     """
     evidence_log = evidence_log or {}
     _current_norm = {_norm_name_for_refill(p.get('name', '')) for p in (current_poi_list or [])}
@@ -1199,6 +1219,19 @@ def _title_mismatch_refill_pool(evidence_log, pre_d1v2_candidates,
                     continue
             except Exception:
                 pass  # classifier is advisory; never let it crash the refill
+        # [LOCAL-580] FABRICATION GUARD: a title-mismatch drop is only a real
+        # stop if it actually exists. An invented title whose existence check
+        # DEFINITIVELY fails is never re-admitted. Inconclusive (None) is not a
+        # failure (D162) — only an explicit False blocks.
+        if exists_fn is not None:
+            try:
+                _exists = exists_fn(_name)
+            except Exception:
+                _exists = None  # a crashing check is inconclusive, never absence
+            if _exists is False:
+                print(f"  [LOCAL-580 FABRICATION GUARD] NOT re-admitting '{_name}' — "
+                      f"title mismatch AND existence check failed (invented, does not exist)")
+                continue
         _rp = dict(p)
         _rp['verified'] = False
         _rp['_title_mismatch_refill'] = True
@@ -8945,9 +8978,34 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # Never REJECTED (wrong venue), never theme/cycle words, never non-existence.
             if tour_category == 'museum' and len(poi_list) < total_stops:
                 _tm_needed = total_stops - len(poi_list)
+                # [LOCAL-580] FABRICATION GUARD: a title-mismatch drop is only a
+                # real stop if it actually exists. Build an existence check so an
+                # invented title (Griffin's "The American Dream") is never
+                # re-admitted, while a real work the corpus just didn't name
+                # (Palais's "The Adoration of the Magi") still is. Definitive
+                # absence (verified=False, not a search failure) blocks; anything
+                # inconclusive returns None and does NOT block (D162).
+                def _tm_exists_fn(_cand_name):
+                    try:
+                        from stop_existence_gate import (get_gate_mode as _eg_mode,
+                                                         verify_stop_existence as _eg_verify)
+                        if _eg_mode() == 'off':
+                            return None  # gate disabled → inconclusive, never absence
+                        try:
+                            from venue_resolver import _get_db_connection as _eg_conn_fn
+                            _eg_conn = _eg_conn_fn()
+                        except Exception:
+                            return None  # no DB → inconclusive
+                        _v = _eg_verify(_cand_name, _museum_venue_name or location,
+                                        _eg_conn, tour_type=tour_type)
+                        if _v.get('search_failed'):
+                            return None  # D162: a search that did not run is not absence
+                        return bool(_v.get('verified'))
+                    except Exception:
+                        return None  # any failure → inconclusive, never block a real stop
                 _tm_pool = _title_mismatch_refill_pool(
                     _d1_evidence_log, _pre_d1v2_candidates, poi_list,
-                    venue_name=_museum_venue_name)
+                    venue_name=_museum_venue_name, exists_fn=_tm_exists_fn)
                 _tm_added = _tm_pool[:_tm_needed]
                 if _tm_added:
                     poi_list = list(poi_list) + _tm_added
