@@ -836,6 +836,12 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 elif status_data["status"] == "error":
                     error_msg = f"Error in tour text generation: {status_data.get('error', 'Unknown error')}"
                     print(f"ERROR: {error_msg}")
+                    # [LOCAL-580] Pass the generator's structured failure through to the app's /status
+                    # poll (LOCAL-581 reads message > error and shows suggestion as a button). Without
+                    # this the app only ever saw the prefixed string above, and no suggestion.
+                    for _k in ("error_code", "message", "suggestion"):
+                        if status_data.get(_k) is not None:
+                            ACTIVE_JOBS[job_id][_k] = status_data[_k]
                     raise Exception(error_msg)
                 else:
                     progress = status_data.get('progress', 'Processing...')
