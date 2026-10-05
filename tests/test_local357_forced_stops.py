@@ -22,6 +22,14 @@ import re
 import pytest
 import tempfile
 
+
+def _gtt_body():
+    """The function that holds the generation code. On `subscribed`, LOCAL-562 made
+    generate_tour_text a thin cost-scope wrapper around _generate_tour_text_impl, so
+    source-inspection tests must read the impl when it exists (LEAD 2026-10-05)."""
+    import generate_tour_text as _m
+    return getattr(_m, '_generate_tour_text_impl', _m.generate_tour_text)
+
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -68,7 +76,7 @@ class TestForcedStopsInjection:
         # BUT with forced_stops, Phase 3A is skipped. Phase 1 still needs the key.
         # So we test the injection logic indirectly via the source code structure.
         import inspect
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # Verify the injection logic exists
         assert '_forced_stops_active' in source, (
@@ -85,10 +93,10 @@ class TestForcedStopsInjection:
         """The _new_poi helper must be called for each forced stop name."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # Verify the code creates poi_list from forced_stops
-        assert "poi_list = [_new_poi(name) for name in forced_stops]" in source, (
+        assert re.search(r'poi_list = \[_new_poi\(name\) for name in (forced_stops|_forced_titles)\]', source), (
             "forced stops must create poi_list via _new_poi(name) for each stop"
         )
 
@@ -96,7 +104,7 @@ class TestForcedStopsInjection:
         """When forced_stops is provided, total_stops is set to len(forced_stops)."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         assert "total_stops = len(forced_stops)" in source, (
             "forced stops must override total_stops with len(forced_stops)"
@@ -110,7 +118,7 @@ class TestForcedStopsGateNotWeakened:
         """The existence gate code path must execute regardless of forced_stops."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # The existence gate code must NOT be conditioned on _forced_stops_active
         # being False. It should run for ALL tours.
@@ -127,7 +135,7 @@ class TestForcedStopsGateNotWeakened:
         """D1v2 museum verification must run regardless of forced stops."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # D1v2 verification section
         d1v2_section = source[source.index('D1] In-collection verification for museum'):]
@@ -142,10 +150,16 @@ class TestForcedStopsOutputMarking:
     """Forced tours must be clearly marked in the output."""
 
     def test_banner_written_to_output(self):
-        """Output file must contain FORCED STOPS banner when forced_stops used."""
+        """Output file must contain FORCED STOPS banner when forced_stops used.
+
+        [LOCAL-586] The banner is now built in the module-level helper
+        _build_harness_banner (so the implicit-concat *70 repetition cannot
+        return and so it can be unit-tested). Inspect the whole module, not just
+        the generate_tour_text body, since the banner literal lives in the helper.
+        """
         import inspect
-        from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        import generate_tour_text as _gtt
+        source = inspect.getsource(_gtt)
 
         assert 'FORCED STOPS — VERIFICATION HARNESS' in source, (
             "Output must contain 'FORCED STOPS — VERIFICATION HARNESS' banner"
@@ -155,10 +169,14 @@ class TestForcedStopsOutputMarking:
         )
 
     def test_banner_warns_not_natural_selection(self):
-        """Banner must warn that this is not a naturally-selected tour."""
+        """Banner must warn that this is not a naturally-selected tour.
+
+        [LOCAL-586] Banner literal now lives in _build_harness_banner; inspect the
+        module so this intent is preserved across the refactor.
+        """
         import inspect
-        from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        import generate_tour_text as _gtt
+        source = inspect.getsource(_gtt)
 
         assert 'NOT a naturally-selected tour' in source, (
             "Banner must clearly state tour is NOT naturally-selected"
@@ -168,7 +186,7 @@ class TestForcedStopsOutputMarking:
         """Forced-stop tours must never be written to the tour cache."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # Find the cache store section
         cache_idx = source.index('store in cache after successful generation')
@@ -186,7 +204,7 @@ class TestNormalPathUnchanged:
         """With forced_stops=None, the _forced_stops_active flag stays False."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # The condition must check both None and empty
         assert "forced_stops is not None and len(forced_stops) > 0" in source, (
@@ -197,7 +215,7 @@ class TestNormalPathUnchanged:
         """With forced_stops=[], the _forced_stops_active flag stays False."""
         import inspect
         from generate_tour_text import generate_tour_text
-        source = inspect.getsource(generate_tour_text)
+        source = inspect.getsource(_gtt_body())
 
         # len(forced_stops) > 0 ensures empty list doesn't activate
         assert "len(forced_stops) > 0" in source, (

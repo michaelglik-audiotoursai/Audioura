@@ -6460,6 +6460,33 @@ def _extract_city_from_resolved_entity(venue_entity) -> str:
     return ''
 
 
+# [LOCAL-586] Harness marker, built in ONE place so it can be unit-tested and so
+# the implicit-string-concat `* 70` repetition (tour 370: 70 stamped banners) can
+# never return. This marker is written to a tour's output ONLY when a genuine
+# verification-harness caller passes harness=True — never on the listener's own
+# chosen-stops product path (orchestrator → /generate), which leaves harness False.
+# THIS IS A VERIFICATION-HARNESS MARKER — NOT A PRODUCT FEATURE.
+def _build_harness_banner(forced_stops):
+    """Return the FORCED STOPS — VERIFICATION HARNESS banner exactly once.
+
+    Built from a list joined with "\\n" (not adjacent string literals) so no
+    literal is ever left adjacent to a `* N` repeat. Ends with one blank line
+    separating it from the tour body.
+    """
+    _bar = "=" * 70
+    return "\n".join([
+        _bar,
+        "⚠️  FORCED STOPS — VERIFICATION HARNESS (LOCAL-357)",
+        "    This tour was generated with a forced stop list.",
+        "    It is NOT a naturally-selected tour and must not be",
+        "    scored as evidence of selection quality.",
+        f"    Forced: {forced_stops}",
+        _bar,
+        "",
+        "",
+    ])
+
+
 # [LOCAL-562] Install the single OpenAI HTTP choke point exactly once, at import.
 # Every chat-completion call made anywhere under a tour scope — in this module or
 # in any gate/extractor/writer module — is priced and attributed to the current
@@ -6484,7 +6511,7 @@ except Exception as _cap_err:  # pragma: no cover
     _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
     This thin wrapper is the per-tour boundary. It opens a
@@ -6509,13 +6536,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     if _cost_accumulator is None:
         return _generate_tour_text_impl(
             location, tour_type, output_file, total_stops,
-            persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops,
+            persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
         )
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
             location, tour_type, output_file, total_stops,
-            persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops,
+            persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
         )
         _reconcile_cost_record_from_accumulator(_acc)
     return result
@@ -6570,7 +6597,7 @@ def _reconcile_cost_record_from_accumulator(acc):
         _import_logger.error(f"[LOCAL-562] cost reconcile skipped: {_rec_err}")
 
 
-def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
+def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -6586,13 +6613,25 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         user_id: Optional user_id for cost attribution (LOCAL-323).
                  Threaded to spine_generator for per-operation ledger rows.
         job_id: Optional job correlation ID for cost_meter recording.
-        forced_stops: Optional list of stop names (LOCAL-357 verification harness).
-                 When provided, bypasses Phase 3A candidate generation entirely
-                 and uses these exact stop names in the given order.
-                 Everything downstream (corpus, enrichment, gates) runs unchanged.
-                 The output is stamped with a FORCED STOPS banner so it cannot be
-                 mistaken for a naturally-generated tour.
-                 THIS IS A VERIFICATION HARNESS — NOT A PRODUCT FEATURE.
+        forced_stops: Optional list of stop names. Bypasses Phase 3A candidate
+                 generation entirely and uses these exact stop names in the given
+                 order. Everything downstream (corpus, enrichment, gates) runs
+                 unchanged. Used by BOTH callers:
+                   * the PRODUCT path — a listener's own chosen stops arriving
+                     through the orchestrator / tour-generator /generate endpoint
+                     (LOCAL-523/525/547). This is a real tour: harness is left
+                     False, so NO banner and nothing extra in the content.
+                   * the VERIFICATION HARNESS — run_* measurement scripts and
+                     tests that inject a known stop list to probe the pipeline.
+                     Those pass harness=True to stamp the banner.
+        harness: [LOCAL-586] When True (verification-harness callers ONLY), stamp
+                 a single FORCED STOPS — VERIFICATION HARNESS banner at the top of
+                 the output file so a measured tour cannot be mistaken for a
+                 naturally-generated one. The orchestrator / product user-stops
+                 path NEVER sets this, so a listener's chosen-stops tour carries no
+                 banner and no "not naturally selected" wording. Default False.
+                 THIS BANNER IS A VERIFICATION-HARNESS MARKER — NOT A PRODUCT
+                 FEATURE.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
@@ -21435,18 +21474,29 @@ RULES:
         output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
     
     with open(output_file, "w", encoding="utf-8") as f:
-        # [LOCAL-357] Stamp forced-stops banner at top of output file
-        if _forced_stops_active:
-            _forced_banner = (
-                "=" * 70 + "\n"
-                "⚠️  FORCED STOPS — VERIFICATION HARNESS (LOCAL-357)\n"
-                "    This tour was generated with a forced stop list.\n"
-                "    It is NOT a naturally-selected tour and must not be\n"
-                "    scored as evidence of selection quality.\n"
-                f"    Forced: {forced_stops}\n"
-                "=" * 70 + "\n\n"
-            )
-            f.write(_forced_banner)
+        # [LOCAL-357] Stamp forced-stops banner — VERIFICATION HARNESS ONLY.
+        # [LOCAL-586] Gated on the explicit `harness` flag, NOT on the mere
+        # presence of forced_stops. A listener's own chosen stops arrive through
+        # the orchestrator / product path with harness=False, so their real tour
+        # gets NO banner and nothing in tour_content beyond the normal format.
+        # Only genuine verification-harness callers (run_* scripts / tests that
+        # pass harness=True) stamp this marker.
+        #
+        # [LOCAL-586] The banner is now built with an explicit list + "\n".join so
+        # it is written EXACTLY ONCE. The previous version relied on implicit
+        # string-literal concatenation:
+        #     "=" * 70 + "\n"
+        #     "...body...\n"
+        #     f"    Forced: {forced_stops}\n"
+        #     "=" * 70 + "\n\n"
+        # Python concatenates adjacent string literals at compile time, so the
+        # f-string line and the following "=" literal merged into one literal
+        # ("    Forced: [...]\n=") which the trailing `* 70` then repeated 70
+        # times — the whole banner body was stamped 70× (tour 370: 70 HARNESS
+        # blocks, each closed by a lone "="). Joining a list removes any literal
+        # adjacent to the `* 70`, so the separator multiplies and the body does not.
+        if harness and _forced_stops_active:
+            f.write(_build_harness_banner(forced_stops))
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")
