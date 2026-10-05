@@ -24434,3 +24434,17 @@ reachable but nothing verifiable on display → **museum overview**, one stop, f
 only, with hours and price stated only with a dated source on the venue's domain (LOCAL-582, parked
 until LOCAL-580 merges); (4) no usable site → structured error + suggestion (LOCAL-580/581). Rule at
 every rung: only what the venue's pages say; never invent (the Griffin failure was GPT inventing 5 shows).
+
+## D608 — Local and Cloud Run generator images must install the same packages (2026-10-05, LEAD)
+
+Michael's Griffin retry on the Mac Mini failed although LOCAL-580 was deployed there: the local
+generator image (`Dockerfile.generator` → `requirements_generator.txt`) lacked **beautifulsoup4**, so
+`exhibition_site_first` silently fell back to a regex that cannot read the Griffin's card markup and
+found 0 exhibitions. Kiro's live run passed because it ran on the host, where bs4 is installed.
+Cloud Run (`Dockerfile.cloudrun`, its own hand-kept pip list) already had bs4, lxml and pydub; the
+local list had none of the three. Fixed (storied 040a361, forward-merged): the container now finds
+9 Griffin exhibitions. **Rule:** a live acceptance run must run inside the container it ships in,
+not on the host. When a task adds an import, check BOTH dependency lists (this is the third time:
+cryptography wdvrday52p, pycountry LOCAL-564, bs4 here). Follow-up: D1v2 matched "The Griffin Museum
+Collection" to the site junk title "Griffin Museum Board Of Directors 2". Canonical-title extraction for
+the non-exhibition path still admits page chrome.

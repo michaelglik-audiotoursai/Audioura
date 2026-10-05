@@ -1,0 +1,1104 @@
+=== LOCAL-583 D4 container run 2 ===
+location : Griffin museum of photography, Winchester, MA
+stops    : 5 (requested)
+model    : gpt-4o   cap: $3.00
+
+======================================================================
+CALL #001 | 17:14:09.784 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Griffin museum of photography, Winchester, MA
+  tour_type: museum
+  total_stops_parameter: 5
+  output_file: /app/tours/LOCAL583_GRIFFIN_RUN2.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 17:14:09.785 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Griffin museum of photography, Winchester, MA
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+Intent analysis response: ```json
+{
+    "poi_type": "museums",
+    "location": "Winchester, MA",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Griffin Museum of Photography",
+    "geographic_scope": "Griffin Museum of Photography",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Winchester, MA
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Griffin Museum of Photography
+  [venue_name sanity] 'Griffin Museum of Photography' OK
+  [S15] Forced tour_category=museum from venue_name='Griffin Museum of Photography'
+[TIMING] phase=intent elapsed=1.3s cumulative=1.3s
+[LOCAL-474] tour_type='museum' → category='museum' (source=explicit)
+
+Detected tour category: MUSEUM
+Using museum template for Griffin museum of photography, Winchester, MA - museum
+
+======================================================================
+CALL #003 | 17:14:11.042 | GENERATING_PROMPT
+======================================================================
+  location: Griffin museum of photography, Winchester, MA
+  user_request: Griffin museum of photography, Winchester, MA
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for Griffin museum of photography, Winchester, MA...
+  [Museum constraint] Venue from intent='Griffin Museum of Photography'
+  [venue_resolver] Name variants: ['Griffin Museum of Photography']
+  [venue_resolver] Resolved: 'Griffin Museum of Photography' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [venue_resolver] SPARQL: 0 works found for Q99108607
+  [S17] no scope_constraint (precision='BUILDING', scope='Griffin Museum of Photography')
+  [venue_resolver] Name variants: ['Griffin Museum of Photography']
+  [venue_resolver] Resolved: 'Griffin Museum of Photography' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [venue_cache] MISS for Q99108607
+  [venue_resolver] SPARQL: 0 works found for Q99108607
+  [LOCAL-30] Deterministic selection: 0 documented works (0 catalogue, 0 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-580] 0 documented works for 'Griffin Museum of Photography' — exhibition-museum site-first path ELIGIBLE (site='https://griffinmuseum.org/')
+  [LOCAL-30] Documented works (0) < total_stops (5) — will use documented as base, GPT fills remainder
+[TIMING] phase=poi_selection elapsed=7.0s cumulative=8.3s
+  [LOCAL-580] Site exhibitions found on https://griffinmuseum.org/current-exhibitions: 9 show(s)
+
+PHASE 3A: SKIPPED (LOCAL-580 site-first — 9 current exhibition(s) from the venue site)
+   - TLC [SITE EXHIBITION https://griffinmuseum.org/show/tlc/]
+   - Lua Kobayashi |The Persistence of Memories [SITE EXHIBITION https://griffinmuseum.org/show/lua-kobayashi/]
+   - BU Masters Show 2026 | Traces: Pursuing Process [SITE EXHIBITION https://griffinmuseum.org/show/bu-masters-show-2026-traces-pursuing-process/]
+   - Intertidal : Field Notes [SITE EXHIBITION https://griffinmuseum.org/show/intertidal-field-notes/]
+   - Homage | Robert Frank: The Americans [SITE EXHIBITION https://griffinmuseum.org/show/robertfrank_homage/]
+   - Earth, Wind & Fire [SITE EXHIBITION https://griffinmuseum.org/show/earth-wind-fire/]
+   - ULTRASOUND [SITE EXHIBITION https://griffinmuseum.org/show/ultrasound/]
+   - Tabitha Soren | An Artist Life [SITE EXHIBITION https://griffinmuseum.org/show/soren_fantasylife/]
+   - New England Portfolio Reviews [SITE EXHIBITION https://griffinmuseum.org/show/nepr_0926/]
+[TIMING] phase=site_first_exhibitions elapsed=34.6s cumulative=42.9s
+  [R4] Museum tour: asking for 10 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 9 documented works)
+OK PHASE 3A parsed 9 candidate POI(s):
+   - TLC
+   - Lua Kobayashi |The Persistence of Memories
+   - BU Masters Show 2026 | Traces: Pursuing Process
+   - Intertidal : Field Notes
+   - Homage | Robert Frank: The Americans
+   - Earth, Wind & Fire
+   - ULTRASOUND
+   - Tabitha Soren | An Artist Life
+   - New England Portfolio Reviews
+  [D1/LOCAL-372] Exhibition path (site_exhibition) — D1v2 checks the PERMANENT collection; a temporary show is not in it
+  [D532] Provenance: 9 page-sourced, 0 knowledge-proposed
+  [D532] 9 stop(s): 9 confirmed by the venue page, 0 unconfirmed and labelled
+  [R4] Target reached: 9/5 stops
+  [LOCAL-16 GATE] All 9 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for Griffin museum of photography, Winchester, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY, 2×EMPTY (not enough covered candidates to fill 5 stops)
+  [LOCAL-212] Selected: ['BU Masters Show 2026 | Traces: Pursuing Process=VENUE_ONLY', 'Earth, Wind & Fire=VENUE_ONLY', 'Tabitha Soren | An Artist Life=VENUE_ONLY', 'TLC=EMPTY', 'Lua Kobayashi |The Persistence of Memories=EMPTY']
+  [LOCAL-212] Dropped:  ['Intertidal : Field Notes=EMPTY', 'Homage | Robert Frank: The Americans=EMPTY', 'ULTRASOUND=EMPTY', 'New England Portfolio Reviews=EMPTY']
+  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition site_exhibition (already grounded against venue page by LOCAL-372)
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+
+======================================================================
+CALL #004 | 17:14:52.940 | PHASE_3B_REQUEST
+======================================================================
+  location: Griffin museum of photography, Winchester, MA
+  stop_count: 5
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:10378. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:10379. Caller should supply input_tokens and output_tokens separately.
+PHASE 3B API call cost: $0.0038 (794 tokens)
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the museum building 'Griffin Museum of Photography' (not per-exhibition — a show has no OSM node)
+[OSM-VENUE] Overpass HTTP 504 for 'Griffin Museum of Photography'
+  [LOCAL-355] museum building: no practical facts in OSM
+   Coords cluster detected: 5 stops share '42.4521, -71.1370', refetching...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:10844. Caller should supply input_tokens and output_tokens separately.
+   Cluster refetch OK 'TLC': 42.4525, -71.1473
+   Cluster refetch OK 'Earth, Wind & Fire': 42.4522, -71.1371
+   Cluster refetch OK 'Tabitha Soren | An Artist Life': 42.4525, -71.1448
+   Cluster refetch OK 'BU Masters Show 2026 | Traces: Pursuing Process': 42.4525, -71.1370
+   Cluster refetch OK 'Lua Kobayashi |The Persistence of Memories': 42.4525, -71.1377
+Extracted first POI coordinates: (42.4525, -71.137)
+  [D4] Museum single-coordinate: all stops set to (42.4525, -71.137) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. BU Masters Show 2026 | Traces: Pursuing Process
+   Address: 67 Shore Road, Winchester, MA 01890
+   Coordinates: 42.4525, -71.137
+   Directions: From Winchester Center Station, head north on Waterfield Rd, turn left onto Chur...
+2. Earth, Wind & Fire
+   Address: 67 Shore Road, Winchester, MA 01890
+   Coordinates: 42.4525, -71.137
+   Directions: Exit the BU Masters Show gallery, continue straight down the hall, and it will b...
+3. Tabitha Soren | An Artist Life
+   Address: 67 Shore Road, Winchester, MA 01890
+   Coordinates: 42.4525, -71.137
+   Directions: Leave the Earth, Wind & Fire exhibit, turn right, and proceed to the end of the ...
+4. TLC
+   Address: 67 Shore Road, Winchester, MA 01890
+   Coordinates: 42.4525, -71.137
+   Directions: From Tabitha Soren's exhibit, head back towards the main entrance, then take the...
+5. Lua Kobayashi |The Persistence of Memories
+   Address: 67 Shore Road, Winchester, MA 01890
+   Coordinates: 42.4525, -71.137
+   Directions: Exit the TLC exhibit, walk straight down the hallway, and take the second right....
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-37] Three-class retrieval: 5 stops processed, 0 with category
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=5)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Griffin Museum of Photography model=gpt-4o tokens=1417 (in=690 out=727) cost=$0.0090 latency=5.2s
+[COST_METER] FRESH | spine_generate | $0.008995 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0090
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 3/5 stops have per-stop passages (36 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='BU Masters Show 2026 | Traces: Pursuing Process' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Earth, Wind & Fire' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Tabitha Soren | An Artist Life' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='TLC' verdict=EMPTY action=EMPTY_RESTRICTED
+  [CORPUS-GATE] stop='Lua Kobayashi |The Persistence of Memories' verdict=EMPTY action=EMPTY_RESTRICTED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 2 EMPTY, 3 SHORTENED
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:218. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history']
+  [work_stories] MISS for bu masters show 2026 traces pursuing pro
+  [work_stories] MISS for earth wind fire
+  [work_stories] MISS for tabitha soren an artist life
+  [work_stories] MISS for tlc
+  [work_stories] MISS for lua kobayashi the persistence of memorie
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=10.1s cumulative=70.8s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+
+  [LOCAL-383] No page text available for story beat extraction
+[TIMING] phase=narration elapsed=0.0s cumulative=70.8s
+  [D495] venue domain seeded tier1: griffinmuseum.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 5 stops...
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for bu masters show 2026 traces pursuing pro
+  [LOCAL-441] Batch P856 check: 3 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for projects.propublica.org: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for projects.propublica.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for grantwatch.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for charitynavigator.org: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 3 unverified, 0 budget-expired
+    [D489] material kind: stop='BU Masters Show 2026 | Traces: Pursuin' kind=inert volume=VENUE_ONLY sentences=12 active=0 staked=1 eventful=0 passive=0
+    [LOCAL-489] Stop 1 needs more material (uncovered+eventless): 7 passages, 1561 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +4 from: "BU Masters Show 2026 | Traces: Pursuing Process" "Griffin Museum of Photograp
+      [LOCAL-498] after replenishment: kind inert -> inert, 1561 -> 2165 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 6 leads, 2 with cross-model agreement, 0 SERP-confirmed
+    Stop 1 'BU Masters Show 2026 | Traces: Pursuing Process': queries=3 serp_results=7 snippets=11
+      → As a public charity, The Griffin Museum is dedicated to elevating the language and art of photography. Through the exhib
+      → The Griffin Museum of Photography is eager to embark on this exciting journey made possible by the Cummings Foundation’s
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for earth wind fire
+  [LOCAL-441] Batch P856 check: 2 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 2 unverified, 0 budget-expired
+    [D489] material kind: stop='Earth, Wind & Fire' kind=inert volume=COVERED sentences=22 active=0 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 2 needs more material (thin+eventless): 10 passages, 1496 chars, verdict=COVERED
+      [LOCAL-489] +3 from: "Earth, Wind & Fire" "Griffin Museum of Photography" provenance
+      [LOCAL-498] after replenishment: kind inert -> inert, 1496 -> 1987 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 8 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 2 'Earth, Wind & Fire': queries=3 serp_results=10 snippets=13
+      → As part of State of Our Union, this exhibition, Earth, Wind & Fire, is an invitation to find those forces at work in the
+      → Earth, Wind & Fire Submit by October 15. Juried by Crista Dix, Executive Director. Exhibition Dates November 1 – 30, 202
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for tabitha soren an artist life
+  [LOCAL-441] Batch P856 check: 3 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 3 unverified, 0 budget-expired
+    [D489] material kind: stop='Tabitha Soren | An Artist Life' kind=inert volume=COVERED sentences=20 active=0 staked=0 eventful=0 passive=1  <-- DISAGREE: enough material, wrong kind
+    [LOCAL-489] Stop 3 needs more material (eventless): 11 passages, 2396 chars, verdict=COVERED
+      [LOCAL-489] +0 from: "Tabitha Soren | An Artist Life" "Griffin Museum of Photography" provenance
+      [LOCAL-498] after replenishment: kind inert -> inert, 2396 -> 2396 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 12 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'Tabitha Soren | An Artist Life': queries=3 serp_results=11 snippets=11
+      → A visual artist in different domains for over twenty-five years, Soren has long explored the intersection of psychology,
+      → The Photography Artist Book Initiative Pages: 15th Annual Photobook Exhibition, Various, Jul-2025 14th Annual Photobook 
+    [D500] Stop 4: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 4 worthiness: score=0/4 mine=False — no named agent, no credit-line fact, no specific medium and no specific title — there is n
+    [LOCAL-486] Stop 4 'TLC' NOT MINED — no named agent, no credit-line fact, no specific medium and no specific title — there is nothing for a Fact → Stop → Exhibition chain to start from
+    [D500] Stop 5: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 5 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for lua kobayashi the persistence of memorie
+    [D489] material kind: stop='Lua Kobayashi |The Persistence of Memo' kind=inert volume=VENUE_ONLY sentences=10 active=0 staked=0 eventful=0 passive=0
+    [LOCAL-489] Stop 5 needs more material (thin+uncovered+eventless): 5 passages, 762 chars, verdict=VENUE_ONLY
+      [LOCAL-489] +8 from: "Lua Kobayashi |The Persistence of Memories" "Griffin Museum of Photography" p
+      [LOCAL-498] after replenishment: kind inert -> inert, 762 -> 1931 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+    [LOCAL-488] step 4: 3 providers, 9 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 5 'Lua Kobayashi |The Persistence of Memories': queries=3 serp_results=5 snippets=13
+      → Your financial contribution supports the institution, the artists, mentors and educators who give their all to elevate a
+      → The Griffin Museum is one of 150 local nonprofits that will share in $30 million through Cummings Foundation's major ann
+
+  [LOCAL-410] SERP search complete: 16 queries, 48 results, 48 total snippets
+  [LOCAL-486] step 2 skipped 1 unworthy stop(s) — roughly 4 queries not issued
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 48 raw → max 25 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    BU Masters Show 2026 | Traces: Pursuing Process: serp_results=7 elements_extracted=- beats_injected=- (measured post-generation)
+    Earth, Wind & Fire: serp_results=10 elements_extracted=- beats_injected=- (measured post-generation)
+    Tabitha Soren | An Artist Life: serp_results=11 elements_extracted=- beats_injected=- (measured post-generation)
+    TLC: serp_results=0 elements_extracted=- beats_injected=- (measured post-generation)
+    Lua Kobayashi |The Persistence of Memories: serp_results=5 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 11 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'BU Masters Show 2026 | Traces: Pursuing Process' has 11 snippet(s) — asking the knowledge fallback
+  [D533] +3 fact(s) via gemini (3 high-confidence) — stop will be labelled aloud
+      [high] "BU Masters Show 2026 | Traces: Pursuing Process" designates an exhibition title or student showcase concept r
+      [high] The Boston University College of Fine Arts School of Visual Arts presents its annual Master of Fine Arts thesi
+      [high] The Griffin Museum of Photography, located in Winchester, Massachusetts, hosts rotating contemporary photograp
+  [D534] Stop 2 has 13 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Earth, Wind & Fire' has 13 snippet(s) — asking the knowledge fallback
+  [D533] fallback returned nothing: model returned no facts
+  [D534] Stop 3 has 11 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'Tabitha Soren | An Artist Life' has 11 snippet(s) — asking the knowledge fallback
+  [D533] +3 fact(s) via gemini (2 high-confidence) — stop will be labelled aloud
+      [high] Tabitha Soren is an American fine-art photographer and former broadcast journalist born in San Antonio, Texas,
+      [high] The Griffin Museum of Photography in Winchester, Massachusetts, engaged Tabitha Soren as a keynote speaker and
+      [low] No accessioned artwork or exhibition titled 'An Artist Life' by Tabitha Soren exists in the permanent collecti
+  [D533] Stop 4 'TLC' has 0 snippet(s) — asking the knowledge fallback
+  [D533] +4 fact(s) via gemini (4 high-confidence) — stop will be labelled aloud
+      [high] Rather than an individual museum object, 'TLC' is a temporary group photography exhibition held at the Griffin
+      [high] The exhibition was curated by Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San
+      [high] The show serves as the third installment in the Griffin Museum's four-part exhibition series titled 'State of 
+      [high] The exhibition features photographic work centered on portraiture and family vernacular imagery by four contem
+  [D534] Stop 5 has 13 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 5 'Lua Kobayashi |The Persistence of Memories' has 13 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via gemini (5 high-confidence) — stop will be labelled aloud
+      [high] The work was created by Lua Kobayashi, a Southern California-based mixed Japanese American and Uruguayan inter
+      [high] The work is an immersive multimedia installation constructed using video projections incorporating family phot
+      [high] The piece was produced as the outcome of Kobayashi receiving the Griffin Museum of Photography's 2025/2026 Cum
+      [high] The installation was scheduled for display at the Griffin Museum of Photography in Winchester, Massachusetts, 
+      [high] The content of the work focuses specifically on the overlooked histories and generational memories of Japanese
+  [D533] Knowledge fallback filled 4 starved stop(s)
+[TIMING] phase=external_lookups elapsed=145.9s cumulative=216.7s
+
+Generating description for Stop 1: BU Masters Show 2026 | Traces: Pursuing Process by , ...
+
+Generating description for Stop 2: Earth, Wind & Fire by , ...
+
+Generating description for Stop 3: Tabitha Soren | An Artist Life by , ...
+
+Generating description for Stop 4: TLC by , ...
+  [LOCAL-381] stop='BU Masters Show 2026 | Traces: Pursuing Process' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=14 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=3 (t1t2=1, t3=0, market=0)
+    Top scores: [('BU Masters Show 2026 | Traces: Pursuing Process', 11, ''), ('BU Masters Show 2026 | Traces: Pursuing Process', 11, ''), ('BU Masters Show 2026 | Traces: Pursuing Process', 11, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 14 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=9421 after=25832 (+16411 from snippets+instructions, facts_first=no)
+
+Generating description for Stop 5: Lua Kobayashi |The Persistence of Memories by , ...
+  [LOCAL-381] stop='Tabitha Soren | An Artist Life' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=14 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Tabitha Soren | An Artist Life', 17, ''), ('Tabitha Soren | An Artist Life - Griffin Museum of', 10, 'tier1'), ('Tabitha Soren | An Artist Life', 10, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 14 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=9897 after=29094 (+19197 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29094)  [LOCAL-411] WARNING: prompt exceeds 20K chars (25832)
+
+  [LOCAL-381] stop='Earth, Wind & Fire' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=13 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('WHUR-FM Digital Reporter Candice A. Adkins on the ', 11, ''), ('The Virtual Gallery Archives', 10, 'tier1'), ('Calls for Entry', 9, 'tier1')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 13 source item(s) arrived after the gate ran
+  [LOCAL-381] stop='TLC' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('TLC', 7, ''), ('TLC', 5, ''), ('TLC', 5, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=9698 after=20667 (+10969 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20667)
+  [LOCAL-381] stop='Lua Kobayashi |The Persistence of Memories' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=18 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Lua Kobayashi |The Persistence of Memories', 12, ''), ('Exhibition The Persistence of Memories', 9, ''), ('Lua Kobayashi |The Persistence of Memories', 9, '')]
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [D533] Stop 5 corpus-gate restriction LIFTED — 18 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 5 prompt size: before_snippets=9647 after=21037 (+11390 from snippets+instructions, facts_first=no)  [LOCAL-411] Stop 2 prompt size: before_snippets=9604 after=23731 (+14127 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23731)
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21037)
+  [D498] Stop 5 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 4 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0037
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0038
+  [LOCAL-490] Stop 2 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0036
+  [LOCAL-490] Stop 5 story pass: ok=True (3 sentences), $0.0046
+    story: "Lua Kobayashi, a mixed Japanese American and Uruguayan interdisciplinary artist based in Southern California, was awarded the Griffin Museum of Photog"
+  [LOCAL-490] Stop 4 story pass: ok=True (6 sentences), $0.0050
+    story: "The Griffin Museum of Photography in Winchester, Massachusetts, was preparing to present the third installment of its 'State of the Union' series. Dr."
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:15037. Caller should supply input_tokens and output_tokens separately.
+Stop 3 API call cost: $0.0366 (7713 tokens, model=gpt-4.1)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Here’s a secret: "Tabitha Soren | An Artist Life" is not a single artwork, but a curated sequence tracing Soren’s meditations on the artist’s daily rituals, vulnerabilities, and thresholds between private and public selves. The works on display—photographic prints mounted in custom frames—draw from '
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0258 (5428 tokens, model=gpt-4.1)
+  [LOCAL-393] Stop 5: WORD FLOOR — 116 words < 120, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0305 (6413 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 1 API call cost: $0.0328 (6911 tokens, model=gpt-4.1)
+Stop 1 description word count: 387 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0271 (5694 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0258 (5426 tokens, model=gpt-4.1)
+  [LOCAL-393] Stop 5: WORD FLOOR — 77 words < 120, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0323 (6797 tokens, model=gpt-4.1)
+Stop 2 description word count: 354 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0366 (7703 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0265 (5577 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 4/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0285 (6002 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0383 (8070 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 4/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0303 (6375 tokens, model=gpt-4.1)
+Stop 4 description word count: 273 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0282 (5935 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 5/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0296 (6231 tokens, model=gpt-4.1)
+  [LOCAL-394] stop='Lua Kobayashi |The Persistence of Memories' below_floor words=61 — kept (never dropped)
+Stop 5 description word count: 61 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0401 (8445 tokens, model=gpt-4.1)
+Stop 3 description word count: 289 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✗ FAIL stop='BU Masters Show 2026 | Traces: Pursuing Process': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✗ FAIL stop='Earth, Wind & Fire': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Tabitha Soren | An Artist Life': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='TLC': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Lua Kobayashi |The Persistence of Memories': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.003581 (input=14891, output=2245)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    [LOCAL-427] Venue page text injected as verification source (venue source, 231948 chars from )
+    ✓ PASS stop='BU Masters Show 2026 | Traces: Pursuing Process': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='Griffin Museum worked with artist' ← 
+    ✗ FAIL stop='Earth, Wind & Fire': claims=1, sourced=0, unsourced=1, contradicted=0
+      → UNSOURCED: 'Dix created a space' (attribution) — no snippet contains this assertion
+    ✓ PASS stop='Tabitha Soren | An Artist Life': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='Soren created these' ← 
+    ✓ PASS stop='TLC': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='Sims assembled the' ← 
+        claim='Sims created a thread' ← 
+    ✓ PASS stop='Lua Kobayashi |The Persistence of Memories': claims=1, sourced=1, unsourced=0, contradicted=0
+      evidence (1 sourced claims):
+        claim='Kobayashi created "The' ← 
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'Earth, Wind & Fire':
+      ✗ "By assembling these images—each rooted in the material or the transient—Dix created a space where th"
+  [LOCAL-394] stop='Lua Kobayashi |The Persistence of Memories' below_floor words=61 — kept (never dropped)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:16350. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 1 para 2: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 1 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R10_UNFULFILLED_PROMISE, R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 5 para 1: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 6 paragraphs retried, 6 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0173 (3634 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 12
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 17
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Ava Harper' reason='It does not specify Ava Harper's direct involvement with this exhibition.' in: "From more than 340 submitted images, only fifty were chosen for this exhibition, shaping the visual "
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Emma Pfannenstiel' reason='It does not specify how Emma Pfannenstiel relates to this stop.' in: "From more than 340 submitted images, only fifty were chosen for this exhibition, shaping the visual "
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Ethan Stumbo' reason='It does not specify Ethan Stumbo's direct involvement with the exhibition.' in: "From more than 340 submitted images, only fifty were chosen for this exhibition, shaping the visual "
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Nanxi Zhang' reason='It does not specify how Nanxi Zhang relates to this stop.' in: "From more than 340 submitted images, only fifty were chosen for this exhibition, shaping the visual "
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Ava Harper' reason='It does not specify how Ava Harper is connected to the exhibition.' in: "Ava Harper, Emma Pfannenstiel, Ethan Stumbo, and Nanxi Zhang each bring a distinct sensibility forge"
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Emma Pfannenstiel' reason='It does not specify how Emma Pfannenstiel relates to the exhibition.' in: "Ava Harper, Emma Pfannenstiel, Ethan Stumbo, and Nanxi Zhang each bring a distinct sensibility forge"
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Ethan Stumbo' reason='It does not specify how Ethan Stumbo relates to the exhibition.' in: "Ava Harper, Emma Pfannenstiel, Ethan Stumbo, and Nanxi Zhang each bring a distinct sensibility forge"
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Nanxi Zhang' reason='It does not specify how Nanxi Zhang relates to the exhibition.' in: "Ava Harper, Emma Pfannenstiel, Ethan Stumbo, and Nanxi Zhang each bring a distinct sensibility forge"
+    [LOCAL-472] UNGROUNDED entity stop='BU Masters Show 2026 | Traces: Pursuing Process' entity='Traces: Pursuing Process,' reason='No concrete link to the stop is provided.' in: "The exhibition’s title, "Traces: Pursuing Process," points directly to this openness. What is at sta"
+    [LOCAL-472] UNGROUNDED entity stop='Earth, Wind & Fire' entity='In November' reason='No concrete link to "In November" is established.' in: "In November 2026, the Griffin Museum of Photography unveiled "Earth, Wind & Fire," curated by Execut"
+    [LOCAL-472] UNGROUNDED entity stop='Earth, Wind & Fire' entity='Maurice White' reason='No concrete link to the stop is provided.' in: "In November 2026, the Griffin Museum of Photography unveiled "Earth, Wind & Fire," curated by Execut"
+    [LOCAL-472] UNGROUNDED entity stop='TLC' entity='Delphine Sims' reason='No concrete link to the stop is provided.' in: "Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of"
+    [LOCAL-472] UNGROUNDED entity stop='TLC' entity='Assistant Curator' reason='No concrete link to the stop is provided.' in: "Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of"
+    [LOCAL-472] UNGROUNDED entity stop='TLC' entity='Modern Art' reason='No concrete link to the stop is provided.' in: "Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of"
+    [LOCAL-472] UNGROUNDED entity stop='TLC' entity='Alanna Airitam' reason='No concrete link to the stop is provided.' in: "Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of"
+    [LOCAL-472] UNGROUNDED entity stop='TLC' entity='Harlan Bozeman' reason='No concrete link to Harlan Bozeman's relationship with this stop is provided.' in: "Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of"
+    [LOCAL-472] UNGROUNDED entity stop='TLC' entity='Star Montana' reason='No concrete link between Star Montana and the stop is provided.' in: "Dr. Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/50)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 15
+    Glossed (composed): 4
+    Suppressed (already explained): 1
+    Degraded (name dropped): 8
+    Guard failures: 0
+    Known (skipped): 2
+    Triage: 1953 tokens, $0.0004, 4.8s
+    Gloss: 1260 tokens, $0.0003, 4.6s
+    Compose: 1222 tokens, $0.0002, 1.6s
+    Total added cost: $0.0009
+    Stops affected: 4
+    Glosses applied:
+      • Ava Harper → DEGRADED (name dropped)
+      • Emma Pfannenstiel → DEGRADED (name dropped)
+      • Ethan Stumbo → DEGRADED (name dropped)
+      • Nanxi Zhang → DEGRADED (name dropped)
+      • Executive Director Crista Dix → DEGRADED (name dropped)
+      • Maurice White → "the co-founder and lead singer of earth, wind & fire" [source: model]
+      • Delphine Sims → SUPPRESSED (already explained)
+      • Assistant Curator → DEGRADED (name dropped)
+      • Alanna Airitam → "a contemporary artist exploring identity themes" [source: model]
+      • Harlan Bozeman → "a contemporary artist addressing race issues" [source: model]
+      • Sims → DEGRADED (name dropped)
+      • Star Montana → "an artist incorporating portraiture and family themes" [source: model]
+      • Cummings Residency Prize → DEGRADED (name dropped)
+
+  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...
+  [LOCAL-385] ungrounded person 'New England Portfolio Review' — will remove all mentions
+  [LOCAL-385] field=description stop='Tabitha Soren | An Artist Life' ungrounded person 'New England Portfolio Review' — dropping sentence: "Over twenty-five years, Soren has explored this territory, but her presence at t..."
+  [LOCAL-385] Prose entity grounding gate summary:
+    Persons detected: 11
+    Persons grounded: 10
+    Persons ungrounded: 1
+    Sentences dropped: 1
+    Stops affected: 3
+    Ungrounded: ['New England Portfolio Review']
+
+  [LOCAL-458] PHASE 5.158b: Role-claim gate...
+  [LOCAL-458] entity gate: corpus=231948 chars, 0 role claims, 0 entities, 0 dropped
+
+  [LOCAL-479] PHASE 5.158c: Organisation grounding gate (corpus 264941 chars)...
+  [LOCAL-479] orgs detected=7 grounded=7 ungrounded=0 sentences_dropped=0
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] PHASE 5.160: Numeric-claim gate (scans all prose fields)...
+  [LOCAL-389] field=description ungrounded quantity 'more than 340' — dropping sentence
+  [LOCAL-389] field=description stop='BU Masters Show 2026 | Traces: Pursuing Process' claim='more than 340' context='From [more than 340] submitted images, only fifty were chose…'
+             dropped: "From more than 340 submitted images, only fifty were chosen for this exhibition, shaping the visual "
+  [LOCAL-389] field=description ungrounded quantity 'the earliest' — dropping sentence
+  [LOCAL-389] field=description stop='Earth, Wind & Fire' claim='the earliest' context='…y works in a lineage that predates even [the earliest] photographic experiments.'
+             dropped: "This compositional decision aligns with the ancient order of the elements, grounding the contemporar"
+  [LOCAL-389] field=description ungrounded quantity 'the third' — dropping sentence
+  [LOCAL-389] field=description stop='TLC' claim='the third' context='Sims assembled the exhibition as [the third] installment in the museum’s “State of t…'
+             dropped: "Sims assembled the exhibition as the third installment in the museum’s “State of the Union” series, "
+  [LOCAL-389] Numeric-claim gate summary:
+    Claims detected: 4
+    Grounded (identity block): 0
+    Grounded (page text): 1
+    Ungrounded (dropped): 3
+    Sentences dropped: 3
+    Stops affected: 3
+    [LOCAL-389] field=description stop='BU Masters Show 2026 | Traces: Pursuing Process' claim='more than 340' context='From [more than 340] submitted images, only fifty were chose…' dropped: "From more than 340 submitted images, only fifty were chosen for this exhibition,"
+    [LOCAL-389] field=description stop='Earth, Wind & Fire' claim='the earliest' context='…y works in a lineage that predates even [the earliest] photographic experiments.' dropped: "This compositional decision aligns with the ancient order of the elements, groun"
+    [LOCAL-389] field=description stop='TLC' claim='the third' context='Sims assembled the exhibition as [the third] installment in the museum’s “State of t…' dropped: "Sims assembled the exhibition as the third installment in the museum’s “State of"
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 61
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Griffin Museum of Photography'...
+   Authority: 4 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 5 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 2
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 2
+    Stops affected: 2
+    [2] DELETED: 'This selection' in: This selection had a tangible impact on both the artists and the museum.
+    [3] DELETED: 'These compositional' in: These compositional choices matter because they foreground the tension between v
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 1 'BU Masters Show 2026 | Traces: Pursuin' (index 60) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s)
+
+  [LOCAL-487] step 7a: 5 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'BU Masters Show 2026 | Traces: Pursuin': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 2 'Earth, Wind & Fire': the longest run (4 sentences, Griffin Museum) has agency=1 stakes=0 — someone is described, but nothing is ris
+    stop 3 'Tabitha Soren | An Artist Life': the longest run (4 sentences, Tabitha Soren) has agency=1 stakes=0 — someone is described, but nothing is risk
+    stop 4 'TLC': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 5 'Lua Kobayashi |The Persistence of Memo': longest qualifying run is 1 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 5 'Lua Kobayashi |The Persistence of ' (index 30)
+  [D534] Stop 2 repeats 1 thing(s) said earlier — will regenerate with them banned
+      already told: This is the pulse of the BU Masters Show 2026—a window into hidden processes and the beginnings of n
+  [D534] Stop 3 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: This is the pulse of the BU Masters Show 2026—a window into hidden processes and the beginnings of n
+      already told: As at the BU Masters Show 2026 you visited earlier, where traces of process lingered in every image,
+  [D534] Stop 4 repeats 2 thing(s) said earlier — will regenerate with them banned
+      already told: Their decision was more than a scheduling note—it put Soren’s preoccupation with psychological bound
+      already told: In November 2026, the Griffin Museum of Photography unveiled "Earth, Wind & Fire," curated.
+  [D534] Stop 5 repeats 4 thing(s) said earlier — will regenerate with them banned
+      already told: In November 2026, the Griffin Museum of Photography unveiled "Earth, Wind & Fire," curated.
+      already told: Their decision was more than a scheduling note—it put Soren’s preoccupation with psychological bound
+      already told: As at the BU Masters Show 2026 you visited earlier, where traces of process lingered in every image,
+      already told: Dr. Delphine Sims, in the Department of Photography at the San Francisco Museum of Modern Art, curat
+
+  [LOCAL-474] PHASE 5.17: retry 'Earth, Wind & Fire' — 310w → 246w after gates, 9 sentence(s) removed
+    removed: "In November 2026, the Griffin Museum of Photography unveiled "Earth, Wind & Fire," juried by Executi"
+    removed: "Dix reviewed submissions from across the country, ultimately selecting works that, in her judgment, "
+    removed: "This act of selection had a tangible consequence for the artists and for the museum."
+    removed: "The photographers included here were chosen for their ability to crystallize the forces that shape o"
+    removed: "For the museum, the exhibition became more than a thematic exercise; it was an act of bearing witnes"
+    removed: "The prints on view range in medium, from archival pigment to silver gelatin, each process attuned to"
+    removed: "This compositional decision aligns with the ancient order of the elements, grounding the contemporar"
+    removed: "The show’s title itself reaches back centuries, long before Maurice White gave the name to his band."
+    removed: "Moving forward, the echoes of earth, wind, and fire will resurface in the next gallery—where human s"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Earth, Wind & Fire is held at Griffin Museum of Photography."
+
+  [LOCAL-474] PHASE 5.17: retry 'Tabitha Soren | An Artist Life' — 289w → 229w after gates, 5 sentence(s) removed
+    removed: "In "Tabitha Soren | An Artist Life," the surface of each print—pigment ink on cotton rag paper—is th"
+    removed: "The wall text credits Soren by name, pairing her mediated photographic images with tangible, physica"
+    removed: "Soren created these works to probe the very intersection of psychology and body; her choice to print"
+    removed: "Over twenty-five years, Soren has explored this territory, but her presence at the Griffin Museum ma"
+    removed: "These compositional choices matter because they foreground the tension between visibility and privac"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Tabitha Soren | An Artist Life is held at Griffin Museum of Photography."
+
+  [LOCAL-474] PHASE 5.17: retry 'TLC' — 273w → 255w after gates, 4 sentence(s) removed
+    removed: "Delphine Sims, Assistant Curator in the Department of Photography at the San Francisco Museum of Mod"
+    removed: "Sims selected the photographic work of four contemporary artists of color—Alanna Airitam, Harlan Boz"
+    removed: "Lee, and Star Montana—choosing images centered on portraiture and family vernacular imagery."
+    removed: "Sims assembled the exhibition as the third installment in the museum’s “State of the Union” series, "
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "TLC is held at Griffin Museum of Photography."
+
+  [LOCAL-474] PHASE 5.17: retry 'Lua Kobayashi |The Persistence of Memories' — 61w → 58w after gates, 4 sentence(s) removed
+    removed: "Lua Kobayashi received the Griffin Museum of Photography’s 2025/2026 Cummings Residency Prize."
+    removed: "Kobayashi created "The Persistence of Memories" as a direct result of this recognition."
+    removed: "Griffin scheduled Kobayashi’s new installation for public exhibition from September 11 through Octob"
+    removed: "Kobayashi blended traditional and digital art forms, producing an immersive experience unique to thi"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Lua Kobayashi |The Persistence of Memories is held at Griffin Museum of Photography."
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 2: Earth, Wind & Fire by , ...
+
+Generating description for Stop 3: Tabitha Soren | An Artist Life by , ...
+  [LOCAL-381] stop='Tabitha Soren | An Artist Life' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 3 snippet ranking: input=14 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=2, t3=0, market=0)
+    Top scores: [('Tabitha Soren | An Artist Life', 17, ''), ('Tabitha Soren | An Artist Life - Griffin Museum of', 10, 'tier1'), ('Tabitha Soren | An Artist Life', 10, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 14 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=9897 after=29094 (+19197 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (29094)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+Generating description for Stop 4: TLC by , ...
+  [LOCAL-381] stop='Earth, Wind & Fire' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 2 snippet ranking: input=13 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=4, t3=0, market=0)
+    Top scores: [('WHUR-FM Digital Reporter Candice A. Adkins on the ', 11, ''), ('The Virtual Gallery Archives', 10, 'tier1'), ('Calls for Entry', 9, 'tier1')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 13 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=9604 after=23731 (+14127 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23731)
+
+Generating description for Stop 5: Lua Kobayashi |The Persistence of Memories by , ...
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Lua Kobayashi |The Persistence of Memories' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 5 snippet ranking: input=18 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Lua Kobayashi |The Persistence of Memories', 12, ''), ('Exhibition The Persistence of Memories', 9, ''), ('Lua Kobayashi |The Persistence of Memories', 9, '')]
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [D533] Stop 5 corpus-gate restriction LIFTED — 18 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 5 prompt size: before_snippets=9647 after=21037 (+11390 from snippets+instructions, facts_first=no)
+  [LOCAL-381] stop='TLC' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 4 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('TLC', 7, ''), ('TLC', 5, ''), ('TLC', 5, '')]
+  [LOCAL-402] Stop 4: injected 4 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=9698 after=20667 (+10969 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (20667)
+  [D498] Stop 4 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (21037)
+  [D498] Stop 5 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 2 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0054
+  [LOCAL-490] Stop 4 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0050
+  [LOCAL-490] Stop 5 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0056
+  [LOCAL-490] Stop 3 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0054
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0294 (6195 tokens, model=gpt-4.1)
+  [LOCAL-417] Stop 5: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Arthur Griffin, the American photographer whose name the museum bears, established a space where the boundary between photography and other mediums could be challenged. This decision allowed artists like Lua Kobayashi to present work that blends traditional and digital forms—here, photographs are la'
+  [LOCAL-417] Stop 5: retrying (attempt 1, temp=0.90)...
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0338 (7104 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0297 (6262 tokens, model=gpt-4.1)
+  [LOCAL-393] Stop 5: WORD FLOOR — 99 words < 120, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0396 (8340 tokens, model=gpt-4.1)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: '“Tabitha Soren | An Artist Life” is not a single artwork but an exhibition that spans over twenty-five years of Soren’s practice, as she investigates the intersection of psychology, culture, politics, and the body. You see a series of mediated images—photographs that examine vulnerability, not throu'
+  [LOCAL-417] Stop 3: retrying (attempt 1, temp=0.90)...
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0356 (7485 tokens, model=gpt-4.1)
+Stop 2 description word count: 393 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0302 (6350 tokens, model=gpt-4.1)
+Stop 5 description word count: 148 words
+  [LOCAL-407] Stop 5: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0399 (8400 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 3: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0306 (6446 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0413 (8694 tokens, model=gpt-4.1)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'This display, "Tabitha Soren | An Artist Life," draws its focus to the lived realities of working artists—quiet moments, measured processes, and the intersection of personal and universal experience. The physical makeup and exact medium of the works in this exhibition are not specified in the materi'
+  [LOCAL-417] Stop 3: retrying (attempt 3, temp=1.00)...
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0413 (8686 tokens, model=gpt-4.1)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'There’s a hush to this room—no single centerpiece, but a procession of photographic works placed in sequence, each exploring the intersection of psychology, culture, politics, and the body. Each frame holds a mediated image: an artist’s hand hovering above a notepad, the outline of a torso turned aw'
+  [LOCAL-417] Stop 3: retrying (attempt 4, temp=1.00)...
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0320 (6733 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=0 < 3, need 3 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0412 (8669 tokens, model=gpt-4.1)
+  [LOCAL-417] Stop 3: POSITIVE GATE FAILED — ['no concrete fact (date, measurement, material, or provenance)']
+  [LOCAL-417]   verbatim: 'Although the exact medium and number of prints are not specified for "An Artist Life," the exhibition at the Griffin Museum draws together visual stories that consider daily habits, gestures and the accumulation of small acts—details you’ll glimpse in familiar objects, hands at work, an artist’s gaz'
+  [LOCAL-417] Stop 3: GATE FAILED after 5 attempts — using fallback (never shipping operator-directed text)
+  [LOCAL-422] Stop 3: resolved final description (367 words)
+Stop 3 description word count: 367 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0334 (7032 tokens, model=gpt-4.1)
+Stop 4 description word count: 305 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 55.9s for 4 stop(s) at max_workers=4
+    [LOCAL-474] regenerated and re-gated: 393w (was 246w)
+    [LOCAL-474] regenerated and re-gated: 311w (was 229w)
+    [LOCAL-474] regenerated and re-gated: 285w (was 255w)
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+  [D534] removed 3 repeated sentence(s) the capped retries could not reach:
+      stop 2: The resonance with earlier rooms—such as the process-driven works you have already seen at
+      stop 4: TLC is not a single object but a temporary photography exhibition on display from Septembe
+      stop 5: Lua Kobayashi received the Griffin Museum of Photography 2025/2026.
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 3 improved, 1 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 4 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://en.wikipedia.org/wiki/Printmaking (attempt 1)
+  [LOCAL-459] R5: Fetched 2151 chars from https://en.wikipedia.org/wiki/Printmaking
+  [LOCAL-427] HTTP 200 from https://www.thehistoryofart.org/topics/printmaking/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2150 chars from https://www.thehistoryofart.org/topics/printmaking
+  [LOCAL-427] HTTP 200 from https://theartofeducation.edu/2024/07/back-to-basics-how-to-teach-printmaking-with-four-processes-for-newbies/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1950 chars from https://theartofeducation.edu/2024/07/back-to-basi
+  [LOCAL-427] HTTP 200 from https://www.artzolo.com/blogs/art-logs/printmaking-guide (attempt 1)
+  [LOCAL-459] R5: Fetched 1235 chars from https://www.artzolo.com/blogs/art-logs/printmaking
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.0s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 4.3s (attempt 2, 28s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 7.8s (attempt 3, 23s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 4 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.worldofprintmaking.com/process/lithography (attempt 1)
+  [LOCAL-459] R5: Fetched 2018 chars from https://www.worldofprintmaking.com/process/lithogr
+  [D512] verb discovery: query='Griffin Museum of Photography printmaking process how it is made' -> 10 new verb(s): raised, inked, transferred, incised, produced, conceived, documented, expanded, pressed, applied
+  [D512] _AGENCY_VERB widened by 10 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: BU Masters Show 2026 | Traces: Pursuing Proc
+    [D501] no object record for 'BU Masters Show 2026 | Traces: Pursuing Proc' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 3.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 6.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 7.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 13.1                   kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.192, max=0.244 (DIVERSE)
+      allowing each artist × reflecting the artis = 0.230
+      allowing each artist × culminating in this  = 0.240
+      allowing each artist × Here, the stakes are = 0.244
+      reflecting the artis × culminating in this  = 0.232
+      reflecting the artis × Here, the stakes are = 0.140
+      culminating in this  × Here, the stakes are = 0.067
+    [D511] examined 4 credit_line(s) (indices 10, 10, 10, 5), no story passed, ~$0.048, 26s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Earth, Wind & Fire
+    [D501] no object record for 'Earth, Wind & Fire' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 1.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 2.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 3.1                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 3.2                    kind=none     idx=10  C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.375, max=0.629 (CONVERGED — seeds not working)
+      assembling musicians × drew deliberately on = 0.382
+      assembling musicians × crossed boundaries o = 0.214
+      assembling musicians × changing the texture = 0.284
+      drew deliberately on × crossed boundaries o = 0.368
+      drew deliberately on × changing the texture = 0.373
+      crossed boundaries o × changing the texture = 0.629
+    [D511] examined 4 credit_line(s) (indices 5, 10, 10, 10), no story passed, ~$0.048, 21s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: Tabitha Soren | An Artist Life
+    [D501] no object record for 'Tabitha Soren | An Artist Life' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 4.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 4.2                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 5.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 5.2                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.740, max=1.000 (CONVERGED — seeds not working)
+      ties these works tog × echoes the routines  = 0.702
+      ties these works tog × Soren's images sugge = 0.812
+      ties these works tog × no moment stands alo = 0.812
+      echoes the routines  × Soren's images sugge = 0.556
+      echoes the routines  × no moment stands alo = 0.556
+      Soren's images sugge × no moment stands alo = 1.000
+    [D511] examined 4 credit_line(s) (indices 5, 5, 5, 5), no story passed, ~$0.048, 24s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 4: TLC
+    [D501] no object record for 'TLC' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] 2.1                    kind=none     idx=10  C0 X4 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 4.1                    kind=none     idx=5   C0 X1 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 5.1                    kind=none     idx=5   C0 X5 fail:index_d515  [old gate: eventful,index,confirmed]
+    [D511] 6.1                    kind=none     idx=5   C0 X4 fail:index_d515  [old gate: eventful,index,confirmed]
+    [LOCAL-468] pairwise overlap: mean=0.253, max=0.462 (DIVERSE)
+      every subject is giv × refusing to crop out = 0.271
+      every subject is giv × creating a communal  = 0.237
+      every subject is giv × family stories are e = 0.163
+      refusing to crop out × creating a communal  = 0.462
+      refusing to crop out × family stories are e = 0.141
+      creating a communal  × family stories are e = 0.241
+    [D511] examined 4 credit_line(s) (indices 10, 5, 5, 5), no story passed, ~$0.048, 43s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 5: Lua Kobayashi |The Persistence of Memories
+    [D501] no object record for 'Lua Kobayashi |The Persistence of Memories' — matrix unchanged
+    [D511] 2 credit_line(s) to try (0 from the matrix, 2 from the text)
+  [LOCAL-427] HTTP 200 from https://griffinmuseum.org/show/lua-kobayashi/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2507 chars from https://griffinmuseum.org/show/lua-kobayashi/
+    [D511] 2.1                    kind=active   idx=46  C1 X3 fail:index_d515  [old gate: eventful,index,confirmed]
+  [LOCAL-427] Cache HIT: https://griffinmuseum.org/show/lua-kobayashi/ (10740 chars)
+  [LOCAL-459] R5: Fetched 2192 chars from https://griffinmuseum.org/show/lua-kobayashi/
+  [LOCAL-427] HTTP 200 from https://www.all-about-photo.com/photography-exhibition/4471/lua-kobayashi-the-persistence-of-memory (attempt 1)
+  [LOCAL-459] R5: Fetched 2008 chars from https://www.all-about-photo.com/photography-exhibi
+  [LOCAL-427] HTTP 200 from https://griffinmuseum.org/gallery/griffin-gallery/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1991 chars from https://griffinmuseum.org/gallery/griffin-gallery/
+    [D511] 3.1                    kind=active   idx=50  C3 X1 PASS  [old gate: eventful,index]
+    [LOCAL-468] pairwise overlap: mean=0.216, max=0.216 (DIVERSE)
+      marking the culminat × producing an immersi = 0.216
+    [D511] examined 2 credit_line(s) (indices 46, 50), STORY ACCEPTED at 50, ~$0.028, 42s
+    [D518] 0 of 3 prose sentence(s) replaced by story 1
+    [D511] stop 5: 1 story published (50) from credit_lines 'producing an immersive experience unique'
+
+  [D511] PHASE 5.20 summary: 1/5 stops got a gated story (0 with multiple stories), ~$0.220, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  BU Masters Show 2026 | Traces: Pursuing    60    12     7    89
+     2  Earth, Wind & Fire                         67    19    28    31
+     3  Tabitha Soren | An Artist Life             57     8     7    16
+     4  TLC                                        61     9    22    15
+     5  Lua Kobayashi |The Persistence of Memori   40    24     0    45
+    [LOCAL-485] index mean 57.0 over 5 stop(s), range 40-67
+    [LOCAL-485] weakest: 'Lua Kobayashi |The Persistence of Memori' at 40
+[TIMING] phase=story_first elapsed=374.3s cumulative=591.1s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (123 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 123 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 123 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 344
+    Words after:  344
+    Delta: 0
+    Stops affected: 0/5
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+    [LOCAL-276] Intrigue ranking completed: 2.4s, $0.0118, 1724 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [BU Masters Show 2026 | Traces: Pursuing Process] (cause): Techniques span both traditional analog and contemporary digital methods, reflec...
+      [Earth, Wind & Fire] (dated_event): In 1969, Maurice White founded the band Earth, Wind & Fire in Chicago, assemblin...
+      [Tabitha Soren | An Artist Life] (cause): Instead of inviting you into a single moment, the display revolves around proces...
+      [TLC] (reversal): Airitam chose to re-stage family photographs using gelatin silver prints, a medi...
+      [Lua Kobayashi |The Persistence of Memories] (cause): As recipient of the 2025/2026 Cummings Residency Prize, Lua Kobayashi spent her ...
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+    Part 4 LLM cost: $0.0038 (646 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "At the BU Masters Show 2026 | Traces: Pursuing Process, you'll see artists blur boundaries with both analog and digital methods, while at Earth, Wind & Fire, discover how Maurice White founded the band in 1969 to explore new directions in American popular music."
+      FAIL: date '2026' attributed to 'Earth, Wind & Fire' but belongs to a different stop
+    Part 4 LLM cost: $0.0037 (640 tokens) [attempt 2]
+    ✓ Part 4 composed and verified (39 words):
+      "Experience the innovative fusion of traditional analog and contemporary digital methods at BU Masters Show 2026 | Traces: Pursuing Process, and discover how Maurice White founded Earth, Wind & Fire in 1969 in Chicago at Earth, Wind & Fire."
+      Stops referenced: 2
+    Part 4 total cost: $0.0075
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Griffin Museum of Photography — next is Ear...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Tabitha Soren | An Artist Life....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to TLC....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Your final stop in Griffin Museum of Photography: Lua Kobaya...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.8s, $0.0025, 431 tokens
+  [LOCAL-280] Recap built: 29 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [TLC] (reversal): "Airitam chose to re-stage family photographs using gelatin silver prints, a medi..."
+      → composed: "TLC, where Airitam re-staged family photographs using gelatin silver prints"
+    [BU Masters Show 2026 | Traces: Pursuing Process] (cause): "Techniques span both traditional analog and contemporary digital methods, reflec..."
+      → composed: "BU Masters Show 2026 | Traces: Pursuing Process, featuring both analog and digital techniques"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops — TLC, where Airitam re-staged family photographs using gelatin silver prints and BU Masters Show 2026 | Traces: Pursuing Process, featuring both analog and digital techniques."
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (12.3 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 5 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (6107 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] No practical claims found to verify (informational for tour_category='museum')
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 2 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+
+=== Word Count Statistics ===
+Stop 1: BU Masters Show 2026 | Traces: Pursuing Process - 387 words
+Stop 2: Earth, Wind & Fire - 354 words
+Stop 3: Tabitha Soren | An Artist Life - 289 words
+Stop 4: TLC - 273 words
+Stop 5: Lua Kobayashi |The Persistence of Memories - 61 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (13411 chars, 5/5 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Tabitha Soren" placed here in 2026 with no source: "As you meander through the museum's collection, you will encounter the BU Mast
+
+Total API cost: $0.5476 (47054 tokens)
+Grounding:      $1.5750 (45 requests)
+Tour total:     $2.1226
+Provenance:     3/31 factual sentences sourced, 28 unsourced (3 corpus, 0 grounded, 28 parametric)
+CACHE STORE: Griffin museum of photography, Winchester, MA / museum / 5
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/LOCAL583_GRIFFIN_RUN2.txt
+  [C5-5] Evidence (provenance-only) persisted: /app/tours/LOCAL583_GRIFFIN_RUN2_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Griffin museum of photography, Winchester, MA
+Tour-Category: museum
+
+Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+
+Address: 67 Shore Road, Winchester, MA 01890
+
+Coordinates: 42.4525, -71.137
+
+Orientation: Welcome to the Griffin Museum of Photography in Winchester, Massachusetts, where the transformative power of photography captures the ephemeral essence of life. As you meander through the museum's collection, you will encounter the BU Masters Show 2026...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    BU Masters Show 2026 | Traces: Pursuing Process: serp_results=7 snippets_injected=11 beats_in_delivered_text=0
+    Earth, Wind & Fire: serp_results=10 snippets_injected=13 beats_in_delivered_text=0
+    Tabitha Soren | An Artist Life: serp_results=11 snippets_injected=11 beats_in_delivered_text=1
+    TLC: serp_results=0 snippets_injected=0 beats_in_delivered_text=0
+    Lua Kobayashi |The Persistence of Memories: serp_results=5 snippets_injected=13 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=7.2s cumulative=598.2s
+[TIMING] phase=verification elapsed=0.0s cumulative=598.2s
+[TIMING] TOTAL wall=598.2s phases: story_first=374.3s, external_lookups=145.9s, site_first_exhibitions=34.6s, fact_sheets=10.1s, packing=7.2s, poi_selection=7.0s, intent=1.3s, narration=0.0s, verification=0.0s
+
+RUN 2: 13411 chars in 598.2s -> LOCAL583_GRIFFIN_RUN2.txt
+RUN 2: delivered stops = 5 / requested 5
+RUN 2: STOP LIST:
+   Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+   Stop 2: Earth, Wind & Fire
+   Stop 3: Tabitha Soren | An Artist Life
+   Stop 4: TLC
+   Stop 5: Lua Kobayashi |The Persistence of Memories
