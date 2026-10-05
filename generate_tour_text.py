@@ -4852,11 +4852,22 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
             from venue_resolver import cache_put
+            # [LOCAL-583 D2] Run the canonical-title union through structural
+            # chrome rejection BEFORE it is written to venue_corpus, so the cache
+            # never stores site furniture as a "work". (cache_put also filters as
+            # defense-in-depth.) SPARQL works are left untouched — Wikidata-
+            # verified, not site-scraped.
+            from exhibition_discovery import reject_chrome_titles as _reject_chrome
+            _canon_in = len(canonical_titles) if canonical_titles else 0
+            _canonical_clean = _reject_chrome(canonical_titles, venue_name)
+            if _canon_in != len(_canonical_clean):
+                print(f"  [D1v2] [LOCAL-583] chrome rejected from canonical union before cache write: "
+                      f"{_canon_in} → {len(_canonical_clean)}")
             cache_put(
                 qid=_venue_entity.qid,
                 venue_name=venue_name,
                 official_url=_base_site_url or '',
-                canonical_titles=canonical_titles,
+                canonical_titles=_canonical_clean,
                 story_elements=corpus_result.get('story_elements'),
                 sparql_works=sparql_works,
                 pages=corpus_result.get('pages'),
@@ -7297,15 +7308,33 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
                             _det_seen_titles_norm.add(_tn)
                 
-                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                # [LOCAL-583 D1] "Documented" means catalogue + SPARQL ONLY.
+                # Site/wiki-derived canonical titles (source == 'canonical') are
+                # NOT documented works: they came from the venue's own pages (or a
+                # cache row written from them) and, as the Griffin field defect
+                # showed, can be pure site chrome ("Our Team", "Calls For Entry").
+                # They must never (a) trigger the deterministic bypass nor (b)
+                # block the LOCAL-580 site-first path, which only runs when the
+                # museum has 0 catalogue/SPARQL works. Canonical titles remain in
+                # _det_documented only as *fill material* once a documented base
+                # has already earned the bypass.
+                _det_documented_count = sum(
+                    1 for d in _det_documented if d.get('source') in ('catalogue', 'sparql')
+                )
+                _det_canonical_count = len(_det_documented) - _det_documented_count
+                print(f"  [LOCAL-30] Deterministic selection: {_det_documented_count} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL"
+                      f"; {_det_canonical_count} site/cache canonical title(s) are NOT documented)")
 
                 # [LOCAL-580] An EXHIBITION MUSEUM resolves but has 0 catalogued
                 # works. Capture its site URL + locality so the block below can
                 # read its CURRENT EXHIBITIONS from its own site (site-first
                 # candidates) instead of Phase 3A inventing generic shows, and so
                 # a clean fail can suggest a locality-based alternative (D4).
-                if len(_det_documented) == 0:
+                # [LOCAL-583 D1] Eligibility keys on documented (catalogue+SPARQL)
+                # count, NOT on canonical titles — a cache full of site chrome
+                # must not keep the site-first path from running.
+                if _det_documented_count == 0:
                     _museum_site_first_eligible = True
                     _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
                     _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
@@ -7317,8 +7346,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"exhibition-museum site-first path ELIGIBLE "
                           f"(site='{_museum_site_url}')")
 
-                # If documented works >= total_stops, fill deterministically
-                if len(_det_documented) >= total_stops:
+                # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill
+                # deterministically. [LOCAL-583 D1] canonical titles do NOT count
+                # toward this threshold — they cannot trigger the bypass alone.
+                if _det_documented_count >= total_stops:
                     # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
                     _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
@@ -7338,7 +7369,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"     - {p['name']} [{_src}]")
                     _deterministic_fill_used = True
                 else:
-                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                    print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
@@ -8216,11 +8247,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
                             _det_seen_titles_norm.add(_tn)
                 
-                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                # [LOCAL-583 D1] "Documented" = catalogue + SPARQL ONLY. Canonical
+                # (site/cache) titles are NOT documented works and must not trigger
+                # the deterministic bypass on their own (the Griffin chrome defect).
+                _det_documented_count = sum(
+                    1 for d in _det_documented if d.get('source') in ('catalogue', 'sparql')
+                )
+                _det_canonical_count = len(_det_documented) - _det_documented_count
+                print(f"  [LOCAL-30] Deterministic selection: {_det_documented_count} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL"
+                      f"; {_det_canonical_count} site/cache canonical title(s) are NOT documented)")
                 
-                # If documented works >= total_stops, fill deterministically
-                if len(_det_documented) >= total_stops:
+                # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill deterministically
+                if _det_documented_count >= total_stops:
                     # -------- [LOCAL-284] Corpus-depth tiebreak for museum selection --------
                     # D170 says stop selection stays free — no artificial constraints.
                     # But for a MUSEUM, the candidate set is a closed list of real objects,
@@ -8300,7 +8339,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"     - {p['name']} [{_src}] (quality={_qscore:.1f})")
                     _deterministic_fill_used = True
                 else:
-                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                    print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
@@ -10679,20 +10718,49 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _osm_city = _extract_city(location)
                 if _osm_city:
                     _venue_hint = 'museum' if tour_category == 'museum' else ''
-                    print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                    # [LOCAL-583 D3] Exhibit-museum stops are EXHIBITIONS, not
+                    # mappable OSM objects. OpenStreetMap has no node for a
+                    # temporary show ("Intertidal : Field Notes") any more than it
+                    # has one for a pulpit (the D569 church-tour defect: N Overpass
+                    # calls, every one a 504/timeout, ~200s wasted). The practical
+                    # facts a listener needs here — admission, hours — belong to
+                    # the MUSEUM BUILDING, so we query OSM ONCE for the venue and
+                    # share its facts across the exhibition stops, instead of
+                    # firing one doomed Overpass query per show name.
+                    _stops_are_exhibitions = (
+                        _exhibition_stops_source in ('site_exhibition', 'checklist', 'partial')
+                        or any(p.get('source') == 'site_exhibition' for p in poi_list)
+                    )
                     _osm_source_texts_355 = []
                     _osm_source_urls_355 = []
-                    for poi in poi_list:
-                        _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
-                        if not _osm_facts.is_empty():
-                            # Only replace if no visitor info was already sourced (LOCAL-34/39)
-                            if not poi.get('operational_details'):
-                                poi['operational_details'] = _osm_facts.format_practical_sentence()
-                            _osm_source_texts_355.append(_osm_facts.source_text)
-                            _osm_source_urls_355.append(_osm_facts.source_url)
-                            print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                    if _stops_are_exhibitions:
+                        _venue_query_name = _museum_venue_name or venue_name
+                        print(f"  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the "
+                              f"museum building '{_venue_query_name}' (not per-exhibition — a show has no OSM node)")
+                        _venue_osm = fetch_osm_venue_facts(_venue_query_name, _osm_city, venue_hint='museum')
+                        if not _venue_osm.is_empty():
+                            _venue_sentence = _venue_osm.format_practical_sentence()
+                            for poi in poi_list:
+                                if not poi.get('operational_details'):
+                                    poi['operational_details'] = _venue_sentence
+                            _osm_source_texts_355.append(_venue_osm.source_text)
+                            _osm_source_urls_355.append(_venue_osm.source_url)
+                            print(f"  [LOCAL-355] museum building: sourced → {_venue_sentence}")
                         else:
-                            print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
+                            print(f"  [LOCAL-355] museum building: no practical facts in OSM")
+                    else:
+                        print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                        for poi in poi_list:
+                            _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
+                            if not _osm_facts.is_empty():
+                                # Only replace if no visitor info was already sourced (LOCAL-34/39)
+                                if not poi.get('operational_details'):
+                                    poi['operational_details'] = _osm_facts.format_practical_sentence()
+                                _osm_source_texts_355.append(_osm_facts.source_text)
+                                _osm_source_urls_355.append(_osm_facts.source_url)
+                                print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                            else:
+                                print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
                     if _osm_source_texts_355:
                         # Append to existing source text (don't overwrite LOCAL-34 website sources)
                         _osm_355_combined = "\n\n".join(_osm_source_texts_355)

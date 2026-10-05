@@ -1117,7 +1117,12 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 4  # LOCAL-24: Work-vs-nonwork filter added; invalidate stale cached data
+CORPUS_VERSION = 5  # LOCAL-583: structural chrome rejection added to the
+                    # canonical-title union before write. Bumping from 4 makes
+                    # every row written by the old plaintext extractor (which
+                    # stored site chrome as "canonical titles") a cache MISS, so
+                    # the Griffin chrome row and its kind are ignored without a
+                    # DELETE. New rows are written chrome-free at this version.
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
@@ -1256,7 +1261,23 @@ def cache_put(qid: str, venue_name: str, official_url: str, canonical_titles,
     conn = _get_db_connection()
     if not conn:
         return
-    
+
+    # [LOCAL-583 D2] Structural chrome rejection BEFORE write. The canonical
+    # union must never again carry site furniture ("Our Team", "Calls For
+    # Entry", "Terms Conditions", "Griffin Museum Board Of Directors 2"). This
+    # is defense-in-depth: the call site also filters, but no caller can write
+    # chrome into venue_corpus through this function. SPARQL works are untouched
+    # (they are Wikidata-verified, not site-scraped).
+    try:
+        from exhibition_discovery import reject_chrome_titles
+        _before = len(list(canonical_titles)) if canonical_titles else 0
+        canonical_titles = reject_chrome_titles(canonical_titles, venue_name)
+        if _before != len(canonical_titles):
+            print(f"  [venue_cache] [LOCAL-583] chrome rejection: "
+                  f"{_before} → {len(canonical_titles)} canonical titles for {qid}")
+    except Exception as _chrome_err:
+        print(f"  [venue_cache] [LOCAL-583] chrome rejection skipped (non-fatal): {_chrome_err}")
+
     # Negative caching: thin/unresolvable get shorter TTL (lets venue recover)
     if tier in ('thin', 'unresolvable'):
         ttl_days = VENUE_CACHE_NEGATIVE_TTL_DAYS
