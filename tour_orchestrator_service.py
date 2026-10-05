@@ -446,7 +446,7 @@ def log_job_update(job_id, status, progress):
     else:
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None):
     """Store the audio tour in the database with original tour content.
 
     Returns:
@@ -597,6 +597,26 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             cur.execute("ALTER TABLE audio_tours ADD COLUMN track VARCHAR(16) NOT NULL DEFAULT 'beta'")
             conn.commit()
             print("Added track column")
+
+        # [LOCAL-582] tour_kind: 'full' (default — a normal multi-stop tour) or
+        # 'overview' (rung 3 — one sourced orientation stop from the venue's own
+        # site when works could not be verified). Additive, self-healing column so
+        # this INSERT works on any Postgres whether or not the migration SQL has run.
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'tour_kind'
+        """)
+        has_tour_kind = cur.fetchone() is not None
+        if not has_tour_kind:
+            print(f"Adding tour_kind column...")
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN tour_kind VARCHAR(16) NOT NULL DEFAULT 'full'")
+            conn.commit()
+            has_tour_kind = True
+            print("Added tour_kind column")
+        _tour_kind_value = (tour_kind or 'full').strip().lower()
+        if _tour_kind_value not in ('full', 'overview'):
+            _tour_kind_value = 'full'
         
         # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
         # lower(tour_name) WHERE original_tour_id IS NULL.
@@ -658,11 +678,12 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             cur.execute(
                 """
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track, tour_kind)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track)
+                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track,
+                 _tour_kind_value)
             )
         elif has_audio_tour and has_lat and has_number_requested:
             cur.execute(
@@ -887,6 +908,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         # Prefer tour_content (HTTP-based, Cloud Run compatible) over tour_file (volume-based)
         tour_content = status_data.get("tour_content")
+        # [LOCAL-582] Carry the generator's tour_kind ('full' | 'overview') through
+        # to the DB row. An overview is a legitimate delivery (rung 3), labelled
+        # honestly rather than stored as a normal tour.
+        ACTIVE_JOBS[job_id]["tour_kind"] = status_data.get("tour_kind", "full") or "full"
         if tour_content:
             modernized_data = {"tour_content": tour_content}
             print(f"Using tour_content for modernized service ({len(tour_content)} chars)")
@@ -1217,7 +1242,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[USER_INDEX] Non-fatal error: {idx_err}")
 
         # Store in database with tour content
-        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"))
         
         # [LOCAL-156] store_audio_tour now returns a dict:
         #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
