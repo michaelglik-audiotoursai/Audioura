@@ -21,7 +21,8 @@ String buildShareMessage(String tourName, String code) =>
     'Home page and paste this code: $code';
 
 /// A single base62 token of exactly 8 characters.
-final RegExp _codeToken = RegExp(r'[A-Za-z0-9]{8}');
+// Whole words only (\b): never a slice of a longer word like "Commonwealth".
+final RegExp _codeToken = RegExp(r'\b[A-Za-z0-9]{8}\b');
 
 /// True when [token] has the shape of a generated share code rather than a
 /// place name: 8 base62 chars that contain a digit OR an internal capital.
@@ -60,7 +61,10 @@ String? extractShareCode(String input) {
     if (isShareCodeShape(last)) return last;
   }
 
-  for (final match in _codeToken.allMatches(text)) {
+  // LAST code-shaped word wins: in the shared message the code comes after the tour name, and a
+  // tour name can itself look code-shaped ("McDonald" has a capital after its first letter).
+  final matches = _codeToken.allMatches(text).toList().reversed;
+  for (final match in matches) {
     final token = match.group(0)!;
     if (isShareCodeShape(token)) return token;
   }

@@ -112,4 +112,14 @@ void main() {
       expect(msg.contains('paste this code: $code'), isTrue);
     });
   });
+
+  test('LEAD: a code-shaped word in the tour name does not shadow the real code', () {
+    final msg = buildShareMessage('McDonald Farm and Brooklyn loop', 'AzuwQYnf');
+    expect(extractShareCode(msg), 'AzuwQYnf');
+  });
+  test('LEAD: never a slice of a longer word', () {
+    expect(extractShareCode('Commonwealth Avenue Mall'), isNull);
+    expect(extractShareCode('Brooklyn'), isNull);
+    expect(extractShareCode('Montreal, Quebec'), isNull);
+  });
 }
