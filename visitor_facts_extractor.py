@@ -120,6 +120,58 @@ def _normalize_time(time_str: str) -> str:
     return time_str
 
 
+def _page_literal_time(raw: str) -> str:
+    """Tidy a raw time token into a page-faithful display form (no 24h synthesis).
+
+    "8 PM" -> "8 PM", "8 pm" -> "8 PM", "10am" -> "10 AM", "Noon" -> "Noon".
+    This is used when a 24h normalisation would introduce a token (e.g. "20:00")
+    that does NOT appear on the page — in that case we keep what the page says.
+    """
+    s = raw.strip()
+    m = re.match(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b', s, re.IGNORECASE)
+    if m:
+        hh = m.group(1)
+        mm = m.group(2)
+        mer = m.group(3).upper()
+        return f"{hh}:{mm} {mer}" if mm else f"{hh} {mer}"
+    return s
+
+
+def _normalize_time_sourced(raw: str, source_lower: str) -> str:
+    """[LOCAL-584] Normalise a time to 24h ONLY if the result maps to a page token.
+
+    The LOCAL-35 extractor blindly rewrote "8 PM" to "20:00". For the Griffin
+    Museum that produced "08:00–20:00" — a 24h schedule that appears NOWHERE on a
+    page whose times are all AM/PM ("8 AM – 8 PM"). Rule (ticket #2): a normalised
+    time is allowed only if every token it introduces maps back to a time token on
+    the page; otherwise keep the page-literal form.
+
+    We treat a normalised value "HH:MM" as page-supported when the source contains
+    that exact 24h token (either "HH:MM" or the French "HHhMM"/"HHh"), i.e. the page
+    really is a 24h page. If it is not, we fall back to _page_literal_time(raw) so
+    the emitted hours use only tokens the reader can find on the page.
+    """
+    norm = _normalize_time(raw)
+    m = re.match(r'(\d{1,2}):(\d{2})$', norm)
+    if not m:
+        # Not a clean 24h value (e.g. "Noon") — present the page-literal token.
+        return _page_literal_time(raw)
+    hh, mm = m.group(1), m.group(2)
+    h_int = str(int(hh))
+    # Does the SOURCE actually contain this 24h token? Accept "20:00", "20h00",
+    # "20h", or (am/pm pages) the morning hour "8:00"/"08:00" when < 13.
+    candidates = [f"{hh}:{mm}", f"{h_int}:{mm}", f"{h_int}h{mm}", f"{h_int}h", f"{hh}h{mm}"]
+    if any(c in source_lower for c in candidates):
+        return norm
+    # The 24h token is NOT on the page. If the raw token itself is am/pm, keep that
+    # (its tokens — "8 pm" — ARE on the page). Only synthesise 24h for pages that
+    # are themselves 24h.
+    if re.search(r'am|pm', raw, re.IGNORECASE):
+        return _page_literal_time(raw)
+    # Raw had no am/pm and no 24h support in source — safest is the page-literal raw.
+    return _page_literal_time(raw)
+
+
 # ============================================================
 # [LOCAL-584] Currency is what the page says — never a default
 # ============================================================
@@ -278,6 +330,10 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
             facts.closed_days.append(except_m.group(1))
 
     # --- 2. HOURS (with seasonal ranges) ---
+    # [LOCAL-584] Normalisation to 24h is allowed ONLY when the result maps back to
+    # a time token on the page. _normalize_time_sourced keeps page-literal AM/PM
+    # otherwise, so a page that says "8 AM – 8 PM" is never stated as "08:00–20:00".
+    _src_lower = page_text.lower()
     if page_lang == "fr":
         # Pattern: "de 10h à 17h du 1er septembre au 30 juin"
         # Can appear multiple times for different seasons
@@ -289,8 +345,8 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
         )
         seen_times = set()
         for hm in hour_matches:
-            t1 = _normalize_time(hm.group(1))
-            t2 = _normalize_time(hm.group(2))
+            t1 = _normalize_time_sourced(hm.group(1), _src_lower)
+            t2 = _normalize_time_sourced(hm.group(2), _src_lower)
             time_range = f"{t1}–{t2}"
             period_text = (hm.group(3) or "").strip().rstrip('.')
             period = _parse_date_range_fr(period_text) if period_text else ""
@@ -307,8 +363,8 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
                 page_text
             )
             if simple_m:
-                t1 = _normalize_time(simple_m.group(1))
-                t2 = _normalize_time(simple_m.group(2))
+                t1 = _normalize_time_sourced(simple_m.group(1), _src_lower)
+                t2 = _normalize_time_sourced(simple_m.group(2), _src_lower)
                 facts.hours.append({'time': f"{t1}–{t2}", 'period': ''})
 
     else:
@@ -329,8 +385,8 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
         for sm in seasonal_en:
             period_start = sm.group(1)
             period_end = sm.group(2)
-            t1 = _normalize_time(sm.group(3))
-            t2 = _normalize_time(sm.group(4))
+            t1 = _normalize_time_sourced(sm.group(3), _src_lower)
+            t2 = _normalize_time_sourced(sm.group(4), _src_lower)
             time_range = f"{t1}–{t2}"
             # Simplify period
             period = _parse_date_range_en(f"from {period_start} to {period_end}")
@@ -346,8 +402,8 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
                 page_text, re.IGNORECASE
             )
             if simple_en:
-                t1 = _normalize_time(simple_en.group(1))
-                t2 = _normalize_time(simple_en.group(2))
+                t1 = _normalize_time_sourced(simple_en.group(1), _src_lower)
+                t2 = _normalize_time_sourced(simple_en.group(2), _src_lower)
                 facts.hours.append({'time': f"{t1}–{t2}", 'period': ''})
 
     # --- 3. ADMISSION (with conditions) ---
