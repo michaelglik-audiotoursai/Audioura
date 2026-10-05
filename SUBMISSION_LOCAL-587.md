@@ -50,9 +50,124 @@ writer calls 29 · story retries 11 · early stops 3 · keep-best 10 · stops al
   the **LOCAL-572 dead-host cold-set scope** (captured at construction, re-bound in each worker).
   That is why this stays within LOCAL-562/572 scope rules.
 
-### Expected effect
-- D511: 190s → ~55s (saves ~135s).
-- SERP: ~120s → ~35s (saves ~85s).
-- Projected TOTAL: 644.9s − ~220s ≈ **~425s ≈ 7.1 min**… still above 5 min on wall, but the
-  **text phase targeted by the ticket (story_first + external_lookups)** drops from 562s to ~250s.
-  Live runs below confirm the measured numbers.
+---
+
+## 2. The change (no quality gate removed)
+
+Two per-stop loops that were serialized are now fanned out across
+`dead_host_breaker.tour_executor` (TourExecutor). Everything stateful — the
+result-merge, the D518 story merge, the publish gate, keep-best/early-stop, the
+cost accumulation, the per-stop stats and every print — stays on the main thread,
+in stop order. Only the independent network waits move off-thread.
+
+**a) D511 PHASE 5.20 credit_line loop** (`generate_tour_text.py`, ~`18740`)
+- Split into: (1) build the eligible `(stop_index, poi, matrix, desc)` list;
+  (2) fan out `story_production_loop.run_for_stop` for all eligible stops via
+  `with tour_executor(max_workers=min(len,5))`, collecting results by stop index;
+  (3) the **unchanged** merge loop reads each stop's result in order.
+- Safe because `run_for_stop` takes a per-stop matrix (built fresh), keeps only
+  local state, does not mutate its input (test), and appends to a JSONL its own
+  docstring guarantees is concurrency-safe.
+
+**b) LOCAL-410 SERP loop** (`generate_tour_text.py`, ~`12685`)
+- Added `_s587_build_stop_data()` (pure; mirrors the loop's matrix build) and a
+  concurrent prefetch of `search_stories_for_stop` for worthy stops into
+  `_s587_prefetch[idx]` via `tour_executor`. The loop's inline search is replaced
+  by `_s587_prefetch.get(idx)` with a live fallback. All post-search logic
+  (worthiness skip, D489 replenishment, LOCAL-488 lead fan-out, snippet
+  injection, accumulators, prints) is unchanged.
+- The D533 Gemini knowledge fallback (5 calls) and the dependent D489
+  replenishment queries are **left sequential on purpose** — the fallback runs
+  after the whole loop and the replenishment queries depend on each stop's own
+  first-search results, so parallelizing them would change behaviour.
+
+Both executors propagate the **LOCAL-562** per-tour cost scope and the
+**LOCAL-572** dead-host cold set into workers, so the ledger and the dead-host
+breaker stay correct under concurrency (asserted by tests, confirmed leak-free on
+the live runs below).
+
+### Tests — `tests/test_local587_parallel_stops.py` (7), full suite 64 green
+- both phases dispatch through `tour_executor` (≥4 sites); D511 + LOCAL-410
+  markers present; a worker inherits the tour's **cost** accumulator; a cold mark
+  made in a worker lands in **this tour's** dead-host set; merging by stop index
+  preserves order when a slow stop finishes last; `run_for_stop` does not mutate
+  its input matrix and returns independent dicts.
+- `python3 -m pytest tests/test_local587_parallel_stops.py tests/test_local572_*.py
+  tests/test_local562_choke_point.py tests/test_local440_story_first.py
+  tests/test_local569_keep_best_story.py` → **64 passed**.
+
+---
+
+## 3. Live, ISOLATED runs (my own image, never touched any `audioura-*` container)
+
+Image `local587-gen:latest` built from this worktree (`Dockerfile.generator`,
+`GIT_SHA=fe3c0a3`). Env captured read-only from `audioura-tour-generator-1`
+(`docker inspect … > /tmp/local587.env`) — carries the subscribed switches
+`STORY_RETRY_KEEP_BEST`, `STORY_RETRY_EARLY_STOP`, `TOUR_STORY_MODEL=gpt-4.1`.
+Run exactly as LEAD did:
+
+```
+docker run --rm --name local587-gen --network development_default \
+  --env-file /tmp/local587.env \
+  -v $PWD/run_local587_container.py:/app/run_local587_container.py:ro \
+  -v /tmp/local587_tours:/app/tours \
+  local587-gen:latest python3 run_local587_container.py <1|2>
+```
+(`run_*_container.py` is in `.dockerignore`, so it is bind-mounted; `/app/tours`
+is a writable mount. OpenAI hard cap `$3`.)
+
+**RUN 1 (cache-miss) — cost $1.96**
+```
+[TIMING] TOTAL wall=441.7s phases: story_first=194.7s, external_lookups=141.8s, site_first_exhibitions=34.0s, fact_sheets=16.0s, packing=6.8s, poi_selection=6.7s, intent=2.0s, narration=0.0s, verification=0.0s
+RUN 1: delivered stops = 5 / requested 5
+   Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+   Stop 2: Earth, Wind & Fire
+   Stop 3: Tabitha Soren | An Artist Life
+   Stop 4: TLC
+   Stop 5: Lua Kobayashi |The Persistence of Memories
+```
+
+**RUN 2 (cache-hit) — cost $1.83**
+```
+[TIMING] TOTAL wall=417.7s phases: story_first=184.5s, external_lookups=153.1s, site_first_exhibitions=35.7s, packing=10.6s, fact_sheets=9.2s, poi_selection=6.3s, intent=2.6s, narration=0.0s, verification=0.0s
+RUN 2: delivered stops = 5 / requested 5
+   Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+   Stop 2: Earth, Wind & Fire
+   Stop 3: Tabitha Soren | An Artist Life
+   Stop 4: TLC
+   Stop 5: Lua Kobayashi |The Persistence of Memories
+```
+
+### Before / after
+
+| Metric | Baseline (LEAD) | Run 1 (miss) | Run 2 (hit) |
+|--------|----------------:|-------------:|------------:|
+| **story_first** | 403.1s | **194.7s** (−52%) | **184.5s** (−54%) |
+| **external_lookups** | 158.9s | **141.8s** (−11%) | 153.1s (−4%) |
+| **text phase** (story_first + external_lookups) | **562.0s** | **336.5s** | **337.6s** |
+| TOTAL wall | 644.9s | **441.7s** (−31%) | **417.7s** (−35%) |
+| stops delivered / order | 5/5, correct | 5/5, same | 5/5, same |
+| D511 PHASE 5.20 gated stories | 0/5 | 1/5 | 0/5 |
+| keep-best / early-stop / retries | 10 / 3 / 11 | 10 / 3 / 13 | 9 / 2 / 10 |
+| cost | — | $1.96 | $1.83 |
+
+### Same gates, same story counts
+- D511 PHASE 5.20 still runs on all 5 stops, 4 credit_lines each, same ~$0.048/stop,
+  same gate verdicts — now overlapping (per-stop blocks 24/25/28s run concurrently
+  instead of summing to 190s). Gated-story count ≥ baseline (0/5 baseline → 1/5 and 0/5).
+- The writer loop still delivers all 5 stops with full word counts
+  (364/357/367/381/158 words, run 1), and keep-best / early-stop / story-retry all
+  fire at baseline rates.
+- No `attributed to no tour` / cross-tour / undercount lines in either run — the
+  LOCAL-562 cost scope and LOCAL-572 dead-host scope stayed correct in the
+  parallel workers on live traffic. The prefetch never fell back (0 skips).
+
+### Honest note on the 5-minute target
+`story_first` — the ticket's headline sink — is cut by more than half (403s → ~185–195s)
+and the **text phase** the ticket defines (story_first + external_lookups) drops from
+**562s to ~337s (−40%)**. Total wall lands at ~7 min; the remainder is the still-serial
+D533 Gemini knowledge fallback inside external_lookups and the one-shot
+site_first_exhibitions / fact_sheets / packing phases, which this ticket scoped out
+(parallelizing the fallback changes which stops get labelled aloud — a gate decision,
+not a speed one). The 190s→~55s D511 collapse and the writer loop (already parallel)
+are the structural wins; both are landed and measured.
