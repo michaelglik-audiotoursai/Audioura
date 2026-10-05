@@ -246,5 +246,65 @@ class TestEngineOverviewEnvelope(unittest.TestCase):
         self.assertIn('Overview', self.text)
 
 
+class TestLiveRunHardening(unittest.TestCase):
+    """Regression for two defects the first live run (Fitchburg Art Museum) exposed."""
+
+    def test_newsletter_cruft_is_not_lifted_as_place_description(self):
+        # The home page's only venue-naming line was a newsletter opt-in. It must
+        # NOT become the "what the place is" sentence.
+        cruft_home = (
+            '<html><body><h1>Fitchburg Art Museum</h1>'
+            '<form><label>Yes, I would like to receive emails from Fitchburg Art '
+            'Museum.</label></form></body></html>')
+
+        def _fetch(url):
+            u = url.rstrip('/')
+            if u.endswith('current-exhibitions') or u.endswith('/exhibitions'):
+                return '<html><body><p>nothing structural here</p></body></html>', []
+            if u.endswith('fitchburgartmuseum.org'):
+                return cruft_home, []
+            return '', []
+
+        ov = mo.build_museum_overview(
+            venue_name='Fitchburg Art Museum', base_site_url='http://www.fitchburgartmuseum.org',
+            locality='Fitchburg, MA', as_of=_AS_OF, fetcher=_fetch,
+            visitor_info_provider=lambda u, l: None)
+        self.assertIsNotNone(ov)
+        self.assertNotIn('receive emails', ov.narration.lower())
+        self.assertNotIn('i would like', ov.narration.lower())
+
+    def test_synthetic_metropole_admission_is_dropped_when_not_in_source(self):
+        # The LOCAL-35 extractor can emit "Free for Métropole residents" (a
+        # Nice/France artifact). On a page that does NOT contain that phrase, the
+        # overview must drop it rather than state a false admission.
+        class VI:
+            formatted_info = 'Closed on Monday. Free for Métropole residents'
+            source_text = ('The Fitchburg Art Museum is open Tuesday through Sunday. '
+                           'The museum is closed on Monday. Welcome.')
+            source_url = 'http://www.fitchburgartmuseum.org/visit'
+            facts = None
+
+        def _fetch(url):
+            u = url.rstrip('/')
+            if u.endswith('fitchburgartmuseum.org'):
+                return ('<html><body><h1>Fitchburg Art Museum</h1>'
+                        '<p>The Fitchburg Art Museum is dedicated to presenting art '
+                        'to the community.</p></body></html>', [])
+            if 'visit' in u:
+                return '<html><body><p>Closed on Monday.</p></body></html>', []
+            return '', []
+
+        ov = mo.build_museum_overview(
+            venue_name='Fitchburg Art Museum', base_site_url='http://www.fitchburgartmuseum.org',
+            locality='Fitchburg, MA', as_of=_AS_OF, fetcher=_fetch,
+            visitor_info_provider=lambda u, l: VI())
+        self.assertIsNotNone(ov)
+        # The closed-day fact is real (Monday is in the source) and may be stated.
+        # The Métropole admission is NOT in the source and must be dropped.
+        self.assertNotIn('métropole', ov.narration.lower())
+        self.assertNotIn('metropole', ov.narration.lower())
+        self.assertFalse(ov.has_admission)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

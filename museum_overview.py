@@ -155,19 +155,48 @@ def _describe_place(venue_name: str, corpus_text: str) -> str:
         # First sentence that mentions the venue (or a leading noun phrase about it).
         _vn_core = re.sub(r',.*$', '', venue_name).strip()
         _vn_first = _vn_core.split()[0] if _vn_core else ''
+        # A real self-description is a descriptive sentence about the venue — not a
+        # form label, nav item, or call to action. Require: ends in sentence
+        # punctuation, names the venue, is a sensible length, carries a descriptive
+        # verb, and is free of UI/marketing cruft.
+        _CRUFT_RE = re.compile(
+            r'(?i)(\bcookie|\bmenu\b|\bdonate\b|subscrib|newsletter|sign\s*up|'
+            r'log\s*in|receive\s+(?:\w+\s+){0,2}emails?|marketing\s+emails?|'
+            r'submitting\s+this\s+form|consent|i\s+would\s+like|email\s+address|'
+            r'\binbox\b|delivered\s+to\s+your|\bnews\b|follow\s+us|copyright|'
+            r'all\s+rights\s+reserved|privacy|\bterms\b|click\s+here|'
+            r'buy\s+tickets?|shop\s+now|opt[\s-]?in|'
+            r'\bpark(?:ing)?\b|\blot\b|do\s+not|please\s+|\bhours?\b|'
+            r'\badmission\b|\bticket|directions?|accessib)')
+        # POSITIVE identity grammar: a self-description is "<Venue> is a/was/houses/
+        # presents/…", i.e. the venue name followed (within a few words) by a
+        # copula or an institutional action verb. This is far more robust than
+        # blacklisting marketing fragments on a JS-heavy homepage: a sentence that
+        # is not grammatically ABOUT the institution is simply not accepted, and
+        # the overview omits the place sentence rather than lift noise.
+        _vn_pat = re.escape(_vn_first) if _vn_first else ''
+        _IDENTITY_RE = re.compile(
+            r'(?i)' + _vn_pat + r'\b[\w\s,\'’-]{0,60}?\b('
+            r'is\s+(?:a|an|the|one|home|dedicated|devoted|located|among|'
+            r'housed|new\s+england)|was\s+(?:founded|established|built|created|'
+            r'the\s+first)|houses?|holds?|presents?|exhibits?|showcases?|'
+            r'preserves?|celebrates?|is\s+devoted|offers?\s+)\b'
+        ) if _vn_pat else None
         # Split on sentence boundaries AND newlines, so a heading with no final
         # period (e.g. an <h1>) does not glue itself onto the first real sentence.
         for sent in re.split(r'(?<=[.!?])\s+|\n+', corpus_text):
             s = sent.strip()
-            # A real self-description is a full sentence that ends in punctuation;
-            # a bare heading ("Griffin Museum of Photography") is skipped.
             if not s.endswith(('.', '!', '?')):
                 continue
-            if 40 <= len(s) <= 240 and _vn_first and _vn_first.lower() in s.lower():
-                # Avoid nav/booking cruft.
-                if not re.search(r'(?i)\b(cookie|menu|donate|subscribe|newsletter|'
-                                 r'copyright|all rights reserved)\b', s):
-                    return s.rstrip('.') + '.'
+            if not (40 <= len(s) <= 240):
+                continue
+            if not (_vn_first and _vn_first.lower() in s.lower()):
+                continue
+            if _CRUFT_RE.search(s):
+                continue
+            if _IDENTITY_RE is None or not _IDENTITY_RE.search(s):
+                continue
+            return s.rstrip('.') + '.'
     return ''
 
 
@@ -196,6 +225,42 @@ def _collect_exhibitions(pages: List[Tuple[str, str]]) -> List[str]:
         except Exception:
             continue
     return names
+
+
+def _claim_tokens_in_source(claim_value: str, source_lower: str) -> bool:
+    """Require a practical claim's DISTINCTIVE content to appear literally in source.
+
+    The LOCAL-35 extractor sometimes emits a normalised/synthetic label whose own
+    words are not in the page it was extracted from (e.g. it rewrites a Nice price
+    table into "free for Métropole residents"). That phrase passed the gate's
+    fuzzy admission check on a Massachusetts museum in the first live run. This is
+    a tighter gate for the OVERVIEW: every distinctive token the claim carries —
+    a day name, a numeric amount, or a condition word like "métropole"/"resident"
+    — must appear verbatim (digits/word-stem) in the source. "free"/"admission"
+    alone are generic and not required to be literal, but any CONDITION on them is.
+    """
+    cl = claim_value.lower()
+    cv = source_lower
+
+    # Day names present in the claim must be present in the source.
+    for day in ('monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+                'saturday', 'sunday'):
+        if day in cl and day not in cv:
+            return False
+
+    # Any numeric amount in the claim (hours like 10:00, price like 10) must be
+    # present as a number in the source.
+    for num in re.findall(r'\d+', cl):
+        if num not in cv:
+            return False
+
+    # Condition words the extractor may synthesise — require them literally.
+    for cond in ('métropole', 'metropole', 'resident', 'residents', 'member',
+                 'students', 'senior', 'child', 'children'):
+        if cond in cl and cond not in cv:
+            return False
+
+    return True
 
 
 def _verified_facts_line(visitor_info, as_of: str, domain: str) -> Tuple[str, bool, bool, str]:
@@ -227,10 +292,20 @@ def _verified_facts_line(visitor_info, as_of: str, domain: str) -> Tuple[str, bo
 
     verified_hours: List[str] = []
     verified_admission: List[str] = []
+    _source_lower = source_text.lower()
     for claim in _parse_info_text_into_claims(formatted):
         if not verify_claim_against_source(claim, source_text):
             continue
         val = claim.value.strip().rstrip('.')
+        if not _claim_tokens_in_source(val, _source_lower):
+            # The LOCAL-35 extractor can emit a SYNTHETIC label whose own words are
+            # not in the source — most notably "free for Métropole residents", a
+            # Nice/France-specific phrase that leaked onto a Massachusetts museum in
+            # the first live run. We require the claim's distinctive content token
+            # (a price, a day name, or an admission keyword) to appear LITERALLY in
+            # the source before we will state it. Belt-and-braces over the gate's
+            # fuzzier match — the overview must never state a fact the page does not.
+            continue
         if claim.claim_type in ('hours', 'closed_day'):
             verified_hours.append(val)
         elif claim.claim_type in ('admission', 'price_band'):
