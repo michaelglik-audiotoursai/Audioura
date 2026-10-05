@@ -168,3 +168,147 @@ run_local584_griffin_facts.py              live/offline practical-facts proof (n
 
 Process: did not touch DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
 `.continuous_dev/STATUS.md`. Committed after each step.
+
+---
+
+## r2 — Hours belong to the venue, not a satellite gallery
+
+**Base:** `LOCAL-584-practical-facts-currency` HEAD **37f6000** (`git merge-base
+--is-ancestor 37f6000 HEAD` exits 0; `git rev-list --count 37f6000..HEAD` ≥ 1).
+
+### Why r1 bounced (LEAD, 2026-10-05 13:3x)
+The currency fix and the one-gate routing were right. But the hours r1 stated for the
+Griffin Museum — **`8 AM–8 PM`** — are the **Lafayette City Center *satellite* gallery's**
+hours. The museum opens **Tuesday–Sunday, Noon–4 PM** and is **closed Mondays**. A listener
+told "8 AM–8 PM" arrives four hours before the museum opens. Faithful to a line, wrong for
+the venue. The committed fixture `tests/fixtures/griffin_about_2026.html` lists, in order:
+
+```
+<h2>Hours</h2>        Tuesday through Sunday: Noon to 4 PM   Closed: Every Monday, Easter …
+<em>Satellite Galleries</em>   Lafayette City Center Gallery  8 AM – 8 PM daily.
+                               Jenks Center Gallery  Monday through Friday 9 AM — 4 PM
+<h2>Admission</h2>    General Admission: $12 for adults  $8 for seniors …
+footer: 67 Shore Road, Winchester, Ma 01890 … Hours: Tues-Sun Noon-4pm
+```
+
+The r1 extractor bound to the **first** time range it saw in the flattened page — the
+satellite's "8 AM–8 PM" — and never captured the "Closed: Every Monday".
+
+### Fix — bind to the venue's own section (`visitor_facts_extractor.py`)
+
+Structural, not a keyword list of words like "satellite":
+
+- **`_html_to_sectioned_text(html)`** flattens a page but inserts a section sentinel
+  (`\x1e`) ahead of every heading-like element (`h1..h6`, and the emphasised sub-labels
+  `strong`/`em`/`b`/`th`/`dt`/`summary`/`figcaption` that WordPress-style pages use as
+  sub-headings). This preserves the document's heading/section structure, which a fully
+  flattened string destroys. `_fetch_visitor_pages` now flattens this way.
+- **`_scope_text_to_venue(text, venue_name, venue_address)`** walks the sections in order
+  and keeps only those that belong to the venue. A section is a **foreign-place block**
+  when its heading names a place that is *not* the venue — detected structurally by
+  `_heading_names_other_place`: the heading is a proper place label (contains/ends in a
+  **place word** — Gallery/Galleries, Center/Centre, Building, Museum, Annex, Pavilion,
+  Wing, Hall, Site, Location, Branch, House) **and** it neither matches a venue-level
+  section heading (Hours/Admission/Tickets/Location/…), nor shares a ≥4-char token with
+  the venue name, nor carries the venue's street-number. "Satellite Galleries" matches via
+  "Galleries"; "Lafayette City Center Gallery" via "Gallery" — the word *satellite* is
+  never special-cased. Everything under a foreign heading is dropped until the next
+  venue-level or venue-named heading re-opens the venue's content.
+- On a page with **no sentinels** (a plain, single-venue string) scoping is a **no-op** —
+  so French municipal pages (Matisse/Palais, which the tests pass as plain text) are
+  unchanged.
+- Closed-days from the **same block**: the EN closed-day regex now also reads
+  `Closed: Every Monday` (colon + "Every", IGNORECASE). EN hours accept the page-literal
+  words **Noon/Midnight** (`_page_literal_time` renders them; the simple EN hours regex
+  matches them), so "Noon to 4 PM" is read as `Noon–4 PM`.
+- `venue_name`/`venue_address` are threaded through `extract_visitor_facts_from_text`,
+  `_extract_best_facts`, `fetch_visitor_info_structured`, and
+  `fetch_visitor_info_with_provenance` (which strips sentinels from the provenance
+  `source_text` so the gate's literal checks see clean prose). `generate_tour_text` passes
+  `_museum_venue_name` on both the official-site and corpus-fallback calls.
+
+### Fix — the one gate keeps the venue's Noon hours (`practical_facts_gate.py`)
+Binding to the venue exposed a second bug: the shared gate **dropped `Noon–4 PM`** because
+its hours classifier and `_verify_hours` only understood digit times — so the venue's real
+hours would have been silently lost. `_facts_segment_claim` and `_verify_hours` now treat
+the page-literal words **Noon/Midnight** as time tokens, verified against the source like
+any other. `Closed on Monday. Noon–4 PM. $12` now survives the gate **whole**.
+
+Result on the committed Griffin fixture (was `8 AM–8 PM. $12`):
+
+```
+Closed on Monday. Noon–4 PM. $12
+```
+
+never `8 AM`, never `9 AM`, never `08:00`/`20:00`, never `€`; every token on the page.
+
+### Tests — `test_local584_venue_bound_hours.py` (10 tests)
+- Griffin fixture (sectioned) → hours `Noon–4 PM` (asserts **no** `8 AM`, **no** `9 AM`,
+  no `08:00`/`20:00`), closed `Monday`, admission `$12` (no `€`), every token on the page.
+- The one gate keeps `Closed on Monday. Noon–4 PM. $12` whole (nothing dropped).
+- Scoping is a **no-op** on a plain single-section page (keeps its only hours).
+
+**RED on 37f6000, GREEN after.** Loading the base `visitor_facts_extractor` and running
+the same fixture proves the defect: base yields `8 AM–8 PM. $12` with **no closed day**;
+after r2 the extractor yields `Closed on Monday. Noon–4 PM. $12`. (On base the new test
+module also fails to import, since `_html_to_sectioned_text` does not yet exist.) The r1
+suite is unchanged — its Griffin assertions ("no €", "no 08:00/20:00", tokens-on-page) hold
+for the venue-bound result too.
+
+### Required suites kept green
+```
+test_local584_practical_facts_currency.py ........ 14 passed   (r1, unchanged)
+test_local584_venue_bound_hours.py ................ 10 passed   (r2)
+test_local582_museum_overview.py .................. 20 passed
+tests/test_local35_visitor_facts.py ............... 23 passed
+tests/test_local36_practical_facts_qa.py .......... 26 passed
+tests/test_local91_corpus_provenance.py ............ 8 passed
+test_palais_fix_lead_fixture.py ................... 23/23 assertions hold, exit 0
+test_local38_theme_threads.py ..................... 12 passed
+test_local38_integration.py ....................... 4 passed
+test_local394_never_drop_a_stop.py ................. 6 passed
+```
+(100 passed in the combined pytest run; palais script exits 0.) French (Matisse €12 /
+Palais €5, Palais 24h hours) is unchanged — scoping no-ops without sentinels.
+
+### Live run in the container (D608, OpenAI hard cap $1.00)
+Rebuilt the generator image from this worktree's **HEAD** (`b74183d`) with
+`Dockerfile.generator` and `--build-arg GIT_SHA=<HEAD>`; verified the fix is baked in
+(`/app/.git_sha` = b74183d; `_html_to_sectioned_text`, `_scope_text_to_venue`, and the
+gate's Noon/Midnight handling all present). Ran one-shot containers on the
+`development_default` network (DB `postgres-2`, `COST_HARD_LIMIT_USD=1.00`). **Never DELETE.**
+
+**Practical-facts path against the committed defect source** (`run_local584_griffin_facts.py`,
+in the container, no LLM) — the LOCAL-35 extractor (now venue-bound) + the LOCAL-91
+corpus-fallback gate:
+```
+[fixture] venue-bound extractor format_en(): 'Closed on Monday. Noon–4 PM. $12'
+[fixture] Museum Information:                 'Closed on Monday. Noon–4 PM. $12'
+[fixture] ✓ venue-bound (no 8 AM / 9 AM satellite) ; ✓ no € ; ✓ no 08:00/20:00 ; ✓ every token on the page
+[fixture] gate dropped: []
+```
+
+**Griffin museum generation** (`run_local584_live.py`, `gpt-4o`, one shot) — ran once at
+**$0.4536** (< $1.00 cap), 0 network failures:
+```
+Total API cost: $0.4536 (41853 tokens)
+RESULT after 327.8s
+audio_tours BEFORE/AFTER: 203 / 203   (never DELETE)
+MUSEUM INFORMATION LINE (poi 1): (no Museum Information line emitted)
+```
+As in r1, the live official-site path today lands on `griffinmuseum.org/plan-your-visit`
+and `/visit`, which publish hours but **no price**, so the extractor omits (too short) —
+silence over a half-fact. The committed fixture is the ground truth for the 2026-10-05
+defect, and the container facts-path run (same baked HEAD) produces the exact venue-bound
+Museum Information line above.
+
+### Files changed (r2)
+```
+visitor_facts_extractor.py                 section the page by headings; read only the venue's block
+practical_facts_gate.py                    gate keeps page-literal Noon/Midnight hours
+generate_tour_text.py                      pass venue name on both visitor-info calls
+test_local584_venue_bound_hours.py         venue-bound hours tests (red on 37f6000, green after)
+run_local584_griffin_facts.py              harness updated: sectioned + venue-bound, asserts no satellite leak
+```
+Process: did not touch DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+`.continuous_dev/STATUS.md`. Committed + pushed after each step.
