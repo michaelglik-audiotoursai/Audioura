@@ -22,6 +22,7 @@ import '../services/tour_translation_helper.dart';
 import '../services/error_handler_service.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
+import '../utils/share_code.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
@@ -1453,12 +1454,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// to the ordinary location search, so a misread costs one round trip and never a
   /// dead end.
   bool _looksLikeShareCode(String q) {
-    final t = q.trim();
-    if (t.length != 8) return false;
-    if (!RegExp(r'^[A-Za-z0-9]{8}$').hasMatch(t)) return false;
-    // Require a digit or internal capital -- that is what separates "JmSTVsMv" from
-    // "Brooklyn". A plain lower-case or Capitalised word is treated as a place.
-    return RegExp(r'[0-9]').hasMatch(t) || RegExp(r'^.+[A-Z]').hasMatch(t);
+    // [LOCAL-579] Accept not just a bare code but the full share message a
+    // curator sends ("…paste this code: FFush25U") or a share link. The
+    // extractor pulls the 8-char token out and applies the SAME digit/internal-
+    // capital discriminator ST-3 used, so a place name like "Boston" or
+    // "Newton MA" still falls through to the ordinary location search.
+    return extractShareCode(q) != null;
   }
 
   /// [ST-3] Resolve a share code into the same tour shape /tours-near returns.
@@ -1492,10 +1493,15 @@ class _HomeScreenState extends State<HomeScreen> {
       // [ST-3] One search box: try the share code first when the input has that
       // shape. The tours come back identical to a /tours-near entry, so everything
       // downstream -- pick, download, translate -- works with no further change.
+      // [LOCAL-579] The input may be a bare code, the full share message, or a
+      // link — gate on _looksLikeShareCode, then extract the 8-char token.
       if (_looksLikeShareCode(query)) {
-        final shared = await _resolveShareCode(query);
-        if (shared.isNotEmpty) return shared;
-        // Not a code after all; fall through and search by location.
+        final shareToken = extractShareCode(query);
+        if (shareToken != null) {
+          final shared = await _resolveShareCode(shareToken);
+          if (shared.isNotEmpty) return shared;
+          // Not a code after all; fall through and search by location.
+        }
       }
 
       // Convert wildcard pattern to regex

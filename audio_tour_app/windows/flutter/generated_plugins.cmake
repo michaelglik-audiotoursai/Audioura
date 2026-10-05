@@ -9,6 +9,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_volume_controller
   geolocator_windows
   permission_handler_windows
+  share_plus
   speech_to_text_windows
   url_launcher_windows
 )
