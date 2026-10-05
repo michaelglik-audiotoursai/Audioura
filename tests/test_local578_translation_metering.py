@@ -45,7 +45,12 @@ def _install_stub_modules():
     """
     if 'boto3' not in sys.modules:
         sys.modules['boto3'] = MagicMock()
-    if 'bs4' not in sys.modules:
+    # Stub bs4 ONLY when it is genuinely not installed. Stubbing it when it is importable leaked a
+    # MagicMock BeautifulSoup into every later test in the run (LEAD 2026-10-05: LOCAL-580's
+    # site-first tests then parsed nothing and failed when run after this file).
+    try:
+        import bs4  # noqa: F401
+    except ImportError:
         bs4_stub = MagicMock()
         bs4_stub.BeautifulSoup = MagicMock()
         bs4_stub.NavigableString = MagicMock()
