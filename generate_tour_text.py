@@ -7600,7 +7600,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             import traceback
             traceback.print_exc()
         finally:
-            _phase_timer.stop('site_first_exhibitions')
+            _phase_timer.end('site_first_exhibitions')
     elif _exhibition_scope is not None:
         # ──── [LOCAL-364] EXHIBITION CHECKLIST RETRIEVAL ──────────────────────
         _phase_timer.start('exhibition_checklist')

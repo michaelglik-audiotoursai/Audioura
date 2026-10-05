@@ -54,16 +54,44 @@ _INTERACTIVE_ROLES = frozenset({'button', 'navigation', 'toolbar', 'menu',
                                 'banner', 'dialog'})
 
 # Class/id fragments that mark a viewer / flipbook / slider / carousel wrapper.
-# Matched as substrings against an element's class and id. This is about the
-# WIDGET KIND (an embedded control surface), not about any show's name.
-_WIDGET_HINT_RE = re.compile(
-    r'(?:flipbook|df-book|df-ui|dflip|3d-?flip|pageflip|turn-?js|'
-    r'viewer|lightbox|carousel|slider|swiper|slick|owl-|'
-    r'toolbar|controls?|nav(?:bar|igation)?|menu|footer|header|'
-    r'cookie|consent|share|social|breadcrumb|pagination|pager|'
-    r'widget|modal|popup|overlay|offcanvas|skip-link)',
+# Matched per class/id TOKEN (tokens split on -, _, whitespace) so a decorative
+# page class like "header-image" is not mistaken for a navigation header. This
+# is about the WIDGET KIND (an embedded control surface), not any show's name.
+#
+# Two tiers:
+#   * exact widget TOKENS — a standalone class token that names a control
+#     surface (toolbar, controls, carousel, slider, lightbox, viewer, flipbook,
+#     dropdown, modal, popup, overlay, offcanvas, pagination, pager, breadcrumb).
+#     Bare 'nav'/'menu'/'header'/'footer' are deliberately NOT here — those are
+#     handled by the <nav>/<footer> structural tags and ARIA roles, so that a
+#     decorative "header-image" column does not suppress real content.
+#   * compound widget prefixes — vendor viewer/flipbook class families
+#     (flipbook, dflip, df-ui, df-book, pageflip, turnjs, swiper, slick, owl).
+_WIDGET_TOKENS = frozenset({
+    'toolbar', 'control', 'controls', 'carousel', 'slider', 'lightbox',
+    'viewer', 'flipbook', 'dropdown', 'modal', 'popup', 'overlay',
+    'offcanvas', 'pagination', 'pager', 'breadcrumb', 'breadcrumbs',
+    'navbar', 'navigation', 'megamenu', 'submenu',
+})
+_WIDGET_COMPOUND_RE = re.compile(
+    r'(?:flipbook|dflip|df-?ui|df-?book|pageflip|turn-?js|swiper|slick|owl-)',
     re.IGNORECASE,
 )
+_TOKEN_SPLIT_RE = re.compile(r'[\s\-_]+')
+
+
+def _tokens_hit_widget(attrs: dict) -> bool:
+    """True when an element's class/id names a control-surface widget."""
+    raw_cls = attrs.get('class', [])
+    if not isinstance(raw_cls, list):
+        raw_cls = [str(raw_cls)]
+    blob = ' '.join(raw_cls) + ' ' + str(attrs.get('id', ''))
+    if _WIDGET_COMPOUND_RE.search(blob):
+        return True
+    for tok in _TOKEN_SPLIT_RE.split(blob.lower()):
+        if tok in _WIDGET_TOKENS:
+            return True
+    return False
 
 # A detail-page path looks like a per-item page on the venue's own site.
 # Generic across venues: /show/, /exhibition(s)/, /exhibit/, /on-view/,
@@ -123,43 +151,82 @@ def _extract_with_bs4(html: str, base_url: str) -> Optional[List[Dict]]:
         cur = node
         while cur is not None and getattr(cur, 'name', None):
             name = (cur.name or '').lower()
+            # Page-root elements are never "widgets" — their classes describe the
+            # whole page (e.g. body class "header-image full-width-content") and
+            # must not be read as a control surface.
+            if name in ('html', 'body'):
+                cur = cur.parent
+                continue
             if name in _INTERACTIVE_TAGS:
                 return True
             attrs = cur.attrs or {}
             role = str(attrs.get('role', '')).lower()
             if role in _INTERACTIVE_ROLES:
                 return True
-            if attrs.get('aria-label') and name not in _HEADING_TAGS:
-                # An aria-label on a non-heading ancestor is a control surface.
-                return True
-            cls = ' '.join(attrs.get('class', []) if isinstance(attrs.get('class'), list)
-                           else [str(attrs.get('class', ''))])
-            ident = str(attrs.get('id', ''))
-            if _WIDGET_HINT_RE.search(cls) or _WIDGET_HINT_RE.search(ident):
+            if _tokens_hit_widget(attrs):
                 return True
             cur = cur.parent
         return False
+
+    def _detail_href(anchor) -> str:
+        """Return a resolved on-domain detail URL for an anchor, or ''."""
+        if anchor is None:
+            return ''
+        href = (anchor.get('href') or '').strip()
+        if not href or href.startswith('#') or href.lower().startswith('javascript:'):
+            return ''
+        if _in_interactive_context(anchor):
+            return ''
+        if not _same_domain(href, base_url):
+            return ''
+        resolved = urljoin(base_url, href)
+        if not _DETAIL_PATH_RE.search(urlparse(resolved).path):
+            return ''
+        return resolved
+
+    def _find_detail_url_for(heading) -> str:
+        """A heading titles an exhibition when it is LINKED to a detail page.
+
+        The link may be, in order of preference:
+          1. the heading itself (<h2><a> or <a><h2>),
+          2. a link INSIDE the heading,
+          3. an ANCESTOR link wrapping the heading (card-level <a> — the shape
+             Griffin uses: <a class="new-show-item" href="/show/..."><h2>..</h2>),
+          4. a link elsewhere in the nearest enclosing card/article.
+        """
+        # 1 & 2: heading is / contains an anchor.
+        if getattr(heading, 'name', '') == 'a':
+            u = _detail_href(heading)
+            if u:
+                return u
+        inner = heading.find('a', href=True)
+        u = _detail_href(inner)
+        if u:
+            return u
+        # 3: an ancestor anchor (card link wrapping the heading). This is the
+        # shape Griffin uses: <a class="new-show-item" href="/show/..."><h2>..</h2>.
+        # We deliberately do NOT fall back to "any link inside the nearest card":
+        # a layout heading that merely sits in the same container as a show card
+        # (e.g. "Satellite Galleries") is not itself a show. The heading must be
+        # INSIDE the show's own link.
+        cur = heading.parent
+        hops = 0
+        while cur is not None and getattr(cur, 'name', None) and hops < 6:
+            if cur.name == 'a':
+                u = _detail_href(cur)
+                if u:
+                    return u
+            cur = cur.parent
+            hops += 1
+        return ''
 
     out: List[Dict] = []
     seen = set()
     for heading in soup.find_all(_HEADING_TAGS):
         if _in_interactive_context(heading):
             continue
-        # The heading must itself be a link, or directly contain one, to a
-        # per-item detail page on the venue's domain.
-        anchor = heading if getattr(heading, 'name', '') == 'a' else heading.find('a', href=True)
-        if anchor is None or not anchor.get('href'):
-            continue
-        # The anchor must not itself be a control.
-        if _in_interactive_context(anchor):
-            continue
-        href = anchor.get('href', '').strip()
-        if not href or href.startswith('#') or href.lower().startswith('javascript:'):
-            continue
-        if not _same_domain(href, base_url):
-            continue
-        resolved = urljoin(base_url, href)
-        if not _DETAIL_PATH_RE.search(urlparse(resolved).path):
+        resolved = _find_detail_url_for(heading)
+        if not resolved:
             continue
         title = _collapse_ws(unescape(heading.get_text(' ', strip=True)))
         if not title or len(title) < 2:
