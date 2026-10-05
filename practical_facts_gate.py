@@ -320,7 +320,11 @@ def _verify_hours(claim_lower: str, source_lower: str) -> bool:
     # [LOCAL-353] Also extract 24h colon format times (e.g., "12:00", "19:00")
     _times_24h = re.findall(r'\d{1,2}:\d{2}', claim_lower)
 
-    if not _times and not _times_24h:
+    # [LOCAL-584 r2] "Noon"/"Midnight" are page-literal time words (e.g. the Griffin
+    # Museum's "Noon to 4 PM"). Treat them as time tokens that must appear in source.
+    _time_words = [w for w in ('noon', 'midnight') if w in claim_lower]
+
+    if not _times and not _times_24h and not _time_words:
         # Try "open daily" type claims
         if 'daily' in claim_lower or 'tous les jours' in claim_lower:
             return ('daily' in source_lower or 'tous les jours' in source_lower
@@ -329,6 +333,11 @@ def _verify_hours(claim_lower: str, source_lower: str) -> bool:
 
     # At least one time value from the claim must appear in the source
     verified_count = 0
+
+    # Noon/Midnight words: must appear verbatim in the source.
+    for _w in _time_words:
+        if _w in source_lower:
+            verified_count += 1
 
     # Check am/pm/h format times
     for time_str in _times:
@@ -577,9 +586,11 @@ def _facts_segment_claim(segment: str) -> Optional[PracticalClaim]:
     parsed = _parse_info_text_into_claims(seg)
     if parsed:
         return parsed[0]
-    # Fallback: a bare clock range with AM/PM or 24h, e.g. "8 AM–8 PM", "10:00–18:00".
-    if re.search(r'\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?',
-                 seg, re.IGNORECASE):
+    # Fallback: a bare clock range with AM/PM, 24h, or the words Noon/Midnight,
+    # e.g. "8 AM–8 PM", "10:00–18:00", "Noon–4 PM". The sentence parser skips these
+    # because of the space before AM/PM or the word "Noon"; we must still verify them.
+    _t = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight)'
+    if re.search(_t + r'\s*[-–—]\s*' + _t, seg, re.IGNORECASE):
         return PracticalClaim(claim_type='hours', value=seg)
     return None
 

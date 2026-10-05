@@ -129,6 +129,25 @@ class TestVenueBoundHours(unittest.TestCase):
                         f"formatted facts carry a token not on the page: {self.formatted!r}")
 
 
+class TestGateKeepsVenueNoonHours(unittest.TestCase):
+    """The ONE gate must keep the venue's 'Noon–4 PM' — it is on the page."""
+
+    def setUp(self):
+        if not _GATE:
+            self.skipTest("practical_facts_gate not importable")
+        from practical_facts_gate import gate_formatted_facts
+        self._gate = gate_formatted_facts
+
+    def test_noon_hours_survive_gate(self):
+        surviving, dropped = self._gate(
+            'Closed on Monday. Noon–4 PM. $12', _PLAIN, source_url='griffinmuseum.org')
+        self.assertIn('Noon–4 PM', surviving,
+                      f"the venue's Noon–4 PM must survive the gate: {surviving!r} dropped={dropped}")
+        self.assertIn('Monday', surviving)
+        self.assertIn('$12', surviving)
+        self.assertEqual(dropped, [], f"nothing on the page should be dropped: {dropped}")
+
+
 class TestScopingIsNoOpWithoutSentinels(unittest.TestCase):
     """A page with no heading sentinels is unchanged — French plain-text pages safe."""
 
