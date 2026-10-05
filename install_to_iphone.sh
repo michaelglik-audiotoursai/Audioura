@@ -13,7 +13,9 @@
 # If the phone asks "Trust This Computer?", tap Trust and re-run.
 
 set -u
-APP_DIR="$HOME/Audioura/audio_tour_app"
+# APP_DIR can point at another checkout, e.g. the Subscribed app the Mac Mini stack runs (D604):
+#   APP_DIR=~/audioura-subscribed-local/audio_tour_app ./install_to_iphone.sh
+APP_DIR="${APP_DIR:-$HOME/Audioura/audio_tour_app}"
 cd "$APP_DIR" || { echo "✗ no $APP_DIR"; exit 1; }
 
 echo "── 1/4  Is the phone visible? ─────────────────────────────────────────────"
