@@ -3306,7 +3306,7 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
     return "\n".join(lines).rstrip() + "\n"
 
 
-
+def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
 
