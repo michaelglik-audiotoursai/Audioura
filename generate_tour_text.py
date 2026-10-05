@@ -10496,8 +10496,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             if _official_url_for_info:
                 try:
                     from visitor_facts_extractor import fetch_visitor_info_with_provenance
+                    # [LOCAL-584 r2] Pass the venue name so hours/closed-days bind to
+                    # the venue's own section, not a satellite gallery's block.
                     _provenance_result = fetch_visitor_info_with_provenance(
-                        _official_url_for_info, language="en")
+                        _official_url_for_info, language="en",
+                        venue_name=_museum_venue_name)
                     _sourced_visitor_info = _provenance_result.formatted_info
                     _visitor_info_source_url = _provenance_result.source_url
                     _visitor_info_source_text = _provenance_result.source_text
@@ -10533,7 +10536,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _en_sig = sum(1 for w in ['closed', 'hours', 'admission', 'open', 'free', 'tuesday']
                                       if w in _cp_lower)
                         _cp_lang = "en" if _en_sig > _fr_sig else "fr"
-                        _cp_facts = extract_visitor_facts_from_text(_cp_text, _cp_lang)
+                        _cp_facts = extract_visitor_facts_from_text(
+                            _cp_text, _cp_lang, venue_name=_museum_venue_name)
                         # Score: admission with price is critical
                         _cp_score = 0
                         _cp_score += min(len(_cp_facts.hours), 2) * 2

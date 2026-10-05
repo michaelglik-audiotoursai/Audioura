@@ -128,6 +128,11 @@ def _page_literal_time(raw: str) -> str:
     that does NOT appear on the page — in that case we keep what the page says.
     """
     s = raw.strip()
+    # "Noon" / "Midnight" are page-literal time words — keep them as the page says.
+    if re.fullmatch(r'noon', s, re.IGNORECASE):
+        return 'Noon'
+    if re.fullmatch(r'midnight', s, re.IGNORECASE):
+        return 'Midnight'
     m = re.match(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b', s, re.IGNORECASE)
     if m:
         hh = m.group(1)
@@ -222,6 +227,159 @@ def _has_price(admission: str) -> bool:
     return bool(_ANY_PRICE_RE.search(admission or ''))
 
 
+# ============================================================
+# [LOCAL-584 r2] Hours/closed-days belong to the VENUE, not a satellite gallery
+# ============================================================
+# Tour 391 told a listener the Griffin Museum opens "8 AM–8 PM"; that line is the
+# Lafayette City Center *satellite* gallery's hours. The museum opens Tue–Sun,
+# Noon–4 PM. The fix is structural: a visitor page that lists several places'
+# hours is split into sections by its headings, and we read ONLY the section that
+# belongs to the venue (its own name/address, or the venue-level "Hours"/"Admission"
+# heading) — never a section under a heading that names a different place.
+
+# A section boundary sentinel. Inserted ahead of every heading-like element while
+# flattening HTML (h1..h6 and the emphasised sub-labels <strong>/<em>/<b>/<th>/
+# <dt>/<summary> that WordPress-style pages use as sub-headings). Survives the
+# whitespace collapse so the extractor can see where one place's block ends and
+# the next begins, which a fully flattened page cannot show.
+_SECTION_SENTINEL = '\x1e'
+
+_HEADING_TAGS = ('h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                 'strong', 'b', 'em', 'th', 'dt', 'summary', 'figcaption')
+
+
+def _html_to_sectioned_text(html: str) -> str:
+    """Flatten HTML to text, but mark heading/sub-heading boundaries with a sentinel.
+
+    The sentinel lets later code treat the page as an ordered list of sections
+    ("Location", "Hours", "Satellite Galleries", "Admission", …) instead of one
+    undifferentiated string. Non-heading markup is still dropped; whitespace is
+    collapsed except that the sentinel is preserved.
+    """
+    if not html:
+        return ''
+    s = re.sub(r'<script[^>]*>.*?</script>', ' ', html, flags=re.DOTALL | re.IGNORECASE)
+    s = re.sub(r'<style[^>]*>.*?</style>', ' ', s, flags=re.DOTALL | re.IGNORECASE)
+    # Mark the START of each heading-like element with a sentinel so the heading
+    # text itself opens a new section.
+    for tag in _HEADING_TAGS:
+        s = re.sub(rf'<{tag}\b[^>]*>', _SECTION_SENTINEL, s, flags=re.IGNORECASE)
+    # Drop every remaining tag.
+    s = re.sub(r'<[^>]+>', ' ', s)
+    # Collapse whitespace but keep the sentinel.
+    s = re.sub(r'[^\S\x1e]+', ' ', s)
+    s = re.sub(r'\s*\x1e\s*', _SECTION_SENTINEL, s)
+    return s.strip()
+
+
+# A heading is a FOREIGN-PLACE boundary when it names a place other than the venue.
+# Structurally (not a stop-word list) a heading opens another place's block when it
+# looks like a venue/building label — a proper-noun phrase ending in a place word
+# (Gallery, Galleries, Center/Centre, Building, Museum, Annex, Pavilion, Wing, Hall,
+# Site, Location, Branch) — AND it is not the venue's own name. "Satellite Galleries"
+# matches via "Galleries"; "Lafayette City Center Gallery" via "Gallery"; the word
+# "satellite" is never special-cased.
+_PLACE_WORD_RE = re.compile(
+    r'\b(galler(?:y|ies)|cent(?:er|re)|building|museum|annex(?:e)?|pavilion|'
+    r'wing|hall|site|location|branch|house)\b',
+    re.IGNORECASE,
+)
+
+# Venue-level (place-agnostic) section headings whose block DOES belong to the venue.
+_VENUE_SECTION_HEADINGS = (
+    'hours', 'opening hours', 'opening times', 'admission', 'tickets', 'prices',
+    'pricing', 'fees', 'visit', 'visitor information', 'plan your visit',
+    'getting here', 'location', 'address', 'contact',
+    # FR
+    'horaires', 'tarifs', 'informations pratiques', 'infos pratiques',
+    'adresse', 'accès', 'acces', 'visite',
+)
+
+
+def _norm(s: str) -> str:
+    return re.sub(r'\s+', ' ', (s or '')).strip().lower()
+
+
+def _heading_names_other_place(heading: str, venue_name: str, venue_address: str) -> bool:
+    """True if a section heading opens a DIFFERENT place's block (not the venue).
+
+    Returns False for venue-level headings (Hours/Admission/…), for a heading that
+    repeats the venue's own name, and for a heading carrying the venue's street
+    address. Returns True only for a proper place label (ends/contains a place word
+    like Gallery/Center/Building) that is not the venue.
+    """
+    h = _norm(heading)
+    if not h:
+        return False
+    # Venue-level section labels keep the block with the venue.
+    for vs in _VENUE_SECTION_HEADINGS:
+        if h == vs or h.startswith(vs + ' ') or h == vs + ':':
+            return False
+    # The venue's own name / address never bounds the venue out of its own block.
+    vn = _norm(venue_name)
+    if vn:
+        # Share a distinctive token (>=4 chars) with the venue name → same place.
+        v_tokens = {t for t in re.findall(r'[a-zàâäéèêëîïôöùûüç]{4,}', vn)}
+        h_tokens = {t for t in re.findall(r'[a-zàâäéèêëîïôöùûüç]{4,}', h)}
+        if v_tokens & h_tokens:
+            return False
+    va = _norm(venue_address)
+    if va:
+        # A street-number token shared with the venue address → the venue's block.
+        v_addr_nums = set(re.findall(r'\d+', va))
+        if v_addr_nums & set(re.findall(r'\d+', h)):
+            return False
+    # Otherwise: a proper place label (ends in a place word) opens another place.
+    return bool(_PLACE_WORD_RE.search(h))
+
+
+def _scope_text_to_venue(page_text: str, venue_name: str = "", venue_address: str = "") -> str:
+    """Return only the venue's own sections from sectioned page text.
+
+    Splits on the section sentinel and walks the sections in order. A section that
+    is introduced by a heading naming ANOTHER place (and everything under it, until
+    the next venue-level or venue-named heading) is dropped. If the text carries no
+    sentinels (a plain, non-sectioned string), it is returned unchanged — callers
+    that never flattened with _html_to_sectioned_text keep today's behaviour.
+    """
+    if _SECTION_SENTINEL not in (page_text or ''):
+        return page_text or ''
+
+    sections = [s for s in page_text.split(_SECTION_SENTINEL)]
+    kept: List[str] = []
+    skipping = False
+    for sec in sections:
+        sec_stripped = sec.strip()
+        if not sec_stripped:
+            continue
+        # The heading of this section is its leading phrase (up to ~8 words / a
+        # terminator). Used only to decide ownership.
+        heading = re.split(r'[.:•\n]|\s{2,}', sec_stripped, maxsplit=1)[0]
+        heading = ' '.join(heading.split()[:8])
+        if _heading_names_other_place(heading, venue_name, venue_address):
+            skipping = True
+            continue
+        # A venue-level or venue-named heading re-opens the venue's own content.
+        if skipping:
+            h = _norm(heading)
+            is_venue_level = any(
+                h == vs or h.startswith(vs + ' ') or h == vs + ':'
+                for vs in _VENUE_SECTION_HEADINGS
+            )
+            vn = _norm(venue_name)
+            shares_name = bool(vn) and bool(
+                {t for t in re.findall(r'[a-z]{4,}', vn)}
+                & {t for t in re.findall(r'[a-z]{4,}', h)}
+            )
+            if is_venue_level or shares_name:
+                skipping = False
+            else:
+                continue
+        kept.append(sec_stripped)
+    scoped = ' '.join(kept).strip()
+    return scoped if scoped else page_text
+
+
 def _parse_date_range_fr(text: str) -> str:
     """Parse a French date range like 'du 1er septembre au 30 juin' → '1 Sep–30 Jun'."""
     # Pattern: du Xer/X month au Y month
@@ -263,12 +421,18 @@ def _parse_date_range_en(text: str) -> str:
 # Structured extraction from page text
 # ============================================================
 
-def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> VisitorFacts:
+def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
+                                    venue_name: str = "", venue_address: str = "") -> VisitorFacts:
     """Extract structured visitor facts from a museum page's text content.
 
     Args:
         page_text: The stripped text content of a museum's visitor info page.
         page_lang: Language of the page ("fr" or "en").
+        venue_name: The venue the listener is visiting (e.g. "Griffin Museum of
+            Photography"). Used to bind hours/closed-days to the venue's own
+            section when the page lists several places (LOCAL-584 r2).
+        venue_address: The venue's street address (from Wikidata/the site). Also
+            used to recognise the venue's own section.
 
     Returns:
         VisitorFacts with whatever fields could be reliably extracted.
@@ -277,6 +441,17 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
 
     if not page_text or len(page_text) < 50:
         return facts
+
+    # [LOCAL-584 r2] Bind to the venue: when a page lists several places' hours,
+    # keep only the sections that belong to the venue (its own name/address or a
+    # venue-level Hours/Admission heading), never a block under another place's
+    # heading ("Satellite Galleries", "… Gallery", "… Center"). On a page with no
+    # section sentinels this is a no-op, so single-venue pages are unchanged.
+    page_text = _scope_text_to_venue(page_text, venue_name, venue_address)
+    # The downstream regexes expect clean prose — drop the sentinels now that
+    # scoping is done.
+    page_text = page_text.replace(_SECTION_SENTINEL, ' ')
+    page_text = re.sub(r'[^\S\n]+', ' ', page_text).strip()
 
     # --- 1. CLOSED DAYS ---
     if page_lang == "fr":
@@ -316,11 +491,11 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
     else:
         # English
         closed_m = re.search(
-            r'(?:[Cc]losed|except)\s+(?:on\s+)?(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s?',
-            page_text
+            r'(?:[Cc]losed|except)\s*:?\s+(?:on\s+|every\s+)?(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s?',
+            page_text, re.IGNORECASE
         )
         if closed_m:
-            facts.closed_days.append(closed_m.group(1))
+            facts.closed_days.append(closed_m.group(1).capitalize())
         # "open daily except Tuesdays"
         except_m = re.search(
             r'(?:daily|every\s+day)\s+except\s+(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s?',
@@ -397,8 +572,9 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr") -> Vi
 
         # Also try simpler single-range English patterns
         if not facts.hours:
+            _en_time = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight)'
             simple_en = re.search(
-                r'(?:open\s+(?:from\s+)?)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:to|[-–])\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)',
+                r'(?:open\s+(?:from\s+)?)?(' + _en_time + r')\s*(?:to|[-–—])\s*(' + _en_time + r')',
                 page_text, re.IGNORECASE
             )
             if simple_en:
@@ -603,11 +779,11 @@ def _fetch_visitor_pages(base_site_url: str) -> list:
             resp = requests.get(_url, headers={'User-Agent': 'Audioura/2.2'},
                               timeout=10, allow_redirects=True)
             if resp.status_code == 200 and len(resp.text) > 200:
-                # Extract text content
-                _text = re.sub(r'<script[^>]*>.*?</script>', '', resp.text, flags=re.DOTALL)
-                _text = re.sub(r'<style[^>]*>.*?</style>', '', _text, flags=re.DOTALL)
-                _text = re.sub(r'<[^>]+>', ' ', _text)
-                _text = re.sub(r'\s+', ' ', _text).strip()
+                # [LOCAL-584 r2] Flatten with section sentinels at heading boundaries
+                # so hours/closed-days can be bound to the venue's own section (not a
+                # satellite gallery's). _scope_text_to_venue consumes the sentinels;
+                # extract_visitor_facts_from_text strips any that remain.
+                _text = _html_to_sectioned_text(resp.text)
                 if len(_text) > 100:
                     # Detect language based on content
                     _lower = _text.lower()
@@ -630,18 +806,20 @@ def _fetch_visitor_pages(base_site_url: str) -> list:
     return _fetched_pages
 
 
-def _extract_best_facts(fetched_pages: list) -> Optional[VisitorFacts]:
+def _extract_best_facts(fetched_pages: list, venue_name: str = "",
+                        venue_address: str = "") -> Optional[VisitorFacts]:
     """[LOCAL-35/39] Pick the best VisitorFacts from a list of fetched pages.
 
     Strategy: extract from each page independently, then MERGE the best fields
     across all results. This handles the common case where one page has better
     hours (e.g., seasonal ranges in FR) and another has better admission data
-    (e.g., specific price on the EN page).
+    (e.g., specific price on the EN page). venue_name/venue_address are passed to
+    the extractor so hours/closed-days are bound to the venue (LOCAL-584 r2).
     """
     all_facts = []
 
     for _text, _lang, _url in fetched_pages:
-        facts = extract_visitor_facts_from_text(_text, _lang)
+        facts = extract_visitor_facts_from_text(_text, _lang, venue_name, venue_address)
         facts.source_url = _url
         print(f"  [LOCAL-35] Extracted from {_url}: closed={facts.closed_days}, "
               f"hours={len(facts.hours)}, admission='{facts.admission}'")
@@ -681,7 +859,8 @@ def _extract_best_facts(fetched_pages: list) -> Optional[VisitorFacts]:
     return best
 
 
-def fetch_visitor_info_structured(base_site_url: str, language: str = "en") -> str:
+def fetch_visitor_info_structured(base_site_url: str, language: str = "en",
+                                  venue_name: str = "", venue_address: str = "") -> str:
     """[LOCAL-35] Fetch and extract structured visitor information from a museum's official site.
 
     Replaces the old _fetch_visitor_info_from_site with structured field extraction.
@@ -698,7 +877,7 @@ def fetch_visitor_info_structured(base_site_url: str, language: str = "en") -> s
     if not _fetched_pages:
         return ""
 
-    _best_facts = _extract_best_facts(_fetched_pages)
+    _best_facts = _extract_best_facts(_fetched_pages, venue_name, venue_address)
 
     if _best_facts is None or _best_facts.is_empty():
         print(f"  [LOCAL-35] Could not extract structured visitor facts from any page")
@@ -725,13 +904,15 @@ class VisitorInfoWithProvenance:
     facts: Optional['VisitorFacts'] = None  # Structured facts object
 
 
-def fetch_visitor_info_with_provenance(base_site_url: str, language: str = "en") -> VisitorInfoWithProvenance:
+def fetch_visitor_info_with_provenance(base_site_url: str, language: str = "en",
+                                       venue_name: str = "", venue_address: str = "") -> VisitorInfoWithProvenance:
     """[LOCAL-39] Structured extraction + provenance for the practical facts gate.
 
     Composes LOCAL-35's structured extractor with LOCAL-36's provenance tracking:
     - Uses LOCAL-35's smart page discovery and structured field extraction
     - Returns the raw source text alongside the formatted result, so LOCAL-36's
       practical_facts_gate can verify every claim against the original source.
+    - venue_name/venue_address bind hours/closed-days to the venue (LOCAL-584 r2).
 
     This replaces both _fetch_visitor_info_from_site AND _fetch_visitor_info_raw_source
     with a single fetch that serves both purposes.
@@ -742,7 +923,7 @@ def fetch_visitor_info_with_provenance(base_site_url: str, language: str = "en")
     if not _fetched_pages:
         return result
 
-    _best_facts = _extract_best_facts(_fetched_pages)
+    _best_facts = _extract_best_facts(_fetched_pages, venue_name, venue_address)
 
     if _best_facts is None or _best_facts.is_empty():
         print(f"  [LOCAL-35] Could not extract structured visitor facts from any page")
@@ -760,7 +941,10 @@ def fetch_visitor_info_with_provenance(base_site_url: str, language: str = "en")
 
     # Provenance: collect raw source text from ALL fetched pages (gives gate
     # maximum evidence to verify against). The source_url is the best-match page.
-    _all_source_text = "\n\n".join(text for text, _, _ in _fetched_pages)
+    # Strip the section sentinels so the gate's literal-token checks see clean prose.
+    _all_source_text = "\n\n".join(
+        text.replace(_SECTION_SENTINEL, ' ') for text, _, _ in _fetched_pages)
+    _all_source_text = re.sub(r'[^\S\n]+', ' ', _all_source_text)
 
     result.formatted_info = formatted
     result.source_url = _best_facts.source_url
