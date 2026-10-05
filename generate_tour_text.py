@@ -7297,15 +7297,33 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
                             _det_seen_titles_norm.add(_tn)
                 
-                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                # [LOCAL-583 D1] "Documented" means catalogue + SPARQL ONLY.
+                # Site/wiki-derived canonical titles (source == 'canonical') are
+                # NOT documented works: they came from the venue's own pages (or a
+                # cache row written from them) and, as the Griffin field defect
+                # showed, can be pure site chrome ("Our Team", "Calls For Entry").
+                # They must never (a) trigger the deterministic bypass nor (b)
+                # block the LOCAL-580 site-first path, which only runs when the
+                # museum has 0 catalogue/SPARQL works. Canonical titles remain in
+                # _det_documented only as *fill material* once a documented base
+                # has already earned the bypass.
+                _det_documented_count = sum(
+                    1 for d in _det_documented if d.get('source') in ('catalogue', 'sparql')
+                )
+                _det_canonical_count = len(_det_documented) - _det_documented_count
+                print(f"  [LOCAL-30] Deterministic selection: {_det_documented_count} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL"
+                      f"; {_det_canonical_count} site/cache canonical title(s) are NOT documented)")
 
                 # [LOCAL-580] An EXHIBITION MUSEUM resolves but has 0 catalogued
                 # works. Capture its site URL + locality so the block below can
                 # read its CURRENT EXHIBITIONS from its own site (site-first
                 # candidates) instead of Phase 3A inventing generic shows, and so
                 # a clean fail can suggest a locality-based alternative (D4).
-                if len(_det_documented) == 0:
+                # [LOCAL-583 D1] Eligibility keys on documented (catalogue+SPARQL)
+                # count, NOT on canonical titles — a cache full of site chrome
+                # must not keep the site-first path from running.
+                if _det_documented_count == 0:
                     _museum_site_first_eligible = True
                     _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
                     _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
@@ -7317,8 +7335,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"exhibition-museum site-first path ELIGIBLE "
                           f"(site='{_museum_site_url}')")
 
-                # If documented works >= total_stops, fill deterministically
-                if len(_det_documented) >= total_stops:
+                # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill
+                # deterministically. [LOCAL-583 D1] canonical titles do NOT count
+                # toward this threshold — they cannot trigger the bypass alone.
+                if _det_documented_count >= total_stops:
                     # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
                     _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
@@ -7338,7 +7358,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"     - {p['name']} [{_src}]")
                     _deterministic_fill_used = True
                 else:
-                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                    print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
@@ -8216,11 +8236,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _det_documented.append({'title': _ct, 'source': 'canonical'})
                             _det_seen_titles_norm.add(_tn)
                 
-                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                # [LOCAL-583 D1] "Documented" = catalogue + SPARQL ONLY. Canonical
+                # (site/cache) titles are NOT documented works and must not trigger
+                # the deterministic bypass on their own (the Griffin chrome defect).
+                _det_documented_count = sum(
+                    1 for d in _det_documented if d.get('source') in ('catalogue', 'sparql')
+                )
+                _det_canonical_count = len(_det_documented) - _det_documented_count
+                print(f"  [LOCAL-30] Deterministic selection: {_det_documented_count} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL"
+                      f"; {_det_canonical_count} site/cache canonical title(s) are NOT documented)")
                 
-                # If documented works >= total_stops, fill deterministically
-                if len(_det_documented) >= total_stops:
+                # If DOCUMENTED works (catalogue+SPARQL) >= total_stops, fill deterministically
+                if _det_documented_count >= total_stops:
                     # -------- [LOCAL-284] Corpus-depth tiebreak for museum selection --------
                     # D170 says stop selection stays free — no artificial constraints.
                     # But for a MUSEUM, the candidate set is a closed list of real objects,
@@ -8300,7 +8328,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"     - {p['name']} [{_src}] (quality={_qscore:.1f})")
                     _deterministic_fill_used = True
                 else:
-                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                    print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
