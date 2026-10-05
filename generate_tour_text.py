@@ -7035,6 +7035,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # This is the ONLY path that guarantees reproducibility.
     # [LOCAL-362] SUPPRESSED when a scoped request (exhibition/artist filter) is detected.
     _deterministic_fill_used = False
+    # [LOCAL-580] Site-first exhibition capture. When the venue resolves but has
+    # 0 catalogued/SPARQL works (an exhibition museum), we read its CURRENT
+    # EXHIBITIONS from its own site and use those as the candidate stops instead
+    # of letting Phase 3A invent generic shows. Captured here (venue already
+    # resolved for the LOCAL-30 fill) and consumed just below, where
+    # _exhibition_stops_source exists.
+    _museum_site_first_eligible = False  # True only when 0 documented works
+    _museum_site_url = ''
+    _museum_site_language = 'en'
+    _museum_resolved_locality = ''       # for the D4 actionable-failure suggestion
     # Pre-compute scope detection for the early block (full detection runs below)
     _early_scope_detected = False
     if intent and intent.get('venue_name') and tour_category == 'museum':
@@ -7106,7 +7116,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 
                 print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
                       f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
-                
+
+                # [LOCAL-580] An EXHIBITION MUSEUM resolves but has 0 catalogued
+                # works. Capture its site URL + locality so the block below can
+                # read its CURRENT EXHIBITIONS from its own site (site-first
+                # candidates) instead of Phase 3A inventing generic shows, and so
+                # a clean fail can suggest a locality-based alternative (D4).
+                if len(_det_documented) == 0:
+                    _museum_site_first_eligible = True
+                    _museum_site_url = getattr(_det_entity, 'official_url', '') or ''
+                    _museum_site_language = getattr(_det_entity, 'language', 'en') or 'en'
+                    print(f"  [LOCAL-580] 0 documented works for '{_museum_venue_name}' — "
+                          f"exhibition-museum site-first path ELIGIBLE "
+                          f"(site='{_museum_site_url}')")
+
                 # If documented works >= total_stops, fill deterministically
                 if len(_det_documented) >= total_stops:
                     # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
@@ -7499,6 +7522,48 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']} [FORCED]")
+    elif (_museum_site_first_eligible and _exhibition_scope is None
+          and not _deterministic_fill_used):
+        # ──── [LOCAL-580] SITE-FIRST EXHIBITION CANDIDATES ────────────────────
+        # The venue resolved but has 0 catalogued works (an exhibition museum).
+        # Read its CURRENT EXHIBITIONS from its own site and use those as the
+        # candidate stops — one stop per show, each sourced from its own detail
+        # page. GPT never invents here. Each POI is page_sourced=True so the
+        # exhibit-museum grounding path (not the permanent-collection D1v2 check)
+        # verifies it against the site text it came from.
+        _phase_timer.start('site_first_exhibitions')
+        try:
+            from exhibition_site_first import build_site_first_candidates, SiteFirstResult
+            _sf_candidates = build_site_first_candidates(
+                base_site_url=_museum_site_url,
+                venue_language=_museum_site_language,
+                total_stops=total_stops,
+            )
+            if _sf_candidates:
+                poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
+                for _poi, _c in zip(poi_list, _sf_candidates):
+                    _poi['detail_url'] = _c.get('detail_url', '')
+                    _poi['source'] = 'site_exhibition'
+                _exhibition_stops_source = 'site_exhibition'
+                _deterministic_fill_used = True   # Phase 3A GPT is bypassed
+                # Build a minimal result carrying the combined site text so the
+                # grounding path can confirm each title appears on the site.
+                _exhibition_checklist_result = SiteFirstResult(
+                    page_text='\n\n'.join(c.get('page_text', '') for c in _sf_candidates)
+                )
+                print(f"\nPHASE 3A: SKIPPED (LOCAL-580 site-first — "
+                      f"{len(poi_list)} current exhibition(s) from the venue site)")
+                for _poi in poi_list:
+                    print(f"   - {_poi['name']} [SITE EXHIBITION {_poi.get('detail_url','')}]")
+            else:
+                print(f"  [LOCAL-580] Site-first found no current exhibitions "
+                      f"on '{_museum_site_url}' — falling through to Phase 3A")
+        except Exception as _sf_err:
+            print(f"  [LOCAL-580] Site-first path failed (falling through): {_sf_err}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            _phase_timer.stop('site_first_exhibitions')
     elif _exhibition_scope is not None:
         # ──── [LOCAL-364] EXHIBITION CHECKLIST RETRIEVAL ──────────────────────
         _phase_timer.start('exhibition_checklist')
@@ -8362,7 +8427,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # exhibition page. These works are already grounded by their source — 
             # verifying them against SPARQL/Wikidata would reject exhibition-specific
             # works that aren't individually catalogued in the museum's permanent collection.
-            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
+            if _exhibition_stops_source in ('checklist', 'partial', 'prose_llm', 'site_exhibition'):
                 # [D532] The condition no longer includes `_deterministic_fill_used`.
                 # That flag describes the RUN, so one appended Phase 3A candidate used
                 # to drag the venue's own works into the permanent-collection check
