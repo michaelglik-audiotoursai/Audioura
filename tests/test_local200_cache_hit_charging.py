@@ -250,17 +250,12 @@ class TestPreLocal197SanityCeiling:
             assert v > 0, f"Ceiling for {k} must be positive"
 
     def test_sanity_ceiling_tour_rejects_inflated(self):
-        """A truly implausible tour cost ($5.00) still exceeds the ceiling."""
-        assert 5.00 > _FRESH_COST_SANITY_CEILING["tour_generate"]
+        """$0.30 our cost exceeds the $0.25 ceiling for tours."""
+        assert 0.30 > _FRESH_COST_SANITY_CEILING["tour_generate"]
 
     def test_sanity_ceiling_tour_accepts_normal(self):
-        """$0.08 our cost (old LLM-only tour) is below the ceiling for tours."""
+        """$0.08 our cost is below the $0.25 ceiling for tours."""
         assert 0.08 < _FRESH_COST_SANITY_CEILING["tour_generate"]
-
-    def test_sanity_ceiling_tour_accepts_grounding_inclusive(self):
-        """[LOCAL-594] A grounding-inclusive tour (~$1.70, measured live) is now
-        recorded for cache-hit charging, not floored to $0 by a $0.25 ceiling."""
-        assert 1.70 < _FRESH_COST_SANITY_CEILING["tour_generate"]
 
 
 # ===========================================================================
@@ -388,31 +383,17 @@ class TestLookupFreshCost:
 
     @patch("cost_meter.psycopg2.connect")
     def test_returns_none_when_cost_exceeds_ceiling(self, mock_connect):
-        """Returns None when cost exceeds sanity ceiling (truly implausible)."""
+        """Returns None when cost exceeds sanity ceiling (pre-LOCAL-197)."""
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
-        # $5.00 > $3.00 ceiling for tour_generate (LOCAL-594)
-        mock_cursor.fetchone.return_value = (Decimal("5.00"),)
+        # $0.30 > $0.25 ceiling for tour_generate
+        mock_cursor.fetchone.return_value = (Decimal("0.30"),)
         mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda s, *a: None
         mock_connect.return_value = mock_conn
 
         result = lookup_fresh_cost_for_cache_hit("job-old", "tour_cache_hit")
         assert result is None
-
-    @patch("cost_meter.psycopg2.connect")
-    def test_grounding_inclusive_cost_is_recorded_not_floored(self, mock_connect):
-        """[LOCAL-594] A grounding-inclusive fresh tour cost above the OLD $0.25
-        ceiling (here $0.30) is now returned, not floored to None → $0.00."""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_cursor.fetchone.return_value = (Decimal("0.30"),)
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = lambda s, *a: None
-        mock_connect.return_value = mock_conn
-
-        result = lookup_fresh_cost_for_cache_hit("job-grounded", "tour_cache_hit")
-        assert result == 0.30
 
     @patch("cost_meter.psycopg2.connect")
     def test_returns_none_when_cost_is_zero(self, mock_connect):
