@@ -1300,6 +1300,26 @@ def fetch_venue_narrative_corpus(
             'es': ('historia', 'coleccion', 'obras', 'exposicion'),
         }
         _NARRATIVE_KEYWORDS = _NARRATIVE_KEYWORDS_BASE + _NARRATIVE_KEYWORDS_LOCALIZED.get(language, ())
+        # [LOCAL-593 #2] Architecture/building-history pages are strong story
+        # sources (a museum's building IS part of its story), so prefer them.
+        _NARRATIVE_KEYWORDS = _NARRATIVE_KEYWORDS + ('architecture', 'building',
+                                                     'batiment', 'edifice', 'architektur')
+        # [LOCAL-593 #2] POLICY / ADMIN stoplist — HIGHEST precedence.
+        # The Harvard run mined `collections/policies/collecting-policy`,
+        # `campus-loans` and `loans-policy`. Those paths contain the substring
+        # "collection"/"collecting", so the old _has_collection_signal promoted
+        # them to Priority 1 and the §3-adapter found no history to extract
+        # (G4 fail-closed, invented arc). Policy/loans/rights/terms/privacy/
+        # employment/press-kit pages are administrative, never story pages.
+        # A page whose URL matches this list is forced to the lowest priority
+        # REGARDLESS of any collection keyword it happens to contain.
+        _POLICY_ADMIN_KEYWORDS = (
+            'policy', 'policies', 'collecting-policy', 'loan', 'loans',
+            'rights', 'reproduction', 'terms', 'privacy', 'cookie',
+            'employment', 'jobs', 'career', 'careers', 'vacanc',
+            'press-kit', 'presskit', 'press-room', 'pressroom', 'press-release',
+            'media-kit', 'legal', 'disclaimer', 'copyright',
+        )
         # LOCAL-23: Deprioritized page types (agenda, publications, press, tickets, visits info)
         _DEPRIORITIZED_KEYWORDS = ('agenda', 'actualite', 'newsletter', 'presse',
                                    'billetterie', 'tarif', 'horaire', 'contact',
@@ -1355,7 +1375,17 @@ def fetch_venue_narrative_corpus(
                 continue
             _href_lower = href.lower()
             _text_lower = link_text.lower()
-            
+
+            # [LOCAL-593 #2] POLICY/ADMIN pages are never story pages. This test
+            # runs FIRST, so a path like 'collecting-policy' or 'campus-loans'
+            # cannot be rescued into Priority 1 by its 'collection'/'loan'
+            # substring. Route straight to the lowest bucket and move on.
+            _is_policy_admin = any(pk in _href_lower or pk in _text_lower
+                                   for pk in _POLICY_ADMIN_KEYWORDS)
+            if _is_policy_admin:
+                _other_urls.append(full_url)
+                continue
+
             # Skip deprioritized pages entirely unless they also have collection keywords
             _is_deprioritized = any(dk in _href_lower for dk in _DEPRIORITIZED_KEYWORDS)
             _has_collection_signal = any(ck in _href_lower or ck in _text_lower
