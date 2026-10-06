@@ -598,8 +598,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         check("Single-venue consistency (no other NAMED venues)",
               _passed_9,
               f"{len(_other_venue_flags)} refs to other named venues: {_other_venue_flags[:3]}")
-        if not _passed_9:
-            FACTUAL_FAIL_COUNT += 1
+        # [D612 r2, LEAD] Advisory only — never release-blocking. Naming another
+        # museum in prose is normal and usually TRUE provenance ("transferred from
+        # the Peabody Museum", "donated to the Fogg"), and a regex cannot tell that
+        # from drift. Drift itself is blocked by check 11 (Venue coherence, FACTUAL)
+        # and by D1v2's verified-works gate. Harvard + McMullen, 2026-10-06.
     else:
         check("Single-venue consistency (no other NAMED venues)", True, "(not a museum tour)")
 
@@ -612,8 +615,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
             check("Attribution grounding (no unverified claims when venues are mixed)",
                   _passed_10,
                   f"{len(_artist_patterns)} artist attributions while {len(_other_venue_flags)} other venues flagged")
-            if not _passed_10:
-                FACTUAL_FAIL_COUNT += 1
+            # [D612 r2] Advisory: it only fires when check 9 does (see above).
         else:
             check("Attribution grounding (consistent with venue)", True,
                   "(single-venue tour — attribution is appropriate)")
