@@ -119,8 +119,9 @@ try:
             print(f"  {tbl} LIKE {pat}: query error {_e}", flush=True)
             conn.rollback()
     try:
-        cur.execute("SELECT count(*) FROM stop_pool WHERE lower(venue_name) LIKE %s", ('%massart%',))
-        print(f"  stop_pool LIKE %massart%: {cur.fetchone()[0]}", flush=True)
+        cur.execute("SELECT count(*) FROM stop_pool WHERE pool_key ILIKE %s OR venue_identity ILIKE %s",
+                    ('%massart%', '%massart%'))
+        print(f"  stop_pool (pool_key/venue_identity LIKE %massart%): {cur.fetchone()[0]}", flush=True)
     except Exception as _e:
         print(f"  stop_pool: query error {_e}", flush=True)
         conn.rollback()
