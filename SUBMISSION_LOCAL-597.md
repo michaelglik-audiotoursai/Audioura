@@ -159,3 +159,115 @@ fallback.
 - `tour_orchestrator_service.py` — read `quota['mode']`, thread it to the generator
 - `tests/test_local595_enforcement.py` — updated L2 expectations (allow + mode)
 - `tests/test_local597_guard.py` (new), `tests/test_local597_by_reference.py` (new)
+
+---
+
+## r2
+
+### Why it bounced
+LEAD (2026-10-06): the path was fine ($0.00, zero grounding, actionable refusal),
+but `tests/test_local597_by_reference.py` broke a binding CLAUDE.md rule (D141,
+the tour-29 event):
+1. It INSERTed `audio_tours` rows with `is_test = FALSE` and real Boston lat/lng
+   ("LOCAL597 Nearby A/B" + a venue tour) into the shared DB. While the test ran,
+   `tours-near` (which filters on lat/lng) could surface them in Michael's app.
+2. It DELETEd them in tearDown with **no** `SELECT is_test` check immediately
+   before the DELETE — the exact shape of the tour-29 loss.
+3. It wrote ZZ597 `stop_pool` rows into the shared pool.
+
+### Fix — zero shared/production writes via a throwaway schema
+Every DB-touching test now runs against a **private throwaway schema** that is
+dropped at the end; no row is ever added to any shared (`public.*`) table. One
+mechanism, no production-code change:
+
+```
+PGOPTIONS = "-c search_path=<throwaway>,public"
+```
+
+libpq applies `PGOPTIONS` to **every** new connection in the process — both the
+ones `l2_by_reference` opens from `db_url` and the env-var connections
+`subscription_levels` / `entitlements` open. With the throwaway schema first on
+the search_path, an unqualified `audio_tours` / `stop_pool` /
+`device_entitlement` / `tour_requests` / `users` resolves to a schema-local copy
+created `LIKE public.<t> INCLUDING ALL` (byte-compatible with the code's
+INSERTs, incl. `device_entitlement`'s unique `user_id` for `ON CONFLICT`).
+`public` is never touched.
+
+- **No cleanup DELETE anywhere.** Rows die with `DROP SCHEMA ... CASCADE` in
+  `tearDownModule`. The D141 "`SELECT is_test` before DELETE" rule governs
+  cleanup DELETEs; there are none.
+- `is_test = FALSE` rows (required because `_nearby_existing_tours` and
+  `tours-near` only surface `is_test IS NOT TRUE`) are safe **only** because they
+  live in the schema, invisible to `tours-near` which queries `public`. Each test
+  asserts its seeded ids are absent from `public.audio_tours`.
+- `tearDownModule` reads `public` row counts for `audio_tours`, `stop_pool`,
+  `device_entitlement`, `tour_requests` before any test and again after the drop,
+  prints both, and asserts they are identical.
+
+Gotcha found and documented in the test: `conftest.py`'s guarded connection
+wrapper does not delegate the `autocommit` **attribute**, so the schema DDL
+commits explicitly (`conn.commit()`), otherwise `CREATE SCHEMA` silently rolls
+back and writes leak to `public`.
+
+Proof (pytest `-s`, re-runnable — identical on repeat):
+```
+[LOCAL-597 r2] public row counts before/after (must be identical):
+  public.audio_tours          before=0        after=0
+  public.stop_pool            before=0        after=0
+  public.device_entitlement   before=7        after=7
+  public.tour_requests        before=2        after=2
+[LOCAL-597 r2] OK — zero shared/production writes.
+9 passed
+```
+
+### Nearby-tours test updated for the c09eda6 rule
+`_nearby_existing_tours` now means "within `NEARBY_MAX_KM` (50 km) of a
+resolvable anchor; no anchor → no list". The tests were updated accordingly:
+- `test_partial_material_refuses_with_nearby_tours` stubs
+  `venue_resolver.resolve_venue` → a Boston anchor (lat/lng) and seeds two
+  Boston-coordinate tours; it now asserts they are offered and that the
+  suggestion contains "pick one of these".
+- `test_no_anchor_offers_empty_list` (new) stubs the resolver → `None` and
+  asserts `nearby_tours == []` and the suggestion drops the "pick one of these"
+  clause (just "Buy a $10 pack for a freshly researched tour.") — a Boston
+  listener is never again offered Nice/Abu Dhabi.
+
+### r1 leftover scan + cleanup
+Scanned both DBs for `audio_tours` named `LOCAL597%`/`ZZ597%` and `stop_pool`
+keys/identities matching `%zz597%`/`%local597%`:
+- **Production (`audiotours`): clean** — 0 rows in every table. r1's test routing
+  kept production untouched.
+- **Test (`audiotours_test`)**: `audio_tours` 0; `stop_pool` had 130 rows (98 from
+  r1 + 32 that leaked from my own pre-fix runs before the autocommit gotcha was
+  found), all 38 identities matching the exact provably-mine pattern
+  `^loc:zz597_(pool|partial)_[0-9a-f]{8}$` (produced only by this test's
+  `ZZ597_POOL_`/`ZZ597_PARTIAL_` + uuid seeds).
+
+Deleted only the exact-pattern rows (regex match, no name-pattern/date-range/
+"above id N"), with counts:
+```
+audiotours:       provably-mine BEFORE=0   (nothing to delete)
+audiotours_test:  provably-mine BEFORE=130  DELETED=130  AFTER=0
+```
+Post-cleanup the suite still passes and `public.stop_pool` before/after is 0/0.
+
+### Re-run of tests/test_local59[5-7]_*  (exits)
+```
+tests/test_local595_anniversary.py        exit=0  18 passed
+tests/test_local595_api.py                exit=0  10 passed
+tests/test_local595_edit_gate.py          exit=0   8 passed
+tests/test_local595_enforcement.py        exit=0  31 passed
+tests/test_local596_api.py                exit=0  11 passed
+tests/test_local596_mirror_in_sync.py     exit=5  no tests ran (script-style check;
+                                                   passes as `python3 <file>` → exit 0;
+                                                   unchanged from base)
+tests/test_local596_referral.py           exit=0   9 passed
+tests/test_local596_seats.py              exit=0  12 passed
+tests/test_local597_by_reference.py       exit=0   9 passed
+tests/test_local597_guard.py              exit=0  13 passed
+```
+
+### Files changed (r2)
+- `tests/test_local597_by_reference.py` — throwaway-schema isolation + public
+  count proof; nearby test stubs a Boston anchor; new no-anchor empty-list test.
+  No production code changed in r2.
