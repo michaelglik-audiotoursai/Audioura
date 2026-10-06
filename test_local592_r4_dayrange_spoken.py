@@ -180,7 +180,12 @@ class TestSpokenVisitingComposition(unittest.TestCase):
         i_time = low.index("4 pm")
         i_closed = low.index("closed")
         i_adm = section.index("$12")
-        i_src = low.index("griffinmuseum.org")
+        # The source signal we mean is the visiting one ("as listed on <domain>
+        # in <month>") — not the About narration's own sourcing close, which may
+        # also name the domain earlier. Anchor on the dated signal.
+        m_src = re.search(r"(?i)as listed on griffinmuseum\.org in October 2026", section)
+        self.assertIsNotNone(m_src, f"visiting source signal missing: {section!r}")
+        i_src = m_src.start()
         # open → days → time all in the hours sentence; closed stated; then
         # admission; then the dated source signal last.
         self.assertLess(i_open, i_days)
