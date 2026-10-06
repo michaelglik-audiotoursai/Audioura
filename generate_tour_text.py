@@ -3408,6 +3408,25 @@ def _site_first_empty_action(reason, fetch_failed):
     return 'fall_through'
 
 
+def _site_fill_effective_cap(exhibition_stops_source, n_candidates, total_stops,
+                             headroom=1):
+    """[LOCAL-589 D4] How many candidates to carry through narration.
+
+    For the site_exhibition path, when MORE real current exhibitions exist than
+    were requested, carry a small narration HEADROOM (default one spare real
+    show) so that if one selected show's narration later comes back empty — and
+    the LOCAL-292 empty-stop gate removes it — the tour still delivers the
+    requested count from real exhibitions (the tour is trimmed back to the exact
+    request after that gate). The spare is only ever a REAL extra exhibition;
+    nothing is invented. All other paths keep the plain cap (no headroom).
+
+    Returns the effective cap (>= total_stops).
+    """
+    if exhibition_stops_source == 'site_exhibition' and n_candidates > total_stops:
+        return total_stops + min(headroom, n_candidates - total_stops)
+    return total_stops
+
+
 def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
@@ -10436,8 +10455,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # ──── END LOCAL-320 INCONCLUSIVE REPLACEMENT ──────────────────────────
 
         # Hard cap and final sanity
-        if len(poi_list) > total_stops:
-            poi_list = poi_list[:total_stops]
+        # [LOCAL-589 D4] FILL THE COUNT FROM REAL EXHIBITIONS. The Griffin field
+        # case: 9 real current shows exist, 7 are requested, but if ONE selected
+        # show's narration later comes back empty, the LOCAL-292 empty-stop gate
+        # removes it and the tour ships 6. When the stops are REAL site
+        # exhibitions (site_exhibition) and MORE of them exist than requested, we
+        # carry a small narration headroom (one spare real show) past this cap so
+        # a single empty-narration removal still leaves the requested count; the
+        # tour is trimmed back to exactly the requested number AFTER the LOCAL-292
+        # gate. Headroom is only taken when extra REAL exhibitions are available —
+        # never invented, and other tour paths are untouched.
+        _effective_cap = _site_fill_effective_cap(
+            _exhibition_stops_source, len(poi_list), total_stops)
+        if _effective_cap > total_stops:
+            print(f"  [LOCAL-589] site-first fill headroom: carrying {_effective_cap} real "
+                  f"exhibition(s) through narration for a {total_stops}-stop request "
+                  f"(spare {_effective_cap - total_stops} covers an empty-narration drop)")
+        if len(poi_list) > _effective_cap:
+            poi_list = poi_list[:_effective_cap]
         if len(poi_list) == 0:
             print(f"X All POIs were filtered out; cannot continue")
             return None, None, (None, None)
@@ -20065,6 +20100,30 @@ RULES:
               f"failed={len(_l292_failed_stops)} / delivered={len(poi_list)}")
     else:
         print(f"\n  [LOCAL-292] Empty stop removal gate: PASSED (all {_l292_requested_stops} stops have narration)")
+
+    # [LOCAL-589 D4] Trim the site-first narration headroom back to the listener's
+    # ask. We carried one or two spare REAL exhibitions through narration so a
+    # single empty-narration removal (LOCAL-292) still leaves the requested count.
+    # Now that the empty stops are gone, drop any remaining spares so we deliver
+    # EXACTLY what was asked — and so LOCAL-394's selected==delivered invariant
+    # measures the request, not the headroom. Only the site_exhibition path ever
+    # has headroom, so other tours are untouched.
+    if (_exhibition_stops_source == 'site_exhibition'
+            and _requested_stop_count_original):
+        if len(poi_list) > _requested_stop_count_original:
+            _l589_before = len(poi_list)
+            poi_list = poi_list[:_requested_stop_count_original]
+            for _l589_i, _l589_p in enumerate(poi_list):
+                _l589_p['stop_number'] = _l589_i + 1
+            total_stops = len(poi_list)
+            print(f"  [LOCAL-589] site-first headroom trimmed: {_l589_before} → "
+                  f"{len(poi_list)} to match the {_requested_stop_count_original}-stop request")
+        # Re-base the gate's "requested" counter to the listener's ask so the
+        # LOCAL-394 invariant below reads selected==delivered: the spares were
+        # intentional headroom, not lost stops. Done whether or not a trim was
+        # needed (an empty-narration drop already consumed the spare).
+        if _l292_requested_stops > _requested_stop_count_original:
+            _l292_requested_stops = _requested_stop_count_original
 
     # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
     if _l292_failed_stops and poi_list:
