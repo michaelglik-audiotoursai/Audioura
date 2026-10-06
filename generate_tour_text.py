@@ -2050,6 +2050,59 @@ def _assert_one_scope_per_tour(tour_category, scope, intent, quiet=False):
 _VENUE_PARTS_RUN = False
 
 
+# [LOCAL-591] The scope judge's own reasoning text that says a stop is OUTSIDE.
+# The judge is asked for {"inside_scope": bool, "confidence": ..., "reason": ...}.
+# On tours 395/396 it returned inside_scope=true with the reason "King's Chapel is
+# located outside the bounds of Boston Athenaeum, Boston, Massachusetts." — the
+# boolean and the reasoning contradicted each other, and the code trusted the
+# boolean, recording a stop as inside that its own reason said was outside.
+_VERDICT_OUTSIDE_RE = re.compile(
+    r'\b(?:located\s+)?outside\b'
+    r'|\bnot\s+(?:located\s+)?(?:inside|within|in)\b'
+    r'|\boutside\s+(?:the\s+)?bounds\b'
+    r'|\bis\s+not\s+(?:part|a\s+part)\s+of\b'
+    r'|\bdifferent\s+(?:building|venue|location)\b'
+    r'|\belsewhere\b',
+    re.IGNORECASE,
+)
+# A reason that says the stop IS inside — used only to detect the reverse
+# contradiction (boolean false, reason says inside). We do NOT flip a removal
+# verdict to "keep" on the strength of text alone (that would weaken the guard);
+# we only make a self-contradiction visible and resolve it toward NOT inside,
+# because the destructive action (removal) still requires high confidence anyway.
+_VERDICT_INSIDE_RE = re.compile(
+    r'\b(?:is\s+)?(?:located\s+)?(?:inside|within)\b'
+    r'|\bpart\s+of\b'
+    r'|\bhoused\s+(?:in|within)\b',
+    re.IGNORECASE,
+)
+
+
+def _reconcile_scope_verdict(inside, reason):
+    """[LOCAL-591] A verdict is its reasoning, not a boolean that can drift from it.
+
+    The containment judge returns a boolean (`inside_scope`) AND a free-text
+    reason. When they disagree, the reason is the ground truth about what the
+    model actually concluded — the boolean is a serialization the model
+    frequently gets backwards (tours 395/396: inside_scope=true alongside
+    "King's Chapel is located outside the bounds of Boston Athenaeum").
+
+    Rule: if the reason clearly says OUTSIDE, the verdict is NOT inside — a
+    reasoning text that says "outside" can never be recorded as inside. The
+    boolean is corrected to match the reason. (The destructive action, removal,
+    still requires high confidence downstream — this only stops a
+    self-contradicting verdict from being mis-recorded as inside.)
+
+    Returns the reconciled `inside` boolean. `reason` is inspected, never changed.
+    """
+    r = reason or ''
+    says_outside = bool(_VERDICT_OUTSIDE_RE.search(r))
+    if inside and says_outside:
+        # The boolean said inside; the model's own words say outside. Trust the words.
+        return False
+    return inside
+
+
 def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                                  protect_first=True):
     """
@@ -2177,8 +2230,17 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
             if resp.status_code != 200:
                 return poi, True, "low", f"API error {resp.status_code} - keeping"
             parsed = json.loads(resp.json()["choices"][0]["message"]["content"])
-            return (poi, parsed.get("inside_scope", True),
-                    parsed.get("confidence", "low"), parsed.get("reason", ""))
+            _inside = parsed.get("inside_scope", True)
+            _conf = parsed.get("confidence", "low")
+            _reason = parsed.get("reason", "")
+            # [LOCAL-591] The verdict IS its reasoning. If the model's own words say
+            # the stop is outside, it is not inside — whatever the boolean claimed.
+            _reconciled = _reconcile_scope_verdict(_inside, _reason)
+            if _reconciled != _inside:
+                print(f"   [LOCAL-591] verdict/reason contradiction for '{name}': "
+                      f"inside_scope={_inside} but reason says outside — recording as "
+                      f"NOT inside. reason: {_reason}")
+            return (poi, _reconciled, _conf, _reason)
         except Exception as e:
             return poi, True, "low", f"check error: {e}"
 
