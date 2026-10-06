@@ -156,11 +156,45 @@ def get_device_state(cur, user_id):
     return d
 
 
-def ensure_device(user_id, level='l1'):
-    """Create a device_entitlement row if absent (install default L1). Idempotent."""
+def ensure_device(user_id, level=None):
+    """Create a device_entitlement row if absent. Idempotent.
+
+    [LOCAL-596] On install (no explicit level requested) this now applies the L2
+    seat auto-grant rule instead of pinning L1: a NEW device is granted L2 only
+    if seats in use < the auto-grant threshold (50, from l2_settings) AND the
+    FIFO queue has no waiting entry; otherwise it starts at L1 and may join the
+    queue. The decision is serialized by a seat advisory lock so two parallel
+    installs at 49 seats cannot both pass (see l2_seats.grant_on_install).
+
+    Passing an explicit `level` keeps the old unconditional insert (used by code
+    paths that already know the level, e.g. a migration or a test). Returns the
+    resulting level string.
+    """
     conn = _get_conn()
     try:
         cur = conn.cursor()
+        if level is None:
+            # Seat-aware install auto-grant (the single authority).
+            import l2_seats
+            try:
+                result_level = l2_seats.grant_on_install(cur, user_id)
+                conn.commit()
+                cur.close()
+                return result_level
+            except Exception as e:
+                # FAIL-CLOSED to L1: if seat state is unreadable, never auto-grant
+                # a scarce L2 seat. Roll back the half-done txn and insert L1.
+                logger.error(f"[LEVELS] seat auto-grant failed for {user_id}: {e}; defaulting L1")
+                conn.rollback()
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO device_entitlement (user_id, level)
+                    VALUES (%s, 'l1')
+                    ON CONFLICT (user_id) DO NOTHING
+                """, (user_id,))
+                conn.commit()
+                cur.close()
+                return 'l1'
         cur.execute("""
             INSERT INTO device_entitlement (user_id, level)
             VALUES (%s, %s)
@@ -168,6 +202,7 @@ def ensure_device(user_id, level='l1'):
         """, (user_id, level))
         conn.commit()
         cur.close()
+        return level
     finally:
         conn.close()
 

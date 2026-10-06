@@ -23,6 +23,13 @@ from referral_engine import (
     generate_referral_code,
     store_referral,
     record_referral_redemption,
+    redeem_referral_for_seat,
+    REDEEM_OK,
+    REDEEM_DUPLICATE,
+    REDEEM_SELF,
+    REDEEM_UNKNOWN,
+    REDEEM_ALLOWANCE_SPENT,
+    REDEEM_SEATS_FULL,
 )
 
 logger = logging.getLogger(__name__)
@@ -216,22 +223,40 @@ def redeem_referral():
             "message": "You cannot redeem your own referral code.",
         }), 403
 
-    # Record redemption (will fail gracefully on duplicate due to UNIQUE constraint)
-    result = record_referral_redemption(code, new_user_id, DATABASE_URL)
+    # [LOCAL-596] Redeem AND grant the redeemer an L2 seat, counted against the
+    # 100-seat cap and gated by the referrer's referral allowance (plans). The
+    # engine does the whole thing in one transaction and returns a structured
+    # result (LOCAL-580 contract).
+    result = redeem_referral_for_seat(code, new_user_id, DATABASE_URL)
 
-    if result == "duplicate":
-        logger.info(f"Duplicate redemption rejected: code={code} user={new_user_id}")
+    if result['ok']:
+        logger.info(
+            f"Referral redeemed+seated: code={code} new_user={new_user_id} "
+            f"referrer={result['referrer_user_id']}"
+        )
         return jsonify({
-            "error": "already_redeemed",
-            "message": "You have already redeemed this referral code.",
-        }), 409
+            "redeemed": True,
+            "granted_level": "l2",
+            "referrer_user_id": result['referrer_user_id'],
+            "message": result['message'],
+        }), 200
 
-    if not result:
-        return jsonify({"error": "Failed to record redemption"}), 500
-
-    logger.info(f"Referral redeemed: code={code} new_user={new_user_id} referrer={referrer_user_id}")
-
+    # Structured refusals → HTTP status map.
+    status_map = {
+        REDEEM_DUPLICATE: 409,
+        REDEEM_SELF: 403,
+        REDEEM_UNKNOWN: 404,
+        REDEEM_ALLOWANCE_SPENT: 409,
+        REDEEM_SEATS_FULL: 409,
+    }
+    http = status_map.get(result['code'], 400)
+    logger.info(
+        f"Referral redeem refused ({result['code']}): code={code} user={new_user_id}"
+    )
     return jsonify({
-        "redeemed": True,
-        "referrer_user_id": referrer_user_id,
-    }), 200
+        "redeemed": False,
+        "error": result['code'],
+        "error_code": result['code'],
+        "message": result['message'],
+        "referrer_user_id": result['referrer_user_id'],
+    }), http
