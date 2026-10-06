@@ -147,6 +147,45 @@ class TestRegroupSafety(unittest.TestCase):
         self.assertEqual(out, ['Show A', 'A: work', 'Lobby'])
 
 
+class TestPooledRegroup(unittest.TestCase):
+    """The orchestrator re-groups POOLED units (which carry no kind) by title:
+    a work's title is 'Artist: Work'; its show is the bare 'Artist'."""
+
+    def test_pooled_works_first_is_regrouped(self):
+        from stop_pool_orchestrator import _regroup_pooled_units
+        units = [
+            {'title': 'Robert Lazzarini: American flag'},
+            {'title': 'Baseera Khan: Second Skin, Half Column 3'},
+            {'title': 'Robert Lazzarini'},
+            {'title': 'Banu Cennetoğlu'},
+            {'title': 'Baseera Khan'},
+        ]
+        out = [u['title'] for u in _regroup_pooled_units(units)]
+        self.assertEqual(out, [
+            'Robert Lazzarini',
+            'Robert Lazzarini: American flag',
+            'Baseera Khan',
+            'Baseera Khan: Second Skin, Half Column 3',
+            'Banu Cennetoğlu',
+        ])
+
+    def test_pooled_already_grouped_unchanged(self):
+        from stop_pool_orchestrator import _regroup_pooled_units
+        units = [{'title': 'A'}, {'title': 'A: w'}, {'title': 'B'}]
+        self.assertEqual([u['title'] for u in _regroup_pooled_units(units)],
+                         ['A', 'A: w', 'B'])
+
+    def test_pooled_no_stop_dropped(self):
+        from stop_pool_orchestrator import _regroup_pooled_units
+        units = [{'title': 'X: w1'}, {'title': 'Y'}, {'title': 'X'}, {'title': 'X: w2'}]
+        out = _regroup_pooled_units(units)
+        self.assertEqual(len(out), 4)
+        titles = [u['title'] for u in out]
+        # X leads its two works.
+        self.assertEqual(titles.index('X') + 1, titles.index('X: w1'))
+        self.assertIn('Y', titles)
+
+
 class TestShortfallSentence(unittest.TestCase):
     """D616 deliverable 2: one honest sentence, from the real counts."""
 
@@ -236,6 +275,9 @@ class TestWiring(unittest.TestCase):
     def test_shortfall_wired_in_orchestrator(self):
         self.assertIn('build_shortfall_sentence', self.orch)
         self.assertIn('shortfall_sentence=', self.orch)
+
+    def test_pooled_regroup_wired_in_orchestrator(self):
+        self.assertIn('_regroup_pooled_units(', self.orch)
 
 
 if __name__ == '__main__':
