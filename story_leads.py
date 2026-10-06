@@ -137,6 +137,20 @@ def _count_grounding_request() -> None:
     _GROUNDING_REQUESTS += 1
 
 
+def _raise_if_grounding_forbidden(what: str) -> None:
+    """[LOCAL-597] Raise GroundingForbiddenError if an L2 by-reference build is
+    active. Lazily imports the guard so story_leads has no hard dependency on it
+    (and so a build without the module simply never forbids). Any import failure
+    is treated as 'not forbidden' — the guard is an extra safety net, never a new
+    way for ordinary generation to break."""
+    try:
+        import l2_by_reference
+    except Exception:
+        return
+    l2_by_reference._raise_if_forbidden(what)
+
+
+
 def _count_grounding_queries(web_search_queries) -> None:
     """[LOCAL-594] Record the Google search queries a grounded response reported.
 
@@ -193,6 +207,9 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     # here, where the key exists and we are about to issue it. Ungrounded calls
     # (grounded=False) are free of the per-request grounding charge and not counted.
     if grounded:
+        # [LOCAL-597] A grounded request is forbidden during an L2 by-reference
+        # build (zero grounding). Raise before counting / issuing it.
+        _raise_if_grounding_forbidden('grounded Gemini request (_gemini)')
         _count_grounding_request()
     r = requests.post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
@@ -274,6 +291,8 @@ def gemini_with_sources(prompt: str, model: str = None,
         # here when a request is actually going out. Guarded by grounded=True so
         # an explicitly ungrounded call is not charged the per-request rate.
         if grounded:
+            # [LOCAL-597] Forbidden during an L2 by-reference build (zero grounding).
+            _raise_if_grounding_forbidden('grounded Gemini request (gemini_with_sources)')
             _count_grounding_request()
         r = requests.post(
             f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
