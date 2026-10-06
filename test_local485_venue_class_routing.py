@@ -234,8 +234,16 @@ class TestWiringSourceAssertions(unittest.TestCase):
         self.assertIn('_detect_worship_civic_class(location, tour_type)', self.src)
 
     def test_s15_excludes_worship_civic(self):
-        # The S15 force-museum condition must include the worship/civic exclusion.
-        self.assertIn('and not _detect_worship_civic_class(location, tour_type)', self.src)
+        # The S15 force-museum decision must still exclude worship/civic venues.
+        # [LOCAL-591] The decision was lifted into _should_force_museum(); the
+        # exclusion now lives there (and the behavioural revert-guard is
+        # TestBreakTheRoutingGoesRed below). Assert the seam still consults the
+        # worship/civic detector so a revert of the exclusion goes red.
+        force_src = inspect.getsource(gtt._should_force_museum)
+        self.assertIn('_detect_worship_civic_class(location, tour_type)', force_src)
+        self.assertIn('return False', force_src)
+        # And the S15 block must call the seam (wiring, not a drifting copy).
+        self.assertIn('_should_force_museum(', self.src)
 
     def test_classifier_routes_worship_civic_to_place(self):
         csrc = inspect.getsource(gtt._classify_tour_category)

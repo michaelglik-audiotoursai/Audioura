@@ -24464,3 +24464,18 @@ Also deleted at Michael's request (2026-10-05 20:2x): tours 391 (en) and 392 (ru
 with website menu items as stops; their 5 stop_metrics; and share code NCyh65N7 (pointed at 392). Counts
 204 → 202 (real 60 → 58). Backups: `/Volumes/AudiouraSSD/deleted_tours/` (audio_tours_391/392.json incl.
 ZIPs, stop_metrics_391_392.json, shared_tours_391_392.json).
+
+## D610 — Stop pool live on the local stack; cache never serves fewer stops than asked (2026-10-05, LEAD)
+
+LOCAL-590 merged (subscribed 1f093e0) and running locally (pool ON; `DISABLE_STOP_POOL=1` turns it off).
+Measured live, isolated: MFA 5→7 reused 4 / new 3, **$0.63 vs $1.13 full (−44%), 403 s vs 740 s (−46%)**;
+Boston Common 4→6 reused 4 / new 2 / 4 transitions rewritten (Michael's prediction), $0.09. Griffin
+reuse was NOT shown live (a flaky QID lookup split the pool across keys; fixed by reading both keys,
+unit-tested). The pool already holds 7 Griffin stops from Kiro's runs, so Michael's next Griffin ≤7 request
+is served from the pool.
+**Found reviewing it (storied 91999e9, forward-merged):** `get_cached_tour` returned a cached tour with
+FEWER stops than requested in the same bucket (a 4-stop tour answering a 6-stop request). Now a miss.
+Test red on old code. **Follow-up:** LOCAL-590's tests wrote ~30 `zz_isolated_*` venues into the shared
+DB's `stop_pool`. Harmless (unmatchable names) but tests must use a transaction/rollback or a test DB.
+
+Also deleted at Michael's request (2026-10-05 23:5x): tours 395 (en) / 396 (ru), the Athenaeum tour that became a city walk (LOCAL-591); 3 stop_metrics. Counts 204 -> 202 (real 60 -> 58). Backups in /Volumes/AudiouraSSD/deleted_tours/.
