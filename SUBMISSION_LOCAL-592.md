@@ -343,3 +343,116 @@ LOCAL-584 gate (not literally supported — D584), so the opening section carrie
   .continuous_dev/STATUS.md.
 - Base verified: `git merge-base --is-ancestor 9802745 HEAD` exits 0; committed + pushed after each
   step on `LOCAL-592-about-in-stop1`.
+
+
+---
+
+## r3 — State the real hours and admission the venue's own pages give
+
+### Why it bounced (LEAD review, 2026-10-06 10:4x)
+r2 fixed the order and the addresses, but the live Griffin Stop 1 said only
+**"Check opening hours and admission on griffinmuseum.org before you go."** — a pointer, no
+facts — even though the Griffin's own site states BOTH on
+`https://griffinmuseum.org/about-the-griffin-2026/` ("Tuesday through Sunday: Noon to 4 PM.
+Closed: Every Monday …" and "General Admission: $12 for adults, $8 for seniors …"). The live
+extractor read `/plan-your-visit` and `/visit` (hours, no price), produced garbage spans, and the
+result never surfaced. Michael: opening hours and admission are "very important".
+
+### Root cause (found by probing the live site)
+1. **The facts page was never fetched.** The fixed `_STORY_SEEDS` are generic slugs (`/about`,
+   `/visit`, `/plan-your-visit`). On the live Griffin those are all `200`s but carry no visitor
+   facts; the real page is the venue-specific slug **`/about-the-griffin-2026/`**, which the seeds
+   never reach. (Confirmed live: that slug yields `'Closed on Monday. Noon–4 PM. $12'`; `/visit`,
+   `/about`, home all yield nothing usable.)
+2. **The extractor mis-read non-time digits as hours.** On the Boston Athenaeum `/visit` the real
+   hours ("Monday–Thursday: 9 am – 8 pm") were present, but the loose single-range fallback matched
+   a **phone number** ("(617) 720-**7604**" → `20–76`) and a year, which the LOCAL-584 gate then
+   correctly dropped — so the whole result was discarded.
+3. **The first gate-passing page won and stopped.** r1/r2 broke on the first page, so hours on one
+   page and the price on another were never combined.
+
+### What changed (r3)
+
+**1. Reach the venue's real visiting page — `stop_pool_orchestrator._discover_visiting_urls`.**
+Fetch the home page once and follow its OWN navigation links whose href or anchor text names
+Visit / Plan Your Visit / Hours / Admission / Tickets / About, staying on the venue's domain. This
+reaches `/about-the-griffin-2026/` (and the Athenaeum's `/visit/`) whatever the slug, without
+guessing and without leaving the venue's site. The discovered URLs are read before the fixed seeds.
+
+**2. State what is known, merged across pages — `stop_pool_orchestrator._source_practical_facts`.**
+Walk ALL the venue's own pages, gate-verify each page's facts against THAT page (unchanged LOCAL-584
+honesty contract), and **merge the survivors by claim type** (closed day, hours, admission),
+preferring an admission segment that carries a concrete price. **The "too short — omitting" rule is
+gone for the Stop-1 visiting section**: hours without a price (or a price without hours) is still
+stated. Injectable `fetcher` for offline tests.
+
+**3. Capture day-schedule hours; never read a phone number as hours — `visitor_facts_extractor`.**
+Added a day-schedule pattern ("Monday–Thursday: 9 AM – 8 PM" — the live Athenaeum) and required a
+time marker (am/pm/colon/noon/midnight) on at least one side of the loose single-range fallback, so
+`720-7604`/years can no longer be mistaken for hours. The Griffin "Noon to 4 PM" path is unchanged.
+
+**4. Partial pointer — only for what is missing — `about_museum_stop.build_opening_section`.**
+When facts are stated, the website pointer covers ONLY the gap:
+- hours known, admission missing → "Admission prices are listed on `<site>`."
+- admission known, hours missing → "Opening hours are listed on `<site>`."
+- both known → no pointer; neither known → the full r2 pointer.
+It never repeats a field already stated and never invents a value (D584).
+
+### Tests (RED on 95f364d, GREEN after)
+`test_local592_about_in_stop1.py` adds four classes (14 new tests, suite now **38 passed**):
+- `TestVisitingInfoStatesKnownFacts` — `_source_practical_facts` states hours (visit page) AND the
+  price (About page) merged; hours-only and admission-only pages are NOT dropped as "too short".
+- `TestPartialPointerOnlyForMissing` — the pointer covers only the missing field; no pointer when
+  both are known; full pointer when neither is known.
+- `TestDayScheduleHoursExtraction` — "Monday-Thursday: 9 AM – 8 PM" is extracted; a phone number is
+  never read as hours; the Griffin "Noon to 4 PM" still extracts.
+- `TestVisitingLinkDiscovery` — discovery follows the home-page Visit nav link to the real slug and
+  stays on the venue's domain.
+
+**Suite exits (all 0):**
+```
+exit=0 test_local592_about_in_stop1            38 passed
+exit=0 test_local584_venue_bound_hours         10 passed
+exit=0 test_local584_practical_facts_currency  14 passed
+exit=0 test_local585_about_museum_stop         24 passed
+exit=0 test_local585_r2_about_hygiene          10 passed
+exit=0 test_local590_assembly                  16 passed
+exit=0 test_local590_pool_store                18 passed
+exit=0 test_local590_orchestrator               8 passed
+exit=0 test_local582_museum_overview           20 passed
+```
+
+### Isolated live run (disposable `local592-gen-$(date +%s)`, never `audioura-*`)
+`./run_local592_live.sh` — `development_default` network (postgres-2 pool), OpenAI hard cap
+**$1.00**, tour cache OFF, `audio_tours` **BEFORE/AFTER 202 / 202** (never DELETE),
+`total_cost=0.0` (served from the pool). Both logged `practical_facts=yes`.
+
+**GRIFFIN — 7 stops (requested 7); Stop 1 visiting line:**
+```
+Before you go in, a few practical notes. Closed on Monday. Noon–4 PM. $12.
+```
+Both hours AND admission stated (the real Griffin facts) — no website pointer, because both are
+known.
+
+**ATHENAEUM — 5 stops (requested 5); Stop 1 visiting line:**
+```
+Before you go in, a few practical notes. 9 AM–8 PM. Admission prices are listed on bostonathenaeum.org.
+```
+The real hours are stated; the pointer covers ONLY the missing admission. (The page's
+`'Free for Métropole residents'` span was correctly dropped by the LOCAL-584 gate — not literally
+supported — so only the real `9 AM–8 PM` survived: silence/honesty over a guess, D584.)
+
+```
+{'tag':'ATHENAEUM','n':5,'requested':5,'exactly_n':True,'no_about_stop':True,'has_about_content':True,'has_practical':True,'non_artwork':True,'covers_arch':True,'total_cost':0.0}
+{'tag':'GRIFFIN','n':7,'requested':7,'exactly_n':True,'no_about_stop':True,'has_about_content':True,'has_practical':True,'non_artwork':False,'total_cost':0.0}
+```
+(`non_artwork=False` on Griffin is the same audit false-positive noted in r1/r2: the heuristic scans
+the whole of Stop 1 including the exhibition body "The work titled 'Interference' …"; the About
+opening section itself is artwork-framing-free, as the unit tests assert.)
+
+### Process (r3)
+- No GCloud. Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Base verified: `git merge-base --is-ancestor 95f364d HEAD` exits 0; `git rev-list --count
+  95f364d..HEAD` = 2. Committed + pushed after each step on `LOCAL-592-about-in-stop1`
+  (`997f8bf`, `a40885a`). Branch created from HEAD, never from `origin/*`.
