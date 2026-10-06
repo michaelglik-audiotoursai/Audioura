@@ -241,7 +241,15 @@ def get_operation_cost(job_id: str) -> Optional[dict]:
 # fall back to $0.00 rather than overcharge.
 # These are 3× the max observed fresh cost for each type.
 _FRESH_COST_SANITY_CEILING = {
-    "tour_generate": 0.25,       # max observed ~$0.08, 3× = $0.24 → round to $0.25
+    # [LOCAL-594] Raised from 0.25 → 3.00. The old $0.25 predated grounding being
+    # metered: a fresh tour was ~$0.08 (LLM+TTS only). Now a grounding-inclusive
+    # fresh tour is far larger — measured live ~$1.47–1.70 LLM alone, plus Google
+    # Search queries at $0.014 each — so a legitimate grounding-inclusive
+    # tour_generate row routinely exceeds $0.25. At the old ceiling that row was
+    # rejected and the matching cache hit charged $0.00 (undercharge), the exact
+    # flooring LOCAL-594 r2 was asked to fix. $3.00 matches the live COST_HARD_LIMIT
+    # for a tour and still rejects a truly implausible pre-LOCAL-197 inflated row.
+    "tour_generate": 3.00,       # grounding-inclusive fresh tour ~$1.5–2.5; was 0.25 (LLM+TTS only)
     "news_generate": 0.05,       # max observed ~$0.011, 3× ≈ $0.033 → round to $0.05
     "translation_generate": 1.80,  # max observed ~$0.54, 3× = $1.62 → round to $1.80
 }
