@@ -1117,6 +1117,328 @@ def _fetch_entity_properties(qid: str, label: str) -> Optional[VenueEntity]:
 
 
 # ============================================================
+# LOCAL-599: Wikidata-independent official-site discovery
+# ============================================================
+# Many small / university / teaching museums (MassArt Art Museum, Boston) have
+# NO Wikidata item of their own — only their parent organisation does. The
+# existing site discovery runs ONLY through Wikidata P856 or the venue's own
+# Wikipedia article, so resolve_venue() returns None, no site is found, no
+# corpus is built, and the run clean-fails in seconds. But the museum's own
+# site (maamboston.org) answers every question at once.
+#
+# This block finds the official site WITHOUT a Wikidata venue entity:
+#   1. Serper web search ("<venue>" <city> official site), top 10.
+#   2. Deterministic scoring of each candidate homepage: the domain whose
+#      <title>/og:site_name matches the venue name and whose page or footer
+#      carries the city or street address wins. NO LLM.
+#   3. Aggregators (tripadvisor, yelp, wikipedia, facebook, instagram,
+#      culturetrip, timeout, google, …) are rejected outright.
+#   4. Parent-org route: Wikidata search for the institution named in the venue
+#      string (MassArt → Q4381563 Massachusetts College of Art and Design),
+#      then its P856 site, as a fallback when the web search is inconclusive.
+#
+# Returns a SiteDiscovery with the picked URL and a diagnostics trail that the
+# caller logs. When nothing is found the caller keeps the current clean fail.
+
+# Domains that are never a museum's own official site. Substring match on the
+# registrable host. Kept explicit (not a heuristic) so the pick is auditable.
+_AGGREGATOR_DOMAINS = frozenset({
+    'tripadvisor', 'yelp', 'wikipedia', 'wikimedia', 'wikidata', 'facebook',
+    'instagram', 'twitter', 'x.com', 'culturetrip', 'timeout', 'google',
+    'youtube', 'pinterest', 'tiktok', 'linkedin', 'foursquare', 'reddit',
+    'eventbrite', 'meetup', 'groupon', 'expedia', 'booking.com', 'getyourguide',
+    'viator', 'atlasobscura', 'wikivoyage', 'mapquest', 'bing', 'yahoo',
+    'maps.apple', 'goo.gl', 'bit.ly', 'medium.com', 'wordpress.com',
+    'blogspot', 'amazonaws', 'patch.com', 'niche.com', 'usnews',
+    'collegedata', 'cappex', 'wikicfp',
+})
+
+# Government / open-data hosts that are informative but never the venue's own
+# marketing site (and should not be mined as a corpus source here).
+_NON_SITE_DOMAINS = frozenset({
+    'loc.gov', 'bnf.fr', 'viaf.org', 'archive.org', 'data.gov',
+})
+
+_STOPWORDS_NAME = {
+    'the', 'of', 'and', 'a', 'an', 'at', 'de', 'du', 'des', 'le', 'la', 'les',
+    'museum', 'gallery', 'art', 'arts', 'center', 'centre', 'college',
+    'institute', 'institution', 'school', 'university',
+}
+
+
+@dataclass
+class SiteDiscovery:
+    """Result of Wikidata-independent official-site discovery."""
+    official_url: str = ""
+    source: str = ""          # 'web_search' | 'parent_org' | ''
+    language: str = "en"
+    parent_qid: str = ""      # set when the parent-org route was used
+    diagnostics: Dict = field(default_factory=dict)
+
+    @property
+    def found(self) -> bool:
+        return bool(self.official_url)
+
+
+def _registrable_host(url: str) -> str:
+    """Lowercase host of a URL, 'www.' stripped. '' when unparseable."""
+    from urllib.parse import urlparse as _up
+    try:
+        if '://' not in url:
+            url = 'https://' + url
+        host = _up(url).netloc.lower()
+        return host[4:] if host.startswith('www.') else host
+    except Exception:
+        return ''
+
+
+def _is_aggregator_host(host: str) -> bool:
+    if not host:
+        return True
+    return (any(bad in host for bad in _AGGREGATOR_DOMAINS)
+            or any(host == nd or host.endswith('.' + nd) for nd in _NON_SITE_DOMAINS))
+
+
+def _name_tokens(text: str) -> Set[str]:
+    """Significant lowercase word tokens of a venue/site name (stopwords out)."""
+    toks = re.findall(r"[a-z0-9]+", (text or '').lower())
+    return {t for t in toks if t not in _STOPWORDS_NAME and len(t) > 1}
+
+
+def _serper_search(query: str, api_key: str = "", num: int = 10) -> List[Dict]:
+    """Run ONE Serper web search. Returns the 'organic' list (possibly empty).
+
+    Costs $0.001/query (cost_rates.SERPER_COST_PER_QUERY). Returns [] on any
+    error or when no key is configured — the caller falls back to parent-org.
+    """
+    import json as _json
+    import urllib.request
+    key = api_key or os.environ.get('SERP_API_KEY', '')
+    if not key:
+        print("  [LOCAL-599] No SERP_API_KEY — web-search discovery skipped")
+        return []
+    payload = _json.dumps({"q": query, "num": num}, ensure_ascii=False).encode('utf-8')
+    try:
+        req = urllib.request.Request(
+            "https://google.serper.dev/search",
+            data=payload,
+            headers={"X-API-KEY": key, "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = _json.loads(resp.read().decode())
+        return body.get("organic", []) or []
+    except Exception as e:
+        print(f"  [LOCAL-599] Serper search failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _fetch_homepage_meta(url: str, timeout: int = 10) -> Dict:
+    """Fetch a homepage and extract (title, og:site_name, visible text).
+
+    Returns {'status', 'title', 'og_site_name', 'text', 'error'}. Network/parse
+    failures are reported, not raised (status 0 == no HTTP response).
+    """
+    import os as _os  # imported here so a test can monkeypatch requests only
+    try:
+        if '://' not in url:
+            url = 'https://' + url
+        resp = requests.get(url, headers={"User-Agent": _USER_AGENT},
+                            timeout=timeout, allow_redirects=True)
+        html = resp.text if (resp.status_code == 200 and resp.text) else ''
+        status = resp.status_code
+        error = ''
+    except Exception as e:
+        html, status, error = '', 0, f"{type(e).__name__}: {e}"
+    title, og_site = '', ''
+    text = ''
+    if html:
+        _m = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
+        if _m:
+            title = re.sub(r'\s+', ' ', _m.group(1)).strip()
+        _og = re.search(
+            r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\'](.*?)["\']',
+            html, re.IGNORECASE)
+        if _og:
+            og_site = _og.group(1).strip()
+        # Strip tags for the city/address check (footer lives in the body text).
+        _stripped = re.sub(r'<(script|style)\b.*?</\1>', ' ', html,
+                           flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', _stripped)).strip()
+    return {'status': status, 'title': title, 'og_site_name': og_site,
+            'text': text, 'error': error}
+
+
+def _score_candidate(host: str, meta: Dict, venue_tokens: Set[str],
+                     city: str) -> Tuple[int, List[str]]:
+    """Deterministic score for one homepage. Higher = more likely the official
+    site. Returns (score, reasons). Negative/zero score = reject.
+
+    Signals (all deterministic, no LLM):
+      +3  <title> or og:site_name token-overlaps the venue name (>= 2 tokens,
+          or all venue tokens when the name is short)
+      +2  the venue's distinctive tokens appear in the host itself
+      +2  the city appears in the page/footer text
+      +2  a US street address pattern ("621 Huntington Ave") appears
+      -5  homepage did not return HTTP 200
+    """
+    reasons: List[str] = []
+    score = 0
+    title_tokens = _name_tokens(meta.get('title', '')) | _name_tokens(meta.get('og_site_name', ''))
+    overlap = venue_tokens & title_tokens
+    need = 2 if len(venue_tokens) >= 2 else 1
+    if len(overlap) >= need:
+        score += 3
+        reasons.append(f"title_match({sorted(overlap)})")
+    # Distinctive venue tokens embedded in the host (maamboston ~ "boston";
+    # also matches venues whose name is in the domain).
+    host_core = re.sub(r'[^a-z0-9]', '', host)
+    host_hits = {t for t in venue_tokens if len(t) >= 4 and t in host_core}
+    if host_hits:
+        score += 2
+        reasons.append(f"host_name({sorted(host_hits)})")
+    text_l = (meta.get('text', '') or '').lower()
+    if city and city.strip() and city.strip().lower() in text_l:
+        score += 2
+        reasons.append(f"city({city.strip()})")
+    if re.search(r'\b\d{1,5}\s+[A-Za-z0-9.\' ]+\b(?:ave|avenue|st|street|rd|road|'
+                 r'blvd|boulevard|dr|drive|ln|lane|way|pkwy|parkway)\b',
+                 meta.get('text', ''), re.IGNORECASE):
+        score += 2
+        reasons.append("street_address")
+    if meta.get('status', 0) != 200:
+        score -= 5
+        reasons.append(f"http_{meta.get('status', 0)}")
+    return score, reasons
+
+
+def _parent_org_route(venue_string: str, searcher=None) -> Tuple[str, str, Dict]:
+    """Parent-org fallback: Wikidata-search the institution named in the venue
+    string, take the first museum/organisation hit's P856 site.
+
+    MassArt Art Museum → "Massachusetts College of Art and Design" (Q4381563)
+    → P856. Returns (url, parent_qid, diag). ('' when nothing usable.)
+    """
+    search = searcher or _search_entities
+    diag: Dict = {'queries': []}
+    # Candidate institution names to search: the full head (minus a trailing
+    # "Art Museum"/"Museum"/"Gallery") and the full string itself.
+    head = re.sub(r'(?i)\s+(art\s+)?(museum|gallery)\s*$', '', venue_string).strip()
+    tries = []
+    for q in (head, venue_string):
+        if q and q not in tries:
+            tries.append(q)
+    for q in tries:
+        diag['queries'].append(q)
+        hits = search(q)
+        if not hits:
+            continue
+        for qid, label in hits[:5]:
+            ent = _fetch_entity_properties(qid, label)
+            if ent and ent.official_url:
+                host = _registrable_host(ent.official_url)
+                if _is_aggregator_host(host):
+                    continue
+                diag['parent_qid'] = qid
+                diag['parent_label'] = label
+                diag['parent_site'] = ent.official_url
+                return ent.official_url, qid, diag
+    return '', '', diag
+
+
+def discover_official_site(
+    venue_string: str,
+    city: str = "",
+    *,
+    serper_searcher=None,
+    homepage_fetcher=None,
+    parent_searcher=None,
+) -> SiteDiscovery:
+    """Find a museum's official site WITHOUT a Wikidata venue entity (LOCAL-599).
+
+    Deterministic, no LLM. Logs every candidate and the pick. Injectable
+    ``serper_searcher(query) -> organic[]``, ``homepage_fetcher(url) -> meta``
+    and ``parent_searcher(query) -> [(qid,label)]`` make it fully unit-testable
+    with no network.
+
+    Returns a SiteDiscovery (``.found`` False when nothing passed the gate — the
+    caller keeps the current clean fail for that case).
+    """
+    # Separate the venue name from a trailing ", City, State" tail for the query
+    # and for the city signal.
+    _name = re.sub(r',\s*[^,]+(?:,\s*[^,]+)?$', '', venue_string).strip() or venue_string
+    _city = city.strip()
+    if not _city and ',' in venue_string:
+        _parts = [p.strip() for p in venue_string.split(',')]
+        if len(_parts) >= 2:
+            _city = _parts[1]
+    venue_tokens = _name_tokens(_name)
+    diag: Dict = {'name': _name, 'city': _city, 'candidates': [], 'route': ''}
+
+    search = serper_searcher or (lambda q: _serper_search(q))
+    fetch = homepage_fetcher or _fetch_homepage_meta
+
+    query = f'"{_name}" {_city} official site'.strip()
+    diag['query'] = query
+    print(f"  [LOCAL-599] Official-site search: {query}")
+    organic = search(query)
+    diag['organic_count'] = len(organic)
+
+    # Score each distinct non-aggregator host's homepage.
+    best_url, best_score, best_reasons = '', 0, []
+    seen_hosts: Set[str] = set()
+    for hit in organic[:10]:
+        link = (hit.get('link') or hit.get('url') or '').strip()
+        if not link:
+            continue
+        host = _registrable_host(link)
+        if not host or host in seen_hosts:
+            continue
+        seen_hosts.add(host)
+        if _is_aggregator_host(host):
+            diag['candidates'].append({'host': host, 'rejected': 'aggregator'})
+            print(f"  [LOCAL-599]   reject (aggregator): {host}")
+            continue
+        home = f"https://{host}/"
+        meta = fetch(home)
+        score, reasons = _score_candidate(host, meta, venue_tokens, _city)
+        diag['candidates'].append({'host': host, 'score': score, 'reasons': reasons,
+                                   'title': meta.get('title', '')[:120]})
+        print(f"  [LOCAL-599]   candidate: {host} score={score} {reasons} "
+              f"title={meta.get('title', '')[:80]!r}")
+        if score > best_score:
+            best_url, best_score, best_reasons = home, score, reasons
+
+    # A pick needs a positive score AND at least one NAME signal (title or host)
+    # so a page that only mentions the city can't win on its own.
+    _name_signal = any(r.startswith('title_match') or r.startswith('host_name')
+                       for r in best_reasons)
+    if best_url and best_score >= 3 and _name_signal:
+        diag['route'] = 'web_search'
+        diag['pick'] = best_url
+        diag['pick_score'] = best_score
+        print(f"  [LOCAL-599] PICK (web_search): {best_url} score={best_score} {best_reasons}")
+        return SiteDiscovery(official_url=best_url, source='web_search',
+                             diagnostics=diag)
+
+    # Parent-org route.
+    print(f"  [LOCAL-599] Web search inconclusive (best score={best_score}) — "
+          f"trying parent-org route")
+    purl, pqid, pdiag = _parent_org_route(venue_string, searcher=parent_searcher)
+    diag['parent_route'] = pdiag
+    if purl:
+        diag['route'] = 'parent_org'
+        diag['pick'] = purl
+        print(f"  [LOCAL-599] PICK (parent_org {pqid}): {purl}")
+        return SiteDiscovery(official_url=purl, source='parent_org',
+                             parent_qid=pqid, diagnostics=diag)
+
+    print(f"  [LOCAL-599] No official site discovered for '{venue_string}' "
+          f"(web + parent-org exhausted)")
+    return SiteDiscovery(official_url='', source='', diagnostics=diag)
+
+
+# ============================================================
 # PHASE 2: Venue Corpus Cache Layer
 # ============================================================
 # Caches discovery results in Postgres to avoid re-mining on repeat requests.

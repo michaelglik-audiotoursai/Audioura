@@ -480,6 +480,39 @@ def _overall_from_new(new_text: str) -> Optional[str]:
     return None
 
 
+def _discover_site_url_fallback(venue_string: str, locality: str = "") -> str:
+    """[LOCAL-599B] Find a venue's official site when it has NO Wikidata entity.
+
+    Reuses venue_resolver.discover_official_site (the LOCAL-599 Wikidata-independent
+    web-search + parent-org discovery) so the opening section and the venue-address
+    resolution can reach a no-Wikidata museum's own /visit and /about pages
+    (MassArt → maam.massart.edu). Deterministic, honest: returns the discovered URL
+    or "" (never a guess). Best-effort: any import/network failure returns "".
+    """
+    if os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
+        return ""
+    try:
+        from venue_resolver import discover_official_site
+    except Exception:
+        return ""
+    city = ""
+    if locality:
+        city = locality.split(",")[0].strip()
+    elif "," in (venue_string or ""):
+        city = venue_string.split(",")[1].strip()
+    try:
+        disc = discover_official_site(venue_string or "", city)
+    except Exception as e:
+        logger.info(f"[LOCAL-599B] official-site discovery for opening section "
+                    f"failed ({e})")
+        return ""
+    if disc is not None and getattr(disc, "found", False):
+        print(f"  [LOCAL-599B] opening-section site discovered (route="
+              f"{getattr(disc, 'source', '?')}): {disc.official_url}")
+        return disc.official_url or ""
+    return ""
+
+
 def _resolve_venue_address(location: str) -> str:
     """[LOCAL-592 r2] Resolve the venue's sourced street address for a contained
     tour, or "". Mirrors _build_opening_section's venue resolution (same site URL
@@ -510,6 +543,11 @@ def _resolve_venue_address(location: str) -> str:
     parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
     if parts:
         locality = ", ".join(parts[:2])
+    # [LOCAL-599B] No-Wikidata venue → discover the official site so the venue's
+    # own address can be lifted from its /visit page (parity with the opening
+    # section). Best-effort; "" when nothing is discovered.
+    if not site_url:
+        site_url = _discover_site_url_fallback(clean_name or location, locality) or site_url
     sourced = _source_venue_address(venue, site_url, locality)
     # Prefer the page-sourced address; fall back to the entity address if present.
     return sourced or (address or "").strip()
@@ -567,6 +605,16 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
     parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
     if parts:
         locality = ", ".join(parts[:2])
+
+    # [LOCAL-599B] When the venue has NO Wikidata entity (MassArt), resolve_venue
+    # returns None and site_url is empty — so the D611 opening section could not be
+    # sourced from /visit and /about and Stop 1 shipped with no About/hours/
+    # admission. Reuse the LOCAL-599 Wikidata-independent official-site discovery
+    # here so the opening section reaches the venue's own pages exactly as the
+    # exhibition path does. Best-effort: any failure leaves site_url as-is.
+    if not site_url:
+        site_url = _discover_site_url_fallback(clean_name or location,
+                                               locality) or site_url
 
     # [LOCAL-592] Source the practical facts (hours/admission/closed days) from the
     # venue's own visit page and gate them (LOCAL-584). Fully best-effort: a failure
@@ -678,6 +726,91 @@ def _discover_visiting_urls(site_url: str, fetch, max_links: int = 8) -> list:
     return out
 
 
+# [LOCAL-599B] Compact clock format normaliser. Some venues render times as
+# "12 – 8p" / "12 – 5p" (a bare 'p'/'a' suffix, en-dash, nbsp) — MAAM's /visit
+# uses exactly this, one weekday per record-separated line
+# ("Thursday 12 – 8p\x1eFriday 12 – 5p"). The LOCAL-592 visitor_facts_extractor
+# keys on "am"/"pm" with BOTH range sides marked and the day on the SAME line, so
+# the compact form yielded NO hours and Stop 1 lost its day-bound hours. This
+# pure, deterministic normaliser rewrites ONLY tokens the page already states into
+# the spelling the extractor recognises — it never invents a time:
+#   * decode &nbsp;/&#160; and the nbsp/word-joiner code points to spaces;
+#   * expand an unambiguous trailing 'p'/'a' on a clock number ("8p" → "8 pm");
+#   * when a range's SECOND side has a meridiem but the FIRST is a bare clock
+#     ("12 – 5 pm"), copy the meridiem onto the first side ("12 pm – 5 pm") so the
+#     extractor's "both sides marked" rule is satisfied with the page's own value;
+#   * turn the record-separator (\x1e) between day lines into ", " so each
+#     "Day time–time" line is one parseable schedule entry.
+_COMPACT_TIME_RE = re.compile(r'(?<!\d)(\d{1,2}(?::\d{2})?)\s*([ap])\b(?!m)',
+                              re.IGNORECASE)
+_BARE_START_RANGE_RE = re.compile(
+    r'(?<!\d)(\d{1,2}(?::\d{2})?)\s*([-–—])\s*(\d{1,2}(?::\d{2})?)\s*(am|pm)\b',
+    re.IGNORECASE)
+
+
+def _normalize_compact_times(text: str) -> str:
+    if not text:
+        return text
+    import html as _html
+    t = _html.unescape(text)                       # &nbsp; → \u00a0
+    t = t.replace('\u00a0', ' ').replace('\u2060', ' ')  # nbsp / word-joiner
+    t = t.replace('\x1e', ', ')                    # day-line record separator
+
+    def _expand(m):
+        clock, suffix = m.group(1), m.group(2).lower()
+        return f"{clock} {'pm' if suffix == 'p' else 'am'}"
+
+    t = _COMPACT_TIME_RE.sub(_expand, t)
+
+    def _carry(m):
+        start, dash, end, mer = m.group(1), m.group(2), m.group(3), m.group(4).lower()
+        return f"{start} {mer} {dash} {end} {mer}"
+
+    t = _BARE_START_RANGE_RE.sub(_carry, t)
+    return t
+
+
+# Weekday order for subsumption checks (the grouped "X through Y" segment).
+_WEEKDAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+                  'saturday', 'sunday']
+
+
+def _expand_day_range(day_phrase: str) -> set:
+    """Expand 'Friday through Sunday' / 'Mon-Wed' → {friday,saturday,sunday}."""
+    dl = (day_phrase or '').lower()
+    found = [d for d in _WEEKDAY_ORDER if d in dl]
+    if not found:
+        return set()
+    if re.search(r'through|thru|to|[-–—]', dl) and len(found) >= 2:
+        i, j = _WEEKDAY_ORDER.index(found[0]), _WEEKDAY_ORDER.index(found[-1])
+        if i <= j:
+            return set(_WEEKDAY_ORDER[i:j + 1])
+    return set(found)
+
+
+def _dedupe_hours_segments(segs: List[str]) -> List[str]:
+    """[LOCAL-599B] Drop a grouped day-range hours segment ('Friday through Sunday,
+    12 PM–5 PM') when every day it covers is ALREADY stated by individual-day
+    segments with the SAME time. The LOCAL-592 extractor emits both the per-day
+    rows and a grouped range; stating both reads as a stutter. Pure; preserves
+    order and keeps the first representation seen for each (day,time)."""
+    kept: List[str] = []
+    covered = {}  # time_str -> set(days) already individually stated
+    time_re = re.compile(r'(\d{1,2}(?::\d{2})?\s*(?:AM|PM)\s*[-–—]\s*'
+                         r'\d{1,2}(?::\d{2})?\s*(?:AM|PM))', re.IGNORECASE)
+    for seg in segs:
+        tm = time_re.search(seg)
+        time_key = re.sub(r'\s+', '', tm.group(1).upper()) if tm else seg
+        days = _expand_day_range(seg)
+        is_group = bool(re.search(r'through|thru|[-–—]|\bto\b', seg.lower())
+                        and len(days) >= 2)
+        if is_group and days and days.issubset(covered.get(time_key, set())):
+            continue  # fully subsumed by already-stated individual days
+        kept.append(seg)
+        covered.setdefault(time_key, set()).update(days)
+    return kept
+
+
 def _source_practical_facts(venue: str, site_url: str, address: str = "",
                             fetcher=None) -> str:
     """[LOCAL-592 r3] Fetch + extract + GATE + MERGE the venue's practical facts, or "".
@@ -762,18 +895,28 @@ def _source_practical_facts(venue: str, site_url: str, address: str = "",
             continue
         try:
             sectioned = _html_to_sectioned_text(html)
+            sectioned = _normalize_compact_times(sectioned)
             facts = extract_visitor_facts_from_text(
                 sectioned, 'en', venue_name=venue, venue_address=address)
             formatted = facts.format_en() if facts and not facts.is_empty() else ""
             if not formatted:
                 continue
-            plain = _visible_text(html).lower()
+            # [LOCAL-599B] The gate re-checks each formatted fact against the page's
+            # literal text. Normalise that text the SAME way the extractor's input
+            # was normalised (compact "12 – 8p" → "12 pm – 8 pm"), so a day/time the
+            # page genuinely states is not dropped merely because its on-page
+            # spelling was compact. This never adds a fact the page lacks — it only
+            # aligns the spelling the gate compares against.
+            plain = _normalize_compact_times(_visible_text(html)).lower()
             gated, _dropped = gate_formatted_facts(formatted, plain, source_url=u)
             if not gated or not gated.strip():
                 continue
             # Classify each surviving segment and fold it into the merge. A segment
             # fills its claim-type slot the first time; a priced admission upgrades
-            # an earlier price-less admission.
+            # an earlier price-less admission. [LOCAL-599B] HOURS accumulate every
+            # distinct day-schedule segment from the SAME page (Thu 12–8; Fri–Sun
+            # 12–5) so the full weekly schedule is stated, not just the first day.
+            _page_hours: List[str] = []
             for seg in re.split(r"\.\s+|;\s+", gated):
                 seg = seg.strip().rstrip(".")
                 if not seg:
@@ -784,13 +927,19 @@ def _source_practical_facts(venue: str, site_url: str, address: str = "",
                     if not merged["closed_day"]:
                         merged["closed_day"] = seg
                 elif ctype == "hours":
-                    if not merged["hours"]:
-                        merged["hours"] = seg
+                    if seg not in _page_hours:
+                        _page_hours.append(seg)
                 elif ctype in ("admission", "price_band"):
                     if not merged["admission"] or (
                             not _has_price_token(merged["admission"])
                             and _has_price_token(seg)):
                         merged["admission"] = seg
+            # Keep the richest (most day-schedule segments) hours statement seen.
+            if _page_hours:
+                _page_hours = _dedupe_hours_segments(_page_hours)
+                candidate = "; ".join(_page_hours)
+                if candidate.count(";") > merged["hours"].count(";") or not merged["hours"]:
+                    merged["hours"] = candidate
         except Exception as e:
             logger.info(f"[LOCAL-592] practical-facts extract/gate error on {u} ({e})")
             continue

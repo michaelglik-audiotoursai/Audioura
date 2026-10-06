@@ -78,3 +78,4 @@ newEnv*
 tools/.venv-play/
 .pytest_cache/
 .venue_parts_cache.json
+.git_sha

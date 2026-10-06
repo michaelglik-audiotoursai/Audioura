@@ -4074,6 +4074,12 @@ def _work_prominence_score(entry, corpus_text_lower=""):
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# [LOCAL-599B] Module-level: the site-first exhibition stops delivered by the LAST
+# generation, each mapped to its own source URL + status + kind. A live runner /
+# acceptance harness reads this to report "the 7 stop titles, each with its source
+# URL" (D611) without re-fetching. {} when the last run took no site-first path.
+_LAST_SITE_FIRST_SOURCES = []  # [{'name','source_url','status','kind'}, ...]
+
 # [LOCAL-540] Module-level: the before/after score record from the last generation
 # (see score_and_retry in scorer_retry.py). None on a cache hit or if scoring was
 # skipped. Exposed so a caller can read the defect the scorer saw, whether a retry
@@ -4838,7 +4844,29 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         print("  [D1v2] venue_resolver not available — using heuristic fallback")
     except Exception as e:
         print(f"  [D1v2] venue_resolver error: {e} — using heuristic fallback")
-    
+
+    # [LOCAL-599] No Wikidata venue entity (or P856) → discover the official site
+    # by WEB SEARCH + parent-org route, so a museum with no Wikidata item of its
+    # own (MassArt Art Museum → maamboston.org) still gets a corpus and the
+    # site-first path, instead of a clean fail in seconds. Deterministic, no LLM.
+    if not _base_site_url:
+        try:
+            from venue_resolver import discover_official_site as _disc
+            _parsed_city = ""
+            if "," in venue_name:
+                _cp = [p.strip() for p in venue_name.split(",")]
+                if len(_cp) >= 2:
+                    _parsed_city = _cp[1]
+            _site_disc = _disc(venue_name, _parsed_city)
+            if _site_disc.found:
+                _base_site_url = _site_disc.official_url
+                print(f"  [LOCAL-599] Official site discovered without Wikidata: "
+                      f"{_base_site_url} (route={_site_disc.source})")
+        except ImportError:
+            print("  [LOCAL-599] discover_official_site unavailable — cannot do site-first discovery")
+        except Exception as _de:
+            print(f"  [LOCAL-599] Site discovery error: {type(_de).__name__}: {_de}")
+
     # Fallback: if venue resolver didn't provide a site URL and we have nothing,
     # the degradation ladder will handle fewer verified stops. No hardcoded URLs.
     if not _base_site_url:
@@ -8331,6 +8359,30 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
+            else:
+                # [LOCAL-599] NO Wikidata venue entity (MassArt Art Museum has
+                # none — only its parent, Q4381563, does). Discover the official
+                # site by web search + parent-org route and make the site-first
+                # exhibition path ELIGIBLE from it. The tier becomes exhibit_museum
+                # downstream (0 documented works, >=1 verified from the site), not
+                # unresolvable. Clean fail stays only when NO site is found at all.
+                try:
+                    from venue_resolver import discover_official_site as _disc599
+                    _sd = _disc599(_museum_venue_name, _det_city_hint)
+                    if _sd.found:
+                        _museum_site_first_eligible = True
+                        _museum_site_url = _sd.official_url
+                        _museum_site_language = getattr(_sd, 'language', 'en') or 'en'
+                        _museum_resolved_locality = _det_city_hint or ''
+                        print(f"  [LOCAL-599] No Wikidata entity for '{_museum_venue_name}' — "
+                              f"site discovered (route={_sd.source}); exhibition-museum "
+                              f"site-first path ELIGIBLE (site='{_museum_site_url}')")
+                    else:
+                        print(f"  [LOCAL-599] No Wikidata entity and no official site "
+                              f"discovered for '{_museum_venue_name}' — clean fail path")
+                except Exception as _disc_err:
+                    print(f"  [LOCAL-599] Site discovery (no-Wikidata) failed: "
+                          f"{type(_disc_err).__name__}: {_disc_err}")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
             import traceback
@@ -8735,6 +8787,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _poi['source'] = 'site_exhibition'
                 _exhibition_stops_source = 'site_exhibition'
                 _deterministic_fill_used = True   # Phase 3A GPT is bypassed
+                # [LOCAL-599B] Record each site-first stop's source URL + status +
+                # kind so a live runner can report "N titles, each with its source
+                # URL" (D611) without re-fetching.
+                global _LAST_SITE_FIRST_SOURCES
+                _LAST_SITE_FIRST_SOURCES = [{
+                    'name': _c.get('name', ''),
+                    'source_url': _c.get('source_url') or _c.get('detail_url', ''),
+                    'status': _c.get('status', ''),
+                    'kind': _c.get('kind', 'exhibition'),
+                } for _c in _sf_candidates]
                 # Build a minimal result carrying the combined site text so the
                 # grounding path can confirm each title appears on the site.
                 _exhibition_checklist_result = SiteFirstResult(
@@ -9720,6 +9782,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         _d1_venue_corpus = ""
         _story_corpus_result = None
         _d1v2_result = None  # [LOCAL-72] Initialize for non-museum paths (prevents NameError in three_class_retrieval)
+        # [LOCAL-599] UNIFIED-FILL (below) reads _pre_d1v2_candidates for any tier
+        # in {thin, medium, exhibit_museum}. The site_exhibition grounding branch
+        # sets tier='exhibit_museum' but never ran D1v2, so it never set this. When
+        # a site publishes FEWER current exhibitions than requested (MassArt: 1
+        # show vs 7 stops), the fill block executed and crashed with
+        # UnboundLocalError. Initialise it here so every verification path has it;
+        # the site_exhibition branch overwrites it with its own candidates below.
+        _pre_d1v2_candidates = []
         if tour_category == 'museum' and _museum_venue_name:
             global _LAST_VERIFICATION_TIER
             # [LOCAL-372] Skip D1v2 verification when stops come from the venue's own
@@ -9814,6 +9884,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                       f"the venue page, {_n_unconf} unconfirmed and labelled")
                 _verification_tier = 'exhibit_museum'
                 _LAST_VERIFICATION_TIER = _verification_tier
+                # [LOCAL-599] Keep the site-sourced, grounded stops as the fill
+                # pool base so UNIFIED-FILL has a defined pool (these are already
+                # the only real candidates; nothing is invented).
+                _pre_d1v2_candidates = list(poi_list)
             else:
                 # Try new story_miner-based verification (T0a/T1)
                 # Pass the clean venue name plus the city, so D1v2 can parse city
