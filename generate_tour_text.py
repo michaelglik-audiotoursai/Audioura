@@ -7087,11 +7087,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             "reused_stops": _pool_out.get("reused_stops", 0),
                             "new_stops": _pool_out.get("new_stops", 0),
                             "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
+                            "about_stops": _pool_out.get("about_stops", 0),
                         },
                     }
                     print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
                           f"new={_pool_out.get('new_stops')} "
                           f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
+                          f"about_stops={_pool_out.get('about_stops', 0)} "
                           f"(pool held {_pool_out.get('pooled_before')})")
                     return _pool_out["text"], output_file, (None, None)
             except Exception as _pool_err:
@@ -7900,6 +7902,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # Skip the constraint entirely — do not apply a fabricated venue name.
             _museum_venue_name = ""
             print(f"  [Museum constraint] No venue_name from intent — single-venue constraint skipped")
+        # [LOCAL-585 r2] A themed-in-building request ("Art and Architectual tour in
+        # Boston Athenaeum") must resolve to the BUILDING name wherever the venue is
+        # spoken — the museum directions ("Continue through {venue} — next is …")
+        # and the single-venue constraint. Without this the whole misspelled request
+        # string leaked into the delivered Directions line (LEAD review 2026-10-06).
+        if _museum_venue_name:
+            try:
+                from about_museum_stop import clean_venue_request_name as _clean_venue
+                _cleaned_venue = _clean_venue(_museum_venue_name)
+                if _cleaned_venue and _cleaned_venue != _museum_venue_name:
+                    print(f"  [LOCAL-585 r2] venue cleaned for seams/constraint: "
+                          f"'{_museum_venue_name}' -> '{_cleaned_venue}'")
+                    _museum_venue_name = _cleaned_venue
+            except Exception as _cv_err:
+                print(f"  [LOCAL-585 r2] venue clean skipped: {_cv_err}")
         # [BLOCKER4a] Deterministic venue fallback: extract venue from location string
         # when intent failed to identify it. Case-insensitive.
         if not _museum_venue_name and tour_category == 'museum':

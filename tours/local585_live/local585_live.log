@@ -1,0 +1,113 @@
+=== LOCAL-585 ISOLATED LIVE RUN ===
+model=gpt-4o cap=$1.00 cache=OFF storied=true
+git_sha=unknown
+
+========================================================================
+CASE GRIFFIN: 'Griffin museum of photography, Winchester, MA'  (7 stops requested)
+========================================================================
+  [venue_resolver] Name variants: ['Griffin museum of photography']
+  [venue_resolver] Resolved: 'Griffin museum of photography, Winchester, MA' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [LOCAL-590] pool: venue=qid:Q99108607 type=museum category=museum contained=True requested=7 pooled=7
+  [venue_resolver] Name variants: ['Griffin museum of photography']
+  [venue_resolver] Resolved: 'Griffin museum of photography' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [LOCAL-585] About stop built for 'Griffin Museum of Photography': architecture=False counts_toward_n=False sources=3
+  [LOCAL-590] POOL DELIVERY: reused=7 new=0 rewritten_transitions=0 about_stops=1 (pool held 7)
+
+--- CASE GRIFFIN RESULT (25.6s) ---
+tour_kind              : full
+generation cost        : total=0.0 about_stops=1 reused=7 new=0
+audio_tours BEFORE/AFTER (never DELETE): 202 / 202
+CASE GRIFFIN: delivered 8 stop(s):
+   Stop 1: About Griffin Museum of Photography
+   Stop 2: BU Masters Show 2026 | Traces: Pursuing Process
+   Stop 3: Intertidal : Field Notes
+   Stop 4: Earth, Wind & Fire
+   Stop 5: Tabitha Soren | An Artist Life
+   Stop 6: TLC
+   Stop 7: Lua Kobayashi |The Persistence of Memories
+   Stop 8: Homage | Robert Frank: The Americans
+
+CASE GRIFFIN STOP-1 AUDIT:
+   is 'About <museum>' stop      : True  ('About Griffin Museum of Photography')
+   NOT framed as an artwork      : True
+   carries founder/history/mission: True
+   NO 'consists of a series of frames' anywhere: True
+
+CASE GRIFFIN r2 HYGIENE AUDIT:
+   NO truncated/dangling sentence in Stop 1 : True
+   NO duplicate sentence in Stop 1          : True
+   NO raw lowercase locality in Stop 1      : True
+   NO raw request string in any Directions  : True
+
+CASE GRIFFIN STOP 1 (full narration) >>>>>>>>>>
+Orientation: You are at Griffin Museum of Photography — this opening stop is about the place itself.
+
+Before we look at anything on the walls, here is the story of Griffin Museum of Photography in Winchester, Massachusetts itself — who created it, why it exists, and what it is known for. Arthur Griffin was an American photographer. Building on the legacy of our founder, Arthur Griffin, we cultivate opportunities to engage with and better understand our diverse world through the photographic arts. The Griffin Museum of Photography is a 501(c)3 nonprofit organization dedicated to the art of photography. Guided by our mission, the Griffin Museum is committed to embedding diversity, equity, accessibility, and inclusion across all aspects of our work—including our mindset, practices, outreach, programming, and exhibitions. Founded in 1992 as a private foundation, the Griffin Museum of Photography became a nonprofit public charity in 2000. This account is drawn from the museum's own pages on griffinmuseum.org and public reference sources.
+
+Directions: Continue through Griffin museum of photography — next is BU Masters Show 2026 | Traces: Pursuing Process.
+<<<<<<<<<< CASE GRIFFIN STOP 1 END
+CASE GRIFFIN first two Directions lines:
+   Directions: Continue through Griffin museum of photography — next is BU Masters Show 2026 | Traces: Pursuing Process.
+   Directions: Next: Intertidal : Field Notes.
+
+========================================================================
+CASE ATHENAEUM: 'Art and Architectual tour in Boston Athenaeum, boston, ma'  (5 stops requested)
+========================================================================
+  [venue_resolver] Name variants: ['Art and Architectual tour in Boston Athenaeum']
+  [venue_resolver] No Wikidata candidates for 'Art and Architectual tour in Boston Athenaeum, boston, ma'
+  [LOCAL-590] pool: venue=loc:art and architectual tour in boston athenaeum boston ma type= category=museum contained=True requested=5 pooled=5
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [LOCAL-585] About stop built for 'Boston Athenæum': architecture=True counts_toward_n=False sources=3
+  [LOCAL-590] POOL DELIVERY: reused=5 new=0 rewritten_transitions=0 about_stops=1 (pool held 5)
+
+--- CASE ATHENAEUM RESULT (5.6s) ---
+tour_kind              : full
+generation cost        : total=0.0 about_stops=1 reused=5 new=0
+audio_tours BEFORE/AFTER (never DELETE): 202 / 202
+CASE ATHENAEUM: delivered 6 stop(s):
+   Stop 1: About Boston Athenæum
+   Stop 2: Boys Come Over Here You're Wanted
+   Stop 3: Picture Gallery with Views of Modern Rome
+   Stop 4: Landscape with Cottages and Pond
+   Stop 5: Cutter Expansive Classification
+   Stop 6: Annie Adams Fields
+
+CASE ATHENAEUM STOP-1 AUDIT:
+   is 'About <museum>' stop      : True  ('About Boston Athenæum')
+   NOT framed as an artwork      : True
+   carries founder/history/mission: True
+   covers architecture/building  : True
+   NO 'consists of a series of frames' anywhere: True
+
+CASE ATHENAEUM r2 HYGIENE AUDIT:
+   NO truncated/dangling sentence in Stop 1 : True
+   NO duplicate sentence in Stop 1          : True
+   NO raw lowercase locality in Stop 1      : True
+   NO raw request string in any Directions  : True
+
+CASE ATHENAEUM STOP 1 (full narration) >>>>>>>>>>
+Orientation: You are at Boston Athenæum — this opening stop is about the place itself.
+
+Before we look at anything on the walls, here is the story of Boston Athenæum in Boston, Massachusetts itself — who created it, why it exists, and what it is known for. The Boston Athenæum is one of the oldest independent libraries in the United States. It is a membership library, for which patrons pay a yearly subscription fee to use Athenæum services. The institution was founded in 1807 by the Anthology Club of Boston, Massachusetts. It is located at 10½ Beacon Street on Beacon Hill in Boston. In 1809, it moved to the Rufus Amory House, adjacent to the King’s Chapel Burial Ground. Construction on the Athenaeum’s present home on Beacon Street began in 1847. Designed by Edward Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first floor, the book collection on the second, and a painting gallery on the skylit third floor. Our research books and collections have strengths in Boston history, New England state and local history, and in the fine arts. A word about the building you are standing in. The Boston Athenaeum—a unique combination of library, museum, and cultural center in a magnificent landmark building. This account is drawn from the museum's own pages on bostonathenaeum.org and public reference sources.
+
+Directions: Continue through Boston Athenaeum — next is Boys Come Over Here You're Wanted.
+<<<<<<<<<< CASE ATHENAEUM STOP 1 END
+CASE ATHENAEUM first two Directions lines:
+   Directions: Continue through Boston Athenaeum — next is Boys Come Over Here You're Wanted.
+   Directions: Next: Picture Gallery with Views of Modern Rome.
+
+########################################################################
+LOCAL-585 SUMMARY
+########################################################################
+  {'tag': 'GRIFFIN', 'ok': True, 'n': 8, 'kind': 'full', 'stop1': 'About Griffin Museum of Photography', 'is_about': True, 'non_artwork': True, 'has_history': True, 'covers_arch': None, 'no_frames_leak': True, 'no_dangling': True, 'no_dup': True, 'no_raw_locality': True, 'no_dir_raw': True, 'total_cost': 0.0}
+  {'tag': 'ATHENAEUM', 'ok': True, 'n': 6, 'kind': 'full', 'stop1': 'About Boston Athenæum', 'is_about': True, 'non_artwork': True, 'has_history': True, 'covers_arch': True, 'no_frames_leak': True, 'no_dangling': True, 'no_dup': True, 'no_raw_locality': True, 'no_dir_raw': True, 'total_cost': 0.0}

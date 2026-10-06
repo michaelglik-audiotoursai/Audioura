@@ -60,12 +60,41 @@ _INTERIOR_TEMPLATES = (
 
 
 def _museum_transition(i: int, n_stops: int, next_name: str, venue: str) -> str:
-    """The museum/building transition line for position i → i+1 (0-based i)."""
+    """The museum/building transition line for position i → i+1 (0-based i).
+
+    [r2] ``venue`` is cleaned with ``_venue_name`` so a themed-in-building request
+    ("Art and Architectual tour in Boston Athenaeum") never leaks into the spoken
+    hand-off — the line names the BUILDING, not the raw request string.
+    """
+    venue = _venue_name(venue)
     if venue and i == 0:
         return f"Continue through {venue} — next is {next_name}."
     if venue and i == n_stops - 2:
         return f"Your final stop in {venue}: {next_name}."
     return _INTERIOR_TEMPLATES[(i - 1) % len(_INTERIOR_TEMPLATES)].format(name=next_name)
+
+
+def _venue_name(location: str) -> str:
+    """Resolve the BUILDING name from a venue/request string for spoken seams.
+
+    [LOCAL-585 r2] A themed-in-building request ("Art and Architectual tour in
+    Boston Athenaeum, boston, ma") must say "Continue through Boston Athenaeum",
+    not the whole request string. Delegates to about_museum_stop so the same rule
+    governs the About stop and the Directions. Plain venue strings are returned
+    unchanged apart from their trailing locality tail. Already-clean input (no
+    theme prefix, no comma tail) passes straight through.
+    """
+    loc = (location or "").strip()
+    if not loc:
+        return ""
+    try:
+        from about_museum_stop import clean_venue_request_name
+        cleaned = clean_venue_request_name(loc)
+        if cleaned:
+            return cleaned
+    except Exception:
+        pass
+    return loc.split(",")[0].strip()
 
 
 @dataclass
@@ -75,6 +104,7 @@ class AssemblyResult:
     new_stops: int = 0
     rewritten_transitions: int = 0
     order: List[str] = field(default_factory=list)  # delivered stop titles, in order
+    about_stops: int = 0  # [LOCAL-585] 1 when an "About <museum>" stop leads the tour
 
 
 # ── Stop-unit helpers ────────────────────────────────────────────────────────
@@ -200,10 +230,16 @@ def assemble_building_tour(
     pooled_stops: List[Dict],
     overall_orientation: Optional[str] = None,
     sources_block: str = "",
+    about_stop: Optional[Dict] = None,
 ) -> AssemblyResult:
-    """Assemble a single-building tour: NEW stops first, then pooled stops.
+    """Assemble a single-building tour: an optional About stop, then NEW, then pooled.
 
-    - New stops lead (so the regenerated overall description introduces them).
+    - [LOCAL-585] When ``about_stop`` is supplied (an "About <museum>" story unit
+      from about_museum_stop.about_stop_unit), it leads the tour as Stop 1: the
+      museum's own founder/history/architecture story, sourced, never an artwork.
+      It is placed FIRST, before new and pooled stops.
+    - New stops lead the exhibition stops (so the regenerated overall description
+      introduces them).
     - Pooled stop narration + orientation are reused verbatim.
     - Directions are museum/building templates recomputed for the delivered order
       (deterministic, no LLM) — every transition names the next delivered stop.
@@ -213,12 +249,14 @@ def assemble_building_tour(
       museum_overview), is injected as the FIRST stop's orientation prefix seed;
       otherwise each stop keeps its own orientation.
     """
-    ordered = list(new_stops) + list(pooled_stops)
+    about_lead = [about_stop] if about_stop else []
+    ordered = about_lead + list(new_stops) + list(pooled_stops)
     n = len(ordered)
 
     # Overall description: the caller regenerates it because it now covers more
     # stops. We seed it into stop 1's orientation (house behaviour: the overall
-    # prolog rides on Stop-1 Orientation).
+    # prolog rides on Stop-1 Orientation). When an About stop leads, the prolog
+    # rides on it — the About stop IS the enriched orientation (LOCAL-585).
     if overall_orientation and ordered:
         s0 = dict(ordered[0])
         base = (s0.get("orientation") or "").strip()
@@ -246,6 +284,7 @@ def assemble_building_tour(
         new_stops=len(new_stops),
         rewritten_transitions=0,  # building directions are templates, not LLM rewrites
         order=[s["title"] for s in ordered],
+        about_stops=1 if about_stop else 0,
     )
 
 
