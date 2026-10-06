@@ -268,6 +268,32 @@ def maybe_generate_with_pool(
 
 # ── small helpers ────────────────────────────────────────────────────────────
 
+# [LOCAL-590 step 5] Audio reuse. Audio is NOT part of the English pool — it is a
+# rendering of a stop's TEXT in one voice/engine, synthesized downstream at
+# delivery/translation time and keyed there on (text, voice_id, engine)
+# (polly_tts_service / translation_service.generate_audio). The POOL's job is to
+# guarantee the PRECONDITION for reuse: a reused stop's narration is byte-identical
+# to the stored one, so a text+voice+engine-keyed renderer returns the SAME audio
+# when the voice/engine match, while a new or transition-rewritten stop has
+# different text and therefore gets NEW audio. `audio_reuse_identity` makes that
+# contract explicit and testable: equal identities ⇒ audio is reusable.
+_POLLY_NEURAL_VOICES = frozenset(["Joanna", "Matthew", "Amy", "Brian"])
+
+
+def audio_reuse_identity(stop_text: str, voice_id: str = "Joanna",
+                         engine: Optional[str] = None) -> tuple:
+    """The identity a TTS layer keys audio on: (normalized_text, voice_id, engine).
+
+    Two stops with the same identity may share one rendered audio file; a change
+    in any component (the narration text, the chosen voice, or the engine) forces
+    a fresh render. Engine defaults to the voice's natural engine (neural for the
+    LOCAL-323 neural voices, else standard), mirroring the delivery layer.
+    """
+    eng = engine or ("neural" if voice_id in _POLLY_NEURAL_VOICES else "standard")
+    norm_text = re.sub(r"\s+", " ", (stop_text or "").strip())
+    return (norm_text, voice_id, eng)
+
+
 def _venue_name(location: str) -> str:
     return (location or "").split(",")[0].strip()
 

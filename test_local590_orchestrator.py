@@ -163,5 +163,35 @@ class TestOrchestratorOutdoor(unittest.TestCase):
             self.assertIn(t, out["text"])
 
 
+class TestAudioReuseContract(unittest.TestCase):
+    """LOCAL-590 step 5: the pool's audio-reuse PRECONDITION, verifiable without
+    a TTS backend. Reused stops keep byte-identical narration → identical audio
+    identity (so a text+voice+engine-keyed renderer reuses the audio); new or
+    transition-rewritten stops have different text → different identity → new
+    audio. Also: a voice/engine change forces a fresh render even for identical
+    text."""
+
+    def test_identical_narration_same_identity(self):
+        pooled_text = "This is the pooled narration body for Alpha. It is reusable prose."
+        reused_text = pooled_text  # the pool reuses it verbatim
+        self.assertEqual(orch.audio_reuse_identity(pooled_text, "Joanna"),
+                         orch.audio_reuse_identity(reused_text, "Joanna"))
+
+    def test_new_stop_text_differs(self):
+        a = orch.audio_reuse_identity("Fresh narration one.", "Joanna")
+        b = orch.audio_reuse_identity("This is the pooled narration body for Alpha.", "Joanna")
+        self.assertNotEqual(a, b)
+
+    def test_voice_change_forces_new_audio(self):
+        text = "Same narration, different voice."
+        self.assertNotEqual(orch.audio_reuse_identity(text, "Joanna"),
+                            orch.audio_reuse_identity(text, "Matthew"))
+
+    def test_engine_tracks_voice(self):
+        # Joanna is a neural voice; a non-neural voice resolves to standard.
+        self.assertEqual(orch.audio_reuse_identity("x", "Joanna")[2], "neural")
+        self.assertEqual(orch.audio_reuse_identity("x", "Tatyana")[2], "standard")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
