@@ -14,9 +14,14 @@
 --
 -- SAFETY:
 --   * NO DELETE anywhere.
---   * ON CONFLICT (user_id) DO NOTHING — a device that already has an
---     entitlement row (e.g. a real L3/L4 purchase) is never overwritten, so
---     re-running is safe and idempotent.
+--   * free->l2 and ppu/unlimited->tester use ON CONFLICT (user_id) DO NOTHING,
+--     so a device that already has an entitlement row (e.g. a real L3/L4
+--     purchase) is never overwritten.
+--   * [LOCAL-595B defect 1] Michael's device is excluded from the free->l2 and
+--     ppu/unlimited sweeps and assigned tester explicitly with
+--     ON CONFLICT DO UPDATE ... WHERE level IN ('l1','l2'). This corrects a row
+--     that an earlier run (or the free->l2 sweep) left at l2, WITHOUT clobbering
+--     a genuine paid pack. Still idempotent and safe to re-run.
 --   * Row counts per plan are reported BEFORE and AFTER via RAISE NOTICE.
 --
 -- PREREQUISITE: 012_subscription_levels.sql must have run (device_entitlement,
@@ -53,10 +58,16 @@ BEGIN
 END $$;
 
 -- ── free -> l2 ──────────────────────────────────────────────────────────────
+-- [LOCAL-595B defect 1] Michael's device is plan='free', so it would be caught
+-- here and pinned to l2 by the DO NOTHING below — and the later tester upsert
+-- would then be a no-op, locking him out (l2 generate refuses with
+-- by_reference_unavailable). Exclude his device id from the free->l2 sweep so
+-- the explicit tester assignment is the single source of truth for his row.
 INSERT INTO device_entitlement (user_id, level, last_activity_at)
 SELECT secret_id, 'l2', NOW()
 FROM users
 WHERE plan = 'free'
+  AND secret_id <> :'michael_user_id'
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ── ppu / unlimited -> tester ────────────────────────────────────────────────
@@ -64,13 +75,20 @@ INSERT INTO device_entitlement (user_id, level, last_activity_at)
 SELECT secret_id, 'tester', NOW()
 FROM users
 WHERE plan IN ('ppu', 'unlimited')
+  AND secret_id <> :'michael_user_id'
 ON CONFLICT (user_id) DO NOTHING;
 
--- ── Michael's device -> tester (explicit, in case his plan differs or his row
---    exists only in `users`). If the device already has a row, keep it. ──────
+-- ── Michael's device -> tester (explicit, authoritative). ────────────────────
+-- [LOCAL-595B defect 1] UPSERT, not DO NOTHING: if a prior run of this migration
+-- (or the free->l2 sweep) already wrote an l2 row for his device, promote it to
+-- tester. We DO NOT clobber a genuine paid pack (l3/l4): only correct a row that
+-- is still at the migration-assigned l1/l2. This keeps the migration safe to
+-- re-run and never overwrites a real purchase.
 INSERT INTO device_entitlement (user_id, level, last_activity_at)
 VALUES (:'michael_user_id', 'tester', NOW())
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (user_id) DO UPDATE
+    SET level = 'tester', updated_at = NOW()
+    WHERE device_entitlement.level IN ('l1', 'l2');
 
 DO $$
 DECLARE
