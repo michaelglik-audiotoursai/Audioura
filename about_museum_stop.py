@@ -140,14 +140,47 @@ _ARTWORK_FRAMING_RE = re.compile(
 # Sentence-level identity grammar: a real self-description is "<Venue> is a/was/
 # houses/presents/founded…". Reused idea from museum_overview._describe_place, but
 # widened to the founding / institutional-story verbs this stop wants.
+#
+# [LOCAL-599C] Also accept a pure IDENTITY claim that carries no founding keyword
+# but states what the institution IS — "<Venue> is Boston's only free contemporary
+# art museum", "… is the first / largest / leading … museum/gallery". MassArt's
+# real About sentence ("The MassArt Art Museum (MAAM) is Boston's only free
+# contemporary art museum …") has no 'founded/mission' token, so the r2 selector
+# missed it and lifted the land acknowledgment instead; this verb matches it.
 _STORY_VERBS = (
     r"is\s+(?:a|an|the|one|home|dedicated|devoted|located|among|housed|"
-    r"new\s+england)|was\s+(?:founded|established|built|created|incorporated|"
+    r"new\s+england)|"
+    r"is\s+[\w'’]+(?:\s+[\w'’]+){0,4}\s+"
+    r"(?:only|first|oldest|largest|leading|premier|foremost|flagship)\b|"
+    r"is\s+(?:the\s+)?(?:only|first|oldest|largest|leading|premier|foremost)\b|"
+    r"was\s+(?:founded|established|built|created|incorporated|"
     r"the\s+first|designed)|were\s+founded|founded\s+(?:in|by)|established\s+(?:in|by)|"
     r"houses?|holds?|presents?|exhibits?|showcases?|preserves?|celebrates?|"
     r"is\s+devoted|offers?\s+|became\s+|opened\s+(?:in|its)|"
     r"has\s+(?:been|grown|championed)|champions?|promotes?|dedicated\s+to"
 )
+
+# [LOCAL-599C] NON-STORY institutional boilerplate that is NOT the museum's story:
+# a land acknowledgment, a DEI / equity / accessibility statement, a cookie /
+# privacy banner, a newsletter / email sign-up. These sentences often carry a
+# story-signal word ("history", "mission", "community") and so slipped past the
+# r2 selector — MassArt's land acknowledgment ("We make this land acknowledgment …
+# the painful history of erasure …") was lifted as the museum's story. This is a
+# deterministic CONTENT rule (what the sentence is ABOUT), run before any sentence
+# is accepted as the institution's story. It is a vocabulary of boilerplate kinds,
+# not a blocklist of any museum's words.
+_NON_STORY_RE = re.compile(
+    r"(?i)("
+    r"land\s+acknowledg|acknowledge?ment\s+of\s+(?:the\s+)?(?:land|territor)|"
+    r"traditional\s+(?:lands?|territor)|indigenous\s+(?:people|communit|tribe|land)|"
+    r"ancestral\s+(?:lands?|homelands?)|unceded\s+(?:territor|lands?)|"
+    r"we\s+(?:make|offer|recognize|acknowledge)\s+this\s+(?:land\s+)?acknowledg|"
+    r"\bdiversity,?\s+equity|\bequity,?\s+(?:and\s+)?inclusion\b|\bDEI\b|"
+    r"anti-?racis|accessibility\s+statement|committed\s+to\s+(?:accessibility|making)|"
+    r"we\s+are\s+committed\s+to\s+(?:diversity|equity|inclusion|accessibility|anti)|"
+    r"cookie|privacy\s+policy|your\s+privacy|"
+    r"newsletter|sign\s*up|subscribe|email\s+(?:list|updates?)|mailing\s+list"
+    r")")
 
 # Cruft that is navigation / account / marketing / legal — never the story.
 _CRUFT_RE = re.compile(
@@ -433,13 +466,26 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
         return False
     if _DANGLING_FINAL_RE.search(s):
         return False  # [r2] truncated object — never lift a half sentence
-    if not _STORY_SIGNAL_RE.search(s):
+    # [LOCAL-599C] Reject institutional boilerplate that is NOT the museum's story:
+    # a land acknowledgment, a DEI/accessibility statement, a cookie/privacy or
+    # newsletter banner. These often carry a story-signal word ("history",
+    # "community") and must be excluded BEFORE the signal/verb check, or the land
+    # acknowledgment is lifted as the museum's story (the r2 defect).
+    if _NON_STORY_RE.search(s):
         return False
     # Must be grammatically ABOUT the institution: either names the venue (or its
     # leading word) OR carries an institutional story verb. This keeps a stray
     # marketing fragment from being lifted as the museum's story.
     names_venue = bool(venue_first and venue_first.lower() in s.lower())
     has_story_verb = bool(re.search(r"(?i)\b(" + _STORY_VERBS + r")\b", s))
+    # [LOCAL-599C] A genuine IDENTITY sentence that names the venue AND states what
+    # it is ("<Venue> is Boston's only free contemporary art museum") qualifies as
+    # the museum's story even with no founding/mission keyword — _STORY_SIGNAL_RE
+    # is no longer a hard gate for a venue-named identity statement.
+    if names_venue and has_story_verb:
+        return True
+    if not _STORY_SIGNAL_RE.search(s):
+        return False
     return names_venue or has_story_verb
 
 
@@ -485,6 +531,8 @@ def _collect_architecture_sentences(corpus_text: str, limit: int = 2) -> List[st
             continue
         if _DANGLING_FINAL_RE.search(s):
             continue  # [r2] truncated object — never lift a half sentence
+        if _NON_STORY_RE.search(s):
+            continue  # [LOCAL-599C] land-ack / DEI / cookie boilerplate, not story
         if not _ARCH_SIGNAL_RE.search(s):
             continue
         key = re.sub(r"\s+", " ", s.lower())
@@ -1023,6 +1071,23 @@ def _short_venue(venue_name: str) -> str:
     return f"the {short}"
 
 
+def _full_venue_for_hours(venue_name: str) -> str:
+    """[LOCAL-599C] The museum's FULL name for the hours sentence, article-led.
+
+    LEAD, r3: the hours sentence must name the museum in full — "The MassArt Art
+    Museum is open …", never the stripped "The MassArt" (which read as a wrong
+    name in r2). This keeps the venue's whole proper name (its ', City, ST' tail
+    removed) and prefixes "The" when the name is not already article-led. Falls
+    back to the spoken short name only when no full name is known.
+    """
+    vn = _venue_core(venue_name) or (venue_name or "").strip()
+    if not vn:
+        return "The museum"
+    if vn.lower().startswith(("the ", "a ", "an ")):
+        return vn[:1].upper() + vn[1:]
+    return f"The {vn}"
+
+
 def _lower_lead(seg: str) -> str:
     """Lower-case the first word of a mid-sentence clause unless it is a proper
     noun / acronym (keeps weekday names, '$', currency intact)."""
@@ -1164,8 +1229,10 @@ def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
             if _ADMISSION_SEG_RE.search(seg):
                 admission_segs.append(seg)
 
-    venue_short = _short_venue(venue_name)
-    hours_sentence = _compose_hours_sentence(venue_short, hours_segs, closed_segs)
+    # [LOCAL-599C] The HOURS sentence names the museum in FULL ("The MassArt Art
+    # Museum is open …"), per LEAD r3 — never the stripped short name.
+    venue_full = _full_venue_for_hours(venue_name)
+    hours_sentence = _compose_hours_sentence(venue_full, hours_segs, closed_segs)
     adm_sentence = _compose_admission_sentence(admission_segs)
     signal = _source_month_signal(domain, as_of)
 
