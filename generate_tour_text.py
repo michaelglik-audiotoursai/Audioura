@@ -7087,11 +7087,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             "reused_stops": _pool_out.get("reused_stops", 0),
                             "new_stops": _pool_out.get("new_stops", 0),
                             "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
+                            "about_stops": _pool_out.get("about_stops", 0),
                         },
                     }
                     print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
                           f"new={_pool_out.get('new_stops')} "
                           f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
+                          f"about_stops={_pool_out.get('about_stops', 0)} "
                           f"(pool held {_pool_out.get('pooled_before')})")
                     return _pool_out["text"], output_file, (None, None)
             except Exception as _pool_err:

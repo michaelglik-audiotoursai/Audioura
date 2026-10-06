@@ -164,9 +164,79 @@ def maybe_generate_with_pool(
     print(f"  [LOCAL-590] pool: venue={identity} type={tour_type} category={tour_category} "
           f"contained={contained} requested={N} pooled={K}")
 
-    # Nothing to reuse and a full request → let the normal path run (and store).
+    # Nothing to reuse and a full request.
     if K == 0:
-        return None
+        # [LOCAL-585] First-ever tour of a CONTAINED venue (museum/facility): there
+        # is nothing pooled to reuse, but the tour should still OPEN with the
+        # museum's own story. Generate the N exhibition stops normally (so every
+        # existence/scope/dedup gate runs on them), then re-assemble with an
+        # "About <museum>" stop leading. If no story can be sourced, or anything
+        # fails, fall through to normal generation unchanged (return None).
+        if not contained or os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
+            return None
+        try:
+            about_unit = _build_about_stop_unit(
+                location, tour_type, request_text=location,
+                available_exhibition_stops=N, requested_stops=N)
+            if not about_unit:
+                return None
+            # Guard against pool re-entry: the inner full generation must run the
+            # NORMAL path (exclude_titles=[] is falsy and would re-trigger the pool
+            # fast-path, recursing). Disable the pool just for this nested call.
+            _prev_disable = os.environ.get("DISABLE_STOP_POOL")
+            os.environ["DISABLE_STOP_POOL"] = "1"
+            try:
+                gen_text, _out, _coords = generate_fn(
+                    location, tour_type, None, N,
+                    user_id=user_id, job_id=job_id, exclude_titles=[],
+                )
+            finally:
+                if _prev_disable is None:
+                    os.environ.pop("DISABLE_STOP_POOL", None)
+                else:
+                    os.environ["DISABLE_STOP_POOL"] = _prev_disable
+            if not gen_text:
+                return None
+            try:
+                from generate_tour_text import _LAST_GENERATION_COST as _nc
+                first_cost = float((_nc or {}).get("total_cost", 0.0))
+            except Exception:
+                first_cost = 0.0
+            parsed = pool.parse_delivered_stops(gen_text)
+            new_units = [_new_unit_from_parsed(s) for s in parsed]
+            if not new_units:
+                return None
+            sources_block = _extract_sources_block(gen_text)
+            result = asm.assemble_building_tour(
+                location, tour_type, tour_category, header_cat, display_cat,
+                venue_name=_venue_name(location),
+                new_stops=new_units, pooled_stops=[],
+                overall_orientation=_overall_from_new(gen_text),
+                sources_block=sources_block,
+                about_stop=about_unit,
+            )
+            _write(output_file, result.tour_text)
+            # Store the exhibition stops to seed the pool (About stop is NOT pooled;
+            # it is a sequence-level opener, regenerated per tour like orientation).
+            try:
+                pool.store_delivered_tour(location, tour_type, gen_text, db_url, qid=qid)
+            except Exception as _se:
+                logger.info(f"[LOCAL-585] pool store (first tour) skipped: {_se}")
+            print(f"  [LOCAL-585] FIRST-TOUR About lead: about_stops={result.about_stops} "
+                  f"exhibition_stops={len(new_units)}")
+            return {
+                "text": result.tour_text,
+                "reused_stops": 0,
+                "new_stops": len(new_units),
+                "rewritten_transitions": 0,
+                "about_stops": result.about_stops,
+                "pooled_before": 0,
+                "served_from_pool_only": False,
+                "new_cost": first_cost,
+            }
+        except Exception as e:
+            logger.info(f"[LOCAL-585] first-tour About lead failed ({e}); normal gen")
+            return None
 
     # ─── N <= K : serve the best N from the pool, no new generation ───────────
     if N <= K:
@@ -174,11 +244,16 @@ def maybe_generate_with_pool(
         pooled_units = [_pooled_unit_from_row(r) for r in chosen]
         sources_block = _sources_from_rows(chosen)
         if contained:
+            about_unit = _build_about_stop_unit(
+                location, tour_type, request_text=location,
+                available_exhibition_stops=len(pooled_units),
+                requested_stops=N)
             result = asm.assemble_building_tour(
                 location, tour_type, tour_category, header_cat, display_cat,
                 venue_name=_venue_name(location),
                 new_stops=[], pooled_stops=pooled_units,
                 overall_orientation=None, sources_block=sources_block,
+                about_stop=about_unit,
             )
         else:
             result = asm.assemble_outdoor_tour(
@@ -194,6 +269,7 @@ def maybe_generate_with_pool(
             "reused_stops": result.reused_stops,
             "new_stops": 0,
             "rewritten_transitions": result.rewritten_transitions,
+            "about_stops": result.about_stops,
             "pooled_before": K,
             "served_from_pool_only": True,
             "new_cost": 0.0,
@@ -229,12 +305,17 @@ def maybe_generate_with_pool(
     sources_block = _merge_sources(gen_text, pooled_rows)
 
     if contained:
+        about_unit = _build_about_stop_unit(
+            location, tour_type, request_text=location,
+            available_exhibition_stops=len(new_units) + len(pooled_units),
+            requested_stops=N)
         result = asm.assemble_building_tour(
             location, tour_type, tour_category, header_cat, display_cat,
             venue_name=_venue_name(location),
             new_stops=new_units, pooled_stops=pooled_units,
             overall_orientation=_overall_from_new(gen_text),
             sources_block=sources_block,
+            about_stop=about_unit,
         )
     else:
         _dir_fn = None
@@ -260,6 +341,7 @@ def maybe_generate_with_pool(
         "reused_stops": result.reused_stops,
         "new_stops": result.new_stops,
         "rewritten_transitions": result.rewritten_transitions,
+        "about_stops": result.about_stops,
         "pooled_before": K,
         "served_from_pool_only": False,
         "new_cost": new_cost,
@@ -345,3 +427,62 @@ def _overall_from_new(new_text: str) -> Optional[str]:
     if m:
         return m.group(1).strip()
     return None
+
+
+def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
+                           available_exhibition_stops: int,
+                           requested_stops: Optional[int]) -> Optional[Dict]:
+    """[LOCAL-585] Build the leading "About <museum>" story-stop unit for a contained
+    venue, or None when no story can be sourced (then the tour is unchanged).
+
+    Best-effort and non-fatal: it resolves the venue's own site URL via
+    venue_resolver (so the story is sourced from the venue's About/history/mission
+    pages) and lets about_museum_stop decide architecture coverage and count
+    semantics. Any resolution/build failure returns None — never breaks a tour.
+    """
+    if os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
+        return None
+    try:
+        from about_museum_stop import build_about_stop, about_stop_unit
+    except Exception as e:
+        logger.info(f"[LOCAL-585] about_museum_stop unavailable ({e}); no About stop")
+        return None
+
+    venue = _venue_name(location)
+    site_url = ""
+    locality = ""
+    address = ""
+    try:
+        from venue_resolver import resolve_venue
+        ent = resolve_venue(location)
+        if ent is not None:
+            site_url = getattr(ent, "official_url", "") or ""
+            venue = getattr(ent, "venue_name", "") or venue
+            address = getattr(ent, "address", "") or ""
+    except Exception as e:
+        logger.info(f"[LOCAL-585] venue resolve for About stop failed ({e}); "
+                    f"continuing without a site URL")
+    # Derive a locality tail from the request ("..., City, ST").
+    parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
+    if parts:
+        locality = ", ".join(parts[:2])
+
+    try:
+        about = build_about_stop(
+            venue_name=venue,
+            base_site_url=site_url,
+            request_text=request_text or location or "",
+            locality=locality,
+            address=address,
+            requested_stops=requested_stops,
+            available_exhibition_stops=available_exhibition_stops,
+        )
+    except Exception as e:
+        logger.info(f"[LOCAL-585] About stop build failed ({e}); no About stop")
+        return None
+    if about is None or about.is_empty():
+        return None
+    print(f"  [LOCAL-585] About stop built for {venue!r}: "
+          f"architecture={about.covers_architecture} counts_toward_n={about.counts_toward_n} "
+          f"sources={len(about.sources)}")
+    return about_stop_unit(about)
