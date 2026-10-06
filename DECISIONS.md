@@ -24479,3 +24479,12 @@ Test red on old code. **Follow-up:** LOCAL-590's tests wrote ~30 `zz_isolated_*`
 DB's `stop_pool`. Harmless (unmatchable names) but tests must use a transaction/rollback or a test DB.
 
 Also deleted at Michael's request (2026-10-05 23:5x): tours 395 (en) / 396 (ru), the Athenaeum tour that became a city walk (LOCAL-591); 3 stop_metrics. Counts 204 -> 202 (real 60 -> 58). Backups in /Volumes/AudiouraSSD/deleted_tours/.
+
+## D611 — Exactly N stops; the opening section belongs to Stop 1 (Michael, 2026-10-06, binding)
+
+"If a user asks for x number of stops, we are supposed to generate exactly x number of stops." As with the
+walking tour's Overall section (the R2 prolog folded into Stop 1), every single-venue tour (museum, facility,
+building) opens Stop 1 with a section carrying the About content (history, architecture) **and the practical
+facts: opening hours, admission, closed days** ("very important… but it has to be the first section of Stop 1"),
+then Stop 1's own narration. LOCAL-585's extra "About" stop (5 asked → 6) was wrong; LEAD had chosen it and
+offered it as an option. Fix: LOCAL-592. Restaurant tours keep per-restaurant practicals in each stop (D538).
