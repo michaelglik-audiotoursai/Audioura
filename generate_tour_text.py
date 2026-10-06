@@ -1967,6 +1967,78 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
                 print(f"  [D536] Falling back to the tour's stated area: '{_wider}' "
                       f"(too wide for a stop-by-stop containment check — skipping PHASE 5.6)")
         scope = ''
+    # [LOCAL-591] ONE SCOPE PER TOUR. Whatever scope we are about to hand the
+    # containment check MUST be the tour's own extent. This is the invariant the
+    # 395/396 defect broke: a city walking tour's stops were checked against one
+    # building. Assert it here, in the single place that decides the scope, so a
+    # mismatch can never reach _validate_stops_within_scope again.
+    scope = _assert_one_scope_per_tour(tour_category, scope, intent, quiet=quiet)
+    return scope
+
+
+def _assert_one_scope_per_tour(tour_category, scope, intent, quiet=False):
+    """[LOCAL-591] Invariant: a tour is only ever checked against ITS OWN extent.
+
+    Tours 395/396: because the Boston Athenaeum request was mis-classified as a
+    WALKING tour, the generator chose city-wide stops (MFA, Trinity, BPL,
+    Gardner, State House, Granary) and then PHASE 5.6 judged each of them against
+    the BUILDING scope 'Boston Athenaeum, Boston, Massachusetts'. Six were removed
+    for being "outside" a building that was never the tour's extent. The scope
+    checked did not belong to the tour.
+
+    The rule, by category:
+
+      museum / facility (contained-venue):
+        containment is the venue guard (PHASE 5.5b) — there is NO second,
+        stop-by-stop scope. Any non-empty `scope` for these categories is a
+        drift and is cleared to ''.
+
+      walking / biking / restaurant / book (area tours):
+        the scope MUST be the tour's own declared extent (its geographic_scope).
+        A scope tighter than — and different from — the tour's declared area
+        (e.g. a single building for a city/district tour) is the 395/396 mismatch
+        and is cleared to ''. A scope that IS the tour's declared area passes
+        through unchanged.
+
+    Returns the validated scope ('' means "no stop-by-stop check applies").
+    """
+    if not scope:
+        return ''
+
+    # A contained-venue tour has no stop-by-stop scope of its own: it is guarded
+    # by PHASE 5.5b against its venue. Anything else here is a cross-scope leak.
+    if tour_category in ('museum', 'facility'):
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant: a {tour_category} tour is "
+                  f"guarded by its venue (PHASE 5.5b); dropping stop-by-stop scope "
+                  f"'{scope}'.")
+        return ''
+
+    # An area tour must be checked against ITS OWN declared extent. The scope the
+    # resolver chose is the intent's geographic_scope, so for a well-formed intent
+    # they already match; this makes the match explicit and catches the case where
+    # the chosen scope is tighter than the tour's actual extent.
+    declared = (intent.get('geographic_scope') or '').strip() if intent else ''
+    if declared and _norm_place(scope) != _norm_place(declared):
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant VIOLATION: tour extent is "
+                  f"'{declared}' but the containment scope is '{scope}' — these are "
+                  f"different places. A tour is never checked against a scope that is "
+                  f"not its own extent; dropping it.")
+        return ''
+
+    # The tour's declared extent is a whole CITY: there is no tight boundary to
+    # check stops against, and judging city-wide stops against a single building
+    # is precisely the 395/396 bug. The resolver already restricts `scope` to
+    # BUILDING/DISTRICT/CORRIDOR precision, so a CITY-precision intent should not
+    # have produced a scope at all — belt-and-braces, clear it.
+    if intent and (intent.get('scope_precision') or '').upper() == 'CITY':
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant: tour extent is a whole city "
+                  f"('{declared}') — too wide for a stop-by-stop containment check; "
+                  f"dropping scope '{scope}'.")
+        return ''
+
     return scope
 
 
