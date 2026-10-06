@@ -83,7 +83,7 @@ class TestBlockWiring(unittest.TestCase):
     fetch failure."""
 
     def _block_src(self):
-        src = inspect.getsource(g.generate_tour_text)
+        src = inspect.getsource(getattr(g, '_generate_tour_text_impl', g.generate_tour_text))  # LOCAL-562 wrapper on subscribed (LEAD)
         start = src.index("SITE-FIRST EXHIBITION CANDIDATES")
         # Up to the next elif branch (LOCAL-364 exhibition checklist).
         end = src.index("EXHIBITION CHECKLIST RETRIEVAL", start)

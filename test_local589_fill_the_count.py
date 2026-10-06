@@ -51,7 +51,7 @@ class TestTrimBackToRequest(unittest.TestCase):
     spare is not mis-reported as a lost stop."""
 
     def _fn_src(self):
-        return inspect.getsource(g.generate_tour_text)
+        return inspect.getsource(getattr(g, '_generate_tour_text_impl', g.generate_tour_text))  # LOCAL-562 wrapper on subscribed (LEAD)
 
     def test_trims_back_to_requested_after_gate(self):
         src = self._fn_src()
