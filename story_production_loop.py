@@ -108,6 +108,12 @@ PAGES_PER_QUERY = int(os.environ.get('STORY_LOOP_PAGES', '3'))
 # calls ungrounded), the default 1 is the LOCAL-594 cap.
 MAX_GROUNDED_PER_STOP = int(os.environ.get('STORY_LOOP_MAX_GROUNDED', '1'))
 
+# [LOCAL-594] Measurement escape hatch ONLY. The pre-cut code grounded the r2
+# adjudication call; the cut makes it ungrounded (it reasons over the Serper
+# evidence, not the web). STORY_LOOP_R2_GROUNDED=1 restores the old grounded r2 so
+# the BEFORE baseline can be reproduced and the cut measured. Default off = cut.
+R2_GROUNDED = os.environ.get('STORY_LOOP_R2_GROUNDED', '').strip() == '1'
+
 # [LOCAL-466] How many stories a single stop may publish. Default 2 — Michael's
 # request is "more than one story per stop", but a long stop with three stories
 # would run to >90 seconds of speech, so the cap stays conservative.
@@ -335,13 +341,18 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             ev_block = '\n'.join(ev_lines[:60]) or '(no independent evidence retrieved)'
 
             # ── 4. adjudicate against the evidence, then write ───────────
-            # [LOCAL-594] UNGROUNDED. The prompt judges only against the retrieved
-            # Serper evidence block ("Do not rely on memory"); it does not search
-            # the web, so grounding it bought a billable Google query for nothing.
+            # [LOCAL-594] UNGROUNDED by default. The prompt judges only against the
+            # retrieved Serper evidence block ("Do not rely on memory"); it does
+            # not search the web, so grounding it bought a billable Google query
+            # for nothing. STORY_LOOP_R2_GROUNDED=1 restores the old behaviour for
+            # BEFORE-baseline measurement only.
+            _ground_r2 = R2_GROUNDED and (n_gem_grounded < MAX_GROUNDED_PER_STOP)
             r2 = gemini_with_sources(ADJUDICATION_PROMPT.format(
                 work=work, exhibition=exhibition, answer=r1['text'],
-                evidence=ev_block), grounded=False)
+                evidence=ev_block), grounded=_ground_r2)
             n_gem += 1
+            if _ground_r2:
+                n_gem_grounded += 1
             text2 = r2.get('text') or ''
             m = re.search(r'PART\s*2.*?$', text2, re.S | re.I)
             story = (re.sub(r'^PART\s*2[^\n]*\n', '', m.group(0)).strip()
