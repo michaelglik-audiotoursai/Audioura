@@ -75,6 +75,7 @@ __all__ = [
     "AboutStop",
     "build_about_stop",
     "about_stop_unit",
+    "build_opening_section",
     "looks_like_artwork_framing",
     "should_count_toward_n",
     "request_wants_architecture",
@@ -312,6 +313,7 @@ class AboutStop:
     coordinates: str = ""
     covers_architecture: bool = False
     counts_toward_n: bool = False
+    practical_facts: str = ""  # [LOCAL-592] gated opening-hours/admission/closed-days
 
     def is_empty(self) -> bool:
         return not self.narration.strip()
@@ -393,23 +395,22 @@ def looks_like_artwork_framing(text: str) -> bool:
 
 def should_count_toward_n(requested_stops: Optional[int],
                           available_exhibition_stops: int) -> bool:
-    """Does the About stop consume one of the N requested stops?
+    """[LOCAL-592] The About content is NEVER a stop — so it never counts.
 
-    It counts toward N ONLY when the listener asked for N and there is not enough
-    exhibition material to reach N without it. Otherwise it is a free, enriched
-    orientation stop that sits in front of the full N exhibition stops.
+    Michael, 2026-10-06 (binding): "If a user asks for x number of stops, we are
+    supposed to generate exactly x number of stops. In Walking tours we have the
+    Overall section and that section is the start of Stop 1 … The same must be
+    true with museum, restaurant, etc." The museum's About story and the practical
+    facts are the OPENING SECTION of Stop 1 (mirroring the walking-tour prolog),
+    not a standalone stop. They cannot add to or subtract from the requested N.
 
-        requested_stops None/0        → not count (no explicit N to fill)
-        enough exhibitions (>= N)      → not count (About is a bonus opener)
-        too few exhibitions (< N)      → count (About helps reach N)
+    This supersedes the LOCAL-585 "extra opener / thin-exhibitions" branch: the
+    function now returns False for every input. It is kept (always-False) so the
+    orchestrator can keep calling it and existing imports do not break, and so a
+    request for N always delivers exactly N stops. The two arguments are accepted
+    and ignored.
     """
-    try:
-        n = int(requested_stops) if requested_stops else 0
-    except (TypeError, ValueError):
-        n = 0
-    if n <= 0:
-        return False
-    return available_exhibition_stops < n
+    return False
 
 
 # ── story extraction ─────────────────────────────────────────────────────────
@@ -572,6 +573,7 @@ def build_about_stop(
     wiki_provider: Optional[WikiProvider] = None,
     corpus_text: Optional[str] = None,
     max_pages: int = 8,
+    practical_facts: str = "",
 ) -> Optional[AboutStop]:
     """Build an "About <museum>" story stop, or None when no story can be sourced.
 
@@ -588,6 +590,13 @@ def build_about_stop(
             pass the venue corpus the generator already built). When given, the
             fetcher is not called.
         max_pages: cap on venue pages fetched when corpus_text is not supplied.
+        practical_facts: [LOCAL-592] an ALREADY-GATED practical-facts string
+            (opening hours, admission, closed days) sourced and venue-bound by the
+            caller through the LOCAL-584 gate (practical_facts_gate.gate_formatted_facts).
+            It is carried verbatim onto the AboutStop and placed in the opening
+            section by build_opening_section. Nothing here invents or re-sources
+            it: the honesty contract (state only what the venue's page supports)
+            is enforced upstream, exactly as for the restaurant/museum facts.
 
     Returns an AboutStop, or None when neither the venue's pages nor the wiki
     sources yield any story sentence (nothing is invented).
@@ -700,6 +709,7 @@ def build_about_stop(
         coordinates=coordinates,
         covers_architecture=bool(arch_sentences),
         counts_toward_n=counts,
+        practical_facts=(practical_facts or "").strip(),
     )
 
 
@@ -783,3 +793,53 @@ def about_stop_unit(about: AboutStop) -> dict:
         "_counts_toward_n": about.counts_toward_n,
         "_covers_architecture": about.covers_architecture,
     }
+
+
+# ── [LOCAL-592] opening-section composer (the Stop-1 prolog, not a stop) ──────
+
+# A short, natural lead-in to the practical facts so the opening does not read as
+# a bare label. Mirrors the walking-tour prolog voice.
+_PRACTICAL_LEAD = "Before you go in, a few practical notes."
+
+
+def build_opening_section(about: Optional["AboutStop"]) -> str:
+    """[LOCAL-592] Compose the OPENING SECTION of Stop 1 for a single-venue tour.
+
+    Michael, 2026-10-06 (binding): the museum's "About" content and the practical
+    facts (opening hours, admission, closed days) are the FIRST SECTION of Stop 1 —
+    exactly as the walking tour's Overall section is the start of Stop 1 — never a
+    standalone stop. This function returns that section as a single block of
+    prose:
+
+        <About story: founder, why it exists, history, architecture when relevant>
+        Before you go in, a few practical notes. <hours. admission. closed days.>
+
+    The About narration is already sourced and artwork-framing-free (build_about_stop).
+    The practical facts are already gated/venue-bound (LOCAL-584) by the caller and
+    carried on ``about.practical_facts``; they are appended verbatim. Nothing is
+    invented: when ``about`` is None the section is empty; when there are no
+    practical facts, only the About story is returned (silence is correct — D584).
+
+    The caller folds the returned text into Stop 1 (its narration/orientation lead),
+    so a request for N stops still delivers exactly N: this section adds zero stops.
+    """
+    if about is None:
+        return ""
+    parts: List[str] = []
+    narration = (about.narration or "").strip()
+    if narration:
+        parts.append(narration)
+    facts = (about.practical_facts or "").strip()
+    if facts:
+        # Ensure the facts end as a clean sentence group.
+        facts_block = facts if facts.endswith((".", "!", "?")) else facts + "."
+        parts.append(f"{_PRACTICAL_LEAD} {facts_block}")
+    section = "\n\n".join(p for p in parts if p).strip()
+    # Belt-and-braces: the opening section must never read as an artwork label.
+    if section and looks_like_artwork_framing(section):
+        # Drop only the offending About narration; keep the practical facts, which
+        # are page-literal and cannot be artwork-framed.
+        if facts:
+            return f"{_PRACTICAL_LEAD} {facts if facts.endswith(('.', '!', '?')) else facts + '.'}"
+        return ""
+    return section

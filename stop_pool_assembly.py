@@ -104,7 +104,7 @@ class AssemblyResult:
     new_stops: int = 0
     rewritten_transitions: int = 0
     order: List[str] = field(default_factory=list)  # delivered stop titles, in order
-    about_stops: int = 0  # [LOCAL-585] 1 when an "About <museum>" stop leads the tour
+    about_stops: int = 0  # [LOCAL-592] 1 when an About+practical opening SECTION was folded into Stop 1 (adds ZERO stops)
 
 
 # ── Stop-unit helpers ────────────────────────────────────────────────────────
@@ -231,13 +231,22 @@ def assemble_building_tour(
     overall_orientation: Optional[str] = None,
     sources_block: str = "",
     about_stop: Optional[Dict] = None,
+    opening_section: str = "",
 ) -> AssemblyResult:
-    """Assemble a single-building tour: an optional About stop, then NEW, then pooled.
+    """Assemble a single-building tour: NEW stops then pooled, with the About +
+    practical "opening section" FOLDED INTO Stop 1 (never a standalone stop).
 
-    - [LOCAL-585] When ``about_stop`` is supplied (an "About <museum>" story unit
-      from about_museum_stop.about_stop_unit), it leads the tour as Stop 1: the
-      museum's own founder/history/architecture story, sourced, never an artwork.
-      It is placed FIRST, before new and pooled stops.
+    - [LOCAL-592] ``opening_section`` (from about_museum_stop.build_opening_section)
+      is the museum's own story + the practical facts (hours/admission/closed days).
+      It is placed at the START of Stop 1 — mirroring the walking-tour prolog that
+      rides on Stop-1 Orientation — so a request for N stops delivers EXACTLY N.
+      The opening section adds zero stops. ``about_stops`` is reported as 1 (for the
+      ledger) when an opening section was folded, but it never changes the count.
+    - [LOCAL-585, superseded] ``about_stop`` (a standalone "About <museum>" unit)
+      is still accepted for backward compatibility, but it is NO LONGER placed as
+      its own stop: if given and no ``opening_section`` is supplied, its narration
+      (and any practical facts) are folded into Stop 1 the same way. This guarantees
+      no tour ever gains an extra "About …" stop.
     - New stops lead the exhibition stops (so the regenerated overall description
       introduces them).
     - Pooled stop narration + orientation are reused verbatim.
@@ -249,14 +258,34 @@ def assemble_building_tour(
       museum_overview), is injected as the FIRST stop's orientation prefix seed;
       otherwise each stop keeps its own orientation.
     """
-    about_lead = [about_stop] if about_stop else []
-    ordered = about_lead + list(new_stops) + list(pooled_stops)
+    ordered = list(new_stops) + list(pooled_stops)
     n = len(ordered)
+
+    # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
+    # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
+    # narration (+ practical facts) so no caller path can resurrect an extra stop.
+    opening = (opening_section or "").strip()
+    if not opening and about_stop:
+        _about_bits = [(about_stop.get("narration") or "").strip()]
+        _pf = (about_stop.get("practical_facts") or "").strip()
+        if _pf:
+            _about_bits.append(_pf if _pf.endswith((".", "!", "?")) else _pf + ".")
+        opening = "\n\n".join(b for b in _about_bits if b).strip()
+    folded_opening = bool(opening)
+
+    # Fold the opening section into Stop 1's narration (it is the first SECTION of
+    # Stop 1, before the stop's own narration). When there are no stops at all,
+    # there is nothing to fold into — the opening is dropped (a no-stop tour is not
+    # created, D577).
+    if folded_opening and ordered:
+        s1 = dict(ordered[0])
+        base_narr = (s1.get("narration") or "").strip()
+        s1["narration"] = (opening + ("\n\n" + base_narr if base_narr else "")).strip()
+        ordered[0] = s1
 
     # Overall description: the caller regenerates it because it now covers more
     # stops. We seed it into stop 1's orientation (house behaviour: the overall
-    # prolog rides on Stop-1 Orientation). When an About stop leads, the prolog
-    # rides on it — the About stop IS the enriched orientation (LOCAL-585).
+    # prolog rides on Stop-1 Orientation).
     if overall_orientation and ordered:
         s0 = dict(ordered[0])
         base = (s0.get("orientation") or "").strip()
@@ -284,7 +313,7 @@ def assemble_building_tour(
         new_stops=len(new_stops),
         rewritten_transitions=0,  # building directions are templates, not LLM rewrites
         order=[s["title"] for s in ordered],
-        about_stops=1 if about_stop else 0,
+        about_stops=1 if folded_opening else 0,
     )
 
 

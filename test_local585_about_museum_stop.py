@@ -16,10 +16,12 @@ runs with no DB/network/LLM. They assert Michael's design rules:
   2. The stop is sourced (venue domain + any wiki URLs) and carries no artist/year.
   3. Architecture coverage fires when the REQUEST names architecture (Athenaeum)
      or the building is architecturally notable (wiki flag).
-  4. Count semantics: the About stop counts toward N only when exhibition material
-     is too thin to reach N; otherwise it is a free, enriched opener.
-  5. In the stop-pool building assembly it is placed FIRST (Stop 1), before new
-     and pooled exhibition stops, and the pooled narration is still reused verbatim.
+  4. Count semantics: [LOCAL-592 SUPERSEDED] the About content is the opening
+     SECTION of Stop 1, never a stop, so should_count_toward_n is always False
+     and a request for N delivers exactly N stops.
+  5. In the stop-pool building assembly the About content is FOLDED into Stop 1's
+     opening section (never an extra stop — LOCAL-592); the pooled narration is
+     still reused verbatim.
 
 Run: python3 -m pytest test_local585_about_museum_stop.py -q
 """
@@ -144,7 +146,10 @@ class TestGriffinAboutStop(unittest.TestCase):
 
 
 class TestGriffinAboutStopCountsWhenThin(unittest.TestCase):
-    def test_counts_toward_n_true_when_exhibitions_thin(self):
+    def test_counts_toward_n_false_even_when_exhibitions_thin(self):
+        # [LOCAL-592] SUPERSEDED: the About content folds into Stop 1's opening
+        # section — it is never a stop — so even when exhibition material is thin
+        # it does NOT count toward N. A request for N delivers exactly N stops.
         about = am.build_about_stop(
             venue_name="Griffin Museum of Photography",
             base_site_url=_BASE,
@@ -153,7 +158,7 @@ class TestGriffinAboutStopCountsWhenThin(unittest.TestCase):
             fetcher=_griffin_fetcher,
         )
         self.assertIsNotNone(about)
-        self.assertTrue(about.counts_toward_n)
+        self.assertFalse(about.counts_toward_n)
 
 
 # ── Architecture coverage (Athenaeum) ───────────────────────────────────────────
@@ -245,11 +250,15 @@ class TestPredicates(unittest.TestCase):
             "The museum was founded in 1992 by Arthur Griffin."))
 
     def test_should_count_toward_n(self):
+        # [LOCAL-592] SUPERSEDED: the About content is the opening SECTION of
+        # Stop 1, never a standalone stop, so it can never count toward N. The
+        # LOCAL-585 "thin exhibitions → count it" branch is gone; the function
+        # now returns False for every input (a request for N delivers exactly N).
         self.assertFalse(am.should_count_toward_n(None, 0))
         self.assertFalse(am.should_count_toward_n(0, 0))
         self.assertFalse(am.should_count_toward_n(7, 10))   # enough exhibitions
         self.assertFalse(am.should_count_toward_n(7, 7))    # exactly enough
-        self.assertTrue(am.should_count_toward_n(5, 3))     # too few → count it
+        self.assertFalse(am.should_count_toward_n(5, 3))    # too few → STILL not a stop
 
     def test_clean_venue_request_name(self):
         # A themed-in-building request resolves to the building name.
@@ -286,6 +295,10 @@ def _new(title, narration, **kw):
 
 
 class TestAssemblyPlacesAboutFirst(unittest.TestCase):
+    """[LOCAL-592] SUPERSEDED: the About content is no longer a standalone Stop 1.
+    A legacy ``about_stop`` unit is now FOLDED into Stop 1's opening section (never
+    an extra stop), so a request for N exhibition stops still delivers exactly N."""
+
     def setUp(self):
         self.about = am.build_about_stop(
             venue_name="Griffin Museum of Photography",
@@ -307,26 +320,28 @@ class TestAssemblyPlacesAboutFirst(unittest.TestCase):
             about_stop=self.about_unit,
         )
 
-    def test_about_stop_is_stop_1(self):
-        self.assertEqual(self.res.order[0], "About Griffin Museum of Photography")
-        self.assertEqual(self.res.about_stops, 1)
-        # Stop 1 header in the rendered text is the About stop.
-        m = re.search(r"(?m)^Stop 1:\s*(.+)$", self.res.tour_text)
-        self.assertIsNotNone(m)
-        self.assertIn("About Griffin Museum of Photography", m.group(1))
+    def test_no_standalone_about_stop(self):
+        # The legacy about_stop is folded in, not placed as its own stop.
+        self.assertNotIn("About Griffin Museum of Photography", self.res.order)
+        self.assertEqual(self.res.about_stops, 1)   # reported for the ledger, 0 stops added
+        # No stop header is titled "About …".
+        self.assertNotRegex(self.res.tour_text, r"(?m)^Stop \d+:.*About")
 
-    def test_order_is_about_then_new_then_pooled(self):
-        self.assertEqual(
-            self.res.order,
-            ["About Griffin Museum of Photography", "New One", "Alpha", "Beta"])
+    def test_order_is_new_then_pooled_exactly_n(self):
+        self.assertEqual(self.res.order, ["New One", "Alpha", "Beta"])
+
+    def test_about_content_folded_into_stop_1(self):
+        stop1_block = self.res.tour_text.split("Stop 2:")[0]
+        self.assertIn("Arthur Griffin", stop1_block)
+        self.assertIn("1992", stop1_block)
+        # Stop 1's own exhibition narration still follows the About material.
+        self.assertIn("Fresh narration one.", stop1_block)
 
     def test_pooled_narration_still_reused_verbatim(self):
         for p in self.pooled:
             self.assertIn(p["narration"], self.res.tour_text)
 
     def test_about_block_has_no_artwork_fields_rendered(self):
-        # The About stop block must not render Type/Specialty / Specific Examples
-        # (museum category omits them anyway) and must not read as an artwork.
         stop1_block = self.res.tour_text.split("Stop 2:")[0]
         self.assertNotIn("Type/Specialty:", stop1_block)
         self.assertNotIn("Specific Examples:", stop1_block)
