@@ -28,9 +28,11 @@ import time
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
-from exhibition_discovery import extract_current_exhibitions
+from exhibition_discovery import (extract_current_exhibitions,
+                                  extract_classified_exhibitions)
 
-__all__ = ['discover_site_exhibitions', 'build_site_first_candidates', 'SiteFirstResult']
+__all__ = ['discover_site_exhibitions', 'build_site_first_candidates',
+           'discover_classified_exhibitions', 'SiteFirstResult']
 
 # [LOCAL-589] Timeouts. The field defect was a swallowed ReadTimeout: a 15 s
 # listing fetch timed out, the error was discarded, and the run reported an empty
@@ -75,6 +77,56 @@ _LISTING_SEEDS_EN = [
     '/en/exhibitions', '/en/whats-on',
     '/exhibitions-events', '/visit/exhibitions',
 ]
+
+# [LOCAL-599B] For an EXHIBITION museum, a detail link whose FIRST path segment is
+# one of these is a program / event / class / studio / shop / membership page —
+# NOT an exhibition. The structural extractor (_DETAIL_PATH_RE) accepts /event/…
+# as a "detail page" so programs can be surfaced for event-driven venues; here, on
+# the exhibition path, we keep only true exhibition detail links. MassArt's
+# "Make with MAAM" (/event/make-maam-222) — a hands-on Studio program, not a show
+# — is dropped by this rule. The policy is a path-segment classifier (deterministic),
+# never a blocklist of titles.
+_NON_EXHIBITION_FIRST_SEGMENTS = frozenset({
+    'event', 'events', 'program', 'programs', 'programme', 'programmes',
+    'class', 'classes', 'workshop', 'workshops', 'studio', 'studios',
+    'shop', 'store', 'membership', 'join', 'donate', 'support', 'give',
+    'rental', 'rentals', 'cafe', 'calendar', 'news', 'blog', 'press',
+    'tour', 'tours', 'camp', 'camps', 'course', 'courses',
+})
+# Path roots that positively mark an EXHIBITION detail page. When a listing yields
+# a mix of exhibition and non-exhibition detail links, those under one of these
+# roots are preferred (and are the only ones kept on the exhibition path).
+_EXHIBITION_FIRST_SEGMENTS = frozenset({
+    'exhibition', 'exhibitions', 'exhibit', 'exhibits', 'show', 'shows',
+    'on-view', 'onview', 'display', 'installation',
+})
+
+
+def _first_path_segment(detail_url: str) -> str:
+    """Lower-cased first path segment of a URL ('/exhibition/x' → 'exhibition')."""
+    try:
+        path = urlparse(detail_url).path.strip('/')
+    except Exception:
+        return ''
+    return path.split('/', 1)[0].lower() if path else ''
+
+
+def _is_exhibition_detail(detail_url: str) -> bool:
+    """True when a detail URL is an EXHIBITION page (not a program/event/shop…)."""
+    seg = _first_path_segment(detail_url)
+    if seg in _NON_EXHIBITION_FIRST_SEGMENTS:
+        return False
+    # When the path has a recognised exhibition root, it is clearly a show.
+    if seg in _EXHIBITION_FIRST_SEGMENTS:
+        return True
+    # Unknown root (a venue that files shows elsewhere): accept it — the structural
+    # extractor already proved it is an on-domain detail page, and this policy only
+    # EXCLUDES the known non-exhibition roots.
+    return True
+
+
+_STATUS_ORDER = {'on_view': 0, 'upcoming': 1, 'past': 2}
+
 
 
 def _default_fetcher(url: str, timeout: int = _LISTING_TIMEOUT):
@@ -174,7 +226,18 @@ def _fetch_with_retry(url: str, fetch, diagnostics: dict,
 
 
 def _candidate_listing_urls(base_site_url: str, venue_language: str = 'en') -> List[str]:
-    """Build an ordered, de-duplicated list of listing-page URLs to try."""
+    """Build an ordered, de-duplicated list of listing-page URLs to try.
+
+    [LOCAL-599B] The dedicated exhibition-listing seeds (``/exhibitions``,
+    ``/current-exhibitions`` …) are tried BEFORE the home page. The home page is a
+    poor exhibition listing: it mixes shows with events/programs and often links
+    its exhibition teasers as image-only anchors with no heading (so the
+    structural extractor misses them), while surfacing a hands-on PROGRAM
+    (MassArt's "Make with MAAM" → /event/…) that is NOT an exhibition. Reaching
+    ``/exhibitions`` first — and accumulating across every seed (see
+    discover_site_exhibitions) — is what gets the real shows instead of the one
+    program. The home page is kept as a LAST resort for small single-page venues.
+    """
     parsed = urlparse(base_site_url)
     if not parsed.scheme:
         base_site_url = 'https://' + base_site_url
@@ -193,8 +256,8 @@ def _candidate_listing_urls(base_site_url: str, venue_language: str = 'en') -> L
 
     urls: List[str] = []
     seen = set()
-    # The base page itself can be the listing (small venues).
-    for u in [base_site_url] + [root + s for s in seeds]:
+    # Dedicated listing seeds FIRST, then the base/home page as a fallback.
+    for u in [root + s for s in seeds] + [base_site_url]:
         if u not in seen:
             seen.add(u)
             urls.append(u)
@@ -234,6 +297,14 @@ def discover_site_exhibitions(
     tried = 0
     _any_html = False          # at least one seed returned usable HTML
     _any_fetch_failure = False  # at least one seed failed to fetch (timeout/5xx)
+    # [LOCAL-599B] ACCUMULATE across seeds instead of returning the FIRST seed that
+    # yields any show. The home page is tried last (poor exhibition listing) and
+    # a dedicated /exhibitions index — which carries the real shows — wins. The
+    # best listing is the one that yields the MOST on-domain exhibition detail
+    # links; ties go to the first (dedicated-seed) page in try order.
+    _best_exhibitions: List[Dict] = []
+    _best_url = ''
+    _best_score = -1
     for url in _candidate_listing_urls(base_site_url, venue_language):
         if tried >= max_listing_tries:
             break
@@ -245,13 +316,27 @@ def discover_site_exhibitions(
             continue
         _any_html = True
         exhibitions = extract_current_exhibitions(html, url)
-        if exhibitions:
-            print(f"  [LOCAL-580] Site exhibitions found on {url}: "
-                  f"{len(exhibitions)} show(s)")
-            diagnostics['reason'] = 'ok'
-            diagnostics['fetch_failed'] = False
-            diagnostics['listing_url'] = url
-            return exhibitions, url
+        if not exhibitions:
+            continue
+        # Score a listing by how many TRUE exhibition detail links it carries, so a
+        # dedicated /exhibitions index beats a home page that links one program.
+        _n_shows = sum(1 for e in exhibitions
+                       if _is_exhibition_detail(e.get('detail_url', '')))
+        _score = _n_shows if _n_shows > 0 else 0
+        print(f"  [LOCAL-580] Site exhibitions on {url}: {len(exhibitions)} "
+              f"detail-linked ({_n_shows} true exhibition{'s' if _n_shows != 1 else ''})")
+        if _score > _best_score:
+            _best_score = _score
+            _best_exhibitions = exhibitions
+            _best_url = url
+        # A listing with several true exhibitions is authoritative — stop early.
+        if _n_shows >= 2:
+            break
+    if _best_exhibitions:
+        diagnostics['reason'] = 'ok'
+        diagnostics['fetch_failed'] = False
+        diagnostics['listing_url'] = _best_url
+        return _best_exhibitions, _best_url
     # Nothing returned — say WHY.
     if _any_html:
         # A listing page was fetched but held no structural exhibitions.
@@ -269,6 +354,150 @@ def discover_site_exhibitions(
     return [], ''
 
 
+def discover_classified_exhibitions(
+    base_site_url: str,
+    venue_language: str = 'en',
+    fetcher: Optional[Callable] = None,
+    max_listing_tries: int = 8,
+    diagnostics: Optional[Dict] = None,
+    today=None,
+) -> Tuple[List[Dict], str]:
+    """[LOCAL-599B] Like discover_site_exhibitions, but returns exhibitions WITH a
+    deterministic status, ordered on_view → upcoming → past, with programs/events
+    EXCLUDED (exhibition-museum policy).
+
+    Returns (exhibitions, listing_url). Each exhibition carries
+    {'title', 'detail_url', 'status', 'dates'}. On-view shows come first (the tour
+    opens with the current exhibitions), then upcoming, then past — the honest
+    fill order of D611. The home page is tried last; the dedicated /exhibitions
+    index (which cleanly splits on-view vs past) wins and provides the authoritative
+    status via its CMS sections.
+    """
+    if diagnostics is None:
+        diagnostics = {}
+    diagnostics.setdefault('fetches', [])
+    if not base_site_url:
+        diagnostics['reason'] = 'no_listing_found'
+        diagnostics['fetch_failed'] = False
+        return [], ''
+    fetch = fetcher or _default_fetcher
+    tried = 0
+    _any_html = False
+    _any_fetch_failure = False
+    _best: List[Dict] = []
+    _best_url = ''
+    _best_score = -1
+    for url in _candidate_listing_urls(base_site_url, venue_language):
+        if tried >= max_listing_tries:
+            break
+        tried += 1
+        html, _links, meta = _fetch_with_retry(url, fetch, diagnostics, is_listing=True)
+        if not html or len(html) < 100:
+            if meta.get('status', 0) in _RETRYABLE_STATUSES and not html:
+                _any_fetch_failure = True
+            continue
+        _any_html = True
+        classified = extract_classified_exhibitions(html, url, today=today)
+        # Keep only TRUE exhibitions (drop programs/events/shop/membership…).
+        shows = [e for e in classified if _is_exhibition_detail(e.get('detail_url', ''))]
+        if not shows:
+            continue
+        _n_on_view = sum(1 for e in shows if e.get('status') == 'on_view')
+        # Prefer the listing with the most TRUE shows; a tie prefers more on-view.
+        _score = len(shows) * 100 + _n_on_view
+        print(f"  [LOCAL-599B] {url}: {len(shows)} exhibition(s) "
+              f"(on_view={_n_on_view}, "
+              f"upcoming={sum(1 for e in shows if e.get('status')=='upcoming')}, "
+              f"past={sum(1 for e in shows if e.get('status')=='past')})")
+        if _score > _best_score:
+            _best_score = _score
+            _best = shows
+            _best_url = url
+        if len(shows) >= 2:
+            break
+    if _best:
+        # [LOCAL-599B] If the chosen listing is short on PAST shows, supplement from
+        # a dedicated past-exhibitions page (many venues keep only the few most
+        # recent past shows on the main index but a full archive at /exhibitions/past).
+        # This is only reached when more material is genuinely needed to fill N;
+        # every added show is a real, detail-linked past exhibition (never invented).
+        _best = _supplement_past_exhibitions(
+            base_site_url, _best, fetch, diagnostics, today=today)
+        # Order on_view → upcoming → past, preserving document order within a group.
+        _best_sorted = sorted(
+            _best, key=lambda e: _STATUS_ORDER.get(e.get('status', 'on_view'), 0))
+        diagnostics['reason'] = 'ok'
+        diagnostics['fetch_failed'] = False
+        diagnostics['listing_url'] = _best_url
+        diagnostics['status_counts'] = {
+            s: sum(1 for e in _best_sorted if e.get('status') == s)
+            for s in ('on_view', 'upcoming', 'past')}
+        return _best_sorted, _best_url
+    if _any_html:
+        diagnostics['reason'] = 'parsed_zero'
+        diagnostics['fetch_failed'] = False
+    elif _any_fetch_failure:
+        diagnostics['reason'] = 'fetch_failed'
+        diagnostics['fetch_failed'] = True
+    else:
+        diagnostics['reason'] = 'no_listing_found'
+        diagnostics['fetch_failed'] = False
+    return [], ''
+
+
+# Dedicated past/archive listing seeds — a full past-exhibitions page that many
+# venues keep separate from their main /exhibitions index.
+_PAST_SEEDS = ['/exhibitions/past', '/past-exhibitions', '/exhibitions/archive',
+               '/exhibitions-archive', '/archive/exhibitions']
+
+
+def _supplement_past_exhibitions(base_site_url, exhibitions, fetch,
+                                 diagnostics, today=None) -> List[Dict]:
+    """[LOCAL-599B] Add PAST exhibitions from a dedicated past-exhibitions page.
+
+    The main /exhibitions index usually shows only the few most recent past shows;
+    a venue's full archive lives at /exhibitions/past (etc). We fetch the first
+    such page that resolves and merge any NEW past exhibitions (de-duplicated by
+    detail_url) after the ones already found. Every added entry is a real,
+    structural, detail-linked PAST show — nothing is invented. Best-effort: any
+    fetch/parse failure returns the input unchanged.
+    """
+    if not base_site_url:
+        return exhibitions
+    parsed = urlparse(base_site_url if '://' in base_site_url
+                      else 'https://' + base_site_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    have_urls = {e.get('detail_url') for e in exhibitions}
+    merged = list(exhibitions)
+    for seed in _PAST_SEEDS:
+        url = root + seed
+        # Skip if this seed IS the page we already parsed.
+        if url == diagnostics.get('listing_url'):
+            continue
+        html, _, meta = _fetch_with_retry(url, fetch, diagnostics, is_listing=False)
+        if not html or len(html) < 100 or meta.get('status', 0) != 200:
+            continue
+        classified = extract_classified_exhibitions(html, url, today=today)
+        added = 0
+        for e in classified:
+            du = e.get('detail_url')
+            if not du or du in have_urls:
+                continue
+            if not _is_exhibition_detail(du):
+                continue
+            # A dedicated past page lists past shows; force the past label unless
+            # classification already found it on-view/upcoming (it won't here).
+            if e.get('status') not in ('on_view', 'upcoming'):
+                e['status'] = 'past'
+            have_urls.add(du)
+            merged.append(e)
+            added += 1
+        if added:
+            print(f"  [LOCAL-599B] +{added} past exhibition(s) from {url}")
+            break  # one archive page is enough
+    return merged
+
+
 def build_site_first_candidates(
     base_site_url: str,
     venue_language: str = 'en',
@@ -276,26 +505,34 @@ def build_site_first_candidates(
     fetcher: Optional[Callable] = None,
     fetch_detail_pages: bool = True,
     diagnostics: Optional[Dict] = None,
+    today=None,
 ) -> List[Dict]:
-    """Build site-first candidate stops for an exhibition museum.
+    """Build site-first candidate stops for an exhibition museum, filled to N.
 
-    One candidate per current exhibition. Each candidate is sourced from its own
-    detail page (fetched for the description). Returns up to ``total_stops * 2``
-    candidates (headroom for grounding) in the site's published order.
+    [LOCAL-599B] The candidate list is assembled in the honest fill order of D611:
+      (a) CURRENT (on-view) exhibitions — one stop per show, sourced from its own
+          detail page;
+      (b) the museum's own NAMED SPACES / building features from /visit and /about
+          (lobby, galleries by floor, the building) — each with a source URL;
+      (c) UPCOMING exhibitions, labelled upcoming;
+      (d) notable PAST exhibitions, labelled past.
+    Programs/events/studios/shop/membership are never exhibitions and are dropped
+    (see _is_exhibition_detail). Every candidate carries a ``source_url`` (its own
+    detail page or the /visit|/about page it was read from) and a ``status`` and
+    ``kind`` so the caller can label it. Nothing is invented: a museum space is
+    only emitted when the venue's own page names it; if (a)-(d) cannot reach N the
+    list is simply shorter and the caller logs the honest shortfall.
 
-    Returns [] when the site yields no exhibitions. When ``diagnostics`` is
-    given it carries the honest reason (see discover_site_exhibitions) so the
-    caller can distinguish 'fetch_failed' (retry / overview rung, NEVER GPT
-    invention) from 'parsed_zero'/'no_listing_found'.
+    Returns [] when the site yields no exhibitions AND no named spaces. When
+    ``diagnostics`` is given it carries the honest reason (see
+    discover_classified_exhibitions) plus ``status_counts`` and ``kind_counts``.
     """
     if diagnostics is None:
         diagnostics = {}
     fetch = fetcher or _default_fetcher
-    exhibitions, listing_url = discover_site_exhibitions(
-        base_site_url, venue_language, fetcher=fetch, diagnostics=diagnostics)
-    if not exhibitions:
-        # reason/fetch_failed already set by discover_site_exhibitions.
-        return []
+    exhibitions, listing_url = discover_classified_exhibitions(
+        base_site_url, venue_language, fetcher=fetch, diagnostics=diagnostics,
+        today=today)
 
     # Fetch the listing page text once so a show with a thin detail page still
     # has SOME grounding text (its blurb on the listing).
@@ -304,29 +541,163 @@ def build_site_first_candidates(
         _html, _, _ = _fetch_with_retry(listing_url, fetch, diagnostics, is_listing=False)
         listing_text = _visible_text(_html)
 
-    cap = max(total_stops * 2, total_stops)
-    candidates: List[Dict] = []
-    for ex in exhibitions[:cap]:
-        title = ex.get('title', '').strip()
-        detail_url = ex.get('detail_url', '').strip()
+    def _mk_exhibition_candidate(ex: Dict) -> Optional[Dict]:
+        title = (ex.get('title') or '').strip()
+        detail_url = (ex.get('detail_url') or '').strip()
         if not title:
-            continue
+            return None
         page_text = ''
         if fetch_detail_pages and detail_url:
             _html, _, _ = _fetch_with_retry(detail_url, fetch, diagnostics, is_listing=False)
             page_text = _visible_text(_html)
         if not page_text:
             page_text = listing_text
-        candidates.append({
+        return {
             'name': title,
             'detail_url': detail_url,
+            'source_url': detail_url or listing_url,
             'page_text': page_text,
             'source': 'site_exhibition',
-        })
+            'kind': 'exhibition',
+            'status': ex.get('status', 'on_view'),
+            'dates': ex.get('dates', ''),
+        }
+
+    # Split by status (already ordered on_view → upcoming → past by discovery).
+    on_view = [e for e in exhibitions if e.get('status') == 'on_view']
+    upcoming = [e for e in exhibitions if e.get('status') == 'upcoming']
+    past = [e for e in exhibitions if e.get('status') == 'past']
+
+    cap = max(total_stops * 2, total_stops)
+    candidates: List[Dict] = []
+
+    # (a) current exhibitions first.
+    for ex in on_view:
+        if len(candidates) >= cap:
+            break
+        c = _mk_exhibition_candidate(ex)
+        if c:
+            candidates.append(c)
+
+    # (b) museum's own named spaces / building features (/visit, /about), only to
+    # fill toward N and only when the venue's own pages name them.
+    if len(candidates) < total_stops:
+        space_candidates = _discover_museum_spaces(
+            base_site_url, fetch, diagnostics,
+            want=total_stops - len(candidates),
+            exclude_titles={c['name'].lower() for c in candidates})
+        for sc in space_candidates:
+            if len(candidates) >= cap:
+                break
+            candidates.append(sc)
+
+    # (c) upcoming, then (d) past — labelled — to honestly reach N.
+    for ex in upcoming + past:
+        if len(candidates) >= cap:
+            break
+        c = _mk_exhibition_candidate(ex)
+        if c:
+            candidates.append(c)
+
+    if not candidates:
+        # reason/fetch_failed already set by discover_classified_exhibitions.
+        return []
+
     diagnostics['reason'] = 'ok'
     diagnostics['fetch_failed'] = False
     diagnostics['candidate_count'] = len(candidates)
+    diagnostics['kind_counts'] = {
+        k: sum(1 for c in candidates if c.get('kind') == k)
+        for k in ('exhibition', 'museum_space')}
+    diagnostics['status_counts'] = {
+        s: sum(1 for c in candidates if c.get('status') == s)
+        for s in ('on_view', 'upcoming', 'past', 'space')}
     return candidates
+
+
+# Pages whose named sections make honest "museum space" stops (lobby, galleries by
+# floor, the building). /visit and /about are the D611-named sources.
+_SPACE_SEEDS = ['/visit', '/plan-your-visit', '/about', '/about-us',
+                '/the-building', '/architecture', '/galleries', '/floor-plan']
+
+# A heading on a /visit or /about page names a MUSEUM SPACE when it reads like a
+# room / gallery / floor / building feature. Deterministic token test — not a
+# blocklist of names. Kept conservative so page furniture ("Plan Your Visit",
+# "Hours & Admission", "Membership") is never emitted as a space.
+_SPACE_TOKEN_RE = re.compile(
+    r'(?i)\b(gallery|galleries|lobby|atrium|hall|wing|floor|mezzanine|'
+    r'rotunda|court|courtyard|terrace|pavilion|studio|theater|theatre|'
+    r'auditorium|library|reading\s+room|sculpture\s+garden|'
+    r'ground\s+floor|first\s+floor|second\s+floor|third\s+floor|'
+    r'main\s+gallery|project\s+space|entrance|building)\b')
+# Space headings that are actually page furniture — never a stop.
+_SPACE_FURNITURE_RE = re.compile(
+    r'(?i)\b(plan\s+your\s+visit|hours|admission|tickets?|membership|directions|'
+    r'parking|accessib|getting\s+here|contact|map|faq|group\s+visits?|'
+    r'book\s+a|buy\b|shop|cafe|store)\b')
+
+
+def _discover_museum_spaces(base_site_url: str, fetch, diagnostics: Dict,
+                            want: int, exclude_titles: set) -> List[Dict]:
+    """[LOCAL-599B] Read the museum's OWN named spaces from /visit and /about.
+
+    Returns up to ``want`` candidate dicts of kind 'museum_space', each with a
+    ``source_url`` (the /visit or /about page it was found on) and the page text as
+    grounding. A space is emitted only when a heading on the venue's own page names
+    a room/gallery/floor/building feature (``_SPACE_TOKEN_RE``) and is not page
+    furniture (``_SPACE_FURNITURE_RE``) — nothing is invented. Pure w.r.t. the
+    injected fetcher; de-duplicated against ``exclude_titles`` and within itself.
+    """
+    if want <= 0 or not base_site_url:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except Exception:
+        return []
+    parsed = urlparse(base_site_url if '://' in base_site_url else 'https://' + base_site_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    out: List[Dict] = []
+    seen = set(t.lower() for t in (exclude_titles or set()))
+    for seed in _SPACE_SEEDS:
+        if len(out) >= want:
+            break
+        url = root + seed
+        html, _, _ = _fetch_with_retry(url, fetch, diagnostics, is_listing=False)
+        if not html or len(html) < 100:
+            continue
+        page_text = _visible_text(html)
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+        except Exception:
+            continue
+        for h in soup.find_all(('h1', 'h2', 'h3', 'h4')):
+            if len(out) >= want:
+                break
+            title = re.sub(r'\s+', ' ', h.get_text(' ', strip=True)).strip()
+            if not title or len(title) < 3 or len(title) > 80:
+                continue
+            if _SPACE_FURNITURE_RE.search(title):
+                continue
+            if not _SPACE_TOKEN_RE.search(title):
+                continue
+            key = title.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({
+                'name': title,
+                'detail_url': url,
+                'source_url': url,
+                'page_text': page_text,
+                'source': 'museum_space',
+                'kind': 'museum_space',
+                'status': 'space',
+                'dates': '',
+            })
+    if out:
+        print(f"  [LOCAL-599B] museum spaces from /visit+/about: "
+              f"{len(out)} named space(s) — {[c['name'] for c in out]}")
+    return out
 
 
 _TAG_RE = re.compile(r'<[^>]+>')

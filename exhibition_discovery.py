@@ -37,7 +37,8 @@ from html import unescape
 from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
-__all__ = ['extract_current_exhibitions', 'is_chrome_title', 'reject_chrome_titles']
+__all__ = ['extract_current_exhibitions', 'extract_classified_exhibitions',
+           'classify_exhibition_status', 'is_chrome_title', 'reject_chrome_titles']
 
 
 # Headings that carry an exhibition title on a listing page.
@@ -410,7 +411,7 @@ def _extract_with_bs4(html: str, base_url: str) -> Optional[List[Dict]]:
         resolved = _find_detail_url_for(heading)
         if not resolved:
             continue
-        title = _collapse_ws(unescape(heading.get_text(' ', strip=True)))
+        title = _title_from_heading(heading)
         if not title or len(title) < 2:
             continue
         if title.lower() in _GENERIC_HEADING_LABELS:
@@ -421,6 +422,43 @@ def _extract_with_bs4(html: str, base_url: str) -> Optional[List[Dict]]:
         seen.add(key)
         out.append({'title': title, 'detail_url': resolved})
     return out
+
+
+# A heading's TITLE token can carry a subtitle/status suffix bleed. On the MAAM
+# (Drupal) listing a past show renders as
+#   <h3><a><span class="exhibition__title">Masako Miki</span></a> Past</h3>
+# so heading.get_text() yields "Masako Miki Past". When the heading (or its detail
+# anchor) carries a dedicated title span/node, prefer that node's text so the
+# status label never bleeds into the show's name. Generic across venues: it keys
+# on a class TOKEN 'title' inside the exhibition heading, not any show name.
+_TITLE_NODE_RE = re.compile(r'(?:^|[\s\-_])title(?:[\s\-_]|$)', re.IGNORECASE)
+
+
+def _title_from_heading(heading) -> str:
+    """Best title string for an exhibition heading, de-bleeding status suffixes.
+
+    Order of preference:
+      1. a descendant element whose class names a 'title' token
+         (<span class="exhibition__title">) — the venue's own title field;
+      2. the detail anchor's own visible text (the title usually lives there);
+      3. the whole heading text (last resort — may include a subtitle/status).
+    """
+    try:
+        for node in heading.find_all(True, recursive=True):
+            cls = node.get('class') or []
+            blob = ' '.join(cls if isinstance(cls, list) else [str(cls)])
+            if _TITLE_NODE_RE.search(blob):
+                t = _collapse_ws(unescape(node.get_text(' ', strip=True)))
+                if t:
+                    return t
+        anchor = heading if getattr(heading, 'name', '') == 'a' else heading.find('a')
+        if anchor is not None:
+            t = _collapse_ws(unescape(anchor.get_text(' ', strip=True)))
+            if t:
+                return t
+    except Exception:
+        pass
+    return _collapse_ws(unescape(heading.get_text(' ', strip=True)))
 
 
 # ─── Regex fallback (no bs4) ─────────────────────────────────────────────────
@@ -471,6 +509,207 @@ def _extract_with_regex(html: str, base_url: str) -> List[Dict]:
             continue
         seen.add(key)
         out.append({'title': title, 'detail_url': resolved})
+    return out
+
+
+# ─── [LOCAL-599B] Status classification (on_view / upcoming / past) ──────────
+#
+# An exhibition listing mixes CURRENT shows with UPCOMING and PAST ones. A tour
+# must open with the current/on-view shows and only reach back to past ones to
+# honestly fill a requested count (D611). The status is read DETERMINISTICALLY,
+# never guessed, in this order of confidence:
+#   1. the Drupal/CMS view SECTION the show sits in — a container class token
+#      'on_view'/'on-view'/'current' vs 'past'/'archive'/'closed'/'upcoming';
+#   2. the show's own DATE RANGE on the page vs. today ("Sep 30, 2026–Feb 28,
+#      2027" → future-start = upcoming, past-end = past, straddling-today =
+#      on_view);
+#   3. a status word in the heading's subtitle suffix ("… On View" / "… Past").
+# When none is present the show defaults to 'on_view' (a listed show with no
+# past/upcoming marker is treated as current — the safe, non-fabricating default).
+
+_STATUS_SECTION_TOKENS = {
+    'on_view': ('on_view', 'on-view', 'onview', 'current', 'now-showing',
+                'nowshowing', 'present'),
+    'upcoming': ('upcoming', 'coming-soon', 'comingsoon', 'future', 'forthcoming'),
+    'past': ('past', 'archive', 'archived', 'closed', 'previous', 'former'),
+}
+
+_STATUS_SUFFIX_RE = {
+    'on_view': re.compile(r'(?i)\b(on\s*view|now\s*showing|current(?:ly)?\s*on\s*view)\b'),
+    'upcoming': re.compile(r'(?i)\b(upcoming|coming\s*soon|opens?\s+\w+\s+\d|forthcoming)\b'),
+    'past': re.compile(r'(?i)\b(past|closed|archived?)\b'),
+}
+
+_MONTHS = ('january', 'february', 'march', 'april', 'may', 'june', 'july',
+           'august', 'september', 'october', 'november', 'december')
+_MONTH_NUM = {m: i + 1 for i, m in enumerate(_MONTHS)}
+_MONTH_ABBR = {m[:3]: i + 1 for i, m in enumerate(_MONTHS)}
+
+# A date like "September 30, 2026" or "Sep 30 2026". Also matches a bare
+# "Month Year" ("September 2026") used by some listings.
+_DATE_RE = re.compile(
+    r'(?i)\b([A-Z][a-z]{2,8})\.?\s+(?:(\d{1,2})\s*,?\s+)?(\d{4})\b')
+# A date RANGE: two dates split by an en/em dash, hyphen, or the word 'to'.
+_DATE_RANGE_RE = re.compile(
+    r'(?i)([A-Z][a-z]{2,8}\.?\s+(?:\d{1,2}\s*,?\s+)?\d{4})'
+    r'\s*(?:–|—|-|to|through|thru)\s*'
+    r'([A-Z][a-z]{2,8}\.?\s+(?:\d{1,2}\s*,?\s+)?\d{4})')
+
+
+def _parse_date_token(tok: str):
+    """Parse 'September 30, 2026' / 'Sep 2026' → (year, month, day) or None."""
+    if not tok:
+        return None
+    m = _DATE_RE.search(tok)
+    if not m:
+        return None
+    mon_word = m.group(1).lower()
+    month = _MONTH_NUM.get(mon_word) or _MONTH_ABBR.get(mon_word[:3])
+    if not month:
+        return None
+    day = int(m.group(2)) if m.group(2) else 1
+    year = int(m.group(3))
+    return (year, month, day)
+
+
+def classify_exhibition_status(section_blob: str, page_text: str,
+                               subtitle: str, today=None) -> str:
+    """Deterministically classify a show as 'on_view' / 'upcoming' / 'past'.
+
+    Args:
+        section_blob: the class/id tokens of the CMS section the show sits in
+            (e.g. 'view-display-id-on_view'); '' when unknown.
+        page_text: the show's own listing/detail text (carries its date range).
+        subtitle: the heading's subtitle/status suffix text, if any.
+        today: a datetime.date for the date comparison (defaults to today).
+    Returns one of 'on_view' / 'upcoming' / 'past'. Defaults to 'on_view'.
+    """
+    import datetime
+    today = today or datetime.date.today()
+
+    # 1. CMS section token — the most authoritative signal.
+    blob = (section_blob or '').lower()
+    for status, toks in _STATUS_SECTION_TOKENS.items():
+        if any(t in blob for t in toks):
+            return status
+
+    # 2. The show's own date range vs. today.
+    rng = _DATE_RANGE_RE.search(page_text or '')
+    if rng:
+        start = _parse_date_token(rng.group(1))
+        end = _parse_date_token(rng.group(2))
+        try:
+            if start:
+                sd = datetime.date(start[0], start[1], start[2])
+            else:
+                sd = None
+            if end:
+                ed = datetime.date(end[0], end[1], end[2])
+            else:
+                ed = None
+            if ed and ed < today:
+                return 'past'
+            if sd and sd > today:
+                return 'upcoming'
+            if (sd and sd <= today) and (ed and ed >= today):
+                return 'on_view'
+        except (ValueError, TypeError):
+            pass
+
+    # 3. A status word in the subtitle suffix.
+    sub = subtitle or ''
+    for status in ('past', 'upcoming', 'on_view'):
+        if _STATUS_SUFFIX_RE[status].search(sub):
+            return status
+
+    # 4. Default: a listed show with no past/upcoming marker is current.
+    return 'on_view'
+
+
+def _section_blob_for(node) -> str:
+    """Collect class/id tokens of a node's enclosing CMS 'view'/'display'
+    section — the container that groups on-view vs past shows."""
+    tokens = []
+    cur = node
+    hops = 0
+    while cur is not None and getattr(cur, 'name', None) and hops < 10:
+        cls = cur.get('class') if hasattr(cur, 'get') else None
+        if cls:
+            tokens.append(' '.join(cls if isinstance(cls, list) else [str(cls)]))
+        _id = cur.get('id') if hasattr(cur, 'get') else None
+        if _id:
+            tokens.append(str(_id))
+        cur = cur.parent
+        hops += 1
+    return ' '.join(tokens)
+
+
+def extract_classified_exhibitions(html: str, base_url: str, today=None) -> List[Dict]:
+    """[LOCAL-599B] Extract exhibitions WITH a deterministic status + dates.
+
+    Same structural signal as ``extract_current_exhibitions`` (a heading linking
+    to an on-domain detail page), but each result also carries:
+        {'title', 'detail_url', 'status', 'dates'}
+    where status ∈ {'on_view', 'upcoming', 'past'} (see classify_exhibition_status)
+    and dates is the raw date-range string found near the show, or ''.
+
+    Programs/events are NOT filtered here (that is the caller's exhibition-museum
+    policy); this function reports every structural detail-linked show so the
+    caller can order current-first and fill honestly. bs4-only: returns the plain
+    list from extract_current_exhibitions (status defaulted) when bs4 is absent.
+    """
+    if not html or not base_url:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except Exception:
+        # No bs4 → fall back to the structural list with a default status.
+        return [dict(e, status='on_view', dates='')
+                for e in extract_current_exhibitions(html, base_url)]
+
+    base = _extract_with_bs4(html, base_url)
+    if not base:
+        return []
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Map each detail_url to the heading node that produced it so we can read its
+    # enclosing section + nearby date range + subtitle.
+    out: List[Dict] = []
+    for ex in base:
+        title = ex['title']
+        detail_url = ex['detail_url']
+        # Locate the anchor for this detail_url to anchor the status read.
+        anchor = None
+        for a in soup.find_all('a', href=True):
+            if urljoin(base_url, a['href']) == detail_url:
+                anchor = a
+                break
+        section_blob = _section_blob_for(anchor) if anchor is not None else ''
+        # Nearest enclosing article/card text (for the date range) + subtitle.
+        card_text = ''
+        subtitle = ''
+        if anchor is not None:
+            card = anchor
+            hops = 0
+            while card is not None and getattr(card, 'name', None) and hops < 8:
+                if card.name in ('article', 'li') or (
+                        card.get('class') and any(
+                            'exhibition' in str(c).lower() or 'views-row' in str(c).lower()
+                            for c in card.get('class'))):
+                    card_text = card.get_text(' ', strip=True)
+                    _sub = card.find(class_=re.compile(r'subtitle', re.I))
+                    if _sub is not None:
+                        subtitle = _sub.get_text(' ', strip=True)
+                    break
+                card = card.parent
+                hops += 1
+            if not card_text and anchor.parent is not None:
+                card_text = anchor.parent.get_text(' ', strip=True)
+        dates_m = _DATE_RANGE_RE.search(card_text)
+        dates = dates_m.group(0) if dates_m else ''
+        status = classify_exhibition_status(section_blob, card_text, subtitle, today=today)
+        out.append({'title': title, 'detail_url': detail_url,
+                    'status': status, 'dates': dates})
     return out
 
 
