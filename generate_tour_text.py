@@ -2103,6 +2103,144 @@ def _reconcile_scope_verdict(inside, reason):
     return inside
 
 
+# [LOCAL-591] A parseable 'lat, lng' already present on a stop, in any of the
+# shapes the generator uses (the `coordinates` string, or numeric
+# latitude/longitude fields, or Wikidata lat/lng).
+_COORD_PAIR_RE = re.compile(r'-?\d+\.?\d*\s*,\s*-?\d+\.?\d*')
+
+
+def _poi_has_coordinates(poi):
+    """True when a stop already carries a usable coordinate.
+
+    Checks the `coordinates` string first, then the numeric latitude/longitude
+    (and wikidata_*) fields. A (0,0) pair or an empty string counts as missing.
+    """
+    cs = poi.get('coordinates', '') or ''
+    m = _COORD_PAIR_RE.search(cs)
+    if m:
+        try:
+            lat, lng = [float(x) for x in m.group(0).split(',')]
+            if not (lat == 0.0 and lng == 0.0):
+                return True
+        except ValueError:
+            pass
+    lat = poi.get('latitude') or poi.get('wikidata_lat')
+    lng = poi.get('longitude') or poi.get('wikidata_lng')
+    try:
+        if lat is not None and lng is not None and (float(lat) != 0.0 or float(lng) != 0.0):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def _geocode_missing_coordinates(poi_list, location, headers,
+                                 coord_fetch=None, resolve_poi_fn=None,
+                                 tour_anchor=None):
+    """[LOCAL-591] Every delivered stop must have coordinates — a final sweep.
+
+    Tours 395/396: King's Chapel was added by the LOCAL-576 replenishment loop,
+    which runs AFTER the D559 geocoding phase. Nothing geocoded it afterward, so
+    it shipped with no coordinates and had no map marker. The same gap exists for
+    any stop added late — D556 additions, LOCAL-577/589 refills — because they
+    all land after geocoding.
+
+    This runs just before packing (PHASE 6) and geocodes every stop that still
+    lacks a parseable coordinate, whatever path added it. A stop that cannot be
+    placed is LOGGED and kept (never DELETE a stop); its name is returned in
+    `still_missing` so the caller can announce the gap.
+
+    `coord_fetch(poi) -> (poi, "lat, lng", tokens)` is injected so the sweep is
+    testable offline; the default calls the same LLM coordinate endpoint the
+    PHASE-3B fallback uses. When `resolve_poi_fn` is given, a freshly fetched
+    coordinate is corroborated through it (the D559 independent geocoder), exactly
+    as the centroid-collapse refill does.
+
+    Returns (n_fixed, still_missing_names, tokens_used). Mutates poi dicts in place.
+    """
+    if not poi_list:
+        return 0, [], 0
+
+    missing = [p for p in poi_list if not _poi_has_coordinates(p)]
+    if not missing:
+        return 0, [], 0
+
+    print(f"\n  [LOCAL-591] COORDINATE SWEEP: {len(missing)} delivered stop(s) have no "
+          f"coordinates (added after the geocoding phase) — geocoding before packing: "
+          f"{[p.get('name', '') for p in missing]}")
+
+    if coord_fetch is None:
+        def coord_fetch(poi):
+            prompt = (
+                f"Provide GPS coordinates for '{poi.get('name', '')}'"
+                + (f" at {poi['address']}" if poi.get('address') else f" in {location}")
+                + ".\nFormat: Latitude: [number]\nLongitude: [number]\n"
+                  "Only coordinates, nothing else."
+            )
+            data = {
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "messages": [
+                    {"role": "system", "content": "You provide accurate GPS coordinates. "
+                     "Respond only with Latitude and Longitude lines."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 60,
+            }
+            try:
+                resp = requests.post("https://api.openai.com/v1/chat/completions",
+                                     headers=headers, data=json.dumps(data))
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"]
+                    lat_m = re.search(r'Latitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    lng_m = re.search(r'Longitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    _tok = resp.json().get("usage", {}).get("total_tokens", 0)
+                    if lat_m and lng_m:
+                        return poi, f"{lat_m.group(1)}, {lng_m.group(1)}", _tok
+            except Exception as _e:
+                print(f"   [LOCAL-591] coord fetch error for '{poi.get('name', '')}': {_e}")
+            return poi, "", 0
+
+    n_fixed = 0
+    tokens_used = 0
+    still_missing = []
+
+    # Fetch in parallel — same executor the rest of the tour path uses.
+    results = []
+    if len(missing) == 1:
+        results = [coord_fetch(missing[0])]
+    else:
+        from concurrent.futures import as_completed as _as_completed
+        with tour_executor(max_workers=min(len(missing), 5)) as _ex:
+            _futs = {_ex.submit(coord_fetch, p): p for p in missing}
+            for _f in _as_completed(_futs):
+                results.append(_f.result())
+
+    for poi, coords, tokens in results:
+        tokens_used += tokens or 0
+        if coords and _COORD_PAIR_RE.search(coords):
+            poi['coordinates'] = coords
+            # Corroborate through the independent geocoder when available, exactly
+            # as the D559 phase and the centroid-collapse refill do.
+            if resolve_poi_fn is not None:
+                try:
+                    resolve_poi_fn(poi, location, tour_anchor)
+                except Exception as _re:
+                    print(f"   [LOCAL-591] resolve_poi after sweep failed for "
+                          f"'{poi.get('name', '')}' (keeping fetched coord): {_re}")
+            n_fixed += 1
+            print(f"   [LOCAL-591] coord sweep OK '{poi.get('name', '')}': "
+                  f"{poi.get('coordinates', '')}")
+        else:
+            still_missing.append(poi.get('name', ''))
+            print(f"   [LOCAL-591] coord sweep COULD NOT place '{poi.get('name', '')}' "
+                  f"— stop is kept (never dropped) but has no map marker; announced.")
+
+    print(f"  [LOCAL-591] COORDINATE SWEEP complete: {n_fixed} geocoded, "
+          f"{len(still_missing)} still without a marker.")
+    return n_fixed, still_missing, tokens_used
+
+
 def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                                  protect_first=True):
     """
@@ -19083,6 +19221,39 @@ REWRITE RULES (all mandatory):
 
     # [LOCAL-3498] Close the story_first sub-phase profile before the phase ends.
     _sfp.summary()
+
+    # [LOCAL-591] FINAL COORDINATE SWEEP — every delivered stop must have a map
+    # marker. Stops added AFTER the D559 geocoding phase (LOCAL-576 replenishment,
+    # D556 additions, LOCAL-577/589 refills) were never geocoded; King's Chapel
+    # shipped on tour 395 with no coordinates and no marker. Geocode any stop that
+    # still lacks a parseable coordinate, here, just before packing — the last
+    # point where the stop set is final. A stop that cannot be placed is announced
+    # (returned in still_missing) and KEPT, never dropped.
+    try:
+        _sweep_resolve = None
+        _sweep_anchor = None
+        try:
+            from geocode_stops import resolve_poi as _sweep_resolve, geocode as _sweep_geocode, \
+                location_hint as _sweep_hint
+            try:
+                _sweep_anchor = _sweep_geocode(_sweep_hint(location) or location)
+            except Exception:
+                _sweep_anchor = None
+        except ImportError as _sw_imp:
+            _import_logger.error(f"[LOCAL-591] geocode_stops unavailable for the "
+                                 f"coordinate sweep ({_sw_imp}); using the LLM fetch alone")
+            _sweep_resolve = None
+        _sweep_fixed, _sweep_missing, _sweep_tokens = _geocode_missing_coordinates(
+            poi_list, location, headers,
+            resolve_poi_fn=_sweep_resolve, tour_anchor=_sweep_anchor)
+        if _sweep_tokens:
+            total_tokens += _sweep_tokens
+            total_cost += _tour_llm_cost(_sweep_tokens)
+        if _sweep_missing:
+            print(f"  [LOCAL-591] {len(_sweep_missing)} stop(s) still without a map "
+                  f"marker after the sweep (kept, announced): {_sweep_missing}")
+    except Exception as _sweep_err:
+        print(f"  [LOCAL-591] coordinate sweep error (non-fatal): {_sweep_err}")
 
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')
