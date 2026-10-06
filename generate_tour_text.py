@@ -4838,7 +4838,29 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
         print("  [D1v2] venue_resolver not available — using heuristic fallback")
     except Exception as e:
         print(f"  [D1v2] venue_resolver error: {e} — using heuristic fallback")
-    
+
+    # [LOCAL-599] No Wikidata venue entity (or P856) → discover the official site
+    # by WEB SEARCH + parent-org route, so a museum with no Wikidata item of its
+    # own (MassArt Art Museum → maamboston.org) still gets a corpus and the
+    # site-first path, instead of a clean fail in seconds. Deterministic, no LLM.
+    if not _base_site_url:
+        try:
+            from venue_resolver import discover_official_site as _disc
+            _parsed_city = ""
+            if "," in venue_name:
+                _cp = [p.strip() for p in venue_name.split(",")]
+                if len(_cp) >= 2:
+                    _parsed_city = _cp[1]
+            _site_disc = _disc(venue_name, _parsed_city)
+            if _site_disc.found:
+                _base_site_url = _site_disc.official_url
+                print(f"  [LOCAL-599] Official site discovered without Wikidata: "
+                      f"{_base_site_url} (route={_site_disc.source})")
+        except ImportError:
+            print("  [LOCAL-599] discover_official_site unavailable — cannot do site-first discovery")
+        except Exception as _de:
+            print(f"  [LOCAL-599] Site discovery error: {type(_de).__name__}: {_de}")
+
     # Fallback: if venue resolver didn't provide a site URL and we have nothing,
     # the degradation ladder will handle fewer verified stops. No hardcoded URLs.
     if not _base_site_url:
@@ -8248,6 +8270,30 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 else:
                     print(f"  [LOCAL-30] Documented works ({_det_documented_count}) < total_stops ({total_stops}) "
                           f"— will use documented as base, GPT fills remainder")
+            else:
+                # [LOCAL-599] NO Wikidata venue entity (MassArt Art Museum has
+                # none — only its parent, Q4381563, does). Discover the official
+                # site by web search + parent-org route and make the site-first
+                # exhibition path ELIGIBLE from it. The tier becomes exhibit_museum
+                # downstream (0 documented works, >=1 verified from the site), not
+                # unresolvable. Clean fail stays only when NO site is found at all.
+                try:
+                    from venue_resolver import discover_official_site as _disc599
+                    _sd = _disc599(_museum_venue_name, _det_city_hint)
+                    if _sd.found:
+                        _museum_site_first_eligible = True
+                        _museum_site_url = _sd.official_url
+                        _museum_site_language = getattr(_sd, 'language', 'en') or 'en'
+                        _museum_resolved_locality = _det_city_hint or ''
+                        print(f"  [LOCAL-599] No Wikidata entity for '{_museum_venue_name}' — "
+                              f"site discovered (route={_sd.source}); exhibition-museum "
+                              f"site-first path ELIGIBLE (site='{_museum_site_url}')")
+                    else:
+                        print(f"  [LOCAL-599] No Wikidata entity and no official site "
+                              f"discovered for '{_museum_venue_name}' — clean fail path")
+                except Exception as _disc_err:
+                    print(f"  [LOCAL-599] Site discovery (no-Wikidata) failed: "
+                          f"{type(_disc_err).__name__}: {_disc_err}")
         except Exception as _det_err:
             print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
             import traceback
