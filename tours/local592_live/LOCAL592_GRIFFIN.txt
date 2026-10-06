@@ -3,13 +3,15 @@ Tour-Category: museum
 
 Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1192
 
-Orientation: You are about to explore the Griffin Museum of Photography in Winchester. Inside, you will encounter "BU Masters Show 2026 | Traces: Pursuing Process" by Ava Harper, Emma Pfannenstiel, Ethan Stumbo, Nanxi Zhang, and "Intertidal: Field Notes" by Andre Bradley and Paul Anthony Smith. These diverse works coalesce around the exploration of photography as a medium to capture the ephemeral and transform it into the eternal. Delve into the unseen traces and intertwined realms of landscape and labor depicted in these pieces, showcasing the power of photography to reveal complex narratives. At the upcoming stops, you'll explore the selected artworks capturing landscape and labor at BU Masters Show 2026 | Traces: Pursuing Process, and experience the blend of field notes and lens-based artworks at Intertidal : Field Notes. Your first stop is BU Masters Show 2026 | Traces: Pursuing Process. Standing in the Griffin Museum of Photography's gallery, position yourself to take in the breadth of the "BU Masters Show 2026 | Traces: Pursuing Process." This exhibition, displayed from January 5 through February 28, 2026, invites you to delve into the emerging narratives and innovative techniques pioneered by the Boston University Master's class.
-
 Before we look at anything on the walls, here is the story of Griffin Museum of Photography in Winchester, Massachusetts itself — who created it, why it exists, and what it is known for. Arthur Griffin was an American photographer. Building on the legacy of our founder, Arthur Griffin, we cultivate opportunities to engage with and better understand our diverse world through the photographic arts. The Griffin Museum of Photography is a 501(c)3 nonprofit organization dedicated to the art of photography. Guided by our mission, the Griffin Museum is committed to embedding diversity, equity, accessibility, and inclusion across all aspects of our work—including our mindset, practices, outreach, programming, and exhibitions. Founded in 1992 as a private foundation, the Griffin Museum of Photography became a nonprofit public charity in 2000. This account is drawn from the museum's own pages on griffinmuseum.org and public reference sources.
+
+Check opening hours and admission on griffinmuseum.org before you go.
+
+Orientation: You are about to explore the Griffin Museum of Photography in Winchester. Inside, you will encounter "BU Masters Show 2026 | Traces: Pursuing Process" by Ava Harper, Emma Pfannenstiel, Ethan Stumbo, Nanxi Zhang, and "Intertidal: Field Notes" by Andre Bradley and Paul Anthony Smith. These diverse works coalesce around the exploration of photography as a medium to capture the ephemeral and transform it into the eternal. Delve into the unseen traces and intertwined realms of landscape and labor depicted in these pieces, showcasing the power of photography to reveal complex narratives. At the upcoming stops, you'll explore the selected artworks capturing landscape and labor at BU Masters Show 2026 | Traces: Pursuing Process, and experience the blend of field notes and lens-based artworks at Intertidal : Field Notes. Your first stop is BU Masters Show 2026 | Traces: Pursuing Process. Standing in the Griffin Museum of Photography's gallery, position yourself to take in the breadth of the "BU Masters Show 2026 | Traces: Pursuing Process." This exhibition, displayed from January 5 through February 28, 2026, invites you to delve into the emerging narratives and innovative techniques pioneered by the Boston University Master's class.
 
 From over 340 entries, only 50 were selected for their unique ability to capture the essence of landscape and labor. Each artist contributes a distinct narrative and technique. Ava Harper, for instance, decided to juxtapose urban landscapes with human motion, capturing the transience of city life. This choice highlighted the constant evolution of urban spaces, an approach that challenges traditional notions by presenting movement as an integral aspect of cityscapes. Emma Pfannenstiel concentrated her efforts on rural labor, capturing the nuanced stories of farm workers. Her images ensure the toil of the fields is both visible and visceral, serving as a dialogue between serenity and the relentless demands of agricultural life. Ethan Stumbo's series focused on personal spaces bathed in natural light. He chose to manipulate shadows and highlights, creating images that evoke intimacy within domestic settings. This deliberate use of light challenges viewers to reconsider the personal spaces we often overlook. Nanxi Zhang sought to explore the impact of climate on landscapes. Zhang crafted images that juxtapose environmental decay with resilience, an endeavor that adds depth to the discourse on human interaction with nature. This exhibition doesn't end at the museum walls; it extends online, inviting a global audience to engage with these groundbreaking interpretations. The artists redefine the captured moment, urging us to view our environments through a lens that reveals the unseen traces of existence.
 
@@ -21,7 +23,7 @@ Directions: Continue through Griffin museum of photography — next is Intertida
 
 Stop 2: Intertidal : Field Notes
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1197
 
@@ -35,7 +37,7 @@ Directions: Next: Earth, Wind & Fire.
 
 Stop 3: Earth, Wind & Fire
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1197
 
@@ -47,7 +49,7 @@ Directions: Proceed to Tabitha Soren | An Artist Life.
 
 Stop 4: Tabitha Soren | An Artist Life
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1197
 
@@ -59,7 +61,7 @@ Directions: Continue to TLC.
 
 Stop 5: TLC
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1197
 
@@ -71,7 +73,7 @@ Directions: Next: Lua Kobayashi |The Persistence of Memories.
 
 Stop 6: Lua Kobayashi |The Persistence of Memories
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1197
 
@@ -83,7 +85,7 @@ Directions: Your final stop in Griffin museum of photography: Homage | Robert Fr
 
 Stop 7: Homage | Robert Frank: The Americans
 
-Address: 1 Washington St, Winchester, MA 01890
+Address: 67 Shore Road, Winchester, MA 01890
 
 Coordinates: 42.4634, -71.1197
 

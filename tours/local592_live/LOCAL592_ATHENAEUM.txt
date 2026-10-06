@@ -3,13 +3,15 @@ Tour-Category: museum
 
 Stop 1: Boys Come Over Here You're Wanted
 
-Address: 10 1/2 Beacon St, Boston, MA 02108
+Address: 10½ Beacon Street, Boston, Massachusetts
 
 Coordinates: 42.3584, -71.0637
 
-Orientation: You are about to explore the Boston Athenaeum in Boston. At this museum, you'll encounter "Boys Come Over Here You're Wanted," Picture Gallery with Views of Modern Rome, Landscape with Cottages and Pond, Cutter Expansive Classification, and Annie Adams Fields. These diverse works, ranging from wartime propaganda to serene landscapes and influential figures, collectively showcase the evolution of knowledge organization. Charles Ammi Cutter's innovative Expansive Classification system, developed during his tenure as the Athenaeum's librarian, revolutionized the cataloging and classification of literary works, shaping the foundation for modern library organization and the Library of Congress classification system. At Boys Come Over Here You're Wanted, you'll see a sophisticated technique using the map as a symbol. Picture Gallery with Views of Modern Rome commemorates Étienne François, Count of Stainville's diplomatic tenure. Your first stop is Boys Come Over Here You're Wanted.
-
 Before we look at anything on the walls, here is the story of Boston Athenæum in Boston, Massachusetts itself — who created it, why it exists, and what it is known for. The Boston Athenæum is one of the oldest independent libraries in the United States. It is a membership library, for which patrons pay a yearly subscription fee to use Athenæum services. The institution was founded in 1807 by the Anthology Club of Boston, Massachusetts. It is located at 10½ Beacon Street on Beacon Hill in Boston. In 1809, it moved to the Rufus Amory House, adjacent to the King’s Chapel Burial Ground. Construction on the Athenaeum’s present home on Beacon Street began in 1847. Designed by Edward Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first floor, the book collection on the second, and a painting gallery on the skylit third floor. Our research books and collections have strengths in Boston history, New England state and local history, and in the fine arts. A word about the building you are standing in. The Boston Athenaeum—a unique combination of library, museum, and cultural center in a magnificent landmark building. This account is drawn from the museum's own pages on bostonathenaeum.org and public reference sources.
+
+Check opening hours and admission on bostonathenaeum.org before you go.
+
+Orientation: You are about to explore the Boston Athenaeum in Boston. At this museum, you'll encounter "Boys Come Over Here You're Wanted," Picture Gallery with Views of Modern Rome, Landscape with Cottages and Pond, Cutter Expansive Classification, and Annie Adams Fields. These diverse works, ranging from wartime propaganda to serene landscapes and influential figures, collectively showcase the evolution of knowledge organization. Charles Ammi Cutter's innovative Expansive Classification system, developed during his tenure as the Athenaeum's librarian, revolutionized the cataloging and classification of literary works, shaping the foundation for modern library organization and the Library of Congress classification system. At Boys Come Over Here You're Wanted, you'll see a sophisticated technique using the map as a symbol. Picture Gallery with Views of Modern Rome commemorates Étienne François, Count of Stainville's diplomatic tenure. Your first stop is Boys Come Over Here You're Wanted.
 
 The poster "Boys Come Over Here You're Wanted" was a centerpiece in the 2014 exhibition "Over Here: World War I Posters from around the World" held at the Boston Athenaeum. This exhibition gathered a diverse array of wartime posters from multiple countries, offering a unique platform for historical reflection on the global nature of World War I propaganda efforts. in Harrow, Middlesex, underscored the Athenaeum's role as a focal point for exploring the cultural and historical impact of wartime communications during that period. Created in 1915, the poster displays a soldier in profile, his figure stark against a background map depicting England and France. This juxtaposition of image and geography was a sophisticated technique at the time, using the map not only as a backdrop but as a symbol of the soldier's mission and the looming battlefields. The use of lithography allowed for sharp, vivid imagery that could be reproduced en masse, facilitating its broad distribution across Britain. The Athenaeum, with its rich collection, became a site of exploration and education through this exhibition. Phineas Adams, who established the magazine The Monthly Anthology, or Magazine of Polite Literature, would have appreciated the cultural resonance of the poster's message — one that spoke to both the urgency and the idealism of the era. In the same spirit, the National Portrait gallery, named for its patron, serves as a reminder of how art and history intertwine, revealing hidden stories in the juxtaposition of imagery and message.
 
@@ -17,7 +19,7 @@ Directions: Continue through Boston Athenaeum — next is Picture Gallery with V
 
 Stop 2: Picture Gallery with Views of Modern Rome
 
-Address: 10 1/2 Beacon St, Boston, MA 02108
+Address: 10½ Beacon Street, Boston, Massachusetts
 
 Coordinates: 42.3584, -71.0637
 
@@ -29,7 +31,7 @@ Directions: Next: Landscape with Cottages and Pond.
 
 Stop 3: Landscape with Cottages and Pond
 
-Address: 10 1/2 Beacon St, Boston, MA 02108
+Address: 10½ Beacon Street, Boston, Massachusetts
 
 Coordinates: 42.3584, -71.0637
 
@@ -41,7 +43,7 @@ Directions: Proceed to Cutter Expansive Classification.
 
 Stop 4: Cutter Expansive Classification
 
-Address: 10 1/2 Beacon St, Boston, MA 02108
+Address: 10½ Beacon Street, Boston, Massachusetts
 
 Coordinates: 42.3584, -71.0637
 
@@ -53,7 +55,7 @@ Directions: Your final stop in Boston Athenaeum: Annie Adams Fields.
 
 Stop 5: Annie Adams Fields
 
-Address: 10 1/2 Beacon St, Boston, MA 02108
+Address: 10½ Beacon Street, Boston, Massachusetts
 
 Coordinates: 42.3584, -71.0637
 

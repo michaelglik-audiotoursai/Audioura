@@ -203,3 +203,143 @@ as the unit tests assert.)
   .continuous_dev/STATUS.md.
 - Committed + pushed after each step; `git rev-list --count subscribed..HEAD` ≥ 1 throughout.
 - Branch created from HEAD (`c9d4c47`), never from `origin/*`.
+
+
+---
+
+## r2 — Stop-1 opening section FIRST, visiting information, address provenance
+
+### Why it bounced (LEAD review, 2026-10-06)
+Exactly-N was right (Athenaeum 5→5, Griffin 7→7, no "About" stop), but three things were wrong
+in `tours/local592_live/`:
+1. **Order.** The About text came **after** the Orientation and "Your first stop is …" (in the
+   Griffin, even after part of the first exhibition's narration). Michael's rule (D611): inside
+   Stop 1 the order is **(a) About the venue → (b) Visiting information → (c) the tour overview /
+   Orientation → (d) Stop 1's own narration.**
+2. **No visiting information.** Neither tour stated hours or admission.
+3. **Address provenance.** The Griffin's Stop 1 showed `1 Washington St, Winchester, MA 01890`;
+   the Griffin is at **67 Shore Road**.
+
+### What changed (r2)
+
+**1. Four-part order — opening section renders FIRST, before Orientation.**
+- `stop_pool_assembly.py`: the opening section is placed on a dedicated Stop-1 field
+  `_opening_section` (no longer folded into the stop's *narration*). `_render_stop_block` emits
+  it **before** the `Orientation:` line. `overall_orientation` stays on the Orientation field, so
+  it now renders *after* the opening section. The resulting order is exactly
+  **About → Visiting info → Orientation/overview → stop narration.**
+
+**2. Visiting information — sourced, with an honest website fallback (never invented).**
+- Sourced path unchanged: `stop_pool_orchestrator._source_practical_facts` fetches the venue's
+  visit/hours page, extracts with the **LOCAL-584** venue-bound extractor
+  (`visitor_facts_extractor`) and passes it through the **LOCAL-584** gate
+  (`practical_facts_gate.gate_formatted_facts`).
+- New fallback: when the venue's pages yield **no gate-passing facts**,
+  `about_museum_stop.build_opening_section` appends a single honest pointer —
+  **"Check opening hours and admission on `<domain>` before you go."** — rather than inventing
+  hours or prices (D584). `AboutStop.site_domain` + `_visiting_fallback_sentence` carry it.
+
+**3. Address provenance — venue-bound address.**
+- `about_museum_stop.extract_venue_address(page_text, locality)` lifts the venue's **own** street
+  address from its page. The street regex requires a house number followed by **adjacent
+  Capitalized street-name words** and a suffix, so a *narrative* clause ("…moved in **1822 to a
+  mansion on Pearl Street**, where it remained…") is **not** mistaken for an address — it correctly
+  lands on "10½ Beacon Street".
+- `about_museum_stop.venue_bound_address(stop_address, venue_address, stop_page_text)`: a contained
+  stop uses the sourced **venue** address unless the stop's own page literally states a satellite
+  gallery address (then that is kept, and the narration can say so). Wired through
+  `assemble_building_tour(..., venue_address=...)` (applied to every stop) and
+  `stop_pool_orchestrator._resolve_venue_address` / `_source_venue_address` at all three assembly
+  call-sites.
+
+### Tests (RED on 9802745 source, GREEN after)
+`test_local592_about_in_stop1.py` adds three classes (7 new tests):
+- `TestFourPartOrderInStop1` — the opening (About + visiting) renders before the `Orientation:`
+  line; overview precedes the stop narration; full chain About→Visiting→Orientation→narration.
+- `TestVisitingInfoFallback` — the website pointer appears when no facts are sourced, invents no
+  hours/prices, and sourced facts are preferred over the fallback.
+- `TestAddressProvenance` — `extract_venue_address` lifts "67 Shore Road" (not a prose clause);
+  a guessed address is replaced by the venue address; a page-stated satellite address is kept; the
+  assembler binds contained stops to the venue address.
+
+RED→GREEN proof (source stashed to base 9802745, test kept):
+```
+7 failed, 18 passed            # on base source (new behaviour absent)
+25 passed                      # after r2 fix
+```
+
+Suite exits (all GREEN):
+```
+test_local592_about_in_stop1.py ....................... 25 passed
+test_local585_about_museum_stop.py + _r2_about_hygiene ...
+test_local584_venue_bound_hours.py + _practical_facts_currency.py ...
+test_local590_assembly.py + _orchestrator.py + _pool_store.py ...
+   → 125 passed (592+585+584+590 combined)
+test_local591_*.py (coordinates/one_scope/contained/verdict) → 37 passed
+```
+
+### Isolated live run (disposable container `local592-gen-$(date +%s)`, never `audioura-*`)
+`./run_local592_live.sh` — `development_default` network (postgres-2 pool), OpenAI hard cap
+**$1.00**, tour cache OFF, `audio_tours` **BEFORE/AFTER 202 / 202** (never DELETE), `total_cost=0.0`
+(served from the pool).
+
+**ATHENAEUM — 5 stops (requested 5); Stop 1, first lines:**
+```
+Stop 1: Boys Come Over Here You're Wanted
+Address: 10½ Beacon Street, Boston, Massachusetts
+Coordinates: 42.3584, -71.0637
+Before we look at anything on the walls, here is the story of Boston Athenæum in Boston,
+Massachusetts itself … founded in 1807 … located at 10½ Beacon Street … Designed by Edward
+Clarke Cabot, the building opened in 1849 … A word about the building you are standing in. …
+This account is drawn from the museum's own pages on bostonathenaeum.org and public reference
+sources.
+Check opening hours and admission on bostonathenaeum.org before you go.
+Orientation: You are about to explore the Boston Athenaeum in Boston. … Your first stop is Boys
+Come Over Here You're Wanted.
+The poster "Boys Come Over Here You're Wanted" was a centerpiece in the 2014 exhibition …
+Directions: Continue through Boston Athenaeum — next is Picture Gallery with Views of Modern Rome.
+```
+Order: **(a) About (history + architecture) → (b) Visiting pointer → (c) Orientation/overview →
+(d) Stop 1 narration.** Address is the venue's (`10½ Beacon Street`), not the earlier narrative
+garbage.
+
+**GRIFFIN — 7 stops (requested 7); Stop 1, first lines:**
+```
+Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+Address: 67 Shore Road, Winchester, MA 01890
+Coordinates: 42.4634, -71.1192
+Before we look at anything on the walls, here is the story of Griffin Museum of Photography in
+Winchester, Massachusetts itself … Arthur Griffin … Founded in 1992 as a private foundation, the
+Griffin Museum of Photography became a nonprofit public charity in 2000. This account is drawn
+from the museum's own pages on griffinmuseum.org and public reference sources.
+Check opening hours and admission on griffinmuseum.org before you go.
+Orientation: You are about to explore the Griffin Museum of Photography in Winchester. … Your
+first stop is BU Masters Show 2026 | Traces: Pursuing Process. …
+From over 340 entries, only 50 were selected …
+```
+Address fixed: **`67 Shore Road, Winchester, MA 01890`** (was `1 Washington St`). Same four-part
+order.
+
+LOCAL-592 SUMMARY (harness audit):
+```
+{'tag':'ATHENAEUM','n':5,'requested':5,'exactly_n':True,'no_about_stop':True,
+ 'has_about_content':True,'has_practical':True,'non_artwork':True,'covers_arch':True}
+{'tag':'GRIFFIN','n':7,'requested':7,'exactly_n':True,'no_about_stop':True,
+ 'has_about_content':True,'has_practical':True,'non_artwork':False,'covers_arch':None}
+```
+(`non_artwork=False` on Griffin is the same audit false-positive noted in r1 §5: the heuristic
+scans the whole of Stop 1 including the exhibition body "The work titled 'Interference' …"; the
+About *opening section* itself is artwork-framing-free, as the unit tests assert.)
+
+### Visiting information on this live run (honesty contract held)
+Both runs logged `practical_facts=none`: the live pages' extracted spans did not survive the
+LOCAL-584 gate (not literally supported — D584), so the opening section carried the honest
+**website pointer** instead of invented hours. On the committed fixture
+`tests/fixtures/griffin_about_2026.html` the same wiring surfaces the real facts
+(`'Closed on Monday. Noon–4 PM. $12'`), as the LOCAL-584 suite asserts.
+
+### Process (r2)
+- No GCloud. Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Base verified: `git merge-base --is-ancestor 9802745 HEAD` exits 0; committed + pushed after each
+  step on `LOCAL-592-about-in-stop1`.
