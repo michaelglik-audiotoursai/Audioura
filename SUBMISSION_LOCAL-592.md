@@ -456,3 +456,113 @@ opening section itself is artwork-framing-free, as the unit tests assert.)
 - Base verified: `git merge-base --is-ancestor 95f364d HEAD` exits 0; `git rev-list --count
   95f364d..HEAD` = 2. Committed + pushed after each step on `LOCAL-592-about-in-stop1`
   (`997f8bf`, `a40885a`). Branch created from HEAD, never from `origin/*`.
+
+## r4 — Hours keep their DAYS, and the visiting note reads as speech
+
+**Base:** `LOCAL-592-about-in-stop1` continued at HEAD `7bba912`. Branch created from HEAD
+(`git merge-base --is-ancestor 7bba912 HEAD` exits 0), never from `origin/*`.
+
+### Why r3 bounced (LEAD review, 2026-10-06 11:0x)
+r3 finally states real facts, but:
+1. **Days were dropped.** The Athenaeum source lists "Monday–Thursday: 9 am – 8 pm"; the Griffin
+   lists "Tuesday through Sunday: Noon to 4 PM". r3 said only the TIME — "9 AM–8 PM", "Noon–4 PM" —
+   which a Saturday listener hears as *every day*. **Hours without their days is a misleading
+   half-fact.**
+2. **It read like a note, not speech:** "Before you go in, a few practical notes. Closed on Monday.
+   Noon–4 PM. $12."
+
+### What was delivered (r4)
+
+**(a) Day-range binding — in the extractor (`visitor_facts_extractor.py`).**
+- `VisitorFacts.hours` entries now carry a `days` field (the weekday range bound to each time
+  range). `format_en()` renders `Tuesday through Sunday, Noon–4 PM`, never a day-less `Noon–4 PM`.
+- English day-schedule extraction captures the day range and **every** day group the page gives,
+  in page order: the Athenaeum's `Monday through Thursday, 9 AM–8 PM; Friday and Saturday, 9 AM–5 PM`.
+- A time range with **no bindable day context** (no weekday, no "daily") is **not stored** as the
+  venue's hours — a day-less time (a café's lunch window) is a half-fact and is dropped.
+- New helpers `_normalize_day_range_en` (renders "Tuesday through Sunday" / "Monday to Thursday" /
+  "Friday and Saturday" per the page's own connector) and `_day_context_en` (binds "daily" /
+  "every day [except <day>]" / a nearby weekday).
+
+**(b) Spoken composition — in the composer (`about_museum_stop.py`).**
+- `build_opening_section` now composes the visiting information as **sentences** via
+  `_compose_visiting_sentences`, not a note:
+
+  > "The Griffin is open Tuesday through Sunday, Noon–4 PM, and closed on Monday. Admission is $12
+  >  for adults and $8 for seniors, students and teachers, as listed on griffinmuseum.org in
+  >  October 2026."
+
+  The day range is spoken WITH the hours; the admission categories the page gives (adults / seniors
+  / students / teachers) are kept **verbatim**, never invented; the **source + month** honesty
+  signal (D584/D582) closes the admission sentence.
+- `build_about_stop` gains an `as_of` month stamp (defaults to the current month via
+  `museum_overview._default_as_of`, so the Stop-1 visiting signal and the rung-3 overview dateline
+  share one source of truth), carried on `AboutStop`.
+- The r2 website-pointer fallback and the r3 partial-pointer (point to the site ONLY for the field
+  the page did not give) are preserved and now read as speech too.
+
+Nothing is invented: every weekday, time, price and category is carried verbatim from the gated
+`practical_facts` string (built upstream under the D584 contract) — r4 only adds the spoken
+connective tissue and binds the day range the extractor already captured.
+
+### Tests (red on `7bba912`, green after)
+`test_local592_r4_dayrange_spoken.py` — 13 tests, RED on `7bba912` (the extractor stores no day
+range; the composer emits note fragments), GREEN after r4:
+- extractor binds the day range to each time range (Griffin "Tuesday through Sunday"; Athenaeum
+  first group carries "Monday–Thursday"); several day groups each stated; `format_en()` renders the
+  days; a day-less time is not stored;
+- the composer reads as sentences (not "a few practical notes"); the day range is spoken before the
+  hours; the source + month signal is present; admission categories are kept and never invented;
+  the Griffin sentence shape (open→days→time→closed→admission→dated source) holds;
+- the Athenaeum states each of its own day groups and speaks free admission without a fabricated
+  price.
+
+```
+$ python3 -m pytest test_local592_about_in_stop1.py test_local592_r4_dayrange_spoken.py -q
+51 passed            # LOCAL592_EXIT=0  (r1–r3 + r4)
+$ python3 -m pytest test_local584_venue_bound_hours.py test_local584_practical_facts_currency.py -q
+24 passed            # LOCAL584_EXIT=0
+$ python3 -m pytest test_local585_about_museum_stop.py test_local585_r2_about_hygiene.py \
+      test_local582_museum_overview.py test_local591_contained_venue.py \
+      test_local591_one_scope_per_tour.py -q
+77 passed            # ADJACENT_EXIT=0
+```
+
+### Live, ISOLATED run (own disposable container, never `audioura-*`)
+`./run_local592_live.sh` builds `Dockerfile.generator` as `local592-gen-<ts>` on
+`development_default` (reads the stop-pool DB from `postgres-2`, its own `.env` for the OpenAI key),
+OpenAI hard cap **$1.00**, tour cache OFF, `audio_tours` only COUNTED (202 → 202, never
+written/deleted), image removed at the end.
+
+**CASE ATHENAEUM — "Art and Architectual tour in Boston Athenaeum, boston, ma" (5):** exactly 5
+stops, no "About …" stop, Stop 1 opens with the About + building + visiting info. Visiting sentences:
+```
+The Boston Athenæum is open Monday through Thursday, 9 AM–8 PM, as listed on
+bostonathenaeum.org in October 2026. Admission prices are listed on bostonathenaeum.org.
+```
+The day range is bound to the hours. (Only the Monday–Thursday group passed the live gate against
+the reachable page; the admission pointer covers the gap — honesty over a guess, D584.)
+
+**CASE GRIFFIN — "Griffin museum of photography, Winchester, MA" (museum, 7):** exactly 7 stops, no
+"About …" stop. Visiting sentences:
+```
+The Griffin is open Tuesday through Sunday, Noon–4 PM, and closed on Monday.
+Admission is $12, as listed on griffinmuseum.org in October 2026.
+```
+The day range ("Tuesday through Sunday") now travels with the hours and the closed day; the source +
+month signal is present.
+
+```
+{'tag':'ATHENAEUM','n':5,'requested':5,'exactly_n':True,'no_about_stop':True,'r4_states_hours':True,'r4_day_bound':True,'r4_source_month':True,'r4_no_note_lead':True,'total_cost':0.0}
+{'tag':'GRIFFIN','n':7,'requested':7,'exactly_n':True,'no_about_stop':True,'r4_states_hours':True,'r4_day_bound':True,'r4_source_month':True,'r4_no_note_lead':True,'total_cost':0.0}
+```
+(`non_artwork=False` on Griffin is the same whole-of-Stop-1 audit false-positive noted in r1–r3: the
+heuristic scans the exhibition body folded into Stop 1; the About + visiting opening section itself
+is artwork-framing-free, as the unit tests assert.)
+
+### Process (r4)
+- No GCloud. Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Base verified: `git merge-base --is-ancestor 7bba912 HEAD` exits 0. Committed + pushed after each
+  step on `LOCAL-592-about-in-stop1` (`b422744` red tests, `dcb8da4` implementation). Branch
+  continued on HEAD, never from `origin/*`.

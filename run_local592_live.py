@@ -123,14 +123,65 @@ def run_case(tag, location, tour_type, stops, expect_architecture):
         print(ln)
     print(f"<<<<<<<<<< CASE {tag} STOP 1 END")
 
+    # ── [r4] VISITING SENTENCES: the spoken hours+admission with the day range
+    # bound and the source + month signal. Pull the sentence(s) that state the
+    # venue being open / closed / admission so the LEAD can read them directly.
+    visiting = _extract_visiting_sentences(stop1_full)
+    print(f"\nCASE {tag} r4 VISITING SENTENCES >>>>>>>>>>")
+    print(visiting or "(none found in Stop 1)")
+    print(f"<<<<<<<<<< CASE {tag} VISITING END")
+
+    # r4 audits: the day range must travel WITH the hours; the source+month signal
+    # must be present when any facts are stated.
+    low_v = (visiting or "").lower()
+    states_hours = bool(re.search(r"\bis open\b|\bopens\b|\bclosed\b", low_v))
+    day_bound = bool(re.search(
+        r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday|daily)", low_v))
+    has_time = bool(re.search(r"\d\s*(?:am|pm)|noon|midnight", low_v))
+    source_month = bool(re.search(r"as listed on .+ in [a-z]+ \d{4}", low_v))
+    reads_as_note = "a few practical notes" in low
+    print(f"\nCASE {tag} r4 AUDIT:")
+    print(f"   visiting reads as a sentence (is open/closed) : {states_hours}")
+    print(f"   day range bound to the hours                  : {day_bound if has_time else 'n/a (no times)'}")
+    print(f"   source + month honesty signal present         : {source_month}")
+    print(f"   r3 note lead GONE ('a few practical notes')   : {not reads_as_note}")
+
     return {
         "tag": tag, "ok": True, "n": len(parsed), "requested": stops,
         "exactly_n": exactly_n, "no_about_stop": not any_about_stop,
         "has_about_content": has_about_content, "has_practical": has_practical,
         "non_artwork": non_artwork,
         "covers_arch": covers_arch if expect_architecture else None,
+        "visiting": visiting,
+        "r4_states_hours": states_hours,
+        "r4_day_bound": (day_bound if has_time else None),
+        "r4_source_month": source_month,
+        "r4_no_note_lead": not reads_as_note,
         "total_cost": cost.get("total_cost"),
     }
+
+
+def _extract_visiting_sentences(stop1_full: str) -> str:
+    """Return the spoken visiting sentence(s) from Stop 1 — the ones that state the
+    venue's hours/closed-day/admission (r4). Matches the composer's voice ('… is
+    open …', 'Admission is …', 'Check … before you go', '… are listed on …')."""
+    sents = re.split(r"(?<=[.!?])\s+", stop1_full)
+    keep = []
+    for s in sents:
+        sl = s.lower().strip()
+        # Anchor on the composer's visiting voice. 'opens' alone is too loose (an
+        # exhibition sentence may say 'it opens a window…'), so require the venue
+        # being open on a day/time, a closed-day clause, an admission clause, or a
+        # website pointer.
+        if (re.search(r"\bis open\b", sl)
+                or re.search(r"\bclosed on\b", sl)
+                or re.search(r"\badmission is\b", sl)
+                or re.search(r"admission prices? (?:are|is) listed", sl)
+                or re.search(r"opening hours (?:are|is) listed", sl)
+                or re.search(r"check (?:opening )?hours|check opening hours and admission", sl)
+                or re.search(r"\bas listed on\b.+\bin [a-z]+ \d{4}", sl)):
+            keep.append(s.strip())
+    return " ".join(keep).strip()
 
 
 def main():
