@@ -407,6 +407,44 @@ _NEIGHBORHOOD_TO_CITY = {
 # Prevents GPT-hallucinated venue_names on walking/restaurant requests from
 # silently flipping the category and injecting a single-venue museum constraint.
 # Word-boundary anchored to avoid false positives ("touring" vs "tour").
+#
+# [LOCAL-591] The set is split into TWO classes, because they are not the same
+# kind of signal:
+#
+#   ACTIVITY/mobility words (walking, restaurant, food, bike, …) name a DIFFERENT
+#   ACTIVITY — you walk a district, you eat your way down a street, you cycle a
+#   corridor. These are genuinely non-museum: they describe how the listener
+#   moves and what they do, not a theme applied to one building.
+#
+#   THEME words (architecture, architectural, art, history, historical, literary,
+#   book, novel, film, movie) name a SUBJECT, not a place or an activity. "An
+#   architecture tour IN the Boston Athenaeum" is still a tour OF the Athenaeum —
+#   the Athenaeum is a museum-library with notable architecture AND collections.
+#   A theme word is not a different place (Michael, 2026-10-06, tours 395/396:
+#   "architectural" flipped the Athenaeum to a city walking tour, then the
+#   building's own walls cut it to 3 stops).
+#
+# So a theme word must NOT block the museum flip when the request names a tour
+# INSIDE one named building; an activity word still may. _should_force_museum
+# below encodes exactly that.
+_ACTIVITY_NON_MUSEUM_TOUR_RE = re.compile(
+    r'\b(walking|restaurant|food|dining|culinary|self[- ]guided'
+    r'|pub\s+crawl|bike|cycling|biking|shopping)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
+# THEME words that READ like a tour genre but name a subject, not a place/activity.
+_THEME_TOUR_RE = re.compile(
+    r'\b(architecture|architectural|art|arts|history|historical|heritage'
+    r'|movie|film|book|literary|novel)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
+# Backward-compatible union: the full "explicit non-museum phrase" set. Kept so
+# existing call sites and tests that reference it by name keep working; the S15
+# decision itself now goes through _should_force_museum (LOCAL-591).
 _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural'
     r'|pub\s+crawl|bike|cycling|biking|shopping'
@@ -414,6 +452,103 @@ _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\s+tour\b',
     re.IGNORECASE,
 )
+
+# [LOCAL-591] Interior prepositions: "...tour IN/INSIDE/WITHIN/AT/OF <building>"
+# means a tour OF that building. "around/near/by/outside <X>" is the perimeter
+# case (D536's Hippodrome, the approved Cimiez walking tour) and is NOT interior.
+# Anchored on "tour <prep>" so a bare "at"/"in" elsewhere in the string does not
+# trigger it.
+_INTERIOR_PREP_RE = re.compile(
+    r'\btours?\s+(?:in|inside|within|at|of|through(?:out)?)\b',
+    re.IGNORECASE,
+)
+
+# Institutional tail nouns — a BUILDING-scope place whose name ends in one of
+# these is a contained venue a tour can be held INSIDE.
+_CONTAINED_VENUE_TAIL = (
+    'museum', 'museums', 'gallery', 'galleries', 'library', 'athenaeum',
+    'athenæum', 'house', 'mansion', 'estate', 'homestead', 'manse', 'villa',
+    'palace', 'palais', 'palazzo', 'castle', 'château', 'chateau', 'institute',
+    'institution', 'collection', 'archive', 'archives', 'hall', 'center',
+    'centre', 'conservatory', 'observatory',
+)
+
+
+def _is_contained_venue_request(location, intent):
+    """[LOCAL-591] True when the request names a tour held INSIDE one building.
+
+    The listener wrote "<theme> tour in/inside/at <named building>" and PHASE 1
+    resolved that building (a BUILDING-scope venue). The tour is OF that building
+    whatever the theme word — "art", "architecture", "history". This is the exact
+    shape that turned "Art and Architectual tour in Boston Athenaeum" into a city
+    walking tour and then cut it to 3 stops by the building's walls (tours
+    395/396).
+
+    It is deterministic — a fact about the phrasing and the resolved scope, not an
+    opinion. Two signals must both hold, so it never fires on a city tour:
+
+      1. An INTERIOR preposition binds the tour to the place: "tour in/inside/
+         within/at/of <X>". "around/near/by" (perimeter) does NOT count — that is
+         D536's Hippodrome and the approved Cimiez walking tour, both of which
+         stay non-museum.
+
+      2. The resolved scope is a single building: scope_precision == BUILDING with
+         a venue_name or a geographic_scope whose leading noun is an institution
+         (museum, library, athenaeum, house, gallery, …).
+    """
+    if not intent:
+        return False
+    loc = location or ''
+    if not _INTERIOR_PREP_RE.search(loc):
+        return False
+    if (intent.get('scope_precision') or '').upper() != 'BUILDING':
+        return False
+    # A single building: either PHASE 1 gave a venue_name, or the geographic_scope
+    # is itself an institution by its leading noun.
+    if intent.get('venue_name'):
+        return True
+    scope = (intent.get('geographic_scope') or '').split(',')[0].strip().lower().rstrip('.')
+    if not scope:
+        return False
+    # Guard against a city-sized scope mislabelled BUILDING.
+    city = (intent.get('location') or '').split(',')[0].strip().lower()
+    if scope and city and scope == city:
+        return False
+    scope_words = scope.split()
+    tail = scope_words[-3:] if len(scope_words) >= 3 else scope_words
+    return any(w in _CONTAINED_VENUE_TAIL for w in tail)
+
+
+def _should_force_museum(location, tour_type, intent, transport_mode='on_foot'):
+    """[LOCAL-591] The S15 decision: should a resolved venue_name force the
+    museum (contained-venue) category?
+
+    Rules, in order:
+      - No venue_name, or not on foot → no (S15 was never about those).
+      - A worship/civic place class (church, courthouse, …) is never a museum
+        (LOCAL-485) — its stops are places, not catalogued works.
+      - A multi-building institution keyword (libraries, churches, …) blocks the
+        single-venue flip (it implies several locations).
+      - A contained-venue request ("tour in/inside/at <named building>") FORCES
+        museum even if a THEME word (architecture/art/history) is present — a
+        theme word is not a different place (LOCAL-591).
+      - Otherwise, an explicit ACTIVITY/mobility phrase ("walking tour", "food
+        tour", "bike tour") blocks the flip; a bare theme word no longer does.
+    """
+    if not intent or not intent.get('venue_name') or transport_mode != 'on_foot':
+        return False
+    if _detect_worship_civic_class(location, tour_type):
+        return False
+    if _MULTI_BUILDING_INSTITUTION_RE.search(location or ''):
+        return False
+    if _is_contained_venue_request(location, intent):
+        # Interior-to-a-building: a theme word does not demote it. Only reject if
+        # the listener ALSO named a different activity (e.g. "walking tour inside
+        # X" — rare, but respect it: it is literally a walking tour).
+        return not _ACTIVITY_NON_MUSEUM_TOUR_RE.search(location or '')
+    # Not a contained-venue request: the full non-museum set (activity + theme)
+    # still blocks a venue_name-only flip, exactly as before LOCAL-591.
+    return not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location or '')
 
 # Multi-building institution keywords — these should NOT be classified as single-venue museum
 # even if GPT returns a venue_name. They imply multiple distinct locations.
@@ -6886,11 +7021,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # courthouse, town hall, …) is NOT a museum: its stops are places, not
         # catalogued works. Do not let S15 flip it to the artwork pipeline.
         if (intent.get('venue_name') and transport_mode == 'on_foot'
-                and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location)
-                and not _MULTI_BUILDING_INSTITUTION_RE.search(location)
-                and not _detect_worship_civic_class(location, tour_type)):
+                and _should_force_museum(location, tour_type, intent, transport_mode)):
             tour_category = 'museum'
-            print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
+            if _is_contained_venue_request(location, intent):
+                print(f"  [S15/LOCAL-591] Forced tour_category=museum from venue_name="
+                      f"'{intent['venue_name']}' — request is a tour INSIDE one building "
+                      f"(a theme word is not a different place)")
+            else:
+                print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
         else:
             if intent.get('venue_name') and _detect_worship_civic_class(location, tour_type):
                 print(f"  [S15/LOCAL-485] venue_name='{intent['venue_name']}' NOT forced to museum "
