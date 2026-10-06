@@ -251,6 +251,23 @@ class TestPredicates(unittest.TestCase):
         self.assertFalse(am.should_count_toward_n(7, 7))    # exactly enough
         self.assertTrue(am.should_count_toward_n(5, 3))     # too few → count it
 
+    def test_clean_venue_request_name(self):
+        # A themed-in-building request resolves to the building name.
+        self.assertEqual(
+            am.clean_venue_request_name(
+                "Art and Architectual tour in Boston Athenaeum, boston, ma"),
+            "Boston Athenaeum")
+        self.assertEqual(
+            am.clean_venue_request_name("architecture tour of the Boston Athenaeum"),
+            "the Boston Athenaeum")
+        # A plain venue string keeps its leading segment.
+        self.assertEqual(
+            am.clean_venue_request_name("Griffin Museum of Photography, Winchester, MA"),
+            "Griffin Museum of Photography")
+
+    def test_default_wiki_provider_empty_name_is_none(self):
+        self.assertIsNone(am.default_wiki_provider(""))
+
 
 # ── Assembly places the About stop FIRST ────────────────────────────────────────
 

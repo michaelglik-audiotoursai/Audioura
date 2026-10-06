@@ -1,0 +1,79 @@
+=== LOCAL-585 ISOLATED LIVE RUN ===
+model=gpt-4o cap=$2.00 cache=OFF storied=true
+git_sha=unknown
+
+========================================================================
+CASE GRIFFIN: 'Griffin museum of photography, Winchester, MA'  (7 stops requested)
+========================================================================
+  [venue_resolver] Name variants: ['Griffin museum of photography']
+  [venue_resolver] Resolved: 'Griffin museum of photography, Winchester, MA' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [LOCAL-590] pool: venue=qid:Q99108607 type=museum category=museum contained=True requested=7 pooled=7
+  [venue_resolver] Name variants: ['Griffin museum of photography']
+  [venue_resolver] Resolved: 'Griffin museum of photography' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [LOCAL-585] About stop built for 'Griffin museum of photography': architecture=False counts_toward_n=False sources=2
+  [LOCAL-590] POOL DELIVERY: reused=7 new=0 rewritten_transitions=0 about_stops=1 (pool held 7)
+
+--- CASE GRIFFIN RESULT (27.7s) ---
+tour_kind              : full
+generation cost        : total=0.0 about_stops=1 reused=7 new=0
+audio_tours BEFORE/AFTER (never DELETE): 202 / 202
+CASE GRIFFIN: delivered 8 stop(s):
+   Stop 1: About Griffin museum of photography
+   Stop 2: BU Masters Show 2026 | Traces: Pursuing Process
+   Stop 3: Intertidal : Field Notes
+   Stop 4: Earth, Wind & Fire
+   Stop 5: Tabitha Soren | An Artist Life
+   Stop 6: TLC
+   Stop 7: Lua Kobayashi |The Persistence of Memories
+   Stop 8: Homage | Robert Frank: The Americans
+
+CASE GRIFFIN STOP-1 AUDIT:
+   is 'About <museum>' stop      : True  ('About Griffin museum of photography')
+   NOT framed as an artwork      : True
+   carries founder/history/mission: True
+   NO 'consists of a series of frames' anywhere: True
+
+========================================================================
+CASE ATHENAEUM: 'Art and Architectual tour in Boston Athenaeum, boston, ma'  (5 stops requested)
+========================================================================
+  [venue_resolver] Name variants: ['Art and Architectual tour in Boston Athenaeum']
+  [venue_resolver] No Wikidata candidates for 'Art and Architectual tour in Boston Athenaeum, boston, ma'
+  [LOCAL-590] pool: venue=loc:art and architectual tour in boston athenaeum boston ma type= category=museum contained=True requested=5 pooled=5
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [LOCAL-585] About stop built for 'Boston Athenaeum': architecture=True counts_toward_n=False sources=3
+  [LOCAL-590] POOL DELIVERY: reused=5 new=0 rewritten_transitions=0 about_stops=1 (pool held 5)
+
+--- CASE ATHENAEUM RESULT (7.0s) ---
+tour_kind              : full
+generation cost        : total=0.0 about_stops=1 reused=5 new=0
+audio_tours BEFORE/AFTER (never DELETE): 202 / 202
+CASE ATHENAEUM: delivered 6 stop(s):
+   Stop 1: About Boston Athenaeum
+   Stop 2: Boys Come Over Here You're Wanted
+   Stop 3: Picture Gallery with Views of Modern Rome
+   Stop 4: Landscape with Cottages and Pond
+   Stop 5: Cutter Expansive Classification
+   Stop 6: Annie Adams Fields
+
+CASE ATHENAEUM STOP-1 AUDIT:
+   is 'About <museum>' stop      : True  ('About Boston Athenaeum')
+   NOT framed as an artwork      : True
+   carries founder/history/mission: True
+   covers architecture/building  : True
+   NO 'consists of a series of frames' anywhere: True
+
+########################################################################
+LOCAL-585 SUMMARY
+########################################################################
+  {'tag': 'GRIFFIN', 'ok': True, 'n': 8, 'kind': 'full', 'stop1': 'About Griffin museum of photography', 'is_about': True, 'non_artwork': True, 'has_history': True, 'covers_arch': None, 'no_frames_leak': True, 'total_cost': 0.0}
+  {'tag': 'ATHENAEUM', 'ok': True, 'n': 6, 'kind': 'full', 'stop1': 'About Boston Athenaeum', 'is_about': True, 'non_artwork': True, 'has_history': True, 'covers_arch': True, 'no_frames_leak': True, 'total_cost': 0.0}

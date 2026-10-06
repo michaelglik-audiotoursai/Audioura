@@ -78,6 +78,8 @@ __all__ = [
     "looks_like_artwork_framing",
     "should_count_toward_n",
     "request_wants_architecture",
+    "clean_venue_request_name",
+    "default_wiki_provider",
 ]
 
 
@@ -555,6 +557,67 @@ def build_about_stop(
         covers_architecture=bool(arch_sentences),
         counts_toward_n=counts,
     )
+
+
+# Leading "<theme> tour in/at/of <building>" prefix to strip when a themed request
+# is actually a tour held inside a named institution (the Athenaeum case).
+_THEME_PREFIX_RE = re.compile(
+    r"(?i)^.*?\btours?\s+(?:in|inside|within|at|of|through(?:out)?)\s+"
+)
+
+
+def clean_venue_request_name(location: str) -> str:
+    """Extract the venue name from a themed-in-building request.
+
+    "Art and Architectual tour in Boston Athenaeum, boston, ma" → "Boston Athenaeum".
+    A plain venue string ("Griffin Museum of Photography, Winchester, MA") is left
+    as-is apart from its trailing locality tail. Used so venue resolution and the
+    About stop key on the building, not the theme words.
+    """
+    loc = (location or "").strip()
+    m = _THEME_PREFIX_RE.search(loc)
+    if m:
+        loc = loc[m.end():].strip()
+    # Keep only the leading (venue) comma-segment.
+    return loc.split(",")[0].strip() or (location or "").split(",")[0].strip()
+
+
+def default_wiki_provider(venue_name: str) -> Optional[dict]:
+    """A dependency-light Wikipedia REST summary provider for the About stop.
+
+    Returns {"summary", "sources", "architecturally_notable"} or None. Best-effort
+    and fully optional: any network/parse failure yields None, so the About stop
+    simply falls back to the venue's own pages. It never raises. Architecture
+    notability is inferred from the summary text naming an architect / building
+    style (a conservative signal, confirmed again from on-page sentences by the
+    composer).
+    """
+    name = clean_venue_request_name(venue_name) or (venue_name or "").strip()
+    if not name:
+        return None
+    try:
+        import requests
+        from urllib.parse import quote
+        url = ("https://en.wikipedia.org/api/rest_v1/page/summary/"
+               + quote(name.replace(" ", "_")))
+        resp = requests.get(url, headers={"User-Agent": "Audioura/2.4 (+about)"},
+                            timeout=10)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        extract = (data.get("extract") or "").strip()
+        if not extract:
+            return None
+        page_url = (((data.get("content_urls") or {}).get("desktop") or {}).get("page")
+                    or f"https://en.wikipedia.org/wiki/{quote(name.replace(' ', '_'))}")
+        notable = bool(_ARCH_SIGNAL_RE.search(extract))
+        return {
+            "summary": extract,
+            "sources": [page_url],
+            "architecturally_notable": notable,
+        }
+    except Exception:
+        return None
 
 
 def about_stop_unit(about: AboutStop) -> dict:

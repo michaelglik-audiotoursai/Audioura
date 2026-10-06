@@ -40,14 +40,50 @@ def _is_contained(tour_category: str) -> bool:
     return (tour_category or "").strip().lower() in ("museum", "facility")
 
 
+def _looks_contained_request(location: str) -> bool:
+    """[LOCAL-585] Lightweight contained-venue-request check for the pool layer.
+
+    The pool runs BEFORE Phase-1 resolution, so it cannot call the generator's
+    intent-based _is_contained_venue_request. But the SHAPE Michael flagged —
+    "<theme> tour in/inside/at <named building>" where the building name ends in
+    an institutional tail noun (museum, library, athenaeum, gallery, house …) —
+    is decidable from the request text alone, and it is exactly the Boston
+    Athenaeum case the shallow classifier mislabels 'walking'. This mirrors
+    generate_tour_text._is_contained_venue_request's deterministic tail test so
+    the About stop can lead a themed-in-building tour too. Conservative: both an
+    interior preposition AND an institutional tail word must be present.
+    """
+    try:
+        from generate_tour_text import _INTERIOR_PREP_RE, _CONTAINED_VENUE_TAIL
+    except Exception:
+        return False
+    loc = location or ""
+    if not _INTERIOR_PREP_RE.search(loc):
+        return False
+    words = re.findall(r"[a-z\u00e6\u00e9\u00e8\u00e2\u00ee\u00f4\u00fb]+", loc.lower())
+    return any(w in _CONTAINED_VENUE_TAIL for w in words)
+
+
 def _classify(location: str, tour_type: str) -> str:
-    """Classify via the generator's own classifier; fall back to tour_type."""
+    """Classify via the generator's own classifier; fall back to tour_type.
+
+    [LOCAL-585] When the shallow classifier does not yield a contained category
+    but the request is clearly a themed tour held INSIDE a named institution
+    (Athenaeum case), treat it as a museum tour so the About stop can lead and the
+    assembler renders museum-style blocks. This only promotes to 'museum'; it
+    never demotes an already-contained verdict.
+    """
     try:
         from generate_tour_text import _classify_tour_category
-        return _classify_tour_category(location, tour_type)
+        cat = _classify_tour_category(location, tour_type)
     except Exception as e:
         logger.info(f"[POOL] classifier unavailable ({e}); using tour_type as category")
-        return (tour_type or "").strip().lower()
+        cat = (tour_type or "").strip().lower()
+    if not _is_contained(cat) and _looks_contained_request(location):
+        logger.info(f"[LOCAL-585] contained-venue request detected; "
+                    f"treating {location!r} as a museum tour (was {cat!r})")
+        return "museum"
+    return cat
 
 
 def _pooled_unit_from_row(row: Dict) -> Dict:
@@ -377,6 +413,17 @@ def audio_reuse_identity(stop_text: str, voice_id: str = "Joanna",
 
 
 def _venue_name(location: str) -> str:
+    # [LOCAL-585] For a themed-in-building request ("Art and Architectual tour in
+    # Boston Athenaeum, …") the venue is the BUILDING — strip the theme/tour prefix
+    # so museum transitions read "Continue through Boston Athenaeum", not the whole
+    # request string. Plain venue strings are unaffected.
+    try:
+        from about_museum_stop import clean_venue_request_name
+        cleaned = clean_venue_request_name(location)
+        if cleaned:
+            return cleaned
+    except Exception:
+        pass
     return (location or "").split(",")[0].strip()
 
 
@@ -443,18 +490,22 @@ def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
     if os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
         return None
     try:
-        from about_museum_stop import build_about_stop, about_stop_unit
+        from about_museum_stop import (build_about_stop, about_stop_unit,
+                                        clean_venue_request_name, default_wiki_provider)
     except Exception as e:
         logger.info(f"[LOCAL-585] about_museum_stop unavailable ({e}); no About stop")
         return None
 
-    venue = _venue_name(location)
+    # Key the About stop on the BUILDING, not the theme words ("Art and
+    # Architectual tour in Boston Athenaeum" → "Boston Athenaeum").
+    clean_name = clean_venue_request_name(location)
+    venue = clean_name or _venue_name(location)
     site_url = ""
     locality = ""
     address = ""
     try:
         from venue_resolver import resolve_venue
-        ent = resolve_venue(location)
+        ent = resolve_venue(clean_name or location)
         if ent is not None:
             site_url = getattr(ent, "official_url", "") or ""
             venue = getattr(ent, "venue_name", "") or venue
@@ -476,6 +527,7 @@ def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
             address=address,
             requested_stops=requested_stops,
             available_exhibition_stops=available_exhibition_stops,
+            wiki_provider=default_wiki_provider,
         )
     except Exception as e:
         logger.info(f"[LOCAL-585] About stop build failed ({e}); no About stop")
