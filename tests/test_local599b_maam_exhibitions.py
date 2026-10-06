@@ -28,7 +28,8 @@ import unittest
 
 from exhibition_discovery import (extract_classified_exhibitions,
                                    extract_current_exhibitions,
-                                   classify_exhibition_status)
+                                   classify_exhibition_status,
+                                   extract_exhibition_works)
 from exhibition_site_first import (discover_classified_exhibitions,
                                    build_site_first_candidates,
                                    _is_exhibition_detail)
@@ -127,43 +128,114 @@ class TestMaamDiscovery(unittest.TestCase):
 
 
 class TestMaamFillToN(unittest.TestCase):
-    def test_fills_to_seven_current_first_with_source_urls(self):
+    def test_no_past_show_is_ever_selected(self):
+        # [LOCAL-599C] r3: the exhibition list holds BOTH on-view and past shows
+        # (3 + 3 on the index). A listener standing in the museum must never be
+        # sent to a show that is off the walls — no past show may be a stop.
         diag = {}
         cands = build_site_first_candidates(
             'https://maam.massart.edu/', total_stops=7, fetcher=_fetcher,
             diagnostics=diag, today=TODAY)
-        self.assertGreaterEqual(len(cands), 7)
-        first7 = cands[:7]
-        # First three are the current on-view exhibitions.
-        self.assertEqual([c['status'] for c in first7[:3]],
-                         ['on_view', 'on_view', 'on_view'])
-        # Every delivered stop carries a source URL and is an exhibition detail
-        # page (no program/event).
-        for c in first7:
-            self.assertTrue(c['source_url'])
-            self.assertNotIn('/event/', c['source_url'])
-        # No invented title, no program.
+        self.assertTrue(cands)
+        for c in cands:
+            self.assertNotEqual(c['status'], 'past',
+                                f"a PAST show leaked in as a stop: {c['name']}")
+        self.assertEqual(diag['status_counts']['past'], 0)
+        # None of the known MAAM past shows may appear as a stop.
         names = {c['name'].lower() for c in cands}
-        self.assertNotIn('make with maam', names)
+        for past in ('masako miki', 'press & pull', "freedom baird m'16",
+                     'generations'):
+            self.assertNotIn(past, names)
 
-    def test_past_supplemented_from_archive(self):
-        # The main index lists 3 past; /exhibitions/past carries the full archive
-        # (9). Fill reaches past shows beyond the index's three.
+    def test_current_shows_split_into_works(self):
+        # [LOCAL-599C] Each on-view show is split into the works/rooms its own
+        # detail page names: the show (artist + named title) as the primary stop,
+        # then specific named works ("Robert Lazzarini: American flag").
         cands = build_site_first_candidates(
             'https://maam.massart.edu/', total_stops=7, fetcher=_fetcher,
             today=TODAY)
-        past_names = {c['name'] for c in cands if c['status'] == 'past'}
-        self.assertIn('GENERATIONS', past_names)  # from /exhibitions/past only
+        kinds = {c['kind'] for c in cands}
+        self.assertIn('exhibition', kinds)
+        self.assertIn('work', kinds, "no per-work stop was produced")
+        names = {c['name'] for c in cands}
+        # The three current shows are present as primary (artist) stops.
+        self.assertIn('Robert Lazzarini', names)
+        self.assertIn('Banu Cennetoğlu', names)
+        self.assertIn('Baseera Khan', names)
+        # And at least one specific named work, credited "Artist: Work".
+        work_names = {c['name'] for c in cands if c['kind'] == 'work'}
+        self.assertTrue(any('American flag' in w for w in work_names),
+                        f"expected a named work split from a show; got {work_names}")
+        for w in work_names:
+            self.assertIn(':', w)  # "Artist: Work"
+
+    def test_every_stop_is_on_view_with_source_url(self):
+        cands = build_site_first_candidates(
+            'https://maam.massart.edu/', total_stops=7, fetcher=_fetcher,
+            today=TODAY)
+        for c in cands:
+            self.assertEqual(c['status'], 'on_view')
+            self.assertTrue(c['source_url'])
+            self.assertIn('/exhibition/', c['source_url'])  # a real detail page
+            self.assertNotIn('/event/', c['source_url'])    # never the program
+
+    def test_honest_shortfall_not_padded_with_past(self):
+        # [LOCAL-599C] On-view material (3 shows + 2 named works) honestly reaches
+        # 5, short of 7. The list is simply shorter — never padded to 7 with past
+        # shows (the r2 behaviour, withdrawn). Don't pad (D611).
+        cands = build_site_first_candidates(
+            'https://maam.massart.edu/', total_stops=7, fetcher=_fetcher,
+            today=TODAY)
+        self.assertLess(len(cands), 7)        # honest shortfall, not padded
+        self.assertGreaterEqual(len(cands), 4)  # the real on-view material
+        self.assertTrue(all(c['status'] != 'past' for c in cands))
 
     def test_no_invention_when_short(self):
-        # Asking for far more than exist yields only the real shows — never padded.
+        # Asking for far more than exist yields only the real ON-VIEW shows/works —
+        # never padded, never a past show, never an invented title.
         cands = build_site_first_candidates(
             'https://maam.massart.edu/', total_stops=50, fetcher=_fetcher,
             today=TODAY)
-        # 3 current + 9 archived past = 12 real exhibitions; nothing invented.
-        self.assertLessEqual(len(cands), 12)
+        names = {c['name'].lower() for c in cands}
+        self.assertNotIn('make with maam', names)
         for c in cands:
             self.assertIn('/exhibition/', c['source_url'])
+            self.assertNotEqual(c['status'], 'past')
+
+
+class TestExhibitionWorks(unittest.TestCase):
+    """[LOCAL-599C] extract_exhibition_works splits ONE show's detail page into
+    its own named title + the specific NAMED WORKS it credits."""
+
+    def test_robert_lazzarini_yields_title_and_work(self):
+        works = extract_exhibition_works(
+            _read('ex_robert.html'), artist='Robert Lazzarini')
+        kinds = [(w['kind'], w['name']) for w in works]
+        # The show's own named title ("metes and bounds") first.
+        self.assertIn(('exhibition_title', 'metes and bounds'), kinds)
+        # A specific named work credited "Robert Lazzarini. American flag , 2022."
+        work_names = [w['name'] for w in works if w['kind'] == 'work']
+        self.assertIn('American flag', work_names)
+
+    def test_caption_prefix_detail_of_is_stripped(self):
+        # "Baseera Khan. Detail of Second Skin, Half Column 3 , 2022." → the work
+        # is "Second Skin, Half Column 3" (the "Detail of" caption prefix dropped).
+        works = extract_exhibition_works(
+            _read('ex_baseera.html'), artist='Baseera Khan')
+        work_names = [w['name'] for w in works if w['kind'] == 'work']
+        self.assertIn('Second Skin, Half Column 3', work_names)
+        for n in work_names:
+            self.assertFalse(n.lower().startswith('detail of'))
+
+    def test_provenance_lines_are_not_works(self):
+        # Installation-view / photo-credit / collection lines are furniture, not
+        # a work a visitor can stand in front of.
+        for fn in ('ex_robert.html', 'ex_banu.html', 'ex_baseera.html'):
+            for w in extract_exhibition_works(_read(fn)):
+                low = w['name'].lower()
+                self.assertNotIn('installation view', low)
+                self.assertNotIn('photo', low)
+                self.assertNotIn('collection', low)
 
 
 if __name__ == '__main__':

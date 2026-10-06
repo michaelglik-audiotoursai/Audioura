@@ -116,5 +116,94 @@ class TestOpeningSectionNoWikidata(unittest.TestCase):
         self.assertIn('621 Huntington', addr)
 
 
+class TestAboutTextSelectionR3(unittest.TestCase):
+    """[LOCAL-599C] The "story of the museum" paragraph must describe the
+    INSTITUTION (founded / mission / what it shows), not the site's land
+    acknowledgment, and the hours sentence must use the museum's FULL name."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._prev_resolve = venue_resolver.resolve_venue
+        cls._prev_disc = venue_resolver.discover_official_site
+        cls._prev_fetch = am._default_fetcher
+        cls._prev_wiki = am.default_wiki_provider
+        cls._prev_pool = os.environ.get('DISABLE_STOP_POOL')
+        os.environ['DISABLE_STOP_POOL'] = '1'
+        venue_resolver.resolve_venue = lambda *a, **k: None
+        venue_resolver.discover_official_site = lambda vs, city="", **k: SiteDiscovery(
+            official_url='https://maam.massart.edu/', source='web_search',
+            language='en')
+        am._default_fetcher = lambda url: (_page_for(url), [])
+        am.default_wiki_provider = lambda name: None  # offline
+
+    @classmethod
+    def tearDownClass(cls):
+        venue_resolver.resolve_venue = cls._prev_resolve
+        venue_resolver.discover_official_site = cls._prev_disc
+        am._default_fetcher = cls._prev_fetch
+        am.default_wiki_provider = cls._prev_wiki
+        if cls._prev_pool is None:
+            os.environ.pop('DISABLE_STOP_POOL', None)
+        else:
+            os.environ['DISABLE_STOP_POOL'] = cls._prev_pool
+
+    def _section(self):
+        return orch._build_opening_section(
+            'MassArt Art Museum, Boston, MA', 'museum',
+            request_text='MassArt Art Museum, Boston, MA',
+            available_exhibition_stops=7, requested_stops=7)
+
+    def test_land_acknowledgment_is_excluded(self):
+        section = self._section()
+        self.assertNotRegex(section, r'(?i)land\s+acknowledg')
+        self.assertNotRegex(section, r'(?i)painful\s+history\s+of\s+erasure')
+        self.assertNotRegex(section, r'(?i)indigenous')
+
+    def test_real_mission_sentence_is_present(self):
+        section = self._section()
+        # The institution's own self-description, not boilerplate.
+        self.assertRegex(section, r"(?i)only\s+free\s+contemporary\s+art\s+museum")
+
+    def test_full_museum_name_in_hours_sentence(self):
+        section = self._section()
+        # The hours sentence names the museum in FULL ("The MassArt Art Museum is
+        # open …"), never the stripped "The MassArt is open" (the r2 defect).
+        self.assertRegex(section, r'MassArt Art Museum is open')
+        self.assertNotRegex(section, r'(?i)\bThe MassArt is open\b')
+
+
+class TestAboutSelectorsPure(unittest.TestCase):
+    """Pure-function contracts for the r3 About-text rules (no network)."""
+
+    def test_land_ack_sentence_is_not_a_story_sentence(self):
+        land_ack = ("We make this land acknowledgment to pay respect to these "
+                    "communities and recognize the painful history of erasure.")
+        self.assertFalse(am._is_story_sentence(land_ack, 'MassArt Art Museum',
+                                               'MassArt'))
+
+    def test_dei_and_cookie_sentences_excluded(self):
+        for s in [
+            "We are committed to diversity, equity, and inclusion in all we do.",
+            "This site uses cookies to improve your experience; see our privacy policy.",
+            "Sign up for our newsletter to receive the latest exhibition news.",
+        ]:
+            self.assertFalse(am._is_story_sentence(s, 'MassArt Art Museum',
+                                                   'MassArt'), s)
+
+    def test_identity_sentence_without_founding_keyword_qualifies(self):
+        mission = ("The MassArt Art Museum is Boston's only free contemporary art "
+                   "museum, a space to experience works by extraordinary artists.")
+        self.assertTrue(am._is_story_sentence(mission, 'MassArt Art Museum',
+                                              'MassArt'))
+
+    def test_hours_sentence_uses_full_name(self):
+        facts = ("Thursday, 12 PM–8 PM; Friday, 12 PM–5 PM. Admission is free.")
+        out = am._compose_visiting_sentences(
+            facts, 'MassArt Art Museum, Boston, MA', 'maam.massart.edu',
+            'October 2026')
+        self.assertIn('The MassArt Art Museum is open', out)
+        self.assertNotIn('The MassArt is open', out)
+
+
 if __name__ == '__main__':
     unittest.main()
