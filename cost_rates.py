@@ -49,25 +49,49 @@ GPT4O_MINI_COST_PER_1K_TOKENS = 0.000285  # ~($0.15*0.7 + $0.60*0.3) / 1000
 SERPER_COST_PER_QUERY = 0.001
 
 # --- Grounding (Gemini + Grounding with Google Search) ---
-# [LOCAL-533]
+# [LOCAL-533 / LOCAL-594]
 # Source: https://ai.google.dev/gemini-api/docs/pricing
-# Read: 2026-09-23
-# Grounding with Google Search is billed PER REQUEST, independent of token count:
-# after a small free daily allowance, requests are billed at $35 per 1,000
-# grounding requests = $0.035 per request. This is a separate billing channel
-# from the OpenAI token cost the pipeline already sums in "Total API cost", and
-# from the Serper query cost above. Counted (not estimated) via
-# story_leads.get_grounding_requests(); one increment per grounded request issued.
-GROUNDING_COST_PER_REQUEST = 0.035
+# Read: 2026-10-06
+#
+# The pricing page lists Grounding with Google Search as "5,000 free search
+# requests per month (shared across all Gemini 3.x models), then $14 per 1,000
+# requests". But what Google actually INVOICES is measured in SEARCH QUERIES, not
+# requests: Michael's bill SKU is "Generate content search query gemini 3 paid",
+# and on 2026-10-05 it read 1,653 queries for $23.14 — $14.00 per 1,000 queries.
+# A single grounded REQUEST can issue several search queries, reported back in
+# `groundingMetadata.webSearchQueries`. So the honest dollar figure follows the
+# QUERIES (that is the invoice line); the request count is kept only to enforce
+# the LOCAL-594 "<= 1 grounded request per stop" cap.
+#
+# This supersedes the LOCAL-533 flat $0.035/request estimate, which did not match
+# the bill. $0.035 was never on any pricing page; it over- or under-counted
+# depending on how many queries a request fanned out into. We now price the unit
+# Google prices.
+GROUNDING_COST_PER_QUERY = 0.014  # $14 / 1,000 search queries
+
+# Legacy LOCAL-533 constant — DEPRECATED. The per-request rate never matched the
+# invoice. Kept only so older callers/tests import without breaking; new code
+# prices per query via grounding_query_cost(). Value re-pointed to the per-query
+# rate so any stray use is at least on the right order of magnitude.
+GROUNDING_COST_PER_REQUEST = GROUNDING_COST_PER_QUERY
+
+
+def grounding_query_cost(num_queries: int) -> float:
+    """[LOCAL-594] Cost in USD of `num_queries` Google search queries issued by
+    grounded Gemini requests. This is the unit Google invoices
+    ("Generate content search query gemini 3 paid"), counted via
+    story_leads.get_grounding_queries(). A generation that issues zero grounded
+    queries (e.g. a cache hit, or a grounded request that did not search) costs
+    $0.00 on this channel."""
+    return max(0, int(num_queries)) * GROUNDING_COST_PER_QUERY
 
 
 def grounding_cost(num_requests: int) -> float:
-    """Cost in USD of `num_requests` grounded Google-Search Gemini requests.
-
-    Grounding bills per request, not per token — so this is a flat multiply.
-    A tour that issues zero grounded requests (e.g. a cache hit) costs $0.00.
-    """
-    return num_requests * GROUNDING_COST_PER_REQUEST
+    """DEPRECATED [LOCAL-594]: use grounding_query_cost(num_queries) for the
+    dollar figure. Kept for LOCAL-533 callers. Prices requests at the per-query
+    rate (one query per request assumption), which under-counts when a request
+    fans out into several queries — so it is no longer the figure Michael sees."""
+    return max(0, int(num_requests)) * GROUNDING_COST_PER_QUERY
 
 # --- TTS (AWS Polly) ---
 # Source: https://aws.amazon.com/polly/pricing/

@@ -82,25 +82,40 @@ YEAR | what happened, in one clause
 """
 
 
-# ── grounding request counter [LOCAL-533] ────────────────────────────────────
-# Google Search grounding bills PER REQUEST (~3.5c), independent of tokens, and
-# was invisible in the pipeline's "Total API cost" line (that sums OpenAI only).
-# Every grounded request in the live pipeline flows through the two functions
-# below (_gemini(grounded=True) and gemini_with_sources(grounded=True)) — they
-# are the only two sites that attach the `google_search` tool. We increment this
-# counter at the exact moment a grounded HTTP request is ISSUED (after the API
-# key check, so a keyless no-op is not counted, and only when grounded=True, so
-# an ungrounded Gemini call is not counted). Requests, not tokens: that is the
-# billable unit. Pricing lives in cost_rates.grounding_cost(); this module only
-# counts. A caller (generate_tour_text) resets the counter at the start of a
-# generation and reads it at the end.
+# ── grounding request + query counters [LOCAL-533, LOCAL-594] ────────────────
+# Google Search grounding was invisible in the pipeline's "Total API cost" line
+# (that sums OpenAI only). Every grounded request in the live pipeline flows
+# through the two functions below (_gemini(grounded=True) and
+# gemini_with_sources(grounded=True)) — they are the only two sites that attach
+# the `google_search` tool.
+#
+# [LOCAL-594] WHAT GOOGLE ACTUALLY BILLS. The request counter LOCAL-533 added was
+# priced at a flat $0.035/request, which did not match Michael's bill. Google's
+# invoice SKU is "Generate content search query gemini 3 paid" and it is measured
+# in SEARCH QUERIES, not requests: on 2026-10-05 it was 1,653 queries for $23.14,
+# i.e. ~$14 per 1,000 queries. The pricing page
+#   https://ai.google.dev/gemini-api/docs/pricing  (read 2026-10-06)
+# lists "Grounding with Google Search: 5,000 free search requests per month, then
+# $14 per 1,000 requests" — but a single grounded REQUEST can issue SEVERAL search
+# queries, which the response reports in `groundingMetadata.webSearchQueries`.
+# Billing follows the queries (that is the invoice line), so we count BOTH: the
+# request (for the per-request cap LOCAL-594 enforces) and the queries actually
+# issued (for the dollar figure Michael sees). We increment at the exact moment a
+# grounded HTTP request is ISSUED (after the API key check, so a keyless no-op is
+# not counted, and only when grounded=True), and add the response's query count
+# when the response is parsed. Pricing lives in cost_rates; this module only
+# counts. A caller (generate_tour_text) resets the counters at the start of a
+# generation and reads them at the end.
 _GROUNDING_REQUESTS = 0
+_GROUNDING_QUERIES = 0
 
 
 def reset_grounding_requests() -> None:
-    """Zero the grounded-request counter. Call at the start of a generation."""
-    global _GROUNDING_REQUESTS
+    """Zero the grounded-request AND grounded-query counters. Call at the start
+    of a generation. (Name kept for LOCAL-533 callers; now resets both.)"""
+    global _GROUNDING_REQUESTS, _GROUNDING_QUERIES
     _GROUNDING_REQUESTS = 0
+    _GROUNDING_QUERIES = 0
 
 
 def get_grounding_requests() -> int:
@@ -108,11 +123,34 @@ def get_grounding_requests() -> int:
     return _GROUNDING_REQUESTS
 
 
+def get_grounding_queries() -> int:
+    """[LOCAL-594] Return the number of Google search queries (webSearchQueries)
+    issued across all grounded responses since the last reset. This is the unit
+    Google's invoice bills ("Generate content search query gemini 3 paid")."""
+    return _GROUNDING_QUERIES
+
+
 def _count_grounding_request() -> None:
     """Record one grounded request actually issued. Called only from the two
     grounded-request sites, guarded by grounded=True and a present API key."""
     global _GROUNDING_REQUESTS
     _GROUNDING_REQUESTS += 1
+
+
+def _count_grounding_queries(web_search_queries) -> None:
+    """[LOCAL-594] Record the Google search queries a grounded response reported.
+
+    `web_search_queries` is `groundingMetadata.webSearchQueries` — the list of
+    strings the engine says it searched for. Billing follows these, so we tally
+    their count. Called once per grounded response, after it is parsed. A grounded
+    request that returned no `webSearchQueries` (e.g. the model answered without
+    searching) contributes 0 queries and so costs nothing on this channel — which
+    is exactly what Google bills."""
+    global _GROUNDING_QUERIES
+    try:
+        _GROUNDING_QUERIES += len(web_search_queries or [])
+    except TypeError:
+        pass
 
 
 # ── providers ────────────────────────────────────────────────────────────────
@@ -182,9 +220,16 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     r.raise_for_status()
     d = r.json()
     try:
+        cand = d['candidates'][0]
+        # [LOCAL-594] Count the Google search queries this grounded response
+        # reported, so the dollar meter follows Google's actual billing unit.
+        # Ungrounded calls carry no groundingMetadata and add 0.
+        if grounded:
+            _gm = cand.get('groundingMetadata', {}) or {}
+            _count_grounding_queries(_gm.get('webSearchQueries', []))
         # ALL parts, not parts[0]. A grounded response is commonly split across
         # several, so taking the first silently truncates it.
-        parts = d['candidates'][0]['content'].get('parts', [])
+        parts = cand.get('content', {}).get('parts', [])
         return ''.join(p.get('text', '') for p in parts)
     except (KeyError, IndexError):
         return ''
@@ -263,6 +308,10 @@ def gemini_with_sources(prompt: str, model: str = None,
                           for p in cand.get('content', {}).get('parts', []))
     gm = cand.get('groundingMetadata', {}) or {}
     out['queries'] = gm.get('webSearchQueries', []) or []
+    # [LOCAL-594] Count the Google search queries this grounded response reported.
+    # These are Google's billing unit; grounded=False responses carry none.
+    if grounded:
+        _count_grounding_queries(out['queries'])
 
     chunks = []
     for ch in gm.get('groundingChunks', []) or []:

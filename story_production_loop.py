@@ -87,6 +87,33 @@ STOP_AT = int(os.environ.get('STORY_LOOP_STOP_AT', '78'))
 CLAIMS_PER_ANSWER = int(os.environ.get('STORY_LOOP_CLAIMS', '4'))
 PAGES_PER_QUERY = int(os.environ.get('STORY_LOOP_PAGES', '3'))
 
+# [LOCAL-594] Grounded-request budget PER STOP. Google bills Gemini grounding by
+# the search query ("Generate content search query gemini 3 paid", $14/1,000),
+# and this loop was its biggest driver: each credit_line issued TWO grounded
+# requests (r1 narrate + r2 adjudicate), up to MAX_CREDIT_LINES of them, so a
+# 7-stop museum tour ran 41-43 grounded requests and the queries behind them were
+# the top per-tour cost. Two changes bring it to <= 1 grounded request per stop
+# without losing story leads:
+#   1. r2 (adjudication) is now UNGROUNDED. Its prompt already says "Judge ONLY
+#      against the retrieved evidence above. Do not rely on memory." — it reasons
+#      over the Serper evidence block, it does not search the web. Grounding it
+#      bought nothing.
+#   2. Only the FIRST credit_line's narrate (r1) is grounded. The grounded call is
+#      what pulls fresh web facts into the first draft; the Serper challenge +
+#      adjudication then verifies EVERY candidate identically, grounded or not. So
+#      additional credit_lines still produce candidates and still get full
+#      verification — they just reuse the one grounded search this stop already
+#      paid for instead of buying a new one each.
+# STORY_LOOP_MAX_GROUNDED controls the budget; 0 means "never ground" (all narrate
+# calls ungrounded), the default 1 is the LOCAL-594 cap.
+MAX_GROUNDED_PER_STOP = int(os.environ.get('STORY_LOOP_MAX_GROUNDED', '1'))
+
+# [LOCAL-594] Measurement escape hatch ONLY. The pre-cut code grounded the r2
+# adjudication call; the cut makes it ungrounded (it reasons over the Serper
+# evidence, not the web). STORY_LOOP_R2_GROUNDED=1 restores the old grounded r2 so
+# the BEFORE baseline can be reproduced and the cut measured. Default off = cut.
+R2_GROUNDED = os.environ.get('STORY_LOOP_R2_GROUNDED', '').strip() == '1'
+
 # [LOCAL-466] How many stories a single stop may publish. Default 2 — Michael's
 # request is "more than one story per stop", but a long stop with three stories
 # would run to >90 seconds of speech, so the cap stays conservative.
@@ -202,6 +229,11 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         return out
 
     n_serp = n_gem = 0
+    # [LOCAL-594] grounded narrate calls issued for THIS stop. The budget
+    # (MAX_GROUNDED_PER_STOP) is spent on the first credit_line; later ones
+    # narrate ungrounded and are still fully verified by Serper challenge +
+    # adjudication. n_gem_grounded is reported so the cut is visible per stop.
+    n_gem_grounded = 0
 
     # ── 1. the museum's own object record ────────────────────────────────
     try:
@@ -260,9 +292,19 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             # the submission added to story_query.py and then never imported —
             # the D511 orphan pattern, inside the fix for D511. One call site,
             # one definition.
+            # [LOCAL-594] Ground the narrate call ONLY while this stop's grounded
+            # budget is unspent (default 1). The grounded first draft pulls fresh
+            # web facts in; every candidate — grounded or not — is then put through
+            # the same Serper challenge + adjudication below, so later credit_lines
+            # still reach the stop as verified candidates without each buying a new
+            # Google search.
+            _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
             r1 = gemini_with_sources(
-                compile_for_seed(seed, matrix, exhibition))
+                compile_for_seed(seed, matrix, exhibition),
+                grounded=_ground_r1)
             n_gem += 1
+            if _ground_r1:
+                n_gem_grounded += 1
             if not (r1.get('text') or '').strip():
                 continue
 
@@ -299,10 +341,18 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             ev_block = '\n'.join(ev_lines[:60]) or '(no independent evidence retrieved)'
 
             # ── 4. adjudicate against the evidence, then write ───────────
+            # [LOCAL-594] UNGROUNDED by default. The prompt judges only against the
+            # retrieved Serper evidence block ("Do not rely on memory"); it does
+            # not search the web, so grounding it bought a billable Google query
+            # for nothing. STORY_LOOP_R2_GROUNDED=1 restores the old behaviour for
+            # BEFORE-baseline measurement only.
+            _ground_r2 = R2_GROUNDED and (n_gem_grounded < MAX_GROUNDED_PER_STOP)
             r2 = gemini_with_sources(ADJUDICATION_PROMPT.format(
                 work=work, exhibition=exhibition, answer=r1['text'],
-                evidence=ev_block))
+                evidence=ev_block), grounded=_ground_r2)
             n_gem += 1
+            if _ground_r2:
+                n_gem_grounded += 1
             text2 = r2.get('text') or ''
             m = re.search(r'PART\s*2.*?$', text2, re.S | re.I)
             story = (re.sub(r'^PART\s*2[^\n]*\n', '', m.group(0)).strip()
@@ -450,6 +500,9 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
         out['cost_usd'] = round(_sc(n_serp) + n_gem * 0.006, 4)
     except Exception:
         pass
+    out['grounded_requests'] = n_gem_grounded  # [LOCAL-594] grounded narrate calls this stop
+    out['gem_calls'] = n_gem                   # total Gemini calls (grounded + ungrounded)
+    out['serp_queries'] = n_serp
     out['elapsed_s'] = round(time.time() - t0, 1)
     if verbose:
         _scores = [c['index'] for c in out['candidates'] if c.get('index') is not None]

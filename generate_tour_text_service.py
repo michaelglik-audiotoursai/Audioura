@@ -329,7 +329,15 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             _cost_info = _LAST_GENERATION_COST
             _is_cache_hit = _cost_info.get("cache_hit", False)
             _op_type = "tour_cache_hit" if _is_cache_hit else "tour_generate"
-            _our_cost = _cost_info.get("total_cost", 0.0)
+            # [LOCAL-594] The metered cost MUST include the Gemini grounding
+            # channel. Until now this recorded only `total_cost` (OpenAI tokens),
+            # so every tour_generate figure Michael saw UNDERSTATED the real cost
+            # by the whole grounding bill — the largest per-tour line. Record the
+            # grounding-inclusive total (LLM + search + TTS + grounding), falling
+            # back to total_cost only if the richer field is absent.
+            _llm_cost = _cost_info.get("total_cost", 0.0)
+            _grounding = _cost_info.get("grounding_cost", 0.0) or 0.0
+            _our_cost = _cost_info.get("tour_total_cost", _llm_cost + _grounding)
             _breakdown = _cost_info.get("breakdown", {})
             record_operation(
                 operation_type=_op_type,
@@ -339,7 +347,8 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 job_id=job_id,
                 breakdown=_breakdown,
             )
-            print(f"[LOCAL-60] Cost metered: {_op_type} | ${_our_cost:.6f} | cache_hit={_is_cache_hit}")
+            print(f"[LOCAL-60] Cost metered: {_op_type} | ${_our_cost:.6f} "
+                  f"(incl grounding ${_grounding:.4f}) | cache_hit={_is_cache_hit}")
         except Exception as _meter_err:
             print(f"[LOCAL-60] Cost metering failed (non-fatal): {_meter_err}")
 
