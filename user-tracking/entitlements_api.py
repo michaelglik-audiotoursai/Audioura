@@ -161,6 +161,25 @@ def _me_payload(cur, user_id, now=None):
     plan = _get_plan(cur, state['level'])
     ann = state['anniversary_at']
     renewal_due = _is_renewal_due(ann, now)
+
+    # [LOCAL-596] Queue + offer status for the L2 seat lifecycle. queue_position
+    # is the device's 1-based place in the FIFO waiting line (None if it is not
+    # waiting). pending_offer is its live, unexpired claim offer (None if it has
+    # none). Both come from the shared seat core so the API and the job agree.
+    queue_position = None
+    pending_offer = None
+    try:
+        import l2_seats
+        queue_position = l2_seats.queue_position(cur, user_id)
+        offer = l2_seats.pending_offer(cur, user_id)
+        if offer:
+            pending_offer = {
+                'code': offer['code'],
+                'expires_at': offer['expires_at'].isoformat() if offer['expires_at'] else None,
+            }
+    except Exception as e:  # pragma: no cover - seat tables optional pre-015
+        logger.warning(f"[LOCAL-596] queue/offer lookup failed for {user_id}: {e}")
+
     return {
         'user_id': user_id,
         'level': state['level'],
@@ -169,6 +188,8 @@ def _me_payload(cur, user_id, now=None):
         'warn_renewal': _warn_renewal(ann, now),
         'renewal_prompt': renewal_due,
         'can_sell': bool(plan['can_sell']) if plan else False,
+        'queue_position': queue_position,
+        'pending_offer': pending_offer,
     }
 
 
@@ -357,6 +378,122 @@ def purchases_verify():
         payload['verified'] = True
         payload['transaction_id'] = transaction_id
         payload['granted_level'] = level
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# [LOCAL-596] L2 seat queue + claim endpoints
+# ───────────────────────────────────────────────────────────────────────────
+@entitlements_bp.route('/l2/queue/join', methods=['POST'])
+def l2_queue_join():
+    """Join the FIFO queue for a free L2 seat.
+
+    Body: {"user_id": "..."}
+    L1 only (a device already holding an L2 seat is refused). Idempotent: a
+    device already waiting/holding an offer gets its current position back.
+    Returns 200 {queue_position, status} on success, 409 if already L2.
+    """
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    import l2_seats
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        result = l2_seats.join_queue(cur, user_id)
+        conn.commit()
+        if not result['joined'] and result.get('reason') == 'already_l2':
+            cur.close()
+            return jsonify({
+                "error": "already_l2",
+                "message": "This device already holds an L2 seat.",
+            }), 409
+        payload = _me_payload(cur, user_id)
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@entitlements_bp.route('/l2/queue/leave', methods=['POST'])
+def l2_queue_leave():
+    """Leave the FIFO queue (idempotent).
+
+    Body: {"user_id": "..."}
+    Marks the queue row 'left' and expires any live offer. Always 200.
+    """
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    import l2_seats
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        l2_seats.leave_queue(cur, user_id)
+        conn.commit()
+        payload = _me_payload(cur, user_id)
+        cur.close()
+        return jsonify(payload), 200
+    finally:
+        conn.close()
+
+
+@entitlements_bp.route('/l2/claim', methods=['POST'])
+def l2_claim():
+    """Claim an L2 seat with an offer code.
+
+    Body: {"user_id": "...", "code": "..."}
+    Grants L2 if the code is valid, unexpired, belongs to THIS device, and a
+    seat is free under the 100 cap. Returns 200 with the refreshed /me payload
+    on success, or a structured 4xx refusal (LOCAL-580 contract) otherwise:
+       claim_invalid_code (400), claim_wrong_device (403),
+       claim_expired (409), claim_seats_full (409).
+    """
+    err = _require_api_key()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id')
+    code = data.get('code')
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    import l2_seats
+    conn = _get_db()
+    try:
+        cur = conn.cursor()
+        result = l2_seats.claim_seat(cur, user_id, code)
+        if not result['ok']:
+            conn.rollback()
+            status_map = {
+                l2_seats.CLAIM_BAD_CODE: 400,
+                l2_seats.CLAIM_WRONG_DEVICE: 403,
+                l2_seats.CLAIM_EXPIRED: 409,
+                l2_seats.CLAIM_SEATS_FULL: 409,
+            }
+            http = status_map.get(result['code'], 400)
+            cur.close()
+            return jsonify({
+                "error": result['code'],
+                "error_code": result['code'],
+                "message": result['message'],
+            }), http
+        conn.commit()
+        payload = _me_payload(cur, user_id)
+        payload['claimed'] = True
         cur.close()
         return jsonify(payload), 200
     finally:
