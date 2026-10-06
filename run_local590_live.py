@@ -27,6 +27,8 @@ os.environ.setdefault("STORIED_MODE", "true")
 SCENARIOS = {
     "griffin": {"location": "Griffin museum of photography, Winchester, MA",
                 "tour_type": "museum", "n1": 5, "n2": 7},
+    "mfa": {"location": "Museum of Fine Arts, Boston, MA",
+            "tour_type": "museum", "n1": 5, "n2": 7},
     "boston_common": {"location": "Boston Common, Boston, MA",
                       "tour_type": "walking", "n1": 4, "n2": 6},
 }
