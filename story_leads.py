@@ -200,6 +200,11 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     """
     model = model or os.environ.get('GEMINI_MODEL', 'gemini-flash-latest')
     import requests
+    # [LOCAL-597] Forbidden during an L2 by-reference build (zero grounding).
+    # Check BEFORE the key short-circuit so a keyless build still fails hard
+    # rather than silently returning ''.
+    if grounded:
+        _raise_if_grounding_forbidden('grounded Gemini request (_gemini)')
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not key:
         return ''
@@ -207,9 +212,6 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     # here, where the key exists and we are about to issue it. Ungrounded calls
     # (grounded=False) are free of the per-request grounding charge and not counted.
     if grounded:
-        # [LOCAL-597] A grounded request is forbidden during an L2 by-reference
-        # build (zero grounding). Raise before counting / issuing it.
-        _raise_if_grounding_forbidden('grounded Gemini request (_gemini)')
         _count_grounding_request()
     r = requests.post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
@@ -282,6 +284,12 @@ def gemini_with_sources(prompt: str, model: str = None,
     import requests
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     out = {'text': '', 'sources': [], 'supports': [], 'queries': [], 'error': ''}
+    # [LOCAL-597] A grounded request is forbidden during an L2 by-reference build
+    # (zero grounding). Check BEFORE the key short-circuit and OUTSIDE the broad
+    # try/except below (which would otherwise swallow the raise into out['error']),
+    # so the guard is a hard failure the build cannot miss.
+    if grounded:
+        _raise_if_grounding_forbidden('grounded Gemini request (gemini_with_sources)')
     if not key:
         out['error'] = 'no GEMINI_API_KEY'
         return out
@@ -291,8 +299,6 @@ def gemini_with_sources(prompt: str, model: str = None,
         # here when a request is actually going out. Guarded by grounded=True so
         # an explicitly ungrounded call is not charged the per-request rate.
         if grounded:
-            # [LOCAL-597] Forbidden during an L2 by-reference build (zero grounding).
-            _raise_if_grounding_forbidden('grounded Gemini request (gemini_with_sources)')
             _count_grounding_request()
         r = requests.post(
             f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
