@@ -9683,6 +9683,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         _d1_venue_corpus = ""
         _story_corpus_result = None
         _d1v2_result = None  # [LOCAL-72] Initialize for non-museum paths (prevents NameError in three_class_retrieval)
+        # [LOCAL-599] UNIFIED-FILL (below) reads _pre_d1v2_candidates for any tier
+        # in {thin, medium, exhibit_museum}. The site_exhibition grounding branch
+        # sets tier='exhibit_museum' but never ran D1v2, so it never set this. When
+        # a site publishes FEWER current exhibitions than requested (MassArt: 1
+        # show vs 7 stops), the fill block executed and crashed with
+        # UnboundLocalError. Initialise it here so every verification path has it;
+        # the site_exhibition branch overwrites it with its own candidates below.
+        _pre_d1v2_candidates = []
         if tour_category == 'museum' and _museum_venue_name:
             global _LAST_VERIFICATION_TIER
             # [LOCAL-372] Skip D1v2 verification when stops come from the venue's own
@@ -9777,6 +9785,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                       f"the venue page, {_n_unconf} unconfirmed and labelled")
                 _verification_tier = 'exhibit_museum'
                 _LAST_VERIFICATION_TIER = _verification_tier
+                # [LOCAL-599] Keep the site-sourced, grounded stops as the fill
+                # pool base so UNIFIED-FILL has a defined pool (these are already
+                # the only real candidates; nothing is invented).
+                _pre_d1v2_candidates = list(poi_list)
             else:
                 # Try new story_miner-based verification (T0a/T1)
                 # Pass the clean venue name plus the city, so D1v2 can parse city
