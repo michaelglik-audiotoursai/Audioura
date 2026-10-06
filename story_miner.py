@@ -1548,9 +1548,28 @@ def fetch_venue_narrative_corpus(
                     _city_from_name = parts[1].strip().lower() if len(parts) > 1 else ""
                 
                 if _city_from_name and _city_from_name not in _candidate.lower()[:2000]:
-                    # Wrong museum (e.g. Belarus Chagall museum vs Nice)
-                    print(f"  [story_miner] Wikipedia EN: '{_en_title}' rejected (doesn't mention '{_city_from_name}')")
-                    continue
+                    # [LOCAL-593 #2] The city-match guard exists to reject a
+                    # WRONG-CITY namesake reached by the fuzzy "Musée X → X Museum"
+                    # title conversions. But it also rejected the CORRECT Harvard
+                    # Art Museums article (its lead says "Harvard University" and
+                    # names Cambridge only lower down), leaving the §3-adapter with
+                    # 0 story pages → G4 fail-closed. Before rejecting, accept the
+                    # article when it unmistakably names the venue itself: the
+                    # distinctive venue tokens appear in the lead. That keeps the
+                    # wrong-city protection (a Belarus Chagall article won't carry
+                    # the queried venue's distinctive words) while trusting an
+                    # article that is plainly about this venue.
+                    _venue_head = (venue_name.split(',')[0] if venue_name else _base_title)
+                    _venue_distinct = [w.lower() for w in re.split(r'[\s\-]+', _venue_head)
+                                       if len(w) >= 4 and w.lower() not in
+                                       ('museum', 'museums', 'gallery', 'national', 'musee', 'musée')]
+                    _lead = _candidate.lower()[:2000]
+                    _names_venue = _venue_distinct and all(t in _lead for t in _venue_distinct)
+                    if not _names_venue:
+                        print(f"  [story_miner] Wikipedia EN: '{_en_title}' rejected (doesn't mention '{_city_from_name}')")
+                        continue
+                    print(f"  [story_miner] Wikipedia EN: '{_en_title}' accepted on venue-name match "
+                          f"(city '{_city_from_name}' not in lead, but venue named)")
                 
                 en_article = _candidate
                 _en_wiki_url = f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}"

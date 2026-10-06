@@ -1215,14 +1215,15 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 6  # LOCAL-593: the page-ranker now excludes policy/admin
-                    # pages (#2) and SPARQL works now carry a sitelinks prominence
-                    # count (#4). Rows written by the pre-LOCAL-593 miner stored
-                    # the admin-page corpus and sitelink-less works, so they must
-                    # be a cache MISS — bumping 5→6 ignores them without a DELETE
-                    # (same mechanism LOCAL-583 used for the Griffin chrome row).
-                    # Fresh rows are written at v6 with the admin pages excluded
-                    # and sitelinks present.
+CORPUS_VERSION = 7  # LOCAL-593: the page-ranker excludes policy/admin pages
+                    # (#2), the Wikipedia city-match guard no longer rejects the
+                    # correctly-resolved venue's own article (#2), and SPARQL works
+                    # carry a sitelinks prominence count (#4). Rows written by any
+                    # pre-LOCAL-593 miner (admin-page corpus, Wikipedia wrongly
+                    # dropped, sitelink-less works) must be a cache MISS — bumping
+                    # to 7 ignores them without a DELETE (the LOCAL-583 mechanism).
+                    # Fresh rows are written at v7 with the admin pages excluded,
+                    # the venue Wikipedia article included, and sitelinks present.
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
