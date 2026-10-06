@@ -161,5 +161,43 @@ class TestRealWiring(unittest.TestCase):
                       "S15 block must call _should_force_museum (wiring, not a copy)")
 
 
+class TestGenericThemeIsNotAnExhibition(unittest.TestCase):
+    """[LOCAL-591] A theme word in `requirements` is not a named exhibition.
+
+    The live run exposed a second layer of the same bug: PHASE 1 returned
+    requirements='Art and Architectural tour' for the Athenaeum, and LOCAL-362
+    read that as a scoped EXHIBITION request, searched the venue for an
+    exhibition by that name, found none, and clean-failed — discarding the six
+    documented works SPARQL had already returned. A generic theme must fall back
+    to the venue's documented works, not an exhibition search.
+    """
+
+    def test_generic_theme_phrases_are_generic(self):
+        for r in ["Art and Architectural tour", "art", "architecture",
+                  "history", "general overview", "art and history tour",
+                  "self-guided tour", "highlights of the collection"]:
+            self.assertTrue(gtt._is_generic_theme_requirement(r),
+                            f"{r!r} is a generic theme, not an exhibition")
+
+    def test_named_exhibitions_and_artists_are_not_generic(self):
+        for r in ["Picasso, Miró, Dalí: Unbound", "works by Chagall",
+                  "Monet and the Impressionists exhibition", "the Degas retrospective"]:
+            self.assertFalse(gtt._is_generic_theme_requirement(r),
+                             f"{r!r} names an exhibition/artist — must stay scoped")
+
+    def test_empty_requirement_is_not_generic_theme(self):
+        # Empty is handled separately by the caller (no scope at all).
+        self.assertFalse(gtt._is_generic_theme_requirement(""))
+        self.assertFalse(gtt._is_generic_theme_requirement(None))
+
+    def test_scope_detection_gated_on_generic_theme_in_source(self):
+        gen_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "generate_tour_text.py")
+        with open(gen_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        self.assertIn("_is_generic_theme_requirement(", source,
+                      "exhibition-scope detection must consult the generic-theme guard")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -550,6 +550,51 @@ def _should_force_museum(location, tour_type, intent, transport_mode='on_foot'):
     # still blocks a venue_name-only flip, exactly as before LOCAL-591.
     return not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location or '')
 
+
+# [LOCAL-591] A generic THEME phrase that PHASE 1 drops into `requirements`
+# ("Art and Architectural tour", "history", "art") is NOT a named exhibition or a
+# specific artist scope. Tours 395/396: the Athenaeum request produced
+# requirements="Art and Architectural tour"; LOCAL-362 read that as a scoped
+# exhibition, searched the venue for an exhibition called "Art and Architectual
+# tour in", found none, asked GPT for its works, got [] — and the whole
+# contained-venue tour clean-failed, even though SPARQL had already returned six
+# documented works for the building. A theme word is not a different place and
+# not a specific exhibition: a generic-theme requirement must NOT trigger the
+# exhibition-scope path, so the tour falls back to the venue's documented works.
+_GENERIC_THEME_WORDS = {
+    'art', 'arts', 'artistic', 'architecture', 'architectural', 'architectual',
+    'history', 'historic', 'historical', 'heritage', 'culture', 'cultural',
+    'general', 'overview', 'highlights', 'collection', 'collections',
+    'permanent', 'masterpiece', 'masterpieces', 'tour', 'tours', 'walking',
+    'self', 'guided', 'self-guided', 'and', 'or', 'the', 'of', 'in', 'a', 'an',
+}
+
+
+def _is_generic_theme_requirement(requirements):
+    """[LOCAL-591] True when a `requirements` string is only generic theme/genre
+    words — i.e. a THEME, not a named exhibition or a specific artist.
+
+    "Art and Architectural tour" → True (generic theme).
+    "Picasso, Miró, Dalí: Unbound" → False (named artists / exhibition).
+    "works by Chagall" → False (specific artist).
+    "" → False (nothing to scope on — the caller treats empty separately).
+
+    Deterministic: it is a fact about the words, not an opinion. If EVERY content
+    word is a generic theme/genre word, there is no specific exhibition to scope
+    to, so the venue's documented works should be used instead.
+    """
+    r = (requirements or '').strip().lower()
+    if not r:
+        return False
+    # A colon usually introduces a named exhibition title ("Artists: Title").
+    if ':' in r:
+        return False
+    words = re.findall(r"[a-zà-ÿ'\-]+", r)
+    if not words:
+        return False
+    return all(w in _GENERIC_THEME_WORDS for w in words)
+
+
 # Multi-building institution keywords — these should NOT be classified as single-venue museum
 # even if GPT returns a venue_name. They imply multiple distinct locations.
 # PLURAL-ONLY: "libraries" (multi) blocks museum; "library" (single) does not.
@@ -7766,6 +7811,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _early_poi = (intent.get('poi_type') or '').strip().lower()
         # LOCAL-362: Same logic as main scope detection — exact match for poi_type
         _early_poi_is_exhibition = _early_poi in ('exhibit', 'exhibition', 'exhibits')
+        # [LOCAL-591] A generic theme requirement is not a scoped exhibition — do
+        # not suppress the deterministic venue-works bypass for it.
+        if _early_req and _is_generic_theme_requirement(_early_req):
+            _early_req = ''
         if _early_req or _early_poi_is_exhibition:
             _early_scope_detected = True
             print(f"  [LOCAL-362] Scoped request detected (requirements='{_early_req}') — "
@@ -8163,6 +8212,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # 1. requirements is non-empty (primary signal — Phase 1 identified criteria), OR
         # 2. poi_type is exactly "exhibit" or "exhibition" (not "museum exhibits" which is generic)
         _poi_is_exhibition = _scope_poi_type in ('exhibit', 'exhibition', 'exhibits')
+        # [LOCAL-591] A generic THEME requirement ("Art and Architectural tour")
+        # is not a named exhibition — it must not trigger the exhibition-scope
+        # path, or a contained-venue tour clean-fails looking for an exhibition
+        # that does not exist (tours 395/396). Fall back to the venue's works.
+        if _scope_requirements and _is_generic_theme_requirement(_scope_requirements):
+            print(f"  [LOCAL-591] requirements='{_scope_requirements}' is a generic "
+                  f"theme, not a named exhibition — NOT treating this as a scoped "
+                  f"exhibition request; using the venue's documented works.")
+            _scope_requirements = ''
         _is_scoped = bool(_scope_requirements) or _poi_is_exhibition
 
         if _is_scoped:
@@ -9351,11 +9409,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _LAST_VERIFICATION_TIER = _verification_tier
             else:
                 # Try new story_miner-based verification (T0a/T1)
-                # Pass full location string so D1v2 can parse city for venue disambiguation
+                # Pass the clean venue name plus the city, so D1v2 can parse city
+                # for venue disambiguation.
                 _d1v2_venue_arg = _museum_venue_name
                 if ',' not in _d1v2_venue_arg and ',' in _location_normalized:
-                    # Append city/state from location if venue name alone lacks it
-                    _d1v2_venue_arg = _location_normalized
+                    # [LOCAL-591] Append ONLY the city/state tail from the location —
+                    # never the whole request string. Tours 395/396: _museum_venue_name
+                    # was the clean 'Boston Athenaeum' but this branch replaced it with
+                    # the full location 'Art and Architectual in Boston Athenaeum, boston,
+                    # ma', so D1v2 then resolved the theme-prefixed phrase
+                    # 'Art and Architectual in Boston Athenaeum', found no Wikidata
+                    # candidate, and clean-failed 'unresolvable' — even though the venue
+                    # had already resolved (Q478013) and SPARQL had returned 6 works.
+                    # The venue name is NOT in the request's leading words; the city is in
+                    # its trailing comma segments. Append those.
+                    _loc_segs = [s.strip() for s in _location_normalized.split(',') if s.strip()]
+                    _city_tail = ', '.join(_loc_segs[1:]) if len(_loc_segs) >= 2 else ''
+                    _d1v2_venue_arg = f"{_museum_venue_name}, {_city_tail}" if _city_tail else _museum_venue_name
                 _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg, exhibition_scope=_exhibition_scope)
                 if isinstance(_d1v2_result, VerificationResult):
                     _verification_tier = _d1v2_result.tier
