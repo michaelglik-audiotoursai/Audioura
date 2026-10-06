@@ -250,6 +250,7 @@ def maybe_generate_with_pool(
                 overall_orientation=_overall_from_new(gen_text),
                 sources_block=sources_block,
                 opening_section=opening_section,
+                venue_address=_resolve_venue_address(location),
             )
             _write(output_file, result.tour_text)
             # Store the exhibition stops to seed the pool (the opening section is
@@ -291,6 +292,7 @@ def maybe_generate_with_pool(
                 new_stops=[], pooled_stops=pooled_units,
                 overall_orientation=None, sources_block=sources_block,
                 opening_section=opening_section or "",
+                venue_address=_resolve_venue_address(location),
             )
         else:
             result = asm.assemble_outdoor_tour(
@@ -353,6 +355,7 @@ def maybe_generate_with_pool(
             overall_orientation=_overall_from_new(gen_text),
             sources_block=sources_block,
             opening_section=opening_section or "",
+            venue_address=_resolve_venue_address(location),
         )
     else:
         _dir_fn = None
@@ -475,6 +478,41 @@ def _overall_from_new(new_text: str) -> Optional[str]:
     if m:
         return m.group(1).strip()
     return None
+
+
+def _resolve_venue_address(location: str) -> str:
+    """[LOCAL-592 r2] Resolve the venue's sourced street address for a contained
+    tour, or "". Mirrors _build_opening_section's venue resolution (same site URL
+    + locality), then lifts the main-gallery address from the venue's own pages.
+    Best-effort and non-fatal: any failure returns "" (the stop keeps its address;
+    nothing is invented).
+    """
+    if os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
+        return ""
+    try:
+        from about_museum_stop import clean_venue_request_name
+    except Exception:
+        return ""
+    clean_name = clean_venue_request_name(location)
+    venue = clean_name or _venue_name(location)
+    site_url = ""
+    address = ""
+    try:
+        from venue_resolver import resolve_venue
+        ent = resolve_venue(clean_name or location)
+        if ent is not None:
+            site_url = getattr(ent, "official_url", "") or ""
+            venue = getattr(ent, "name", "") or venue
+            address = getattr(ent, "address", "") or ""
+    except Exception as e:
+        logger.info(f"[LOCAL-592] venue resolve for address failed ({e})")
+    locality = ""
+    parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
+    if parts:
+        locality = ", ".join(parts[:2])
+    sourced = _source_venue_address(venue, site_url, locality)
+    # Prefer the page-sourced address; fall back to the entity address if present.
+    return sourced or (address or "").strip()
 
 
 def _build_opening_section(location: str, tour_type: str, request_text: str,
@@ -622,3 +660,54 @@ def _source_practical_facts(venue: str, site_url: str, address: str = "") -> str
             logger.info(f"[LOCAL-592] practical-facts extract/gate error on {u} ({e})")
             continue
     return best
+
+
+def _source_venue_address(venue: str, site_url: str, locality: str = "") -> str:
+    """[LOCAL-592 r2] Fetch the venue's own page and lift its street address, or "".
+
+    The sourced venue address is used to bind every contained-venue stop's address
+    to the BUILDING (D611), replacing per-stop LLM/geocode guesses that drift to a
+    town-centre address no source supports (the Griffin "1 Washington St" defect).
+    Best-effort and non-fatal: no site URL, a fetch failure, or no address on the
+    page all return "" — then the stop keeps whatever address it had (never
+    invented here). Only the venue's OWN pages are read, so a satellite gallery
+    address elsewhere on the site is not mistaken for the main address: the
+    extractor returns the FIRST street address, and the venue's main-gallery
+    address leads its About/visit footer.
+    """
+    if not site_url:
+        return ""
+    try:
+        from about_museum_stop import (_candidate_story_urls, _visible_text,
+                                        _default_fetcher, extract_venue_address)
+    except Exception as e:
+        logger.info(f"[LOCAL-592] venue-address modules unavailable ({e})")
+        return ""
+    try:
+        urls = _candidate_story_urls(site_url)
+    except Exception:
+        urls = [site_url]
+    # Prefer visit/contact/about pages where the main address is stated.
+    def _addr_rank(u: str) -> int:
+        ul = u.lower()
+        for i, kw in enumerate(("plan-your-visit", "/visit", "contact", "about")):
+            if kw in ul:
+                return i
+        return 99
+    urls = sorted(dict.fromkeys(urls), key=_addr_rank)[:6]
+    fetch = _default_fetcher
+    for u in urls:
+        try:
+            html, _ = fetch(u)
+        except Exception:
+            html = ""
+        if not html or len(html) < 80:
+            continue
+        try:
+            addr = extract_venue_address(_visible_text(html), locality=locality)
+            if addr:
+                return addr
+        except Exception as e:
+            logger.info(f"[LOCAL-592] venue-address extract error on {u} ({e})")
+            continue
+    return ""

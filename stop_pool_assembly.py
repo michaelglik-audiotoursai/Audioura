@@ -164,6 +164,18 @@ def _render_stop_block(stop: Dict, stop_num: int, tour_category: str,
         _field("Specific Examples", "specific_examples")
         _field("Operational Details", "operational_details")
 
+    # [LOCAL-592 r2] The OPENING SECTION (About the venue + visiting information)
+    # is the FIRST spoken section of Stop 1 — Michael's four-part order
+    # (D611): (a) About the venue → (b) Visiting information → (c) the tour
+    # overview / Orientation → (d) Stop 1's own narration. It is rendered BEFORE
+    # the Orientation line so the About + hours/admission come first, exactly like
+    # the walking-tour Overall section. It is carried on a dedicated field so it is
+    # never confused with the stop's own narration and never read as an artwork.
+    opening = (stop.get("_opening_section") or "").strip()
+    if opening:
+        parts.append(opening)
+        parts.append("")
+
     orientation = (stop.get("orientation") or "").strip()
     if orientation:
         parts.append(f"{_ORIENTATION_PREFIX}{orientation}")
@@ -232,6 +244,7 @@ def assemble_building_tour(
     sources_block: str = "",
     about_stop: Optional[Dict] = None,
     opening_section: str = "",
+    venue_address: str = "",
 ) -> AssemblyResult:
     """Assemble a single-building tour: NEW stops then pooled, with the About +
     practical "opening section" FOLDED INTO Stop 1 (never a standalone stop).
@@ -261,6 +274,28 @@ def assemble_building_tour(
     ordered = list(new_stops) + list(pooled_stops)
     n = len(ordered)
 
+    # [LOCAL-592 r2] Address provenance (D611): in a contained venue every
+    # exhibition stop is at the building, so its address is the sourced
+    # ``venue_address`` — unless the stop's own page states a satellite gallery
+    # address. ``venue_bound_address`` keeps a satellite address only when it is
+    # supported by the stop's page text; otherwise it uses the venue address.
+    # This replaces per-stop LLM-guessed addresses that drift to a town-centre
+    # address no source supports (the "1 Washington St" defect).
+    if (venue_address or "").strip():
+        try:
+            from about_museum_stop import venue_bound_address as _vba
+        except Exception:
+            _vba = None
+        if _vba is not None:
+            fixed = []
+            for s in ordered:
+                s2 = dict(s)
+                s2["address"] = _vba(
+                    s2.get("address", ""), venue_address,
+                    stop_page_text=s2.get("_page_text", "") or s2.get("narration", ""))
+                fixed.append(s2)
+            ordered = fixed
+
     # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
     # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
     # narration (+ practical facts) so no caller path can resurrect an extra stop.
@@ -273,19 +308,22 @@ def assemble_building_tour(
         opening = "\n\n".join(b for b in _about_bits if b).strip()
     folded_opening = bool(opening)
 
-    # Fold the opening section into Stop 1's narration (it is the first SECTION of
-    # Stop 1, before the stop's own narration). When there are no stops at all,
-    # there is nothing to fold into — the opening is dropped (a no-stop tour is not
-    # created, D577).
+    # [LOCAL-592 r2] Place the opening section on Stop 1 as a DEDICATED field, not
+    # inside the stop's narration. The renderer emits it BEFORE the Orientation
+    # line, so the four-part order inside Stop 1 is (D611):
+    #   (a) About the venue → (b) Visiting information  (the opening section)
+    #   (c) the tour overview / Orientation             (overall_orientation)
+    #   (d) Stop 1's own narration                       (the stop body)
+    # When there are no stops at all, there is nothing to attach it to — the
+    # opening is dropped (a no-stop tour is not created, D577).
     if folded_opening and ordered:
         s1 = dict(ordered[0])
-        base_narr = (s1.get("narration") or "").strip()
-        s1["narration"] = (opening + ("\n\n" + base_narr if base_narr else "")).strip()
+        s1["_opening_section"] = opening
         ordered[0] = s1
 
     # Overall description: the caller regenerates it because it now covers more
-    # stops. We seed it into stop 1's orientation (house behaviour: the overall
-    # prolog rides on Stop-1 Orientation).
+    # stops. We seed it into stop 1's Orientation (house behaviour: the overall
+    # prolog rides on Stop-1 Orientation). It now renders AFTER the opening section.
     if overall_orientation and ordered:
         s0 = dict(ordered[0])
         base = (s0.get("orientation") or "").strip()

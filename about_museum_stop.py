@@ -84,6 +84,8 @@ __all__ = [
     "has_dangling_object_sentence",
     "dedupe_sentences",
     "normalise_locality",
+    "extract_venue_address",
+    "venue_bound_address",
 ]
 
 
@@ -314,6 +316,7 @@ class AboutStop:
     covers_architecture: bool = False
     counts_toward_n: bool = False
     practical_facts: str = ""  # [LOCAL-592] gated opening-hours/admission/closed-days
+    site_domain: str = ""      # [LOCAL-592 r2] venue domain for the visiting-info fallback pointer
 
     def is_empty(self) -> bool:
         return not self.narration.strip()
@@ -710,6 +713,7 @@ def build_about_stop(
         covers_architecture=bool(arch_sentences),
         counts_toward_n=counts,
         practical_facts=(practical_facts or "").strip(),
+        site_domain=domain,
     )
 
 
@@ -795,11 +799,116 @@ def about_stop_unit(about: AboutStop) -> dict:
     }
 
 
+# ── [LOCAL-592 r2] venue-bound address provenance ───────────────────────────
+#
+# Michael, tour 391 (D611): the Griffin's Stop 1 showed "Address: 1 Washington
+# St, Winchester, MA 01890" — the Griffin is at 67 Shore Road. That address was a
+# per-stop LLM/geocode GUESS (Phase 3B asks GPT for a "complete street address")
+# that drifted to a town-centre address no source supports. For a CONTAINED venue
+# (one museum/library building) every exhibition stop is physically at the venue,
+# so its address is the VENUE's address — unless the exhibition's own page states
+# a different (satellite) gallery address, in which case we keep that and the
+# narration says so. These two pure functions encode that rule; they are
+# unit-testable and have no network/LLM dependency.
+
+# A US street address: "<number> <Street words> [, City] [, ST] [ZIP]".
+_STREET_ADDRESS_RE = re.compile(
+    r"(?i)\b(\d{1,5}(?:\s*(?:-|–|/|\s)\s*\d{1,4})?\s+"
+    r"[A-Z0-9][A-Za-z0-9.'’]*(?:\s+[A-Z0-9][A-Za-z0-9.'’]*){0,4}\s+"
+    r"(?:street|st|road|rd|avenue|ave|boulevard|blvd|lane|ln|drive|dr|way|place|pl|"
+    r"square|sq|court|ct|terrace|ter|highway|hwy|parkway|pkwy|circle|cir|row))"
+    r"(?:\s*,\s*[A-Za-z.'’ ]+)?(?:\s*,\s*[A-Z]{2})?(?:\s+\d{5}(?:-\d{4})?)?\b"
+)
+
+
+def extract_venue_address(page_text: str, locality: str = "") -> str:
+    """Lift the venue's OWN street address from its page text, or "".
+
+    Scans the venue's visible page text for the FIRST street address and returns
+    it as a clean "<street>, <City>, <ST> <ZIP>" string when those tails are
+    present on the page. Pure/best-effort: anything it cannot find on the page is
+    simply absent (nothing invented — D584). The Griffin "Main Gallery Address /
+    67 Shore Road, Winchester, Ma 01890" footer is the canonical case.
+
+    When ``locality`` is given and the matched address has no city/state tail, the
+    locality is appended (properly cased) so the stop still carries a complete,
+    page-grounded address.
+    """
+    if not page_text:
+        return ""
+    m = _STREET_ADDRESS_RE.search(page_text)
+    if not m:
+        return ""
+    addr = re.sub(r"\s+", " ", m.group(0)).strip().rstrip(",")
+    # Normalise state casing: "Winchester, Ma 01890" → "Winchester, MA 01890".
+    addr = re.sub(r",\s*([A-Za-z]{2})(\s+\d{5}(?:-\d{4})?)?$",
+                  lambda mm: f", {mm.group(1).upper()}{mm.group(2) or ''}", addr)
+    has_tail = bool(re.search(r",\s*[A-Z]{2}\b", addr) or re.search(r"\b\d{5}\b", addr))
+    if not has_tail and locality:
+        addr = f"{addr}, {normalise_locality(locality)}"
+    return addr
+
+
+def venue_bound_address(stop_address: str, venue_address: str,
+                        stop_page_text: str = "") -> str:
+    """Return the address a contained-venue stop should carry (provenance-safe).
+
+    Rule (D611):
+      • If ``stop_address`` is literally supported by this stop's own page
+        (``stop_page_text`` — a satellite gallery address the exhibition states),
+        keep it: it is sourced for THIS stop.
+      • Otherwise prefer the sourced ``venue_address`` (the building everyone is
+        standing in).
+      • If there is no venue address, fall back to the stop_address unchanged
+        (we never erase an address, but we never invent one either).
+
+    A pure function: no network, no LLM. ``stop_page_text`` is matched
+    case-insensitively on the address's informative tokens (the street number and
+    first street word), so paraphrase/whitespace differences do not reject a real
+    satellite address.
+    """
+    sa = (stop_address or "").strip()
+    va = (venue_address or "").strip()
+    if not va:
+        return sa
+    if not sa:
+        return va
+    if _address_supported_by_page(sa, stop_page_text):
+        return sa
+    return va
+
+
+def _address_supported_by_page(address: str, page_text: str) -> bool:
+    """True when the address's key tokens (number + first street word) are on the page."""
+    if not address or not page_text:
+        return False
+    low = page_text.lower()
+    m = re.match(r"\s*(\d{1,5})\s+([A-Za-z][A-Za-z.'’]*)", address)
+    if not m:
+        return False
+    number, first_word = m.group(1), m.group(2).lower()
+    return number in low and first_word in low
+
+
 # ── [LOCAL-592] opening-section composer (the Stop-1 prolog, not a stop) ──────
 
 # A short, natural lead-in to the practical facts so the opening does not read as
 # a bare label. Mirrors the walking-tour prolog voice.
 _PRACTICAL_LEAD = "Before you go in, a few practical notes."
+
+
+def _visiting_fallback_sentence(domain: str) -> str:
+    """[LOCAL-592 r2] The one-sentence website pointer used when the venue's own
+    pages yield NO hours/admission the gate will pass.
+
+    Michael (D611): opening hours and admission are "very important". When they
+    cannot be sourced we must NOT invent them (D584) — we say so in a single
+    sentence that points the listener at the venue's site, e.g.
+    "Check opening hours and admission on bostonathenaeum.org before you go."
+    With no known domain the pointer stays generic ("…on the museum's website…").
+    """
+    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    return f"Check opening hours and admission on {where} before you go."
 
 
 def build_opening_section(about: Optional["AboutStop"]) -> str:
@@ -816,12 +925,18 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
 
     The About narration is already sourced and artwork-framing-free (build_about_stop).
     The practical facts are already gated/venue-bound (LOCAL-584) by the caller and
-    carried on ``about.practical_facts``; they are appended verbatim. Nothing is
-    invented: when ``about`` is None the section is empty; when there are no
-    practical facts, only the About story is returned (silence is correct — D584).
+    carried on ``about.practical_facts``; they are appended verbatim.
 
-    The caller folds the returned text into Stop 1 (its narration/orientation lead),
-    so a request for N stops still delivers exactly N: this section adds zero stops.
+    [r2] Visiting information is "very important" (D611). When the venue's own pages
+    yield NO gate-passing hours/admission, the section does NOT go silent on them:
+    it appends a single honest pointer to the venue's website
+    ("Check opening hours and admission on <domain> before you go.") rather than
+    inventing any hours or prices (D584). When ``about`` is None the section is
+    empty.
+
+    The caller folds the returned text into Stop 1 as its opening SECTION (rendered
+    before the Orientation), so a request for N stops still delivers exactly N: this
+    section adds zero stops.
     """
     if about is None:
         return ""
@@ -834,6 +949,9 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
         # Ensure the facts end as a clean sentence group.
         facts_block = facts if facts.endswith((".", "!", "?")) else facts + "."
         parts.append(f"{_PRACTICAL_LEAD} {facts_block}")
+    else:
+        # [r2] No sourced hours/admission → honest website pointer, never invented.
+        parts.append(_visiting_fallback_sentence(getattr(about, "site_domain", "")))
     section = "\n\n".join(p for p in parts if p).strip()
     # Belt-and-braces: the opening section must never read as an artwork label.
     if section and looks_like_artwork_framing(section):
@@ -841,5 +959,5 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
         # are page-literal and cannot be artwork-framed.
         if facts:
             return f"{_PRACTICAL_LEAD} {facts if facts.endswith(('.', '!', '?')) else facts + '.'}"
-        return ""
+        return _visiting_fallback_sentence(getattr(about, "site_domain", ""))
     return section

@@ -306,5 +306,173 @@ class TestPooledBodiesVerbatimOpeningRegenerated(unittest.TestCase):
         self.assertEqual(res.order, ["New One", "A"])
 
 
+# ── 5. [r2] Four-part order inside Stop 1 (D611) ─────────────────────────────
+
+class TestFourPartOrderInStop1(unittest.TestCase):
+    """Michael (D611): the order INSIDE Stop 1 is (a) About the venue →
+    (b) Visiting information → (c) the tour overview / Orientation → (d) Stop 1's
+    own narration. The r1 fold put the About+visiting AFTER the Orientation (and,
+    live, even after part of the first exhibition's narration). r2 renders the
+    opening section FIRST, before the Orientation line."""
+
+    def setUp(self):
+        self.about = am.build_about_stop(
+            venue_name="Boston Athenaeum",
+            base_site_url=_ATH_BASE,
+            request_text="Art and Architectual tour in Boston Athenaeum",
+            locality="Boston, MA",
+            requested_stops=5,
+            available_exhibition_stops=5,
+            fetcher=_athenaeum_fetcher,
+            practical_facts="Closed on Sunday. 9 AM–5 PM. Admission is free",
+        )
+        self.opening = am.build_opening_section(self.about)
+        self.new = [_new("Artwork 1", "Narration body for artwork one.",
+                         orientation="Stand before the first case.")]
+        self.res = asm.assemble_building_tour(
+            location="Art and Architectual tour in Boston Athenaeum, boston, ma",
+            tour_type="museum", tour_category="museum",
+            header_category="museum", display_category="Museum",
+            venue_name="Boston Athenaeum",
+            new_stops=self.new, pooled_stops=[],
+            overall_orientation="You are about to explore the Boston Athenaeum. "
+                                "Your first stop is Artwork 1.",
+            opening_section=self.opening,
+        )
+
+    def test_stop1_renders_opening_before_orientation(self):
+        stop1 = self.res.tour_text.split("Stop 2:")[0] if "Stop 2:" in self.res.tour_text \
+            else self.res.tour_text
+        low = stop1.lower()
+        i_about = low.index("cabot")                     # (a) About (architect)
+        i_visit = stop1.index("free")                    # (b) Visiting info (admission)
+        i_orient = stop1.index("Orientation:")           # (c) the Orientation line
+        i_overview = low.index("your first stop is")      # overview text (in Orientation)
+        i_narr = low.index("narration body for artwork one")  # (d) stop narration
+        # (a) and (b) both come BEFORE the Orientation line and the overview.
+        self.assertLess(i_about, i_orient, "About must precede the Orientation line")
+        self.assertLess(i_visit, i_orient, "Visiting info must precede the Orientation line")
+        self.assertLess(i_orient, i_overview + 1, "overview rides on the Orientation line")
+        # (c) overview precedes (d) the stop's own narration.
+        self.assertLess(i_overview, i_narr, "overview must precede the stop narration")
+        # Full chain: About → Visiting → Orientation/overview → narration.
+        self.assertLess(i_about, i_visit)
+        self.assertLess(i_visit, i_overview)
+        self.assertLess(i_overview, i_narr)
+
+    def test_opening_section_not_inside_orientation_or_narration(self):
+        # The opening section is its own block, before 'Orientation:'; the About
+        # text must not be glued into the Orientation value nor the narration body.
+        stop1 = self.res.tour_text.split("Stop 2:")[0]
+        before_orient = stop1.split("Orientation:")[0]
+        self.assertIn("Cabot", before_orient)
+        self.assertIn("free", before_orient)
+
+
+# ── 6. [r2] Visiting-information fallback pointer (never invent) ──────────────
+
+class TestVisitingInfoFallback(unittest.TestCase):
+    """D611: hours/admission are "very important". When the venue's pages yield no
+    gate-passing facts we must NOT invent them (D584) — the opening section carries
+    a single honest website pointer instead."""
+
+    def _about_no_facts(self, domain_base):
+        return am.build_about_stop(
+            venue_name="Griffin Museum of Photography",
+            base_site_url=domain_base,
+            request_text="museum tour of the Griffin",
+            locality="Winchester, MA",
+            requested_stops=7,
+            available_exhibition_stops=7,
+            fetcher=_griffin_fetcher,
+            practical_facts="",   # nothing sourced/gated
+        )
+
+    def test_fallback_sentence_present_when_no_facts(self):
+        about = self._about_no_facts(_BASE)
+        section = am.build_opening_section(about)
+        self.assertIn("Check opening hours and admission on", section)
+        self.assertIn("griffinmuseum.org", section)
+        self.assertIn("before you go", section)
+
+    def test_fallback_never_invents_hours_or_prices(self):
+        about = self._about_no_facts(_BASE)
+        section = am.build_opening_section(about)
+        # No fabricated numbers/currency/times leaked in as "facts".
+        self.assertNotRegex(section, r"\$\d")
+        self.assertNotRegex(section, r"\d\s*(?:AM|PM|am|pm)")
+        self.assertNotIn("€", section)
+
+    def test_sourced_facts_preferred_over_fallback(self):
+        about = am.build_about_stop(
+            venue_name="Griffin Museum of Photography", base_site_url=_BASE,
+            requested_stops=7, available_exhibition_stops=7,
+            fetcher=_griffin_fetcher,
+            practical_facts="Closed on Monday. Noon–4 PM. $12")
+        section = am.build_opening_section(about)
+        self.assertIn("$12", section)
+        self.assertNotIn("Check opening hours and admission on", section)
+
+
+# ── 7. [r2] Address provenance (D611) ────────────────────────────────────────
+
+class TestAddressProvenance(unittest.TestCase):
+    """The Griffin's Stop 1 showed '1 Washington St, Winchester, MA 01890' — a
+    guessed address no source supports; the Griffin is at 67 Shore Road. A
+    contained-venue stop's address is the venue's sourced address unless the stop's
+    own page states a satellite gallery address."""
+
+    _GRIFFIN_PAGE = (
+        "We're located in Winchester. Main Gallery Address 67 Shore Road, "
+        "Winchester, Ma 01890. Satellite Galleries Lafayette City Center Gallery "
+        "2 Ave de Lafayette in Downtown Crossing, Boston.")
+
+    def test_extract_venue_address_from_page(self):
+        addr = am.extract_venue_address(self._GRIFFIN_PAGE)
+        self.assertIn("67 Shore Road", addr)
+        self.assertIn("Winchester", addr)
+        self.assertRegex(addr, r"\bMA\b")   # state normalised to upper case
+
+    def test_guessed_address_replaced_by_venue_address(self):
+        # The LLM guess "1 Washington St" is on NO source → use the venue address.
+        out = am.venue_bound_address(
+            "1 Washington St, Winchester, MA 01890",
+            "67 Shore Road, Winchester, MA 01890",
+            stop_page_text="This exhibition shows photographs about labour.")
+        self.assertEqual(out, "67 Shore Road, Winchester, MA 01890")
+
+    def test_satellite_address_kept_when_on_stop_page(self):
+        # When the stop's own page states the satellite address, keep it.
+        out = am.venue_bound_address(
+            "2 Ave de Lafayette, Boston",
+            "67 Shore Road, Winchester, MA 01890",
+            stop_page_text="Shown at the Griffin's Lafayette City Center Gallery, "
+                           "2 Ave de Lafayette in Downtown Crossing, Boston.")
+        self.assertIn("Lafayette", out)
+        self.assertNotIn("Shore Road", out)
+
+    def test_assembler_binds_contained_stops_to_venue_address(self):
+        about = am.build_about_stop(
+            venue_name="Griffin Museum of Photography", base_site_url=_BASE,
+            requested_stops=3, available_exhibition_stops=3,
+            fetcher=_griffin_fetcher,
+            practical_facts="Closed on Monday. Noon–4 PM. $12")
+        opening = am.build_opening_section(about)
+        new = [_new("Show A", "Narration A.", address="1 Washington St, Winchester, MA 01890"),
+               _new("Show B", "Narration B.", address="1 Washington St, Winchester, MA 01890"),
+               _new("Show C", "Narration C.", address="1 Washington St, Winchester, MA 01890")]
+        res = asm.assemble_building_tour(
+            location="Griffin Museum of Photography, Winchester, MA",
+            tour_type="museum", tour_category="museum",
+            header_category="museum", display_category="Museum",
+            venue_name="Griffin Museum of Photography",
+            new_stops=new, pooled_stops=[],
+            opening_section=opening,
+            venue_address="67 Shore Road, Winchester, MA 01890",
+        )
+        self.assertNotIn("1 Washington St", res.tour_text)
+        self.assertIn("67 Shore Road", res.tour_text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
