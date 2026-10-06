@@ -39,7 +39,9 @@ entitlements_bp = Blueprint('entitlements', __name__)
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://admin:password123@localhost:5432/audiotours')
 API_KEY = os.getenv('GATEWAY_API_KEY', '')
-IAP_VERIFY_MODE = os.getenv('IAP_VERIFY_MODE', 'stub')  # 'stub' | 'apple' | 'google'
+# LEAD 2026-10-06: default 'apple' — a 'stub' default would grant a free pack to any
+# POST /purchases/verify. Tests set IAP_VERIFY_MODE=stub explicitly.
+IAP_VERIFY_MODE = os.getenv('IAP_VERIFY_MODE', 'apple')  # 'stub' | 'apple' | 'google'
 RENEWAL_WARN_DAYS = int(os.getenv('RENEWAL_WARN_DAYS', '3'))
 
 # [LOCAL-598] Apple verification config. The bundle id the JWS must carry; the
