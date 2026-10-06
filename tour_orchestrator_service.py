@@ -2472,6 +2472,33 @@ if __name__ == '__main__':
     print(f"Starting Modified Tour Orchestrator Service: {datetime.now().isoformat()}")
     print(f"Tours directory: {TOURS_DIR}")
     print(f"Pipeline: Complete tour generation orchestration with database storage")
-    
+
+    # [LOCAL-596] Guarded hourly L2 seat-maintenance job.
+    # The orchestrator already runs background work as daemon threads
+    # (GENERATION_MODE=thread); there is no launchd autonomy_tick.sh in this tree
+    # (that tick is a task-file dispatcher, not a general cron). So the hourly
+    # seat job (evict idle L2 >=7d, expire offers >72h, offer free seats to the
+    # queue head) is wired here as a guarded daemon thread. It is OFF by default
+    # and only starts when L2_SEAT_JOB_ENABLED=true, so existing deployments are
+    # unaffected until explicitly opted in. The same job is runnable standalone
+    # (python3 l2_seat_job.py) for manual use or a future launchd/cron entry.
+    if os.getenv('L2_SEAT_JOB_ENABLED', 'false').lower() == 'true':
+        try:
+            import l2_seat_job
+            _seat_job_thread = threading.Thread(
+                target=l2_seat_job.run_forever,
+                kwargs={'quiet': False},
+                name='l2-seat-job',
+                daemon=True,
+            )
+            _seat_job_thread.start()
+            print("[LOCAL-596] L2 seat-maintenance job thread started "
+                  f"(interval={os.getenv('L2_SEAT_JOB_INTERVAL_SECONDS', '3600')}s)")
+        except Exception as _seat_job_err:  # pragma: no cover - startup safety
+            print(f"[LOCAL-596] WARNING: could not start L2 seat job thread: {_seat_job_err}")
+    else:
+        print("[LOCAL-596] L2 seat-maintenance job disabled "
+              "(set L2_SEAT_JOB_ENABLED=true to enable)")
+
     # Run Flask app
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5002')), debug=False)
