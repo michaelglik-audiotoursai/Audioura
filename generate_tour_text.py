@@ -4074,6 +4074,12 @@ def _work_prominence_score(entry, corpus_text_lower=""):
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# [LOCAL-599B] Module-level: the site-first exhibition stops delivered by the LAST
+# generation, each mapped to its own source URL + status + kind. A live runner /
+# acceptance harness reads this to report "the 7 stop titles, each with its source
+# URL" (D611) without re-fetching. {} when the last run took no site-first path.
+_LAST_SITE_FIRST_SOURCES = []  # [{'name','source_url','status','kind'}, ...]
+
 # [LOCAL-540] Module-level: the before/after score record from the last generation
 # (see score_and_retry in scorer_retry.py). None on a cache hit or if scoring was
 # skipped. Exposed so a caller can read the defect the scorer saw, whether a retry
@@ -8698,6 +8704,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _poi['source'] = 'site_exhibition'
                 _exhibition_stops_source = 'site_exhibition'
                 _deterministic_fill_used = True   # Phase 3A GPT is bypassed
+                # [LOCAL-599B] Record each site-first stop's source URL + status +
+                # kind so a live runner can report "N titles, each with its source
+                # URL" (D611) without re-fetching.
+                global _LAST_SITE_FIRST_SOURCES
+                _LAST_SITE_FIRST_SOURCES = [{
+                    'name': _c.get('name', ''),
+                    'source_url': _c.get('source_url') or _c.get('detail_url', ''),
+                    'status': _c.get('status', ''),
+                    'kind': _c.get('kind', 'exhibition'),
+                } for _c in _sf_candidates]
                 # Build a minimal result carrying the combined site text so the
                 # grounding path can confirm each title appears on the site.
                 _exhibition_checklist_result = SiteFirstResult(

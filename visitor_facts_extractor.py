@@ -810,8 +810,15 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
             )
 
         # Check for free admission
+        # [LOCAL-599B] MAAM states "Always free" (its admission banner). Accept the
+        # bare "always free" / "free to the public" / "free to visit" / "admission
+        # is (always) free" forms in addition to the existing "free admission" /
+        # "admission free" / "no admission fee". A page-literal free statement, not
+        # an invented price.
         _free_match = re.search(
-            r'(?:free\s+(?:admission|entry)|admission\s+free|no\s+(?:admission|entry)\s+(?:fee|charge))',
+            r'(?:free\s+(?:admission|entry)|admission\s+(?:is\s+)?(?:always\s+)?free|'
+            r'always\s+free|free\s+to\s+(?:the\s+public|visit|enter|all)|'
+            r'no\s+(?:admission|entry)\s+(?:fee|charge))',
             page_text, re.IGNORECASE
         )
 
