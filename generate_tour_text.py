@@ -6582,7 +6582,7 @@ except Exception as _cap_err:  # pragma: no cover
     _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
     This thin wrapper is the per-tour boundary. It opens a
@@ -6599,6 +6599,52 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     see the same shape, only now with correct numbers.
     """
     global _LAST_GENERATION_COST
+
+    # [LOCAL-590] Stop-pool fast path. When a tour of this venue was already
+    # delivered, reuse the pooled stops and generate only the new ones (Michael's
+    # LOCAL-495 design). Active only in storied mode with a DB, and ONLY when this
+    # call is not itself the pool's own new-stop generation (exclude_titles set),
+    # which must run normally to avoid infinite recursion. forced_stops (a user's
+    # own chosen stops) and the harness path bypass pooling. Returns None when
+    # pooling does not apply, so normal generation runs unchanged.
+    _storied = os.environ.get("STORIED_MODE", "").strip().lower() in ("true", "1", "yes")
+    if (_storied and total_stops and not forced_stops and not harness
+            and not exclude_titles
+            and os.environ.get("DISABLE_STOP_POOL", "").strip() != "1"):
+        _pool_db = os.environ.get("DATABASE_URL")
+        if _pool_db:
+            try:
+                from stop_pool_orchestrator import maybe_generate_with_pool
+                _api_key = os.environ.get("OPENAI_API_KEY", "")
+                _pool_out = maybe_generate_with_pool(
+                    location, tour_type, total_stops, _pool_db,
+                    generate_fn=generate_tour_text,
+                    output_file=output_file, user_id=user_id, job_id=job_id,
+                    api_key=_api_key,
+                )
+                if _pool_out is not None:
+                    # Record the ledger cost with reuse metering (LOCAL-590 step 6).
+                    _LAST_GENERATION_COST = {
+                        "total_cost": _pool_out.get("new_cost", 0.0),
+                        "total_tokens": 0,
+                        "cache_hit": False,
+                        "pool_reuse": True,
+                        "breakdown": {
+                            "llm": _pool_out.get("new_cost", 0.0),
+                            "tts": 0.0, "search": 0.0,
+                            "reused_stops": _pool_out.get("reused_stops", 0),
+                            "new_stops": _pool_out.get("new_stops", 0),
+                            "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
+                        },
+                    }
+                    print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
+                          f"new={_pool_out.get('new_stops')} "
+                          f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
+                          f"(pool held {_pool_out.get('pooled_before')})")
+                    return _pool_out["text"], output_file, (None, None)
+            except Exception as _pool_err:
+                print(f"  [LOCAL-590] pool path error (falling back to normal gen): {_pool_err}")
+
     try:
         import cost_accumulator as _cost_accumulator
     except Exception:
@@ -6608,12 +6654,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         return _generate_tour_text_impl(
             location, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
+            exclude_titles=exclude_titles,
         )
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
             location, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
+            exclude_titles=exclude_titles,
         )
         _reconcile_cost_record_from_accumulator(_acc)
     return result
@@ -6668,7 +6716,7 @@ def _reconcile_cost_record_from_accumulator(acc):
         _import_logger.error(f"[LOCAL-562] cost reconcile skipped: {_rec_err}")
 
 
-def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False):
+def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -6715,6 +6763,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # empty signal — which is exactly what "classify it" means.
     if tour_type is None:
         tour_type = ''
+
+    # [LOCAL-590] Stop-pool exclusion. When the pool orchestrator asks for only
+    # the NEW stops of a larger request, it passes the titles already in the pool
+    # here. We normalise them (accent-fold + collapse, the stop_pool_store title
+    # norm) into a set the candidate-selection stage filters against, so the
+    # generator proposes the next-best stops that are NOT already pooled. Empty /
+    # absent means "no pooling in play" — behaviour is unchanged.
+    _pool_exclude_norm = set()
+    if exclude_titles:
+        try:
+            from stop_pool_store import _title_norm as _pool_title_norm
+            _pool_exclude_norm = {_pool_title_norm(t) for t in exclude_titles if t and _pool_title_norm(t)}
+        except Exception as _pex:
+            print(f"  [LOCAL-590] pool exclusion disabled (import error): {_pex}")
+            _pool_exclude_norm = set()
+    if _pool_exclude_norm:
+        print(f"  [LOCAL-590] pool exclusion active: {len(_pool_exclude_norm)} pooled title(s) will not be re-selected")
 
     # [LOCAL-230] Reset per-run network failure counter
     try:
@@ -6850,7 +6915,18 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
     _disable_cache = os.environ.get("DISABLE_TOUR_CACHE", "").strip() == "1"
-    if _storied_mode and not _disable_cache:
+    # [LOCAL-590] Exact counts. The whole-tour cache (tour_cache_layer1) rounds a
+    # request to a stop BUCKET (1-3/4-6/7-10) and trims on delivery. With the stop
+    # POOL in place that bucketing is superseded — reuse now happens per stop, and
+    # the request must generate EXACTLY N (plus R4 replenishment), never a rounded
+    # bucket. When stop pooling is enabled (the default) we skip the bucketed
+    # whole-tour cache read entirely: the pool path (run earlier in the wrapper)
+    # already served any reuse, and the pool's own new-stop sub-generation
+    # (exclude_titles set) must likewise be exact and fresh — never served a
+    # rounded bucket. DISABLE_STOP_POOL=1 restores the old bucket cache.
+    _pool_enabled = (os.environ.get("DISABLE_STOP_POOL", "").strip() != "1")
+    _skip_bucket_cache = _pool_enabled
+    if _storied_mode and not _disable_cache and not _skip_bucket_cache:
         _db_url = os.environ.get("DATABASE_URL")
         if _db_url:
             try:
@@ -9977,6 +10053,41 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             except Exception as e:
                 print(f"   Part C attempt {attempts}: exception {e}")
                 continue
+
+        # ──── [LOCAL-590] POOL EXCLUSION: drop already-pooled candidates ───────
+        # When the pool orchestrator asked for only the NEW stops of a larger
+        # request, remove every candidate whose title is already in the pool, so
+        # the trim/coverage stages below select the next-best stops that are NOT
+        # already written. Applied here, on the OVER-selected candidate set (the
+        # pipeline deliberately gathers more candidates than total_stops), so
+        # dropping the pooled ones still leaves enough to fill the request. If the
+        # filter would empty the list, it is skipped (never deliver zero stops);
+        # a protective floor keeps at least `total_stops` candidates.
+        if _pool_exclude_norm and poi_list:
+            try:
+                from stop_pool_store import _title_norm as _pool_title_norm
+                _before = len(poi_list)
+                _kept = [p for p in poi_list
+                         if _pool_title_norm(p.get('name', '')) not in _pool_exclude_norm]
+                _dropped = _before - len(_kept)
+                if _kept and len(_kept) >= (total_stops or 1):
+                    poi_list = _kept
+                    print(f"  [LOCAL-590] pool exclusion dropped {_dropped} already-pooled "
+                          f"candidate(s); {len(poi_list)} remain for selection")
+                elif _kept:
+                    # Not enough non-pooled candidates to fill the request on their
+                    # own — keep the non-pooled ones first, then the pooled tail, so
+                    # we never under-deliver. The orchestrator's title de-dup still
+                    # drops exact pooled matches from the delivered set downstream.
+                    _pooled_tail = [p for p in poi_list
+                                    if _pool_title_norm(p.get('name', '')) in _pool_exclude_norm]
+                    poi_list = _kept + _pooled_tail
+                    print(f"  [LOCAL-590] pool exclusion: only {len(_kept)} non-pooled "
+                          f"candidate(s) (< {total_stops}); kept them first, pooled tail retained")
+                else:
+                    print(f"  [LOCAL-590] pool exclusion skipped — all candidates are pooled")
+            except Exception as _pfe:
+                print(f"  [LOCAL-590] pool exclusion filter error (non-fatal): {_pfe}")
 
         # ──── [LOCAL-212] COVERAGE-AWARE STOP SELECTION ────────────────────────
         # When enabled (DISABLE_COVERAGE_SELECTION != '1'), reorder candidates
@@ -21790,6 +21901,34 @@ RULES:
                 _import_logger.error("[S20] MISSING: tour_cache_layer1 (store_tour) — tour cache storage DISABLED")
             except Exception as e:
                 print(f"  [S20] Cache store error: {e}")
+
+            # [LOCAL-590] Also pool each delivered stop as an audio-independent
+            # unit, so a LATER, larger request of this venue reuses them and
+            # generates only the new ones. Additive (never DELETE); keyed on venue
+            # identity (QID-first) + tour_type + cache version. A failure here must
+            # not fail the tour — the tour is already assembled and cached.
+            try:
+                import stop_pool_store as _pool
+                _pool_sources = None
+                try:
+                    _pool_sources = (_LAST_OVERVIEW_SOURCES or None)
+                except Exception:
+                    _pool_sources = None
+                _pool_qid = None
+                try:
+                    _pool_ident = _pool.resolve_venue_identity(location)
+                    _pool_qid = _pool_ident[4:] if _pool_ident.startswith("qid:") else None
+                except Exception:
+                    _pool_qid = None
+                _pool_written = _pool.store_delivered_tour(
+                    location, tour_type, complete_tour, _db_url,
+                    qid=_pool_qid, sources=_pool_sources,
+                )
+                print(f"  [LOCAL-590] POOL STORE: {_pool_written} stop(s) pooled for {location} / {tour_type}")
+            except ImportError:
+                _import_logger.error("[LOCAL-590] MISSING: stop_pool_store — stop pooling DISABLED")
+            except Exception as _pool_store_err:
+                print(f"  [LOCAL-590] Pool store error (non-fatal): {_pool_store_err}")
 
     # Save to file if output_file is provided
     if not output_file:
