@@ -24477,3 +24477,5 @@ is served from the pool.
 FEWER stops than requested in the same bucket (a 4-stop tour answering a 6-stop request). Now a miss.
 Test red on old code. **Follow-up:** LOCAL-590's tests wrote ~30 `zz_isolated_*` venues into the shared
 DB's `stop_pool`. Harmless (unmatchable names) but tests must use a transaction/rollback or a test DB.
+
+Also deleted at Michael's request (2026-10-05 23:5x): tours 395 (en) / 396 (ru), the Athenaeum tour that became a city walk (LOCAL-591); 3 stop_metrics. Counts 204 -> 202 (real 60 -> 58). Backups in /Volumes/AudiouraSSD/deleted_tours/.
