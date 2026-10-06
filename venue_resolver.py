@@ -288,11 +288,12 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
     Includes P170 (creator) for exhibition-scoped filtering (LOCAL-362).
     """
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator ?sitelinks WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
       OPTIONAL {{ ?work wdt:P170 ?creator. }}
+      OPTIONAL {{ ?work wikibase:sitelinks ?sitelinks. }}
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
@@ -324,6 +325,13 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
             creator_label = r.get("creatorLabel", {}).get("value", "")
             creator_uri = r.get("creator", {}).get("value", "")
             creator_qid = creator_uri.split("/")[-1] if creator_uri else ""
+            # [LOCAL-593 #4] Prominence signal: number of Wikipedia/Wikimedia
+            # sitelinks the work's Wikidata item carries. A famous work (many
+            # language editions) outranks an obscure one at the same source tier.
+            try:
+                _sitelinks = int(r.get("sitelinks", {}).get("value", "0") or "0")
+            except (TypeError, ValueError):
+                _sitelinks = 0
             
             # Deduplicate: same work may appear multiple times with different creators
             # (works with multiple creators) — keep first occurrence but merge creator info
@@ -331,9 +339,12 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                 if work_qid in _seen_qids:
                     # Merge creator into existing entry
                     for existing in works:
-                        if existing['qid'] == work_qid and creator_label:
-                            if creator_label not in existing.get('creators', []):
+                        if existing['qid'] == work_qid:
+                            if creator_label and creator_label not in existing.get('creators', []):
                                 existing.setdefault('creators', []).append(creator_label)
+                            # [LOCAL-593 #4] Keep the strongest prominence seen.
+                            if _sitelinks > existing.get('sitelinks', 0):
+                                existing['sitelinks'] = _sitelinks
                             break
                     continue
                 _seen_qids.add(work_qid)
@@ -345,6 +356,7 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                     "creator": creator_label if creator_label and not creator_label.startswith("Q") else "",
                     "creator_qid": creator_qid if creator_label and not creator_label.startswith("Q") else "",
                     "creators": [creator_label] if creator_label and not creator_label.startswith("Q") else [],
+                    "sitelinks": _sitelinks,  # [LOCAL-593 #4] prominence signal
                 }
                 works.append(entry)
         
