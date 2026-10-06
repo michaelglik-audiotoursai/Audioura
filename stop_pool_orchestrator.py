@@ -608,6 +608,76 @@ def _has_price_token(text: str) -> bool:
                           (text or ""), re.IGNORECASE))
 
 
+# [LOCAL-592 r3] Anchor/href keywords that mark a venue's visiting-facts page. The
+# venue states its hours/admission on whatever slug it chose (the live Griffin uses
+# /about-the-griffin-2026/, not /about or /visit), so we follow the venue's OWN nav
+# links by meaning rather than guessing fixed slugs.
+_VISIT_LINK_RE = re.compile(
+    r"(?i)(plan\s*your\s*visit|visit\s*us|\bvisit\b|hours|opening|admission|"
+    r"tickets?|getting\s*here|about)"
+)
+
+
+def _discover_visiting_urls(site_url: str, fetch, max_links: int = 8) -> list:
+    """[LOCAL-592 r3] Return same-domain URLs from the home page's own navigation
+    that name Visit / Plan Your Visit / Hours / Admission / Tickets / About.
+
+    Fetches the home page once and scans its anchors (``<a href=… >text</a>``):
+    a link is kept when its href OR its anchor text matches a visiting keyword and
+    it stays on the venue's domain. This reaches the venue's real visiting-facts
+    page whatever its slug, without leaving the venue's own site. Pure/best-effort:
+    returns [] on any failure. ``fetch`` is the same injectable (html, links) fetcher
+    used elsewhere; links from the fetcher are honoured too when present.
+    """
+    from urllib.parse import urlparse, urljoin
+    if "://" not in site_url:
+        site_url = "https://" + site_url
+    parsed = urlparse(site_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    domain = parsed.netloc.lower()
+    domain = domain[4:] if domain.startswith("www.") else domain
+
+    try:
+        html, links = fetch(root)
+    except Exception:
+        html, links = "", []
+    if not html:
+        return []
+
+    # Anchors from the HTML (href + visible text), plus any links the fetcher gave.
+    pairs = []  # (href, text)
+    for m in re.finditer(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+                         html, re.IGNORECASE | re.DOTALL):
+        href = m.group(1)
+        text = re.sub(r"<[^>]+>", " ", m.group(2))
+        text = re.sub(r"\s+", " ", text).strip()
+        pairs.append((href, text))
+    for lk in (links or []):
+        if isinstance(lk, (list, tuple)) and len(lk) >= 1:
+            pairs.append((lk[0], lk[1] if len(lk) > 1 else ""))
+
+    out = []
+    seen = set()
+    for href, text in pairs:
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        if not (_VISIT_LINK_RE.search(href) or _VISIT_LINK_RE.search(text or "")):
+            continue
+        absu = urljoin(root + "/", href)
+        pu = urlparse(absu)
+        ud = pu.netloc.lower()
+        ud = ud[4:] if ud.startswith("www.") else ud
+        if ud and ud != domain:
+            continue  # stay on the venue's own site
+        norm = absu.split("#")[0].rstrip("/")
+        if norm and norm not in seen:
+            seen.add(norm)
+            out.append(absu)
+        if len(out) >= max_links:
+            break
+    return out
+
+
 def _source_practical_facts(venue: str, site_url: str, address: str = "",
                             fetcher=None) -> str:
     """[LOCAL-592 r3] Fetch + extract + GATE + MERGE the venue's practical facts, or "".
@@ -645,22 +715,38 @@ def _source_practical_facts(venue: str, site_url: str, address: str = "",
         logger.info(f"[LOCAL-592] practical-facts modules unavailable ({e})")
         return ""
 
+    fetch = fetcher or _default_fetcher
+
     try:
         urls = _candidate_story_urls(site_url)
     except Exception:
         urls = [site_url]
+
+    # [r3] The real visiting-facts page is often a venue-specific slug the fixed
+    # `_STORY_SEEDS` miss — the live Griffin states its hours AND admission on
+    # /about-the-griffin-2026/, which /about, /visit and /plan-your-visit (all
+    # 200s) do NOT. Discover it from the home page's OWN navigation: follow the
+    # same-domain links whose href or anchor text names Visit / Plan Your Visit /
+    # Hours / Admission / Tickets / About. This keeps us on the venue's own pages
+    # (no guessing, no other sites) and reaches whatever slug the venue actually
+    # uses. Best-effort: any failure leaves `urls` as the seed list.
+    try:
+        discovered = _discover_visiting_urls(site_url, fetch)
+        if discovered:
+            urls = discovered + urls
+    except Exception as e:
+        logger.info(f"[LOCAL-592] visiting-link discovery failed ({e})")
+
     # Read the venue's own visit/hours/admission AND About/history pages — the
     # price frequently lives on the About page, the hours on /visit.
     def _visit_rank(u: str) -> int:
         ul = u.lower()
-        for i, kw in enumerate(("plan-your-visit", "/visit", "admission", "tickets",
-                                "hours", "about", "history", "mission")):
+        for i, kw in enumerate(("about-the", "plan-your-visit", "/visit", "admission",
+                                "tickets", "hours", "/about", "history", "mission")):
             if kw in ul:
                 return i
         return 99
-    urls = sorted(dict.fromkeys(urls), key=_visit_rank)[:8]
-
-    fetch = fetcher or _default_fetcher
+    urls = sorted(dict.fromkeys(urls), key=_visit_rank)[:10]
 
     # Merge the GATED survivors across pages, keyed by claim type. Order matters:
     # closed day, then hours, then admission — the natural reading order and the

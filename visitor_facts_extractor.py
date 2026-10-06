@@ -570,13 +570,41 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
                 seen_times.add(key)
                 facts.hours.append({'time': time_range, 'period': period})
 
-        # Also try simpler single-range English patterns
+        # [LOCAL-592 r3] Day-schedule hours: "Monday-Thursday: 9 am – 8 pm",
+        # "Monday through Friday 9 AM — 4 PM". The venue often lists its hours as a
+        # weekday range followed by a time range (the Boston Athenaeum, the Griffin
+        # satellite rows). The time sides MUST carry an am/pm (or noon/midnight)
+        # marker, so a phone number ("720-7604") or a year ("2026") can never be
+        # mistaken for hours. Venue-scoping already dropped other places' sections,
+        # so the FIRST such schedule is the venue's own primary hours.
         if not facts.hours:
-            _en_time = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight)'
-            simple_en = re.search(
-                r'(?:open\s+(?:from\s+)?)?(' + _en_time + r')\s*(?:to|[-–—])\s*(' + _en_time + r')',
+            _day = (r'(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)(?:day)?')
+            _en_time_m = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight)'
+            day_sched = re.search(
+                r'\b' + _day + r'\s*(?:through|thru|to|[-–—&]|and)?\s*(?:' + _day + r')?'
+                r'\s*[:\s]\s*(' + _en_time_m + r')\s*(?:to|[-–—])\s*(' + _en_time_m + r')',
                 page_text, re.IGNORECASE
             )
+            if day_sched:
+                t1 = _normalize_time_sourced(day_sched.group(1), _src_lower)
+                t2 = _normalize_time_sourced(day_sched.group(2), _src_lower)
+                facts.hours.append({'time': f"{t1}–{t2}", 'period': ''})
+
+        # Also try simpler single-range English patterns. At least ONE side must
+        # carry a time marker (am/pm/colon/noon/midnight) so bare digit ranges in
+        # phone numbers / ZIPs / years are never read as hours (r3).
+        if not facts.hours:
+            _en_time = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight)'
+            _en_time_marked = r'(?:\d{1,2}:\d{2}\s*(?:am|pm)?|\d{1,2}\s*(?:am|pm)|noon|midnight)'
+            simple_en = re.search(
+                r'(?:open\s+(?:from\s+)?)?(' + _en_time_marked + r')\s*(?:to|[-–—])\s*(' + _en_time + r')',
+                page_text, re.IGNORECASE
+            )
+            if not simple_en:
+                simple_en = re.search(
+                    r'(?:open\s+(?:from\s+)?)?(' + _en_time + r')\s*(?:to|[-–—])\s*(' + _en_time_marked + r')',
+                    page_text, re.IGNORECASE
+                )
             if simple_en:
                 t1 = _normalize_time_sourced(simple_en.group(1), _src_lower)
                 t2 = _normalize_time_sourced(simple_en.group(2), _src_lower)

@@ -647,5 +647,79 @@ class TestPartialPointerOnlyForMissing(unittest.TestCase):
         self.assertIn("griffinmuseum.org", section)
 
 
+# ── 10. [r3] Extractor captures day-schedule hours, ignores phone/year digits ─
+
+class TestDayScheduleHoursExtraction(unittest.TestCase):
+    """r3: the venue's hours are often a weekday range + time range
+    ("Monday-Thursday: 9 AM – 8 PM" — the live Boston Athenaeum). The extractor
+    must capture that, and must NOT read a phone number ('(617) 720-7604') or a
+    year as hours."""
+
+    def test_day_schedule_hours_are_extracted(self):
+        from visitor_facts_extractor import extract_visitor_facts_from_text
+        page = ("Hours Monday-Thursday: 9 am – 8 pm Friday and Saturday: 9 am – 5 pm "
+                "Sunday: Closed. Questions? Call (617) 720-7604 or email us.")
+        f = extract_visitor_facts_from_text(page, 'en', venue_name="Boston Athenaeum")
+        joined = " ".join(h["time"] for h in f.hours)
+        self.assertRegex(joined, r"(?i)9\s*AM")
+        self.assertRegex(joined, r"(?i)8\s*PM")
+
+    def test_phone_number_is_not_read_as_hours(self):
+        from visitor_facts_extractor import extract_visitor_facts_from_text
+        # No real hours on the page — only a phone number. Nothing must be invented.
+        page = ("Contact our membership team at (617) 720-7604 or email "
+                "membership@example.org. We are at 10 Beacon Street.")
+        f = extract_visitor_facts_from_text(page, 'en', venue_name="Boston Athenaeum")
+        joined = " ".join(h["time"] for h in f.hours)
+        self.assertNotIn("20–76", joined)
+        self.assertNotIn("20-76", joined)
+
+    def test_griffin_noon_to_4pm_still_extracted(self):
+        from visitor_facts_extractor import extract_visitor_facts_from_text
+        page = ("Hours Tuesday through Sunday: Noon to 4 PM. Closed: Every Monday.")
+        f = extract_visitor_facts_from_text(page, 'en',
+                                            venue_name="Griffin Museum of Photography")
+        joined = " ".join(h["time"] for h in f.hours).lower()
+        self.assertIn("4 pm", joined)
+        self.assertRegex(joined, r"noon|12")
+
+
+# ── 11. [r3] Home-page nav-link discovery reaches the real visiting page ─────
+
+class TestVisitingLinkDiscovery(unittest.TestCase):
+    """r3: the real visiting-facts page is a venue-specific slug the fixed seeds
+    miss (the live Griffin uses /about-the-griffin-2026/). Discovery follows the
+    home page's OWN navigation links by meaning (Visit / Hours / Admission / About)
+    and stays on the venue's domain."""
+
+    _HOME = (
+        "<html><body><nav>"
+        "<a href='/about-the-griffin-2026/'>Visit</a>"
+        "<a href='/current-exhibitions/'>On View</a>"
+        "<a href='https://facebook.com/x'>Follow us</a>"
+        "<a href='/membership/'>Membership</a>"
+        "</nav></body></html>")
+
+    def setUp(self):
+        import stop_pool_orchestrator as orch
+        self.orch = orch
+
+    def _fetch(self, url):
+        if url.rstrip("/") == "https://griffinmuseum.org":
+            return self._HOME, []
+        return "", []
+
+    def test_discovers_venue_specific_visit_slug(self):
+        urls = self.orch._discover_visiting_urls("https://griffinmuseum.org", self._fetch)
+        self.assertTrue(any("about-the-griffin-2026" in u for u in urls),
+                        f"should follow the Visit nav link: {urls}")
+
+    def test_stays_on_venue_domain(self):
+        urls = self.orch._discover_visiting_urls("https://griffinmuseum.org", self._fetch)
+        for u in urls:
+            self.assertIn("griffinmuseum.org", u)
+            self.assertNotIn("facebook.com", u)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
