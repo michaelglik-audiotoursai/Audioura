@@ -474,5 +474,178 @@ class TestAddressProvenance(unittest.TestCase):
         self.assertIn("67 Shore Road", res.tour_text)
 
 
+# ── 8. [r3] State the real hours AND admission the venue's own pages give ────
+
+# The real Griffin case (tour 391, 2026-10-06): the live visiting section said only
+# "Check opening hours and admission on griffinmuseum.org before you go." although
+# the Griffin's own About page states BOTH hours and admission. The extractor read
+# /plan-your-visit and /visit (hours, no price) and then DROPPED the result for
+# being "too short". r3: read the About page too, MERGE hours + admission across
+# the venue's pages, state what is known, and point to the site ONLY for what is
+# missing.
+#
+# These fixtures mirror the committed tests/fixtures/griffin_about_2026.html: the
+# About page carries both the hours ("Tuesday through Sunday: Noon to 4 PM. Closed:
+# Every Monday …") and the admission ("General Admission: $12 for adults, $8 for
+# seniors …"). The visit page carries ONLY hours (the live failure mode).
+
+_GRIFFIN_ABOUT_FULL_HTML = (
+    "<html><body>"
+    "<h1>Visit Us - Griffin Museum of Photography</h1>"
+    "<p>We're located in Winchester. Main Gallery Address 67 Shore Road, "
+    "Winchester, MA.</p>"
+    "<h2>Hours</h2>"
+    "<p>Tuesday through Sunday: Noon to 4 PM. "
+    "Closed: Every Monday, Easter, 4th of July, Thanksgiving, Christmas Eve, "
+    "Christmas Day and New Year's Day.</p>"
+    "<h2>Admission</h2>"
+    "<p>General Admission: $12 for adults, $8 for seniors. "
+    "Discounted: $8 for students, $8 for teachers.</p>"
+    "</body></html>"
+)
+_GRIFFIN_VISIT_ONLY_HOURS_HTML = (
+    "<html><body>"
+    "<h1>Plan Your Visit</h1>"
+    "<h2>Hours</h2>"
+    "<p>Tuesday through Sunday: Noon to 4 PM. Closed: Every Monday.</p>"
+    "</body></html>"
+)
+
+
+def _griffin_split_fetcher(url):
+    """Hours-only on /visit and /plan-your-visit (the live failure mode); the full
+    About page (both hours AND admission) on the About seeds and the home page."""
+    u = url.rstrip("/").lower()
+    if u.endswith("/visit") or u.endswith("/plan-your-visit"):
+        return _GRIFFIN_VISIT_ONLY_HOURS_HTML, []
+    if (u.endswith("/about") or u.endswith("/about-us")
+            or u.endswith("/about-the-museum") or u.endswith("/history")
+            or u.endswith("/mission") or u.endswith("/your-support-matters")
+            or u == "https://griffinmuseum.org"):
+        return _GRIFFIN_ABOUT_FULL_HTML, []
+    return "", []
+
+
+class TestVisitingInfoStatesKnownFacts(unittest.TestCase):
+    """r3: the sourcing path surfaces the real hours AND admission the venue's own
+    pages state — merged across the visit page (hours) and the About page
+    (admission) — instead of dropping a hours-only result as 'too short'."""
+
+    def setUp(self):
+        import stop_pool_orchestrator as orch
+        self.orch = orch
+
+    def test_source_practical_facts_states_hours_and_admission(self):
+        facts = self.orch._source_practical_facts(
+            "Griffin Museum of Photography",
+            "https://griffinmuseum.org",
+            address="67 Shore Road, Winchester, MA",
+            fetcher=_griffin_split_fetcher,
+        )
+        self.assertTrue(facts.strip(), "practical facts must not be empty")
+        # Hours (from the visit page) are stated.
+        self.assertRegex(facts, r"(?i)noon|12|4\s*PM", )
+        # Admission (from the About page) is stated — the price, not dropped.
+        self.assertIn("$12", facts)
+        # Closed day stated.
+        self.assertIn("Monday", facts)
+
+    def test_hours_only_page_is_not_dropped_as_too_short(self):
+        # Even when ONLY the hours-bearing page is reachable, the hours survive —
+        # the "too short — omitting" rule is gone for the Stop-1 visiting section.
+        def _hours_only(url):
+            return _GRIFFIN_VISIT_ONLY_HOURS_HTML, []
+        facts = self.orch._source_practical_facts(
+            "Griffin Museum of Photography",
+            "https://griffinmuseum.org",
+            address="67 Shore Road, Winchester, MA",
+            fetcher=_hours_only,
+        )
+        self.assertTrue(facts.strip(), "hours-only must still be stated")
+        self.assertRegex(facts, r"(?i)noon|12|4\s*PM")
+
+    def test_admission_only_page_is_not_dropped(self):
+        _ADM_ONLY = (
+            "<html><body><h2>Admission</h2>"
+            "<p>General Admission: $12 for adults, $8 for seniors.</p>"
+            "</body></html>")
+        def _adm_only(url):
+            return _ADM_ONLY, []
+        facts = self.orch._source_practical_facts(
+            "Griffin Museum of Photography",
+            "https://griffinmuseum.org",
+            address="67 Shore Road, Winchester, MA",
+            fetcher=_adm_only,
+        )
+        self.assertTrue(facts.strip(), "admission-only must still be stated")
+        self.assertIn("$12", facts)
+
+    def test_opening_section_states_real_facts_end_to_end(self):
+        facts = self.orch._source_practical_facts(
+            "Griffin Museum of Photography",
+            "https://griffinmuseum.org",
+            address="67 Shore Road, Winchester, MA",
+            fetcher=_griffin_split_fetcher,
+        )
+        about = am.build_about_stop(
+            venue_name="Griffin Museum of Photography",
+            base_site_url=_BASE,
+            request_text="museum tour of the Griffin",
+            locality="Winchester, MA",
+            requested_stops=7, available_exhibition_stops=7,
+            fetcher=_griffin_fetcher,
+            practical_facts=facts,
+        )
+        section = am.build_opening_section(about)
+        self.assertIn("$12", section)
+        self.assertRegex(section, r"(?i)noon|4\s*PM")
+        # Facts are stated, so NO website pointer is appended.
+        self.assertNotIn("Check opening hours and admission on", section)
+
+
+# ── 9. [r3] Partial pointer: point to the site ONLY for the missing field ────
+
+class TestPartialPointerOnlyForMissing(unittest.TestCase):
+    """D611 + r3: hours without a price (or a price without hours) is still worth
+    saying. The website pointer must cover ONLY what is missing — never repeat the
+    field the venue's page already gave."""
+
+    def _about(self, practical_facts):
+        return am.build_about_stop(
+            venue_name="Griffin Museum of Photography", base_site_url=_BASE,
+            request_text="museum tour of the Griffin", locality="Winchester, MA",
+            requested_stops=7, available_exhibition_stops=7,
+            fetcher=_griffin_fetcher, practical_facts=practical_facts)
+
+    def test_hours_known_admission_missing_points_to_admission_only(self):
+        # Hours+closed day stated, no price → pointer mentions admission, not hours.
+        about = self._about("Closed on Monday. Noon–4 PM")
+        section = am.build_opening_section(about)
+        self.assertRegex(section, r"(?i)noon|4\s*PM")          # hours stated
+        self.assertRegex(section, r"(?i)admission")            # pointer for the gap
+        # The pointer must NOT ask the listener to check HOURS (we already have them).
+        self.assertNotRegex(section, r"(?i)check (?:opening )?hours")
+        self.assertRegex(section, r"(?i)admission (?:prices? |information )?(?:are |is )?(?:listed|available|on)")
+
+    def test_admission_known_hours_missing_points_to_hours_only(self):
+        about = self._about("$12 for adults, $8 for seniors")
+        section = am.build_opening_section(about)
+        self.assertIn("$12", section)                          # admission stated
+        self.assertRegex(section, r"(?i)hours")                # pointer for the gap
+        self.assertNotRegex(section, r"(?i)admission (?:prices?|information).{0,40}(?:listed|on griffin)")
+
+    def test_both_known_no_pointer(self):
+        about = self._about("Closed on Monday. Noon–4 PM. $12 for adults, $8 for seniors")
+        section = am.build_opening_section(about)
+        self.assertNotRegex(section, r"(?i)check .*on .*before you go")
+        self.assertNotRegex(section, r"(?i)are listed on")
+
+    def test_neither_known_full_pointer(self):
+        about = self._about("")
+        section = am.build_opening_section(about)
+        self.assertIn("Check opening hours and admission on", section)
+        self.assertIn("griffinmuseum.org", section)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

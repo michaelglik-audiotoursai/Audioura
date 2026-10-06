@@ -601,14 +601,38 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
     return section
 
 
-def _source_practical_facts(venue: str, site_url: str, address: str = "") -> str:
-    """[LOCAL-592] Fetch + extract + GATE the venue's practical facts, or "".
+def _has_price_token(text: str) -> bool:
+    """True when an admission segment carries a concrete price (so a priced
+    admission is preferred over a bare 'Free'/condition when merging)."""
+    return bool(re.search(r"[$€£]\s?\d|\b\d+\s?(?:usd|eur|gbp|dollars?|euros?)\b",
+                          (text or ""), re.IGNORECASE))
 
-    Reuses the exact LOCAL-584 contract: visitor_facts_extractor reads only the
-    venue's own section (venue-bound hours), and practical_facts_gate.gate_formatted_facts
-    drops anything not literally supported by the page (currency, days, amounts).
-    Fully best-effort and non-fatal: no site URL, a fetch failure, or an empty
-    result all return "" — the opening section then carries only the About story.
+
+def _source_practical_facts(venue: str, site_url: str, address: str = "",
+                            fetcher=None) -> str:
+    """[LOCAL-592 r3] Fetch + extract + GATE + MERGE the venue's practical facts, or "".
+
+    Reuses the exact LOCAL-584 honesty contract per page: visitor_facts_extractor
+    reads only the venue's own section (venue-bound hours), and
+    practical_facts_gate.gate_formatted_facts drops anything not literally supported
+    by that page (currency, days, amounts).
+
+    r3 change — STATE WHAT IS KNOWN, merged across the venue's pages:
+    the Griffin's /visit and /plan-your-visit state the HOURS but no price, while
+    its About page ("about-the-griffin-2026") states BOTH the hours and the
+    admission. r1/r2 took the FIRST gate-passing page and stopped, so the price was
+    never reached and a hours-only result was discarded as "too short". r3 instead
+    walks ALL the venue's own pages (About / history / plan-your-visit / visit /
+    tickets / admission / home-page footer — the same `_STORY_SEEDS` the About
+    section reads), gate-verifies each page's facts against THAT page, and MERGES
+    the survivors by claim type: closed days, hours, and admission are filled from
+    whichever page states them, preferring an admission segment that carries a
+    concrete price. The "too short — omitting" rule is gone for the Stop-1 visiting
+    section: hours without a price (or a price without hours) is still stated.
+
+    Fully best-effort and non-fatal: no site URL, a fetch failure, or no
+    gate-passing fact on any page all return "" (then the opening section carries
+    only the About story + the website pointer — never invented).
     """
     if not site_url:
         return ""
@@ -616,27 +640,33 @@ def _source_practical_facts(venue: str, site_url: str, address: str = "") -> str
         from about_museum_stop import _candidate_story_urls, _visible_text, _default_fetcher
         from visitor_facts_extractor import (_html_to_sectioned_text,
                                               extract_visitor_facts_from_text)
-        from practical_facts_gate import gate_formatted_facts
+        from practical_facts_gate import gate_formatted_facts, _facts_segment_claim
     except Exception as e:
         logger.info(f"[LOCAL-592] practical-facts modules unavailable ({e})")
         return ""
 
-    # Prefer the visit/plan-your-visit/hours pages for the facts.
     try:
         urls = _candidate_story_urls(site_url)
     except Exception:
         urls = [site_url]
-    # Bring visit-oriented seeds to the front.
+    # Read the venue's own visit/hours/admission AND About/history pages — the
+    # price frequently lives on the About page, the hours on /visit.
     def _visit_rank(u: str) -> int:
         ul = u.lower()
-        for i, kw in enumerate(("plan-your-visit", "/visit", "hours", "admission")):
+        for i, kw in enumerate(("plan-your-visit", "/visit", "admission", "tickets",
+                                "hours", "about", "history", "mission")):
             if kw in ul:
                 return i
         return 99
-    urls = sorted(dict.fromkeys(urls), key=_visit_rank)[:6]
+    urls = sorted(dict.fromkeys(urls), key=_visit_rank)[:8]
 
-    fetch = _default_fetcher
-    best = ""
+    fetch = fetcher or _default_fetcher
+
+    # Merge the GATED survivors across pages, keyed by claim type. Order matters:
+    # closed day, then hours, then admission — the natural reading order and the
+    # order the LOCAL-584 suite asserts.
+    merged = {"closed_day": "", "hours": "", "admission": ""}
+
     for u in urls:
         try:
             html, _ = fetch(u)
@@ -653,13 +683,38 @@ def _source_practical_facts(venue: str, site_url: str, address: str = "") -> str
                 continue
             plain = _visible_text(html).lower()
             gated, _dropped = gate_formatted_facts(formatted, plain, source_url=u)
-            if gated and gated.strip():
-                best = gated.strip()
-                break
+            if not gated or not gated.strip():
+                continue
+            # Classify each surviving segment and fold it into the merge. A segment
+            # fills its claim-type slot the first time; a priced admission upgrades
+            # an earlier price-less admission.
+            for seg in re.split(r"\.\s+|;\s+", gated):
+                seg = seg.strip().rstrip(".")
+                if not seg:
+                    continue
+                claim = _facts_segment_claim(seg)
+                ctype = getattr(claim, "claim_type", None) if claim else None
+                if ctype == "closed_day":
+                    if not merged["closed_day"]:
+                        merged["closed_day"] = seg
+                elif ctype == "hours":
+                    if not merged["hours"]:
+                        merged["hours"] = seg
+                elif ctype in ("admission", "price_band"):
+                    if not merged["admission"] or (
+                            not _has_price_token(merged["admission"])
+                            and _has_price_token(seg)):
+                        merged["admission"] = seg
         except Exception as e:
             logger.info(f"[LOCAL-592] practical-facts extract/gate error on {u} ({e})")
             continue
-    return best
+        # Stop once we have both the hours and a priced admission — the fullest
+        # statement. Otherwise keep reading more pages to fill the gaps.
+        if merged["hours"] and merged["admission"] and _has_price_token(merged["admission"]):
+            break
+
+    parts = [merged["closed_day"], merged["hours"], merged["admission"]]
+    return ". ".join(p for p in parts if p).strip()
 
 
 def _source_venue_address(venue: str, site_url: str, locality: str = "") -> str:

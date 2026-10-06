@@ -938,6 +938,51 @@ def _visiting_fallback_sentence(domain: str) -> str:
     return f"Check opening hours and admission on {where} before you go."
 
 
+# [LOCAL-592 r3] What a gated practical-facts string already STATES, so the website
+# pointer covers ONLY the gap. Hours without a price (or a price without hours) is
+# still worth saying (D611); the pointer must not repeat a field we already have.
+_HOURS_PRESENT_RE = re.compile(
+    r"(?i)(\bnoon\b|\bmidnight\b|\d\s*(?:am|pm)\b|\d{1,2}\s*[-–:]\s*\d|"
+    r"open\s+daily|\bhours?\b|monday|tuesday|wednesday|thursday|friday|"
+    r"saturday|sunday|daily)"
+)
+_ADMISSION_PRESENT_RE = re.compile(
+    r"(?i)([$€£]\s?\d|\b\d+\s?(?:usd|eur|gbp|dollars?|euros?)\b|"
+    r"\bfree\b|\badmission\b|\bentry\b|\bticket)"
+)
+
+
+def _facts_state_hours(facts: str) -> bool:
+    """True when the gated facts string already states opening hours / closed days."""
+    return bool(_HOURS_PRESENT_RE.search(facts or ""))
+
+
+def _facts_state_admission(facts: str) -> bool:
+    """True when the gated facts string already states admission (a price or free)."""
+    return bool(_ADMISSION_PRESENT_RE.search(facts or ""))
+
+
+def _partial_pointer_sentence(facts: str, domain: str) -> str:
+    """[LOCAL-592 r3] A website pointer that covers ONLY the field the venue's own
+    pages did NOT give.
+
+    - hours known, admission missing  → "Admission prices are listed on <site>."
+    - admission known, hours missing  → "Opening hours are listed on <site>."
+    - both known                      → "" (nothing to point to)
+    - neither known                   → "" (the caller uses the full fallback)
+
+    Never repeats a field we already stated, and never invents a value (D584).
+    """
+    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    has_hours = _facts_state_hours(facts)
+    has_adm = _facts_state_admission(facts)
+    if has_hours and not has_adm:
+        return f"Admission prices are listed on {where}."
+    if has_adm and not has_hours:
+        return f"Opening hours are listed on {where}."
+    return ""
+
+
 def build_opening_section(about: Optional["AboutStop"]) -> str:
     """[LOCAL-592] Compose the OPENING SECTION of Stop 1 for a single-venue tour.
 
@@ -958,8 +1003,13 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
     yield NO gate-passing hours/admission, the section does NOT go silent on them:
     it appends a single honest pointer to the venue's website
     ("Check opening hours and admission on <domain> before you go.") rather than
-    inventing any hours or prices (D584). When ``about`` is None the section is
-    empty.
+    inventing any hours or prices (D584).
+
+    [r3] STATE WHAT IS KNOWN. Hours without a price (or a price without hours) is
+    still stated. The website pointer then covers ONLY what is missing
+    ("Admission prices are listed on <site>." / "Opening hours are listed on
+    <site>."), and is omitted entirely when both are known. When ``about`` is None
+    the section is empty.
 
     The caller folds the returned text into Stop 1 as its opening SECTION (rendered
     before the Orientation), so a request for N stops still delivers exactly N: this
@@ -972,19 +1022,28 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
     if narration:
         parts.append(narration)
     facts = (about.practical_facts or "").strip()
+    domain = getattr(about, "site_domain", "")
     if facts:
         # Ensure the facts end as a clean sentence group.
         facts_block = facts if facts.endswith((".", "!", "?")) else facts + "."
-        parts.append(f"{_PRACTICAL_LEAD} {facts_block}")
+        practical = f"{_PRACTICAL_LEAD} {facts_block}"
+        # [r3] Point to the site ONLY for the field the page did not give.
+        pointer = _partial_pointer_sentence(facts, domain)
+        if pointer:
+            practical = f"{practical} {pointer}"
+        parts.append(practical)
     else:
         # [r2] No sourced hours/admission → honest website pointer, never invented.
-        parts.append(_visiting_fallback_sentence(getattr(about, "site_domain", "")))
+        parts.append(_visiting_fallback_sentence(domain))
     section = "\n\n".join(p for p in parts if p).strip()
     # Belt-and-braces: the opening section must never read as an artwork label.
     if section and looks_like_artwork_framing(section):
         # Drop only the offending About narration; keep the practical facts, which
         # are page-literal and cannot be artwork-framed.
         if facts:
-            return f"{_PRACTICAL_LEAD} {facts if facts.endswith(('.', '!', '?')) else facts + '.'}"
-        return _visiting_fallback_sentence(getattr(about, "site_domain", ""))
+            facts_block = facts if facts.endswith((".", "!", "?")) else facts + "."
+            practical = f"{_PRACTICAL_LEAD} {facts_block}"
+            pointer = _partial_pointer_sentence(facts, domain)
+            return f"{practical} {pointer}".strip() if pointer else practical
+        return _visiting_fallback_sentence(domain)
     return section
