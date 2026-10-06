@@ -1,0 +1,50 @@
+{
+  "identifier" : "A0A0A0A0-0000-4000-8000-000000000598",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "10.00",
+      "familyShareable" : false,
+      "internalID" : "B1B1B1B1-0001-4000-8000-000000000598",
+      "localizations" : [
+        {
+          "description" : "5 fresh tours, up to 10 stops each, plus 5 stop-adding edits. One-time purchase; nothing renews automatically.",
+          "displayName" : "$10 pack",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "audioura.pack.l3",
+      "referenceName" : "L3 Pack ($10)",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "25.00",
+      "familyShareable" : false,
+      "internalID" : "B2B2B2B2-0002-4000-8000-000000000598",
+      "localizations" : [
+        {
+          "description" : "25 operations (new tours or edits, any mix), up to 25 stops each. One-time purchase; nothing renews automatically.",
+          "displayName" : "$25 round",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "audioura.round.l4",
+      "referenceName" : "L4 Round ($25)",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "000000000",
+    "_developerTeamID" : "0000000000",
+    "_lastSynchronizedDate" : 0
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
