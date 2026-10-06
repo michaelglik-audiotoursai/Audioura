@@ -1,0 +1,736 @@
+
+======================================================================
+CALL #001 | 04:01:47.094 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: walking tour of Beacon Hill, Boston, MA
+  tour_type: 
+  total_stops_parameter: 4
+  output_file: /app/tours/LOCAL591_B.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 04:01:47.106 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: walking tour of Beacon Hill, Boston, MA
+  total_stops_final: 4
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'walking tour of Beacon Hill, Boston, MA' → 'walking  of Beacon Hill, Boston, MA'
+  [LOCAL-46] Stripped transport words: 'walking  of Beacon Hill, Boston, MA' → 'of Beacon Hill, Boston, MA'
+  [Bug2Fix/D536] tour_type='' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "landmarks",
+    "location": "Beacon Hill, Boston, MA",
+    "theme_type": "STANDARD",
+    "theme_name": "",
+    "requirements": "",
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Beacon Hill, Boston, MA",
+    "named_places": [],
+    "scope_precision": "DISTRICT",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Beacon Hill, Boston, MA
+   Requirements: 
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+[TIMING] phase=intent elapsed=1.3s cumulative=1.3s
+[LOCAL-474] tour_type='' → category='walking' (source=inferred)
+
+Detected tour category: WALKING
+Using walking template for walking tour of Beacon Hill, Boston, MA - 
+
+======================================================================
+CALL #003 | 04:01:48.370 | GENERATING_PROMPT
+======================================================================
+  location: walking tour of Beacon Hill, Boston, MA
+  user_request: walking tour of Beacon Hill, Boston, MA
+  total_stops: 4
+
+
+PHASE 3A: Fetching 4 candidate POI(s) for walking tour of Beacon Hill, Boston, MA...
+  [S17] scope_constraint injected: precision=DISTRICT, scope='Beacon Hill, Boston, MA'
+  [LOCAL-290] Asking for 7 candidates (N=4 + margin for gate filtering)
+
+======================================================================
+CALL #004 | 04:01:48.370 | PHASE_3A_REQUEST
+======================================================================
+  location: walking tour of Beacon Hill, Boston, MA
+  total_stops: 4
+  poi_type_hint: landmarks
+
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:9097. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:9098. Caller should supply input_tokens and output_tokens separately.
+PHASE 3A API call cost: $0.0034 (704 tokens)
+
+======================================================================
+CALL #005 | 04:01:51.546 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 4
+  stop_count_in_prompt: False
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for walking tour of Beacon Hill, Boston, MA.
+List exactly 7 specific, real, well-known landmarks relevant to: walking tour of Beacon Hill, Boston, MA.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Beacon Hill, Boston, MA.
+- Do NO
+  prompt_last_300_chars: laces with a specific story (a date, a named architect, a historical event). Include a 'reason' for each.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+    {"name": "Massachusetts State House", "address": "24 Beacon St, Boston, MA 02133", "reason": "Completed in 1798, designed by Charles Bulfinch, and known for its iconic gold dome."},
+    {"name": "Boston African American National Historic Site", "address": "46 Joy St, Boston, MA 02114", "reason": "Includes the African Meeting House, built in 1806, the oldest surviving Black church building in the U.S."},
+    {"name": "Louisburg Square", "address": "Louisburg Sq, Boston, MA 02108", "reason":
+
+   ! [LOCAL-329] Hollow reason for 'Acorn Street': 'One of the most photographed streets in America, famous for its picturesque cobb'
+  [LOCAL-329] Substance filter: 1 candidate(s) rejected for ranking-only reasons
+  [LOCAL-329] Captured 6 substantive selection reason(s)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Massachusetts State House @ 24 Beacon St, Boston, MA 02133
+   - Boston African American National Historic Site @ 46 Joy St, Boston, MA 02114
+   - Louisburg Square @ Louisburg Sq, Boston, MA 02108
+   - Nichols House Museum @ 55 Mt Vernon St, Boston, MA 02108
+   - Beacon Hill Monument @ Beacon St & Park St, Boston, MA 02108
+   - Otis House Museum @ 141 Cambridge St, Boston, MA 02114
+  [area_resolver] Parsed: city='Boston, MA', neighborhood='Beacon Hill'
+  [area_resolver] City resolved: Boston, MA → Q100 (42.3603, -71.0578)
+  [area_resolver] Neighborhood resolved: Beacon Hill → Q812889 (42.3583, -71.0661)
+  [area_resolver] Resolved: center=(42.3583, -71.0661), radius=1.5km, lang=en
+  [area_cache] HIT for Q812889: 46 landmarks (tier=rich)
+  [verify_landmarks] 6/6 stops verified against 46 discovered landmarks (tier: rich)
+  [WALK-D1] Verified 6 stops, tier=rich
+
+PHASE 4.5: Validating AI knowledge for walking tour of Beacon Hill, Boston, MA...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='walking', no type-verification required)
+   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 4×VENUE_ONLY (not enough covered candidates to fill 4 stops)
+  [LOCAL-212] Selected: ['Massachusetts State House=VENUE_ONLY', 'Nichols House Museum=VENUE_ONLY', 'Louisburg Square=VENUE_ONLY', 'Boston African American National Historic Site=VENUE_ONLY']
+  [LOCAL-212] Dropped:  ['Beacon Hill Monument=VENUE_ONLY', 'Otis House Museum=VENUE_ONLY']
+  [LOCAL-349] Yield scores (selected): ['Massachusetts State House=14.0', 'Nichols House Museum=13.0', 'Louisburg Square=5.0', 'Boston African American National Historic Site=0.0']
+  [LOCAL-349] Yield scores (dropped):  ['Beacon Hill Monument=0.0', 'Otis House Museum=0.0']
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Massachusetts State House' — venue_corpus canonical_title(geo): 'Massachusetts House of Representatives' at '
+    [VERIFIED] 'Nichols House Museum' — venue_corpus canonical_title(geo): 'Nichols House Museum' at 'Beacon Hill walkin
+    [VERIFIED] 'Louisburg Square' — venue_corpus canonical_title(geo): 'Louisburg Square' at 'Beacon Hill walking ar
+    [VERIFIED] 'Boston African American National Historic Site' — venue_corpus canonical_title(geo): 'Boston African American National Historic Si
+    [VERIFIED] 'Beacon Hill Monument' — venue_corpus canonical_title(geo): 'Beacon Hill Reservoir' at 'Beacon Hill walki
+    [VERIFIED] 'Otis House Museum' — wikipedia_en_search: 'First Harrison Gray Otis House' matches and snippet mentio
+    [HARVEST] 'Boston African American National Historic Site': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Beacon Hill Monument': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Otis House Museum': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 3 already had corpus, 3 verified_no_detail
+    [INTERPRETIVE] 'Massachusetts State House': +1 passages (2 queries)
+    [INTERPRETIVE] 'Nichols House Museum': +1 passages (2 queries)
+    [INTERPRETIVE] 'Boston African American National Historic Site': +1 passages (2 queries)
+    [INTERPRETIVE] 'Beacon Hill Monument': +5 passages (2 queries)
+    [INTERPRETIVE] 'Otis House Museum': +9 passages (2 queries)
+    [INTERPRETIVE] Summary: 5 stops enriched, +17 passages, 12 queries issued, 0 attributions dropped
+  [ROUTE-ORDER] Computed route for 4 stops with coords (0 without): 0.53km total
+
+PHASE 3B: Requesting structured details and walking directions for 4 stop(s)...
+
+======================================================================
+CALL #006 | 04:02:22.349 | PHASE_3B_REQUEST
+======================================================================
+  location: walking tour of Beacon Hill, Boston, MA
+  stop_count: 4
+
+PHASE 3B API call cost: $0.0048 (1001 tokens)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11040. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11041. Caller should supply input_tokens and output_tokens separately.
+OK PHASE 3B: ordered 4 stop(s) with structured details and directions
+  [LOCAL-355] Querying OSM for venue facts (city: Boston, hint: auto)
+[OSM-VENUE] Overpass HTTP 504 for 'Louisburg Square'
+  [LOCAL-355] Louisburg Square: no practical facts in OSM
+  [LOCAL-355] Nichols House Museum: no practical facts in OSM
+[OSM-VENUE] Overpass HTTP 504 for 'Nichols House Museum'
+[OSM-VENUE] Overpass ReadTimeout for 'Massachusetts State House' (attempt 1/2)
+  [LOCAL-355] Massachusetts State House: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Massachusetts State House' (attempt 2/2)
+[OSM-VENUE] Overpass ReadTimeout for 'Boston African American National Historic Site' (attempt 1/2)
+  [LOCAL-355] Boston African American National Historic Site: no practical facts in OSM
+[OSM-VENUE] Overpass ReadTimeout for 'Boston African American National Historic Site' (attempt 2/2)
+   GEO-CHECK: all 4 stops within walking distance (max leg 0.41 km, total 0.70 km, limit 12 km)
+Extracted first POI coordinates: (42.3587, -71.0681)
+
+=== Extracted POI Information ===
+1. Louisburg Square
+   Address: Louisburg Sq, Boston, MA 02108
+   Coordinates: 42.3587, -71.0681
+   Directions: From Charles/MGH T Station, head south on Charles St, turn right onto Mt Vernon ...
+2. Nichols House Museum
+   Address: 55 Mt Vernon St, Boston, MA 02108
+   Coordinates: 42.3581, -71.0686
+   Directions: Head southeast on Louisburg Sq toward Pinckney St, turn left onto Pinckney St, t...
+3. Massachusetts State House
+   Address: 24 Beacon St, Boston, MA 02133
+   Coordinates: 42.3586, -71.0637
+   Directions: Continue on Mt Vernon St, turn left onto Hancock St, then right onto Beacon St. ...
+4. Boston African American National Historic Site
+   Address: 46 Joy St, Boston, MA 02114
+   Coordinates: 42.3601, -71.0653
+   Directions: Head northwest on Beacon St toward Park St, turn right onto Joy St. As you walk,...
+================================
+
+  [D556] +4 story fact(s) for 'Louisburg Square' via openai+web(15) (3 high)
+  [D556] +3 story fact(s) for 'Nichols House Museum' via openai+web(13) (3 high)
+  [D556] +3 story fact(s) for 'Massachusetts State House' via openai+web(13) (3 high)
+  [D556] +3 story fact(s) for 'Boston African American National Histori' via openai+web(14) (3 high)
+[TIMING] phase=poi_selection elapsed=166.4s cumulative=167.6s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [LOCAL-186] Disambiguated fetch hit: 'Louisburg Square of Beacon Hill' → 2226 chars
+  [LOCAL-47] Louisburg Square: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Nichols House Museum of Beacon Hill' → 20237 chars
+  [LOCAL-47] Nichols House Museum: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Massachusetts State House of Beacon Hill' → 20237 chars
+  [LOCAL-47] Massachusetts State House: tier=rich, facts=8
+  [LOCAL-186] Disambiguated fetch hit: 'Boston African American National Historic Site of Beacon Hill' → 9002 chars
+  [LOCAL-47] Boston African American Nation: tier=rich, facts=8
+  [LOCAL-37] Three-class retrieval: 4 stops processed, 0 with category
+  [LOCAL-47] Outdoor retrieval tiers: {'rich': 4}
+  [SQ-S6b] Insufficient data for thread discovery (elements=0, stops=4)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=walking venue=walking tour of Beacon Hill, B model=gpt-4o tokens=1491 (in=865 out=626) cost=$0.0084 latency=6.0s
+[COST_METER] FRESH | spine_generate | $0.008423 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0084
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 4 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 4/4 stops have per-stop passages (126 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Louisburg Square' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Nichols House Museum' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Massachusetts State House' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Boston African American National Historic Site' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 4 SHORTENED
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 4/4 generated
+  [S25] Story types assigned: ['culture', 'history', 'architecture', 'culture']
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+  [LOCAL-576] Pre-writing scope check against 'Beacon Hill, Boston, MA' (4 stop(s), want 4)...
+   OK 'Nichols House Museum' — inside 'Beacon Hill, Boston, MA': check error: Expecting value: line 1 column 1 (char 0) (conf=low)
+   OK 'Massachusetts State House' — inside 'Beacon Hill, Boston, MA': check error: Expecting value: line 1 column 1 (char 0) (conf=low)
+   OK 'Boston African American National Historic Site' — inside 'Beacon Hill, Boston, MA': check error: Expecting value: line 1 column 1 (char 0) (conf=low)
+  [LOCAL-576] Pre-writing scope check: all 4 stop(s) within 'Beacon Hill, Boston, MA'.
+[TIMING] phase=fact_sheets elapsed=15.6s cumulative=183.2s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+[TIMING] phase=narration elapsed=0.0s cumulative=183.2s
+[TIMING] phase=external_lookups elapsed=0.0s cumulative=183.2s
+
+Generating description for Stop 1: Louisburg Square by , ...
+
+Generating description for Stop 2: Nichols House Museum by , ...
+Generating description for Stop 3: Massachusetts State House by , ...
+
+Generating description for Stop 4: Boston African American National Historic Site by , ...
+
+  [LOCAL-381] stop='Boston African American National Historic Site' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Massachusetts State House' matched_work=False medium='' work_identity_chars=0  [LOCAL-381] stop='Louisburg Square' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Nichols House Museum' matched_work=False medium='' work_identity_chars=0
+
+  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston African American National Historic Site', 8, ''), ('Boston African American National Historic Site', 8, ''), ('Boston African American National Historic Site', 8, '')]
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13389 after=22783 (+9394 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22783)
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nichols House Museum', 17, ''), ('Nichols House Museum', 9, ''), ('Nichols House Museum', 7, '')]
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12987 after=25933 (+12946 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25933)
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Louisburg Square', 8, ''), ('Louisburg Square', 6, ''), ('Louisburg Square', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12716 after=23606 (+10890 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23606)
+    Top scores: [('Massachusetts State House', 16, ''), ('Massachusetts State House', 10, ''), ('Massachusetts State House', 8, '')]
+  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12874 after=26510 (+13636 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26510)
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:15728. Caller should supply input_tokens and output_tokens separately.
+Stop 3 API call cost: $0.0312 (6557 tokens, model=gpt-4.1)
+Stop 3 description word count: 285 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0264 (5566 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 description word count: 276 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0311 (6549 tokens, model=gpt-4.1)
+Stop 2 description word count: 320 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0285 (5989 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 1 description word count: 344 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Louisburg Square': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✓ PASS stop='Nichols House Museum': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✗ FAIL stop='Massachusetts State House': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Boston African American National Historic Site': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=4, new_info=3, deduction=1, total=6
+  [LOCAL-439] Classification cost: $0.001871 (input=7797, output=1169)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17041. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 3 para 4: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 2: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 4 para 3: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Style retry summary: 6 paragraphs retried, 5 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0125 (2630 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] Stop 1 'Louisburg Square': 1 rewritten, 0 deleted
+  [LOCAL-255] R1 summary: 1 rewritten, 0 deleted, 1 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] Stop 1 'Louisburg Square': 1 sentence(s) deleted, 0 paragraph(s) emptied
+  [LOCAL-251] R7 summary: 1 sentences deleted, 0 paragraphs emptied, 1 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 4
+    Paragraphs checked: 15
+    Transferable (high, removed): 0
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 13
+    Stops affected: 0
+    [LOCAL-472] UNGROUNDED entity stop='Louisburg Square' entity='Beacon Hill' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Here, Boston’s Beacon Hill reveals a rhythm wholly its own—quiet, reserved, yet layered with the amb"
+    [LOCAL-472] UNGROUNDED entity stop='Louisburg Square' entity='William Pepperrell' reason='No concrete link to the stop is provided.' in: "The name “Louisburg Square” carries the echo of a colonial clash far from these calm streets. In 174"
+    [LOCAL-472] UNGROUNDED entity stop='Louisburg Square' entity='Nova Scotia' reason='No concrete link between Nova Scotia and Louisburg Square is provided.' in: "The name “Louisburg Square” carries the echo of a colonial clash far from these calm streets. In 174"
+    [LOCAL-472] UNGROUNDED entity stop='Louisburg Square' entity='French Fortress' reason='No concrete link between the French Fortress and Louisburg Square is provided.' in: "The name “Louisburg Square” carries the echo of a colonial clash far from these calm streets. In 174"
+    [LOCAL-472] UNGROUNDED entity stop='Louisburg Square' entity='Greek Revival' reason='It does not specify a direct link between Greek Revival and the stop.' in: "The name “Louisburg Square” carries the echo of a colonial clash far from these calm streets. In 174"
+    [LOCAL-472] UNGROUNDED entity stop='Nichols House Museum' entity='Beacon Hill' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Since 1961, the Nichols House Museum has opened these rooms to the public. Its purpose is not to fre"
+    [LOCAL-472] UNGROUNDED entity stop='Nichols House Museum' entity='Boston Brahmin' reason='It does not specify a direct link between the term "Boston Brahmin" and the Nichols House Museum.' in: "Since 1961, the Nichols House Museum has opened these rooms to the public. Its purpose is not to fre"
+    [LOCAL-472] UNGROUNDED entity stop='Massachusetts State House' entity='State Senate' reason='No specific person or work is mentioned with a concrete link to the State Senate.' in: "The State House is more than a landmark of brick and gold. It has housed the State Senate, House of "
+    [LOCAL-472] UNGROUNDED entity stop='Massachusetts State House' entity='Beacon Hill' reason='No specific person or work is mentioned with a concrete link to the State House.' in: "The State House is more than a landmark of brick and gold. It has housed the State Senate, House of "
+    [LOCAL-472] UNGROUNDED entity stop='Massachusetts State House' entity='Capitol Hill' reason='No specific person or work is linked to Capitol Hill in relation to the State House.' in: "The State House is more than a landmark of brick and gold. It has housed the State Senate, House of "
+    [LOCAL-472] UNGROUNDED entity stop='Boston African American National Historic Site' entity='Ellen Craft' reason='It does not specify that Ellen Craft lived or stayed at this stop.' in: "Ellen Craft was a fugitive slave who disguised herself as a white man to escape slavery, finding ref"
+    [LOCAL-472] UNGROUNDED entity stop='Boston African American National Historic Site' entity='Underground Railroad' reason='It does not specify where Ellen Craft stayed or acted in relation to this stop.' in: "Ellen Craft was a fugitive slave who disguised herself as a white man to escape slavery, finding ref"
+    [LOCAL-472] UNGROUNDED entity stop='Boston African American National Historic Site' entity='African Meeting House' reason='No specific person or work is mentioned with a concrete link to the stop.' in: "Among the preserved buildings, the 1806 African Meeting House stands as the oldest black church in t"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/47)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Louisburg Square' cut orphaned dependant of a removed introduction — subject 'itself/square': "The square itself is bisected by a meticulously kept private park, maintained no"
+  [LOCAL-479] stop='Louisburg Square' cut orphaned dependant of a removed introduction — subject 'victory': "The victory was so significant that he became the first American baronet—a title"
+  [LOCAL-479] stop='Massachusetts State House' cut orphaned dependant of a removed introduction — subject 'house/massachusetts/state': "The Massachusetts State House stands on ground that once belonged to John Hancoc"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 18
+    Glossed (composed): 6
+    Suppressed (already explained): 0
+    Degraded (name dropped): 5
+    Guard failures: 0
+    Known (skipped): 7
+    Triage: 2155 tokens, $0.0005, 6.1s
+    Gloss: 878 tokens, $0.0002, 2.7s
+    Compose: 2262 tokens, $0.0004, 2.6s
+    Total added cost: $0.0011
+    Stops affected: 4
+    Glosses applied:
+      • Beacon Hill → "a neighborhood with rich history" [source: corpus]
+      • French Fortress → "a significant military stronghold in North America" [source: model]
+      • Pepperrell → DEGRADED (name dropped)
+      • Greek Revival → DEGRADED (name dropped)
+      • Charles Bulfinch → "america’s first native-born architect" [source: corpus]
+      • When Charles Bulfinch → DEGRADED (name dropped)
+      • Old Money → DEGRADED (name dropped)
+      • Capitol Hill → "the seat of the U.S. Congress" [source: model]
+      • Civil War → DEGRADED (name dropped)
+      • President Jimmy Carter → "the 39th president of the united states" [source: model]
+      • Ellen Craft → "a fugitive slave who escaped in 1848" [source: model]
+
+  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] CONTRADICTED block summary: 0 group(s) blocked, 0 stop(s) affected
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.6: skipped — the pre-writing scope check already ran (LOCAL-576; a second pass after writing can only remove a stop too late to replace).
+OK PHASE 5.7: Dangling-reference scrub complete (4 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 0
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 0
+    Stops affected: 0
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 2 'Nichols House Museum' (index 67) — allowance 5 -> 7 sentences on regeneration, story currently 0 sentence(s) — no story pass result, cannot judge
+
+  [LOCAL-487] step 7a: 4 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Louisburg Square': the longest run (3 sentences, Louisa May Alcott) has agency=0 stakes=0 — someone is described, but nothing is 
+    stop 2 'Nichols House Museum': the longest run (5 sentences, Arthur Nichols) has agency=1 stakes=0 — someone is described, but nothing is ris
+    stop 3 'Massachusetts State House': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Boston African American National Histo': the longest run (3 sentences, Underground Railroad) has agency=0 stakes=0 — someone is described, but nothing 
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Louisburg Square' (index 39)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Louisburg Square' — 344w → 268w after gates, 5 sentence(s) removed
+    removed: "The bricks around Louisburg Square are smooth beneath your feet, worn by over a century of comings a"
+    removed: "Here, Boston’s Beacon Hill reveals a rhythm wholly its own—quiet, reserved, yet layered with the amb"
+    removed: "The square itself is bisected by a meticulously kept private park, maintained not by the city but by"
+    removed: "Pepperrell’s victory was so significant that he became the first American baronet—a title that marke"
+    removed: "The square’s name is a living reminder of that episode, linking the ambitions of Boston’s past with "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Nichols House Museum' — 320w → 296w after gates, 10 sentence(s) removed
+    removed: "In 1885, Dr."
+    removed: "Arthur Nichols and his wife Elizabeth purchased this house, a structure originally designed in the f"
+    removed: "Here, Rose Standish Nichols—a name known to those who trace the gardens and parks of early twentieth"
+    removed: "Rose was not merely a resident."
+    removed: "She was a landscape architect, an artist, and a writer, whose vision extended far beyond the parlor "
+    removed: "Rose’s advocacy for peace and her commitment to public spaces shaped the city’s green contours; her "
+    removed: "The rooms where she read and planned are preserved, the air still holding the faint scent of old pap"
+    removed: "You have already seen the dignified sweep of Louisburg Square, a place shaped by the same generation"
+    removed: "Now the Nichols House Museum stands as their lived reality—a threshold between the ideals of a class"
+    removed: "Just ahead, the golden dome of the State House beckons with stories of power and decision."
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Massachusetts State House' — 285w → 265w after gates, 5 sentence(s) removed
+    removed: "The Massachusetts State House stands on ground that once belonged to John Hancock, the first elected"
+    removed: "When Charles Bulfinch began his design in 1795, he chose this highest point of Beacon Hill for a bui"
+    removed: "Bulfinch’s State House opened in 1798: a red brick structure in the Federal style, its symmetry and "
+    removed: "It has housed the State Senate, House of Representatives, and the Governor’s Office since its comple"
+    removed: "Around the corner from the State House, the echoes of community struggles for freedom still linger, "
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-474] PHASE 5.17: retry 'Boston African American National Historic Si' — 276w → 256w after gates, 6 sentence(s) removed
+    removed: "The Boston African American National Historic Site surrounds you now—a patchwork of fifteen pre-Civi"
+    removed: "This area was designated in 1980, when President Jimmy Carter signed legislation to preserve and com"
+    removed: "One story that echoes through these streets is Ellen Craft’s."
+    removed: "She was a fugitive slave who disguised herself as a white man to escape slavery, and she found refug"
+    removed: "Her journey, from bondage to freedom, was made possible by the network of safe houses and allies her"
+    removed: "As you turn back toward the Common, the living traditions and stories of this neighborhood carry for"
+    [LOCAL-491] step 7b: no unused fact left on the matrix — retrying without a rotation
+
+  [LOCAL-526] PHASE 5.17: regenerating 4 eligible stop(s) concurrently (max_workers=4)
+
+Generating description for Stop 1: Louisburg Square by , ...
+  [LOCAL-381] stop='Louisburg Square' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-411] Stop 1 snippet ranking: input=4 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=4 usable=4 (t1t2=0, t3=0, market=0)
+    Top scores: [('Louisburg Square', 8, ''), ('Louisburg Square', 6, ''), ('Louisburg Square', 6, '')]
+  [LOCAL-402] Stop 1: injected 4 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 4 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 1 prompt size: before_snippets=12716 after=23606 (+10890 from snippets+instructions, facts_first=no)
+Generating description for Stop 2: Nichols House Museum by , ...
+
+Generating description for Stop 3: Massachusetts State House by , ...
+
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (23606)
+  [LOCAL-381] stop='Massachusetts State House' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-381] stop='Nichols House Museum' matched_work=False medium='' work_identity_chars=0
+
+Generating description for Stop 4: Boston African American National Historic Site by , ...
+  [LOCAL-411] Stop 3 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Massachusetts State House', 16, ''), ('Massachusetts State House', 10, ''), ('Massachusetts State House', 8, '')]
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt  [LOCAL-411] Stop 2 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Nichols House Museum', 17, ''), ('Nichols House Museum', 9, ''), ('Nichols House Museum', 7, '')]  [LOCAL-402] Stop 3: injected 3 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12874 after=26510 (+13636 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26510)
+  [LOCAL-381] stop='Boston African American National Historic Site' matched_work=False medium='' work_identity_chars=0
+
+
+  [LOCAL-402] Stop 2: injected 3 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 2 prompt size: before_snippets=12987 after=25933 (+12946 from snippets+instructions, facts_first=no)  [LOCAL-411] Stop 4 snippet ranking: input=3 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=3 usable=3 (t1t2=0, t3=0, market=0)
+    Top scores: [('Boston African American National Historic Site', 8, ''), ('Boston African American National Historic Site', 8, ''), ('Boston African American National Historic Site', 8, '')]
+  [LOCAL-402] Stop 4: injected 3 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 3 source item(s) arrived after the gate ran
+  [LOCAL-411] Stop 4 prompt size: before_snippets=13389 after=22783 (+9394 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (25933)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (22783)
+
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0284 (5975 tokens, model=gpt-4.1)
+Stop 4 description word count: 251 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0333 (7008 tokens, model=gpt-4.1)
+Stop 3 description word count: 313 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+Stop 2 API call cost: $0.0333 (7003 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 description word count: 300 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 1 API call cost: $0.0309 (6500 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 1 description word count: 298 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 5.5s for 4 stop(s) at max_workers=4
+    [LOCAL-487] retry judged on the story bar, not on length: cleared=False
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+    [LOCAL-474] regenerated and re-gated: 300w (was 296w)
+    [LOCAL-474] regenerated and re-gated: 313w (was 265w)
+    [LOCAL-474] retry not better after re-gating — keeping the original gated text
+      [PERSON-CAP] stop 3: 'hill' already carries two stops — cut: Beacon Hill today is more than a neighborhood; its name serves as a metonym for 
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 4 eligible, 4 retried, 2 improved, 2 kept original
+  [LOCAL-487] triggers: 0 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 0 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://joekinsella.me/2021/10/historic-boston-beacon-hill-podcast/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2212 chars from https://joekinsella.me/2021/10/historic-boston-bea
+  [LOCAL-427] HTTP 200 from https://bostonbyfoot.org/tours/beacon-hill/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://bostonbyfoot.org/tours/beacon-hill/
+  [LOCAL-427] HTTP 200 from https://www.facebook.com/groups/513744017561133/posts/606448904957310/ (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.boston.gov/news/pressing-play-beacon-hill-how-thoughtful-design-moves-historic-district-forward (attempt 1)
+  [LOCAL-459] R5: Fetched 2053 chars from https://www.boston.gov/news/pressing-play-beacon-h
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=IPIJzTrM_38&xstg=CAMSBhUDze3xHw%3D%3D (attempt 1)
+  [LOCAL-427] HTTP 200 from https://www.architecturalrecord.com/articles/6056-walking-tour-of-beacon-hill-and-downtown (attempt 1)
+  [LOCAL-459] R5: Fetched 1526 chars from https://www.architecturalrecord.com/articles/6056-
+  [LOCAL-427] HTTP 200 from https://udspace.udel.edu/items/b2c924fd-6813-423c-a925-cecfed10eac2 (attempt 1)
+  [LOCAL-459] R5: Fetched 1287 chars from https://udspace.udel.edu/items/b2c924fd-6813-423c-
+  [LOCAL-427] HTTP 200 from https://www.trolleytours.com/boston/beacon-hill (attempt 1)
+  [LOCAL-459] R5: Fetched 2232 chars from https://www.trolleytours.com/boston/beacon-hill
+  [D512] verb discovery: query='walking tour of Beacon Hill, Boston, MA construction process how' -> 10 new verb(s): covered, leaked, shaped, marked, dedicated, converted, attempted, perceived, worked, organized
+  [D512] _AGENCY_VERB widened by 10 discovered verb(s)
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Louisburg Square                           39    29     8    77
+     2  Nichols House Museum                       28    41     0    50
+     3  Massachusetts State House                  72    48    26    60
+     4  Boston African American National Histori   56    51    12    65
+    [LOCAL-485] index mean 48.8 over 4 stop(s), range 28-72
+    [LOCAL-485] weakest: 'Nichols House Museum' at 28
+[TIMING] phase=story_first elapsed=90.8s cumulative=273.9s
+
+PHASE 6: Assembling the complete tour...
+  [R2] Prolog saved for Stop 1 (121 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 121 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 121 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+    Stop 1 orientation R7: 1 sentence(s) deleted
+    Stop 4 orientation R7: 1 sentence(s) deleted
+  [LOCAL-246] Orientation gating summary:
+    Words before: 274
+    Words after:  222
+    Delta: -52
+    Stops affected: 2/4
+    Deletions (2):
+      [Stop 1][R7_HALLUCINATED_SENSORY] "The gentle clatter of a dog’s leash and the soft chatter of neighbors passing under leafy trees sign..."
+      [Stop 4][R7_HALLUCINATED_SENSORY] "Here, red-brick sidewalks rise and fall beneath your feet, and the iron railings and narrow alleys m..."
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 4/4
+    [LOCAL-276] Intrigue ranking completed: 2.3s, $0.0093, 1393 tokens
+    [LOCAL-276] Ranked 4 stops:
+      [Louisburg Square] (dated_event): In 1745, Massachusetts militiamen led by William Pepperrell sailed north to Nova...
+      [Nichols House Museum] (cause): She was recognized for her contributions to landscape design and for her advocac...
+      [Massachusetts State House] (dated_event): In 1802, just four years after the State House opened, Paul Revere and his sons ...
+      [Boston African American National Historic Site] (reversal): Ellen Craft, a fugitive slave who escaped in 1848, was a fugitive slave who disg...
+    [LOCAL-276] 4 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (4 stops)
+    Part 4 LLM cost: $0.0032 (543 tokens) [attempt 1]
+    ✗ Part 4 attempt 1 FAILED verification:
+      Candidate: "As you continue the tour, learn about Massachusetts militiamen storming the French Fortress of Louisbourg in 1745 at Louisburg Square and discover Ellen Craft's daring escape from slavery in 1848 at the Boston African American National Historic Site."
+      FAIL: date '1848' attributed to 'Louisburg Square' but belongs to a different stop
+    Part 4 LLM cost: $0.0032 (541 tokens) [attempt 2]
+    ✗ Part 4 attempt 2 FAILED verification:
+      Candidate: "On this tour, you'll learn about Massachusetts militiamen storming the French Fortress of Louisbourg in 1745 at Louisburg Square and Ellen Craft's daring escape from slavery in 1848 at the Boston African American National Historic Site."
+      FAIL: date '1848' attributed to 'Louisburg Square' but belongs to a different stop
+    ✗ Part 4 FAILED all 2 attempts — omitting
+      Last candidate: "On this tour, you'll learn about Massachusetts militiamen storming the French Fortress of Louisbourg in 1745 at Louisburg Square and Ellen Craft's daring escape from slavery in 1848 at the Boston African American National Historic Site."
+    Part 4 total cost: $0.0064
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 4 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)
+  [D536] Listener asked for 4 stop(s), delivering 4 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:20908. Caller should supply input_tokens and output_tokens separately.
+  [T4] Transition to Stop 2: As you leave the picturesque Louisburg Square, head southeas...
+  DEBUG - POI 2 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 3: As you leave Nichols House Museum, head east on Mount Vernon...
+  DEBUG - POI 3 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 4: As you leave the Massachusetts State House, head south on Pa...
+  DEBUG - POI 4 content includes:
+    Specific Examples: True
+    Operational Details: True
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.7s, $0.0024, 413 tokens
+  [LOCAL-280] Recap built: 31 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Boston African American National Historic Site] (reversal): "Ellen Craft, a fugitive slave who escaped in 1848, was a fugitive slave who disg..."
+      → composed: "Boston African American National Historic Site, where Ellen Craft found refuge after escaping slavery"
+    [Nichols House Museum] (cause): "She was recognized for her contributions to landscape design and for her advocac..."
+      → composed: "Nichols House Museum, known for contributions to landscape design and peace advocacy"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 4 stops — Boston African American National Historic Site, where Ellen Craft found refuge after escaping slavery and Nichols House Museum, known for contributions to landscape design and peace advocacy."
+  [LOCAL-273] Part 1: no verified nearby stop found — omitted
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=372 'chart house restaurant tour, Boston, MA -  Tour' (1.2 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 4 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (62442 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 6
+    Verified: 0
+    Dropped: 6
+    AUDIT: hours | Open Tuesday-Saturday, 11 AM - 4 PM | (no source) | DROPPED — no source content
+    AUDIT: admission | $10 admission | (no source) | DROPPED — no source content
+    AUDIT: hours | Open Monday-Friday, 8 AM - 6 PM | (no source) | DROPPED — no source content
+    AUDIT: admission | free admission | (no source) | DROPPED — no source content
+    AUDIT: hours | Open daily, 10 AM - 4 PM | (no source) | DROPPED — no source content
+    AUDIT: admission | free admission | (no source) | DROPPED — no source content
+  [LOCAL-36] PRACTICAL FACTS GATE: 6 claim(s) dropped
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 1 error(s), 0 warning(s)
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 3 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to embark on a walking journey through Beacon Hill, Boston, MA. This expedition will t..."
+  [2] "As you stand here at the crest of Beacon Hill, the Massachusetts State House commands the skyline — ..."
+  [3] "Step away from the bustle that spills out from the Massachusetts State House—the gold dome you stopp..."
+
+=== Word Count Statistics ===
+Stop 1: Louisburg Square - 344 words
+Stop 2: Nichols House Museum - 320 words
+Stop 3: Massachusetts State House - 285 words
+Stop 4: Boston African American National Historic Site - 276 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (11486 chars, 4/4 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Arthur Nichols" placed here in 1885 with no source: "Another moment stands out: In 1885, Dr. Arthur Nichols and his wife Elizabeth
+
+Total API cost: $0.2295 (36768 tokens)
+Grounding:      $0.1400 (4 requests)
+Tour total:     $0.3695
+Provenance:     3/38 factual sentences sourced, 35 unsourced (3 corpus, 0 grounded, 35 parametric)
+CACHE STORE: walking tour of Beacon Hill, Boston, MA /  / 4
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/LOCAL591_B.txt
+  [C5-5] Evidence persisted: /app/tours/LOCAL591_B_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: walking tour of Beacon Hill, Boston, MA
+Tour-Category: walking
+
+Stop 1: Louisburg Square
+
+Address: Louisburg Sq, Boston, MA 02108
+
+Coordinates: 42.3587, -71.0681
+
+Type/Specialty: Historic residential square
+
+Specific Examples: Elegant Federal-style townhouses, private park, home of notable residents.
+
+Orientation: You are about to embark on a walking journey through Beacon Hill, Boston, MA. This expedition will take you from the prestigious Louisburg Square to the...
+
+[TIMING] phase=packing elapsed=9.2s cumulative=283.1s
+[TIMING] phase=verification elapsed=0.0s cumulative=283.1s
+[TIMING] TOTAL wall=283.1s phases: poi_selection=166.4s, story_first=90.8s, fact_sheets=15.6s, packing=9.2s, intent=1.3s, external_lookups=0.0s, narration=0.0s, verification=0.0s
+CATEGORY full
+STOPS 4
+   Louisburg Square | 42.3587, -71.0681
+   Nichols House Museum | 42.3581, -71.0686
+   Massachusetts State House | 42.3586, -71.0637
+   Boston African American National Histori | 42.3601, -71.0653

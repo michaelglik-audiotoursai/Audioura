@@ -407,6 +407,44 @@ _NEIGHBORHOOD_TO_CITY = {
 # Prevents GPT-hallucinated venue_names on walking/restaurant requests from
 # silently flipping the category and injecting a single-venue museum constraint.
 # Word-boundary anchored to avoid false positives ("touring" vs "tour").
+#
+# [LOCAL-591] The set is split into TWO classes, because they are not the same
+# kind of signal:
+#
+#   ACTIVITY/mobility words (walking, restaurant, food, bike, …) name a DIFFERENT
+#   ACTIVITY — you walk a district, you eat your way down a street, you cycle a
+#   corridor. These are genuinely non-museum: they describe how the listener
+#   moves and what they do, not a theme applied to one building.
+#
+#   THEME words (architecture, architectural, art, history, historical, literary,
+#   book, novel, film, movie) name a SUBJECT, not a place or an activity. "An
+#   architecture tour IN the Boston Athenaeum" is still a tour OF the Athenaeum —
+#   the Athenaeum is a museum-library with notable architecture AND collections.
+#   A theme word is not a different place (Michael, 2026-10-06, tours 395/396:
+#   "architectural" flipped the Athenaeum to a city walking tour, then the
+#   building's own walls cut it to 3 stops).
+#
+# So a theme word must NOT block the museum flip when the request names a tour
+# INSIDE one named building; an activity word still may. _should_force_museum
+# below encodes exactly that.
+_ACTIVITY_NON_MUSEUM_TOUR_RE = re.compile(
+    r'\b(walking|restaurant|food|dining|culinary|self[- ]guided'
+    r'|pub\s+crawl|bike|cycling|biking|shopping)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
+# THEME words that READ like a tour genre but name a subject, not a place/activity.
+_THEME_TOUR_RE = re.compile(
+    r'\b(architecture|architectural|art|arts|history|historical|heritage'
+    r'|movie|film|book|literary|novel)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
+# Backward-compatible union: the full "explicit non-museum phrase" set. Kept so
+# existing call sites and tests that reference it by name keep working; the S15
+# decision itself now goes through _should_force_museum (LOCAL-591).
 _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural'
     r'|pub\s+crawl|bike|cycling|biking|shopping'
@@ -414,6 +452,148 @@ _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\s+tour\b',
     re.IGNORECASE,
 )
+
+# [LOCAL-591] Interior prepositions: "...tour IN/INSIDE/WITHIN/AT/OF <building>"
+# means a tour OF that building. "around/near/by/outside <X>" is the perimeter
+# case (D536's Hippodrome, the approved Cimiez walking tour) and is NOT interior.
+# Anchored on "tour <prep>" so a bare "at"/"in" elsewhere in the string does not
+# trigger it.
+_INTERIOR_PREP_RE = re.compile(
+    r'\btours?\s+(?:in|inside|within|at|of|through(?:out)?)\b',
+    re.IGNORECASE,
+)
+
+# Institutional tail nouns — a BUILDING-scope place whose name ends in one of
+# these is a contained venue a tour can be held INSIDE.
+_CONTAINED_VENUE_TAIL = (
+    'museum', 'museums', 'gallery', 'galleries', 'library', 'athenaeum',
+    'athenæum', 'house', 'mansion', 'estate', 'homestead', 'manse', 'villa',
+    'palace', 'palais', 'palazzo', 'castle', 'château', 'chateau', 'institute',
+    'institution', 'collection', 'archive', 'archives', 'hall', 'center',
+    'centre', 'conservatory', 'observatory',
+)
+
+
+def _is_contained_venue_request(location, intent):
+    """[LOCAL-591] True when the request names a tour held INSIDE one building.
+
+    The listener wrote "<theme> tour in/inside/at <named building>" and PHASE 1
+    resolved that building (a BUILDING-scope venue). The tour is OF that building
+    whatever the theme word — "art", "architecture", "history". This is the exact
+    shape that turned "Art and Architectual tour in Boston Athenaeum" into a city
+    walking tour and then cut it to 3 stops by the building's walls (tours
+    395/396).
+
+    It is deterministic — a fact about the phrasing and the resolved scope, not an
+    opinion. Two signals must both hold, so it never fires on a city tour:
+
+      1. An INTERIOR preposition binds the tour to the place: "tour in/inside/
+         within/at/of <X>". "around/near/by" (perimeter) does NOT count — that is
+         D536's Hippodrome and the approved Cimiez walking tour, both of which
+         stay non-museum.
+
+      2. The resolved scope is a single building: scope_precision == BUILDING with
+         a venue_name or a geographic_scope whose leading noun is an institution
+         (museum, library, athenaeum, house, gallery, …).
+    """
+    if not intent:
+        return False
+    loc = location or ''
+    if not _INTERIOR_PREP_RE.search(loc):
+        return False
+    if (intent.get('scope_precision') or '').upper() != 'BUILDING':
+        return False
+    # A single building: either PHASE 1 gave a venue_name, or the geographic_scope
+    # is itself an institution by its leading noun.
+    if intent.get('venue_name'):
+        return True
+    scope = (intent.get('geographic_scope') or '').split(',')[0].strip().lower().rstrip('.')
+    if not scope:
+        return False
+    # Guard against a city-sized scope mislabelled BUILDING.
+    city = (intent.get('location') or '').split(',')[0].strip().lower()
+    if scope and city and scope == city:
+        return False
+    scope_words = scope.split()
+    tail = scope_words[-3:] if len(scope_words) >= 3 else scope_words
+    return any(w in _CONTAINED_VENUE_TAIL for w in tail)
+
+
+def _should_force_museum(location, tour_type, intent, transport_mode='on_foot'):
+    """[LOCAL-591] The S15 decision: should a resolved venue_name force the
+    museum (contained-venue) category?
+
+    Rules, in order:
+      - No venue_name, or not on foot → no (S15 was never about those).
+      - A worship/civic place class (church, courthouse, …) is never a museum
+        (LOCAL-485) — its stops are places, not catalogued works.
+      - A multi-building institution keyword (libraries, churches, …) blocks the
+        single-venue flip (it implies several locations).
+      - A contained-venue request ("tour in/inside/at <named building>") FORCES
+        museum even if a THEME word (architecture/art/history) is present — a
+        theme word is not a different place (LOCAL-591).
+      - Otherwise, an explicit ACTIVITY/mobility phrase ("walking tour", "food
+        tour", "bike tour") blocks the flip; a bare theme word no longer does.
+    """
+    if not intent or not intent.get('venue_name') or transport_mode != 'on_foot':
+        return False
+    if _detect_worship_civic_class(location, tour_type):
+        return False
+    if _MULTI_BUILDING_INSTITUTION_RE.search(location or ''):
+        return False
+    if _is_contained_venue_request(location, intent):
+        # Interior-to-a-building: a theme word does not demote it. Only reject if
+        # the listener ALSO named a different activity (e.g. "walking tour inside
+        # X" — rare, but respect it: it is literally a walking tour).
+        return not _ACTIVITY_NON_MUSEUM_TOUR_RE.search(location or '')
+    # Not a contained-venue request: the full non-museum set (activity + theme)
+    # still blocks a venue_name-only flip, exactly as before LOCAL-591.
+    return not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location or '')
+
+
+# [LOCAL-591] A generic THEME phrase that PHASE 1 drops into `requirements`
+# ("Art and Architectural tour", "history", "art") is NOT a named exhibition or a
+# specific artist scope. Tours 395/396: the Athenaeum request produced
+# requirements="Art and Architectural tour"; LOCAL-362 read that as a scoped
+# exhibition, searched the venue for an exhibition called "Art and Architectual
+# tour in", found none, asked GPT for its works, got [] — and the whole
+# contained-venue tour clean-failed, even though SPARQL had already returned six
+# documented works for the building. A theme word is not a different place and
+# not a specific exhibition: a generic-theme requirement must NOT trigger the
+# exhibition-scope path, so the tour falls back to the venue's documented works.
+_GENERIC_THEME_WORDS = {
+    'art', 'arts', 'artistic', 'architecture', 'architectural', 'architectual',
+    'history', 'historic', 'historical', 'heritage', 'culture', 'cultural',
+    'general', 'overview', 'highlights', 'collection', 'collections',
+    'permanent', 'masterpiece', 'masterpieces', 'tour', 'tours', 'walking',
+    'self', 'guided', 'self-guided', 'and', 'or', 'the', 'of', 'in', 'a', 'an',
+}
+
+
+def _is_generic_theme_requirement(requirements):
+    """[LOCAL-591] True when a `requirements` string is only generic theme/genre
+    words — i.e. a THEME, not a named exhibition or a specific artist.
+
+    "Art and Architectural tour" → True (generic theme).
+    "Picasso, Miró, Dalí: Unbound" → False (named artists / exhibition).
+    "works by Chagall" → False (specific artist).
+    "" → False (nothing to scope on — the caller treats empty separately).
+
+    Deterministic: it is a fact about the words, not an opinion. If EVERY content
+    word is a generic theme/genre word, there is no specific exhibition to scope
+    to, so the venue's documented works should be used instead.
+    """
+    r = (requirements or '').strip().lower()
+    if not r:
+        return False
+    # A colon usually introduces a named exhibition title ("Artists: Title").
+    if ':' in r:
+        return False
+    words = re.findall(r"[a-zà-ÿ'\-]+", r)
+    if not words:
+        return False
+    return all(w in _GENERIC_THEME_WORDS for w in words)
+
 
 # Multi-building institution keywords — these should NOT be classified as single-venue museum
 # even if GPT returns a venue_name. They imply multiple distinct locations.
@@ -1832,6 +2012,78 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
                 print(f"  [D536] Falling back to the tour's stated area: '{_wider}' "
                       f"(too wide for a stop-by-stop containment check — skipping PHASE 5.6)")
         scope = ''
+    # [LOCAL-591] ONE SCOPE PER TOUR. Whatever scope we are about to hand the
+    # containment check MUST be the tour's own extent. This is the invariant the
+    # 395/396 defect broke: a city walking tour's stops were checked against one
+    # building. Assert it here, in the single place that decides the scope, so a
+    # mismatch can never reach _validate_stops_within_scope again.
+    scope = _assert_one_scope_per_tour(tour_category, scope, intent, quiet=quiet)
+    return scope
+
+
+def _assert_one_scope_per_tour(tour_category, scope, intent, quiet=False):
+    """[LOCAL-591] Invariant: a tour is only ever checked against ITS OWN extent.
+
+    Tours 395/396: because the Boston Athenaeum request was mis-classified as a
+    WALKING tour, the generator chose city-wide stops (MFA, Trinity, BPL,
+    Gardner, State House, Granary) and then PHASE 5.6 judged each of them against
+    the BUILDING scope 'Boston Athenaeum, Boston, Massachusetts'. Six were removed
+    for being "outside" a building that was never the tour's extent. The scope
+    checked did not belong to the tour.
+
+    The rule, by category:
+
+      museum / facility (contained-venue):
+        containment is the venue guard (PHASE 5.5b) — there is NO second,
+        stop-by-stop scope. Any non-empty `scope` for these categories is a
+        drift and is cleared to ''.
+
+      walking / biking / restaurant / book (area tours):
+        the scope MUST be the tour's own declared extent (its geographic_scope).
+        A scope tighter than — and different from — the tour's declared area
+        (e.g. a single building for a city/district tour) is the 395/396 mismatch
+        and is cleared to ''. A scope that IS the tour's declared area passes
+        through unchanged.
+
+    Returns the validated scope ('' means "no stop-by-stop check applies").
+    """
+    if not scope:
+        return ''
+
+    # A contained-venue tour has no stop-by-stop scope of its own: it is guarded
+    # by PHASE 5.5b against its venue. Anything else here is a cross-scope leak.
+    if tour_category in ('museum', 'facility'):
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant: a {tour_category} tour is "
+                  f"guarded by its venue (PHASE 5.5b); dropping stop-by-stop scope "
+                  f"'{scope}'.")
+        return ''
+
+    # An area tour must be checked against ITS OWN declared extent. The scope the
+    # resolver chose is the intent's geographic_scope, so for a well-formed intent
+    # they already match; this makes the match explicit and catches the case where
+    # the chosen scope is tighter than the tour's actual extent.
+    declared = (intent.get('geographic_scope') or '').strip() if intent else ''
+    if declared and _norm_place(scope) != _norm_place(declared):
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant VIOLATION: tour extent is "
+                  f"'{declared}' but the containment scope is '{scope}' — these are "
+                  f"different places. A tour is never checked against a scope that is "
+                  f"not its own extent; dropping it.")
+        return ''
+
+    # The tour's declared extent is a whole CITY: there is no tight boundary to
+    # check stops against, and judging city-wide stops against a single building
+    # is precisely the 395/396 bug. The resolver already restricts `scope` to
+    # BUILDING/DISTRICT/CORRIDOR precision, so a CITY-precision intent should not
+    # have produced a scope at all — belt-and-braces, clear it.
+    if intent and (intent.get('scope_precision') or '').upper() == 'CITY':
+        if not quiet:
+            print(f"  [LOCAL-591] ONE-SCOPE invariant: tour extent is a whole city "
+                  f"('{declared}') — too wide for a stop-by-stop containment check; "
+                  f"dropping scope '{scope}'.")
+        return ''
+
     return scope
 
 
@@ -1841,6 +2093,197 @@ def _resolve_scope_for_check(intent, location, tour_category, museum_venue_name,
 # how `_lore` was lost and then how `_venue_part` was lost after that. Same bug, same
 # fix: do not hang run-scoped truth on an object that gets replaced.
 _VENUE_PARTS_RUN = False
+
+
+# [LOCAL-591] The scope judge's own reasoning text that says a stop is OUTSIDE.
+# The judge is asked for {"inside_scope": bool, "confidence": ..., "reason": ...}.
+# On tours 395/396 it returned inside_scope=true with the reason "King's Chapel is
+# located outside the bounds of Boston Athenaeum, Boston, Massachusetts." — the
+# boolean and the reasoning contradicted each other, and the code trusted the
+# boolean, recording a stop as inside that its own reason said was outside.
+_VERDICT_OUTSIDE_RE = re.compile(
+    r'\b(?:located\s+)?outside\b'
+    r'|\bnot\s+(?:located\s+)?(?:inside|within|in)\b'
+    r'|\boutside\s+(?:the\s+)?bounds\b'
+    r'|\bis\s+not\s+(?:part|a\s+part)\s+of\b'
+    r'|\bdifferent\s+(?:building|venue|location)\b'
+    r'|\belsewhere\b',
+    re.IGNORECASE,
+)
+# A reason that says the stop IS inside — used only to detect the reverse
+# contradiction (boolean false, reason says inside). We do NOT flip a removal
+# verdict to "keep" on the strength of text alone (that would weaken the guard);
+# we only make a self-contradiction visible and resolve it toward NOT inside,
+# because the destructive action (removal) still requires high confidence anyway.
+_VERDICT_INSIDE_RE = re.compile(
+    r'\b(?:is\s+)?(?:located\s+)?(?:inside|within)\b'
+    r'|\bpart\s+of\b'
+    r'|\bhoused\s+(?:in|within)\b',
+    re.IGNORECASE,
+)
+
+
+def _reconcile_scope_verdict(inside, reason):
+    """[LOCAL-591] A verdict is its reasoning, not a boolean that can drift from it.
+
+    The containment judge returns a boolean (`inside_scope`) AND a free-text
+    reason. When they disagree, the reason is the ground truth about what the
+    model actually concluded — the boolean is a serialization the model
+    frequently gets backwards (tours 395/396: inside_scope=true alongside
+    "King's Chapel is located outside the bounds of Boston Athenaeum").
+
+    Rule: if the reason clearly says OUTSIDE, the verdict is NOT inside — a
+    reasoning text that says "outside" can never be recorded as inside. The
+    boolean is corrected to match the reason. (The destructive action, removal,
+    still requires high confidence downstream — this only stops a
+    self-contradicting verdict from being mis-recorded as inside.)
+
+    Returns the reconciled `inside` boolean. `reason` is inspected, never changed.
+    """
+    r = reason or ''
+    says_outside = bool(_VERDICT_OUTSIDE_RE.search(r))
+    if inside and says_outside:
+        # The boolean said inside; the model's own words say outside. Trust the words.
+        return False
+    return inside
+
+
+# [LOCAL-591] A parseable 'lat, lng' already present on a stop, in any of the
+# shapes the generator uses (the `coordinates` string, or numeric
+# latitude/longitude fields, or Wikidata lat/lng).
+_COORD_PAIR_RE = re.compile(r'-?\d+\.?\d*\s*,\s*-?\d+\.?\d*')
+
+
+def _poi_has_coordinates(poi):
+    """True when a stop already carries a usable coordinate.
+
+    Checks the `coordinates` string first, then the numeric latitude/longitude
+    (and wikidata_*) fields. A (0,0) pair or an empty string counts as missing.
+    """
+    cs = poi.get('coordinates', '') or ''
+    m = _COORD_PAIR_RE.search(cs)
+    if m:
+        try:
+            lat, lng = [float(x) for x in m.group(0).split(',')]
+            if not (lat == 0.0 and lng == 0.0):
+                return True
+        except ValueError:
+            pass
+    lat = poi.get('latitude') or poi.get('wikidata_lat')
+    lng = poi.get('longitude') or poi.get('wikidata_lng')
+    try:
+        if lat is not None and lng is not None and (float(lat) != 0.0 or float(lng) != 0.0):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def _geocode_missing_coordinates(poi_list, location, headers,
+                                 coord_fetch=None, resolve_poi_fn=None,
+                                 tour_anchor=None):
+    """[LOCAL-591] Every delivered stop must have coordinates — a final sweep.
+
+    Tours 395/396: King's Chapel was added by the LOCAL-576 replenishment loop,
+    which runs AFTER the D559 geocoding phase. Nothing geocoded it afterward, so
+    it shipped with no coordinates and had no map marker. The same gap exists for
+    any stop added late — D556 additions, LOCAL-577/589 refills — because they
+    all land after geocoding.
+
+    This runs just before packing (PHASE 6) and geocodes every stop that still
+    lacks a parseable coordinate, whatever path added it. A stop that cannot be
+    placed is LOGGED and kept (never DELETE a stop); its name is returned in
+    `still_missing` so the caller can announce the gap.
+
+    `coord_fetch(poi) -> (poi, "lat, lng", tokens)` is injected so the sweep is
+    testable offline; the default calls the same LLM coordinate endpoint the
+    PHASE-3B fallback uses. When `resolve_poi_fn` is given, a freshly fetched
+    coordinate is corroborated through it (the D559 independent geocoder), exactly
+    as the centroid-collapse refill does.
+
+    Returns (n_fixed, still_missing_names, tokens_used). Mutates poi dicts in place.
+    """
+    if not poi_list:
+        return 0, [], 0
+
+    missing = [p for p in poi_list if not _poi_has_coordinates(p)]
+    if not missing:
+        return 0, [], 0
+
+    print(f"\n  [LOCAL-591] COORDINATE SWEEP: {len(missing)} delivered stop(s) have no "
+          f"coordinates (added after the geocoding phase) — geocoding before packing: "
+          f"{[p.get('name', '') for p in missing]}")
+
+    if coord_fetch is None:
+        def coord_fetch(poi):
+            prompt = (
+                f"Provide GPS coordinates for '{poi.get('name', '')}'"
+                + (f" at {poi['address']}" if poi.get('address') else f" in {location}")
+                + ".\nFormat: Latitude: [number]\nLongitude: [number]\n"
+                  "Only coordinates, nothing else."
+            )
+            data = {
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "messages": [
+                    {"role": "system", "content": "You provide accurate GPS coordinates. "
+                     "Respond only with Latitude and Longitude lines."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 60,
+            }
+            try:
+                resp = requests.post("https://api.openai.com/v1/chat/completions",
+                                     headers=headers, data=json.dumps(data))
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"]
+                    lat_m = re.search(r'Latitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    lng_m = re.search(r'Longitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    _tok = resp.json().get("usage", {}).get("total_tokens", 0)
+                    if lat_m and lng_m:
+                        return poi, f"{lat_m.group(1)}, {lng_m.group(1)}", _tok
+            except Exception as _e:
+                print(f"   [LOCAL-591] coord fetch error for '{poi.get('name', '')}': {_e}")
+            return poi, "", 0
+
+    n_fixed = 0
+    tokens_used = 0
+    still_missing = []
+
+    # Fetch in parallel — same executor the rest of the tour path uses.
+    results = []
+    if len(missing) == 1:
+        results = [coord_fetch(missing[0])]
+    else:
+        from concurrent.futures import as_completed as _as_completed
+        with tour_executor(max_workers=min(len(missing), 5)) as _ex:
+            _futs = {_ex.submit(coord_fetch, p): p for p in missing}
+            for _f in _as_completed(_futs):
+                results.append(_f.result())
+
+    for poi, coords, tokens in results:
+        tokens_used += tokens or 0
+        if coords and _COORD_PAIR_RE.search(coords):
+            poi['coordinates'] = coords
+            # Corroborate through the independent geocoder when available, exactly
+            # as the D559 phase and the centroid-collapse refill do.
+            if resolve_poi_fn is not None:
+                try:
+                    resolve_poi_fn(poi, location, tour_anchor)
+                except Exception as _re:
+                    print(f"   [LOCAL-591] resolve_poi after sweep failed for "
+                          f"'{poi.get('name', '')}' (keeping fetched coord): {_re}")
+            n_fixed += 1
+            print(f"   [LOCAL-591] coord sweep OK '{poi.get('name', '')}': "
+                  f"{poi.get('coordinates', '')}")
+        else:
+            still_missing.append(poi.get('name', ''))
+            print(f"   [LOCAL-591] coord sweep COULD NOT place '{poi.get('name', '')}' "
+                  f"— stop is kept (never dropped) but has no map marker; announced.")
+
+    print(f"  [LOCAL-591] COORDINATE SWEEP complete: {n_fixed} geocoded, "
+          f"{len(still_missing)} still without a marker.")
+    return n_fixed, still_missing, tokens_used
 
 
 def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
@@ -1970,8 +2413,17 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
             if resp.status_code != 200:
                 return poi, True, "low", f"API error {resp.status_code} - keeping"
             parsed = json.loads(resp.json()["choices"][0]["message"]["content"])
-            return (poi, parsed.get("inside_scope", True),
-                    parsed.get("confidence", "low"), parsed.get("reason", ""))
+            _inside = parsed.get("inside_scope", True)
+            _conf = parsed.get("confidence", "low")
+            _reason = parsed.get("reason", "")
+            # [LOCAL-591] The verdict IS its reasoning. If the model's own words say
+            # the stop is outside, it is not inside — whatever the boolean claimed.
+            _reconciled = _reconcile_scope_verdict(_inside, _reason)
+            if _reconciled != _inside:
+                print(f"   [LOCAL-591] verdict/reason contradiction for '{name}': "
+                      f"inside_scope={_inside} but reason says outside — recording as "
+                      f"NOT inside. reason: {_reason}")
+            return (poi, _reconciled, _conf, _reason)
         except Exception as e:
             return poi, True, "low", f"check error: {e}"
 
@@ -6886,11 +7338,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # courthouse, town hall, …) is NOT a museum: its stops are places, not
         # catalogued works. Do not let S15 flip it to the artwork pipeline.
         if (intent.get('venue_name') and transport_mode == 'on_foot'
-                and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location)
-                and not _MULTI_BUILDING_INSTITUTION_RE.search(location)
-                and not _detect_worship_civic_class(location, tour_type)):
+                and _should_force_museum(location, tour_type, intent, transport_mode)):
             tour_category = 'museum'
-            print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
+            if _is_contained_venue_request(location, intent):
+                print(f"  [S15/LOCAL-591] Forced tour_category=museum from venue_name="
+                      f"'{intent['venue_name']}' — request is a tour INSIDE one building "
+                      f"(a theme word is not a different place)")
+            else:
+                print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
         else:
             if intent.get('venue_name') and _detect_worship_civic_class(location, tour_type):
                 print(f"  [S15/LOCAL-485] venue_name='{intent['venue_name']}' NOT forced to museum "
@@ -7356,6 +7811,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _early_poi = (intent.get('poi_type') or '').strip().lower()
         # LOCAL-362: Same logic as main scope detection — exact match for poi_type
         _early_poi_is_exhibition = _early_poi in ('exhibit', 'exhibition', 'exhibits')
+        # [LOCAL-591] A generic theme requirement is not a scoped exhibition — do
+        # not suppress the deterministic venue-works bypass for it.
+        if _early_req and _is_generic_theme_requirement(_early_req):
+            _early_req = ''
         if _early_req or _early_poi_is_exhibition:
             _early_scope_detected = True
             print(f"  [LOCAL-362] Scoped request detected (requirements='{_early_req}') — "
@@ -7753,6 +8212,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # 1. requirements is non-empty (primary signal — Phase 1 identified criteria), OR
         # 2. poi_type is exactly "exhibit" or "exhibition" (not "museum exhibits" which is generic)
         _poi_is_exhibition = _scope_poi_type in ('exhibit', 'exhibition', 'exhibits')
+        # [LOCAL-591] A generic THEME requirement ("Art and Architectural tour")
+        # is not a named exhibition — it must not trigger the exhibition-scope
+        # path, or a contained-venue tour clean-fails looking for an exhibition
+        # that does not exist (tours 395/396). Fall back to the venue's works.
+        if _scope_requirements and _is_generic_theme_requirement(_scope_requirements):
+            print(f"  [LOCAL-591] requirements='{_scope_requirements}' is a generic "
+                  f"theme, not a named exhibition — NOT treating this as a scoped "
+                  f"exhibition request; using the venue's documented works.")
+            _scope_requirements = ''
         _is_scoped = bool(_scope_requirements) or _poi_is_exhibition
 
         if _is_scoped:
@@ -8941,11 +9409,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _LAST_VERIFICATION_TIER = _verification_tier
             else:
                 # Try new story_miner-based verification (T0a/T1)
-                # Pass full location string so D1v2 can parse city for venue disambiguation
+                # Pass the clean venue name plus the city, so D1v2 can parse city
+                # for venue disambiguation.
                 _d1v2_venue_arg = _museum_venue_name
                 if ',' not in _d1v2_venue_arg and ',' in _location_normalized:
-                    # Append city/state from location if venue name alone lacks it
-                    _d1v2_venue_arg = _location_normalized
+                    # [LOCAL-591] Append ONLY the city/state tail from the location —
+                    # never the whole request string. Tours 395/396: _museum_venue_name
+                    # was the clean 'Boston Athenaeum' but this branch replaced it with
+                    # the full location 'Art and Architectual in Boston Athenaeum, boston,
+                    # ma', so D1v2 then resolved the theme-prefixed phrase
+                    # 'Art and Architectual in Boston Athenaeum', found no Wikidata
+                    # candidate, and clean-failed 'unresolvable' — even though the venue
+                    # had already resolved (Q478013) and SPARQL had returned 6 works.
+                    # The venue name is NOT in the request's leading words; the city is in
+                    # its trailing comma segments. Append those.
+                    _loc_segs = [s.strip() for s in _location_normalized.split(',') if s.strip()]
+                    _city_tail = ', '.join(_loc_segs[1:]) if len(_loc_segs) >= 2 else ''
+                    _d1v2_venue_arg = f"{_museum_venue_name}, {_city_tail}" if _city_tail else _museum_venue_name
                 _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg, exhibition_scope=_exhibition_scope)
                 if isinstance(_d1v2_result, VerificationResult):
                     _verification_tier = _d1v2_result.tier
@@ -18811,6 +19291,39 @@ REWRITE RULES (all mandatory):
 
     # [LOCAL-3498] Close the story_first sub-phase profile before the phase ends.
     _sfp.summary()
+
+    # [LOCAL-591] FINAL COORDINATE SWEEP — every delivered stop must have a map
+    # marker. Stops added AFTER the D559 geocoding phase (LOCAL-576 replenishment,
+    # D556 additions, LOCAL-577/589 refills) were never geocoded; King's Chapel
+    # shipped on tour 395 with no coordinates and no marker. Geocode any stop that
+    # still lacks a parseable coordinate, here, just before packing — the last
+    # point where the stop set is final. A stop that cannot be placed is announced
+    # (returned in still_missing) and KEPT, never dropped.
+    try:
+        _sweep_resolve = None
+        _sweep_anchor = None
+        try:
+            from geocode_stops import resolve_poi as _sweep_resolve, geocode as _sweep_geocode, \
+                location_hint as _sweep_hint
+            try:
+                _sweep_anchor = _sweep_geocode(_sweep_hint(location) or location)
+            except Exception:
+                _sweep_anchor = None
+        except ImportError as _sw_imp:
+            _import_logger.error(f"[LOCAL-591] geocode_stops unavailable for the "
+                                 f"coordinate sweep ({_sw_imp}); using the LLM fetch alone")
+            _sweep_resolve = None
+        _sweep_fixed, _sweep_missing, _sweep_tokens = _geocode_missing_coordinates(
+            poi_list, location, headers,
+            resolve_poi_fn=_sweep_resolve, tour_anchor=_sweep_anchor)
+        if _sweep_tokens:
+            total_tokens += _sweep_tokens
+            total_cost += _tour_llm_cost(_sweep_tokens)
+        if _sweep_missing:
+            print(f"  [LOCAL-591] {len(_sweep_missing)} stop(s) still without a map "
+                  f"marker after the sweep (kept, announced): {_sweep_missing}")
+    except Exception as _sweep_err:
+        print(f"  [LOCAL-591] coordinate sweep error (non-fatal): {_sweep_err}")
 
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')
