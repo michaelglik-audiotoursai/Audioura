@@ -60,12 +60,41 @@ _INTERIOR_TEMPLATES = (
 
 
 def _museum_transition(i: int, n_stops: int, next_name: str, venue: str) -> str:
-    """The museum/building transition line for position i → i+1 (0-based i)."""
+    """The museum/building transition line for position i → i+1 (0-based i).
+
+    [r2] ``venue`` is cleaned with ``_venue_name`` so a themed-in-building request
+    ("Art and Architectual tour in Boston Athenaeum") never leaks into the spoken
+    hand-off — the line names the BUILDING, not the raw request string.
+    """
+    venue = _venue_name(venue)
     if venue and i == 0:
         return f"Continue through {venue} — next is {next_name}."
     if venue and i == n_stops - 2:
         return f"Your final stop in {venue}: {next_name}."
     return _INTERIOR_TEMPLATES[(i - 1) % len(_INTERIOR_TEMPLATES)].format(name=next_name)
+
+
+def _venue_name(location: str) -> str:
+    """Resolve the BUILDING name from a venue/request string for spoken seams.
+
+    [LOCAL-585 r2] A themed-in-building request ("Art and Architectual tour in
+    Boston Athenaeum, boston, ma") must say "Continue through Boston Athenaeum",
+    not the whole request string. Delegates to about_museum_stop so the same rule
+    governs the About stop and the Directions. Plain venue strings are returned
+    unchanged apart from their trailing locality tail. Already-clean input (no
+    theme prefix, no comma tail) passes straight through.
+    """
+    loc = (location or "").strip()
+    if not loc:
+        return ""
+    try:
+        from about_museum_stop import clean_venue_request_name
+        cleaned = clean_venue_request_name(loc)
+        if cleaned:
+            return cleaned
+    except Exception:
+        pass
+    return loc.split(",")[0].strip()
 
 
 @dataclass

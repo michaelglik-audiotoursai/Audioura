@@ -80,6 +80,9 @@ __all__ = [
     "request_wants_architecture",
     "clean_venue_request_name",
     "default_wiki_provider",
+    "has_dangling_object_sentence",
+    "dedupe_sentences",
+    "normalise_locality",
 ]
 
 
@@ -169,6 +172,133 @@ _ARCH_SIGNAL_RE = re.compile(
     r"renaissance\s+revival|brick|granite|limestone|marble\s+hall|rotunda|"
     r"landmark|national\s+register|listed\s+building|style)\b"
 )
+
+# ── Sentence hygiene (LOCAL-585 r2) ───────────────────────────────────────────
+#
+# A sentence whose final content word still expects an object was truncated by
+# the extractor — the object lived in a clause the sentence splitter dropped. The
+# Athenaeum ship had "…a group of Bostonians who produced a magazine called." The
+# object ("The Monthly Anthology") was gone, so the sentence ended mid-thought.
+# These tokens, when they are the LAST word before the terminal period, mean the
+# object is missing: name/call/title it X, known/such/referred-to AS X, etc.
+_DANGLING_FINAL_RE = re.compile(
+    r"(?i)(?:^|\s)("
+    r"called|named|titled|entitled|dubbed|nicknamed|"       # "called X"
+    r"known\s+as|referred\s+to\s+as|such\s+as|"             # "known as X"
+    r"including|featuring|comprising|consisting\s+of|containing|"  # "including X"
+    r"designed\s+by|built\s+by|founded\s+by|created\s+by|"  # "designed by X"
+    r"and|or|but|with|the|an"                               # bare trailing connector/article
+    r")\s*[.!?]?\s*$"
+)
+
+# US state-abbreviation → full name, so a request tail like "boston, ma" is spoken
+# as "Boston, Massachusetts" (mirrors geocode_stops._STATE_ABBR, extended).
+_US_STATE_ABBR = {
+    "al": "Alabama", "ak": "Alaska", "az": "Arizona", "ar": "Arkansas",
+    "ca": "California", "co": "Colorado", "ct": "Connecticut", "de": "Delaware",
+    "fl": "Florida", "ga": "Georgia", "hi": "Hawaii", "id": "Idaho",
+    "il": "Illinois", "in": "Indiana", "ia": "Iowa", "ks": "Kansas",
+    "ky": "Kentucky", "la": "Louisiana", "me": "Maine", "md": "Maryland",
+    "ma": "Massachusetts", "mi": "Michigan", "mn": "Minnesota", "ms": "Mississippi",
+    "mo": "Missouri", "mt": "Montana", "ne": "Nebraska", "nv": "Nevada",
+    "nh": "New Hampshire", "nj": "New Jersey", "nm": "New Mexico", "ny": "New York",
+    "nc": "North Carolina", "nd": "North Dakota", "oh": "Ohio", "ok": "Oklahoma",
+    "or": "Oregon", "pa": "Pennsylvania", "ri": "Rhode Island",
+    "sc": "South Carolina", "sd": "South Dakota", "tn": "Tennessee", "tx": "Texas",
+    "ut": "Utah", "vt": "Vermont", "va": "Virginia", "wa": "Washington",
+    "wv": "West Virginia", "wi": "Wisconsin", "wy": "Wyoming", "dc": "D.C.",
+}
+
+
+def has_dangling_object_sentence(text: str) -> bool:
+    """True when ANY sentence in `text` ends mid-thought (object was cut).
+
+    The last content token of the sentence is a verb/preposition/determiner that
+    still expects an object (e.g. "…a magazine called."). Such a sentence was
+    truncated by extraction and must be completed from the source or dropped — it
+    is never shipped. Pure and side-effect free so tests and callers can assert it.
+    """
+    for sent in _hygiene_split(text):
+        if _DANGLING_FINAL_RE.search(sent):
+            return True
+    return False
+
+
+def _hygiene_split(text: str) -> List[str]:
+    """Abbreviation-safe sentence split, reusing the shared helper when available."""
+    try:
+        from sentence_split import split_sentences as _ss
+        return [s for s in _ss(text or "") if s.strip()]
+    except Exception:
+        return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text or "") if s.strip()]
+
+
+def _dedup_key(sentence: str) -> str:
+    """Normalised comparison key: lowercase, punctuation/whitespace-flattened."""
+    s = (sentence or "").lower()
+    s = re.sub(r"[^a-z0-9 ]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def dedupe_sentences(sentences: List[str]) -> List[str]:
+    """Drop near-identical (normalised) repeats, keeping first occurrence order.
+
+    Cross-section: the same architect sentence appearing once in the history and
+    again in the architecture block collapses to one. Also drops any sentence that
+    ends mid-thought (a truncated object) rather than shipping it.
+    """
+    out: List[str] = []
+    seen = set()
+    for sent in sentences:
+        s = (sent or "").strip()
+        if not s:
+            continue
+        if _DANGLING_FINAL_RE.search(s):
+            continue  # truncated object — never ship a half sentence
+        key = _dedup_key(s)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(s)
+    return out
+
+
+def normalise_locality(locality: str) -> str:
+    """Properly case a locality tail and expand a US state abbreviation.
+
+    "boston, ma" → "Boston, Massachusetts"; "nice, france" → "Nice, France".
+    An empty/blank input returns "". Non-US tails are title-cased but otherwise
+    left as the request gave them (we only expand recognised US state codes).
+    """
+    loc = (locality or "").strip()
+    if not loc:
+        return ""
+    parts = [p.strip() for p in loc.split(",") if p.strip()]
+    out: List[str] = []
+    for p in parts:
+        low = p.lower()
+        if low in _US_STATE_ABBR:
+            out.append(_US_STATE_ABBR[low])
+        elif re.fullmatch(r"[A-Za-z.]{2,4}", p) and "." in p:
+            out.append(p.upper())            # keep dotted acronyms like U.S.A.
+        else:
+            out.append(_titlecase_place(p))
+    return ", ".join(out)
+
+
+def _titlecase_place(word: str) -> str:
+    """Title-case a place word, keeping small connectors lower unless leading."""
+    small = {"of", "the", "and", "upon", "on", "de", "la", "le", "du", "des"}
+    toks = word.split()
+    cased = []
+    for i, t in enumerate(toks):
+        if i > 0 and t.lower() in small:
+            cased.append(t.lower())
+        elif t.isupper() and len(t) <= 3:
+            cased.append(t)                  # already an acronym (NY handled above)
+        else:
+            cased.append(t[:1].upper() + t[1:].lower() if t else t)
+    return " ".join(cased)
 
 
 @dataclass
@@ -296,6 +426,8 @@ def _is_story_sentence(sent: str, venue_core: str, venue_first: str) -> bool:
         return False
     if _CRUFT_RE.search(s):
         return False
+    if _DANGLING_FINAL_RE.search(s):
+        return False  # [r2] truncated object — never lift a half sentence
     if not _STORY_SIGNAL_RE.search(s):
         return False
     # Must be grammatically ABOUT the institution: either names the venue (or its
@@ -346,6 +478,8 @@ def _collect_architecture_sentences(corpus_text: str, limit: int = 2) -> List[st
             continue
         if _CRUFT_RE.search(s):
             continue
+        if _DANGLING_FINAL_RE.search(s):
+            continue  # [r2] truncated object — never lift a half sentence
         if not _ARCH_SIGNAL_RE.search(s):
             continue
         key = re.sub(r"\s+", " ", s.lower())
@@ -384,9 +518,14 @@ def _compose_about_narration(
     It is explicitly the MUSEUM'S OWN STORY — founder, why it exists, what it is
     known for — and, when present, the building. It never says "this work" or
     describes an object; it describes an institution.
+
+    [r2] Sentence hygiene: the locality is properly cased / state-expanded, the
+    story and architecture sentences are de-duplicated ACROSS sections (so the
+    architect sentence can never appear twice), and any sentence truncated to a
+    dangling object is dropped before it is spoken.
     """
     vn = _venue_core(museum_name) or museum_name
-    where = f" in {locality}" if locality else ""
+    where = f" in {normalise_locality(locality)}" if locality else ""
     parts: List[str] = []
 
     # Opening orientation: this is the museum's story, not an object label.
@@ -394,14 +533,19 @@ def _compose_about_narration(
         f"Before we look at anything on the walls, here is the story of {vn}{where} "
         f"itself — who created it, why it exists, and what it is known for.")
 
-    if wiki_summary:
-        parts.append(wiki_summary.strip())
+    # [r2] Build the body as ONE de-duplicated pool so a sentence shared between
+    # the history (story) and the building (architecture) section is spoken once.
+    wiki_sents = _hygiene_split(wiki_summary.strip()) if wiki_summary else []
+    body_story = dedupe_sentences(wiki_sents + list(story_sentences))
+    seen_body = {_dedup_key(s) for s in body_story}
+    body_arch = [s for s in dedupe_sentences(list(arch_sentences))
+                 if _dedup_key(s) not in seen_body]
 
-    parts.extend(story_sentences)
+    parts.extend(body_story)
 
-    if arch_sentences:
+    if body_arch:
         parts.append("A word about the building you are standing in.")
-        parts.extend(arch_sentences)
+        parts.extend(body_arch)
 
     # Honest sourcing close.
     if domain:

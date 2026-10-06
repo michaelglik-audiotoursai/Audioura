@@ -508,12 +508,18 @@ def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
         ent = resolve_venue(clean_name or location)
         if ent is not None:
             site_url = getattr(ent, "official_url", "") or ""
-            venue = getattr(ent, "venue_name", "") or venue
-            address = getattr(ent, "address", "") or ""
+            # [LOCAL-585 r2] VenueEntity exposes the resolved Wikidata display name
+            # as `.name` (properly cased). Prefer it so the narration says the
+            # venue's real name, not the request's casing. (`.venue_name`/`.address`
+            # do not exist on the entity — the old getattrs always fell through.)
+            venue = getattr(ent, "name", "") or getattr(ent, "venue_name", "") or venue
+            address = getattr(ent, "address", "") or address
     except Exception as e:
         logger.info(f"[LOCAL-585] venue resolve for About stop failed ({e}); "
                     f"continuing without a site URL")
-    # Derive a locality tail from the request ("..., City, ST").
+    # Derive a locality tail from the request ("..., City, ST"). The composer
+    # properly-cases and state-expands it (normalise_locality), so a raw
+    # "boston, ma" request tail is spoken as "Boston, Massachusetts".
     parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
     if parts:
         locality = ", ".join(parts[:2])
