@@ -712,3 +712,30 @@ def truncate_to_word_budget(text, word_budget):
     if cut > 0:
         clipped = clipped[:cut + 1]
     return clipped, True
+
+
+# ---------------------------------------------------------------------------
+# LOCAL-595 subscription levels (L1/L2/L3/L4/Tester).
+#
+# The levels model supersedes the wallet / PPU / Unlimited gating above. Its
+# single decision point lives in subscription_levels.py and is re-exported here
+# so the orchestrator and editing service import it from the same module they
+# already use: `from entitlements import check_operation`.
+#
+# The old check_tour_quota / check_news_quota paths are retained unchanged for
+# the free/ppu/unlimited plans; no new decision routes through the wallet.
+# ---------------------------------------------------------------------------
+try:
+    from subscription_levels import (
+        check_operation,
+        consume as consume_operation,
+        record_activity,
+        lapse_to_l1,
+        grant_pack,
+        ensure_device,
+        add_one_calendar_month,
+        is_renewal_due,
+        warn_renewal,
+    )
+except Exception as _levels_import_err:  # pragma: no cover - import-time safety
+    logger.error(f"[ENTITLEMENTS] Could not import subscription_levels: {_levels_import_err}")

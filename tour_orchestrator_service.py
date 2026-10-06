@@ -1845,22 +1845,27 @@ def generate_complete_tour():
             "message": "A valid user id is required to generate tours."
         }), 401
 
+    # [LOCAL-595] Subscription-levels enforcement is the authoritative gate.
+    # check_operation reads the device's level from device_entitlement (install
+    # default L1) and the per-level numbers from the plans table, and returns an
+    # allow (with clamped_stops) or a structured LOCAL-580 refusal.
     try:
-        from entitlements import check_tour_quota
-        quota = check_tour_quota(user_id, total_stops)
+        from entitlements import check_operation
+        quota = check_operation(user_id, 'generate', requested_stops=total_stops)
     except Exception as quota_err:
-        print(f"[QUOTA] Tour quota check failed — denying (fail-closed): {quota_err}")
+        print(f"[QUOTA] Operation check failed — denying (fail-closed): {quota_err}")
         return jsonify({
             "allowed": False, "error": "quota_check_failed",
+            "error_code": "generation_failed",
             "message": "Could not verify your tour quota. Please try again."
         }), 503
 
     if not quota['allowed']:
         print(f"[QUOTA] Denied tour for {user_id}: {quota}")
         return jsonify(quota), 429
-    # Clamp stops to plan maximum
+    # Clamp stops to the level maximum (max_stops column).
     total_stops = quota['clamped_stops']
-    print(f"[QUOTA] Allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}, stops_clamped={total_stops}")
+    print(f"[QUOTA] Allowed for {user_id}: level={quota.get('level')}, stops_clamped={total_stops}")
 
     # [LOCAL-525] A user-chosen stop list is a promise: "generate EXACTLY these
     # stops." If the plan would clamp the count below the list length, silently
@@ -1911,6 +1916,15 @@ def generate_complete_tour():
     except Exception as usage_err:
         # Non-fatal: usage recording failure shouldn't block generation
         print(f"[QUOTA] WARNING: Failed to record usage (non-fatal): {usage_err}")
+
+    # [LOCAL-595] Consume the device's pack allowance for L3/L4 (fresh_used /
+    # ops_used). Period levels (L2/Tester) count from the tour_requests row just
+    # written, so they need no counter bump. Best-effort; never blocks.
+    try:
+        from entitlements import consume_operation
+        consume_operation(user_id, 'generate')
+    except Exception as _consume_err:
+        print(f"[QUOTA] WARNING: Failed to consume pack allowance (non-fatal): {_consume_err}")
     
     # Initialize job tracking
     ACTIVE_JOBS[job_id] = {
