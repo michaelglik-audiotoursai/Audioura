@@ -43,10 +43,16 @@ os.environ['DISABLE_STOP_POOL'] = '1'
 os.environ.setdefault('STORY_LOOP_ENABLED', '1')
 
 LABEL = os.environ.get('LOCAL594_LABEL', 'AFTER')
-LOCATION = 'McMullen Museum of Art, Boston College, Boston, MA'
-TOUR_TYPE = 'museum'
-STOPS = 7
-OUT = os.path.join(HERE, f'LOCAL594_MCMULLEN_{LABEL}.txt')
+# [LOCAL-594 r2] Parameterized so the same driver runs McMullen AND the Freedom
+# Trail walking tour. Defaults preserve the original McMullen 7-stop behaviour.
+LOCATION = os.environ.get('LOCAL594_LOCATION', 'McMullen Museum of Art, Boston College, Boston, MA')
+TOUR_TYPE = os.environ.get('LOCAL594_TYPE', 'museum')
+STOPS = int(os.environ.get('LOCAL594_STOPS', '7'))
+_SLUG = os.environ.get('LOCAL594_SLUG', 'MCMULLEN')
+# [LOCAL-594 r2] Write outputs into the mounted tours/ dir when present so .txt
+# and .json survive a --rm container; fall back to HERE for a bare local run.
+_OUTDIR = os.path.join(HERE, 'tours') if os.path.isdir(os.path.join(HERE, 'tours')) else HERE
+OUT = os.path.join(_OUTDIR, f'LOCAL594_{_SLUG}_{LABEL}.txt')
 
 import story_leads  # noqa: E402
 import story_production_loop as _spl  # noqa: E402
@@ -124,7 +130,8 @@ print(f"  ---")
 print(f"  WHOLE-TOUR grounded requests (all call sites): {total_gr}")
 print(f"  WHOLE-TOUR grounded queries  (all call sites): {total_gq}")
 _stops_with_story = sum(1 for r in _PER_STOP if r['story_reached'])
-print(f"  Stops with a story (gate PASS): {_stops_with_story}/{len(_PER_STOP)}")
+print(f"  Stops with a story (gate PASS / cleared): {_stops_with_story}/{len(_PER_STOP)}")
+print(f"  Loop stories per stop: {[r['stories'] for r in _PER_STOP]}")
 print(f"  Per-stop grounded requests (D511 loop): "
       f"{[r['loop_grounded_requests'] for r in _PER_STOP]}")
 _max_per_stop = max([r['loop_grounded_requests'] or 0 for r in _PER_STOP] or [0])
@@ -140,7 +147,7 @@ summary = {
     'stops_with_story': _stops_with_story,
     'per_stop': _PER_STOP,
 }
-with open(os.path.join(HERE, f'LOCAL594_MCMULLEN_{LABEL}.json'), 'w') as fh:
+with open(os.path.join(_OUTDIR, f'LOCAL594_{_SLUG}_{LABEL}.json'), 'w') as fh:
     json.dump(summary, fh, indent=2)
-print(f"\n  wrote LOCAL594_MCMULLEN_{LABEL}.json")
+print(f"\n  wrote tours/LOCAL594_{_SLUG}_{LABEL}.json")
 print("=" * 74)
