@@ -3882,6 +3882,86 @@ def _site_fill_effective_cap(exhibition_stops_source, n_candidates, total_stops,
     return total_stops
 
 
+def _regroup_site_first_stops(poi_list):
+    """[LOCAL-600 / D616] Re-group site-first exhibition stops so each exhibition
+    stop comes FIRST, immediately followed by the stops for its own works.
+
+    The site-first candidate builder (exhibition_site_first.build_site_first_candidates)
+    already emits show-then-its-works per exhibition, but the downstream gate chain
+    can reorder the POIs by kind (the LOCAL-599 r3 live run delivered the two WORK
+    stops first and the three exhibition stops after, so Stop 1 was
+    "Robert Lazzarini: American flag" while its show "Robert Lazzarini" was Stop 3,
+    two stops later). This pure function restores the grouping the ruling requires:
+
+      * group by ``_sf_group_key`` (a show's detail_url ties its works to it);
+      * within a group the exhibition stop leads, then its works in their original
+        site-first order;
+      * groups are ordered by the earliest ``_sf_order`` seen in each group, so the
+        existing route/story order BETWEEN shows is preserved;
+      * any POI that is not a site-first stop (no ``_sf_group_key``), or a museum
+        space / standalone kind, keeps its relative position by ``_sf_order``.
+
+    Only applies when EVERY POI is a site-first stop (``source == 'site_exhibition'``);
+    otherwise the list is returned unchanged (never reorder a mixed/other tour).
+    Returns a NEW list; the input is not mutated.
+    """
+    if not poi_list:
+        return poi_list
+    # Guard: only the pure site-first path. A single non-site-first POI (an About
+    # stop, a fallthrough GPT stop) means we must not touch the order.
+    if not all((p.get('source') == 'site_exhibition') for p in poi_list):
+        return poi_list
+
+    # Stable original order fallback for any POI missing _sf_order.
+    for _i, _p in enumerate(poi_list):
+        if _p.get('_sf_order') is None:
+            _p['_sf_order'] = _i
+
+    # Partition into groups keyed by the show (detail_url / group key). A work and
+    # its exhibition share the key; a museum space keys on its own name so it never
+    # merges into a show.
+    groups = {}          # group_key -> {'order': int, 'exhibition': poi|None, 'works': [poi], 'other': [poi]}
+    group_order = []     # keys in first-seen order (by _sf_order)
+    for p in sorted(poi_list, key=lambda q: q.get('_sf_order', 0)):
+        kind = (p.get('_sf_kind') or 'exhibition')
+        key = (p.get('_sf_group_key') or '').strip()
+        if kind == 'work' and key:
+            gk = key
+        elif kind == 'exhibition' and key:
+            gk = key
+        else:
+            # museum_space or a keyless stop: its own singleton group.
+            gk = f"__single__:{p.get('name','')}:{p.get('_sf_order',0)}"
+        if gk not in groups:
+            groups[gk] = {'order': p.get('_sf_order', 0),
+                          'exhibition': None, 'works': [], 'other': []}
+            group_order.append(gk)
+        g = groups[gk]
+        g['order'] = min(g['order'], p.get('_sf_order', 0))
+        if kind == 'exhibition':
+            # First exhibition POI for the key leads; a second (rare) joins works.
+            if g['exhibition'] is None:
+                g['exhibition'] = p
+            else:
+                g['other'].append(p)
+        elif kind == 'work':
+            g['works'].append(p)
+        else:
+            g['other'].append(p)
+
+    out = []
+    for gk in sorted(group_order, key=lambda k: groups[k]['order']):
+        g = groups[gk]
+        if g['exhibition'] is not None:
+            out.append(g['exhibition'])
+        out.extend(sorted(g['works'], key=lambda q: q.get('_sf_order', 0)))
+        out.extend(sorted(g['other'], key=lambda q: q.get('_sf_order', 0)))
+    # Safety: never drop or duplicate a stop.
+    if len(out) != len(poi_list):
+        return poi_list
+    return out
+
+
 def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
@@ -4079,6 +4159,17 @@ _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": Fals
 # acceptance harness reads this to report "the 7 stop titles, each with its source
 # URL" (D611) without re-fetching. {} when the last run took no site-first path.
 _LAST_SITE_FIRST_SOURCES = []  # [{'name','source_url','status','kind'}, ...]
+
+# [LOCAL-600 / D616] Module-level: the real counts behind the LAST site-first
+# delivery, so the stop-pool orchestrator can build the honest shortfall sentence
+# ("<Venue> currently has N exhibitions on view, so this tour has M stops rather
+# than the R you asked for.") from measured facts, not a guess. Keys:
+#   exhibitions_on_view — distinct on-view SHOWS delivered (kind=='exhibition',
+#                         status=='on_view'); the listener-facing "exhibitions".
+#   delivered_stops     — total site-first stops delivered (shows + works + spaces).
+#   requested_stops     — what the listener asked for.
+# {} when the last run took no site-first path.
+_LAST_SITE_FIRST_COUNTS = {}
 
 # [LOCAL-540] Module-level: the before/after score record from the last generation
 # (see score_and_retry in scorer_retry.py). None on a cache hit or if scoring was
@@ -8782,9 +8873,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             )
             if _sf_candidates:
                 poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
-                for _poi, _c in zip(poi_list, _sf_candidates):
+                for _sf_i, (_poi, _c) in enumerate(zip(poi_list, _sf_candidates)):
                     _poi['detail_url'] = _c.get('detail_url', '')
                     _poi['source'] = 'site_exhibition'
+                    # [LOCAL-600] Carry the show grouping on each POI so the
+                    # delivered order can be re-grouped deterministically after the
+                    # gate chain (which may reorder by kind). ``_sf_kind`` is
+                    # 'exhibition' | 'work' | 'museum_space'; ``_sf_group_key`` ties
+                    # a work to its show (same detail_url). ``_sf_order`` is the
+                    # original site-first position, the stable inter-show key.
+                    _poi['_sf_kind'] = _c.get('kind', 'exhibition')
+                    _poi['_sf_status'] = _c.get('status', '')
+                    _poi['_sf_group_key'] = (_c.get('detail_url', '') or '').strip()
+                    _poi['_sf_order'] = _sf_i
                 _exhibition_stops_source = 'site_exhibition'
                 _deterministic_fill_used = True   # Phase 3A GPT is bypassed
                 # [LOCAL-599B] Record each site-first stop's source URL + status +
@@ -21418,6 +21519,19 @@ RULES:
     else:
         print(f"\n  [LOCAL-292] Empty stop removal gate: PASSED (all {_l292_requested_stops} stops have narration)")
 
+    # [LOCAL-600 / D616] Re-group the site-first stops so each exhibition leads its
+    # own works (the gate chain can reorder POIs by kind — the r3 run delivered the
+    # works first and their shows two stops later). Done BEFORE the headroom trim so
+    # the trim keeps whole, correctly-ordered show→works groups and Stop 1 is a show.
+    if _exhibition_stops_source == 'site_exhibition' and poi_list:
+        _sf_before_order = [p.get('name') for p in poi_list]
+        poi_list = _regroup_site_first_stops(poi_list)
+        for _sf_i, _sf_p in enumerate(poi_list):
+            _sf_p['stop_number'] = _sf_i + 1
+        if [p.get('name') for p in poi_list] != _sf_before_order:
+            print(f"  [LOCAL-600] site-first stops re-grouped (exhibition→works): "
+                  f"{[p.get('name') for p in poi_list]}")
+
     # [LOCAL-589 D4] Trim the site-first narration headroom back to the listener's
     # ask. We carried one or two spare REAL exhibitions through narration so a
     # single empty-narration removal (LOCAL-292) still leaves the requested count.
@@ -21441,6 +21555,25 @@ RULES:
         # needed (an empty-narration drop already consumed the spare).
         if _l292_requested_stops > _requested_stop_count_original:
             _l292_requested_stops = _requested_stop_count_original
+
+    # [LOCAL-600 / D616] Record the real counts behind this site-first delivery so
+    # the stop-pool orchestrator can build the honest shortfall sentence from
+    # measured facts. Computed from the FINAL (re-grouped, trimmed) poi_list.
+    if _exhibition_stops_source == 'site_exhibition':
+        global _LAST_SITE_FIRST_COUNTS
+        _sf_on_view_shows = sum(
+            1 for _p in poi_list
+            if (_p.get('_sf_kind') == 'exhibition'
+                and _p.get('_sf_status') == 'on_view'))
+        _LAST_SITE_FIRST_COUNTS = {
+            'exhibitions_on_view': _sf_on_view_shows,
+            'delivered_stops': len(poi_list),
+            'requested_stops': (_requested_stop_count_original or total_stops),
+        }
+        print(f"  [LOCAL-600] site-first counts: "
+              f"exhibitions_on_view={_sf_on_view_shows} "
+              f"delivered={len(poi_list)} "
+              f"requested={_LAST_SITE_FIRST_COUNTS['requested_stops']}")
 
     # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
     if _l292_failed_stops and poi_list:

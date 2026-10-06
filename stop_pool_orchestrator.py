@@ -242,6 +242,33 @@ def maybe_generate_with_pool(
             new_units = [_new_unit_from_parsed(s) for s in parsed]
             if not new_units:
                 return None
+            # [LOCAL-600 / D616] If the site-first exhibition path could not reach
+            # the requested N from verified on-view material, say so in Stop 1's
+            # opening section — one honest sentence from the real counts. Only the
+            # site-first (exhibition-museum) path sets these counts; a non-site-first
+            # delivery leaves them empty and no sentence is emitted. Rebuild the
+            # opening section WITH the sentence now that the delivered count is known.
+            _shortfall_sentence = ""
+            try:
+                from generate_tour_text import _LAST_SITE_FIRST_COUNTS as _sfc
+                if _sfc:
+                    from about_museum_stop import build_shortfall_sentence
+                    _shortfall_sentence = build_shortfall_sentence(
+                        venue_name=_venue_name(location),
+                        exhibitions_on_view=_sfc.get('exhibitions_on_view', 0),
+                        delivered_stops=_sfc.get('delivered_stops', len(new_units)),
+                        requested_stops=_sfc.get('requested_stops', N))
+            except Exception as _sf_e:
+                logger.info(f"[LOCAL-600] shortfall sentence skipped ({_sf_e})")
+            if _shortfall_sentence:
+                _opening_with_shortfall = _build_opening_section(
+                    location, tour_type, request_text=location,
+                    available_exhibition_stops=len(new_units), requested_stops=N,
+                    shortfall_sentence=_shortfall_sentence)
+                if _opening_with_shortfall:
+                    opening_section = _opening_with_shortfall
+                print(f"  [LOCAL-600] D616 shortfall sentence folded into Stop 1: "
+                      f"{_shortfall_sentence!r}")
             sources_block = _extract_sources_block(gen_text)
             result = asm.assemble_building_tour(
                 location, tour_type, tour_category, header_cat, display_cat,
@@ -555,7 +582,8 @@ def _resolve_venue_address(location: str) -> str:
 
 def _build_opening_section(location: str, tour_type: str, request_text: str,
                            available_exhibition_stops: int,
-                           requested_stops: Optional[int]) -> Optional[str]:
+                           requested_stops: Optional[int],
+                           shortfall_sentence: str = "") -> Optional[str]:
     """[LOCAL-592] Build the OPENING SECTION of Stop 1 for a contained venue: the
     museum's own story (founder/history/architecture) + the practical facts
     (opening hours, admission, closed days). Returns the section text, or None when
@@ -639,7 +667,7 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
         return None
     if about is None or about.is_empty():
         return None
-    section = build_opening_section(about)
+    section = build_opening_section(about, shortfall_sentence=shortfall_sentence)
     if not section or not section.strip():
         return None
     print(f"  [LOCAL-592] Opening section folded into Stop 1 for {venue!r}: "
