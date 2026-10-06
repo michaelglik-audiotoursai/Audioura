@@ -361,10 +361,17 @@ def discover_classified_exhibitions(
     max_listing_tries: int = 8,
     diagnostics: Optional[Dict] = None,
     today=None,
+    supplement_past: bool = False,
 ) -> Tuple[List[Dict], str]:
     """[LOCAL-599B] Like discover_site_exhibitions, but returns exhibitions WITH a
     deterministic status, ordered on_view → upcoming → past, with programs/events
     EXCLUDED (exhibition-museum policy).
+
+    [LOCAL-599C] ``supplement_past`` defaults to False: r3 never ships a past show
+    as a stop, so the dedicated past-archive page is NOT fetched by default (it was
+    only ever used to pad to N with past shows, which is withdrawn). It is kept as
+    an opt-in for any caller that still wants the full archive (e.g. an archive
+    view), but the site-first stop builder leaves it off.
 
     Returns (exhibitions, listing_url). Each exhibition carries
     {'title', 'detail_url', 'status', 'dates'}. On-view shows come first (the tour
@@ -416,13 +423,12 @@ def discover_classified_exhibitions(
         if len(shows) >= 2:
             break
     if _best:
-        # [LOCAL-599B] If the chosen listing is short on PAST shows, supplement from
-        # a dedicated past-exhibitions page (many venues keep only the few most
-        # recent past shows on the main index but a full archive at /exhibitions/past).
-        # This is only reached when more material is genuinely needed to fill N;
-        # every added show is a real, detail-linked past exhibition (never invented).
-        _best = _supplement_past_exhibitions(
-            base_site_url, _best, fetch, diagnostics, today=today)
+        # [LOCAL-599B/599C] Supplement PAST shows from a dedicated archive page
+        # ONLY when the caller opts in (``supplement_past``). r3 never ships a past
+        # show, so the stop builder leaves this off and the archive is not fetched.
+        if supplement_past:
+            _best = _supplement_past_exhibitions(
+                base_site_url, _best, fetch, diagnostics, today=today)
         # Order on_view → upcoming → past, preserving document order within a group.
         _best_sorted = sorted(
             _best, key=lambda e: _STATUS_ORDER.get(e.get('status', 'on_view'), 0))
@@ -507,23 +513,28 @@ def build_site_first_candidates(
     diagnostics: Optional[Dict] = None,
     today=None,
 ) -> List[Dict]:
-    """Build site-first candidate stops for an exhibition museum, filled to N.
+    """Build site-first candidate stops for an exhibition museum, filled toward N.
 
-    [LOCAL-599B] The candidate list is assembled in the honest fill order of D611:
-      (a) CURRENT (on-view) exhibitions — one stop per show, sourced from its own
-          detail page;
+    [LOCAL-599C] The candidate list is assembled from WHAT IS ON VIEW, in the
+    honest fill order (r3, LEAD 2026-10-06 — the r2 "past shows pad to N" order
+    is WITHDRAWN):
+      (a) each CURRENT (on-view) exhibition is SPLIT into the works/rooms its own
+          detail page names — the show itself (artist + named title) as the
+          primary stop, then the specific NAMED WORKS the page credits — so three
+          current shows yield 2–3 stops each (``extract_exhibition_works``);
       (b) the museum's own NAMED SPACES / building features from /visit and /about
           (lobby, galleries by floor, the building) — each with a source URL;
-      (c) UPCOMING exhibitions, labelled upcoming;
-      (d) notable PAST exhibitions, labelled past.
-    Programs/events/studios/shop/membership are never exhibitions and are dropped
-    (see _is_exhibition_detail). Every candidate carries a ``source_url`` (its own
-    detail page or the /visit|/about page it was read from) and a ``status`` and
-    ``kind`` so the caller can label it. Nothing is invented: a museum space is
-    only emitted when the venue's own page names it; if (a)-(d) cannot reach N the
-    list is simply shorter and the caller logs the honest shortfall.
+      (c) at most ONE UPCOMING exhibition, labelled "opening <date>".
+    PAST exhibitions are NEVER emitted: a listener standing in the museum must not
+    be sent to a show that is off the walls. Programs/events/studios/shop are never
+    exhibitions and are dropped (``_is_exhibition_detail``). Every candidate carries
+    a ``source_url`` (its own detail page or the /visit|/about page it was read
+    from), a ``status`` and a ``kind``. Nothing is invented: a work is only emitted
+    when the show's own page names it, a space only when the venue's own page names
+    it; if (a)-(c) cannot reach N the list is simply shorter and the caller logs the
+    honest shortfall (D611 — don't pad).
 
-    Returns [] when the site yields no exhibitions AND no named spaces. When
+    Returns [] when the site yields no on-view exhibition AND no named space. When
     ``diagnostics`` is given it carries the honest reason (see
     discover_classified_exhibitions) plus ``status_counts`` and ``kind_counts``.
     """
@@ -541,43 +552,120 @@ def build_site_first_candidates(
         _html, _, _ = _fetch_with_retry(listing_url, fetch, diagnostics, is_listing=False)
         listing_text = _visible_text(_html)
 
-    def _mk_exhibition_candidate(ex: Dict) -> Optional[Dict]:
+    def _fetch_detail(ex: Dict) -> Tuple[str, str]:
+        """Return (detail_html, visible_text) for an exhibition's detail page."""
+        detail_url = (ex.get('detail_url') or '').strip()
+        if fetch_detail_pages and detail_url:
+            _html, _, _ = _fetch_with_retry(detail_url, fetch, diagnostics, is_listing=False)
+            return _html or '', _visible_text(_html)
+        return '', ''
+
+    def _mk_exhibition_candidate(ex: Dict, label_upcoming: bool = False) -> Optional[Dict]:
         title = (ex.get('title') or '').strip()
         detail_url = (ex.get('detail_url') or '').strip()
         if not title:
             return None
-        page_text = ''
-        if fetch_detail_pages and detail_url:
-            _html, _, _ = _fetch_with_retry(detail_url, fetch, diagnostics, is_listing=False)
-            page_text = _visible_text(_html)
+        _html, page_text = _fetch_detail(ex)
         if not page_text:
             page_text = listing_text
+        status = ex.get('status', 'on_view')
+        name = title
+        if label_upcoming and status == 'upcoming':
+            dates = (ex.get('dates') or '').strip()
+            # Derive the opening date from the show's date range when present.
+            opening = ''
+            if dates:
+                m = re.match(r'\s*([A-Za-z]{3,9}\.?\s+\d{0,2}\s*,?\s*\d{4})', dates)
+                opening = (m.group(1).strip() if m else dates.split('–')[0].split('-')[0].strip())
+            name = f"{title} (opening {opening})" if opening else f"{title} (upcoming)"
         return {
-            'name': title,
+            'name': name,
             'detail_url': detail_url,
             'source_url': detail_url or listing_url,
             'page_text': page_text,
             'source': 'site_exhibition',
             'kind': 'exhibition',
-            'status': ex.get('status', 'on_view'),
+            'status': status,
             'dates': ex.get('dates', ''),
         }
 
-    # Split by status (already ordered on_view → upcoming → past by discovery).
+    def _work_candidates(ex: Dict, detail_html: str, detail_text: str,
+                         exclude: set) -> List[Dict]:
+        """Per-work stops split from ONE on-view show's detail page.
+
+        The show's artist (its listing title) + named work read "Artist: Work",
+        so a stop is a specific thing on the wall ("Robert Lazzarini: American
+        flag"). The show's own named title is NOT re-emitted here (the primary
+        exhibition candidate already carries it); only distinct WORKS are added.
+        """
+        from exhibition_discovery import extract_exhibition_works
+        artist = (ex.get('title') or '').strip()
+        detail_url = (ex.get('detail_url') or '').strip()
+        works = extract_exhibition_works(
+            detail_html, base_url=detail_url, artist=artist, max_works=4)
+        out: List[Dict] = []
+        _local_seen = set()
+        for w in works:
+            if w.get('kind') != 'work':
+                continue  # the exhibition_title is the primary stop, not a work
+            wname = w['name'].strip()
+            full = f"{artist}: {wname}" if artist else wname
+            fkey = full.lower()
+            # Only skip against names ALREADY placed (``exclude``) and local repeats;
+            # the shared ``_names`` set is updated by ``_append`` alone, so a work is
+            # never silently dropped by a double-add.
+            if fkey in exclude or fkey in _local_seen:
+                continue
+            _local_seen.add(fkey)
+            out.append({
+                'name': full,
+                'detail_url': detail_url,
+                'source_url': detail_url or listing_url,
+                'page_text': detail_text or listing_text,
+                'source': 'site_exhibition',
+                'kind': 'work',
+                'status': 'on_view',
+                'dates': ex.get('dates', ''),
+            })
+        return out
+
+    # Split by status. PAST is dropped entirely (r3): never a stop.
     on_view = [e for e in exhibitions if e.get('status') == 'on_view']
     upcoming = [e for e in exhibitions if e.get('status') == 'upcoming']
-    past = [e for e in exhibitions if e.get('status') == 'past']
 
     cap = max(total_stops * 2, total_stops)
     candidates: List[Dict] = []
+    _names = set()
 
-    # (a) current exhibitions first.
+    def _append(c: Optional[Dict]) -> bool:
+        if not c or len(candidates) >= cap:
+            return False
+        key = c['name'].lower()
+        if key in _names:
+            return False
+        _names.add(key)
+        candidates.append(c)
+        return True
+
+    # (a) current exhibitions, each SPLIT into the works/rooms its page names.
+    # First pass: the show itself (artist + named title) as the primary stop,
+    # with its detail page fetched once and reused for the works split.
     for ex in on_view:
         if len(candidates) >= cap:
             break
+        detail_html, detail_text = _fetch_detail(ex)
         c = _mk_exhibition_candidate(ex)
         if c:
-            candidates.append(c)
+            # Reuse the already-fetched detail text (avoid a second fetch).
+            if detail_text:
+                c['page_text'] = detail_text
+            _append(c)
+        # Then the show's specific named works, interleaved per show so each
+        # current exhibition contributes 2–3 stops before we move on.
+        for wc in _work_candidates(ex, detail_html, detail_text, _names):
+            if len(candidates) >= cap:
+                break
+            _append(wc)
 
     # (b) museum's own named spaces / building features (/visit, /about), only to
     # fill toward N and only when the venue's own pages name them.
@@ -585,19 +673,15 @@ def build_site_first_candidates(
         space_candidates = _discover_museum_spaces(
             base_site_url, fetch, diagnostics,
             want=total_stops - len(candidates),
-            exclude_titles={c['name'].lower() for c in candidates})
+            exclude_titles=set(_names))
         for sc in space_candidates:
             if len(candidates) >= cap:
                 break
-            candidates.append(sc)
+            _append(sc)
 
-    # (c) upcoming, then (d) past — labelled — to honestly reach N.
-    for ex in upcoming + past:
-        if len(candidates) >= cap:
-            break
-        c = _mk_exhibition_candidate(ex)
-        if c:
-            candidates.append(c)
+    # (c) at most ONE upcoming exhibition, labelled "opening <date>". NEVER past.
+    if len(candidates) < total_stops and upcoming:
+        _append(_mk_exhibition_candidate(upcoming[0], label_upcoming=True))
 
     if not candidates:
         # reason/fetch_failed already set by discover_classified_exhibitions.
@@ -608,10 +692,13 @@ def build_site_first_candidates(
     diagnostics['candidate_count'] = len(candidates)
     diagnostics['kind_counts'] = {
         k: sum(1 for c in candidates if c.get('kind') == k)
-        for k in ('exhibition', 'museum_space')}
+        for k in ('exhibition', 'work', 'museum_space')}
     diagnostics['status_counts'] = {
         s: sum(1 for c in candidates if c.get('status') == s)
         for s in ('on_view', 'upcoming', 'past', 'space')}
+    # r3 invariant: a past show must never leave this function as a stop.
+    assert diagnostics['status_counts']['past'] == 0, \
+        "LOCAL-599C: past exhibition leaked into site-first candidates"
     return candidates
 
 

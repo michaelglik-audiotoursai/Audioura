@@ -38,7 +38,8 @@ from typing import Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
 __all__ = ['extract_current_exhibitions', 'extract_classified_exhibitions',
-           'classify_exhibition_status', 'is_chrome_title', 'reject_chrome_titles']
+           'classify_exhibition_status', 'is_chrome_title', 'reject_chrome_titles',
+           'extract_exhibition_works']
 
 
 # Headings that carry an exhibition title on a listing page.
@@ -732,3 +733,142 @@ def extract_current_exhibitions(html: str, base_url: str) -> List[Dict]:
     if result is None:  # bs4 unavailable
         result = _extract_with_regex(html, base_url)
     return result
+
+
+# ─── [LOCAL-599C] Split a current show into its WORKS / SECTIONS ─────────────
+#
+# r3 (LEAD, 2026-10-06): a listener standing in the museum must be sent to things
+# that are ON THE WALLS. r2 shipped 4 PAST shows as stops to pad to N — withdrawn.
+# r3 fills from WHAT IS ON VIEW: each current exhibition is split into the works
+# or rooms its OWN detail page names, so three current shows yield 2–3 stops each.
+#
+# The signal is, again, the DOM/text SHAPE on the show's detail page — never a
+# hardcoded list of work titles:
+#   1. the exhibition's own named title (the <h2 class="exhibition__subtitle…">
+#      inner span — "metes and bounds", "right?", "Where We Come From" — the show
+#      the artist's <h1> names), de-bleeded of the "On View"/"Past" status label;
+#   2. NAMED WORKS the body text credits in the museum's own caption grammar
+#      "Artist. Title , YEAR." (e.g. "Robert Lazzarini. American flag , 2022.") —
+#      a specific object a visitor can stand in front of;
+#   3. captioned images (<figcaption>) that name a work.
+# Installation-view / photo-credit lines and the bare artist name are rejected,
+# so a "stop" is always a nameable thing on the wall, never page furniture.
+
+# The museum's caption grammar for a credited work: "<Artist>. <Title> , <YEAR>."
+# The artist is 1–4 capitalised words; the title is the words up to the year; the
+# year is 4 digits. A trailing " (detail)" and surrounding whitespace are
+# tolerated. This is MAAM's own publishing convention and is common across art
+# museums; it is matched structurally, not against any specific work name.
+_WORK_CREDIT_RE = re.compile(
+    r'(?:^|(?<=[.\u2022]))\s*'
+    r'(?P<artist>[A-Z][A-Za-z\u00C0-\u024F.\'\u2019-]+(?:\s+[A-Z][A-Za-z\u00C0-\u024F.\'\u2019-]+){0,3})\.\s+'
+    r'(?P<title>[A-Z\u00C0-\u024F][^.;\n]{1,80}?)\s*'
+    r'(?:\(detail\)\s*)?,\s*(?P<year>\d{4})\b')
+
+# Lines that are provenance/credit furniture, not a work a visitor views.
+_WORK_FURNITURE_RE = re.compile(
+    r'(?i)\b(installation\s+view|photo(?:graph)?\s*:|courtesy\s+of|collection\s+'
+    r'of|collection\b|gift\s+of|photo\s+credit|view\s+all|share\b|'
+    r'all\s+rights\s+reserved)\b')
+
+
+def _debleed_status(text: str) -> str:
+    """Strip a trailing on-view/past/upcoming status label off a title string."""
+    s = _collapse_ws(unescape(text or ''))
+    s = re.sub(r'(?i)\s*(on\s*view|now\s*showing|currently\s*on\s*view|past|'
+               r'closed|archived?|upcoming|coming\s*soon|forthcoming)\s*$', '', s)
+    return s.strip()
+
+
+def _exhibition_named_title(soup) -> str:
+    """The show's OWN named title from its detail page — the
+    <span class="exhibition__subtitle…-inner"> ("metes and bounds"), or the
+    de-bleeded exhibition subtitle <h2>, or ''. Never the bare artist <h1>."""
+    try:
+        inner = soup.find(class_=re.compile(r'subtitle.*inner|inner.*subtitle', re.I))
+        if inner is not None:
+            t = _debleed_status(inner.get_text(' ', strip=True))
+            if t:
+                return t
+        for h2 in soup.find_all('h2'):
+            cls = ' '.join(h2.get('class') or [])
+            if 'subtitle' in cls.lower():
+                # Remove any status span's text, then de-bleed.
+                for st in h2.find_all(class_=re.compile(r'status', re.I)):
+                    st.extract()
+                t = _debleed_status(h2.get_text(' ', strip=True))
+                if t:
+                    return t
+    except Exception:
+        pass
+    return ''
+
+
+def extract_exhibition_works(html: str, base_url: str = '',
+                             artist: str = '', max_works: int = 4) -> List[Dict]:
+    """[LOCAL-599C] Split ONE current exhibition's detail page into its works/rooms.
+
+    Returns an ORDERED list of ``{'name', 'kind'}`` dicts naming things ON VIEW in
+    the show — the show's own named title first (kind 'exhibition_title'), then up
+    to ``max_works`` specific NAMED WORKS the page credits (kind 'work'). Each is a
+    nameable thing a visitor can stand in front of; nothing is invented — every
+    entry is lifted verbatim from the detail page's own structure/text. Returns []
+    when the page names no work (the caller then uses the show itself as one stop).
+
+    Pure: HTML/text in, works out, no network. bs4 preferred; a text-only regex
+    pass runs when bs4 is unavailable (works credits live in the visible text).
+    """
+    if not html:
+        return []
+    out: List[Dict] = []
+    seen = set()
+
+    def _add(name: str, kind: str):
+        n = _collapse_ws(name).strip(' .;,')
+        # Caption prefixes ("Detail of X", "Installation view of X") name the SAME
+        # work — strip them so the stop reads as the work itself, de-duplicated.
+        n = re.sub(r'(?i)^(?:detail|detail\s+view|installation\s+view|'
+                   r'view)\s+of\s+', '', n).strip(' .;,')
+        if not n or len(n) < 2 or len(n) > 90:
+            return
+        if _WORK_FURNITURE_RE.search(n):
+            return
+        key = n.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        out.append({'name': n, 'kind': kind})
+
+    text = ''
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        # 1. the exhibition's own named title.
+        named = _exhibition_named_title(soup)
+        if named:
+            _add(named, 'exhibition_title')
+        # 3. captioned images naming a work (figcaption).
+        for cap in soup.find_all('figcaption'):
+            m = _WORK_CREDIT_RE.search(cap.get_text(' ', strip=True))
+            if m:
+                _add(m.group('title'), 'work')
+        for t in soup(['script', 'style']):
+            t.decompose()
+        text = soup.get_text(' ', strip=True)
+    except Exception:
+        text = re.sub(r'<[^>]+>', ' ', html)
+    text = _collapse_ws(text)
+
+    # 2. NAMED WORKS from the caption grammar "Artist. Title , YEAR." The artist
+    # token, when known, confirms the credit is for THIS show's artist, but a
+    # credited work from any artist named on the page still counts.
+    for m in _WORK_CREDIT_RE.finditer(text):
+        if len(out) >= max_works + 1:
+            break
+        title = m.group('title')
+        # Reject a "work" whose title is itself just the artist's name repeated.
+        if artist and title.strip().lower() == artist.strip().lower():
+            continue
+        _add(title, 'work')
+
+    return out[:max_works + 1]
