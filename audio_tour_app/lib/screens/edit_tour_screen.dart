@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_editing_service.dart';
+import '../utils/tour_error_resolver.dart';
 import 'edit_stop_screen.dart';
+import 'plan_screen.dart';
 
 /// LOCAL-475 — the edit screen and its caller must agree on the return type.
 ///
@@ -488,18 +490,120 @@ class _EditTourScreenState extends State<EditTourScreen> {
     } catch (e) {
       await DebugLogHelper.addDebugLog('EDIT: Error in save: $e');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Save failed: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 6),
-        ),
-      );
+      // [LOCAL-598 D6] A metered-edit refusal gets the server's message plus a
+      // matching action button (Buy a pack / Your plan / Edit request), never
+      // a bare "Save failed".
+      if (e is TourEditRefusal) {
+        if (mounted) {
+          _showEditRefusalDialog(
+            resolveTourError(e.body),
+            refusalActionFor(e.body),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  /// [LOCAL-598 D6] Show a metered-edit refusal with the server message and a
+  /// button that matches the error_code. Join-queue is disabled ("coming
+  /// soon") — LOCAL-596's queue endpoints are not on this base.
+  void _showEditRefusalDialog(
+      ResolvedTourError resolved, TourRefusalAction action) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        Widget? actionButton;
+        switch (action) {
+          case TourRefusalAction.buyPack:
+          case TourRefusalAction.yourPlan:
+            actionButton = SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlanScreen()),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: Text(refusalActionLabel(action)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            );
+            break;
+          case TourRefusalAction.joinQueue:
+            actionButton = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: const [
+                ElevatedButton(
+                  onPressed: null,
+                  child: Text('Join the queue'),
+                ),
+                SizedBox(height: 4),
+                Text('Coming soon',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.black54)),
+              ],
+            );
+            break;
+          case TourRefusalAction.editRequest:
+          case TourRefusalAction.none:
+            actionButton = null;
+            break;
+        }
+
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.indigo, size: 28),
+              SizedBox(width: 8),
+              Expanded(child: Text('About your plan')),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(resolved.message, style: const TextStyle(fontSize: 16)),
+                if (resolved.suggestion != null) ...[
+                  const SizedBox(height: 12),
+                  Text(resolved.suggestion!.label,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.black54)),
+                ],
+                if (actionButton != null) ...[
+                  const SizedBox(height: 20),
+                  actionButton,
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _handleNewTourDownload(Map<String, dynamic> result) async {

@@ -26,6 +26,74 @@ const Set<String> kNonRetryableErrorCodes = {
   'venue_no_verifiable_content',
 };
 
+/// [LOCAL-598] The action button a refusal should offer. The subscription-
+/// levels refusals (subscription_levels.py, returned as 429/401 with an
+/// error_code) each map to one of these so the UI can show a button that
+/// matches the code — never a dead-end "Unable to generate tour".
+enum TourRefusalAction {
+  /// Buy a pack (L3/L4) — the user is out of fresh/pack/ops allowance, or at a
+  /// level that cannot generate what they asked for.
+  buyPack,
+
+  /// Join the L2 seat queue — shown DISABLED ("coming soon") until LOCAL-596's
+  /// queue endpoints exist. Reserved for a future wiring.
+  joinQueue,
+
+  /// Open "Your plan" — the refusal is about plan state (renewal due, or a
+  /// device-id problem the plan screen explains), not a buyable allowance.
+  yourPlan,
+
+  /// Change the request itself (fewer stops, or a by-reference-only level that
+  /// can't research the asked-for place) — a plain retry won't help.
+  editRequest,
+
+  /// No specific action — show the message only.
+  none,
+}
+
+/// The subscription-levels error_codes (subscription_levels.py) and the action
+/// each one should offer. Generation-failure codes (actionable_failure.py) are
+/// NOT in this map — they are handled by the suggestion/canRetry path. A code
+/// not in this map yields [TourRefusalAction.none].
+const Map<String, TourRefusalAction> kRefusalActions = {
+  // Out of allowance -> buy a pack.
+  'plan_limit_daily': TourRefusalAction.buyPack,
+  'plan_limit_monthly': TourRefusalAction.buyPack,
+  'pack_exhausted': TourRefusalAction.buyPack,
+  'level_cannot_generate': TourRefusalAction.buyPack,
+  // Request itself is the problem -> edit it.
+  'stops_over_plan': TourRefusalAction.editRequest,
+  'by_reference_unavailable': TourRefusalAction.editRequest,
+  // Plan state -> open the plan screen.
+  'renewal_due': TourRefusalAction.yourPlan,
+  'user_id_required': TourRefusalAction.yourPlan,
+};
+
+/// Resolve a subscription-levels refusal (429/401 body) into the action button
+/// it should offer. Pure: body map in, action out. Unknown/absent code ->
+/// [TourRefusalAction.none]. This is the D6 mapping the UI branches on.
+TourRefusalAction refusalActionFor(Map<String, dynamic> body) {
+  final code = _nonEmpty(body['error_code']);
+  if (code == null) return TourRefusalAction.none;
+  return kRefusalActions[code] ?? TourRefusalAction.none;
+}
+
+/// Human-facing label for a refusal action button.
+String refusalActionLabel(TourRefusalAction action) {
+  switch (action) {
+    case TourRefusalAction.buyPack:
+      return 'Buy a pack';
+    case TourRefusalAction.joinQueue:
+      return 'Join the queue';
+    case TourRefusalAction.yourPlan:
+      return 'Your plan';
+    case TourRefusalAction.editRequest:
+      return 'Edit request';
+    case TourRefusalAction.none:
+      return '';
+  }
+}
+
 /// A suggestion the server offers alongside a failure (LOCAL-580 contract):
 /// a one-tap alternative request. `label` is the button text, `request` is the
 /// tour request to submit, `tourType` an optional tour_type hint.

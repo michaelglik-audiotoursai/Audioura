@@ -6,6 +6,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../config/endpoints.dart';
 
+/// [LOCAL-598 D6] A metered edit the server refused with a structured
+/// subscription-levels refusal (429, or 401 user_id_required). Carries the
+/// status code and the parsed body (error_code, message, suggestion) so the
+/// edit UI can show the server's message plus a matching action button instead
+/// of a bare "Save failed".
+class TourEditRefusal implements Exception {
+  final int statusCode;
+  final Map<String, dynamic> body;
+  const TourEditRefusal(this.statusCode, this.body);
+
+  String? get errorCode => body['error_code'] as String?;
+
+  @override
+  String toString() =>
+      'TourEditRefusal($statusCode, ${body['error_code']}: ${body['message']})';
+}
+
 class TourEditingService {
   static Future<String> _getBaseUrl() async {
     // Editing is now deployed to Cloud Run behind the gateway (GCS-5), so it
@@ -267,6 +284,23 @@ class TourEditingService {
         final result = jsonDecode(response.body);
         await DebugLogHelper.addDebugLog('EDIT API: Save success - ${result['message']}');
         return result;
+      } else if (response.statusCode == 429 || response.statusCode == 401) {
+        // [LOCAL-598 D6] A metered-edit refusal (over plan / add-stops not
+        // allowed at this level / user_id_required). Surface the structured
+        // body so the UI shows the server message + a matching button.
+        Map<String, dynamic> body;
+        try {
+          body = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          body = <String, dynamic>{};
+        }
+        if (body['error_code'] != null) {
+          await DebugLogHelper.addDebugLog(
+              'EDIT API: refusal ${response.statusCode} code=${body['error_code']}');
+          throw TourEditRefusal(response.statusCode, body);
+        }
+        final msg = body['message'] ?? body['error'] ?? 'Save failed';
+        throw Exception(msg);
       } else if (response.statusCode == 400) {
         final error = jsonDecode(response.body);
         if (error['error_code'] == 'MISSING_AUDIO_DATA') {

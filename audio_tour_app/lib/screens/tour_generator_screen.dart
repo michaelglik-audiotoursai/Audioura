@@ -26,6 +26,7 @@ import '../utils/tour_error_resolver.dart';
 import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
 import 'main_screen.dart';
+import 'plan_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
   const TourGeneratorScreen({super.key});
@@ -254,13 +255,39 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       await DebugLogHelper.addDebugLog('TOUR_REQUEST: Response body: ${response.body}');
 
       if (response.statusCode != 200) {
+        // [LOCAL-598 D6] A subscription-levels refusal (429, or 401
+        // user_id_required) arrives here with a structured body carrying an
+        // error_code, message and (sometimes) suggestion. Show the server's
+        // own message plus a button that matches the code — never a dead-end
+        // "Unable to generate tour".
+        Map<String, dynamic>? body;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) body = decoded;
+        } catch (_) {}
+
+        final isRefusal = (response.statusCode == 429 ||
+                response.statusCode == 401) &&
+            body != null &&
+            body['error_code'] != null;
+
+        if (isRefusal) {
+          await DebugLogHelper.addDebugLog(
+              'TOUR_REQUEST: refusal ${response.statusCode} code=${body!['error_code']}: ${response.body}');
+          if (mounted) {
+            setState(() { _isGenerating = false; _progress = ''; });
+            _showRefusalDialog(resolveTourError(body), refusalActionFor(body));
+          }
+          return;
+        }
+
         String errorMessage = 'Failed to start tour generation';
-        
+
         if (response.statusCode == 401) {
           errorMessage = ErrorHandlerService.friendlyMessage(401);
         } else {
           try {
-            final errorData = jsonDecode(response.body);
+            final errorData = body ?? jsonDecode(response.body);
             if (errorData['user_message'] != null) {
               errorMessage = errorData['user_message'];
             } else if (errorData['error'] != null) {
@@ -272,7 +299,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             errorMessage = ErrorHandlerService.friendlyMessage(response.statusCode);
           }
         }
-        
+
         await DebugLogHelper.addDebugLog('TOUR_REQUEST_ERROR: $errorMessage');
         throw Exception(errorMessage);
       }
@@ -474,13 +501,24 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             await DebugLogHelper.addDebugLog('TOUR_POLL: 429 quota exceeded for job $jobId: ${response.body}');
             if (mounted) {
               setState(() { _isGenerating = false; _progress = ''; });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Daily tour limit reached. Please try again tomorrow or check your plan.'),
-                  backgroundColor: Colors.deepOrange,
-                  duration: Duration(seconds: 12),
-                ),
-              );
+              // [LOCAL-598 D6] Prefer the server's structured refusal (message +
+              // matching action button) over a generic snackbar.
+              Map<String, dynamic>? body;
+              try {
+                final decoded = jsonDecode(response.body);
+                if (decoded is Map<String, dynamic>) body = decoded;
+              } catch (_) {}
+              if (body != null && body['error_code'] != null) {
+                _showRefusalDialog(resolveTourError(body), refusalActionFor(body));
+              } else {
+                _showRefusalDialog(
+                  resolveTourError(body ?? const {
+                    'message':
+                        'You\u2019ve reached your plan\u2019s limit for now.',
+                  }),
+                  TourRefusalAction.yourPlan,
+                );
+              }
             }
             return;
           } else if (response.statusCode >= 500) {
@@ -1052,6 +1090,111 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  /// [LOCAL-598 D6] Show a subscription-levels refusal: the server's own
+  /// message and suggestion, plus a button that matches the error_code
+  /// (Buy a pack / Your plan / Join the queue / Edit request). Never a
+  /// dead-end "Unable to generate tour".
+  void _showRefusalDialog(ResolvedTourError resolved, TourRefusalAction action) {
+    final suggestion = resolved.suggestion;
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        // Build the matching action button. Join-queue is disabled with a
+        // "coming soon" note: LOCAL-596's queue endpoints are not on this base.
+        Widget? actionButton;
+        switch (action) {
+          case TourRefusalAction.buyPack:
+          case TourRefusalAction.yourPlan:
+            actionButton = SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlanScreen()),
+                  );
+                },
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: Text(refusalActionLabel(action)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            );
+            break;
+          case TourRefusalAction.joinQueue:
+            actionButton = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: null, // coming soon — no LOCAL-596 endpoints yet
+                  icon: const Icon(Icons.hourglass_empty),
+                  label: const Text('Join the queue'),
+                ),
+                const SizedBox(height: 4),
+                const Text('Coming soon',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Colors.black54)),
+              ],
+            );
+            break;
+          case TourRefusalAction.editRequest:
+            actionButton = SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _editRequest();
+                },
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Edit request'),
+              ),
+            );
+            break;
+          case TourRefusalAction.none:
+            actionButton = null;
+            break;
+        }
+
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.indigo, size: 28),
+              SizedBox(width: 8),
+              Expanded(child: Text('About your plan')),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(resolved.message, style: const TextStyle(fontSize: 16)),
+                if (suggestion != null) ...[
+                  const SizedBox(height: 12),
+                  Text(suggestion.label,
+                      style: const TextStyle(fontSize: 14, color: Colors.black54)),
+                ],
+                if (actionButton != null) ...[
+                  const SizedBox(height: 20),
+                  actionButton,
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        );
+      },
     );
   }
 
