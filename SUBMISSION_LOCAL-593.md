@@ -259,3 +259,164 @@ anywhere; the only DB write was the allowed `venue_corpus` cache row for Q378357
 6. `#7` bump CORPUS_VERSION; trust the resolved venue's own Wikipedia article
 
 `git rev-list --count 0315513..HEAD` ≥ 1 holds after every step.
+
+
+---
+
+## r2 — rework the single-venue check in place (LEAD + Michael, 2026-10-06)
+
+**Why.** This was a **regression**. LOCAL-592 (D611) put an "About the venue"
+history + visiting-info section at the start of Stop 1. The July-2026
+single-venue consistency check (`content_qa_runner.py`, check 9) and the
+venue-coherence check (check 11) scan that section. A museum's own history names
+its predecessor and constituent museums, and the checks counted each as a
+"foreign venue". The first two museum tours since the change both failed on it
+(Harvard's Sackler/Reisinger, McMullen's Devlin/Art Gallery).
+
+**Michael's direction:** rework the check — do not produce a new mechanism.
+
+### 1. Reverted r1 #1 (the Wikidata part-of/has-part lookup)
+
+Commit `6a3c800` ("constituent/sibling venues are the tour's own venue") added
+`venue_resolver.fetch_constituent_aliases()` (Wikidata P527/P361/P749), wired
+`_LAST_SIBLING_VENUES` through `generate_tour_text` and
+`venue_context['sibling_venues']` through the service, and exempted sibling
+tokens in both checks. Per Michael, this is reverted:
+
+- `venue_resolver.fetch_constituent_aliases()` — **deleted**
+- `generate_tour_text` `_LAST_RESOLVED_QID` / `_LAST_SIBLING_VENUES` + the fetch
+  call — **deleted**
+- `generate_tour_text_service` `venue_context['sibling_venues']` wiring — **deleted**
+- `content_qa_runner` `_sibling_tokens` / `_is_constituent_ref` + both
+  exemptions — **deleted**
+- `tests/test_local593_constituent_venues.py` — **deleted**
+
+All other r1 work stays (story-page ranking, the `name_lower` fix,
+highlight-first works, the actionable factual-integrity error, the
+`CORPUS_VERSION` bump). Diff: **163 deletions across 4 files + test file removed.**
+
+### 2. Reworked check 9 (and the sibling check 11) in place — no new mechanism
+
+Three edits, all inside the existing checks:
+
+- **(a) Skip the Stop 1 opening section.** It is the tour-level description;
+  found **structurally** via the existing
+  `prolog_structure_validator.extract_prolog_from_tour_content` (the same
+  extractor the generator already uses — not a new marker). The opening span is
+  removed from the Stop 1 scan in both checks, so the venue's own history naming
+  its constituents/predecessor no longer counts.
+- **(b) Exempt the venue's own name phrased differently.** A ref is exempt when
+  it is a substring of / contains the tour venue's name, or when its
+  *distinctive* (non-generic) tokens are all part of the venue's own name tokens
+  — the resolver-derived `venue_context['venue_tokens']` plus the title. Covers
+  `College Museum of Art` ⊂ `Boston College Museum of Art`. No hard-coded list.
+- **(c) Drop the bare two-word generic matches** (`Art Gallery`, `Art Museum`)
+  the regex produces — a category phrase with no distinctive proper noun is not
+  a foreign venue.
+
+A genuinely foreign venue named **outside** the opening section stays flagged:
+it is not the venue, not an alias, not generic, and not in the opening section.
+
+Diff: **content_qa_runner.py +96/−5** (two small helper closures + the
+opening-skip, reused across checks 9 and 11; executable logic is modest, most of
+the delta is explanatory comments).
+
+### 3. Tests — red on r1 HEAD, green after
+
+`tests/test_local593_single_venue_opening_section.py` drives the **real**
+`content_qa_runner.run_qa` and reads the printed verdicts:
+
+- Harvard: three constituents in the Stop 1 opening + the Sackler once more in
+  Stop 7 → single-venue **PASS**, coherence **PASS**.
+- McMullen: three predecessor galleries (Devlin/Bapst/Burns) + a bare
+  "Art Gallery" in the Stop 1 opening, and "College Museum of Art" (a sub-phrase
+  of the venue) in Stop 3 → single-venue **PASS**, coherence **PASS**.
+- Foreign: Isabella Stewart Gardner Museum named 3× in an exhibition stop that is
+  **not** the opening section → single-venue **FAIL**.
+
+Proven both directions by running the fixtures against the r1-HEAD
+`content_qa_runner.py` and the r2 version:
+
+```
+r1 HEAD (8042100):  HARVARD  single=FAIL coherence=FAIL   ← the regression
+                    MCMULLEN single=FAIL
+r2 HEAD:            3 passed
+```
+
+Existing suite unaffected: `test_local85_venue_coherence` + the surviving
+LOCAL-593 tests → **38 passed**.
+
+### 4. Live, isolated container (OpenAI credit available this round)
+
+A single HTTP-200 probe confirmed the account has credit again. Both runs used
+`docker run --rm --name local593b-gen` on `development_default`, env injected via
+`--env-file` from `audioura-tour-generator-1` (DATABASE_URL → postgres-2, keys);
+the temp env file was shredded afterwards. **No `audioura-*` container was
+touched, renamed or rebuilt** — `audioura-tour-generator-1` was `healthy` before
+and after, and `--rm` left nothing behind.
+
+```
+docker run --rm --name local593b-gen \
+  --network development_default \
+  --env-file <env of audioura-tour-generator-1> \
+  -v <worktree>:/app -w /app \
+  audioura-tour-generator \
+  python3 run_local593b_container.py
+```
+
+**McMullen Museum of Art, Boston College, Chestnut Hill, MA — 7 stops, cap $1.00**
+```
+venue_context.venue_tokens = ['art', 'mcmullen', 'museum']
+PASS: Single-venue consistency (no other NAMED venues)
+PASS: Venue coherence (stops reference correct venue)
+BLOCKER 3 line 1 — PASS checks:          16
+BLOCKER 3 line 2 — style FAIL checks:    4
+BLOCKER 3 line 3 — FACTUAL FAIL checks:  1   (G4 fail-closed — story_elements unavailable)
+COST/TIME: total_cost=$0.6496  cache_hit=False  wall_time=569.0s
+```
+The Stop 1 opening ("You are about to explore the McMullen Museum of Art at
+Boston College…") was handled; **no foreign-venue flag**. The regression is
+fixed live.
+
+**Harvard Art Museums, Cambridge, MA — 7 stops, cap $1.50**
+```
+venue_context.venue_tokens = ['art', 'harvard', 'museums']
+FAIL: Single-venue consistency — 3 refs: Peabody Museum (Stop 3),
+      Straus Gallery (Stop 6), Fogg Museum (Stop 7)
+PASS: Venue coherence (stops reference correct venue)
+BLOCKER 3 line 1 — PASS checks:          16
+BLOCKER 3 line 2 — style FAIL checks:    4
+BLOCKER 3 line 3 — FACTUAL FAIL checks:  3
+COST/TIME: total_cost=$0.7499  cache_hit=False  wall_time=590.1s
+```
+
+**Honest read of the Harvard run.** The opening-section regression **is fixed**:
+Stop 1's prolog names only "the Harvard Art Museums" — none of the three flags
+come from the opening section (verified in the delivered text). The three refs
+are mid-tour narration the LLM wrote into the body:
+
+- `Peabody Museum` (Stop 3) — "transferred here from the Peabody Museum"; a
+  genuinely different Harvard museum (archaeology/ethnology). A real other-venue
+  mention.
+- `Straus Gallery` (Stop 6, also 2/4/7) — a gallery **inside** the Harvard Art
+  Museums building; a room, not a foreign museum (a regex false-positive, but
+  "straus" is not a venue token).
+- `Fogg Museum` (Stop 7) — "donated the work to the Fogg Museum"; a **true
+  constituent**.
+
+The r1 Wikidata exemption would have cleared the Fogg reference, but that is the
+mechanism Michael directed us to revert. With the constituent list gone, a
+constituent named in body prose counts. This is a different problem from the
+opening-section regression this ticket targets — the generator writing
+constituent/sibling/in-building-gallery names into mid-tour narration — and is
+left as-is for the LEAD/Michael to decide, rather than re-introducing the
+reverted lookup. The McMullen run shows the targeted regression cleanly fixed.
+
+**Total live spend this round:** $0.6496 + $0.7499 = **$1.3995**, within caps.
+
+### Commits (all on `LOCAL-593-harvard-factual`)
+
+1. `r2: revert #1 Wikidata constituent/sibling lookup (Michael)` — 163 deletions + test
+2. `r2: rework single-venue check in place` — content_qa_runner.py +96/−5
+3. `r2: test — single-venue check skips Stop 1 opening, keeps foreign venues flagged`
+4. `r2: isolated-container live-run harness (no sibling_venues)` + live results
