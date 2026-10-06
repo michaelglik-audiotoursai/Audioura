@@ -4035,6 +4035,15 @@ _LAST_POI_LIST = []
 # Module-level: populated after D1v2 verification with the computed tier
 _LAST_VERIFICATION_TIER = ""
 
+# [LOCAL-593 #1] Module-level: the resolved venue QID and its Wikidata
+# constituent/sibling institution names (P527/P361/P749). The service layer
+# reads these to build venue_context['sibling_venues'] so the content-QA
+# single-venue consistency check can exempt the venue's OWN constituents
+# (e.g. Fogg / Sackler / Busch-Reisinger inside a Harvard Art Museums tour)
+# without any hard-coded venue list. Empty when no venue resolved.
+_LAST_RESOLVED_QID = ""
+_LAST_SIBLING_VENUES = []
+
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
@@ -4797,6 +4806,20 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
             # Build Wikipedia title from entity name
             _wiki_title = _venue_entity.name
             print(f"  [D1v2] Venue resolved: {_venue_entity.qid} → URL={_base_site_url}, lang={_language}")
+            # [LOCAL-593 #1] Record the resolved QID and fetch the venue's own
+            # constituent/sibling institutions so the content-QA single-venue
+            # consistency check can exempt them. Derived from Wikidata only; a
+            # failure leaves the list empty (check behaves exactly as before).
+            try:
+                global _LAST_RESOLVED_QID, _LAST_SIBLING_VENUES
+                _LAST_RESOLVED_QID = _venue_entity.qid or ""
+                from venue_resolver import fetch_constituent_aliases as _fca
+                _LAST_SIBLING_VENUES = _fca(_venue_entity.qid, _language) if _venue_entity.qid else []
+                if _LAST_SIBLING_VENUES:
+                    print(f"  [LOCAL-593 #1] constituent/sibling venues: {_LAST_SIBLING_VENUES}")
+            except Exception as _sib_err:
+                print(f"  [LOCAL-593 #1] constituent fetch failed (non-fatal): {_sib_err}")
+                _LAST_SIBLING_VENUES = []
         else:
             print(f"  [D1v2] Venue resolver returned None — falling back to heuristic")
     except ImportError:

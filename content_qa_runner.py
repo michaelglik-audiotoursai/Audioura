@@ -478,6 +478,38 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         
         # [GAP 3] Collect stop titles for exemption check
         _stop_titles = [re.sub(r'^Stop\s+\d+:\s*', '', h).strip().lower() for h in _stop_headers]
+
+        # [LOCAL-593 #1] Constituent & sibling institutions are the SAME venue.
+        # venue_context carries 'sibling_venues' — the labels+aliases of this
+        # venue's Wikidata constituents (P527), the whole it is part of (P361),
+        # its parent org (P749) and that parent's other parts. For the Harvard
+        # Art Museums these are the Fogg, Busch-Reisinger and Arthur M. Sackler.
+        # A named-venue reference that matches one of these is NOT drift and must
+        # be exempt. The list is derived from Wikidata, never hard-coded, so a
+        # genuinely foreign venue (e.g. the Isabella Stewart Gardner Museum) is
+        # absent from it and stays flagged.
+        _vctx = venue_context if venue_context else {}
+        _GENERIC_SIB_WORDS = {'musée', 'musee', 'museum', 'gallery', 'galerie',
+                              'palais', 'villa', 'national', 'municipal', 'royal',
+                              'university', 'art', 'arts', 'collection', 'collections',
+                              'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les', 'and',
+                              'center', 'centre', 'institute', 'institut'}
+        _sibling_tokens = set()
+        for _s in (_vctx.get('sibling_venues') or []):
+            for _w in re.split(r'[\s,.\-]+', (_s or '').lower()):
+                _w = _w.strip()
+                if len(_w) >= 4 and _w not in _GENERIC_SIB_WORDS:
+                    _sibling_tokens.add(_w)
+
+        def _is_constituent_ref(_ref_lower: str) -> bool:
+            """True when a named-venue ref carries a DISTINCTIVE token of one of
+            the venue's own constituents/siblings (e.g. 'fogg', 'sackler',
+            'reisinger'). Token-based so it survives the greedy named-venue
+            regex capturing trailing prose ('Sackler Museum are consulted …')."""
+            if not _sibling_tokens:
+                return False
+            _ref_words = set(re.split(r'[\s,.\-]+', _ref_lower))
+            return bool(_ref_words & _sibling_tokens)
         
         # Check address containment (<=2 unique addresses)
         _all_addresses = re.findall(r'^Address:\s*(.+)$', tour_text, re.MULTILINE)
@@ -508,6 +540,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                 _ref_core = ' '.join(ref.split()[:2]).lower()
                 if _tour_venue and (_tour_venue.lower()[:20] in ref.lower() or ref.lower()[:20] in _tour_venue.lower() or _ref_core in _tour_venue.lower()):
                     continue  # It's the tour's own venue — not a foreign reference
+                # [LOCAL-593 #1] Exempt the venue's own constituent/sibling
+                # institutions (Wikidata P527/P361/P749), e.g. Fogg / Sackler /
+                # Busch-Reisinger inside a Harvard Art Museums tour.
+                if _is_constituent_ref(ref.strip().lower()):
+                    continue
                 # [GAP 3] Exemption: if tour is address-contained AND ref matches a stop title
                 if _is_contained:
                     _ref_lower = ref.strip().lower()
@@ -583,6 +620,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                 # Skip if ref contains any distinctive word from the venue
                 _ref_lower = ref.lower()
                 if any(vw in _ref_lower for vw in _venue_words):
+                    continue
+                # [LOCAL-593 #1] Skip the venue's own constituent/sibling
+                # institutions (Wikidata P527/P361/P749) — same exemption as the
+                # single-venue consistency check above.
+                if _is_constituent_ref(_ref_lower):
                     continue
                 _has_foreign = True
                 break

@@ -430,6 +430,17 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                             'artist': '',  # Will be populated if venue_resolver provides it
                             'tier': _gen_tier,
                         }
+                        # [LOCAL-593 #1] Carry the venue's own constituent/sibling
+                        # institutions (Wikidata P527/P361/P749) so the single-venue
+                        # consistency check exempts them (Fogg/Sackler/Busch-Reisinger
+                        # inside a Harvard Art Museums tour) without a hard-coded list.
+                        try:
+                            from generate_tour_text import _LAST_SIBLING_VENUES as _sibs
+                            if _sibs:
+                                _venue_ctx['sibling_venues'] = list(_sibs)
+                        except Exception as _sib_ctx_err:
+                            _svc_logger.error(
+                                f"[LOCAL-593 #1] sibling_venues unavailable (non-fatal): {_sib_ctx_err}")
                     except Exception:
                         pass
                     # [LOCAL-22] Print all Stop N: headings BEFORE QA for verification

@@ -356,6 +356,92 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
         return []
 
 
+def fetch_constituent_aliases(venue_qid: str, language: str = "en") -> List[str]:
+    """[LOCAL-593 #1] The venue's OWN constituent and sibling institutions.
+
+    A tour of the Harvard Art Museums (Q3783572) legitimately names the Fogg,
+    the Busch-Reisinger and the Arthur M. Sackler — these are its constituent
+    museums, not foreign venues. The single-venue consistency check in
+    content_qa_runner must not treat them as drift. This function returns the
+    labels + aliases of every institution that is the SAME venue in the museum
+    sense, derived purely from Wikidata relations (no hard-coded venue list):
+
+      * P527  has part(s)      — the venue's own constituents (Fogg, Sackler…)
+      * P361  part of          — the whole this venue belongs to (the parent)
+      * P749  parent organization
+      * siblings — other P527 parts of the parent reached via P361/P749, so a
+        tour of one constituent still recognises its sibling constituents.
+
+    Deterministic given Wikidata; returns a de-duplicated list of lowercase
+    strings (labels and alt-labels). A genuinely foreign venue (e.g. the
+    Isabella Stewart Gardner Museum, which is neither a part nor a sibling) will
+    NOT appear here and so remains flagged.
+
+    Returns [] on any network/parse failure — the check then behaves exactly as
+    before (fails safe, never turns a working tour into no tour).
+    """
+    if not venue_qid:
+        return []
+
+    query = f"""
+    SELECT DISTINCT ?inst ?instLabel ?instAltLabel WHERE {{
+      {{
+        # Direct constituents of this venue (P527 has part).
+        wd:{venue_qid} wdt:P527 ?inst.
+      }} UNION {{
+        # The whole(s) this venue is part of (P361) or its parent org (P749).
+        wd:{venue_qid} wdt:P361 ?inst.
+      }} UNION {{
+        wd:{venue_qid} wdt:P749 ?inst.
+      }} UNION {{
+        # Siblings: other parts of the same parent (reached via P361 or P749).
+        wd:{venue_qid} wdt:P361 ?parent.
+        ?parent wdt:P527 ?inst.
+      }} UNION {{
+        wd:{venue_qid} wdt:P749 ?parent.
+        ?parent wdt:P527 ?inst.
+      }}
+      SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
+    }}
+    LIMIT 200
+    """
+
+    try:
+        resp = requests.get(
+            _SPARQL_ENDPOINT,
+            params={"query": query, "format": "json"},
+            headers={"User-Agent": _USER_AGENT, "Accept": "application/sparql-results+json"},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            logger.warning(f"constituent SPARQL error: {resp.status_code}")
+            return []
+
+        data = resp.json()
+        results = data.get("results", {}).get("bindings", [])
+
+        out, seen = [], set()
+        for r in results:
+            label = (r.get("instLabel", {}).get("value", "") or "").strip()
+            alt = (r.get("instAltLabel", {}).get("value", "") or "").strip()
+            for cand in [label] + [a.strip() for a in alt.split(",")]:
+                cand = cand.strip()
+                # Skip blanks and unresolved QIDs (e.g. "Q12345").
+                if not cand or re.fullmatch(r"Q\d+", cand):
+                    continue
+                low = cand.lower()
+                if low not in seen:
+                    seen.add(low)
+                    out.append(cand)
+
+        print(f"  [venue_resolver] constituents/siblings for {venue_qid}: {len(out)} name(s)")
+        return out
+
+    except Exception as e:
+        logger.warning(f"constituent SPARQL query failed: {e}")
+        return []
+
+
 def build_dynamic_aliases(works: List[Dict]) -> Dict[str, str]:
     """Build a CANONICAL_ALIASES dict from SPARQL-fetched works.
     
