@@ -1,13 +1,13 @@
 Step-by-Step Audio Guided Tour: Art and Architectual tour in Boston Athenaeum, boston, ma
 Tour-Category: museum
 
-Stop 1: About Boston Athenaeum
+Stop 1: About Boston Athenæum
 
-Orientation: You are at Boston Athenaeum — this opening stop is about the place itself.
+Orientation: You are at Boston Athenæum — this opening stop is about the place itself.
 
-Before we look at anything on the walls, here is the story of Boston Athenaeum in boston, ma itself — who created it, why it exists, and what it is known for. The Boston Athenæum is one of the oldest independent libraries in the United States. It is a membership library, for which patrons pay a yearly subscription fee to use Athenæum services. The institution was founded in 1807 by the Anthology Club of Boston, Massachusetts. It is located at 10½ Beacon Street on Beacon Hill in Boston. Founded in 1807, the Boston Athenaeum evolved out of an organization known as the Anthology Society, formed in 1805 by a group of Bostonians who produced a magazine called. In 1809, it moved to the Rufus Amory House, adjacent to the King’s Chapel Burial Ground. Construction on the Athenaeum’s present home on Beacon Street began in 1847. Designed by Edward Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first floor, the book collection on the second, and a painting gallery on the skylit third floor. A word about the building you are standing in. The Boston Athenaeum—a unique combination of library, museum, and cultural center in a magnificent landmark building. Designed by Edward Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first floor, the book collection on the second, and a painting gallery on the skylit third floor.
+Before we look at anything on the walls, here is the story of Boston Athenæum in Boston, Massachusetts itself — who created it, why it exists, and what it is known for. The Boston Athenæum is one of the oldest independent libraries in the United States. It is a membership library, for which patrons pay a yearly subscription fee to use Athenæum services. The institution was founded in 1807 by the Anthology Club of Boston, Massachusetts. It is located at 10½ Beacon Street on Beacon Hill in Boston. In 1809, it moved to the Rufus Amory House, adjacent to the King’s Chapel Burial Ground. Construction on the Athenaeum’s present home on Beacon Street began in 1847. Designed by Edward Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first floor, the book collection on the second, and a painting gallery on the skylit third floor. Our research books and collections have strengths in Boston history, New England state and local history, and in the fine arts. A word about the building you are standing in. The Boston Athenaeum—a unique combination of library, museum, and cultural center in a magnificent landmark building. This account is drawn from the museum's own pages on bostonathenaeum.org and public reference sources.
 
-Directions: Continue through Art and Architectual tour in Boston Athenaeum — next is Boys Come Over Here You're Wanted.
+Directions: Continue through Boston Athenaeum — next is Boys Come Over Here You're Wanted.
 
 Stop 2: Boys Come Over Here You're Wanted
 
@@ -55,7 +55,7 @@ Orientation: Standing before this piece, you can appreciate the organizational b
 
 In 1868, Charles Ammi Cutter assumed the role of Librarian at the Boston Athenaeum. During his tenure, he developed the Expansive Classification system, an ambitious undertaking aimed at creating a comprehensive yet user-friendly way to organize knowledge. This system featured alphanumeric codes, offering an innovative method for cataloging diverse materials with precision. In 1891, Cutter published the first edition of his classification system, laying the groundwork for future library science innovations. However, many smaller libraries found his system too intricate, prompting requests for adaptations. Goya, an artist famed for his evocative imagery, captured the intensity of human experience in his illustrated texts. In a different creative sphere, Manos, a noteworthy author, also contributed a textual richness that accompanied visual illustrations, enhancing the depth of narratives told through art. Both figures exemplify how text and illustration can intertwine to tell powerful stories, much like Cutter's own blending of structure and accessibility in the realm of books. Cutter's initative at the Athenaeum wasn't just a solitary endeavor but a catalyst that extended beyond his lifetime. His work, though initially not universally accepted, has left a lasting imprint on the management of library systems worldwide. This legacy invites consideration of how contemporary systems at institutions like the Athenaeum continue to evolve, informed by Cutter's groundbreaking efforts.
 
-Directions: Your final stop in Art and Architectual tour in Boston Athenaeum: Annie Adams Fields.
+Directions: Your final stop in Boston Athenaeum: Annie Adams Fields.
 
 Stop 6: Annie Adams Fields
 
@@ -69,6 +69,6 @@ Annie Adams Fields, born in Boston in 1834, was an influential figure in literar
 
 That's 5 stops — Annie Adams Fields, championed simplicity in design over Victorian opulence and Boys Come Over Here You're Wanted, used map as symbol and backdrop. If you would like to eat nearby we can build you a restaurant tour.
 
-From About Boston Athenaeum to Annie Adams Fields, you have followed the thread of a single story.
+From About Boston Athenæum to Annie Adams Fields, you have followed the thread of a single story.
 
 That's 6 stops.

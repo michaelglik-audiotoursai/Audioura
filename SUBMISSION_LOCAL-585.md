@@ -155,3 +155,98 @@ contained branch and by the unit tests.
 - `test_local585_about_museum_stop.py` (new, 23 tests)
 - `run_local585_live.py`, `run_local585_live.sh` (new, isolated live run)
 - `tours/local585_live/` (live evidence)
+
+
+---
+
+## r2 — About-stop listener-facing defects (LEAD review, 2026-10-06)
+
+The design was accepted; `tours/local585_live/LOCAL585_ATHENAEUM.txt` stop 1 shipped
+four listener-facing defects. All four are now fixed, with tests red on `5a2b4bd` and
+green after, and re-verified by an isolated live run.
+
+- **Branch/base:** `LOCAL-585-museum-story-stop`, continued at HEAD `5a2b4bd`
+  (`git merge-base --is-ancestor 5a2b4bd HEAD` exits 0).
+- **r2 commit:** `a46ab59` — the four fixes + `test_local585_r2_about_hygiene.py`.
+
+### The four defects and the fix
+
+1. **Truncated sentence** — shipped "…a group of Bostonians who produced a magazine
+   **called.**" (object cut). A sentence whose final content token still expects an
+   object (`called`/`named`/`titled`/`known as`/`such as`/`including`/`designed by`/
+   a bare trailing `and`/`the`/…) is now DROPPED, never spoken. New pure predicate
+   `has_dangling_object_sentence()`; applied where story and architecture sentences
+   are collected (`_is_story_sentence`, `_collect_architecture_sentences`) and inside
+   `dedupe_sentences`.
+2. **Duplicate sentence** — "Designed by Edward Clarke Cabot, the building opened in
+   1849, with a sculpture gallery…" appeared **twice** (once in the history, once in
+   the "A word about the building…" section). `_compose_about_narration` now builds
+   the body as ONE de-duplicated pool (`dedupe_sentences` over wiki+story) and filters
+   the architecture section against it, so a sentence shared across sections is spoken
+   **once**. Normalised comparison via `_dedup_key`.
+3. **Raw request locality in narration** — "here is the story of Boston Athenaeum in
+   **boston, ma** itself". `normalise_locality()` properly-cases the tail and expands
+   US state codes ("boston, ma" → "**Boston, Massachusetts**"); the orchestrator reads
+   the resolver's display name (`VenueEntity.name`, which the old `getattr(.., "venue_name")`
+   never found) for the venue.
+4. **Raw request string in Directions** — "Continue through **Art and Architectual tour
+   in Boston Athenaeum** — next is…". Fixed on BOTH transition composers:
+   `stop_pool_assembly._museum_transition` now cleans the venue via a new `_venue_name`
+   helper (`clean_venue_request_name`), and `generate_tour_text` cleans
+   `_museum_venue_name` immediately after intent — before it is woven into
+   "Continue through {venue} — next is …" or the single-venue constraint.
+
+### Tests (`test_local585_r2_about_hygiene.py` — 10, offline)
+
+Pins the EXACT Athenaeum strings: no dangling "produced a magazine called."; the
+architect sentence appears exactly once; the lowercase request locality is absent and
+"Boston, Massachusetts" present; the pool-assembly transition and the generator's
+venue derivation both name the venue, not the raw request. Plus pure-predicate tests
+for `has_dangling_object_sentence`, `dedupe_sentences`, `normalise_locality`.
+Red on `5a2b4bd` (9/10 failed before the fix), green after. The 23 original LOCAL-585
+tests still pass; **137 passed** across the touched-module suite (585 r2 + 585 + 590
+assembly + 591 contained-venue/one-scope/verdict + d523 story hygiene + local44 + local494).
+
+### Isolated live run (disposable container `local585-gen-img`, never `audioura-*`; OpenAI cap $1)
+
+`./run_local585_live.sh` — `docker run --rm`, `--network development_default`
+(so `postgres-2` resolves), own `--env-file`, cache OFF, `COST_HARD_LIMIT_USD=1.00`.
+Both cases pool-served, cost **$0.00**. The disposable image is removed at the end;
+`audio_tours` only counted, never written/deleted; no `audioura-*` service touched.
+r2 audit flags all green for both: `no_dangling`, `no_dup`, `no_raw_locality`,
+`no_dir_raw`.
+
+**ATHENAEUM** `Art and Architectual tour in Boston Athenaeum, boston, ma` (5 → 6):
+
+> Stop 1 (About Boston Athenæum): "Before we look at anything on the walls, here is the
+> story of Boston Athenæum in **Boston, Massachusetts** itself … The institution was
+> founded in 1807 by the Anthology Club of Boston, Massachusetts … **Designed by Edward
+> Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first
+> floor, the book collection on the second, and a painting gallery on the skylit third
+> floor.** [appears once] … A word about the building you are standing in. …"
+> (the truncated "produced a magazine called." sentence is **gone**.)
+>
+> - Directions: `Continue through Boston Athenaeum — next is Boys Come Over Here You're Wanted.`
+> - Directions: `Next: Picture Gallery with Views of Modern Rome.`
+
+**GRIFFIN** `Griffin museum of photography, Winchester, MA` (7 → 8):
+
+> Stop 1 (About Griffin Museum of Photography): "… here is the story of Griffin Museum
+> of Photography in **Winchester, Massachusetts** itself … Arthur Griffin was an American
+> photographer … a 501(c)3 nonprofit organization … **Founded in 1992** as a private
+> foundation, the Griffin Museum of Photography became a nonprofit public charity in 2000."
+>
+> - Directions: `Continue through Griffin museum of photography — next is BU Masters Show 2026 | Traces: Pursuing Process.`
+> - Directions: `Next: Intertidal : Field Notes.`
+
+### Files (r2)
+
+- `about_museum_stop.py` — `has_dangling_object_sentence`, `dedupe_sentences`,
+  `normalise_locality` (+ `_hygiene_split`, `_dedup_key`, `_titlecase_place`); hygiene
+  wired into collection and `_compose_about_narration`.
+- `stop_pool_assembly.py` — `_venue_name` helper; `_museum_transition` cleans the venue.
+- `generate_tour_text.py` — cleans `_museum_venue_name` before seams/constraint.
+- `stop_pool_orchestrator.py` — About-stop unit reads the resolver display name.
+- `test_local585_r2_about_hygiene.py` (new, 10 tests).
+- `run_local585_live.py` / `run_local585_live.sh` — r2 hygiene audit, full Stop-1 +
+  Directions dump, cap $1, disposable image renamed off `audioura-*`.

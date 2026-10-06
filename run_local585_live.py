@@ -31,7 +31,7 @@ sys.path.insert(0, HERE)
 os.environ["STORIED_MODE"] = "true"
 os.environ["DISABLE_TOUR_CACHE"] = "1"
 os.environ.setdefault("TOUR_LLM_MODEL", "gpt-4o")
-os.environ["COST_HARD_LIMIT_USD"] = "2.00"   # OpenAI hard cap $2 (ticket)
+os.environ["COST_HARD_LIMIT_USD"] = "1.00"   # OpenAI hard cap $1 (r2 ticket)
 
 import about_museum_stop as am
 import generate_tour_text as g
@@ -114,12 +114,44 @@ def run_case(tag, location, tour_type, stops, expect_architecture):
     leaked = "consists of a series of frames" in text.lower()
     print(f"   NO 'consists of a series of frames' anywhere: {not leaked}")
 
+    # ── r2 listener-facing defects (LEAD 2026-10-06) ──
+    dangling = am.has_dangling_object_sentence(stop1_full)
+    # Any sentence repeated (normalised) inside Stop 1?
+    try:
+        _sents = am._hygiene_split(stop1_body)
+        _keys = [am._dedup_key(s) for s in _sents if am._dedup_key(s)]
+        _dups = sorted({k for k in _keys if _keys.count(k) > 1})
+    except Exception:
+        _dups = []
+    # Raw lowercase request locality must not leak. Use a word boundary so the
+    # correctly-expanded "Boston, Massachusetts" (which contains "boston, ma" as a
+    # prefix of "massachusetts") does not false-positive.
+    raw_locality_leak = bool(re.search(r"\bboston,\s*ma\b", low)
+                             or " ma itself" in low)
+    # Directions lines across the whole tour must never carry the raw request string.
+    raw_request = location
+    dir_lines = re.findall(r"(?mi)^\s*Directions:\s*(.+?)\s*$", text)
+    dir_raw_leak = any(raw_request.lower() in d.lower() for d in dir_lines)
+    print(f"\nCASE {tag} r2 HYGIENE AUDIT:")
+    print(f"   NO truncated/dangling sentence in Stop 1 : {not dangling}")
+    print(f"   NO duplicate sentence in Stop 1          : {not _dups}")
+    print(f"   NO raw lowercase locality in Stop 1      : {not raw_locality_leak}")
+    print(f"   NO raw request string in any Directions  : {not dir_raw_leak}")
+    print(f"\nCASE {tag} STOP 1 (full narration) >>>>>>>>>>")
+    print(stop1_body.strip())
+    print(f"<<<<<<<<<< CASE {tag} STOP 1 END")
+    print(f"CASE {tag} first two Directions lines:")
+    for d in dir_lines[:2]:
+        print(f"   Directions: {d}")
+
     return {
         "tag": tag, "ok": True, "n": len(parsed), "kind": kind,
         "stop1": stop1_name, "is_about": is_about, "non_artwork": non_artwork,
         "has_history": has_founder_or_history,
         "covers_arch": covers_arch if expect_architecture else None,
         "no_frames_leak": not leaked,
+        "no_dangling": not dangling, "no_dup": not _dups,
+        "no_raw_locality": not raw_locality_leak, "no_dir_raw": not dir_raw_leak,
         "total_cost": cost.get("total_cost"),
     }
 

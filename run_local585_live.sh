@@ -10,7 +10,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-IMAGE="audioura-test-local585"
+IMAGE="local585-gen-img"
 ENV_FILE="${HERE}/.env"
 OUT_DIR="${HERE}/tours/local585_live"
 mkdir -p "${OUT_DIR}"
@@ -36,7 +36,7 @@ args=(
   -e DB_PASSWORD=password123
   -e STORIED_MODE=true
   -e DISABLE_TOUR_CACHE=1
-  -e COST_HARD_LIMIT_USD=2.00
+  -e COST_HARD_LIMIT_USD=1.00
   -v "${OUT_DIR}:/app/tours"
 )
 # Own env-file (the audioura-tour-generator-1 container's env = project .env),
