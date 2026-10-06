@@ -1,0 +1,12 @@
+# LOCAL-595 live-check: stub orchestrator image. Builds as its OWN image/
+# container (local595-orchestrator). Never touches audioura-* containers.
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install --no-cache-dir Flask==2.3.3 psycopg2-binary==2.9.7
+# Only the modules the enforcement path needs — no generator code, no spend.
+COPY local595_orchestrator_stub.py /app/
+COPY entitlements.py /app/
+COPY subscription_levels.py /app/
+COPY payment_provider.py /app/
+EXPOSE 5002
+CMD ["python", "local595_orchestrator_stub.py"]
