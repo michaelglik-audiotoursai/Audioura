@@ -451,3 +451,209 @@ test_local590_*.py + test_local370_*.py                           69 passed   EX
    compact-hours normalisation + "Always free") + source-URL reporting + runner
    through the orchestrator + MAAM tests.
 3. `SUBMISSION_LOCAL-599.md` r2.
+
+---
+
+## r3
+
+**MassArt bounced because 4 of 7 r2 stops were PAST exhibitions, and the "story
+of the museum" was the site's land acknowledgment.** r2 verified 7 stops from the
+museum's own site with real hours and free admission — but a listener standing in
+the museum was being sent to 4 shows that are off the walls (Nicholas Galanin,
+Ghost of a Dream, Masako Miki, Press & Pull), and Stop 1 opened with the land
+acknowledgment under the wrong name ("The MassArt is open…"). r3 fills from WHAT
+IS ON VIEW, never past; selects the institution's real About text; and names the
+museum in full in the hours sentence.
+
+- **Agent:** Mac Mini Kiro
+- **Branch:** `LOCAL-599-no-wikidata-venue` (continued; HEAD base `d7c7e74`,
+  verified `git merge-base --is-ancestor d7c7e74 HEAD` → exit 0)
+
+### 1 — Fill from what is on view; never a past show (commit 1)
+
+The r2 fill order `(a) current → (b) spaces → (c) upcoming → (d) PAST` is
+**withdrawn**: padding to N with past shows misleads the listener.
+
+`exhibition_discovery.extract_exhibition_works` — splits ONE current show's own
+detail page into the works/rooms it names, STRUCTURALLY (not a hardcoded list):
+- the show's own named title (the `<span class="exhibition__subtitle…-inner">` —
+  *"metes and bounds"*, *"right?"*, *"Where We Come From"*), de-bleeded of the
+  "On View"/"Past" status label;
+- the specific NAMED WORKS the body credits in the museum's own caption grammar
+  *"Artist. Title , YEAR."* (e.g. *"Robert Lazzarini. American flag , 2022."*),
+  with a leading *"Detail of"* / *"Installation view of"* caption prefix stripped;
+- captioned images (`<figcaption>`). Installation-view / photo-credit / collection
+  lines are rejected, so a stop is always a nameable thing on the wall.
+
+`exhibition_site_first.build_site_first_candidates` — new honest fill order:
+**(a)** each on-view show split into works/rooms — the show (artist + named title)
+as the primary stop, then its named works ("Robert Lazzarini: American flag");
+**(b)** the museum's own named spaces from `/visit` + `/about`; **(c)** at most
+**one** upcoming show, labelled *"opening <date>"*. **PAST is never emitted** — a
+hard `assert status_counts['past'] == 0` guards it. `discover_classified_exhibitions`
+no longer fetches the past archive (`supplement_past` defaults False). When
+on-view material honestly can't reach N the list is simply shorter and the log
+says so — **no padding** (D611; a real shortfall is for LEAD to escalate, not for
+the generator to invent).
+
+### 2 — Real "About" text, not the land acknowledgment; full name in hours (commit 2)
+
+`about_museum_stop.py`:
+- `_NON_STORY_RE` — a deterministic exclusion of institutional boilerplate that is
+  **not** the museum's story: a **land acknowledgment**, a **DEI / equity /
+  accessibility** statement, a **cookie / privacy** banner, a **newsletter /
+  sign-up**. It runs in `_is_story_sentence` (and the architecture selector)
+  **before** the signal/verb check, so the land acknowledgment — which carried the
+  word "history" and slipped past r2 — can never be lifted as the story.
+- `_STORY_VERBS` broadened to accept a genuine **identity** claim with no founding
+  keyword: *"<Venue> is Boston's only free contemporary art museum"*, *"… is the
+  first / largest / leading … museum"*. A venue-named identity sentence no longer
+  needs a founding/mission keyword to qualify, so MAAM's real mission sentence is
+  selected.
+- `_full_venue_for_hours` + the hours sentence now name the museum in **full**:
+  *"The MassArt Art Museum is open Thursday, 12 PM–8 PM; …"* — never the stripped
+  *"The MassArt"* (the r2 wrong-name bug).
+
+### 3 — Tests (commit 3)
+
+`tests/test_local599b_maam_exhibitions.py` (rewrote `TestMaamFillToN` for r3; new
+`TestExhibitionWorks`):
+- **no past show is ever selected** when the exhibition list holds both on-view
+  and past shows (the index carries 3 + 3); `status_counts['past'] == 0`; none of
+  the four r2 past shows (nor GENERATIONS) appears;
+- each current show **splits into works** ("Robert Lazzarini: American flag");
+- every stop is `on_view` with a real `/exhibition/<slug>` source URL (never
+  `/event/`);
+- the honest shortfall (5 < 7) is **not padded** with past shows;
+- `extract_exhibition_works` yields title + work, strips *"Detail of"*, and
+  rejects provenance/photo-credit lines.
+
+`tests/test_local599b_opening_section.py` (new `TestAboutTextSelectionR3`,
+`TestAboutSelectorsPure`):
+- the **land acknowledgment is excluded** from the opening section;
+- the **real mission sentence** ("only free contemporary art museum") is present;
+- the hours sentence uses the **full name** ("MassArt Art Museum is open");
+- pure selectors: land-ack / DEI / cookie / newsletter excluded, a venue-named
+  identity sentence qualifies without a founding keyword, hours full name.
+
+#### Suite exits (all 0)
+
+```
+tests/test_local599_official_site_discovery.py                     7 passed   EXIT=0
+tests/test_local599b_maam_exhibitions.py + _opening_section.py    26 passed   EXIT=0
+test_local589_*.py                                                25 passed   EXIT=0
+test_local592_*.py                                                51 passed   EXIT=0
+test_local580_*.py + test_local583_*.py + test_local368_*.py      84 passed   EXIT=0
+```
+
+### 4 — Pool hygiene: remove the 4 r2 past-show rows (commit 4)
+
+Against `development-postgres-2-1` (the stop-pool DB `postgres-2/audiotours`; not
+an `audioura-*` container). Removed by EXACT `pool_key` + `title`, guarded so the
+transaction aborts unless exactly 4 rows match (`cleanup_local599c_pool.sql`):
+
+```
+SELECT (exact 4 past rows)                                              = 4
+BEFORE: massart rows = 7   total stop_pool rows = 909
+guarded DELETE (Nicholas Galanin, Ghost of a Dream, Masako Miki,
+                Press & Pull)                                 rowcount  = 4
+AFTER : massart rows = 3 (Banu Cennetoğlu, Baseera Khan, Robert Lazzarini)
+        total stop_pool rows = 905
+```
+
+No other DELETE. The new run reseeds.
+
+### 5 — Live run (isolated container `local599c-gen`, cap $2) (commit 5)
+
+`docker run --rm --name local599c-gen` on `development_default`, DB `postgres-2`,
+tour cache OFF, `COST_HARD_LIMIT_USD=2.00`, routed through
+`stop_pool_orchestrator.maybe_generate_with_pool`. No `audioura-*` container
+touched. Runner: `run_local599c_massart.py` / `run_local599c_live.sh`.
+
+**`MassArt Art Museum, Boston, MA`, 7 stops. TIER: `exhibit_museum`.**
+Site discovered `https://maam.massart.edu/` (web_search, score 9) over
+`massart.edu` / `calendar.massart.edu`; instagram / tripadvisor / facebook /
+eventbrite rejected as aggregators; `cntraveler.com` (score 4, no NAME signal)
+not picked. On-view material honestly reaches **5**, short of 7 — the five
+verified on-view stops are delivered, **no past show, no padding** (honest
+shortfall for LEAD to escalate).
+
+#### The stop titles, each with its source URL and status
+
+```
+Stop 1: Robert Lazzarini: American flag                 https://maam.massart.edu/exhibition/robert-lazzarini  [work/on_view]
+Stop 2: Baseera Khan: Second Skin, Half Column 3        https://maam.massart.edu/exhibition/baseera-khan      [work/on_view]
+Stop 3: Robert Lazzarini                                https://maam.massart.edu/exhibition/robert-lazzarini  [exhibition/on_view]
+Stop 4: Banu Cennetoğlu                                 https://maam.massart.edu/exhibition/banu-cennetoglu   [exhibition/on_view]
+Stop 5: Baseera Khan                                    https://maam.massart.edu/exhibition/baseera-khan      [exhibition/on_view]
+```
+
+3 current shows + 2 named works split from them; every stop `on_view`, each a
+real `/exhibition/<slug>` detail page. The program *"Make with MAAM"* (`/event/…`)
+and all PAST shows are absent.
+
+#### Stop 1 opening section (in full)
+
+```
+Stop 1: Robert Lazzarini: American flag
+
+Address: 621 Huntington Avenue, Boston, Massachusetts
+
+Coordinates: 42.3398, -71.0942
+
+Before we look at anything on the walls, here is the story of MassArt Art Museum
+in Boston, Massachusetts itself — who created it, why it exists, and what it is
+known for. The MassArt Art Museum (MAAM) is Boston's only free contemporary art
+museum, a space to experience works by extraordinary artists at the forefront of
+contemporary art. This account is drawn from the museum's own pages on
+maam.massart.edu.
+
+The MassArt Art Museum is open Thursday, 12 PM–8 PM; Friday, 12 PM–5 PM;
+Saturday, 12 PM–5 PM; Sunday, 12 PM–5 PM. Admission is FREE, as listed on
+maam.massart.edu in October 2026.
+
+Orientation: You are about to explore the MassArt Art Museum in Boston. … Your
+first stop is Robert Lazzarini. …
+```
+
+The story paragraph is now the museum's own mission ("Boston's only free
+contemporary art museum"), **not the land acknowledgment**; the hours sentence
+names the museum in **full** ("The MassArt Art Museum is open…"); address, hours
+with days, and free admission are all sourced from the venue's own `/visit` +
+`/about`.
+
+#### BLOCKER 3 (content-QA factual gate)
+
+```
+BLOCKER 3 line 1 — PASS checks:          20
+BLOCKER 3 line 2 — style FAIL checks:    0
+BLOCKER 3 line 3 — FACTUAL FAIL checks:  0
+```
+
+Clean on all three lines (r2's 3 style FAILs are gone — no forbidden phrase, no
+other-venue naming).
+
+#### Cost + wall time
+
+```
+Tour total: $0.6349   (well under the $2 cap)
+wall time : 419.2s
+```
+
+#### DB after the run
+
+```
+stop_pool (massart): 5  — the run reseeded the pool with its 5 on-view stops
+                          (3 shows + 2 named works); 0 past rows.
+```
+
+### Commits (branch `LOCAL-599-no-wikidata-venue`, base `d7c7e74`)
+
+1. Never ship past shows; split on-view shows into works/rooms; ≤1 upcoming
+   labelled; `extract_exhibition_works`; `supplement_past` default off.
+2. Real About text (exclude land acknowledgment / DEI / cookie / newsletter);
+   identity-sentence selection; full museum name in the hours sentence.
+3. Tests: no past selected, works split, land-ack excluded, full name in hours.
+4. Pool hygiene — remove the 4 r2 past-show rows (guarded; `cleanup_local599c_pool.sql`).
+5. Isolated-container live-run scripts (`local599c-gen`).
+6. `SUBMISSION_LOCAL-599.md` r3.
