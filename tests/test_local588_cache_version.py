@@ -151,3 +151,26 @@ class TestLookupLogLine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+def test_lead_cache_never_serves_fewer_stops_than_requested(monkeypatch):
+    """A 4-stop tour cached in the 4–6 bucket must NOT answer a 6-stop request (LEAD 2026-10-05;
+    LOCAL-590's live run saw `CACHE HIT: Boston Common / walking / 6` return 4 stops)."""
+    import tour_cache_layer1 as t
+
+    class _Cur:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def execute(self, *a, **k): pass
+        def fetchone(self): return ("Stop 1: A\n\nStop 2: B\n\nStop 3: C\n\nStop 4: D\n", 4)
+        def close(self): pass
+
+    class _Conn:
+        def cursor(self): return _Cur()
+        def commit(self): pass
+        def close(self): pass
+
+    monkeypatch.setattr(t.psycopg2, "connect", lambda *a, **k: _Conn())
+    assert t.get_cached_tour("Boston Common, Boston, MA", "walking", 6, "postgresql://x") is None
+    # and a request for FEWER than cached is still a (trimmed) hit
+    assert t.get_cached_tour("Boston Common, Boston, MA", "walking", 4, "postgresql://x") is not None

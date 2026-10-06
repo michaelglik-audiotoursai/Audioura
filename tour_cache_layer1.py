@@ -403,6 +403,16 @@ def get_cached_tour(
             content, cached_stops = row[0], row[1]
             bucket = _stop_bucket(total_stops)
             logger.info(f"[S20] cache v{TOUR_CACHE_VERSION} HIT key={key[:12]}")
+            if cached_stops and total_stops and total_stops > cached_stops:
+                # [LEAD 2026-10-05] The bucket holds FEWER stops than the listener asked for
+                # (e.g. a 4-stop tour cached in the 4–6 bucket, request 6). Serving it would
+                # deliver fewer stops than requested; treat it as a MISS so generation (or the
+                # stop pool on subscribed) produces the full count.
+                logger.info(
+                    f"Cache MISS (cached {cached_stops} < requested {total_stops}, bucket={_stop_bucket(total_stops)}): "
+                    f"{location} / {tour_type} / {total_stops}"
+                )
+                return None
             if cached_stops and total_stops and total_stops < cached_stops:
                 # Bucket hit for a smaller count: trim down and repair the seam.
                 trimmed = trim_tour_to_stops(content, total_stops)
