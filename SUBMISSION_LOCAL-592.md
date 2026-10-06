@@ -1,0 +1,568 @@
+# SUBMISSION — LOCAL-592
+
+**Exactly N stops: the museum "About" content and the practical facts are the OPENING SECTION of Stop 1, never an extra stop.**
+
+- **Agent:** Mac Mini Kiro
+- **Branch:** `LOCAL-592-about-in-stop1`
+- **Base:** subscribed @ `c9d4c47` (verified: `git merge-base --is-ancestor c9d4c47 HEAD` exits 0)
+- **Commits:**
+  - `aeffdbb` — RED tests (`test_local592_about_in_stop1.py`), failing on `c9d4c47`
+  - `5690e21` — implementation (GREEN) + updated the 4 LOCAL-585 tests that encoded the superseded extra-stop behaviour
+  - `1898abf` — isolated live-run harness (`run_local592_live.py` / `.sh`)
+
+---
+
+## 1. Michael's rule (2026-10-06, binding)
+
+> "If a user asks for x number of stops, we are supposed to generate exactly x number of
+> stops. In Walking tours we have the Overall section and that section is the start of
+> Stop 1. The stop itself is after this section but still part of Stop 1. The same must be
+> true with museum, restaurant, etc. and other tours. It is very important to say when the
+> museum opens, how much they charge for entrance, etc. but it has to be the first section
+> of Stop 1."
+
+## 2. The problem on `c9d4c47`
+
+LOCAL-585 (subscribed) adds "About &lt;museum&gt;" as an **EXTRA stop**: a 5-stop request
+for the Boston Athenaeum delivered **6**, a 7-stop Griffin request delivered **8**. The
+extra stop came from three places:
+
+- `about_museum_stop.should_count_toward_n` — a count branch that treated About as a stop;
+- `stop_pool_assembly.assemble_building_tour` — `about_lead = [about_stop]` prepended a
+  standalone Stop 1;
+- `stop_pool_orchestrator` — all three delivery paths built an About *stop unit*.
+
+The walking tour already does the right thing: its `[R2]` prolog is **folded into Stop 1**
+(it rides on the Stop-1 Orientation prefix — `generate_tour_text.py:~21407`,
+`_saved_prolog`), "no standalone Introduction block". LOCAL-592 makes museum/facility/
+building tours mirror that pattern.
+
+## 3. What was delivered
+
+### a. `about_museum_stop.py`
+- **`should_count_toward_n(...)` now always returns `False`.** The About content is a
+  SECTION of Stop 1, not a stop, so it can never add to or subtract from N. The LOCAL-585
+  "thin exhibitions → count it" branch is gone. Kept as always-False so existing imports
+  keep working and a request for N always delivers N.
+- **`AboutStop.practical_facts`** field + **`build_about_stop(..., practical_facts="")`**
+  parameter: an already-gated practical-facts string (hours / admission / closed days) is
+  carried verbatim onto the AboutStop. Nothing is invented here — the sourcing + LOCAL-584
+  gate are upstream.
+- **`build_opening_section(about) -> str`**: composes the Stop-1 opening section —
+  the sourced, artwork-framing-free About narration, then
+  `"Before you go in, a few practical notes. <gated facts>"`. Empty when there is no story;
+  practical-facts-only when the About narration would be unsafe (belt-and-braces artwork
+  guard). This is the single block the caller folds into Stop 1.
+
+### b. `stop_pool_assembly.py` — `assemble_building_tour`
+- New `opening_section: str = ""` parameter. `ordered = new_stops + pooled_stops`
+  (**no `about_lead`**). The opening section is folded into **Stop 1's narration opening**
+  (the museum's story + practical facts come first, then Stop 1's own exhibition narration).
+- The legacy `about_stop` unit is still accepted but is **folded**, never placed as its own
+  stop — no caller path can resurrect an extra "About …" stop.
+- `about_stops` is reported as `1` when an opening section was folded (for the ledger) but
+  **adds ZERO stops**: `len(order) == len(new_stops) + len(pooled_stops)`.
+- Pooled narration is still reused verbatim; `overall_orientation` still rides on Stop-1
+  Orientation (LOCAL-590 unchanged).
+
+### c. `stop_pool_orchestrator.py`
+- `_build_about_stop_unit` → **`_build_opening_section`** (returns the opening-section text).
+- **`_source_practical_facts(venue, site_url, address)`**: fetches the venue's visit/hours/
+  admission pages, extracts with `visitor_facts_extractor` (venue-bound hours), and runs the
+  result through `practical_facts_gate.gate_formatted_facts` (the ONE LOCAL-584 gate:
+  venue-bound, dated, state-only-what-the-page-supports). Best-effort — any failure yields
+  `""` and the opening section carries only the About story (silence is correct, D584).
+- All three delivery paths (K==0 first tour; N≤K; N>K) now request **exactly N** exhibition
+  stops and pass `opening_section=` instead of `about_stop=`.
+
+### d. Restaurant / outdoor tours — unchanged (D538)
+`assemble_outdoor_tour` is untouched: the walking Overall section already folds into Stop 1,
+and each restaurant's practical facts stay in that restaurant's stop. Only single-venue
+(museum / facility / contained building) tours gained the fold.
+
+## 4. Tests
+
+New: `test_local592_about_in_stop1.py` (16 tests) — **RED on `c9d4c47`, GREEN after**:
+- `should_count_toward_n` is always False (the About content never consumes/adds a stop);
+- the opening section carries both the About story and the practical facts, artwork-framing-free;
+- Athenaeum **5 → 5** and Griffin **7 → 7**: Stop 1 opens with the About + practical section,
+  then the first artwork's own narration, in the same stop;
+- no stop is titled "About …";
+- pooled bodies stay verbatim; the opening section is regenerated per tour;
+- backward compatible when no opening section is supplied.
+
+Updated the 4 LOCAL-585 tests that encoded the now-superseded extra-stop behaviour
+(`should_count_toward_n`, counts-when-thin, and the "About is Stop 1" assembly class →
+"About is folded into Stop 1").
+
+**Suite exits (all 0):**
+
+```
+exit=0 test_local592_about_in_stop1
+exit=0 test_local584_venue_bound_hours
+exit=0 test_local584_practical_facts_currency
+exit=0 test_local585_about_museum_stop
+exit=0 test_local585_r2_about_hygiene
+exit=0 test_local590_assembly
+exit=0 test_local590_pool_store
+exit=0 test_local590_orchestrator
+exit=0 test_local591_verdict_equals_reasoning
+exit=0 test_local591_contained_venue
+exit=0 test_local591_one_scope_per_tour
+exit=0 test_local591_every_stop_has_coordinates
+```
+
+Combined run: **153 passed**. LOCAL-582 / 589 also green (29 passed) — no regression.
+
+## 5. Live, ISOLATED run
+
+`./run_local592_live.sh` — a DISPOSABLE `local592-gen-img` container (`docker run --rm`,
+name `local592-gen-…`), on `development_default`, with its OWN `--env-file` (the project
+`.env`, i.e. the env the `audioura-tour-generator-1` container uses). Never an `audioura-*`
+container; the image is removed at the end; `audio_tours` is only counted (202 → 202, never
+written/deleted). OpenAI hard cap `$1.00` (&lt; the $2 ticket cap), tour cache OFF.
+
+### CASE ATHENAEUM — "Art and Architectual tour in Boston Athenaeum, boston, ma" (5 requested)
+
+**Delivered EXACTLY 5 stops. No stop titled "About …".**
+
+```
+Stop 1: Boys Come Over Here You're Wanted
+Stop 2: Picture Gallery with Views of Modern Rome
+Stop 3: Landscape with Cottages and Pond
+Stop 4: Cutter Expansive Classification
+Stop 5: Annie Adams Fields
+```
+
+Stop 1 — first 15 lines (About + architecture opening section, then the first artwork):
+
+```
+Stop 1: Boys Come Over Here You're Wanted
+Address: 10 1/2 Beacon St, Boston, MA 02108
+Coordinates: 42.3584, -71.0637
+Orientation: You are about to explore the Boston Athenaeum in Boston. … Your first stop is Boys Come Over Here You're Wanted.
+Before we look at anything on the walls, here is the story of Boston Athenæum in Boston,
+Massachusetts itself — who created it, why it exists, and what it is known for. The Boston
+Athenæum is one of the oldest independent libraries in the United States. … The institution
+was founded in 1807 by the Anthology Club of Boston. … Construction on the Athenaeum's present
+home on Beacon Street began in 1847. Designed by Edward Clarke Cabot, the building opened in
+1849 … A word about the building you are standing in. … This account is drawn from the museum's
+own pages on bostonathenaeum.org and public reference sources.
+The poster "Boys Come Over Here You're Wanted" was a centerpiece in the 2014 exhibition …
+```
+
+### CASE GRIFFIN — "Griffin museum of photography, Winchester, MA" (museum, 7 requested)
+
+**Delivered EXACTLY 7 stops. No stop titled "About …".**
+
+```
+Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+Stop 2: Intertidal : Field Notes
+Stop 3: Earth, Wind & Fire
+Stop 4: Tabitha Soren | An Artist Life
+Stop 5: TLC
+Stop 6: Lua Kobayashi |The Persistence of Memories
+Stop 7: Homage | Robert Frank: The Americans
+```
+
+Stop 1 opens with the About section (then the first exhibition's own narration):
+
+```
+… Before we look at anything on the walls, here is the story of Griffin Museum of Photography
+in Winchester, Massachusetts itself — who created it, why it exists, and what it is known for.
+Arthur Griffin was an American photographer. … The Griffin Museum of Photography is a 501(c)3
+nonprofit organization dedicated to the art of photography. … Founded in 1992 as a private
+foundation, the Griffin Museum of Photography became a nonprofit public charity in 2000. This
+account is drawn from the museum's own pages on griffinmuseum.org and public reference sources.
+```
+
+Both ran through the LOCAL-590 pool fast-path (pool held 5 / 7): `reused=5/7, new=0,
+about_stops=1` — the `about_stops=1` is the **folded opening section**, adding **zero** stops.
+
+### Practical facts on the live run (honesty contract held)
+
+Both live runs logged `practical_facts=none`. This is the **LOCAL-584 gate working as
+designed**, not a wiring gap: the live pages' extracted spans (`'81–72'`, `'20–76'`,
+`'Free for Métropole residents'`) were **dropped** because they are not literally supported by
+the fetched page — silence over a guess (D584). The wiring is proven to surface *real* facts:
+on the committed fixture `tests/fixtures/griffin_about_2026.html`,
+`stop_pool_orchestrator._source_practical_facts(...)` returns
+`'Closed on Monday. Noon–4 PM. $12'`, and `build_opening_section` folds
+`"Before you go in, a few practical notes. Closed on Monday. Noon–4 PM. $12."` into Stop 1 —
+exactly as the LOCAL-584 suite asserts.
+
+(The harness's `non_artwork=False` flag on Griffin is a false positive of the audit heuristic:
+it scans the *whole* of Stop 1, including the exhibition body — which legitimately says
+"The work titled 'Interference' …". The About *opening section* itself is artwork-framing-free,
+as the unit tests assert.)
+
+## 6. Process
+
+- No GCloud.
+- Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Committed + pushed after each step; `git rev-list --count subscribed..HEAD` ≥ 1 throughout.
+- Branch created from HEAD (`c9d4c47`), never from `origin/*`.
+
+
+---
+
+## r2 — Stop-1 opening section FIRST, visiting information, address provenance
+
+### Why it bounced (LEAD review, 2026-10-06)
+Exactly-N was right (Athenaeum 5→5, Griffin 7→7, no "About" stop), but three things were wrong
+in `tours/local592_live/`:
+1. **Order.** The About text came **after** the Orientation and "Your first stop is …" (in the
+   Griffin, even after part of the first exhibition's narration). Michael's rule (D611): inside
+   Stop 1 the order is **(a) About the venue → (b) Visiting information → (c) the tour overview /
+   Orientation → (d) Stop 1's own narration.**
+2. **No visiting information.** Neither tour stated hours or admission.
+3. **Address provenance.** The Griffin's Stop 1 showed `1 Washington St, Winchester, MA 01890`;
+   the Griffin is at **67 Shore Road**.
+
+### What changed (r2)
+
+**1. Four-part order — opening section renders FIRST, before Orientation.**
+- `stop_pool_assembly.py`: the opening section is placed on a dedicated Stop-1 field
+  `_opening_section` (no longer folded into the stop's *narration*). `_render_stop_block` emits
+  it **before** the `Orientation:` line. `overall_orientation` stays on the Orientation field, so
+  it now renders *after* the opening section. The resulting order is exactly
+  **About → Visiting info → Orientation/overview → stop narration.**
+
+**2. Visiting information — sourced, with an honest website fallback (never invented).**
+- Sourced path unchanged: `stop_pool_orchestrator._source_practical_facts` fetches the venue's
+  visit/hours page, extracts with the **LOCAL-584** venue-bound extractor
+  (`visitor_facts_extractor`) and passes it through the **LOCAL-584** gate
+  (`practical_facts_gate.gate_formatted_facts`).
+- New fallback: when the venue's pages yield **no gate-passing facts**,
+  `about_museum_stop.build_opening_section` appends a single honest pointer —
+  **"Check opening hours and admission on `<domain>` before you go."** — rather than inventing
+  hours or prices (D584). `AboutStop.site_domain` + `_visiting_fallback_sentence` carry it.
+
+**3. Address provenance — venue-bound address.**
+- `about_museum_stop.extract_venue_address(page_text, locality)` lifts the venue's **own** street
+  address from its page. The street regex requires a house number followed by **adjacent
+  Capitalized street-name words** and a suffix, so a *narrative* clause ("…moved in **1822 to a
+  mansion on Pearl Street**, where it remained…") is **not** mistaken for an address — it correctly
+  lands on "10½ Beacon Street".
+- `about_museum_stop.venue_bound_address(stop_address, venue_address, stop_page_text)`: a contained
+  stop uses the sourced **venue** address unless the stop's own page literally states a satellite
+  gallery address (then that is kept, and the narration can say so). Wired through
+  `assemble_building_tour(..., venue_address=...)` (applied to every stop) and
+  `stop_pool_orchestrator._resolve_venue_address` / `_source_venue_address` at all three assembly
+  call-sites.
+
+### Tests (RED on 9802745 source, GREEN after)
+`test_local592_about_in_stop1.py` adds three classes (7 new tests):
+- `TestFourPartOrderInStop1` — the opening (About + visiting) renders before the `Orientation:`
+  line; overview precedes the stop narration; full chain About→Visiting→Orientation→narration.
+- `TestVisitingInfoFallback` — the website pointer appears when no facts are sourced, invents no
+  hours/prices, and sourced facts are preferred over the fallback.
+- `TestAddressProvenance` — `extract_venue_address` lifts "67 Shore Road" (not a prose clause);
+  a guessed address is replaced by the venue address; a page-stated satellite address is kept; the
+  assembler binds contained stops to the venue address.
+
+RED→GREEN proof (source stashed to base 9802745, test kept):
+```
+7 failed, 18 passed            # on base source (new behaviour absent)
+25 passed                      # after r2 fix
+```
+
+Suite exits (all GREEN):
+```
+test_local592_about_in_stop1.py ....................... 25 passed
+test_local585_about_museum_stop.py + _r2_about_hygiene ...
+test_local584_venue_bound_hours.py + _practical_facts_currency.py ...
+test_local590_assembly.py + _orchestrator.py + _pool_store.py ...
+   → 125 passed (592+585+584+590 combined)
+test_local591_*.py (coordinates/one_scope/contained/verdict) → 37 passed
+```
+
+### Isolated live run (disposable container `local592-gen-$(date +%s)`, never `audioura-*`)
+`./run_local592_live.sh` — `development_default` network (postgres-2 pool), OpenAI hard cap
+**$1.00**, tour cache OFF, `audio_tours` **BEFORE/AFTER 202 / 202** (never DELETE), `total_cost=0.0`
+(served from the pool).
+
+**ATHENAEUM — 5 stops (requested 5); Stop 1, first lines:**
+```
+Stop 1: Boys Come Over Here You're Wanted
+Address: 10½ Beacon Street, Boston, Massachusetts
+Coordinates: 42.3584, -71.0637
+Before we look at anything on the walls, here is the story of Boston Athenæum in Boston,
+Massachusetts itself … founded in 1807 … located at 10½ Beacon Street … Designed by Edward
+Clarke Cabot, the building opened in 1849 … A word about the building you are standing in. …
+This account is drawn from the museum's own pages on bostonathenaeum.org and public reference
+sources.
+Check opening hours and admission on bostonathenaeum.org before you go.
+Orientation: You are about to explore the Boston Athenaeum in Boston. … Your first stop is Boys
+Come Over Here You're Wanted.
+The poster "Boys Come Over Here You're Wanted" was a centerpiece in the 2014 exhibition …
+Directions: Continue through Boston Athenaeum — next is Picture Gallery with Views of Modern Rome.
+```
+Order: **(a) About (history + architecture) → (b) Visiting pointer → (c) Orientation/overview →
+(d) Stop 1 narration.** Address is the venue's (`10½ Beacon Street`), not the earlier narrative
+garbage.
+
+**GRIFFIN — 7 stops (requested 7); Stop 1, first lines:**
+```
+Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+Address: 67 Shore Road, Winchester, MA 01890
+Coordinates: 42.4634, -71.1192
+Before we look at anything on the walls, here is the story of Griffin Museum of Photography in
+Winchester, Massachusetts itself … Arthur Griffin … Founded in 1992 as a private foundation, the
+Griffin Museum of Photography became a nonprofit public charity in 2000. This account is drawn
+from the museum's own pages on griffinmuseum.org and public reference sources.
+Check opening hours and admission on griffinmuseum.org before you go.
+Orientation: You are about to explore the Griffin Museum of Photography in Winchester. … Your
+first stop is BU Masters Show 2026 | Traces: Pursuing Process. …
+From over 340 entries, only 50 were selected …
+```
+Address fixed: **`67 Shore Road, Winchester, MA 01890`** (was `1 Washington St`). Same four-part
+order.
+
+LOCAL-592 SUMMARY (harness audit):
+```
+{'tag':'ATHENAEUM','n':5,'requested':5,'exactly_n':True,'no_about_stop':True,
+ 'has_about_content':True,'has_practical':True,'non_artwork':True,'covers_arch':True}
+{'tag':'GRIFFIN','n':7,'requested':7,'exactly_n':True,'no_about_stop':True,
+ 'has_about_content':True,'has_practical':True,'non_artwork':False,'covers_arch':None}
+```
+(`non_artwork=False` on Griffin is the same audit false-positive noted in r1 §5: the heuristic
+scans the whole of Stop 1 including the exhibition body "The work titled 'Interference' …"; the
+About *opening section* itself is artwork-framing-free, as the unit tests assert.)
+
+### Visiting information on this live run (honesty contract held)
+Both runs logged `practical_facts=none`: the live pages' extracted spans did not survive the
+LOCAL-584 gate (not literally supported — D584), so the opening section carried the honest
+**website pointer** instead of invented hours. On the committed fixture
+`tests/fixtures/griffin_about_2026.html` the same wiring surfaces the real facts
+(`'Closed on Monday. Noon–4 PM. $12'`), as the LOCAL-584 suite asserts.
+
+### Process (r2)
+- No GCloud. Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Base verified: `git merge-base --is-ancestor 9802745 HEAD` exits 0; committed + pushed after each
+  step on `LOCAL-592-about-in-stop1`.
+
+
+---
+
+## r3 — State the real hours and admission the venue's own pages give
+
+### Why it bounced (LEAD review, 2026-10-06 10:4x)
+r2 fixed the order and the addresses, but the live Griffin Stop 1 said only
+**"Check opening hours and admission on griffinmuseum.org before you go."** — a pointer, no
+facts — even though the Griffin's own site states BOTH on
+`https://griffinmuseum.org/about-the-griffin-2026/` ("Tuesday through Sunday: Noon to 4 PM.
+Closed: Every Monday …" and "General Admission: $12 for adults, $8 for seniors …"). The live
+extractor read `/plan-your-visit` and `/visit` (hours, no price), produced garbage spans, and the
+result never surfaced. Michael: opening hours and admission are "very important".
+
+### Root cause (found by probing the live site)
+1. **The facts page was never fetched.** The fixed `_STORY_SEEDS` are generic slugs (`/about`,
+   `/visit`, `/plan-your-visit`). On the live Griffin those are all `200`s but carry no visitor
+   facts; the real page is the venue-specific slug **`/about-the-griffin-2026/`**, which the seeds
+   never reach. (Confirmed live: that slug yields `'Closed on Monday. Noon–4 PM. $12'`; `/visit`,
+   `/about`, home all yield nothing usable.)
+2. **The extractor mis-read non-time digits as hours.** On the Boston Athenaeum `/visit` the real
+   hours ("Monday–Thursday: 9 am – 8 pm") were present, but the loose single-range fallback matched
+   a **phone number** ("(617) 720-**7604**" → `20–76`) and a year, which the LOCAL-584 gate then
+   correctly dropped — so the whole result was discarded.
+3. **The first gate-passing page won and stopped.** r1/r2 broke on the first page, so hours on one
+   page and the price on another were never combined.
+
+### What changed (r3)
+
+**1. Reach the venue's real visiting page — `stop_pool_orchestrator._discover_visiting_urls`.**
+Fetch the home page once and follow its OWN navigation links whose href or anchor text names
+Visit / Plan Your Visit / Hours / Admission / Tickets / About, staying on the venue's domain. This
+reaches `/about-the-griffin-2026/` (and the Athenaeum's `/visit/`) whatever the slug, without
+guessing and without leaving the venue's site. The discovered URLs are read before the fixed seeds.
+
+**2. State what is known, merged across pages — `stop_pool_orchestrator._source_practical_facts`.**
+Walk ALL the venue's own pages, gate-verify each page's facts against THAT page (unchanged LOCAL-584
+honesty contract), and **merge the survivors by claim type** (closed day, hours, admission),
+preferring an admission segment that carries a concrete price. **The "too short — omitting" rule is
+gone for the Stop-1 visiting section**: hours without a price (or a price without hours) is still
+stated. Injectable `fetcher` for offline tests.
+
+**3. Capture day-schedule hours; never read a phone number as hours — `visitor_facts_extractor`.**
+Added a day-schedule pattern ("Monday–Thursday: 9 AM – 8 PM" — the live Athenaeum) and required a
+time marker (am/pm/colon/noon/midnight) on at least one side of the loose single-range fallback, so
+`720-7604`/years can no longer be mistaken for hours. The Griffin "Noon to 4 PM" path is unchanged.
+
+**4. Partial pointer — only for what is missing — `about_museum_stop.build_opening_section`.**
+When facts are stated, the website pointer covers ONLY the gap:
+- hours known, admission missing → "Admission prices are listed on `<site>`."
+- admission known, hours missing → "Opening hours are listed on `<site>`."
+- both known → no pointer; neither known → the full r2 pointer.
+It never repeats a field already stated and never invents a value (D584).
+
+### Tests (RED on 95f364d, GREEN after)
+`test_local592_about_in_stop1.py` adds four classes (14 new tests, suite now **38 passed**):
+- `TestVisitingInfoStatesKnownFacts` — `_source_practical_facts` states hours (visit page) AND the
+  price (About page) merged; hours-only and admission-only pages are NOT dropped as "too short".
+- `TestPartialPointerOnlyForMissing` — the pointer covers only the missing field; no pointer when
+  both are known; full pointer when neither is known.
+- `TestDayScheduleHoursExtraction` — "Monday-Thursday: 9 AM – 8 PM" is extracted; a phone number is
+  never read as hours; the Griffin "Noon to 4 PM" still extracts.
+- `TestVisitingLinkDiscovery` — discovery follows the home-page Visit nav link to the real slug and
+  stays on the venue's domain.
+
+**Suite exits (all 0):**
+```
+exit=0 test_local592_about_in_stop1            38 passed
+exit=0 test_local584_venue_bound_hours         10 passed
+exit=0 test_local584_practical_facts_currency  14 passed
+exit=0 test_local585_about_museum_stop         24 passed
+exit=0 test_local585_r2_about_hygiene          10 passed
+exit=0 test_local590_assembly                  16 passed
+exit=0 test_local590_pool_store                18 passed
+exit=0 test_local590_orchestrator               8 passed
+exit=0 test_local582_museum_overview           20 passed
+```
+
+### Isolated live run (disposable `local592-gen-$(date +%s)`, never `audioura-*`)
+`./run_local592_live.sh` — `development_default` network (postgres-2 pool), OpenAI hard cap
+**$1.00**, tour cache OFF, `audio_tours` **BEFORE/AFTER 202 / 202** (never DELETE),
+`total_cost=0.0` (served from the pool). Both logged `practical_facts=yes`.
+
+**GRIFFIN — 7 stops (requested 7); Stop 1 visiting line:**
+```
+Before you go in, a few practical notes. Closed on Monday. Noon–4 PM. $12.
+```
+Both hours AND admission stated (the real Griffin facts) — no website pointer, because both are
+known.
+
+**ATHENAEUM — 5 stops (requested 5); Stop 1 visiting line:**
+```
+Before you go in, a few practical notes. 9 AM–8 PM. Admission prices are listed on bostonathenaeum.org.
+```
+The real hours are stated; the pointer covers ONLY the missing admission. (The page's
+`'Free for Métropole residents'` span was correctly dropped by the LOCAL-584 gate — not literally
+supported — so only the real `9 AM–8 PM` survived: silence/honesty over a guess, D584.)
+
+```
+{'tag':'ATHENAEUM','n':5,'requested':5,'exactly_n':True,'no_about_stop':True,'has_about_content':True,'has_practical':True,'non_artwork':True,'covers_arch':True,'total_cost':0.0}
+{'tag':'GRIFFIN','n':7,'requested':7,'exactly_n':True,'no_about_stop':True,'has_about_content':True,'has_practical':True,'non_artwork':False,'total_cost':0.0}
+```
+(`non_artwork=False` on Griffin is the same audit false-positive noted in r1/r2: the heuristic scans
+the whole of Stop 1 including the exhibition body "The work titled 'Interference' …"; the About
+opening section itself is artwork-framing-free, as the unit tests assert.)
+
+### Process (r3)
+- No GCloud. Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Base verified: `git merge-base --is-ancestor 95f364d HEAD` exits 0; `git rev-list --count
+  95f364d..HEAD` = 2. Committed + pushed after each step on `LOCAL-592-about-in-stop1`
+  (`997f8bf`, `a40885a`). Branch created from HEAD, never from `origin/*`.
+
+## r4 — Hours keep their DAYS, and the visiting note reads as speech
+
+**Base:** `LOCAL-592-about-in-stop1` continued at HEAD `7bba912`. Branch created from HEAD
+(`git merge-base --is-ancestor 7bba912 HEAD` exits 0), never from `origin/*`.
+
+### Why r3 bounced (LEAD review, 2026-10-06 11:0x)
+r3 finally states real facts, but:
+1. **Days were dropped.** The Athenaeum source lists "Monday–Thursday: 9 am – 8 pm"; the Griffin
+   lists "Tuesday through Sunday: Noon to 4 PM". r3 said only the TIME — "9 AM–8 PM", "Noon–4 PM" —
+   which a Saturday listener hears as *every day*. **Hours without their days is a misleading
+   half-fact.**
+2. **It read like a note, not speech:** "Before you go in, a few practical notes. Closed on Monday.
+   Noon–4 PM. $12."
+
+### What was delivered (r4)
+
+**(a) Day-range binding — in the extractor (`visitor_facts_extractor.py`).**
+- `VisitorFacts.hours` entries now carry a `days` field (the weekday range bound to each time
+  range). `format_en()` renders `Tuesday through Sunday, Noon–4 PM`, never a day-less `Noon–4 PM`.
+- English day-schedule extraction captures the day range and **every** day group the page gives,
+  in page order: the Athenaeum's `Monday through Thursday, 9 AM–8 PM; Friday and Saturday, 9 AM–5 PM`.
+- A time range with **no bindable day context** (no weekday, no "daily") is **not stored** as the
+  venue's hours — a day-less time (a café's lunch window) is a half-fact and is dropped.
+- New helpers `_normalize_day_range_en` (renders "Tuesday through Sunday" / "Monday to Thursday" /
+  "Friday and Saturday" per the page's own connector) and `_day_context_en` (binds "daily" /
+  "every day [except <day>]" / a nearby weekday).
+
+**(b) Spoken composition — in the composer (`about_museum_stop.py`).**
+- `build_opening_section` now composes the visiting information as **sentences** via
+  `_compose_visiting_sentences`, not a note:
+
+  > "The Griffin is open Tuesday through Sunday, Noon–4 PM, and closed on Monday. Admission is $12
+  >  for adults and $8 for seniors, students and teachers, as listed on griffinmuseum.org in
+  >  October 2026."
+
+  The day range is spoken WITH the hours; the admission categories the page gives (adults / seniors
+  / students / teachers) are kept **verbatim**, never invented; the **source + month** honesty
+  signal (D584/D582) closes the admission sentence.
+- `build_about_stop` gains an `as_of` month stamp (defaults to the current month via
+  `museum_overview._default_as_of`, so the Stop-1 visiting signal and the rung-3 overview dateline
+  share one source of truth), carried on `AboutStop`.
+- The r2 website-pointer fallback and the r3 partial-pointer (point to the site ONLY for the field
+  the page did not give) are preserved and now read as speech too.
+
+Nothing is invented: every weekday, time, price and category is carried verbatim from the gated
+`practical_facts` string (built upstream under the D584 contract) — r4 only adds the spoken
+connective tissue and binds the day range the extractor already captured.
+
+### Tests (red on `7bba912`, green after)
+`test_local592_r4_dayrange_spoken.py` — 13 tests, RED on `7bba912` (the extractor stores no day
+range; the composer emits note fragments), GREEN after r4:
+- extractor binds the day range to each time range (Griffin "Tuesday through Sunday"; Athenaeum
+  first group carries "Monday–Thursday"); several day groups each stated; `format_en()` renders the
+  days; a day-less time is not stored;
+- the composer reads as sentences (not "a few practical notes"); the day range is spoken before the
+  hours; the source + month signal is present; admission categories are kept and never invented;
+  the Griffin sentence shape (open→days→time→closed→admission→dated source) holds;
+- the Athenaeum states each of its own day groups and speaks free admission without a fabricated
+  price.
+
+```
+$ python3 -m pytest test_local592_about_in_stop1.py test_local592_r4_dayrange_spoken.py -q
+51 passed            # LOCAL592_EXIT=0  (r1–r3 + r4)
+$ python3 -m pytest test_local584_venue_bound_hours.py test_local584_practical_facts_currency.py -q
+24 passed            # LOCAL584_EXIT=0
+$ python3 -m pytest test_local585_about_museum_stop.py test_local585_r2_about_hygiene.py \
+      test_local582_museum_overview.py test_local591_contained_venue.py \
+      test_local591_one_scope_per_tour.py -q
+77 passed            # ADJACENT_EXIT=0
+```
+
+### Live, ISOLATED run (own disposable container, never `audioura-*`)
+`./run_local592_live.sh` builds `Dockerfile.generator` as `local592-gen-<ts>` on
+`development_default` (reads the stop-pool DB from `postgres-2`, its own `.env` for the OpenAI key),
+OpenAI hard cap **$1.00**, tour cache OFF, `audio_tours` only COUNTED (202 → 202, never
+written/deleted), image removed at the end.
+
+**CASE ATHENAEUM — "Art and Architectual tour in Boston Athenaeum, boston, ma" (5):** exactly 5
+stops, no "About …" stop, Stop 1 opens with the About + building + visiting info. Visiting sentences:
+```
+The Boston Athenæum is open Monday through Thursday, 9 AM–8 PM, as listed on
+bostonathenaeum.org in October 2026. Admission prices are listed on bostonathenaeum.org.
+```
+The day range is bound to the hours. (Only the Monday–Thursday group passed the live gate against
+the reachable page; the admission pointer covers the gap — honesty over a guess, D584.)
+
+**CASE GRIFFIN — "Griffin museum of photography, Winchester, MA" (museum, 7):** exactly 7 stops, no
+"About …" stop. Visiting sentences:
+```
+The Griffin is open Tuesday through Sunday, Noon–4 PM, and closed on Monday.
+Admission is $12, as listed on griffinmuseum.org in October 2026.
+```
+The day range ("Tuesday through Sunday") now travels with the hours and the closed day; the source +
+month signal is present.
+
+```
+{'tag':'ATHENAEUM','n':5,'requested':5,'exactly_n':True,'no_about_stop':True,'r4_states_hours':True,'r4_day_bound':True,'r4_source_month':True,'r4_no_note_lead':True,'total_cost':0.0}
+{'tag':'GRIFFIN','n':7,'requested':7,'exactly_n':True,'no_about_stop':True,'r4_states_hours':True,'r4_day_bound':True,'r4_source_month':True,'r4_no_note_lead':True,'total_cost':0.0}
+```
+(`non_artwork=False` on Griffin is the same whole-of-Stop-1 audit false-positive noted in r1–r3: the
+heuristic scans the exhibition body folded into Stop 1; the About + visiting opening section itself
+is artwork-framing-free, as the unit tests assert.)
+
+### Process (r4)
+- No GCloud. Did **not** edit DECISIONS.md, CLAUDE.md, BACKLOG.md, WORK_QUEUE.md or
+  .continuous_dev/STATUS.md.
+- Base verified: `git merge-base --is-ancestor 7bba912 HEAD` exits 0. Committed + pushed after each
+  step on `LOCAL-592-about-in-stop1` (`b422744` red tests, `dcb8da4` implementation). Branch
+  continued on HEAD, never from `origin/*`.

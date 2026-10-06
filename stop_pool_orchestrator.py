@@ -211,10 +211,10 @@ def maybe_generate_with_pool(
         if not contained or os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
             return None
         try:
-            about_unit = _build_about_stop_unit(
+            opening_section = _build_opening_section(
                 location, tour_type, request_text=location,
                 available_exhibition_stops=N, requested_stops=N)
-            if not about_unit:
+            if not opening_section:
                 return None
             # Guard against pool re-entry: the inner full generation must run the
             # NORMAL path (exclude_titles=[] is falsy and would re-trigger the pool
@@ -249,17 +249,19 @@ def maybe_generate_with_pool(
                 new_stops=new_units, pooled_stops=[],
                 overall_orientation=_overall_from_new(gen_text),
                 sources_block=sources_block,
-                about_stop=about_unit,
+                opening_section=opening_section,
+                venue_address=_resolve_venue_address(location),
             )
             _write(output_file, result.tour_text)
-            # Store the exhibition stops to seed the pool (About stop is NOT pooled;
-            # it is a sequence-level opener, regenerated per tour like orientation).
+            # Store the exhibition stops to seed the pool (the opening section is
+            # NOT pooled; it is a sequence-level opener, regenerated per tour like
+            # orientation — LOCAL-590/592).
             try:
                 pool.store_delivered_tour(location, tour_type, gen_text, db_url, qid=qid)
             except Exception as _se:
-                logger.info(f"[LOCAL-585] pool store (first tour) skipped: {_se}")
-            print(f"  [LOCAL-585] FIRST-TOUR About lead: about_stops={result.about_stops} "
-                  f"exhibition_stops={len(new_units)}")
+                logger.info(f"[LOCAL-592] pool store (first tour) skipped: {_se}")
+            print(f"  [LOCAL-592] FIRST-TOUR opening section folded into Stop 1: "
+                  f"about_stops={result.about_stops} exhibition_stops={len(new_units)}")
             return {
                 "text": result.tour_text,
                 "reused_stops": 0,
@@ -271,7 +273,7 @@ def maybe_generate_with_pool(
                 "new_cost": first_cost,
             }
         except Exception as e:
-            logger.info(f"[LOCAL-585] first-tour About lead failed ({e}); normal gen")
+            logger.info(f"[LOCAL-592] first-tour opening-section fold failed ({e}); normal gen")
             return None
 
     # ─── N <= K : serve the best N from the pool, no new generation ───────────
@@ -280,7 +282,7 @@ def maybe_generate_with_pool(
         pooled_units = [_pooled_unit_from_row(r) for r in chosen]
         sources_block = _sources_from_rows(chosen)
         if contained:
-            about_unit = _build_about_stop_unit(
+            opening_section = _build_opening_section(
                 location, tour_type, request_text=location,
                 available_exhibition_stops=len(pooled_units),
                 requested_stops=N)
@@ -289,7 +291,8 @@ def maybe_generate_with_pool(
                 venue_name=_venue_name(location),
                 new_stops=[], pooled_stops=pooled_units,
                 overall_orientation=None, sources_block=sources_block,
-                about_stop=about_unit,
+                opening_section=opening_section or "",
+                venue_address=_resolve_venue_address(location),
             )
         else:
             result = asm.assemble_outdoor_tour(
@@ -341,7 +344,7 @@ def maybe_generate_with_pool(
     sources_block = _merge_sources(gen_text, pooled_rows)
 
     if contained:
-        about_unit = _build_about_stop_unit(
+        opening_section = _build_opening_section(
             location, tour_type, request_text=location,
             available_exhibition_stops=len(new_units) + len(pooled_units),
             requested_stops=N)
@@ -351,7 +354,8 @@ def maybe_generate_with_pool(
             new_stops=new_units, pooled_stops=pooled_units,
             overall_orientation=_overall_from_new(gen_text),
             sources_block=sources_block,
-            about_stop=about_unit,
+            opening_section=opening_section or "",
+            venue_address=_resolve_venue_address(location),
         )
     else:
         _dir_fn = None
@@ -476,27 +480,67 @@ def _overall_from_new(new_text: str) -> Optional[str]:
     return None
 
 
-def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
-                           available_exhibition_stops: int,
-                           requested_stops: Optional[int]) -> Optional[Dict]:
-    """[LOCAL-585] Build the leading "About <museum>" story-stop unit for a contained
-    venue, or None when no story can be sourced (then the tour is unchanged).
+def _resolve_venue_address(location: str) -> str:
+    """[LOCAL-592 r2] Resolve the venue's sourced street address for a contained
+    tour, or "". Mirrors _build_opening_section's venue resolution (same site URL
+    + locality), then lifts the main-gallery address from the venue's own pages.
+    Best-effort and non-fatal: any failure returns "" (the stop keeps its address;
+    nothing is invented).
+    """
+    if os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
+        return ""
+    try:
+        from about_museum_stop import clean_venue_request_name
+    except Exception:
+        return ""
+    clean_name = clean_venue_request_name(location)
+    venue = clean_name or _venue_name(location)
+    site_url = ""
+    address = ""
+    try:
+        from venue_resolver import resolve_venue
+        ent = resolve_venue(clean_name or location)
+        if ent is not None:
+            site_url = getattr(ent, "official_url", "") or ""
+            venue = getattr(ent, "name", "") or venue
+            address = getattr(ent, "address", "") or ""
+    except Exception as e:
+        logger.info(f"[LOCAL-592] venue resolve for address failed ({e})")
+    locality = ""
+    parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
+    if parts:
+        locality = ", ".join(parts[:2])
+    sourced = _source_venue_address(venue, site_url, locality)
+    # Prefer the page-sourced address; fall back to the entity address if present.
+    return sourced or (address or "").strip()
 
-    Best-effort and non-fatal: it resolves the venue's own site URL via
-    venue_resolver (so the story is sourced from the venue's About/history/mission
-    pages) and lets about_museum_stop decide architecture coverage and count
-    semantics. Any resolution/build failure returns None — never breaks a tour.
+
+def _build_opening_section(location: str, tour_type: str, request_text: str,
+                           available_exhibition_stops: int,
+                           requested_stops: Optional[int]) -> Optional[str]:
+    """[LOCAL-592] Build the OPENING SECTION of Stop 1 for a contained venue: the
+    museum's own story (founder/history/architecture) + the practical facts
+    (opening hours, admission, closed days). Returns the section text, or None when
+    no story can be sourced (then the tour is unchanged — D577).
+
+    This supersedes the LOCAL-585 standalone "About <museum>" stop: the content is
+    now the first SECTION of Stop 1 (mirroring the walking-tour prolog), so a
+    request for N stops delivers EXACTLY N. The About narration is sourced from the
+    venue's own About/history/mission pages; the practical facts are sourced from
+    the venue's visit/hours/admission page and passed through the LOCAL-584 gate
+    (venue-bound, dated, state-only-what-the-page-supports). Best-effort and
+    non-fatal: any resolution/build failure returns None — never breaks a tour.
     """
     if os.environ.get("DISABLE_ABOUT_STOP", "").strip() == "1":
         return None
     try:
-        from about_museum_stop import (build_about_stop, about_stop_unit,
+        from about_museum_stop import (build_about_stop, build_opening_section,
                                         clean_venue_request_name, default_wiki_provider)
     except Exception as e:
-        logger.info(f"[LOCAL-585] about_museum_stop unavailable ({e}); no About stop")
+        logger.info(f"[LOCAL-592] about_museum_stop unavailable ({e}); no opening section")
         return None
 
-    # Key the About stop on the BUILDING, not the theme words ("Art and
+    # Key the opening section on the BUILDING, not the theme words ("Art and
     # Architectual tour in Boston Athenaeum" → "Boston Athenaeum").
     clean_name = clean_venue_request_name(location)
     venue = clean_name or _venue_name(location)
@@ -515,7 +559,7 @@ def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
             venue = getattr(ent, "name", "") or getattr(ent, "venue_name", "") or venue
             address = getattr(ent, "address", "") or address
     except Exception as e:
-        logger.info(f"[LOCAL-585] venue resolve for About stop failed ({e}); "
+        logger.info(f"[LOCAL-592] venue resolve for opening section failed ({e}); "
                     f"continuing without a site URL")
     # Derive a locality tail from the request ("..., City, ST"). The composer
     # properly-cases and state-expands it (normalise_locality), so a raw
@@ -523,6 +567,12 @@ def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
     parts = [p.strip() for p in (location or "").split(",")[1:] if p.strip()]
     if parts:
         locality = ", ".join(parts[:2])
+
+    # [LOCAL-592] Source the practical facts (hours/admission/closed days) from the
+    # venue's own visit page and gate them (LOCAL-584). Fully best-effort: a failure
+    # yields "" so the opening section carries only the About story (silence is
+    # correct — never invent hours/prices).
+    practical_facts = _source_practical_facts(venue, site_url, address)
 
     try:
         about = build_about_stop(
@@ -534,13 +584,271 @@ def _build_about_stop_unit(location: str, tour_type: str, request_text: str,
             requested_stops=requested_stops,
             available_exhibition_stops=available_exhibition_stops,
             wiki_provider=default_wiki_provider,
+            practical_facts=practical_facts,
         )
     except Exception as e:
-        logger.info(f"[LOCAL-585] About stop build failed ({e}); no About stop")
+        logger.info(f"[LOCAL-592] opening-section build failed ({e}); no opening section")
         return None
     if about is None or about.is_empty():
         return None
-    print(f"  [LOCAL-585] About stop built for {venue!r}: "
-          f"architecture={about.covers_architecture} counts_toward_n={about.counts_toward_n} "
+    section = build_opening_section(about)
+    if not section or not section.strip():
+        return None
+    print(f"  [LOCAL-592] Opening section folded into Stop 1 for {venue!r}: "
+          f"architecture={about.covers_architecture} "
+          f"practical_facts={'yes' if practical_facts else 'none'} "
           f"sources={len(about.sources)}")
-    return about_stop_unit(about)
+    return section
+
+
+def _has_price_token(text: str) -> bool:
+    """True when an admission segment carries a concrete price (so a priced
+    admission is preferred over a bare 'Free'/condition when merging)."""
+    return bool(re.search(r"[$€£]\s?\d|\b\d+\s?(?:usd|eur|gbp|dollars?|euros?)\b",
+                          (text or ""), re.IGNORECASE))
+
+
+# [LOCAL-592 r3] Anchor/href keywords that mark a venue's visiting-facts page. The
+# venue states its hours/admission on whatever slug it chose (the live Griffin uses
+# /about-the-griffin-2026/, not /about or /visit), so we follow the venue's OWN nav
+# links by meaning rather than guessing fixed slugs.
+_VISIT_LINK_RE = re.compile(
+    r"(?i)(plan\s*your\s*visit|visit\s*us|\bvisit\b|hours|opening|admission|"
+    r"tickets?|getting\s*here|about)"
+)
+
+
+def _discover_visiting_urls(site_url: str, fetch, max_links: int = 8) -> list:
+    """[LOCAL-592 r3] Return same-domain URLs from the home page's own navigation
+    that name Visit / Plan Your Visit / Hours / Admission / Tickets / About.
+
+    Fetches the home page once and scans its anchors (``<a href=… >text</a>``):
+    a link is kept when its href OR its anchor text matches a visiting keyword and
+    it stays on the venue's domain. This reaches the venue's real visiting-facts
+    page whatever its slug, without leaving the venue's own site. Pure/best-effort:
+    returns [] on any failure. ``fetch`` is the same injectable (html, links) fetcher
+    used elsewhere; links from the fetcher are honoured too when present.
+    """
+    from urllib.parse import urlparse, urljoin
+    if "://" not in site_url:
+        site_url = "https://" + site_url
+    parsed = urlparse(site_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    domain = parsed.netloc.lower()
+    domain = domain[4:] if domain.startswith("www.") else domain
+
+    try:
+        html, links = fetch(root)
+    except Exception:
+        html, links = "", []
+    if not html:
+        return []
+
+    # Anchors from the HTML (href + visible text), plus any links the fetcher gave.
+    pairs = []  # (href, text)
+    for m in re.finditer(r'<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+                         html, re.IGNORECASE | re.DOTALL):
+        href = m.group(1)
+        text = re.sub(r"<[^>]+>", " ", m.group(2))
+        text = re.sub(r"\s+", " ", text).strip()
+        pairs.append((href, text))
+    for lk in (links or []):
+        if isinstance(lk, (list, tuple)) and len(lk) >= 1:
+            pairs.append((lk[0], lk[1] if len(lk) > 1 else ""))
+
+    out = []
+    seen = set()
+    for href, text in pairs:
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        if not (_VISIT_LINK_RE.search(href) or _VISIT_LINK_RE.search(text or "")):
+            continue
+        absu = urljoin(root + "/", href)
+        pu = urlparse(absu)
+        ud = pu.netloc.lower()
+        ud = ud[4:] if ud.startswith("www.") else ud
+        if ud and ud != domain:
+            continue  # stay on the venue's own site
+        norm = absu.split("#")[0].rstrip("/")
+        if norm and norm not in seen:
+            seen.add(norm)
+            out.append(absu)
+        if len(out) >= max_links:
+            break
+    return out
+
+
+def _source_practical_facts(venue: str, site_url: str, address: str = "",
+                            fetcher=None) -> str:
+    """[LOCAL-592 r3] Fetch + extract + GATE + MERGE the venue's practical facts, or "".
+
+    Reuses the exact LOCAL-584 honesty contract per page: visitor_facts_extractor
+    reads only the venue's own section (venue-bound hours), and
+    practical_facts_gate.gate_formatted_facts drops anything not literally supported
+    by that page (currency, days, amounts).
+
+    r3 change — STATE WHAT IS KNOWN, merged across the venue's pages:
+    the Griffin's /visit and /plan-your-visit state the HOURS but no price, while
+    its About page ("about-the-griffin-2026") states BOTH the hours and the
+    admission. r1/r2 took the FIRST gate-passing page and stopped, so the price was
+    never reached and a hours-only result was discarded as "too short". r3 instead
+    walks ALL the venue's own pages (About / history / plan-your-visit / visit /
+    tickets / admission / home-page footer — the same `_STORY_SEEDS` the About
+    section reads), gate-verifies each page's facts against THAT page, and MERGES
+    the survivors by claim type: closed days, hours, and admission are filled from
+    whichever page states them, preferring an admission segment that carries a
+    concrete price. The "too short — omitting" rule is gone for the Stop-1 visiting
+    section: hours without a price (or a price without hours) is still stated.
+
+    Fully best-effort and non-fatal: no site URL, a fetch failure, or no
+    gate-passing fact on any page all return "" (then the opening section carries
+    only the About story + the website pointer — never invented).
+    """
+    if not site_url:
+        return ""
+    try:
+        from about_museum_stop import _candidate_story_urls, _visible_text, _default_fetcher
+        from visitor_facts_extractor import (_html_to_sectioned_text,
+                                              extract_visitor_facts_from_text)
+        from practical_facts_gate import gate_formatted_facts, _facts_segment_claim
+    except Exception as e:
+        logger.info(f"[LOCAL-592] practical-facts modules unavailable ({e})")
+        return ""
+
+    fetch = fetcher or _default_fetcher
+
+    try:
+        urls = _candidate_story_urls(site_url)
+    except Exception:
+        urls = [site_url]
+
+    # [r3] The real visiting-facts page is often a venue-specific slug the fixed
+    # `_STORY_SEEDS` miss — the live Griffin states its hours AND admission on
+    # /about-the-griffin-2026/, which /about, /visit and /plan-your-visit (all
+    # 200s) do NOT. Discover it from the home page's OWN navigation: follow the
+    # same-domain links whose href or anchor text names Visit / Plan Your Visit /
+    # Hours / Admission / Tickets / About. This keeps us on the venue's own pages
+    # (no guessing, no other sites) and reaches whatever slug the venue actually
+    # uses. Best-effort: any failure leaves `urls` as the seed list.
+    try:
+        discovered = _discover_visiting_urls(site_url, fetch)
+        if discovered:
+            urls = discovered + urls
+    except Exception as e:
+        logger.info(f"[LOCAL-592] visiting-link discovery failed ({e})")
+
+    # Read the venue's own visit/hours/admission AND About/history pages — the
+    # price frequently lives on the About page, the hours on /visit.
+    def _visit_rank(u: str) -> int:
+        ul = u.lower()
+        for i, kw in enumerate(("about-the", "plan-your-visit", "/visit", "admission",
+                                "tickets", "hours", "/about", "history", "mission")):
+            if kw in ul:
+                return i
+        return 99
+    urls = sorted(dict.fromkeys(urls), key=_visit_rank)[:10]
+
+    # Merge the GATED survivors across pages, keyed by claim type. Order matters:
+    # closed day, then hours, then admission — the natural reading order and the
+    # order the LOCAL-584 suite asserts.
+    merged = {"closed_day": "", "hours": "", "admission": ""}
+
+    for u in urls:
+        try:
+            html, _ = fetch(u)
+        except Exception:
+            html = ""
+        if not html or len(html) < 80:
+            continue
+        try:
+            sectioned = _html_to_sectioned_text(html)
+            facts = extract_visitor_facts_from_text(
+                sectioned, 'en', venue_name=venue, venue_address=address)
+            formatted = facts.format_en() if facts and not facts.is_empty() else ""
+            if not formatted:
+                continue
+            plain = _visible_text(html).lower()
+            gated, _dropped = gate_formatted_facts(formatted, plain, source_url=u)
+            if not gated or not gated.strip():
+                continue
+            # Classify each surviving segment and fold it into the merge. A segment
+            # fills its claim-type slot the first time; a priced admission upgrades
+            # an earlier price-less admission.
+            for seg in re.split(r"\.\s+|;\s+", gated):
+                seg = seg.strip().rstrip(".")
+                if not seg:
+                    continue
+                claim = _facts_segment_claim(seg)
+                ctype = getattr(claim, "claim_type", None) if claim else None
+                if ctype == "closed_day":
+                    if not merged["closed_day"]:
+                        merged["closed_day"] = seg
+                elif ctype == "hours":
+                    if not merged["hours"]:
+                        merged["hours"] = seg
+                elif ctype in ("admission", "price_band"):
+                    if not merged["admission"] or (
+                            not _has_price_token(merged["admission"])
+                            and _has_price_token(seg)):
+                        merged["admission"] = seg
+        except Exception as e:
+            logger.info(f"[LOCAL-592] practical-facts extract/gate error on {u} ({e})")
+            continue
+        # Stop once we have both the hours and a priced admission — the fullest
+        # statement. Otherwise keep reading more pages to fill the gaps.
+        if merged["hours"] and merged["admission"] and _has_price_token(merged["admission"]):
+            break
+
+    parts = [merged["closed_day"], merged["hours"], merged["admission"]]
+    return ". ".join(p for p in parts if p).strip()
+
+
+def _source_venue_address(venue: str, site_url: str, locality: str = "") -> str:
+    """[LOCAL-592 r2] Fetch the venue's own page and lift its street address, or "".
+
+    The sourced venue address is used to bind every contained-venue stop's address
+    to the BUILDING (D611), replacing per-stop LLM/geocode guesses that drift to a
+    town-centre address no source supports (the Griffin "1 Washington St" defect).
+    Best-effort and non-fatal: no site URL, a fetch failure, or no address on the
+    page all return "" — then the stop keeps whatever address it had (never
+    invented here). Only the venue's OWN pages are read, so a satellite gallery
+    address elsewhere on the site is not mistaken for the main address: the
+    extractor returns the FIRST street address, and the venue's main-gallery
+    address leads its About/visit footer.
+    """
+    if not site_url:
+        return ""
+    try:
+        from about_museum_stop import (_candidate_story_urls, _visible_text,
+                                        _default_fetcher, extract_venue_address)
+    except Exception as e:
+        logger.info(f"[LOCAL-592] venue-address modules unavailable ({e})")
+        return ""
+    try:
+        urls = _candidate_story_urls(site_url)
+    except Exception:
+        urls = [site_url]
+    # Prefer visit/contact/about pages where the main address is stated.
+    def _addr_rank(u: str) -> int:
+        ul = u.lower()
+        for i, kw in enumerate(("plan-your-visit", "/visit", "contact", "about")):
+            if kw in ul:
+                return i
+        return 99
+    urls = sorted(dict.fromkeys(urls), key=_addr_rank)[:6]
+    fetch = _default_fetcher
+    for u in urls:
+        try:
+            html, _ = fetch(u)
+        except Exception:
+            html = ""
+        if not html or len(html) < 80:
+            continue
+        try:
+            addr = extract_venue_address(_visible_text(html), locality=locality)
+            if addr:
+                return addr
+        except Exception as e:
+            logger.info(f"[LOCAL-592] venue-address extract error on {u} ({e})")
+            continue
+    return ""

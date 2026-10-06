@@ -20,12 +20,33 @@ from dataclasses import dataclass, field
 class VisitorFacts:
     """Structured visitor information extracted from a museum website."""
     closed_days: List[str] = field(default_factory=list)      # e.g. ["Tuesday"]
-    hours: List[Dict[str, str]] = field(default_factory=list)  # [{time: "10:00–18:00", period: "1 Apr–31 Oct"}]
+    # [LOCAL-592 r4] Each hours entry carries the DAY range the page bound to the
+    # time range — hours without their days is a misleading half-fact (a Saturday
+    # listener hears "9 AM–8 PM" as every day). 'days' is the spoken weekday range
+    # ("Tuesday through Sunday", "Monday to Thursday"); '' only when the page truly
+    # gives none, in which case the time is NOT stored (see extraction below).
+    hours: List[Dict[str, str]] = field(default_factory=list)  # [{time: "10:00–18:00", period: "1 Apr–31 Oct", days: "Tuesday through Sunday"}]
     admission: str = ""                                         # e.g. "€10 / 48h pass; free for Métropole residents"
     source_url: str = ""
 
     def is_empty(self) -> bool:
         return not self.closed_days and not self.hours and not self.admission
+
+    @staticmethod
+    def _format_one_hours(h: Dict[str, str]) -> str:
+        """Render one hours entry as 'Days, time (period)'.
+
+        The day range (LOCAL-592 r4) leads the time range when the page bound one,
+        so the fact is never a day-less half-truth. The seasonal period, when any,
+        trails in parentheses exactly as before.
+        """
+        time = (h.get('time') or '').strip()
+        if not time:
+            return ''
+        days = (h.get('days') or '').strip()
+        period = (h.get('period') or '').strip()
+        body = f"{days}, {time}" if days else time
+        return f"{body} ({period})" if period else body
 
     def format_en(self) -> str:
         """Format all fields into a single English-language Museum Information string."""
@@ -38,23 +59,12 @@ class VisitorFacts:
             else:
                 parts.append(f"Closed on {', '.join(self.closed_days)}")
 
-        # Hours
+        # Hours — each time range is spoken WITH the day range the page bound to
+        # it (LOCAL-592 r4). "Tuesday through Sunday, Noon–4 PM" — never a bare
+        # "Noon–4 PM" that a listener hears as every day.
         if self.hours:
-            if len(self.hours) == 1:
-                h = self.hours[0]
-                if h.get('period'):
-                    parts.append(f"{h['time']} ({h['period']})")
-                else:
-                    parts.append(h['time'])
-            else:
-                # Multiple seasonal ranges — each paired with its period
-                hour_parts = []
-                for h in self.hours:
-                    if h.get('period'):
-                        hour_parts.append(f"{h['time']} ({h['period']})")
-                    else:
-                        hour_parts.append(h['time'])
-                parts.append('; '.join(hour_parts))
+            hour_parts = [self._format_one_hours(h) for h in self.hours]
+            parts.append('; '.join(p for p in hour_parts if p))
 
         # Admission
         if self.admission:
@@ -418,6 +428,82 @@ def _parse_date_range_en(text: str) -> str:
 
 
 # ============================================================
+# [LOCAL-592 r4] Day-range binding for English hours
+# ============================================================
+
+_EN_DAY_FULL = {
+    'mon': 'Monday', 'tue': 'Tuesday', 'tues': 'Tuesday', 'wed': 'Wednesday',
+    'wednes': 'Wednesday', 'thu': 'Thursday', 'thur': 'Thursday', 'thurs': 'Thursday',
+    'fri': 'Friday', 'sat': 'Saturday', 'satur': 'Saturday', 'sun': 'Sunday',
+}
+
+# One English weekday token (abbrev or full), used to read a day group off the page.
+_EN_DAY_TOKEN_RE = re.compile(
+    r'\b(mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)(?:day)?\b', re.IGNORECASE)
+
+
+def _canon_en_day(token: str) -> str:
+    """Map a weekday token ('Tues', 'thursday', 'Mon') to its full name."""
+    t = token.strip().lower()
+    t = t[:-3] if t.endswith('day') else t
+    return _EN_DAY_FULL.get(t, token.strip().capitalize())
+
+
+def _normalize_day_range_en(raw: str) -> str:
+    """Render a captured day group as a spoken range, e.g.:
+
+        "Tuesday through Sunday", "Monday to Thursday", "Friday and Saturday".
+
+    The connector the page used (through / to / – / & / and) is preserved as a
+    natural spoken word; a single day stays a single day. Returns '' if no weekday
+    token is present (so the caller never binds an empty day range).
+    """
+    if not raw:
+        return ''
+    tokens = _EN_DAY_TOKEN_RE.findall(raw)
+    if not tokens:
+        return ''
+    days = [_canon_en_day(t) for t in tokens]
+    if len(days) == 1:
+        return days[0]
+    # Which connector did the page use between the first two day tokens?
+    connector = 'through'
+    if re.search(r'\b(?:and|&)\b', raw) and not re.search(r'through|thru|to|[-–—]', raw):
+        connector = 'and'
+    elif re.search(r'\bto\b', raw) and not re.search(r'through|thru', raw):
+        connector = 'to'
+    return f"{days[0]} {connector} {days[-1]}"
+
+
+def _day_context_en(page_text: str, around: Optional[int] = None, window: int = 60) -> str:
+    """Return a spoken day binding for a time range that has no explicit day group.
+
+    A time range is only the VENUE'S hours when the page binds it to days. Two
+    honest bindings exist without an explicit weekday range:
+      * "daily" / "every day" / "open daily"  → "Daily" (optionally "… except <day>").
+      * a weekday token on the same stretch of text near the time.
+    Returns '' when neither is present — the caller then does NOT store the time
+    (a day-less time is a misleading half-fact, D611/r4).
+    """
+    if around is not None:
+        seg = page_text[max(0, around - window): around + window]
+    else:
+        seg = page_text
+    low = seg.lower()
+    if re.search(r'\b(?:open\s+)?daily\b|\bevery\s*day\b', low):
+        exc = re.search(
+            r'except\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?',
+            low)
+        if exc:
+            return f"Daily except {exc.group(1).capitalize()}s"
+        return "Daily"
+    m = _EN_DAY_TOKEN_RE.search(seg)
+    if m:
+        return _canon_en_day(m.group(0))
+    return ''
+
+
+# ============================================================
 # Structured extraction from page text
 # ============================================================
 
@@ -557,6 +643,9 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
             page_text, re.IGNORECASE
         )
         seen_times = set()
+        # The season sentence may still carry a day qualifier ("daily", "every day
+        # except Tuesdays") — bind it so a seasonal line is never day-less either.
+        _season_days = _day_context_en(page_text)
         for sm in seasonal_en:
             period_start = sm.group(1)
             period_end = sm.group(2)
@@ -568,19 +657,65 @@ def extract_visitor_facts_from_text(page_text: str, page_lang: str = "fr",
             key = (time_range, period)
             if key not in seen_times:
                 seen_times.add(key)
-                facts.hours.append({'time': time_range, 'period': period})
+                facts.hours.append({'time': time_range, 'period': period,
+                                    'days': _season_days})
 
-        # Also try simpler single-range English patterns
+        # [LOCAL-592 r3/r4] Day-schedule hours: "Monday-Thursday: 9 am – 8 pm",
+        # "Monday through Friday 9 AM — 4 PM". The venue lists its hours as a
+        # weekday range followed by a time range (the Boston Athenaeum, the Griffin
+        # satellite rows). The time sides MUST carry an am/pm (or noon/midnight)
+        # marker, so a phone number ("720-7604") or a year ("2026") can never be
+        # mistaken for hours. Venue-scoping already dropped other places' sections.
+        #
+        # r4 — BIND THE DAYS. r3 captured the time but discarded the weekday range,
+        # so "Tuesday through Sunday: Noon to 4 PM" was stated as the day-less
+        # "Noon–4 PM" (a Saturday listener hears every day). Now every match keeps
+        # its day range, and the page's SEVERAL day groups are each stated (Mon–Thu
+        # 9–8; Fri–Sat 9–5), in page order.
+        if not facts.hours:
+            _day = (r'(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)(?:day)?')
+            _en_time_m = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|noon|midnight)'
+            day_sched_re = re.compile(
+                r'\b(' + _day + r'(?:\s*(?:through|thru|to|[-–—&]|and)\s*' + _day + r')?)'
+                r'\s*[:\s]\s*(' + _en_time_m + r')\s*(?:to|[-–—])\s*(' + _en_time_m + r')',
+                re.IGNORECASE,
+            )
+            seen_dayslot = set()
+            for dm in day_sched_re.finditer(page_text):
+                days = _normalize_day_range_en(dm.group(1))
+                t1 = _normalize_time_sourced(dm.group(2), _src_lower)
+                t2 = _normalize_time_sourced(dm.group(3), _src_lower)
+                time_range = f"{t1}–{t2}"
+                key = (days, time_range)
+                if not days or key in seen_dayslot:
+                    continue
+                seen_dayslot.add(key)
+                facts.hours.append({'time': time_range, 'period': '', 'days': days})
+
+        # Also try simpler single-range English patterns. At least ONE side must
+        # carry a time marker (am/pm/colon/noon/midnight) so bare digit ranges in
+        # phone numbers / ZIPs / years are never read as hours (r3). r4: the match
+        # must ALSO have a bindable day context ("daily", "every day", or a weekday
+        # on the same line) — a day-less time (a café's lunch window) is a
+        # misleading half-fact and is NOT stored as the venue's hours.
         if not facts.hours:
             _en_time = r'(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight)'
+            _en_time_marked = r'(?:\d{1,2}:\d{2}\s*(?:am|pm)?|\d{1,2}\s*(?:am|pm)|noon|midnight)'
             simple_en = re.search(
-                r'(?:open\s+(?:from\s+)?)?(' + _en_time + r')\s*(?:to|[-–—])\s*(' + _en_time + r')',
+                r'(?:open\s+(?:from\s+)?)?(' + _en_time_marked + r')\s*(?:to|[-–—])\s*(' + _en_time + r')',
                 page_text, re.IGNORECASE
             )
+            if not simple_en:
+                simple_en = re.search(
+                    r'(?:open\s+(?:from\s+)?)?(' + _en_time + r')\s*(?:to|[-–—])\s*(' + _en_time_marked + r')',
+                    page_text, re.IGNORECASE
+                )
             if simple_en:
-                t1 = _normalize_time_sourced(simple_en.group(1), _src_lower)
-                t2 = _normalize_time_sourced(simple_en.group(2), _src_lower)
-                facts.hours.append({'time': f"{t1}–{t2}", 'period': ''})
+                days = _day_context_en(page_text, around=simple_en.start())
+                if days:   # r4: never store a day-less time as the venue's hours
+                    t1 = _normalize_time_sourced(simple_en.group(1), _src_lower)
+                    t2 = _normalize_time_sourced(simple_en.group(2), _src_lower)
+                    facts.hours.append({'time': f"{t1}–{t2}", 'period': '', 'days': days})
 
     # --- 3. ADMISSION (with conditions) ---
     # This is the critical part: we must distinguish unconditional free from conditional.
