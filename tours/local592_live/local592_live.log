@@ -1,0 +1,122 @@
+[LOCAL-584] dropped unsupported practical fact: '20–76' — not supported by source (gate) [http://www.bostonathenaeum.org/visit]
+[LOCAL-584] dropped unsupported practical fact: 'Free for Métropole residents' — distinctive token (price/day/currency/condition) absent from source [http://www.bostonathenaeum.org/visit]
+[LOCAL-584] dropped unsupported practical fact: '17–22' — not supported by source (gate) [http://www.bostonathenaeum.org]
+[LOCAL-584] dropped unsupported practical fact: '13–19' — not supported by source (gate) [http://www.bostonathenaeum.org/about]
+[LOCAL-584] dropped unsupported practical fact: '81–72' — not supported by source (gate) [https://griffinmuseum.org/plan-your-visit]
+[LOCAL-584] dropped unsupported practical fact: '81–72' — not supported by source (gate) [https://griffinmuseum.org/visit]
+[LOCAL-584] dropped unsupported practical fact: '81–72' — not supported by source (gate) [https://griffinmuseum.org]
+[LOCAL-584] dropped unsupported practical fact: '81–72' — not supported by source (gate) [https://griffinmuseum.org/about]
+=== LOCAL-592 ISOLATED LIVE RUN ===
+model=gpt-4o cap=$1.00 cache=OFF storied=true
+git_sha=unknown
+
+========================================================================
+CASE ATHENAEUM: 'Art and Architectual tour in Boston Athenaeum, boston, ma'  (5 stops requested)
+========================================================================
+  [venue_resolver] Name variants: ['Art and Architectual tour in Boston Athenaeum']
+  [venue_resolver] No Wikidata candidates for 'Art and Architectual tour in Boston Athenaeum, boston, ma'
+  [LOCAL-590] pool: venue=loc:art and architectual tour in boston athenaeum boston ma type= category=museum contained=True requested=5 pooled=5
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [LOCAL-592] Opening section folded into Stop 1 for 'Boston Athenæum': architecture=True practical_facts=none sources=3
+  [LOCAL-590] POOL DELIVERY: reused=5 new=0 rewritten_transitions=0 about_stops=1 (pool held 5)
+
+--- CASE ATHENAEUM RESULT (10.1s) ---
+tour_kind              : full
+generation cost        : total=0.0 about_stops=1 reused=5 new=0
+audio_tours BEFORE/AFTER (never DELETE): 202 / 202
+
+CASE ATHENAEUM: delivered 5 stop(s) (requested 5):
+   Stop 1: Boys Come Over Here You're Wanted
+   Stop 2: Picture Gallery with Views of Modern Rome
+   Stop 3: Landscape with Cottages and Pond
+   Stop 4: Cutter Expansive Classification
+   Stop 5: Annie Adams Fields
+
+CASE ATHENAEUM LOCAL-592 AUDIT:
+   EXACTLY N stops (5)             : True  (delivered 5)
+   NO stop titled 'About …'              : True
+   Stop 1 carries About content          : True
+   Stop 1 carries practical facts        : False
+   Stop 1 NOT framed as an artwork        : True
+   Stop 1 covers architecture/building   : True
+
+CASE ATHENAEUM STOP 1 — FIRST 15 LINES >>>>>>>>>>
+Stop 1: Boys Come Over Here You're Wanted
+Address: 10 1/2 Beacon St, Boston, MA 02108
+
+Coordinates: 42.3584, -71.0637
+
+Orientation: You are about to explore the Boston Athenaeum in Boston. At this museum, you'll encounter "Boys Come Over Here You're Wanted," Picture Gallery with Views of Modern Rome, Landscape with Cottages and Pond, Cutter Expansive Classification, and Annie Adams Fields. These diverse works, ranging from wartime propaganda to serene landscapes and influential figures, collectively showcase the evolution of knowledge organization. Charles Ammi Cutter's innovative Expansive Classification system, developed during his tenure as the Athenaeum's librarian, revolutionized the cataloging and classification of literary works, shaping the foundation for modern library organization and the Library of Congress classification system. At Boys Come Over Here You're Wanted, you'll see a sophisticated technique using the map as a symbol. Picture Gallery with Views of Modern Rome commemorates Étienne François, Count of Stainville's diplomatic tenure. Your first stop is Boys Come Over Here You're Wanted.
+
+Before we look at anything on the walls, here is the story of Boston Athenæum in Boston, Massachusetts itself — who created it, why it exists, and what it is known for. The Boston Athenæum is one of the oldest independent libraries in the United States. It is a membership library, for which patrons pay a yearly subscription fee to use Athenæum services. The institution was founded in 1807 by the Anthology Club of Boston, Massachusetts. It is located at 10½ Beacon Street on Beacon Hill in Boston. In 1809, it moved to the Rufus Amory House, adjacent to the King’s Chapel Burial Ground. Construction on the Athenaeum’s present home on Beacon Street began in 1847. Designed by Edward Clarke Cabot, the building opened in 1849, with a sculpture gallery on the first floor, the book collection on the second, and a painting gallery on the skylit third floor. Our research books and collections have strengths in Boston history, New England state and local history, and in the fine arts. A word about the building you are standing in. The Boston Athenaeum—a unique combination of library, museum, and cultural center in a magnificent landmark building. This account is drawn from the museum's own pages on bostonathenaeum.org and public reference sources.
+
+The poster "Boys Come Over Here You're Wanted" was a centerpiece in the 2014 exhibition "Over Here: World War I Posters from around the World" held at the Boston Athenaeum. This exhibition gathered a diverse array of wartime posters from multiple countries, offering a unique platform for historical reflection on the global nature of World War I propaganda efforts. in Harrow, Middlesex, underscored the Athenaeum's role as a focal point for exploring the cultural and historical impact of wartime communications during that period. Created in 1915, the poster displays a soldier in profile, his figure stark against a background map depicting England and France. This juxtaposition of image and geography was a sophisticated technique at the time, using the map not only as a backdrop but as a symbol of the soldier's mission and the looming battlefields. The use of lithography allowed for sharp, vivid imagery that could be reproduced en masse, facilitating its broad distribution across Britain. The Athenaeum, with its rich collection, became a site of exploration and education through this exhibition. Phineas Adams, who established the magazine The Monthly Anthology, or Magazine of Polite Literature, would have appreciated the cultural resonance of the poster's message — one that spoke to both the urgency and the idealism of the era. In the same spirit, the National Portrait gallery, named for its patron, serves as a reminder of how art and history intertwine, revealing hidden stories in the juxtaposition of imagery and message.
+
+Directions: Continue through Boston Athenaeum — next is Picture Gallery with Views of Modern Rome.
+<<<<<<<<<< CASE ATHENAEUM STOP 1 END
+
+========================================================================
+CASE GRIFFIN: 'Griffin museum of photography, Winchester, MA'  (7 stops requested)
+========================================================================
+  [venue_resolver] Name variants: ['Griffin museum of photography']
+  [venue_resolver] Resolved: 'Griffin museum of photography, Winchester, MA' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [LOCAL-590] pool: venue=qid:Q99108607 type=museum category=museum contained=True requested=7 pooled=7
+  [venue_resolver] Name variants: ['Griffin museum of photography']
+  [venue_resolver] Resolved: 'Griffin museum of photography' → Q99108607 (Griffin Museum of Photography)
+    URL: https://griffinmuseum.org/
+    Coords: 42.45448886799077, -71.13591124251319
+    Language: en
+  [LOCAL-592] Opening section folded into Stop 1 for 'Griffin Museum of Photography': architecture=False practical_facts=none sources=3
+  [LOCAL-590] POOL DELIVERY: reused=7 new=0 rewritten_transitions=0 about_stops=1 (pool held 7)
+
+--- CASE GRIFFIN RESULT (51.7s) ---
+tour_kind              : full
+generation cost        : total=0.0 about_stops=1 reused=7 new=0
+audio_tours BEFORE/AFTER (never DELETE): 202 / 202
+
+CASE GRIFFIN: delivered 7 stop(s) (requested 7):
+   Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+   Stop 2: Intertidal : Field Notes
+   Stop 3: Earth, Wind & Fire
+   Stop 4: Tabitha Soren | An Artist Life
+   Stop 5: TLC
+   Stop 6: Lua Kobayashi |The Persistence of Memories
+   Stop 7: Homage | Robert Frank: The Americans
+
+CASE GRIFFIN LOCAL-592 AUDIT:
+   EXACTLY N stops (7)             : True  (delivered 7)
+   NO stop titled 'About …'              : True
+   Stop 1 carries About content          : True
+   Stop 1 carries practical facts        : False
+   Stop 1 NOT framed as an artwork        : False
+
+CASE GRIFFIN STOP 1 — FIRST 15 LINES >>>>>>>>>>
+Stop 1: BU Masters Show 2026 | Traces: Pursuing Process
+Address: 1 Washington St, Winchester, MA 01890
+
+Coordinates: 42.4634, -71.1192
+
+Orientation: You are about to explore the Griffin Museum of Photography in Winchester. Inside, you will encounter "BU Masters Show 2026 | Traces: Pursuing Process" by Ava Harper, Emma Pfannenstiel, Ethan Stumbo, Nanxi Zhang, and "Intertidal: Field Notes" by Andre Bradley and Paul Anthony Smith. These diverse works coalesce around the exploration of photography as a medium to capture the ephemeral and transform it into the eternal. Delve into the unseen traces and intertwined realms of landscape and labor depicted in these pieces, showcasing the power of photography to reveal complex narratives. At the upcoming stops, you'll explore the selected artworks capturing landscape and labor at BU Masters Show 2026 | Traces: Pursuing Process, and experience the blend of field notes and lens-based artworks at Intertidal : Field Notes. Your first stop is BU Masters Show 2026 | Traces: Pursuing Process. Standing in the Griffin Museum of Photography's gallery, position yourself to take in the breadth of the "BU Masters Show 2026 | Traces: Pursuing Process." This exhibition, displayed from January 5 through February 28, 2026, invites you to delve into the emerging narratives and innovative techniques pioneered by the Boston University Master's class.
+
+Before we look at anything on the walls, here is the story of Griffin Museum of Photography in Winchester, Massachusetts itself — who created it, why it exists, and what it is known for. Arthur Griffin was an American photographer. Building on the legacy of our founder, Arthur Griffin, we cultivate opportunities to engage with and better understand our diverse world through the photographic arts. The Griffin Museum of Photography is a 501(c)3 nonprofit organization dedicated to the art of photography. Guided by our mission, the Griffin Museum is committed to embedding diversity, equity, accessibility, and inclusion across all aspects of our work—including our mindset, practices, outreach, programming, and exhibitions. Founded in 1992 as a private foundation, the Griffin Museum of Photography became a nonprofit public charity in 2000. This account is drawn from the museum's own pages on griffinmuseum.org and public reference sources.
+
+From over 340 entries, only 50 were selected for their unique ability to capture the essence of landscape and labor. Each artist contributes a distinct narrative and technique. Ava Harper, for instance, decided to juxtapose urban landscapes with human motion, capturing the transience of city life. This choice highlighted the constant evolution of urban spaces, an approach that challenges traditional notions by presenting movement as an integral aspect of cityscapes. Emma Pfannenstiel concentrated her efforts on rural labor, capturing the nuanced stories of farm workers. Her images ensure the toil of the fields is both visible and visceral, serving as a dialogue between serenity and the relentless demands of agricultural life. Ethan Stumbo's series focused on personal spaces bathed in natural light. He chose to manipulate shadows and highlights, creating images that evoke intimacy within domestic settings. This deliberate use of light challenges viewers to reconsider the personal spaces we often overlook. Nanxi Zhang sought to explore the impact of climate on landscapes. Zhang crafted images that juxtapose environmental decay with resilience, an endeavor that adds depth to the discourse on human interaction with nature. This exhibition doesn't end at the museum walls; it extends online, inviting a global audience to engage with these groundbreaking interpretations. The artists redefine the captured moment, urging us to view our environments through a lens that reveals the unseen traces of existence.
+
+Intertidal: Field Notes found its home at the Griffin Museum of Photography, a decision rooted in the museum's recognition of the exhibition's potential to engage audiences through diverse artistic perspectives. This move allowed the exhibition to become a part of both the museum’s physical and virtual galleries. Consequently, visitors can now explore these artworks in person and online, expanding access to a global audience. The exhibition combines field notes with lens-based artworks, blending scientific observation with artistic interpretation. The work titled "Interference" by Andre Bradley and Paul Anthony Smith, created in 2017, exemplifies this blend. This piece explores the themes of transformation and fluidity, a nod to the ever-changing nature of intertidal zones. The work's physical medium, photography, captures these ephemeral moments, freezing time in a way that highlights the transient beauty and complexity of these environments. Historically, the exhibit draws parallels with the museum's previous BU Masters Show 2026, which you have already seen, by fostering dialogues between emerging and established artists. This connection underscores the museum's commitment to showcasing diverse narratives and perspectives. Incorporating field notes, juried by Nathaniel M. Stein, the exhibition invites viewers to ponder the unseen processes that shape our world, much like the intertidal zones it depicts. These notes provide context, grounding the artworks in real-world observations and scientific inquiry. The integration of these elements reflects a broader conversation about the intersection of art and science, offering unique insights into the natural world. The Griffin Museum’s decision to host Intertidal: Field Notes exemplifies its dedication to accessible, thought-provoking art. It opens a window to the unseen forces of nature, inviting us to consider the ever-shifting balance between land and sea.
+
+That's 2 stops — BU Masters Show 2026 featured 50 entries capturing landscape and labor essence and Intertidal: Field Notes merges scientific observation with artistic lens-based works. If you would like to eat nearby we can build you a restaurant tour.
+
+<<<<<<<<<< CASE GRIFFIN STOP 1 END
+
+########################################################################
+LOCAL-592 SUMMARY
+########################################################################
+  {'tag': 'ATHENAEUM', 'ok': True, 'n': 5, 'requested': 5, 'exactly_n': True, 'no_about_stop': True, 'has_about_content': True, 'has_practical': False, 'non_artwork': True, 'covers_arch': True, 'total_cost': 0.0}
+  {'tag': 'GRIFFIN', 'ok': True, 'n': 7, 'requested': 7, 'exactly_n': True, 'no_about_stop': True, 'has_about_content': True, 'has_practical': False, 'non_artwork': False, 'covers_arch': None, 'total_cost': 0.0}
