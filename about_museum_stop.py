@@ -86,6 +86,7 @@ __all__ = [
     "normalise_locality",
     "extract_venue_address",
     "venue_bound_address",
+    "build_shortfall_sentence",
 ]
 
 
@@ -1256,7 +1257,53 @@ def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
     return composed
 
 
-def build_opening_section(about: Optional["AboutStop"]) -> str:
+def build_shortfall_sentence(venue_name: str, exhibitions_on_view: int,
+                             delivered_stops: int,
+                             requested_stops: Optional[int]) -> str:
+    """[LOCAL-600 / D616] One plain sentence telling the listener, honestly, why a
+    site-first exhibition tour delivers fewer stops than they asked for.
+
+    LEAD (D616): "When verified on-view material can't reach N, deliver the verified
+    stops and say so in Stop 1's opening section. One plain sentence, from the real
+    counts: 'MassArt Art Museum currently has 3 exhibitions on view, so this tour
+    has 5 stops rather than the 7 you asked for.'"
+
+    Returns that sentence, or "" when there is no shortfall to announce:
+      * ``requested_stops`` is unknown/zero, or
+      * ``delivered_stops`` >= ``requested_stops`` (the ask was met — D611's exact
+        N holds and NO sentence is emitted), or
+      * the counts are not positive integers.
+
+    Pure and deterministic; no network, no LLM. The venue name is used as given
+    (its ', City, ST' tail trimmed) so the sentence names the museum, not the raw
+    request string.
+    """
+    try:
+        req = int(requested_stops) if requested_stops is not None else 0
+        delivered = int(delivered_stops)
+        shows = int(exhibitions_on_view)
+    except (TypeError, ValueError):
+        return ""
+    if req <= 0 or delivered <= 0:
+        return ""
+    if delivered >= req:
+        return ""  # the ask was met — D611 exact N, no sentence
+    vn = _venue_core(venue_name) or (venue_name or "").strip() or "This museum"
+    # "has 1 exhibition on view" / "has 3 exhibitions on view"
+    if shows >= 1:
+        show_clause = (f"{vn} currently has {shows} "
+                       f"exhibition{'s' if shows != 1 else ''} on view, so ")
+    else:
+        # No distinct on-view show count available: still be honest about the gap
+        # without inventing a show count.
+        show_clause = f"{vn} has a limited number of exhibitions on view, so "
+    stop_word_d = "stop" if delivered == 1 else "stops"
+    return (f"{show_clause}this tour has {delivered} {stop_word_d} "
+            f"rather than the {req} you asked for.")
+
+
+def build_opening_section(about: Optional["AboutStop"],
+                          shortfall_sentence: str = "") -> str:
     """[LOCAL-592] Compose the OPENING SECTION of Stop 1 for a single-venue tour.
 
     Michael, 2026-10-06 (binding): the museum's "About" content and the practical
@@ -1295,6 +1342,14 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
     The caller folds the returned text into Stop 1 as its opening SECTION (rendered
     before the Orientation), so a request for N stops still delivers exactly N: this
     section adds zero stops.
+
+    [LOCAL-600 / D616] ``shortfall_sentence`` — when the site-first exhibition path
+    could not reach the requested N from verified on-view material, the caller
+    passes the one honest sentence from build_shortfall_sentence (e.g. "MassArt Art
+    Museum currently has 3 exhibitions on view, so this tour has 5 stops rather than
+    the 7 you asked for."). It is placed as its OWN paragraph right after the About
+    story and before the practical notes, so the listener hears the scope up front.
+    Empty string (the default, and whenever the ask was met) adds nothing.
     """
     if about is None:
         return ""
@@ -1302,6 +1357,9 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
     narration = (about.narration or "").strip()
     if narration:
         parts.append(narration)
+    _shortfall = (shortfall_sentence or "").strip()
+    if _shortfall:
+        parts.append(_shortfall)
     facts = (about.practical_facts or "").strip()
     domain = getattr(about, "site_domain", "")
     as_of = getattr(about, "as_of", "") or ""
@@ -1325,13 +1383,18 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
     section = "\n\n".join(p for p in parts if p).strip()
     # Belt-and-braces: the opening section must never read as an artwork label.
     if section and looks_like_artwork_framing(section):
-        # Drop only the offending About narration; keep the practical facts, which
-        # are page-literal and cannot be artwork-framed.
+        # Drop only the offending About narration; keep the shortfall note and the
+        # practical facts, which are page-literal and cannot be artwork-framed.
+        _rebuilt: List[str] = []
+        if _shortfall:
+            _rebuilt.append(_shortfall)
         if facts:
             practical = _compose_visiting_sentences(facts, venue_name, domain, as_of)
             if not practical:
                 practical = facts if facts.endswith((".", "!", "?")) else facts + "."
             pointer = _partial_pointer_sentence(facts, domain)
-            return f"{practical} {pointer}".strip() if pointer else practical
-        return _visiting_fallback_sentence(domain)
+            _rebuilt.append(f"{practical} {pointer}".strip() if pointer else practical)
+        else:
+            _rebuilt.append(_visiting_fallback_sentence(domain))
+        return "\n\n".join(p for p in _rebuilt if p).strip()
     return section

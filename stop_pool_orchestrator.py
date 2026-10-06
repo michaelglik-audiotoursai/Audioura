@@ -242,6 +242,21 @@ def maybe_generate_with_pool(
             new_units = [_new_unit_from_parsed(s) for s in parsed]
             if not new_units:
                 return None
+            # [LOCAL-600 / D616] If the site-first exhibition path could not reach
+            # the requested N from verified on-view material, say so in Stop 1's
+            # opening section — one honest sentence from the real counts. Rebuild
+            # the opening section WITH the sentence now the delivered count is known.
+            _shortfall_sentence = _site_first_shortfall_sentence(
+                location, len(new_units), N)
+            if _shortfall_sentence:
+                _opening_with_shortfall = _build_opening_section(
+                    location, tour_type, request_text=location,
+                    available_exhibition_stops=len(new_units), requested_stops=N,
+                    shortfall_sentence=_shortfall_sentence)
+                if _opening_with_shortfall:
+                    opening_section = _opening_with_shortfall
+                print(f"  [LOCAL-600] D616 shortfall sentence folded into Stop 1: "
+                      f"{_shortfall_sentence!r}")
             sources_block = _extract_sources_block(gen_text)
             result = asm.assemble_building_tour(
                 location, tour_type, tour_category, header_cat, display_cat,
@@ -278,10 +293,22 @@ def maybe_generate_with_pool(
 
     # ─── N <= K : serve the best N from the pool, no new generation ───────────
     if N <= K:
-        chosen = pooled_rows[:N]
-        pooled_units = [_pooled_unit_from_row(r) for r in chosen]
+        if contained:
+            # [LOCAL-600 / D616] Re-group all pooled units (show→its works) BEFORE
+            # selecting N, so slicing never splits a work from its show (the r3
+            # pool stored them works-first). Then take the first N in group order.
+            _all_units = _regroup_pooled_units(
+                [_pooled_unit_from_row(r) for r in pooled_rows])
+            pooled_units = _all_units[:N]
+            _chosen_titles = {u["title"] for u in pooled_units}
+            chosen = [r for r in pooled_rows if r["title"] in _chosen_titles]
+        else:
+            chosen = pooled_rows[:N]
+            pooled_units = [_pooled_unit_from_row(r) for r in chosen]
         sources_block = _sources_from_rows(chosen)
         if contained:
+            # [LOCAL-600] N <= K means the pool can satisfy the request in full, so
+            # there is NO shortfall (D611 exact N). No shortfall sentence here.
             opening_section = _build_opening_section(
                 location, tour_type, request_text=location,
                 available_exhibition_stops=len(pooled_units),
@@ -325,8 +352,57 @@ def maybe_generate_with_pool(
         user_id=user_id, job_id=job_id, exclude_titles=pooled_titles,
     )
     if not gen_text:
-        logger.info("[POOL] new-stop generation returned no text; normal fallback")
-        return None
+        # [LOCAL-600 / D616] For a CONTAINED exhibition museum, "no new stops" means
+        # the venue has no more verified on-view material beyond the K already
+        # pooled — a genuine shortfall, NOT a reason to abandon the pool and re-run
+        # the whole pipeline. Serve the K pooled stops and announce the honest
+        # shortfall in Stop 1. (Outdoor/other venues keep the normal fallback.)
+        if not contained or K == 0:
+            logger.info("[POOL] new-stop generation returned no text; normal fallback")
+            return None
+        print(f"  [LOCAL-600] N>K: no new on-view stops beyond the {K} pooled — "
+              f"serving {K} with the honest shortfall (requested {N})")
+        pooled_units = _regroup_pooled_units(
+            [_pooled_unit_from_row(r) for r in pooled_rows])
+        sources_block = _sources_from_rows(pooled_rows)
+        _on_view_shows = sum(1 for u in pooled_units
+                             if ':' not in (u.get('title') or ''))
+        try:
+            from about_museum_stop import build_shortfall_sentence
+            _shortfall_sentence = build_shortfall_sentence(
+                venue_name=_venue_name(location),
+                exhibitions_on_view=_on_view_shows,
+                delivered_stops=len(pooled_units), requested_stops=N)
+        except Exception:
+            _shortfall_sentence = ""
+        opening_section = _build_opening_section(
+            location, tour_type, request_text=location,
+            available_exhibition_stops=len(pooled_units), requested_stops=N,
+            shortfall_sentence=_shortfall_sentence)
+        if _shortfall_sentence:
+            print(f"  [LOCAL-600] D616 shortfall sentence folded into Stop 1 "
+                  f"(pool-only shortfall): {_shortfall_sentence!r}")
+        result = asm.assemble_building_tour(
+            location, tour_type, tour_category, header_cat, display_cat,
+            venue_name=_venue_name(location),
+            new_stops=[], pooled_stops=pooled_units,
+            overall_orientation=None, sources_block=sources_block,
+            opening_section=opening_section or "",
+            venue_address=_resolve_venue_address(location),
+        )
+        _write(output_file, result.tour_text)
+        pool.bump_hit_counts(location, tour_type,
+                             [u["title"] for u in pooled_units], db_url, qid=qid)
+        return {
+            "text": result.tour_text,
+            "reused_stops": result.reused_stops,
+            "new_stops": 0,
+            "rewritten_transitions": result.rewritten_transitions,
+            "about_stops": result.about_stops,
+            "pooled_before": K,
+            "served_from_pool_only": True,
+            "new_cost": 0.0,
+        }
 
     # Capture the cost of the new-stop generation BEFORE we touch the pool again.
     try:
@@ -341,13 +417,50 @@ def maybe_generate_with_pool(
     new_units = [_new_unit_from_parsed(s) for s in parsed_new
                  if pool._title_norm(s["title"]) not in pooled_norm]
     pooled_units = [_pooled_unit_from_row(r) for r in pooled_rows]
+    if contained:
+        # [LOCAL-600 / D616] Keep each pooled show ahead of its own works.
+        pooled_units = _regroup_pooled_units(pooled_units)
     sources_block = _merge_sources(gen_text, pooled_rows)
 
     if contained:
+        # [LOCAL-600 / D616] For an exhibition museum, the pool + whatever new
+        # on-view stops could be generated may still fall short of N (the venue
+        # simply has fewer verified on-view stops than asked). When the TOTAL
+        # delivered is below N, announce the honest shortfall in Stop 1's opening
+        # section — one sentence from the real counts. Prefer the engine's measured
+        # on-view-show count; fall back to counting shows (non-work titles) among
+        # the delivered units.
+        _delivered_total = len(new_units) + len(pooled_units)
+        _shortfall_sentence = ""
+        if _delivered_total < N:
+            _sf_counts = {}
+            try:
+                from generate_tour_text import _LAST_SITE_FIRST_COUNTS as _sfc
+                _sf_counts = _sfc or {}
+            except Exception:
+                _sf_counts = {}
+            _on_view_shows = _sf_counts.get('exhibitions_on_view')
+            if not _on_view_shows:
+                # A show's title has no "Artist: Work" separator; a work does.
+                _on_view_shows = sum(
+                    1 for u in (new_units + pooled_units)
+                    if ':' not in (u.get('title') or ''))
+            try:
+                from about_museum_stop import build_shortfall_sentence
+                _shortfall_sentence = build_shortfall_sentence(
+                    venue_name=_venue_name(location),
+                    exhibitions_on_view=_on_view_shows,
+                    delivered_stops=_delivered_total,
+                    requested_stops=N)
+            except Exception as _sf_e:
+                logger.info(f"[LOCAL-600] N>K shortfall sentence skipped ({_sf_e})")
         opening_section = _build_opening_section(
             location, tour_type, request_text=location,
             available_exhibition_stops=len(new_units) + len(pooled_units),
-            requested_stops=N)
+            requested_stops=N, shortfall_sentence=_shortfall_sentence)
+        if _shortfall_sentence:
+            print(f"  [LOCAL-600] D616 shortfall sentence folded into Stop 1 "
+                  f"(N>K path): {_shortfall_sentence!r}")
         result = asm.assemble_building_tour(
             location, tour_type, tour_category, header_cat, display_cat,
             venue_name=_venue_name(location),
@@ -553,9 +666,91 @@ def _resolve_venue_address(location: str) -> str:
     return sourced or (address or "").strip()
 
 
+def _regroup_pooled_units(units):
+    """[LOCAL-600 / D616] Re-group pooled stop units so each exhibition stop leads
+    its own works (works have an "Artist: Work" title; the show is the bare
+    "Artist"). The LOCAL-599 r3 run pooled the stops works-first, so a pool read in
+    stored order can still put a work before its show. This restores the grouping:
+
+      * a unit whose title contains ": " is a WORK; the text before the first ": "
+        is its show key (the artist / show title);
+      * a unit with no ": " is a SHOW; its key is its whole title;
+      * each show leads, immediately followed by its own works in pool order; shows
+        appear in first-seen pool order; a work whose show is absent keeps position.
+
+    Pure; returns a NEW list; order-stable. A list with no works, or already
+    grouped, comes back unchanged (same contents, possibly re-ordered).
+    """
+    if not units:
+        return units
+
+    def _key(u):
+        t = (u.get('title') or '').strip()
+        if ': ' in t:
+            return ('work', t.split(': ', 1)[0].strip().lower())
+        return ('show', t.strip().lower())
+
+    show_order = []          # show-key in first-seen order
+    groups = {}              # show-key -> {'show': unit|None, 'works': [unit], 'order': int}
+    for i, u in enumerate(units):
+        kind, key = _key(u)
+        if key not in groups:
+            groups[key] = {'show': None, 'works': [], 'order': i}
+            show_order.append(key)
+        if kind == 'show' and groups[key]['show'] is None:
+            groups[key]['show'] = u
+        else:
+            groups[key]['works'].append(u)
+
+    out = []
+    orphans = []
+    for key in sorted(show_order, key=lambda k: groups[k]['order']):
+        g = groups[key]
+        if g['show'] is not None:
+            out.append(g['show'])
+            out.extend(g['works'])
+        else:
+            orphans.extend(g['works'])  # works whose show is absent — keep later
+    out.extend(sorted(orphans, key=lambda u: units.index(u)))
+    if len(out) != len(units):
+        return units
+    return out
+
+
+def _site_first_shortfall_sentence(location, delivered_count, requested_n):
+    """[LOCAL-600 / D616] The honest shortfall sentence for a site-first (exhibition
+    museum) delivery, or "" when there is no shortfall / the path was not site-first.
+
+    Reads the real counts the engine recorded for the LAST generation
+    (generate_tour_text._LAST_SITE_FIRST_COUNTS). The sentence is emitted ONLY when
+    the engine measured a site-first delivery (exhibitions_on_view present) AND the
+    delivered count is below the request — the D611 exact-N exception. Pure w.r.t.
+    the module state it reads; never raises.
+    """
+    try:
+        from generate_tour_text import _LAST_SITE_FIRST_COUNTS as _sfc
+    except Exception:
+        return ""
+    if not _sfc:
+        return ""
+    try:
+        from about_museum_stop import build_shortfall_sentence
+    except Exception:
+        return ""
+    try:
+        return build_shortfall_sentence(
+            venue_name=_venue_name(location),
+            exhibitions_on_view=_sfc.get('exhibitions_on_view', 0),
+            delivered_stops=_sfc.get('delivered_stops', delivered_count),
+            requested_stops=_sfc.get('requested_stops', requested_n))
+    except Exception:
+        return ""
+
+
 def _build_opening_section(location: str, tour_type: str, request_text: str,
                            available_exhibition_stops: int,
-                           requested_stops: Optional[int]) -> Optional[str]:
+                           requested_stops: Optional[int],
+                           shortfall_sentence: str = "") -> Optional[str]:
     """[LOCAL-592] Build the OPENING SECTION of Stop 1 for a contained venue: the
     museum's own story (founder/history/architecture) + the practical facts
     (opening hours, admission, closed days). Returns the section text, or None when
@@ -639,7 +834,7 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
         return None
     if about is None or about.is_empty():
         return None
-    section = build_opening_section(about)
+    section = build_opening_section(about, shortfall_sentence=shortfall_sentence)
     if not section or not section.strip():
         return None
     print(f"  [LOCAL-592] Opening section folded into Stop 1 for {venue!r}: "
