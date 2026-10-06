@@ -398,17 +398,30 @@ def get_pool_stops(
     db_url: str,
     qid: Optional[str] = None,
 ) -> List[Dict]:
-    """Return every pooled stop for (venue identity, tour_type, version).
+    """Return every pooled stop for this venue (both QID and location identity).
 
     Ordered by stable delivery sequence (order_seq ASC) so a caller taking "the
     best N from the pool" gets the venue's original stop order — the core stops
     first, new stops appended after — not an alphabetical or write-time accident.
+
+    Venue-identity robustness (D582 class): resolving a Wikidata QID is a network
+    call that can succeed on one generation and fail on the next, which would
+    silently split one venue's pool between a `qid:...` key and a `loc:...` key —
+    a stored stop then never found on reuse. To defend against that, this reads
+    BOTH the QID-based pool key (when a QID is supplied) AND the normalised-
+    location key, and UNIONs them (dedup by normalised title, earliest order_seq
+    wins). So however the resolver behaved when a stop was stored, it is found.
+
     Each dict mirrors the stored unit plus `generated_at` (ISO) and `hit_count`.
     Returns [] on any error or empty pool — an empty pool is a legitimate
     "nothing reusable yet", distinct from an exception which is logged.
     """
-    identity = venue_identity(location, qid)
-    pool_key = _pool_key(identity, tour_type)
+    keys = []
+    if qid:
+        keys.append(_pool_key(venue_identity(location, qid), tour_type))
+    loc_key = _pool_key(venue_identity(location), tour_type)
+    if loc_key not in keys:
+        keys.append(loc_key)
     try:
         conn = psycopg2.connect(db_url)
         _ensure_table(conn)
@@ -418,12 +431,12 @@ def get_pool_stops(
                 SELECT title, artist, year, narration, raw_block,
                        address, coordinates, type_specialty, specific_examples,
                        operational_details, sources_json, story_elements_json,
-                       generated_at, hit_count
+                       generated_at, hit_count, title_norm
                 FROM stop_pool
-                WHERE pool_key = %s
+                WHERE pool_key = ANY(%s)
                 ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
                 """,
-                (pool_key,),
+                (keys,),
             )
             rows = cur.fetchall()
         conn.close()
@@ -432,7 +445,12 @@ def get_pool_stops(
         return []
 
     stops = []
+    _seen_titles = set()
     for r in rows:
+        tnorm = r[14]
+        if tnorm in _seen_titles:
+            continue  # same stop under both keys — keep the first (earliest order_seq)
+        _seen_titles.add(tnorm)
         stops.append({
             "title": r[0],
             "artist": r[1] or "",
@@ -449,7 +467,7 @@ def get_pool_stops(
             "generated_at": r[12].isoformat() if r[12] else None,
             "hit_count": r[13] or 0,
         })
-    logger.info(f"[POOL] {len(stops)} pooled stop(s) for {pool_key}")
+    logger.info(f"[POOL] {len(stops)} pooled stop(s) across keys {keys}")
     return stops
 
 
