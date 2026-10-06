@@ -1102,9 +1102,23 @@ def extract_story_elements_from_pages(
                 score += 2000
         # Official museum "about" / "history" / "collection" pages
         _high_value_patterns = ('/about', '/history', '/collection', '/oeuvres',
-                                '/permanent', '/histoire', '/museo', '/propos')
+                                '/permanent', '/histoire', '/museo', '/propos',
+                                '/architecture', '/building', '/batiment')
         if any(p in url.lower() for p in _high_value_patterns):
             score += 5000
+        # [LOCAL-593 #2] POLICY / ADMIN pages are never story pages — they are
+        # what filled the Harvard corpus (collecting-policy, campus-loans,
+        # loans-policy) and left the §3-adapter with no history to extract.
+        # Penalise them hard so, even if one reaches this stage, it ranks last.
+        # The substring test is deliberate: 'collecting-policy' must lose despite
+        # containing 'collection'.
+        _policy_admin_patterns = (
+            'policy', 'policies', 'loan', 'rights', 'reproduction', 'terms',
+            'privacy', 'cookie', 'employment', 'jobs', 'career', 'press-kit',
+            'presskit', 'press-release', 'media-kit', 'legal', 'copyright',
+        )
+        if any(p in url.lower() for p in _policy_admin_patterns):
+            score -= 20000
         # Penalize event/agenda pages (long but content-poor)
         _low_value_patterns = ('/agenda', '/evenement', '/exposition', '/event',
                                '/calendar', '/programme', '/saison', '/ticket',

@@ -37,6 +37,10 @@ ERROR_CODES = {
     'address_scatter': 'stops_not_colocated',
     'unclassifiable_request': 'request_unclassifiable',
     'story_gate_failed': 'content_quality_insufficient',
+    # [LOCAL-593 #5] The content-QA factual-integrity gate rejected the tour.
+    # The listener must never be told to "try again" (the same request produces
+    # the same rejection); they get a stable code + a plain WHY + a next step.
+    'factual_integrity': 'factual_integrity',
     'generation_failed': 'generation_failed',
 }
 
@@ -111,6 +115,46 @@ def _walking_suggestion(locality: str) -> Optional[Dict]:
     }
 
 
+def _fewer_stops_suggestion(request: str, evidence: Optional[Dict]) -> Optional[Dict]:
+    """[LOCAL-593 #5] Next step for a factual-integrity rejection.
+
+    The verified-content base was too thin to narrate the requested number of
+    stops safely. A smaller, same-venue tour has a real chance of passing, so we
+    hand the app a ready-to-fire request with a reduced stop count (and keep the
+    museum tour_type). The 'request' field is what the LOCAL-581 "Edit request"
+    button pre-fills, so it must be a complete, re-submittable request string.
+
+    Deterministic: we parse the stop count out of the original request and halve
+    it (floor, min 3). If no count is present we suggest 3. Nothing invented.
+    """
+    evidence = evidence or {}
+    base = (request or '').strip()
+    if not base:
+        return None
+
+    # Find a trailing "<N> stops" and compute a smaller target.
+    _m = re.search(r'(\d+)\s*stops?', base, re.IGNORECASE)
+    if _m:
+        try:
+            _cur = int(_m.group(1))
+        except ValueError:
+            _cur = 0
+        _fewer = max(3, _cur // 2) if _cur > 3 else max(1, _cur - 1)
+        if _fewer >= _cur:
+            _fewer = max(1, _cur - 1)
+        new_request = re.sub(r'\d+\s*stops?', f'{_fewer} stops', base, count=1,
+                             flags=re.IGNORECASE)
+    else:
+        _fewer = 3
+        new_request = f'{base}, {_fewer} stops'
+
+    return {
+        'label': f"Try {_fewer} stops instead",
+        'request': new_request,
+        'tour_type': 'museum',
+    }
+
+
 def build_actionable_failure(evidence: Optional[Dict], request: str,
                              legacy_message: str) -> Dict:
     """Return the structured fields to attach to a clean-fail job.
@@ -139,6 +183,12 @@ def build_actionable_failure(evidence: Optional[Dict], request: str,
     suggestion = None
     if error_code == 'venue_no_verifiable_content':
         suggestion = _walking_suggestion(locality)
+    elif error_code == 'factual_integrity':
+        # [LOCAL-593 #5] A smaller same-venue tour may pass; offer it as the
+        # one-tap next step. Falls back to a locality walking tour if the request
+        # has no usable stop count at all.
+        suggestion = (_fewer_stops_suggestion(request, evidence)
+                      or _walking_suggestion(locality))
 
     return {
         'error': legacy_message,          # unchanged for pre-LOCAL-581 builds

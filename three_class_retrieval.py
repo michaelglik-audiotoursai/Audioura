@@ -115,10 +115,17 @@ def determine_category(stop: Dict, per_work_contexts: Dict = None,
         Returns empty string if category cannot be determined.
     """
     name = stop.get("name", "")
-    
+    # [LOCAL-593 #3] name_lower is used by BOTH section 1 (catalogue_works) and
+    # section 3 (per_work_contexts). It was previously assigned only inside the
+    # `if catalogue_works:` branch, so a stop with no catalogue works but with
+    # per_work_contexts hit section 3 and raised
+    # `UnboundLocalError: local variable 'name_lower' referenced before assignment`
+    # (the non-fatal LOCAL-37 three-class retrieval error seen in the Harvard run).
+    # Bind it once, up front, where every section can rely on it.
+    name_lower = name.lower().strip()
+
     # 1. Check catalogue_works for structured metadata
     if catalogue_works:
-        name_lower = name.lower().strip()
         for cw in catalogue_works:
             cw_title_lower = cw.get("title", "").lower().strip()
             if not cw_title_lower:
