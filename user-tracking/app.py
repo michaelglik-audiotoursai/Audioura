@@ -7,6 +7,16 @@ import traceback
 
 app = Flask(__name__)
 
+# [LOCAL-595] Subscription-levels HTTP surface: /entitlements/* and
+# /purchases/verify. Registered as a blueprint so the existing user-tracking
+# routes are untouched.
+try:
+    from entitlements_api import entitlements_bp
+    app.register_blueprint(entitlements_bp)
+    print("[LOCAL-595] entitlements blueprint registered")
+except Exception as _ent_err:  # pragma: no cover - import-time safety
+    print(f"[LOCAL-595] WARNING: could not register entitlements blueprint: {_ent_err}")
+
 def get_db():
     return psycopg2.connect(os.getenv('DATABASE_URL'))
 

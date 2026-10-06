@@ -10,6 +10,7 @@ COPY news_cache_layer1.py .
 COPY cost_meter.py .
 COPY cost_rates.py .
 COPY entitlements.py .
+COPY subscription_levels.py .
 COPY payment_provider.py .
 COPY pricing.py .
 COPY wallet_ledger.py .

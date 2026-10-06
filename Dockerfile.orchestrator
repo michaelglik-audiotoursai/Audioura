@@ -6,6 +6,7 @@ COPY tour_orchestrator_service.py /app/
 COPY swipe_preference_service.py /app/
 COPY tests/db_connection.py /app/tests/db_connection.py
 COPY entitlements.py /app/
+COPY subscription_levels.py /app/
 COPY cost_ceiling_monitor.py /app/
 COPY wallet_api.py /app/
 COPY tier_change.py /app/
