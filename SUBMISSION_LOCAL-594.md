@@ -168,3 +168,130 @@ topped up, the same meter will report the real per-query dollars with no further
 
 No DELETE, no GCloud. DECISIONS.md / CLAUDE.md / BACKLOG.md / WORK_QUEUE.md /
 .continuous_dev/STATUS.md untouched.
+
+
+---
+
+## r2 — the quality claim, re-proven with Gemini grounding LIVE
+
+**Why r1 bounced (LEAD, 2026-10-06):** the meter was right, but the quality claim was
+not. In r1 **both** BEFORE and AFTER had Gemini returning **402 (prepay depleted)**, so
+both produced 0 loop stories. "Same outcome" compared two broken runs. Michael's priority
+is the stories, so the cut cannot merge until it is compared with grounding **live**.
+
+### Step 1 — probe Gemini first (one call, no loop)
+
+Probed `gemini-flash-latest` through the production path (`preflight.check_gemini`), then
+one grounded call through `story_leads._gemini(grounded=True)`:
+
+```
+preflight.check_gemini()  → HTTP 200          (r1 was 402 — credit has been topped up)
+_gemini(grounded=True)    → 1 request, 1 query, 163 chars of real web facts:
+  "The McMullen Museum of Art at Boston College originally opened in Devlin Hall in
+   1993, before relocating to its current Brighton Campus facility in September 2016."
+```
+
+**Gemini grounding is live and billing queries.** Not blocked. Proceeded to the runs.
+
+### Steps 3–4 — BEFORE/AFTER, two tours, grounding live, isolated container
+
+`./run_local594b_r2_live.sh` — disposable `docker run --rm --name local594b-gen` on
+`development_default` (postgres-2 **counted-only**), tour cache + stop pool OFF, image
+removed at end. **Never** touched `audioura-*` (verified: 13 containers up before and
+after, 0 stray `local594b`). Per-run LLM cap $1.80 with an **$8 batch gate** that stops
+before any run lacking $2.20 headroom. **Batch spent: $4.03 / $8.**
+
+- **AFTER** = defaults (the cut): `STORY_LOOP_MAX_GROUNDED=1`, r2 ungrounded, redundant
+  grounded-leads provider dropped.
+- **BEFORE** = storied-equivalent: `STORY_LOOP_MAX_GROUNDED=4`, `STORY_LOOP_R2_GROUNDED=1`,
+  `STORY_LEADS_GROUNDED=1`.
+
+**McMullen Museum of Art, Boston College — museum, 7 stops**
+
+| | loop stories / stop | gate cleared | grounded requests | grounded queries | grounding $ | Tour total |
+|---|---|---|---|---|---|---|
+| **BEFORE** | [0,0,0,0,0,1,1] | **2 / 7** | 42 | 38 | $0.5320 | **$1.8306** |
+| **AFTER**  | [0,0,0,0,0,1,0] | **1 / 7** | 14 | 11 | $0.1540 | **$1.4678** |
+
+Per-stop grounded requests in the D511 loop: **BEFORE [4,4,4,4,4,4,4] → AFTER
+[1,1,1,1,1,1,1]** (the cap holds at 1/stop live). Grounding is now **non-zero and
+billed** on both runs — the exact thing r1 could not show.
+
+**Freedom Trail, Boston, MA — walking, 5 stops**
+
+| | loop stories / stop | gate cleared (D511) | grounded requests | grounded queries | grounding $ | Tour total |
+|---|---|---|---|---|---|---|
+| **BEFORE** | [] | 0 / 0 | 5 | 8 | $0.1120 | $0.3732 |
+| **AFTER**  | [] | 0 / 0 | 5 | 7 | $0.0980 | $0.3567 |
+
+A walking tour's stops are historic sites, **not catalogue works with a `credit_line`**, so
+the D511 credit_line story loop (`run_for_stop`) is **never invoked** — hence `0/0` loop
+stories in *both* runs. These tours are gated instead by LOCAL-439, which reported
+**`STORY GATE: ALL STOPS PASSED`** in both BEFORE and AFTER. Grounding is still live here
+(7–8 queries, billed) via the per-tour/venue call sites; the cut does not touch that path,
+so the counts and cost are ~equal by construction.
+
+### Rule (step 4): AFTER cleared ≥ BEFORE − 1, per tour
+
+- **McMullen:** AFTER **1** ≥ BEFORE **2** − 1 = **1** → **PASS**.
+- **Freedom Trail:** 0 ≥ 0 − 1 → **PASS** (vacuous — the loop runs on neither; both pass
+  the LOCAL-439 gate on all stops).
+
+Both tours satisfy the rule, so **`STORY_LOOP_MAX_GROUNDED` stays at 1** — no raise to 2,
+no re-measure needed. The cut keeps story quality with grounding live: on McMullen it loses
+exactly one loop story (within tolerance) while cutting grounded requests 42 → 14 (loop
+4/stop → 1/stop) and grounding cost $0.53 → $0.15; on the walking tour it is quality-neutral.
+
+### One stop, delivered text, side by side (Stop 3 — *Dura-Europos: Crossroads of Antiquity*, McMullen)
+
+Same stop in both runs; AFTER is the stop where the cut's single grounded loop story
+cleared (idx 58). Both deliver a full, grounded, multi-paragraph narrative — the quality is
+comparable, not degraded by the cut.
+
+**AFTER (cut):**
+> The story of Dura-Europos, a forgotten jewel buried under the Syrian sands until the
+> early 20th century, unfolds at the crossroads of the Seleucid, Parthian, and Roman
+> empires. … Founded around 300 BCE by Macedonian settlers along the Euphrates River,
+> Dura-Europos grew into a multicultural crossroads … In 256 CE, a Persian Sasanian siege
+> brought an abrupt end to the city's prosperity. While museum records state the city was
+> completely abandoned after the sack, other historians argue that sporadic activity and
+> Mediterranean contact continued rather than total desertion.
+
+**BEFORE (baseline):**
+> Dura-Europos stood at the crossroads of the Seleucid, Parthian, and Roman Empires,
+> thriving as a multicultural hub on the Euphrates River. … In 2011, the McMullen Museum
+> of Art partnered with the Yale University Art Gallery to present Dura-Europos: Crossroads
+> of Antiquity. The exhibition brought together artifacts unearthed during Yale's
+> archaeological excavations of the ancient city, which began in 1928. Curators assembled
+> these excavated treasures to partially reconstruct the city's ancient religious spaces,
+> incorporating newly restored wall paintings.
+
+### Step 2 — fix the `_FRESH_COST_SANITY_CEILING["tour_generate"]=0.25` flooring
+
+r1 flagged this as a known follow-up; r2 fixes it. The ceiling is a LOCAL-200 guard used by
+`lookup_fresh_cost_for_cache_hit`: when a **cache hit** must charge what the original fresh
+generation cost, a stored row above the ceiling is rejected and the cache hit charges
+**$0.00**. The old **$0.25** predated grounding being metered — a fresh tour was ~$0.08
+(LLM+TTS only). As the live runs above show, a **grounding-inclusive** fresh tour is now
+**$1.47–1.83**, far above $0.25, so every such row was being floored to $0.00 (an
+undercharge on the matching cache hit).
+
+**Change:** `_FRESH_COST_SANITY_CEILING["tour_generate"] = 0.25 → 3.00` in both
+`cost_meter.py` and `translation-service/cost_meter.py` (verified identical before and
+after). $3.00 matches the live `COST_HARD_LIMIT` for a tour and still rejects a truly
+implausible pre-LOCAL-197 inflated row. Tests updated in
+`tests/test_local200_cache_hit_charging.py`: a $5.00 row is still rejected; a
+grounding-inclusive $0.30 / $1.70 row is now **recorded, not floored**. Full LOCAL-200
+suite + LOCAL-594 grounding suite: **60 passed**.
+
+### Files (r2)
+
+- `cost_meter.py`, `translation-service/cost_meter.py` — ceiling 0.25 → 3.00 (step 2).
+- `tests/test_local200_cache_hit_charging.py` — reject $5.00, accept grounding-inclusive
+  $0.30/$1.70.
+- `run_local594_mcmullen.py` — parameterized location/type/stops/slug; outputs to mounted
+  `tours/`; report loop-stories-per-stop + cleared count.
+- `run_local594b_r2_live.sh` — two-tour isolated-container harness with the $8 batch gate.
+
+No DELETE, no GCloud. DECISIONS.md / CLAUDE.md / BACKLOG.md / WORK_QUEUE.md /
+.continuous_dev/STATUS.md untouched.
