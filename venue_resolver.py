@@ -1215,12 +1215,14 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 5  # LOCAL-583: structural chrome rejection added to the
-                    # canonical-title union before write. Bumping from 4 makes
-                    # every row written by the old plaintext extractor (which
-                    # stored site chrome as "canonical titles") a cache MISS, so
-                    # the Griffin chrome row and its kind are ignored without a
-                    # DELETE. New rows are written chrome-free at this version.
+CORPUS_VERSION = 6  # LOCAL-593: the page-ranker now excludes policy/admin
+                    # pages (#2) and SPARQL works now carry a sitelinks prominence
+                    # count (#4). Rows written by the pre-LOCAL-593 miner stored
+                    # the admin-page corpus and sitelink-less works, so they must
+                    # be a cache MISS — bumping 5→6 ignores them without a DELETE
+                    # (same mechanism LOCAL-583 used for the Griffin chrome row).
+                    # Fresh rows are written at v6 with the admin pages excluded
+                    # and sitelinks present.
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
