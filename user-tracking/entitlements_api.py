@@ -39,14 +39,45 @@ entitlements_bp = Blueprint('entitlements', __name__)
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://admin:password123@localhost:5432/audiotours')
 API_KEY = os.getenv('GATEWAY_API_KEY', '')
-IAP_VERIFY_MODE = os.getenv('IAP_VERIFY_MODE', 'stub')  # 'stub' | 'apple' | 'google'
+# LEAD 2026-10-06: default 'apple' — a 'stub' default would grant a free pack to any
+# POST /purchases/verify. Tests set IAP_VERIFY_MODE=stub explicitly.
+IAP_VERIFY_MODE = os.getenv('IAP_VERIFY_MODE', 'apple')  # 'stub' | 'apple' | 'google'
 RENEWAL_WARN_DAYS = int(os.getenv('RENEWAL_WARN_DAYS', '3'))
 
+# [LOCAL-598] Apple verification config. The bundle id the JWS must carry; the
+# path to the bundled Apple Root CA G3 we pin the x5c chain to.
+APPLE_BUNDLE_ID = os.getenv('APPLE_BUNDLE_ID', 'com.audioura.audiotours')
+APPLE_ROOT_CA_PATH = os.getenv(
+    'APPLE_ROOT_CA_PATH',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'apple_root_ca_g3.pem'),
+)
+
 # product -> level mapping. Data, not logic: a new product is one dict entry.
+# Keys are the SERVER product keys.
 PRODUCT_LEVELS = {
     'l3_pack_10': 'l3',
     'l4_round_25': 'l4',
 }
+
+# [LOCAL-598] The app/StoreKit product ids (App Store Connect / StoreKit config
+# file) mapped to the server product keys above. The device sends the STORE id
+# in `product`; we accept either the store id or the server key so the stub and
+# apple paths share one endpoint. A new product is one more dict entry.
+STORE_PRODUCT_IDS = {
+    'audioura.pack.l3': 'l3_pack_10',
+    'audioura.round.l4': 'l4_round_25',
+}
+
+# Reverse: server key -> expected store productId (for the apple JWS check).
+SERVER_TO_STORE_PRODUCT = {v: k for k, v in STORE_PRODUCT_IDS.items()}
+
+
+def _normalize_product(product):
+    """Accept either a store product id (audioura.pack.l3) or a server product
+    key (l3_pack_10); return the SERVER key, or None if unknown."""
+    if product in PRODUCT_LEVELS:
+        return product
+    return STORE_PRODUCT_IDS.get(product)
 
 
 def _get_db():
@@ -194,7 +225,7 @@ def _me_payload(cur, user_id, now=None):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# IAP verifier interface + sandbox stub
+# IAP verifier interface + sandbox stub + offline Apple verification
 # ───────────────────────────────────────────────────────────────────────────
 class VerificationResult:
     def __init__(self, ok, raw_status, amount=None):
@@ -203,19 +234,74 @@ class VerificationResult:
         self.amount = amount
 
 
-def verify_purchase(store, transaction_id, product):
+_PLAN_AMOUNTS = {'l3_pack_10': 10.00, 'l4_round_25': 25.00}
+
+
+def _load_apple_root_ca():
+    with open(APPLE_ROOT_CA_PATH, 'rb') as f:
+        return f.read()
+
+
+def verify_purchase(store, transaction_id, product, signed_transaction=None):
     """Verify an IAP against the store. IAP_VERIFY_MODE selects the backend.
 
-    stub   : accept any non-empty transaction_id (sandbox). The real
-             Apple App Store Server API / Google Play Developer API land in
-             LOCAL-598 as additional branches here.
+    Args:
+        store: 'apple' (or 'google', not implemented).
+        transaction_id: the store transaction id (used by the stub and for the
+            idempotency check at the call site).
+        product: the SERVER product key (l3_pack_10 / l4_round_25).
+        signed_transaction: the StoreKit 2 JWS (required for apple mode).
+
+    stub   : accept any non-empty transaction_id (sandbox). No crypto.
+    apple  : verify the StoreKit 2 JWS OFFLINE — x5c chain pinned to Apple Root
+             CA G3, ES256 signature, bundleId, productId and type==Consumable.
+             No API key, no network. The verified transactionId from the JWS is
+             authoritative; it is returned in raw_status for the caller.
     """
     if IAP_VERIFY_MODE == 'stub':
         if not transaction_id:
             return VerificationResult(False, 'stub_rejected_empty_transaction')
-        plan_amounts = {'l3_pack_10': 10.00, 'l4_round_25': 25.00}
-        return VerificationResult(True, 'stub_verified', plan_amounts.get(product))
-    # LOCAL-598: real verification
+        return VerificationResult(True, 'stub_verified', _PLAN_AMOUNTS.get(product))
+
+    if IAP_VERIFY_MODE == 'apple':
+        if store != 'apple':
+            return VerificationResult(False, f'apple_mode_wrong_store:{store}')
+        if not signed_transaction:
+            return VerificationResult(False, 'apple_missing_signed_transaction')
+        try:
+            # Imported lazily so stub-mode deployments need no crypto dep.
+            from apple_jws_verifier import (
+                verify_signed_transaction, JwsVerificationError,
+            )
+        except Exception as e:  # pragma: no cover - import-time safety
+            logger.error(f"[LOCAL-598] apple verifier import failed: {e}")
+            return VerificationResult(False, f'apple_verifier_unavailable:{e}')
+
+        expected_store_product = SERVER_TO_STORE_PRODUCT.get(product)
+        try:
+            root_pem = _load_apple_root_ca()
+            verified = verify_signed_transaction(
+                signed_transaction,
+                root_ca_pem=root_pem,
+                expected_bundle_id=APPLE_BUNDLE_ID,
+                expected_product_id=expected_store_product,
+                required_type='Consumable',
+            )
+        except JwsVerificationError as e:
+            logger.warning(f"[LOCAL-598] apple verify failed: {e.code}")
+            return VerificationResult(False, f'apple_{e.code}')
+        except Exception as e:
+            logger.error(f"[LOCAL-598] apple verify error: {e}")
+            return VerificationResult(False, f'apple_error:{e}')
+
+        # The JWS is authoritative: trust the transactionId FROM the signed
+        # transaction, not the client-supplied one. Report it so the caller
+        # records/idempotency-checks the verified id.
+        return VerificationResult(
+            True, f'apple_verified:{verified.transaction_id}',
+            _PLAN_AMOUNTS.get(product))
+
+    # google / other: not implemented in LOCAL-598 (out of scope).
     return VerificationResult(False, f'verify_mode_not_implemented:{IAP_VERIFY_MODE}')
 
 
@@ -304,13 +390,19 @@ def purchases_verify():
     transaction_id = data.get('transaction_id')
     product = data.get('product')
     user_id = data.get('user_id')
+    # [LOCAL-598] StoreKit 2 JWS signed transaction (apple mode). Optional in
+    # stub mode so existing sandbox tests keep working.
+    signed_transaction = data.get('signed_transaction')
     if not all([store, transaction_id, product, user_id]):
         return jsonify({
             "error": "missing_fields",
             "message": "store, transaction_id, product and user_id are all required.",
         }), 400
 
-    level = PRODUCT_LEVELS.get(product)
+    # Accept either the store product id (audioura.pack.l3) or the server key
+    # (l3_pack_10). Normalize to the server key for the level mapping.
+    server_product = _normalize_product(product)
+    level = PRODUCT_LEVELS.get(server_product) if server_product else None
     if level is None:
         return jsonify({
             "error": "unknown_product",
@@ -321,7 +413,9 @@ def purchases_verify():
     try:
         cur = conn.cursor()
 
-        # Idempotency: the same transaction_id can never grant twice.
+        # Idempotency (first pass): the client-supplied transaction_id can
+        # never grant twice. In apple mode the JWS yields the authoritative id
+        # which we re-check below before recording.
         cur.execute("SELECT id FROM purchases WHERE transaction_id = %s", (transaction_id,))
         if cur.fetchone():
             cur.close()
@@ -331,8 +425,11 @@ def purchases_verify():
                 "transaction_id": transaction_id,
             }), 409
 
-        # Verify with the store (sandbox stub by default).
-        result = verify_purchase(store, transaction_id, product)
+        # Verify with the store. apple mode verifies the JWS offline; stub
+        # accepts any non-empty transaction_id.
+        result = verify_purchase(
+            store, transaction_id, server_product,
+            signed_transaction=signed_transaction)
         if not result.ok:
             cur.close()
             return jsonify({
@@ -341,19 +438,35 @@ def purchases_verify():
                 "raw_status": result.raw_status,
             }), 402
 
+        # In apple mode the verified transaction id (from the signed payload) is
+        # authoritative — use it for recording and the uniqueness check, not the
+        # client-supplied one. raw_status is 'apple_verified:<txid>'.
+        effective_txid = transaction_id
+        if isinstance(result.raw_status, str) and result.raw_status.startswith('apple_verified:'):
+            effective_txid = result.raw_status.split(':', 1)[1]
+            # Re-check idempotency on the authoritative id.
+            cur.execute("SELECT id FROM purchases WHERE transaction_id = %s", (effective_txid,))
+            if cur.fetchone():
+                cur.close()
+                return jsonify({
+                    "error": "already_verified",
+                    "message": "This transaction has already been processed.",
+                    "transaction_id": effective_txid,
+                }), 409
+
         # Record the purchase (UNIQUE transaction_id enforces idempotency even
         # under a race; catch the violation and report 409).
         try:
             cur.execute("""
                 INSERT INTO purchases (transaction_id, store, product, user_id, amount, raw_status)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """, (transaction_id, store, product, user_id, result.amount, result.raw_status))
+            """, (effective_txid, store, server_product, user_id, result.amount, result.raw_status))
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             cur2 = conn.cursor()
             payload = {"error": "already_verified",
                        "message": "This transaction has already been processed.",
-                       "transaction_id": transaction_id}
+                       "transaction_id": effective_txid}
             cur2.close()
             return jsonify(payload), 409
 
@@ -376,7 +489,7 @@ def purchases_verify():
 
         payload = _me_payload(cur, user_id)
         payload['verified'] = True
-        payload['transaction_id'] = transaction_id
+        payload['transaction_id'] = effective_txid
         payload['granted_level'] = level
         cur.close()
         return jsonify(payload), 200

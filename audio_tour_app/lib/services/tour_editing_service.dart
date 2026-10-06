@@ -2,8 +2,26 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:archive/archive.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../config/endpoints.dart';
+
+/// [LOCAL-598 D6] A metered edit the server refused with a structured
+/// subscription-levels refusal (429, or 401 user_id_required). Carries the
+/// status code and the parsed body (error_code, message, suggestion) so the
+/// edit UI can show the server's message plus a matching action button instead
+/// of a bare "Save failed".
+class TourEditRefusal implements Exception {
+  final int statusCode;
+  final Map<String, dynamic> body;
+  const TourEditRefusal(this.statusCode, this.body);
+
+  String? get errorCode => body['error_code'] as String?;
+
+  @override
+  String toString() =>
+      'TourEditRefusal($statusCode, ${body['error_code']}: ${body['message']})';
+}
 
 class TourEditingService {
   static Future<String> _getBaseUrl() async {
@@ -11,6 +29,27 @@ class TourEditingService {
     // works in both local WiFi and cloud modes. Endpoints.base() returns the
     // gateway base in cloud mode and the LAN host in local mode.
     return await Endpoints.base(Service.tourEditing);
+  }
+
+  /// LOCAL-598 Deliverable 1 — the metered edit calls MUST carry the device id.
+  ///
+  /// The edit path (`/tour/<id>/update-multiple-stops`, `/tour/<id>/update-stop`)
+  /// is metered by LOCAL-595: an add-stops edit consumes a pack/ops allowance,
+  /// and the server keys that on `secret_id`. Before this fix the edit body
+  /// carried no id, so LOCAL-595 refused add-stops edits with 401
+  /// `user_id_required` (see edit_tour_screen.dart's note).
+  ///
+  /// The generate call sends the same single stored id as `user_id` (the
+  /// orchestrator forwards it to the metered path as `secret_id`). The editing
+  /// service reads `secret_id` directly, so we send BOTH keys with the one
+  /// stored value: `user_id` for the gateway/auth path and `secret_id` as the
+  /// metered-count key. Reads SharedPreferences 'user_id' — the exact key the
+  /// generate call uses (tour_generator_screen.dart) and DeviceService writes.
+  static Future<Map<String, String>> _deviceIdFields() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    if (userId.isEmpty) return <String, String>{};
+    return <String, String>{'user_id': userId, 'secret_id': userId};
   }
   
   static Future<Map<String, dynamic>> updateStop({
@@ -25,6 +64,9 @@ class TourEditingService {
       final body = {
         'stop_number': stopNumber,
         'new_text': newText,
+        // LOCAL-598 D1: carry the device id so metered edits aren't refused
+        // with 401 user_id_required. secret_id is the metered-count key.
+        ...await _deviceIdFields(),
       };
       
       final response = await http.post(
@@ -220,7 +262,14 @@ class TourEditingService {
       await DebugLogHelper.addDebugLog('EDIT API: URL: $baseUrl/tour/$tourId/update-multiple-stops');
       await DebugLogHelper.addDebugLog('EDIT API: Payload stops count: ${stopsData.length}');
       
-      final requestBody = {'stops': stopsData};
+      final requestBody = {
+        'stops': stopsData,
+        // LOCAL-598 D1: carry the device id so an add-stops edit is metered to
+        // the right device instead of refused with 401 user_id_required.
+        // secret_id is the metered-count key LOCAL-595 reads; user_id is the
+        // gateway/auth key — both carry the one stored id, as generate does.
+        ...await _deviceIdFields(),
+      };
       final response = await http.post(
         Uri.parse('$baseUrl/tour/$tourId/update-multiple-stops'),
         headers: await Endpoints.apiHeaders(Service.tourEditing, requestBody: requestBody),
@@ -235,6 +284,23 @@ class TourEditingService {
         final result = jsonDecode(response.body);
         await DebugLogHelper.addDebugLog('EDIT API: Save success - ${result['message']}');
         return result;
+      } else if (response.statusCode == 429 || response.statusCode == 401) {
+        // [LOCAL-598 D6] A metered-edit refusal (over plan / add-stops not
+        // allowed at this level / user_id_required). Surface the structured
+        // body so the UI shows the server message + a matching button.
+        Map<String, dynamic> body;
+        try {
+          body = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          body = <String, dynamic>{};
+        }
+        if (body['error_code'] != null) {
+          await DebugLogHelper.addDebugLog(
+              'EDIT API: refusal ${response.statusCode} code=${body['error_code']}');
+          throw TourEditRefusal(response.statusCode, body);
+        }
+        final msg = body['message'] ?? body['error'] ?? 'Save failed';
+        throw Exception(msg);
       } else if (response.statusCode == 400) {
         final error = jsonDecode(response.body);
         if (error['error_code'] == 'MISSING_AUDIO_DATA') {

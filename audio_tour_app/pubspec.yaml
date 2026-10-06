@@ -1,7 +1,7 @@
 name: audio_tour_app_dev
 description: AudioTours Dev - AI-powered audio tour generator
 publish_to: 'none'
-version: 2.4.2+28
+version: 2.4.3+29
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -36,6 +36,12 @@ dependencies:
   # 3.5 floor, so an unpinned range would break `flutter pub get`. 10.1.4
   # requires Dart >=3.4.0, Flutter >=3.22.0.
   share_plus: 10.1.4
+  # LOCAL-598: consumable IAP (StoreKit 2 on iOS via the storekit2 backend).
+  # Product ids audioura.pack.l3 ($10) and audioura.round.l4 ($25), both
+  # consumable, never subscriptions. Google Play is out of scope for
+  # LOCAL-598 (Android buy buttons hidden behind a flag).
+  in_app_purchase: ^3.2.0
+  in_app_purchase_storekit: ^0.3.19
 
 dev_dependencies:
   flutter_test:
