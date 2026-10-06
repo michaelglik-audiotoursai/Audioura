@@ -149,6 +149,24 @@ _CHROME_EXACT_LABELS = frozenset({
     'hours admission', 'hours and admission', 'donate', 'support us',
     'newsletter', 'sign up', 'log in', 'login', 'my account', 'cart',
     'board of directors', 'staff', 'press', 'shop', 'store',
+    # [LOCAL-589] Plurals of existing labels that escaped in the field (tour 394):
+    # the Griffin listing published "Exhibitions Closed" / "Exhibitions Archive"
+    # (plural), while LOCAL-583 only carried the singular forms.
+    'exhibitions closed', 'exhibitions archive', 'closed exhibitions',
+    'past exhibitions archive',
+})
+
+# [LOCAL-589] Institutional-SECTION tokens: when one of these is the LAST word of
+# a venue-branded title, the title names a SECTION of the institution (its
+# archive, its salon, its travel programme, its rentals desk, its board
+# bulletin) — not a show. These are a strict subset of _CHROME_TOKENS; the extra
+# power is only used by the terminal-section rule in is_chrome_title, which also
+# requires a venue-name word to be present, so a real show that merely ends in
+# an ordinary word is never caught. ("Arthur Griffin Archive" → founder name
+# 'Arthur' + venue word 'Griffin' + section token 'archive'.)
+_CHROME_SECTION_TERMINAL = frozenset({
+    'archive', 'archives', 'salon', 'travel', 'rentals', 'rental',
+    'bulletin', 'directors', 'governance', 'bylaws',
 })
 
 # Chrome LEXICON tokens. A title whose words are DOMINATED by these (and carry no
@@ -167,6 +185,11 @@ _CHROME_TOKENS = frozenset({
     'calls', 'entry', 'entries', 'submission', 'submissions', 'review',
     'reviews', 'scheduled', 'bulletin', 'salon', 'travel', 'archive',
     'governance', 'bylaws', 'rentals',
+    # [LOCAL-589] page-state / listing-furniture words. "Closed" is a status
+    # label the Griffin site renders beside its exhibitions list ("Exhibitions
+    # Closed"); paired with the generic listing word "exhibitions" it is pure
+    # furniture, never a show name. "archives" is the plural section token.
+    'closed', 'archives',
 })
 
 # Words that mark a title as PAGE FURNITURE even alongside institutional nouns —
@@ -221,6 +244,21 @@ def is_chrome_title(title: str, venue_name: str = "") -> bool:
     if len(words) >= 3 and words[0] in _INTERROGATIVES:
         return True
     _venue_words = set(_chrome_norm(venue_name).split()) if venue_name else set()
+    # [LOCAL-589] Terminal institutional-SECTION rule. A venue-branded title whose
+    # LAST word names an institutional section (archive / salon / travel /
+    # rentals / bulletin / directors / governance) is a section of the venue, not
+    # a show — "Arthur Griffin Archive", "Griffin Salon", "Griffin Travel". The
+    # rule fires only when the title also carries a venue-name word, so the venue
+    # is clearly its subject; a real show that merely ends in an ordinary word is
+    # untouched (and none of the published Griffin shows end in a section token).
+    # It catches the founder-name case ("Arthur Griffin Archive") that the
+    # all-words-are-chrome loop below misses, because "Arthur" reads as a
+    # distinctive content word there.
+    if (len(words) >= 2
+            and words[-1] in _CHROME_SECTION_TERMINAL
+            and _venue_words
+            and any(w in _venue_words for w in words[:-1])):
+        return True
     # A title is chrome when EVERY word is a chrome-lexicon token, a venue-name
     # word, or a function/filler word AND at least one chrome-lexicon token is
     # present. Numbers alone (e.g. a year) count as filler, not distinctive

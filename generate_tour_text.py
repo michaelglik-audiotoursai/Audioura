@@ -3381,6 +3381,52 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
     return ov_text
 
 
+def _site_first_empty_action(reason, fetch_failed):
+    """[LOCAL-589 D2] Decide what to do when site-first returned NO candidates
+    for a resolved exhibition museum (0 catalogue/SPARQL works).
+
+    This is the no-invention contract, as a pure function so it is unit-testable:
+
+      * A FETCH FAILURE (``fetch_failed`` True, reason 'fetch_failed') — the
+        venue's own site could not be read (timeout/5xx/exception), even after
+        the one retry build_site_first_candidates already performed. We must NOT
+        fall through to Phase 3A, where GPT would INVENT shows. Return
+        ``'overview'`` so the caller takes the LOCAL-582 sourced-overview rung
+        (and, if that is impossible, clean-fails) — GPT may only ever CHOOSE
+        among real site exhibitions, never originate them.
+
+      * reason 'parsed_zero' / 'no_listing_found' — the site WAS reachable and
+        genuinely published no structural exhibitions. Falling through to the
+        existing paths is correct (D577: never turn a working tour into no tour);
+        downstream GPT candidates are still gated by D1v2 against the LOCAL-589
+        chrome-free canonical set. Return ``'fall_through'``.
+
+    Returns 'overview' or 'fall_through'.
+    """
+    if fetch_failed or reason == 'fetch_failed':
+        return 'overview'
+    return 'fall_through'
+
+
+def _site_fill_effective_cap(exhibition_stops_source, n_candidates, total_stops,
+                             headroom=1):
+    """[LOCAL-589 D4] How many candidates to carry through narration.
+
+    For the site_exhibition path, when MORE real current exhibitions exist than
+    were requested, carry a small narration HEADROOM (default one spare real
+    show) so that if one selected show's narration later comes back empty — and
+    the LOCAL-292 empty-stop gate removes it — the tour still delivers the
+    requested count from real exhibitions (the tour is trimmed back to the exact
+    request after that gate). The spare is only ever a REAL extra exhibition;
+    nothing is invented. All other paths keep the plain cap (no headroom).
+
+    Returns the effective cap (>= total_stops).
+    """
+    if exhibition_stops_source == 'site_exhibition' and n_candidates > total_stops:
+        return total_stops + min(headroom, n_candidates - total_stops)
+    return total_stops
+
+
 def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     """
     PHASE 5.5 — Post-description guard for single-venue museum tours.
@@ -4496,7 +4542,32 @@ def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     _gallery_titles = _filter_result['galleries']
     _excluded_titles = _filter_result['excluded']
     _cross_lang_aliases = _filter_result['aliases']
-    
+
+    # [LOCAL-589 D3] ONE CHROME FILTER, APPLIED TO THE CANONICAL SET EVERYONE
+    # VERIFIES AGAINST. LOCAL-583 ran reject_chrome_titles only on a LOCAL copy
+    # just before the cache write, so the in-memory canonical set that D1v2
+    # verification (match_candidate_to_canonical), R4 replenishment, UNIFIED-FILL,
+    # POST-R4-FILL and LOCAL-577's title-mismatch refill all check against still
+    # held site chrome. That is how the Griffin field run (tour 394) "VERIFIED"
+    # Function Rentals / Calls For Entry / Griffin Salon / Exhibitions Closed /
+    # Arthur Griffin Archive as exhibition stops. Filtering HERE — right after the
+    # LOCAL-24 work/non-work filter and BEFORE corpus_result['canonical_titles']
+    # is set — means the chrome-free set propagates to every one of those paths
+    # from a single point. SPARQL works are inside this union but are themselves
+    # Wikidata-verified show/collection labels and do not read as chrome, so they
+    # are untouched.
+    if canonical_titles:
+        from exhibition_discovery import reject_chrome_titles as _reject_chrome_canon
+        _canon_before = len(canonical_titles)
+        _canonical_kept = _reject_chrome_canon(canonical_titles, venue_name)
+        if len(_canonical_kept) != _canon_before:
+            _canonical_dropped = sorted(set(canonical_titles) - set(_canonical_kept))
+            print(f"  [D1v2] [LOCAL-589] chrome rejected from the canonical SET "
+                  f"(verified-against) : {_canon_before} → {len(_canonical_kept)} "
+                  f"— dropped {_canonical_dropped}")
+        # Preserve set type (downstream does set algebra on canonical_titles).
+        canonical_titles = set(_canonical_kept)
+
     # Store classification in corpus_result for downstream audit
     # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
     # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
@@ -7791,10 +7862,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _phase_timer.start('site_first_exhibitions')
         try:
             from exhibition_site_first import build_site_first_candidates, SiteFirstResult
+            _sf_diagnostics = {}
             _sf_candidates = build_site_first_candidates(
                 base_site_url=_museum_site_url,
                 venue_language=_museum_site_language,
                 total_stops=total_stops,
+                diagnostics=_sf_diagnostics,
             )
             if _sf_candidates:
                 poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]
@@ -7813,8 +7886,62 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 for _poi in poi_list:
                     print(f"   - {_poi['name']} [SITE EXHIBITION {_poi.get('detail_url','')}]")
             else:
+                _sf_reason = _sf_diagnostics.get('reason', 'no_listing_found')
+                _sf_fetch_failed = bool(_sf_diagnostics.get('fetch_failed'))
                 print(f"  [LOCAL-580] Site-first found no current exhibitions "
-                      f"on '{_museum_site_url}' — falling through to Phase 3A")
+                      f"on '{_museum_site_url}' — reason={_sf_reason}")
+                # ──── [LOCAL-589 D2] NO INVENTION FOR EXHIBITION MUSEUMS ────────
+                # The Griffin field defect: a swallowed ReadTimeout made a
+                # transient FETCH FAILURE look like "the site has no shows", and
+                # the run fell through to Phase 3A where GPT INVENTED seven shows
+                # ("The Still Life Collection", "The Annual Juried Exhibition"…),
+                # six of which D1v2 rightly dropped. For a resolved exhibition
+                # museum (0 catalogue/SPARQL works), a fetch failure must NEVER
+                # become GPT invention. The listing fetch has ALREADY been retried
+                # once with a longer timeout inside build_site_first_candidates
+                # (LOCAL-589 D1); if it STILL failed, we take the LOCAL-582 museum
+                # overview rung — a sourced orientation from the venue's own site —
+                # instead of falling through to invention. GPT may only ever CHOOSE
+                # among real site exhibitions, never originate them.
+                _sf_action = _site_first_empty_action(_sf_reason, _sf_fetch_failed)
+                if _sf_action == 'overview':
+                    print(f"  [LOCAL-589] site-first fetch FAILED (reason={_sf_reason}) for "
+                          f"exhibition museum '{_museum_venue_name}' — NOT falling through to "
+                          f"Phase 3A GPT invention; taking the LOCAL-582 overview rung")
+                    _ov_text = _try_deliver_museum_overview(
+                        venue_name=_museum_venue_name, location=location,
+                        tour_type=tour_type, site_url=_museum_site_url,
+                        locality=_museum_resolved_locality,
+                        site_language=_museum_site_language,
+                        requested_stops=_requested_stop_count_original or total_stops,
+                        output_file=output_file,
+                        entity_resolved=True, site_reachable=True)
+                    if _ov_text is not None:
+                        return _ov_text, output_file, (None, None)
+                    # Overview could not be built either (site truly unreachable).
+                    # Clean-fail with structured evidence — still no invention.
+                    print(f"  [LOCAL-589] overview rung also failed — clean-fail "
+                          f"(no GPT-invented stops) for '{_museum_venue_name}'")
+                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                        "error_type": "thin_evidence",
+                        "entity_resolved": True,
+                        "qid": "",
+                        "sparql_works": 0,
+                        "site_reachable": False,
+                        "wikipedia_available": False,
+                        "tier": "unresolvable",
+                        "venue": _museum_venue_name or location,
+                        "locality": _museum_resolved_locality,
+                        "reason": f"site-first {_sf_reason}; overview unavailable",
+                    }
+                    return None, None, (None, None)
+                # reason in {parsed_zero, no_listing_found}: the site WAS reachable
+                # and genuinely published no structural exhibitions. Falling through
+                # to the existing paths is correct here (D577 — never turn a working
+                # tour into no tour); GPT invention is still gated downstream by
+                # D1v2 + the LOCAL-589 chrome-free canonical set.
+                print(f"  [LOCAL-580] reason={_sf_reason} (site reachable, 0 shows) "
+                      f"— falling through to Phase 3A")
         except Exception as _sf_err:
             print(f"  [LOCAL-580] Site-first path failed (falling through): {_sf_err}")
             import traceback
@@ -10328,8 +10455,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # ──── END LOCAL-320 INCONCLUSIVE REPLACEMENT ──────────────────────────
 
         # Hard cap and final sanity
-        if len(poi_list) > total_stops:
-            poi_list = poi_list[:total_stops]
+        # [LOCAL-589 D4] FILL THE COUNT FROM REAL EXHIBITIONS. The Griffin field
+        # case: 9 real current shows exist, 7 are requested, but if ONE selected
+        # show's narration later comes back empty, the LOCAL-292 empty-stop gate
+        # removes it and the tour ships 6. When the stops are REAL site
+        # exhibitions (site_exhibition) and MORE of them exist than requested, we
+        # carry a small narration headroom (one spare real show) past this cap so
+        # a single empty-narration removal still leaves the requested count; the
+        # tour is trimmed back to exactly the requested number AFTER the LOCAL-292
+        # gate. Headroom is only taken when extra REAL exhibitions are available —
+        # never invented, and other tour paths are untouched.
+        _effective_cap = _site_fill_effective_cap(
+            _exhibition_stops_source, len(poi_list), total_stops)
+        if _effective_cap > total_stops:
+            print(f"  [LOCAL-589] site-first fill headroom: carrying {_effective_cap} real "
+                  f"exhibition(s) through narration for a {total_stops}-stop request "
+                  f"(spare {_effective_cap - total_stops} covers an empty-narration drop)")
+        if len(poi_list) > _effective_cap:
+            poi_list = poi_list[:_effective_cap]
         if len(poi_list) == 0:
             print(f"X All POIs were filtered out; cannot continue")
             return None, None, (None, None)
@@ -19957,6 +20100,30 @@ RULES:
               f"failed={len(_l292_failed_stops)} / delivered={len(poi_list)}")
     else:
         print(f"\n  [LOCAL-292] Empty stop removal gate: PASSED (all {_l292_requested_stops} stops have narration)")
+
+    # [LOCAL-589 D4] Trim the site-first narration headroom back to the listener's
+    # ask. We carried one or two spare REAL exhibitions through narration so a
+    # single empty-narration removal (LOCAL-292) still leaves the requested count.
+    # Now that the empty stops are gone, drop any remaining spares so we deliver
+    # EXACTLY what was asked — and so LOCAL-394's selected==delivered invariant
+    # measures the request, not the headroom. Only the site_exhibition path ever
+    # has headroom, so other tours are untouched.
+    if (_exhibition_stops_source == 'site_exhibition'
+            and _requested_stop_count_original):
+        if len(poi_list) > _requested_stop_count_original:
+            _l589_before = len(poi_list)
+            poi_list = poi_list[:_requested_stop_count_original]
+            for _l589_i, _l589_p in enumerate(poi_list):
+                _l589_p['stop_number'] = _l589_i + 1
+            total_stops = len(poi_list)
+            print(f"  [LOCAL-589] site-first headroom trimmed: {_l589_before} → "
+                  f"{len(poi_list)} to match the {_requested_stop_count_original}-stop request")
+        # Re-base the gate's "requested" counter to the listener's ask so the
+        # LOCAL-394 invariant below reads selected==delivered: the spares were
+        # intentional headroom, not lost stops. Done whether or not a trim was
+        # needed (an empty-narration drop already consumed the spare).
+        if _l292_requested_stops > _requested_stop_count_original:
+            _l292_requested_stops = _requested_stop_count_original
 
     # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
     if _l292_failed_stops and poi_list:
