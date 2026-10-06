@@ -280,8 +280,13 @@ def _ensure_table(conn) -> None:
                 story_elements_json TEXT,
                 generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 hit_count INTEGER DEFAULT 0,
+                order_seq INTEGER DEFAULT 0,
                 PRIMARY KEY (pool_key, title_norm)
             )
+        """)
+        # Migration path for a table created before order_seq existed.
+        cur.execute("""
+            ALTER TABLE stop_pool ADD COLUMN IF NOT EXISTS order_seq INTEGER DEFAULT 0
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_stop_pool_key
@@ -327,7 +332,15 @@ def store_delivered_tour(
         conn = psycopg2.connect(db_url)
         _ensure_table(conn)
         with conn.cursor() as cur:
-            for u in units:
+            # Base offset so NEW stops in this delivery append after everything
+            # already pooled for this venue, while stops already present keep
+            # their earlier (MIN) position — the venue's original order is stable.
+            cur.execute(
+                "SELECT COALESCE(MAX(order_seq), -1) FROM stop_pool WHERE pool_key = %s",
+                (pool_key,),
+            )
+            base_seq = (cur.fetchone() or [-1])[0] + 1
+            for seq_i, u in enumerate(units):
                 tnorm = _title_norm(u["title"])
                 if not tnorm:
                     continue
@@ -340,8 +353,8 @@ def store_delivered_tour(
                         title, artist, year, narration, raw_block,
                         address, coordinates, type_specialty, specific_examples,
                         operational_details, sources_json, story_elements_json,
-                        generated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+                        order_seq, generated_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
                     ON CONFLICT (pool_key, title_norm) DO UPDATE SET
                         title = EXCLUDED.title,
                         artist = EXCLUDED.artist,
@@ -355,6 +368,7 @@ def store_delivered_tour(
                         operational_details = EXCLUDED.operational_details,
                         sources_json = COALESCE(EXCLUDED.sources_json, stop_pool.sources_json),
                         story_elements_json = COALESCE(EXCLUDED.story_elements_json, stop_pool.story_elements_json),
+                        order_seq = LEAST(stop_pool.order_seq, EXCLUDED.order_seq),
                         generated_at = NOW()
                     """,
                     (
@@ -363,7 +377,7 @@ def store_delivered_tour(
                         u["narration"], u["raw_block"],
                         u["address"], u["coordinates"], u["type_specialty"],
                         u["specific_examples"], u["operational_details"],
-                        sources_json_default, se_json,
+                        sources_json_default, se_json, base_seq + seq_i,
                     ),
                 )
                 written += 1
@@ -386,12 +400,12 @@ def get_pool_stops(
 ) -> List[Dict]:
     """Return every pooled stop for (venue identity, tour_type, version).
 
-    Ordered oldest-first (generated_at ASC) so a caller taking "the best N from
-    the pool" gets a stable, deterministic order and the earliest-written stops
-    (the venue's core) lead. Each dict mirrors the stored unit plus
-    `generated_at` (ISO) and `hit_count`. Returns [] on any error or empty pool —
-    an empty pool is a legitimate "nothing reusable yet", distinct from an
-    exception which is logged.
+    Ordered by stable delivery sequence (order_seq ASC) so a caller taking "the
+    best N from the pool" gets the venue's original stop order — the core stops
+    first, new stops appended after — not an alphabetical or write-time accident.
+    Each dict mirrors the stored unit plus `generated_at` (ISO) and `hit_count`.
+    Returns [] on any error or empty pool — an empty pool is a legitimate
+    "nothing reusable yet", distinct from an exception which is logged.
     """
     identity = venue_identity(location, qid)
     pool_key = _pool_key(identity, tour_type)
@@ -407,7 +421,7 @@ def get_pool_stops(
                        generated_at, hit_count
                 FROM stop_pool
                 WHERE pool_key = %s
-                ORDER BY generated_at ASC, title_norm ASC
+                ORDER BY order_seq ASC, generated_at ASC, title_norm ASC
                 """,
                 (pool_key,),
             )
