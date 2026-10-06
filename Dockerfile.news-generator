@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements-news.txt
 
 COPY news_generator_service.py .
 COPY entitlements.py .
+COPY subscription_levels.py .
 COPY build_manifest.py .
 
 # Build-time manifest: record checksums of all Python sources + git SHA
