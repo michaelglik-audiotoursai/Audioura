@@ -7389,22 +7389,27 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if _cache_hit:
                     print(f"CACHE HIT: {location} / {tour_type} / {total_stops}")
                     # [LOCAL-60] Record cache hit cost = 0
-                    # [LOCAL-533] A cache hit issues no grounded requests, so
-                    # grounding is $0.00 / 0 requests. Read the counter (reset
-                    # just above, so 0) rather than assuming, and print the same
-                    # two lines a fresh tour prints so the format is uniform.
+                    # [LOCAL-533 / LOCAL-594] A cache hit issues no grounded
+                    # requests, so grounding is $0.00 / 0 queries / 0 requests.
+                    # Read the counters (reset just above, so 0) rather than
+                    # assuming, and print the same lines a fresh tour prints so the
+                    # format is uniform.
                     try:
-                        from story_leads import get_grounding_requests as _get_gr
+                        from story_leads import (get_grounding_requests as _get_gr,
+                                                  get_grounding_queries as _get_gq)
                         _cache_gr = _get_gr()
+                        _cache_gq = _get_gq()
                     except ImportError:
                         _cache_gr = 0
+                        _cache_gq = 0
                     try:
-                        from cost_rates import grounding_cost as _grounding_cost
-                        _cache_gr_cost = _grounding_cost(_cache_gr)
+                        from cost_rates import grounding_query_cost as _grounding_query_cost
+                        _cache_gr_cost = _grounding_query_cost(_cache_gq)
                     except ImportError:
                         _cache_gr_cost = 0.0
                     print(f"\nTotal API cost: $0.0000 (0 tokens)")
-                    print(f"Grounding:      ${_cache_gr_cost:.4f} ({_cache_gr} requests)")
+                    print(f"Grounding:      ${_cache_gr_cost:.4f} "
+                          f"({_cache_gq} queries, {_cache_gr} requests)")
                     print(f"Tour total:     ${_cache_gr_cost:.4f}")
                     _LAST_GENERATION_COST = {
                         "total_cost": 0.0,
@@ -7412,6 +7417,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         "cache_hit": True,
                         "grounding_cost": _cache_gr_cost,
                         "grounding_requests": _cache_gr,
+                        "grounding_queries": _cache_gq,
                         "tour_total_cost": 0.0 + _cache_gr_cost,
                         "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0,
                                       "grounding": _cache_gr_cost},
@@ -22356,18 +22362,33 @@ RULES:
     # requests actually issued this generation (single chokepoint in story_leads),
     # price them at the one constant in cost_rates, and print both lines so a
     # glance separates them. This measures; it does not change generation.
+    # [LOCAL-533 / LOCAL-594] Grounding cost — a separate billing channel from the
+    # OpenAI tokens summed above. Grounding (Gemini + Google Search) is invoiced
+    # by Google per SEARCH QUERY ("Generate content search query gemini 3 paid",
+    # $14/1,000 queries), not per token, so it never appeared in "Total API cost"
+    # and could rival the whole OpenAI cost of a tour while the printed number said
+    # nothing. Count the queries actually issued this generation (the webSearch
+    # queries each grounded response reports; single chokepoint in story_leads),
+    # price them at the one constant in cost_rates, and print both lines so a glance
+    # separates them. Also print the request count — it is what the LOCAL-594 cap
+    # (<= 1 grounded request per stop) is measured against. This measures; the cut
+    # itself lives in the per-stop loop.
     try:
-        from story_leads import get_grounding_requests as _get_gr
+        from story_leads import (get_grounding_requests as _get_gr,
+                                  get_grounding_queries as _get_gq)
         _grounding_requests = _get_gr()
+        _grounding_queries = _get_gq()
     except ImportError:
         _grounding_requests = 0
+        _grounding_queries = 0
     try:
-        from cost_rates import grounding_cost as _grounding_cost
-        _grounding_cost_usd = _grounding_cost(_grounding_requests)
+        from cost_rates import grounding_query_cost as _grounding_query_cost
+        _grounding_cost_usd = _grounding_query_cost(_grounding_queries)
     except ImportError:
         _grounding_cost_usd = 0.0
     _tour_total_cost = total_cost + _grounding_cost_usd
-    print(f"Grounding:      ${_grounding_cost_usd:.4f} ({_grounding_requests} requests)")
+    print(f"Grounding:      ${_grounding_cost_usd:.4f} "
+          f"({_grounding_queries} queries, {_grounding_requests} requests)")
     print(f"Tour total:     ${_tour_total_cost:.4f}")
 
     # [LOCAL-543] Per-claim provenance — the question the cost lines do not answer:
@@ -22568,12 +22589,13 @@ RULES:
         "cache_hit": False,
         "grounding_cost": _grounding_cost_usd,
         "grounding_requests": _grounding_requests,
+        "grounding_queries": _grounding_queries,
         "tour_total_cost": _tour_total_cost,
         "breakdown": {
             "llm": total_cost,  # Currently all tracked cost is LLM tokens
             "tts": 0.0,         # TTS cost tracked separately at orchestrator level
             "search": 0.0,      # Search cost tracked separately via work_story_searcher
-            "grounding": _grounding_cost_usd,  # [LOCAL-533] per-request Google Search
+            "grounding": _grounding_cost_usd,  # [LOCAL-594] per-query Google Search
         },
     }
     # [LOCAL-543] Fold the per-claim provenance counts into the same record a
