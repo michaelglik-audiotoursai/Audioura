@@ -52,6 +52,12 @@ APPLE_ROOT_CA_PATH = os.getenv(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), 'apple_root_ca_g3.pem'),
 )
 
+# [LOCAL-598B] Expected StoreKit environment. The signed transaction carries an
+# `environment` claim; a Sandbox transaction must never grant on Production and
+# vice-versa. 'Sandbox' locally, 'Production' once live. Empty disables the
+# check (we pass None), which keeps older stub tests working.
+APPLE_IAP_ENVIRONMENT = os.getenv('APPLE_IAP_ENVIRONMENT', '')
+
 # product -> level mapping. Data, not logic: a new product is one dict entry.
 # Keys are the SERVER product keys.
 PRODUCT_LEVELS = {
@@ -286,6 +292,7 @@ def verify_purchase(store, transaction_id, product, signed_transaction=None):
                 expected_bundle_id=APPLE_BUNDLE_ID,
                 expected_product_id=expected_store_product,
                 required_type='Consumable',
+                expected_environment=(APPLE_IAP_ENVIRONMENT or None),
             )
         except JwsVerificationError as e:
             logger.warning(f"[LOCAL-598] apple verify failed: {e.code}")
