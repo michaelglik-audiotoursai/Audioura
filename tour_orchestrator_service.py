@@ -799,7 +799,7 @@ def link_stop_metrics_to_tour(tour_id, job_id):
         return -1
 
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -837,6 +837,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # as forced_stops. Absent → omitted → normal generation, unchanged.
         if stops:
             generate_data["stops"] = stops
+        # [LOCAL-597] Forward the generation mode. 'by_reference' makes the
+        # generator reuse already-researched stops only (zero grounding, zero
+        # SERP). Absent/None → normal generation.
+        if mode:
+            generate_data["mode"] = mode
         
         print(f"Calling tour text generator API: {datetime.now().isoformat()}")
         print(f"Request data: {generate_data}")
@@ -1927,7 +1932,12 @@ def generate_complete_tour():
         return jsonify(quota), 429
     # Clamp stops to the level maximum (max_stops column).
     total_stops = quota['clamped_stops']
-    print(f"[QUOTA] Allowed for {user_id}: level={quota.get('level')}, stops_clamped={total_stops}")
+    # [LOCAL-597] Generation mode from the levels check. L2 free tours come back
+    # allowed with mode='by_reference' — the orchestrator forwards it so the
+    # generator reuses already-researched stops only (zero grounding, zero SERP).
+    generation_mode = quota.get('mode')
+    print(f"[QUOTA] Allowed for {user_id}: level={quota.get('level')}, "
+          f"stops_clamped={total_stops}, mode={generation_mode}")
 
     # [LOCAL-525] A user-chosen stop list is a promise: "generate EXACTLY these
     # stops." If the plan would clamp the count below the list length, silently
@@ -2006,6 +2016,7 @@ def generate_complete_tour():
         "persona": persona,  # [S81] Pass persona for downstream generation
         "is_test": is_test_override,  # [LOCAL-103] Track test flag
         "stops": stops,  # [LOCAL-525] User-chosen stops (None → normal generation)
+        "mode": generation_mode,  # [LOCAL-597] 'by_reference' for L2 free tours, else None
         "created_at": datetime.now().isoformat()
     }
     
@@ -2044,7 +2055,7 @@ def generate_complete_tour():
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
             thread = threading.Thread(
                 target=orchestrate_tour_async,
-                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops)
+                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops, generation_mode)
             )
             thread.daemon = True
             thread.start()
@@ -2056,7 +2067,7 @@ def generate_complete_tour():
         sys.stdout.flush()
         thread = threading.Thread(
             target=orchestrate_tour_async,
-            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops)
+            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override, stops, generation_mode)
         )
         thread.daemon = True
         thread.start()

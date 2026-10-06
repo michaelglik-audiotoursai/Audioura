@@ -188,7 +188,7 @@ def validate_stops(raw):
     return clean, None
 
 
-def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=None, forced_stops=None):
+def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=None, forced_stops=None, mode=None):
     """Generate tour text asynchronously."""
     try:
         api_call_logger.log("GENERATOR_SERVICE_ASYNC_START", {
@@ -238,7 +238,7 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         # to the engine (validated at the /generate boundary). When None, the
         # engine runs normal candidate generation — behaviour is unchanged.
         # Generate the tour text - PASS total_stops and persona parameters
-        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value, user_id=user_id, job_id=job_id, forced_stops=forced_stops)
+        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value, user_id=user_id, job_id=job_id, forced_stops=forced_stops, mode=mode)
         
         if tour_text is None:
             # Check for structured evidence from degradation ladder
@@ -277,6 +277,22 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                             f'"{_venue_name}" to build a tour. Try a broader request — '
                             f'for example a walking tour of the surrounding neighbourhood.'
                         )
+                    # [LOCAL-597] L2 by-reference: the venue has no reusable
+                    # researched material. Surface the exact D613 message +
+                    # suggestion (with up to 3 nearby existing tours) verbatim —
+                    # NEVER a fresh generation. This is a terminal, actionable
+                    # refusal, so it carries its own structured fields and skips
+                    # the actionable_failure mapping below (which would otherwise
+                    # relabel the unknown error_type as generation_failed).
+                    elif _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "by_reference_no_material":
+                        _error_msg = _LAST_CLEAN_FAIL_EVIDENCE.get(
+                            "message",
+                            "This place hasn't been researched yet on the free level.")
+                        _error_extra["error_code"] = "by_reference_no_material"
+                        _error_extra["message"] = _error_msg
+                        _error_extra["suggestion"] = _LAST_CLEAN_FAIL_EVIDENCE.get("suggestion", "")
+                        _error_extra["nearby_tours"] = _LAST_CLEAN_FAIL_EVIDENCE.get("nearby_tours", [])
+                        _error_extra["_by_reference_terminal"] = True
                     else:
                         # [LOCAL-485 / D564] The catch-all must describe the CATCH-ALL case.
                         # It previously borrowed the museum "not enough works" wording, so
@@ -304,15 +320,23 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             # "Walking tour of Winchester, MA"). The old human string stays in
             # `error` verbatim for pre-LOCAL-581 app builds.
             try:
-                from actionable_failure import build_actionable_failure
-                _af = build_actionable_failure(
-                    _error_extra.get("evidence_summary"), location, _error_msg)
-                _error_extra["error_code"] = _af["error_code"]
-                _error_extra["message"] = _af["message"]
-                _error_extra["suggestion"] = _af["suggestion"]
-                _svc_logger.info(
-                    f"[LOCAL-580] clean-fail error_code={_af['error_code']} "
-                    f"suggestion={_af['suggestion']}")
+                if _error_extra.get("_by_reference_terminal"):
+                    # [LOCAL-597] Already carries its own error_code/message/
+                    # suggestion/nearby_tours — do not remap.
+                    _error_extra.pop("_by_reference_terminal", None)
+                    _svc_logger.info(
+                        f"[LOCAL-597] clean-fail error_code=by_reference_no_material "
+                        f"nearby={len(_error_extra.get('nearby_tours', []))}")
+                else:
+                    from actionable_failure import build_actionable_failure
+                    _af = build_actionable_failure(
+                        _error_extra.get("evidence_summary"), location, _error_msg)
+                    _error_extra["error_code"] = _af["error_code"]
+                    _error_extra["message"] = _af["message"]
+                    _error_extra["suggestion"] = _af["suggestion"]
+                    _svc_logger.info(
+                        f"[LOCAL-580] clean-fail error_code={_af['error_code']} "
+                        f"suggestion={_af['suggestion']}")
             except Exception as _af_err:
                 _svc_logger.error(f"[LOCAL-580] actionable-failure build failed (non-fatal): {_af_err}")
             ACTIVE_JOBS.update(job_id, status="error", error=_error_msg, **_error_extra)
@@ -817,6 +841,10 @@ def generate_tour():
     tour_type = data.get('tour_type') or ''  # [LOCAL-474] None → '' so the classifier can run
     total_stops = data.get('total_stops', 10)
     user_id = data.get('user_id')  # [S46] Extract user_id for persona lookup
+    # [LOCAL-597] Generation mode. The orchestrator sets mode='by_reference' for
+    # an L2 free tour so the engine reuses already-researched stops only (zero
+    # grounding / zero SERP). Absent/None → normal generation, unchanged.
+    mode = data.get('mode')
 
     # [LOCAL-525] Optional user-chosen stops. When present, these EXACT stops are
     # generated in order (the engine's forced_stops path, LOCAL-357). When absent,
@@ -879,7 +907,7 @@ def generate_tour():
     # Start generation in background thread
     thread = threading.Thread(
         target=generate_tour_async,
-        args=(job_id, location, tour_type, total_stops, user_id, forced_stops)
+        args=(job_id, location, tour_type, total_stops, user_id, forced_stops, mode)
     )
     thread.daemon = True
     thread.start()
