@@ -7065,7 +7065,7 @@ except Exception as _cap_err:  # pragma: no cover
     _import_logger.error(f"[LOCAL-562] executor context propagation unavailable: {_cap_err}")
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None, mode=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
     This thin wrapper is the per-tour boundary. It opens a
@@ -7080,8 +7080,85 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     Signature, return value, and all existing ``_LAST_GENERATION_COST`` keys are
     unchanged — callers and tests that read ``total_cost`` / ``breakdown`` / etc.
     see the same shape, only now with correct numbers.
+
+    [LOCAL-597] ``mode='by_reference'`` (set by the orchestrator for an L2 free
+    tour) routes to the by-reference path: reuse already-researched stops only
+    (the stop pool + existing non-test tours of the venue), zero grounded Gemini,
+    zero Serper. On success it returns the assembled text with _LAST_GENERATION_COST
+    at ~$0; when the venue has no reusable material it sets _LAST_CLEAN_FAIL_EVIDENCE
+    to the by_reference_no_material refusal (with nearby tours) and returns None,
+    so the service surfaces the actionable refusal — never a fresh generation.
     """
-    global _LAST_GENERATION_COST
+    global _LAST_GENERATION_COST, _LAST_CLEAN_FAIL_EVIDENCE
+
+    # [LOCAL-597] L2 by-reference path. Terminal: it either delivers a tour built
+    # entirely from reused material (zero grounding / zero SERP, enforced by the
+    # guard inside build_by_reference_tour) or returns a structured refusal. It
+    # never falls through to fresh generation — that is the whole point of the
+    # free tier's economics (D613).
+    if (mode or "").strip().lower() == "by_reference":
+        _pool_db = os.environ.get("DATABASE_URL")
+        if not _pool_db:
+            print("  [LOCAL-597] by_reference requested but no DATABASE_URL — cannot reuse material")
+            _LAST_CLEAN_FAIL_EVIDENCE = {
+                "error_type": "by_reference_no_material",
+                "error_code": "by_reference_no_material",
+                "message": "This place hasn't been researched yet on the free level.",
+                "suggestion": "Buy a $10 pack for a freshly researched tour.",
+                "nearby_tours": [],
+            }
+            return None, output_file, (None, None)
+        try:
+            import l2_by_reference
+            result = l2_by_reference.build_by_reference_tour(
+                location, tour_type, total_stops or 0, _pool_db,
+                output_file=output_file,
+            )
+        except Exception as _br_err:
+            print(f"  [LOCAL-597] by-reference build error: {_br_err}")
+            _LAST_CLEAN_FAIL_EVIDENCE = {
+                "error_type": "by_reference_no_material",
+                "error_code": "by_reference_no_material",
+                "message": "This place hasn't been researched yet on the free level.",
+                "suggestion": "Buy a $10 pack for a freshly researched tour.",
+                "nearby_tours": [],
+            }
+            return None, output_file, (None, None)
+
+        if result.get("allowed"):
+            _LAST_GENERATION_COST = {
+                "total_cost": 0.0,
+                "total_tokens": 0,
+                "cache_hit": False,
+                "pool_reuse": True,
+                "by_reference": True,
+                "grounding": result.get("grounding", {"requests": 0, "queries": 0}),
+                "breakdown": {
+                    "llm": 0.0, "tts": 0.0, "search": 0.0,
+                    "reused_stops": result.get("reused_stops", 0),
+                    "new_stops": 0,
+                    "rewritten_transitions": result.get("rewritten_transitions", 0),
+                    "about_stops": result.get("about_stops", 0),
+                },
+            }
+            _g = result.get("grounding", {})
+            print(f"  [LOCAL-597] BY-REFERENCE DELIVERY: reused={result.get('reused_stops')} "
+                  f"rewritten_transitions={result.get('rewritten_transitions')} "
+                  f"about_stops={result.get('about_stops', 0)} "
+                  f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
+            return result["text"], output_file, (None, None)
+
+        # Refusal — hand the structured no-material error to the service layer.
+        _LAST_CLEAN_FAIL_EVIDENCE = {
+            "error_type": "by_reference_no_material",
+            "error_code": result.get("error_code", "by_reference_no_material"),
+            "message": result.get("message", ""),
+            "suggestion": result.get("suggestion", ""),
+            "nearby_tours": result.get("nearby_tours", []),
+        }
+        print(f"  [LOCAL-597] BY-REFERENCE REFUSED: {result.get('message')} "
+              f"(nearby={len(result.get('nearby_tours', []))})")
+        return None, output_file, (None, None)
 
     # [LOCAL-590] Stop-pool fast path. When a tour of this venue was already
     # delivered, reuse the pooled stops and generate only the new ones (Michael's

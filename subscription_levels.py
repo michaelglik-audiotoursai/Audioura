@@ -17,8 +17,11 @@ STRUCTURED REFUSAL that follows the LOCAL-580 error contract:
 
 error_code values this module emits:
     plan_limit_daily, plan_limit_monthly, pack_exhausted,
-    level_cannot_generate, stops_over_plan, renewal_due,
-    by_reference_unavailable   (L2 generate, until LOCAL-597)
+    level_cannot_generate, stops_over_plan, renewal_due
+
+L2 generate is ALLOWED with mode='by_reference' [LOCAL-597]; the orchestrator
+routes it to the by-reference path, which emits by_reference_no_material when a
+venue has no reusable material.
 
 Every number comes from the `plans` row for the device's level — the code holds
 NO tier constants. Per-device state (level, pack window, counters) lives in
@@ -486,11 +489,15 @@ def _check_generate(cur, user_id, level, plan, requested_stops):
     if refusal:
         return refusal
 
-    # L2: by-reference only. The by-reference generation path is LOCAL-597; until
-    # then L2 generate is refused with a stable, documented code.
+    # L2: by-reference only. [LOCAL-597] The by-reference generation path is now
+    # live: an L2 request is ALLOWED, carrying mode='by_reference' so the
+    # orchestrator routes it to l2_by_reference.build_by_reference_tour (reuse
+    # already-researched stops only, zero grounded Gemini, zero Serper). The
+    # daily/monthly volume caps are still enforced here FIRST — only a DELIVERED
+    # tour counts (D613), so these count completed tour_requests rows. If there is
+    # no reusable material, the by-reference path itself returns the actionable
+    # by_reference_no_material refusal; this gate does not pre-judge material.
     if plan['by_reference_only']:
-        # Still enforce the daily/monthly caps so the refusal is honest about why
-        # even once 597 lands the counting is in place.
         daily_cap = plan['tours_per_day']
         monthly_cap = plan['tours_per_month']
         if daily_cap is not None:
@@ -511,12 +518,7 @@ def _check_generate(cur, user_id, level, plan, requested_stops):
                     "Buy a $10 pack for 5 new tours.",
                     level=level, used=used_month, max=monthly_cap,
                 )
-        return _refuse(
-            'by_reference_unavailable',
-            "Free tours reuse already-researched places, and that path isn't available yet.",
-            "Buy a $10 pack for a freshly researched tour, or pick a nearby existing tour.",
-            level=level,
-        )
+        return _allow(level=level, clamped_stops=clamped, mode='by_reference')
 
     # Tester: daily + monthly fresh-generation caps.
     if plan['tours_per_day'] is not None or plan['tours_per_month'] is not None:

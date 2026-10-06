@@ -144,9 +144,13 @@ class TestL2(LevelsTestBase):
         super().setUp()
         self._set_level('l2')
 
-    def test_l2_generate_by_reference_unavailable(self):
+    def test_l2_generate_allowed_by_reference(self):
+        # [LOCAL-597] L2 generate is now ALLOWED, carrying mode='by_reference';
+        # the orchestrator routes it to the by-reference path.
         r = sl.check_operation(self.uid, 'generate', requested_stops=3)
-        self.assertStructuredRefusal(r, 'by_reference_unavailable')
+        self.assertTrue(r['allowed'])
+        self.assertEqual('by_reference', r.get('mode'))
+        self.assertEqual(3, r['clamped_stops'])
 
     def test_l2_stops_over_plan_at_edge(self):
         # max_stops = 5. 5 is allowed-through-to-by_reference; 6 is over.
@@ -287,14 +291,16 @@ class TestDefect2CompletedOnlyCounting(LevelsTestBase):
         # One in-flight ('started') request today — the daily cap of 1 is NOT hit.
         self._add_tour_requests(1, status='started')
         r = sl.check_operation(self.uid, 'generate', requested_stops=3)
-        # L2 generate still refuses with by_reference_unavailable (597), but the
-        # point is it is NOT plan_limit_daily — the allowance was not consumed.
-        self.assertStructuredRefusal(r, 'by_reference_unavailable')
+        # [LOCAL-597] L2 generate is now ALLOWED (by_reference); the point is it is
+        # NOT plan_limit_daily — the allowance was not consumed by an in-flight row.
+        self.assertTrue(r['allowed'])
+        self.assertEqual('by_reference', r.get('mode'))
 
     def test_failed_row_does_not_count(self):
         self._add_tour_requests(1, status='failed')
         r = sl.check_operation(self.uid, 'generate', requested_stops=3)
-        self.assertStructuredRefusal(r, 'by_reference_unavailable')
+        self.assertTrue(r['allowed'])
+        self.assertEqual('by_reference', r.get('mode'))
 
     def test_completed_row_counts_toward_daily_cap(self):
         # One DELIVERED tour today -> the daily cap of 1 IS hit.

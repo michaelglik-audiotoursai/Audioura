@@ -137,6 +137,20 @@ def _count_grounding_request() -> None:
     _GROUNDING_REQUESTS += 1
 
 
+def _raise_if_grounding_forbidden(what: str) -> None:
+    """[LOCAL-597] Raise GroundingForbiddenError if an L2 by-reference build is
+    active. Lazily imports the guard so story_leads has no hard dependency on it
+    (and so a build without the module simply never forbids). Any import failure
+    is treated as 'not forbidden' — the guard is an extra safety net, never a new
+    way for ordinary generation to break."""
+    try:
+        import l2_by_reference
+    except Exception:
+        return
+    l2_by_reference._raise_if_forbidden(what)
+
+
+
 def _count_grounding_queries(web_search_queries) -> None:
     """[LOCAL-594] Record the Google search queries a grounded response reported.
 
@@ -186,6 +200,11 @@ def _gemini(prompt: str, model: str = None, grounded: bool = False) -> str:
     """
     model = model or os.environ.get('GEMINI_MODEL', 'gemini-flash-latest')
     import requests
+    # [LOCAL-597] Forbidden during an L2 by-reference build (zero grounding).
+    # Check BEFORE the key short-circuit so a keyless build still fails hard
+    # rather than silently returning ''.
+    if grounded:
+        _raise_if_grounding_forbidden('grounded Gemini request (_gemini)')
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     if not key:
         return ''
@@ -265,6 +284,12 @@ def gemini_with_sources(prompt: str, model: str = None,
     import requests
     key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
     out = {'text': '', 'sources': [], 'supports': [], 'queries': [], 'error': ''}
+    # [LOCAL-597] A grounded request is forbidden during an L2 by-reference build
+    # (zero grounding). Check BEFORE the key short-circuit and OUTSIDE the broad
+    # try/except below (which would otherwise swallow the raise into out['error']),
+    # so the guard is a hard failure the build cannot miss.
+    if grounded:
+        _raise_if_grounding_forbidden('grounded Gemini request (gemini_with_sources)')
     if not key:
         out['error'] = 'no GEMINI_API_KEY'
         return out

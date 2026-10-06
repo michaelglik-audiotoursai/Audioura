@@ -848,6 +848,18 @@ def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) 
 def _serp_search(query: str) -> Tuple[List[Dict], float]:
     """Execute a single SERP query via Serper.dev. Returns (results, latency_ms).
     On failure → ([], latency_ms) + logged with full request/response detail."""
+    # [LOCAL-597] A Serper query is forbidden during an L2 by-reference build
+    # (zero SERP). Raise BEFORE any key check / network, so the guard proves the
+    # path never even attempts a query. Lazy import keeps work_story_searcher free
+    # of a hard dependency on the guard module; an import failure means "not
+    # forbidden" — the guard is a safety net, never a new failure mode for normal
+    # generation.
+    try:
+        import l2_by_reference as _l2
+        _l2._raise_if_forbidden('Serper query (_serp_search)')
+    except ImportError:
+        pass
+
     if not SERP_API_KEY:
         print(f"  [SQ-S2] No SERP_API_KEY — skipping query")
         return [], 0.0
