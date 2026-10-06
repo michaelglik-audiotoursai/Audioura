@@ -811,24 +811,42 @@ def about_stop_unit(about: AboutStop) -> dict:
 # narration says so. These two pure functions encode that rule; they are
 # unit-testable and have no network/LLM dependency.
 
-# A US street address: "<number> <Street words> [, City] [, ST] [ZIP]".
-_STREET_ADDRESS_RE = re.compile(
-    r"(?i)\b(\d{1,5}(?:\s*(?:-|–|/|\s)\s*\d{1,4})?\s+"
-    r"[A-Z0-9][A-Za-z0-9.'’]*(?:\s+[A-Z0-9][A-Za-z0-9.'’]*){0,4}\s+"
-    r"(?:street|st|road|rd|avenue|ave|boulevard|blvd|lane|ln|drive|dr|way|place|pl|"
-    r"square|sq|court|ct|terrace|ter|highway|hwy|parkway|pkwy|circle|cir|row))"
-    r"(?:\s*,\s*[A-Za-z.'’ ]+)?(?:\s*,\s*[A-Z]{2})?(?:\s+\d{5}(?:-\d{4})?)?\b"
+# A US street address: "<house-number> <Capitalized street words> <suffix>
+# [, City] [, ST] [ZIP]". The street-name words must be Capitalized tokens
+# IMMEDIATELY between the number and the suffix — no lowercase connectors
+# ("to", "a", "on", "where") — so a NARRATIVE sentence that happens to contain a
+# year and a street name ("…moved in 1822 to a mansion on Pearl Street, where it
+# remained…") is NOT mistaken for an address. The house number allows the common
+# half/fraction and unit forms (10½, 10 1/2, 164, 2-4).
+_STREET_SUFFIX = (
+    r"street|st|road|rd|avenue|ave|boulevard|blvd|lane|ln|drive|dr|way|place|pl|"
+    r"square|sq|court|ct|terrace|ter|highway|hwy|parkway|pkwy|circle|cir|row"
 )
+_STREET_ADDRESS_RE = re.compile(
+    r"(\d{1,5}(?:\s*\u00bd|\s*1/2|(?:\s*[-–/]\s*\d{1,4}))?"      # house number (+ ½ / 1/2 / range)
+    r"\s+(?:[A-Z][A-Za-z0-9.'’]*\.?\s+){1,3}"                    # 1–3 Capitalized street-name words
+    r"(?:" + _STREET_SUFFIX + r")\.?)"                           # a street suffix
+    r"(?:\s*,\s*([A-Z][A-Za-z.'’]+(?:\s+[A-Z][A-Za-z.'’]+){0,3}))?"  # optional , City
+    r"(?:\s*,\s*([A-Za-z]{2}))?"                                  # optional , ST
+    r"(?:\s+(\d{5}(?:-\d{4})?))?",                               # optional ZIP
+    re.IGNORECASE,
+)
+
+# Case-insensitive suffix set used to confirm a candidate really ends in a street
+# word (the regex above is IGNORECASE so "Street"/"street" both match).
+_SUFFIX_WORDS = frozenset(_STREET_SUFFIX.split("|"))
 
 
 def extract_venue_address(page_text: str, locality: str = "") -> str:
     """Lift the venue's OWN street address from its page text, or "".
 
-    Scans the venue's visible page text for the FIRST street address and returns
-    it as a clean "<street>, <City>, <ST> <ZIP>" string when those tails are
-    present on the page. Pure/best-effort: anything it cannot find on the page is
-    simply absent (nothing invented — D584). The Griffin "Main Gallery Address /
-    67 Shore Road, Winchester, Ma 01890" footer is the canonical case.
+    Scans the venue's visible page text for the FIRST genuine street address
+    (house number + Capitalized street name + suffix) and returns it as a clean
+    "<street>, <City>, <ST> <ZIP>" string when those tails are present. Pure and
+    best-effort: anything not on the page is absent (nothing invented — D584). The
+    Griffin "Main Gallery Address / 67 Shore Road, Winchester, Ma 01890" footer and
+    the Athenaeum "located at 10½ Beacon Street" sentence are the canonical cases;
+    a narrative clause with a stray year + street name is rejected.
 
     When ``locality`` is given and the matched address has no city/state tail, the
     locality is appended (properly cased) so the stop still carries a complete,
@@ -839,13 +857,22 @@ def extract_venue_address(page_text: str, locality: str = "") -> str:
     m = _STREET_ADDRESS_RE.search(page_text)
     if not m:
         return ""
-    addr = re.sub(r"\s+", " ", m.group(0)).strip().rstrip(",")
-    # Normalise state casing: "Winchester, Ma 01890" → "Winchester, MA 01890".
-    addr = re.sub(r",\s*([A-Za-z]{2})(\s+\d{5}(?:-\d{4})?)?$",
-                  lambda mm: f", {mm.group(1).upper()}{mm.group(2) or ''}", addr)
-    has_tail = bool(re.search(r",\s*[A-Z]{2}\b", addr) or re.search(r"\b\d{5}\b", addr))
+    street = re.sub(r"\s+", " ", (m.group(1) or "")).strip().rstrip(",")
+    city = (m.group(2) or "").strip()
+    state = (m.group(3) or "").strip().upper()
+    zipc = (m.group(4) or "").strip()
+    parts = [street]
+    tail = []
+    if city:
+        tail.append(city)
+    if state:
+        tail.append(state + (f" {zipc}" if zipc else ""))
+    elif zipc:
+        tail.append(zipc)
+    addr = ", ".join([street] + tail) if tail else street
+    has_tail = bool(city or state or zipc)
     if not has_tail and locality:
-        addr = f"{addr}, {normalise_locality(locality)}"
+        addr = f"{street}, {normalise_locality(locality)}"
     return addr
 
 
