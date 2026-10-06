@@ -13981,6 +13981,19 @@ Exempt: navigation directions ("Turn left", "Continue past").
                         from story_leads import (run as _leads_run, available_providers,
                                                  families_agreeing, provider_family)
                         _provs = available_providers()
+                        # [LOCAL-594] Drop the `gemini_grounded` provider from the
+                        # leads fan-out. The prize here is cross-model AGREEMENT,
+                        # and this module already states that gemini + gemini_grounded
+                        # is "one model answering twice, which is not corroboration"
+                        # — grounded adds no agreement the ungrounded `gemini` call
+                        # does not. It only adds a billable Google search per mined
+                        # stop, on TOP of the one the D511 loop already issues for
+                        # the same stop. So we keep openai + (ungrounded) gemini for
+                        # the two-family signal and let the per-stop grounded budget
+                        # live entirely in the D511 loop. STORY_LEADS_GROUNDED=1
+                        # restores the grounded provider.
+                        if os.environ.get('STORY_LEADS_GROUNDED', '').strip() != '1':
+                            _provs = [_p for _p in _provs if _p != 'gemini_grounded']
                         if len({provider_family(_p) for _p in _provs}) < 2:
                             print(f"    [LOCAL-488] providers {_provs} span fewer than "
                                   f"two model families — cross-model agreement needs "
