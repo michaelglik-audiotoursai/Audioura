@@ -24448,3 +24448,19 @@ not on the host. When a task adds an import, check BOTH dependency lists (this i
 cryptography wdvrday52p, pycountry LOCAL-564, bs4 here). Follow-up: D1v2 matched "The Griffin Museum
 Collection" to the site junk title "Griffin Museum Board Of Directors 2". Canonical-title extraction for
 the non-exhibition path still admits page chrome.
+
+## D609 — Stop pool (LOCAL-590) per Michael's design; exact counts; tour 394 deleted at his request (2026-10-05)
+
+Michael asked to build the stop pool (LOCAL-495). His ordering rule: **single-building tours** add the
+new stops **before** the pooled ones, regenerate the orientation, leave the conclusion; **outdoor tours**
+re-sequence the route and rewrite the directions of the stops next to each insertion (often 4 rewritten
+for 2 added; still worth it). Subscribed only. Generate exactly N (no bucket rounding once the pool
+exists). Correction recorded: LEAD said a 7-stop request "builds 10 trimmed to 7"; wrong. The generator
+builds exactly N, and only the cache buckets. Tour 394 (Michael's broken Griffin 7-stop) deleted with his
+explicit authorisation: 5 stop_metrics + 1 audio_tours row, counts 205→204; full backup
+`/Volumes/AudiouraSSD/deleted_tours/`. The bad 4–6 bucket cache row was retired, not deleted (D-note
+2026-10-05).
+Also deleted at Michael's request (2026-10-05 20:2x): tours 391 (en) and 392 (ru), the junk Griffin pair
+with website menu items as stops; their 5 stop_metrics; and share code NCyh65N7 (pointed at 392). Counts
+204 → 202 (real 60 → 58). Backups: `/Volumes/AudiouraSSD/deleted_tours/` (audio_tours_391/392.json incl.
+ZIPs, stop_metrics_391_392.json, shared_tours_391_392.json).
