@@ -1,0 +1,1173 @@
+
+======================================================================
+CALL #001 | 03:41:56.585 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Art and Architectual tour in Boston Athenaeum, boston, ma
+  tour_type: 
+  total_stops_parameter: 5
+  output_file: /app/tours/LOCAL591_A.txt
+
+  [LOCAL-245] Stop-existence gate mode: LOG_ONLY
+
+======================================================================
+CALL #002 | 03:41:56.590 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Art and Architectual tour in Boston Athenaeum, boston, ma
+  total_stops_final: 5
+  source: parameter
+
+
+PHASE 1: Analyzing tour intent with AI...
+  [BLOCKER1] Stripped 'tour' from location: 'Art and Architectual tour in Boston Athenaeum, boston, ma' → 'Art and Architectual  in Boston Athenaeum, boston, ma'
+  [LOCAL-46] Stripped transport words: 'Art and Architectual  in Boston Athenaeum, boston, ma' → 'Art and Architectual in Boston Athenaeum, boston, ma'
+  [Bug2Fix/D536] tour_type='' not prepended (pre_category='walking'); intent sees the ORIGINAL request, not the stripped one
+Intent analysis response: ```json
+{
+    "poi_type": "art or architectural locations",
+    "location": "boston, ma",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Boston Athenaeum",
+    "geographic_scope": "Boston Athenaeum",
+    "named_places": [],
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+```
+  [INTENT] Stripped LLM fences from response
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: art or architectural locations
+   Location: boston, ma
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Boston Athenaeum
+  [venue_name sanity] 'Boston Athenaeum' OK
+  [S15/LOCAL-591] Forced tour_category=museum from venue_name='Boston Athenaeum' — request is a tour INSIDE one building (a theme word is not a different place)
+[TIMING] phase=intent elapsed=1.2s cumulative=1.2s
+[LOCAL-474] tour_type='' → category='museum' (source=inferred)
+
+Detected tour category: MUSEUM
+Using museum template for Art and Architectual tour in Boston Athenaeum, boston, ma - 
+
+======================================================================
+CALL #003 | 03:41:57.789 | GENERATING_PROMPT
+======================================================================
+  location: Art and Architectual tour in Boston Athenaeum, boston, ma
+  user_request: Art and Architectual tour in Boston Athenaeum, boston, ma
+  total_stops: 5
+
+
+PHASE 3A: Fetching 5 candidate POI(s) for Art and Architectual tour in Boston Athenaeum, boston, ma...
+  [Museum constraint] Venue from intent='Boston Athenaeum'
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [venue_resolver] SPARQL: 6 works found for Q478013
+  [Phase3A] Injected 6 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Boston Athenaeum')
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [venue_cache] MISS for Q478013
+  [venue_resolver] SPARQL: 6 works found for Q478013
+  [LOCAL-30] Deterministic selection: 6 documented works (0 catalogue, 6 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Picture Gallery with Views of Modern Rome [sparql]
+     - Annie Adams Fields [sparql]
+     - Boys Come Over Here You're Wanted [sparql]
+     - Landscape with Cottages and Pond [sparql]
+     - Blind-Man’s Bluff [sparql]
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [venue_cache] MISS for Q478013
+  [venue_resolver] SPARQL: 6 works found for Q478013
+  [LOCAL-30] Deterministic selection: 6 documented works (0 catalogue, 6 SPARQL; 0 site/cache canonical title(s) are NOT documented)
+  [LOCAL-328] Quality score map: 6 objects scored (source-weighted, sludge excluded)
+  [LOCAL-30] DETERMINISTIC BYPASS: 6 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, quality-score ranked):
+     - Annie Adams Fields [sparql] (quality=0.0)
+     - Blind-Man’s Bluff [sparql] (quality=0.0)
+     - Boys Come Over Here You're Wanted [sparql] (quality=0.0)
+     - Hudson River from Fort Putnam [sparql] (quality=0.0)
+     - Landscape with Cottages and Pond [sparql] (quality=0.0)
+  [R4] Museum tour: asking for 10 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 6 documented works)
+OK PHASE 3A parsed 6 candidate POI(s):
+   - Annie Adams Fields
+   - Blind-Man’s Bluff
+   - Boys Come Over Here You're Wanted
+   - Hudson River from Fort Putnam
+   - Landscape with Cottages and Pond
+   - Picture Gallery with Views of Modern Rome
+  [venue_resolver] Name variants: ['Boston Athenaeum']
+  [venue_resolver] Resolved: 'Boston Athenaeum' → Q478013 (Boston Athenæum)
+    URL: http://www.bostonathenaeum.org
+    Coords: 42.358044, -71.062158
+    Language: en
+  [D1v2] Venue resolved: Q478013 → URL=http://www.bostonathenaeum.org, lang=en
+  [venue_cache] MISS for Q478013
+  [venue_resolver] SPARQL: 6 works found for Q478013
+  [D1v2] SPARQL source: 7 canonical titles
+  [story_miner] Site crawl: 1 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Boston Athenæum'
+  [story_miner] Wikipedia EN: 13321 chars (title: 'Boston Athenæum')
+  [T0a] Exhibit-name extraction: 11 from sections, 1 from quoted/bold/list
+  [T0a] Extracted 12 canonical titles, 0 cycle names
+  [story_miner] Corpus: 2 pages, 12 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 12 site/wiki + 7 SPARQL = 19 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 18 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 18 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 7 dynamic aliases from 6 works
+  [D1v2] Injected 7 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Annie Adams Fields' → canonical: 'Annie Adams Fields'
+  [D1v2] VERIFIED 'Blind-Man’s Bluff' → canonical: 'Blind-Man’s Bluff'
+  [D1v2] VERIFIED 'Boys Come Over Here You're Wanted' → canonical: 'Boys Come Over Here You're Wanted'
+  [D1v2] VERIFIED 'Hudson River from Fort Putnam' → canonical: 'Hudson River from Fort Putnam'
+  [D1v2] VERIFIED 'Landscape with Cottages and Pond' → canonical: 'Landscape with Cottages and Pond'
+  [D1v2] VERIFIED 'Picture Gallery with Views of Modern Rome' → canonical: 'Picture Gallery with Views of Modern Rome'
+  [D1v2] 6/6 works verified — tier: medium
+  [venue_cache] STORED Q478013 (tier=medium, ttl=30d, expires=2026-11-05)
+  [D1] Tier: medium (6 verified works)
+  [R4] Target reached: 6/5 stops
+  [LOCAL-16 GATE] All 6 stops cleared the gate ✓
+
+PHASE 4.5: Validating AI knowledge for Art and Architectual tour in Boston Athenaeum, boston, ma...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+  [LOCAL-212] Coverage selection: 0 COVERED, fallback needed: 3×VENUE_ONLY, 2×EMPTY (not enough covered candidates to fill 5 stops)
+  [LOCAL-212] Selected: ['Annie Adams Fields=VENUE_ONLY', 'Hudson River from Fort Putnam=VENUE_ONLY', 'Landscape with Cottages and Pond=VENUE_ONLY', 'Blind-Man’s Bluff=EMPTY', "Boys Come Over Here You're Wanted=EMPTY"]
+  [LOCAL-212] Dropped:  ['Picture Gallery with Views of Modern Rome=EMPTY']
+  [EXISTENCE-GATE] LOG_ONLY — 6/6 stops verified (100%), 0 would be dropped
+    [VERIFIED] 'Annie Adams Fields' — venue_corpus canonical_title: 'Annie Adams Fields' at 'Boston Athenaeum, boston,
+    [VERIFIED] 'Hudson River from Fort Putnam' — venue_corpus canonical_title: 'Hudson River from Fort Putnam' at 'Boston Athenae
+    [VERIFIED] 'Landscape with Cottages and Pond' — venue_corpus canonical_title: 'Landscape with Cottages and Pond' at 'Boston Athe
+    [VERIFIED] 'Blind-Man’s Bluff' — venue_corpus canonical_title: 'Blind-Man’s Bluff' at 'Boston Athenaeum, boston, 
+    [VERIFIED] "Boys Come Over Here You're Wanted" — venue_corpus canonical_title: "Boys Come Over Here You're Wanted" at 'Boston Ath
+    [VERIFIED] 'Picture Gallery with Views of Modern Rome' — venue_corpus canonical_title: 'Picture Gallery with Views of Modern Rome' at 'Bo
+    [HARVEST] 'Annie Adams Fields': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Hudson River from Fort Putnam': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Landscape with Cottages and Pond': verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Blind-Man’s Bluff': verified_no_detail (name match only, no facts in source)
+    [HARVEST] "Boys Come Over Here You're Wanted": verified_no_detail (name match only, no facts in source)
+    [HARVEST] 'Picture Gallery with Views of Modern Rome': verified_no_detail (name match only, no facts in source)
+    [HARVEST] Summary: 0 harvested, 0 already had corpus, 6 verified_no_detail
+    [INTERPRETIVE] 'Annie Adams Fields': +5 passages (2 queries)
+    [INTERPRETIVE] 'Hudson River from Fort Putnam': +5 passages (2 queries)
+    [INTERPRETIVE] 'Landscape with Cottages and Pond': +3 passages (2 queries)
+    [INTERPRETIVE] 'Blind-Man’s Bluff': +3 passages (2 queries)
+    [INTERPRETIVE] "Boys Come Over Here You're Wanted": +2 passages (3 queries)
+    [INTERPRETIVE] DROPPED attributed quote for "Boys Come Over Here You're Wanted": 'Boston Athenaeum' — no_primary_source_found_for:Boston Athenaeum
+    [INTERPRETIVE] 'Picture Gallery with Views of Modern Rome': +9 passages (3 queries)
+    [INTERPRETIVE] DROPPED attributed quote for 'Picture Gallery with Views of Modern Rome': 'The Athenaeum' — no_primary_source_found_for:The Athenaeum
+    [INTERPRETIVE] Summary: 6 stops enriched, +27 passages, 14 queries issued, 2 attributions dropped
+
+PHASE 3B: Requesting structured details and walking directions for 5 stop(s)...
+
+======================================================================
+CALL #004 | 03:42:30.235 | PHASE_3B_REQUEST
+======================================================================
+  location: Art and Architectual tour in Boston Athenaeum, boston, ma
+  stop_count: 5
+
+PHASE 3B API call cost: $0.0038 (790 tokens)
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11040. Caller should supply input_tokens and output_tokens separately.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11041. Caller should supply input_tokens and output_tokens separately.
+OK PHASE 3B: ordered 5 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 5 stops
+  [LOCAL-35] Visitor info page found (en): http://www.bostonathenaeum.org/visit
+  [LOCAL-35] Extracted from http://www.bostonathenaeum.org/visit: closed=[], hours=1, admission='Free for Métropole residents'
+  [LOCAL-35] Final Museum Information: 20–76. Free for Métropole residents
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+  [LOCAL-355] Querying OSM for venue facts (city: Art, hint: museum)
+  [LOCAL-355] Annie Adams Fields: no practical facts in OSM
+  [LOCAL-355] Hudson River from Fort Putnam: no practical facts in OSM
+  [LOCAL-355] Landscape with Cottages and Pond: no practical facts in OSM
+  [LOCAL-355] Blind-Man’s Bluff: no practical facts in OSM
+[OSM-VENUE] Overpass HTTP 504 for 'Blind-Man’s Bluff'
+  [LOCAL-355] Boys Come Over Here You're Wanted: no practical facts in OSM
+   Coords cluster detected: 5 stops share '42.3575, -71.0628', refetching...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:11535. Caller should supply input_tokens and output_tokens separately.
+   Cluster refetch OK 'Blind-Man’s Bluff': 42.3581, -71.0636
+   Cluster refetch OK 'Landscape with Cottages and Pond': 42.358804, -71.066207
+   Cluster refetch OK 'Hudson River from Fort Putnam': 42.3581, -71.0645
+   Cluster refetch OK 'Annie Adams Fields': 42.3572, -71.0635
+   Cluster refetch OK 'Boys Come Over Here You're Wanted': 42.358056, -71.064722
+Extracted first POI coordinates: (42.3572, -71.0635)
+  [D4] Museum single-coordinate: all stops set to (42.3572, -71.0635) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Annie Adams Fields
+   Address: 10½ Beacon Street, Boston, MA 02108
+   Coordinates: 42.3572, -71.0635
+   Directions: Start at Park Street T Station. Head east on Tremont St toward Park St. Turn lef...
+2. Hudson River from Fort Putnam
+   Address: 10½ Beacon Street, Boston, MA 02108
+   Coordinates: 42.3572, -71.0635
+   Directions: From Annie Adams Fields, head straight down the hallway and turn right at the fi...
+3. Landscape with Cottages and Pond
+   Address: 10½ Beacon Street, Boston, MA 02108
+   Coordinates: 42.3572, -71.0635
+   Directions: Continue straight past Hudson River from Fort Putnam, and take the next left. Th...
+4. Blind-Man’s Bluff
+   Address: 10½ Beacon Street, Boston, MA 02108
+   Coordinates: 42.3572, -71.0635
+   Directions: Turn around and head back to the main hallway, then take a right. The artwork is...
+5. Boys Come Over Here You're Wanted
+   Address: 10½ Beacon Street, Boston, MA 02108
+   Coordinates: 42.3572, -71.0635
+   Directions: Continue down the hallway, past Blind-Man’s Bluff, and make a left at the end. T...
+================================
+
+[TIMING] phase=poi_selection elapsed=84.0s cumulative=85.2s
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 2/2 corpus pages for 'Boston Athenaeum'
+    page[0] score=11095 url=https://en.wikipedia.org/wiki/Boston_Athenæum
+    page[1] score=165 url=http://www.bostonathenaeum.org
+  [§3-adapter] Raw elements: 1 from 1 pages
+  [§3-adapter] After corroboration scoring: 1 elements
+  [§3-adapter] Final: 1 ranked elements (top type: origin)
+  [§3-adapter] Persisted 1 elements → /app/tours/LOCAL591_A_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q478013 (1 elements)
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=1, s1=0, s2=0, s3=0, s4=0
+  [SQ-S6b] Entity clusters found: 0 (≥2 stops)
+  [SQ-S6b] Theme naming: $0.0022, 434 tokens
+  [SQ-S6b] LLM named 0 candidate themes
+  [SQ-S6b] Scored themes: 0
+  [SQ-S6b] DEGRADATION → mosaic mode (no theme ≥60% coverage)
+  [SQ-S6b] Thread discovery: mode=mosaic, threads=0
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Boston Athenaeum model=gpt-4o tokens=1323 (in=668 out=655) cost=$0.0082 latency=6.3s
+[COST_METER] FRESH | spine_generate | $0.008220 | user=None | job=None
+  [LOCAL-278] Spine cost folded into total: $0.0082
+  [LOCAL-111] Spine quality: 4/4 | {'climax_position': True, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 5 arc entries (mode=invented)
+  [LOCAL-183] stop_corpus: 5/5 stops have per-stop passages (16 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Annie Adams Fields' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Hudson River from Fort Putnam' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Landscape with Cottages and Pond' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Blind-Man’s Bluff' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Boys Come Over Here You're Wanted' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 0 CREATOR_ONLY, 0 EMPTY, 5 SHORTENED
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/fact_extractor.py:220. Caller should supply input_tokens and output_tokens separately.
+  [Storied] Fact sheets: 5/5 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history']
+  [work_stories] MISS for annie adams fields
+  [work_stories] MISS for hudson river from fort putnam
+  [work_stories] MISS for landscape with cottages and pond
+  [work_stories] MISS for blindmans bluff
+  [work_stories] MISS for boys come over here youre wanted
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+[TIMING] phase=fact_sheets elapsed=14.1s cumulative=99.3s
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+  [LOCAL-382] framing=none source='-'
+
+  [LOCAL-383] Extracted 12 story beats, 12 named people: Athenaeum, Athenæum, Audubon, Books, Commonwealth, Goya
+[TIMING] phase=narration elapsed=0.0s cumulative=99.4s
+  [D495] venue domain seeded tier1: bostonathenaeum.org
+
+  [LOCAL-410] SERP search wiring — searching for stories on 5 stops...
+    [D500] Stop 1: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 1 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for annie adams fields
+  [LOCAL-441] Batch P856 check: 6 domains, budget=20.0s, pool=10
+  [DEAD-HOST] Marked cold: wikimedia (timeout/network error for jewett.house: The read operation timed out)
+  [SQ-S2] Wikidata P856 check failed for jewett.house: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for bwht.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for anb.org: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for seacoastnh.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for instrumentl.com: The read operation timed out
+  [SQ-S2] Wikidata P856 check failed for masshist.org: The read operation timed out
+  [LOCAL-441] Batch complete: 3.1s, 0 tier1, 6 unverified, 0 budget-expired
+    [D489] material kind: stop='Annie Adams Fields' kind=active volume=COVERED sentences=50 active=1 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in 1805 by a group of Bostonians "
+    [LOCAL-489] Stop 1 needs more material (eventless): 19 passages, 2940 chars, verdict=COVERED
+      [LOCAL-489] +8 from: "Annie Adams Fields" "Boston Athenaeum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 2940 -> 4140 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in "
+    [LOCAL-488] step 4: 3 providers, 6 leads, 0 with cross-model agreement, 1 SERP-confirmed
+      → injected 1 confirmed lead(s) ahead of the SERP snippets
+    Stop 1 'Annie Adams Fields': queries=3 serp_results=19 snippets=28
+      → 1874 Annie Adams Fields hosted a literary salon at her home in Boston, attended by prominent authors and intellectuals.
+      → Annie Adams Fields. Artist. John Singer Sargent (1856–1925). Date. 1890. Medium. Oil on canvas. Dimensions. 30 1/16 x 24
+    [D500] Stop 2: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 2 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for hudson river from fort putnam
+  [LOCAL-441] Batch P856 check: 2 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 2 unverified, 0 budget-expired
+    [D489] material kind: stop='Hudson River from Fort Putnam' kind=active volume=COVERED sentences=27 active=1 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in 1805 by a group of Bostonians "
+    [LOCAL-489] Stop 2 needs more material (eventless): 10 passages, 1550 chars, verdict=COVERED
+      [LOCAL-489] +0 from: "Hudson River from Fort Putnam" "Boston Athenaeum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 1550 -> 1550 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in "
+    [LOCAL-488] step 4: 3 providers, 5 leads, 0 with cross-model agreement, 2 SERP-confirmed
+      → injected 2 confirmed lead(s) ahead of the SERP snippets
+    Stop 2 'Hudson River from Fort Putnam': queries=3 serp_results=10 snippets=12
+      → 1848 Thomas Cole's death
+      → 1825 Thomas Cole painted "Hudson River from Fort Putnam"
+    [D500] Stop 3: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 3 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for landscape with cottages and pond
+    [D489] material kind: stop='Landscape with Cottages and Pond' kind=active volume=COVERED sentences=18 active=1 staked=0 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in 1805 by a group of Bostonians "
+    [LOCAL-489] Stop 3 needs more material (eventless): 10 passages, 1516 chars, verdict=COVERED
+      [LOCAL-489] +0 from: "Landscape with Cottages and Pond" "Boston Athenaeum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 1516 -> 1516 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in "
+    [LOCAL-488] step 4: 3 providers, 6 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 3 'Landscape with Cottages and Pond': queries=3 serp_results=10 snippets=10
+      → Landscape with Cottages and Pond. Artist. Jules Dupre (French 1811–1889). Date. about 1870–1880. Medium. Oil on canvas. 
+      → Landscape with Cottages and Pond, painting by Jules Dupré, Boston Athenæum, UR181, 1870s, Boston Athenæum · https://bost
+    [D500] Stop 4: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 4 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for blindmans bluff
+  [LOCAL-441] Batch P856 check: 6 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 6 unverified, 0 budget-expired
+    [D489] material kind: stop='Blind-Man’s Bluff' kind=active volume=COVERED sentences=70 active=1 staked=1 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in 1805 by a group of Bostonians "
+    [LOCAL-489] Stop 4 needs more material (eventless): 23 passages, 3579 chars, verdict=COVERED
+      [LOCAL-489] +7 from: "Blind-Man’s Bluff" "Boston Athenaeum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3579 -> 5800 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Founded in 1807, the Boston Athenaem evolved out of an organization known as the Anthology Society, formed in "
+    [LOCAL-488] step 4: 3 providers, 1 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 4 'Blind-Man’s Bluff': queries=3 serp_results=23 snippets=30
+      → Le Colin-Maillard (Blind-Man's Bluff). Artist. Jean-Baptiste Pater (French, 1695–1736). Date. about 1730–1760. Medium. O
+      → Le Colin-Maillard (Blind-Man's Bluff). Artist. Jean-Baptiste Pater (French ... Copyright © 2026 The Proprietors of the B
+    [D500] Stop 5: placeholder cleared from ['publisher', 'credit_line', 'medium', 'artist'] — unknown, not 'Not specified'
+    [LOCAL-486] Stop 5 worthiness: score=1/4 mine=True — has specific_title
+  [work_stories] MISS for boys come over here youre wanted
+  [LOCAL-441] Batch P856 check: 4 domains, budget=20.0s, pool=10
+  [LOCAL-441] Batch complete: 0.0s, 0 tier1, 4 unverified, 0 budget-expired
+    [D489] material kind: stop='Boys Come Over Here You're Wanted' kind=active volume=COVERED sentences=37 active=2 staked=2 eventful=0 passive=0  <-- DISAGREE: enough material, wrong kind
+         best: "Colour lithograph published by the Parliamentary Recruiting Committee, Poster No 82, printed by David Allen and Sons Ltd, Harrow, Middlesex."
+    [LOCAL-489] Stop 5 needs more material (eventless): 21 passages, 3331 chars, verdict=COVERED
+      [LOCAL-489] +2 from: "Boys Come Over Here You're Wanted" "Boston Athenaeum" provenance
+      [LOCAL-498] after replenishment: kind active -> active, 3331 -> 3652 chars, eventful=0 (NO CHANGE — the round bought more of the same)
+         best now: "Colour lithograph published by the Parliamentary Recruiting Committee, Poster No 82, printed by David Allen an"
+    [LOCAL-488] step 4: 3 providers, 6 leads, 0 with cross-model agreement, 0 SERP-confirmed
+    Stop 5 'Boys Come Over Here You're Wanted': queries=3 serp_results=21 snippets=23
+      → Discover events from Boston Athenaeum sort Sort by arrow_drop_down
+      → The Boston Athenaeum is a unique combination of library, museum, and cultural center in a magnificent landmark building.
+
+  [LOCAL-410] SERP search complete: 20 queries, 100 results, 103 total snippets
+  [LOCAL-411] Snippet ranking+capping enabled: cap=5/stop, 103 raw → max 25 injected
+
+  [LOCAL-410] CHAIN INSTRUMENTATION:
+    Annie Adams Fields: serp_results=19 elements_extracted=- beats_injected=- (measured post-generation)
+    Hudson River from Fort Putnam: serp_results=10 elements_extracted=- beats_injected=- (measured post-generation)
+    Landscape with Cottages and Pond: serp_results=10 elements_extracted=- beats_injected=- (measured post-generation)
+    Blind-Man’s Bluff: serp_results=23 elements_extracted=- beats_injected=- (measured post-generation)
+    Boys Come Over Here You're Wanted: serp_results=21 elements_extracted=- beats_injected=- (measured post-generation)
+  [D534] Stop 1 has 28 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 1 'Annie Adams Fields' has 28 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via openai+web(16) (5 high-confidence) — stop will be labelled aloud
+      [high] The portrait of Annie Adams Fields was painted by John Singer Sargent in 1890.
+      [high] The medium of the portrait is oil on canvas.
+      [high] The dimensions of the portrait are 30 1/16 x 24 7/8 inches (76.3 x 63.2 cm).
+      [high] The portrait is displayed at the Boston Athenaeum.
+      [high] The portrait was a gift to the Boston Athenaeum from Elizabeth Sturgis Beal Hinds.
+  [D534] Stop 2 has 12 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 2 'Hudson River from Fort Putnam' has 12 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(10) (6 high-confidence) — stop will be labelled aloud
+      [high] The painting 'Hudson River from Fort Putnam' was created by Victor de Grailly, a French artist who lived from 
+      [high] The painting dates to around 1845.
+      [high] The medium of the painting is oil on canvas.
+      [high] The dimensions of the painting are 23 7/16 x 28 3/4 inches (59.5 x 73 cm).
+      [high] The painting was a gift to the Boston Athenaeum from Margaret H. Jewell in 1950.
+      [high] The inventory number for this painting at the Boston Athenaeum is UR24.
+  [D534] Stop 3 has 10 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 3 'Landscape with Cottages and Pond' has 10 snippet(s) — asking the knowledge fallback
+  [D533] +7 fact(s) via openai+web(9) (7 high-confidence) — stop will be labelled aloud
+      [high] The painting 'Landscape with Cottages and Pond' was created by Jules Dupré, a French artist who lived from 181
+      [high] The painting dates from about 1870 to 1880.
+      [high] The medium of the painting is oil on canvas.
+      [high] The dimensions of the painting are 12 1/16 x 19 11/16 inches (30.7 x 50 cm).
+      [high] The painting is inscribed on the lower left with 'JULES DUPRE'.
+      [high] The painting was a gift to the Boston Athenaeum from the Misses Aimee and Rosamond Lamb in 1982.
+  [D534] Stop 4 has 30 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 4 'Blind-Man’s Bluff' has 30 snippet(s) — asking the knowledge fallback
+  [D533] +5 fact(s) via openai+web(15) (5 high-confidence) — stop will be labelled aloud
+      [high] The painting 'Blind-Man's Bluff' is by Jean-Baptiste Pater, a French artist who lived from 1695 to 1736.
+      [high] The painting dates from about 1730 to 1760.
+      [high] The medium of the painting is oil on canvas.
+      [high] The dimensions of the painting are 37 3/16 x 44 7/8 inches (94.4 x 114 cm).
+      [high] The provenance of the painting is unknown, but it was in the collection by 1835.
+  [D534] Stop 5 has 23 snippet(s) but they are VENUE-level only — fetching object-level facts
+  [D533] Stop 5 'Boys Come Over Here You're Wanted' has 23 snippet(s) — asking the knowledge fallback
+  [D533] +6 fact(s) via openai+web(12) (6 high-confidence) — stop will be labelled aloud
+      [high] The poster 'Boys Come Over Here You're Wanted' is a color lithograph created in 1915.
+      [high] It was published by the Parliamentary Recruiting Committee as Poster No. 82.
+      [high] The poster was printed by David Allen and Sons Ltd, Harrow, Middlesex.
+      [high] The poster depicts a three-quarter length image of a British/Commonwealth infantryman facing right, peering wi
+      [high] The Boston Athenaeum holds this poster in its collection.
+      [high] The dimensions of the poster are approximately 760 millimeters in width and 1,012 millimeters in height.
+  [D533] Knowledge fallback filled 5 starved stop(s)
+[TIMING] phase=external_lookups elapsed=95.1s cumulative=194.4s
+
+Generating description for Stop 1: Annie Adams Fields by , ...
+
+Generating description for Stop 2: Hudson River from Fort Putnam by , ...
+
+Generating description for Stop 3: Landscape with Cottages and Pond by , ...
+
+Generating description for Stop 4: Blind-Man’s Bluff by , ...
+
+Generating description for Stop 5: Boys Come Over Here You're Wanted by , ...
+  [LOCAL-381] stop='Hudson River from Fort Putnam' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Athenæum, He
+  [LOCAL-411] Stop 2 snippet ranking: input=18 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Hudson River from Fort Putnam', 18, ''), ('Cross-model lead (openai)', 10, ''), ('Hudson River from Fort Putnam', 10, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 18 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 1 required names (no snippet evidence): ['Athenæum']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11879 after=27207 (+15328 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27207)
+  [LOCAL-381] stop='Annie Adams Fields' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Athenaeum, What, Goya
+  [LOCAL-381] stop='Blind-Man’s Bluff' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 4 beats: Books, Commonwealth
+  [LOCAL-381] stop='Landscape with Cottages and Pond' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: King, Phineas Adams
+  [LOCAL-411] Stop 3 snippet ranking: input=17 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=4 (t1t2=1, t3=0, market=0)
+    Top scores: [('Landscape with Cottages and Pond', 16, ''), ('Landscape with Cottages and Pond', 8, ''), ('Landscape with Cottages and Pond', 8, '')]  [LOCAL-411] Stop 4 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Blind-Man’s Bluff', 9, ''), ('Charles Dickens', 9, 'unverified'), ('Jean-Baptiste Pater (French, 1695–1736) Archives', 8, 'tier1')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 35 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 4: SUPPRESSED 2 required names (no snippet evidence): ['Books', 'Commonwealth']
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+
+  [LOCAL-411] Stop 4 prompt size: before_snippets=11591 after=26431 (+14840 from snippets+instructions, facts_first=no)
+  [LOCAL-411] Stop 1 snippet ranking: input=33 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Annie Adams Fields in Later Life, Including a “Bos', 16, 'unverified'), ('Annie Adams Fields in Later Life, Including a “Bos', 16, 'unverified'), ('April | 2023 | Beehive', 11, '')]
+  [LOCAL-381] stop='Boys Come Over Here You're Wanted' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 5 beats: Manos, Audubon, National Portrait
+  [LOCAL-411] Stop 5 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [("'Boys Come over here you're wanted', 1915 | Online", 19, 'tier1'), ("Boys Come Over Here You're Wanted", 18, ''), ("Boys come over here, you're wanted.", 13, '')]
+  [D533] Stop 3 corpus-gate restriction LIFTED — 17 source item(s) arrived after the gate ran  [LOCAL-411] WARNING: prompt exceeds 20K chars (26431)
+  [LOCAL-417] Stop 3: SUPPRESSED 2 required names (no snippet evidence): ['King', 'Phineas Adams']
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12193 after=26587 (+14394 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26587)  [LOCAL-407] Stop 5: 1 candidate specifics extracted: ['publisher/printer: David Allen and Sons ']
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 33 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 2 required names (no snippet evidence): ['What', 'Goya']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11367 after=26719 (+15352 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26719)
+
+
+
+  [D498] Stop 2 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 3 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 1 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D533] Stop 5 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 5: SUPPRESSED 3 required names (no snippet evidence): ['Manos', 'Audubon', 'National Portrait']
+  [LOCAL-411] Stop 5 prompt size: before_snippets=12251 after=27233 (+14982 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27233)
+  [D498] Stop 5 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D498] Stop 4 matrix: 3/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line', 'focus_fact']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 4 story pass: ok=False (model returned NO_STORY — material did not support one), $0.0036
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0041
+    story: "In 1874, Annie Adams Fields began hosting a literary salon at her Boston home. This gathering attracted prominent authors and intellectuals, creating "
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0044
+    story: "In 1950, Margaret H. Jewell decided to gift the painting 'Hudson River from Fort Putnam' to the Boston Athenaeum. This action brought the work of Vict"
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0043
+    story: "Jules Dupré painted 'Landscape with Cottages and Pond' between 1870 and 1880, capturing the serene beauty of rural life. In 1982, the Misses Aimee and"
+  [LOCAL-490] Stop 5 story pass: ok=True (4 sentences), $0.0050
+    story: "In 1915, the Parliamentary Recruiting Committee faced a challenge as voluntary enlistment into the Army began to decline by the end of the year. In re"
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:15728. Caller should supply input_tokens and output_tokens separately.
+Stop 4 API call cost: $0.0339 (7133 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 2 API call cost: $0.0341 (7176 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 description word count: 388 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0329 (6923 tokens, model=gpt-4.1)
+Stop 3 description word count: 331 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0342 (7205 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0336 (7068 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0356 (7489 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+Stop 1 API call cost: $0.0354 (7461 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 1 description word count: 341 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+Stop 5 API call cost: $0.0364 (7652 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+  [LOCAL-432] Stop 5: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0377 (7946 tokens, model=gpt-4.1)
+Stop 4 description word count: 334 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 API call cost: $0.0388 (8162 tokens, model=gpt-4.1)
+Stop 5 description word count: 408 words
+  [LOCAL-407] Stop 5 snippet-specifics audit:
+    offered: 1
+    used:    1 — ['publisher/printer: David Allen and Sons Ltd']
+    ignored: 0 — []
+  [LOCAL-388] PRE-GATE stop='Annie Adams Fields' beats_assigned=3 beats_in_output=3 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Hudson River from Fort Putnam' beats_assigned=2 beats_in_output=2 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Landscape with Cottages and Pond' beats_assigned=2 beats_in_output=2 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Blind-Man’s Bluff' beats_assigned=2 beats_in_output=2 dropped=[]
+  [LOCAL-388] PRE-GATE stop='Boys Come Over Here You're Wanted' beats_assigned=3 beats_in_output=3 dropped=[]
+
+  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...
+    ✓ PASS stop='Annie Adams Fields': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=3, new_info=2, deduction=1, total=4
+    ✓ PASS stop='Hudson River from Fort Putnam': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=1, new_info=2, deduction=0, total=3
+    ✗ FAIL stop='Landscape with Cottages and Pond': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+    ✓ PASS stop='Blind-Man’s Bluff': story_units=1, entities_ok=True, thesis_ok=True
+      interest: emotional=2, new_info=2, deduction=0, total=4
+    ✗ FAIL stop='Boys Come Over Here You're Wanted': story_units=0, entities_ok=True, thesis_ok=True
+      → story_units=0: no candidate story-unit of ≥3 sentences passes classification (need at least 1 with named person, real actions, arc)
+  [LOCAL-439] Classification cost: $0.003640 (input=15237, output=2258)
+  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)
+
+  [LOCAL-423] STORY VERIFICATION: checking claims against sources...
+    ✗ FAIL stop='Annie Adams Fields': claims=4, sourced=3, unsourced=1, contradicted=0
+      → UNSOURCED: 'Athenaeum, known for its early efforts in cataloging and printing, produced general-purpose' (attribution) — no snippet contains this assertion
+      evidence (3 sourced claims):
+        claim='1874' ← 
+        claim='in 1890' ← https://bostonathenaeum.org/library-collections/special-coll
+        claim='and donated to the Athenaeum by Elizabeth Sturgis Beal Hinds' ← https://jewett.house/deepzoom/annie-adams-fields/
+    ✗ FAIL stop='Hudson River from Fort Putnam': claims=3, sourced=1, unsourced=2, contradicted=0
+      → UNSOURCED: 'in 1778' (year) — no snippet contains this assertion
+      → UNSOURCED: 'in 1609' (year) — no snippet contains this assertion
+      evidence (1 sourced claims):
+        claim='1950' ← 
+    ✓ PASS stop='Landscape with Cottages and Pond': claims=2, sourced=2, unsourced=0, contradicted=0
+      evidence (2 sourced claims):
+        claim='1982' ← 
+        claim='in 1805' ← https://bostonathenaeum.org/about/
+    ✗ FAIL stop='Blind-Man’s Bluff': claims=0, sourced=0, unsourced=0, contradicted=0
+      → VACUOUS: 0 claims extracted — nothing was verified
+    ✓ PASS stop='Boys Come Over Here You're Wanted': claims=5, sourced=5, unsourced=0, contradicted=0
+      evidence (5 sourced claims):
+        claim='1915' ← https://collection.nam.ac.uk/detail.php?acc=1977-06-81-43
+        claim='Committee commissioned the' ← https://collection.nam.ac.uk/detail.php?acc=1977-06-81-43
+        claim='printed by David Allen' ← https://collection.nam.ac.uk/detail.php?acc=1977-06-81-43
+  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS
+  [LOCAL-423] Unsourced claims will be stripped from delivered text
+    [LOCAL-423] Stripped 1 sentence(s) from 'Annie Adams Fields':
+      ✗ "Athenaeum, known for its early efforts in cataloging and printing, produced general-purpose catalogs"
+    [LOCAL-423] Stripped 2 sentence(s) from 'Hudson River from Fort Putnam':
+      ✗ "The painting presents a commanding view from the heights of Fort Putnam, a military garrison complet"
+      ✗ "The river, named for Henry Hudson—the English explorer who charted its course in 1609—winds through "
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+[LOCAL-197] llm_cost() called with total_tokens (deprecated) by /app/generate_tour_text.py:17041. Caller should supply input_tokens and output_tokens separately.
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R10_UNFULFILLED_PROMISE)
+  [LOCAL-192] Stop 2 para 1: retry FAILED — keeping original (R1_IMPERATIVE)
+  [LOCAL-192] Stop 3 para 2: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 4 para 4: retry FIXED (R10_UNFULFILLED_PROMISE, R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 5 para 5: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Style retry summary: 5 paragraphs retried, 4 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0162 (3408 tokens)
+
+  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...
+  [LOCAL-255] R1 summary: 0 rewritten, 0 deleted, 0 stops affected, LLM tokens: 0 ($0.0000)
+
+  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...
+  [LOCAL-251] R7 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.141: R2 question deletion...
+  [LOCAL-261] R2 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...
+  [LOCAL-261] R3 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...
+  [LOCAL-261] R4 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...
+  [LOCAL-261] R8 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...
+  [LOCAL-216] R9 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+  [LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+
+  [LOCAL-472] PHASE 5.152: Stop-specificity gate...
+  [LOCAL-472] Stop-specificity gate summary:
+    Stops checked: 5
+    Paragraphs checked: 17
+    Transferable (high, removed): 2
+    Transferable (low conf, kept): 0
+    Last-paragraph protected: 0
+    Ungrounded named entities: 10
+    Stops affected: 2
+    [LOCAL-472] REMOVED transferable paragraph stop='Landscape with Cottages and Pond' conf=high reason='Generic scene-setting applicable to any coastal viewpoint.': "After this moment of serenity, the tour will lead you to a landscape that takes a sly turn — where the scene’s calm is u"
+    [LOCAL-472] REMOVED transferable paragraph stop='Blind-Man’s Bluff' conf=high reason='Generic claims about art and joy apply to any art museum.': ""Blind-Man’s Bluff" presents a scene of pure delight, highlighting simple pleasures alongside the calm and serenity that"
+    [LOCAL-472] UNGROUNDED entity stop='Annie Adams Fields' entity='Ralph Waldo Emerson' reason='No specific link to Emerson's presence at the stop is provided.' in: "In 1874, Annie Adams Fields began hosting a literary salon at her Boston home. Fields gathered write"
+    [LOCAL-472] UNGROUNDED entity stop='Hudson River from Fort Putnam' entity='Boston Athenæum' reason='No concrete link to the stop is provided.' in: "In 1950, Margaret H. Jewell decided to gift the painting “Hudson River from Fort Putnam” to the Bost"
+    [LOCAL-472] UNGROUNDED entity stop='Hudson River from Fort Putnam' entity='Expansive Classification' reason='It does not specify how "Expansive Classification" directly relates to the painting or stop.' in: "In 1950, Margaret H. Jewell decided to gift the painting “Hudson River from Fort Putnam” to the Bost"
+    [LOCAL-472] UNGROUNDED entity stop='Landscape with Cottages and Pond' entity='Anthology Society' reason='It does not specify a direct link between the Anthology Society and the painting.' in: "There’s another layer to this painting’s place in the Athenaeum. The institution itself evolved from"
+    [LOCAL-472] UNGROUNDED entity stop='Landscape with Cottages and Pond' entity='Phineas Adams' reason='No concrete link to the stop is provided.' in: "There’s another layer to this painting’s place in the Athenaeum. The institution itself evolved from"
+    [LOCAL-472] UNGROUNDED entity stop='Boys Come Over Here You're Wanted' entity='Parliamentary Recruiting Committee' reason='No concrete link to the stop is provided.' in: "In 1915, the Parliamentary Recruiting Committee faced a challenge as voluntary enlistment into the A"
+    [LOCAL-472] UNGROUNDED entity stop='Boys Come Over Here You're Wanted' entity='David Allen' reason='No concrete link to the stop is provided.' in: "In 1915, the Parliamentary Recruiting Committee faced a challenge as voluntary enlistment into the A"
+    [LOCAL-472] UNGROUNDED entity stop='Boys Come Over Here You're Wanted' entity='David Allen' reason='No concrete link to the stop is provided.' in: "This particular work was produced by David Allen and Sons Ltd, a firm whose printing facilities in H"
+    [LOCAL-472] UNGROUNDED entity stop='Boys Come Over Here You're Wanted' entity='Martha Washington' reason='No concrete link to Martha Washington's presence or actions at this stop.' in: "The unfinished portraits of George and Martha Washington in the Athenaeum recall a nation’s early ye"
+    [LOCAL-472] UNGROUNDED entity stop='Boys Come Over Here You're Wanted' entity='National Portrait' reason='No concrete link to the stop is provided.' in: "The unfinished portraits of George and Martha Washington in the Athenaeum recall a nation’s early ye"
+
+  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...
+  [LOCAL-263] Unsupported-claim gate summary:
+    Sentences removed: 0
+    Sentences kept (substantiated): 0
+    By type: PROMISE=0, SENSORY=0, FEELING=0, QUALITY=0
+    Escalation calls: 0
+    Stops affected: 0
+    Deletion rate: 0.0% (0/62)
+
+  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...
+  [LOCAL-479] stop='Annie Adams Fields' cut orphaned dependant of a removed introduction — subject 'portrait': "The portrait stands as evidence of those gatherings, but it also gestures toward"
+  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):
+    References detected: 19
+    Glossed (composed): 8
+    Suppressed (already explained): 1
+    Degraded (name dropped): 10
+    Guard failures: 0
+    Known (skipped): 0
+    Triage: 2571 tokens, $0.0006, 8.4s
+    Gloss: 1521 tokens, $0.0003, 4.3s
+    Compose: 2476 tokens, $0.0004, 3.3s
+    Total added cost: $0.0014
+    Stops affected: 5
+    Glosses applied:
+      • Ralph Waldo Emerson → "an american essayist and poet" [source: model]
+      • Louisa May Alcott → "best known for "little women"" [source: model]
+      • Elizabeth Sturgis Beal Hinds → DEGRADED (name dropped)
+      • Sargent → "an american painter of portraits" [source: model]
+      • Jewell → DEGRADED (name dropped)
+      • Grailly → DEGRADED (name dropped)
+      • Jules Dupré → "a french landscape painter of the 19th century" [source: model]
+      • Misses Aimee → DEGRADED (name dropped)
+      • Rosamond Lamb → DEGRADED (name dropped)
+      • Dupré → DEGRADED (name dropped)
+      • Honoré Fragonard → "the painting created around 1750" [source: corpus]
+      • Fragonard → SUPPRESSED (already explained)
+      • Sons Ltd → DEGRADED (name dropped)
+      • Middlesex → "a historic county in England" [source: model]
+      • Committee → DEGRADED (name dropped)
+      • Martha Washington → "the wife of the first President" [source: model]
+      • George → "the first President of the United States" [source: model]
+      • National Portrait → DEGRADED (name dropped)
+      • Manos → DEGRADED (name dropped)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-458] entity gate SKIPPED: no exhibition scope (unscoped museum tour)
+
+  [LOCAL-385] Form-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-389] Numeric-claim gate SKIPPED (no exhibition scope — unscoped museum tours are not gated)
+
+  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...
+  [LOCAL-402] Temporal coherence gate summary:
+    Relations checked: 71
+    Relations rejected: 0
+    Sentences removed: 0
+    Stops affected: 0
+
+  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...
+  [LOCAL-229] BLOCKED Stop 1 'Annie Adams Fields': claim='1874 (in context: "In 1874, Annie Adams Fields began hosting' contradicted_by='1854, Bostonian Annie Adams (1834–1915) and her husband, the publisher James Tho' → DROPPED
+  [LOCAL-229] BLOCKED Stop 2 'Hudson River from Fort Putnam': claim='1950 (in context: "In 1950, Margaret H. Decided to gift the ' contradicted_by='inting 0 references inception 1845 sourcing circumstances circa 0 references loc' → DROPPED
+  [LOCAL-229] CONTRADICTED block summary: 2 group(s) blocked, 2 stop(s) affected
+  [LOCAL-229] Block log (2 entries):
+    stop=1 claim='1874 (in context: "In 1874, Annie Adams Fields beg' evidence='1854, Bostonian Annie Adams (1834–1915) and her hu' action=DROPPED
+    stop=2 claim='1950 (in context: "In 1950, Margaret H. Decided to' evidence='inting 0 references inception 1845 sourcing circum' action=DROPPED
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Boston Athenaeum'...
+   Authority: 4 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 5 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (5 stops)
+
+  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...
+  [LOCAL-318] Dangling-demonstrative scrub summary:
+    Detected: 5
+    Repaired (name substituted): 0
+    Deleted (unrepairable): 5
+    Stops affected: 4
+    [1] DELETED: 'This choice' in: This choice emphasizes her dual role as both social catalyst and thoughtful list
+    [1] DELETED: 'This physical' in: This physical act of recording and sharing knowledge echoes Fields’s work in fos
+    [3] DELETED: 'This balancing' in: This balancing act between tranquility and the encroaching modern world echoes t
+    [4] DELETED: 'This work’s' in: This work’s journey to the collection involved Books, who gave it as part of a l
+    [5] DELETED: 'This action' in: This action aimed to boost recruitment numbers by appealing to a sense of duty a
+OK PHASE 5.7b: Dangling-demonstrative scrub complete
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+  [D498] step 7c: most valuable stop is 5 'Boys Come Over Here You're Wanted' (index 72) — allowance 5 -> 7 sentences on regeneration, story currently 4 sentence(s)
+
+  [LOCAL-487] step 7a: 5 stop(s) have NO VALID STORY by Michael's bar (3+ consecutive sentences, one person, an action and something at stake)
+    stop 1 'Annie Adams Fields': the longest run (4 sentences, Fields) has agency=1 stakes=0 — someone is described, but nothing is risked, ref
+    stop 2 'Hudson River from Fort Putnam': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 3 'Landscape with Cottages and Pond': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 4 'Blind-Man’s Bluff': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    stop 5 'Boys Come Over Here You're Wanted': longest qualifying run is 2 sentence(s); the bar is 3 consecutive sentences about one subject, carrying an act
+    [LOCAL-487] cap=1: retrying only the weakest — stop 1 'Annie Adams Fields' (index 33)
+  [D534] No cross-stop repetition in the drafts
+
+  [LOCAL-474] PHASE 5.17: retry 'Annie Adams Fields' — 314w → 103w after gates, 9 sentence(s) removed
+    removed: "In 1874, Annie Adams Fields began hosting a literary salon at her Boston home."
+    removed: "Fields gathered writers and thinkers, including those who would later define American letters, and t"
+    removed: "Among those drawn into her orbit were Ralph Waldo Emerson and Louisa May Alcott; by opening her room"
+    removed: "Sargent’s portrait, created in 1890 and donated to the Athenaeum by Elizabeth Sturgis Beal Hinds, is"
+    removed: "This choice emphasizes her dual role as both social catalyst and thoughtful listener."
+    removed: "This physical act of recording and sharing knowledge echoes Fields’s work in fostering intellectual "
+    removed: "What, who authored the text that was illustrated in one of the Athenaeum’s catalog publications, con"
+    removed: "Goya, also credited as author for texts the Athenaeum illustrated, became part of this legacy, as th"
+    removed: "The portrait stands as evidence of those gatherings, but it also gestures toward the visual art that"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Annie Adams Fields is held at Boston Athenaeum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Hudson River from Fort Putnam' — 327w → 288w after gates, 4 sentence(s) removed
+    removed: "In 1950, Margaret H."
+    removed: "Jewell decided to gift the painting “Hudson River from Fort Putnam” to the Boston Athenæum."
+    removed: "This action brought the work of Victor de Grailly, a French artist from the 19th century, into the A"
+    removed: "One of de Grailly’s most deliberate choices was to render the atmosphere with layers of translucent "
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Hudson River from Fort Putnam is held at Boston Athenaeum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Landscape with Cottages and Pond' — 331w → 255w after gates, 7 sentence(s) removed
+    removed: "Jules Dupré painted "Landscape with Cottages and Pond" between 1870 and 1880, capturing the serene b"
+    removed: "In 1982, the Misses Aimee and Rosamond Lamb decided to donate this piece to the Boston Athenaeum."
+    removed: "Look closely at the surface: this is oil on canvas, with Dupré’s brushwork gently layering earthy gr"
+    removed: "The cottages are rendered with a kind of sturdy tenderness, their red-tiled roofs anchoring the comp"
+    removed: "The pond, ringed with reeds and willows, becomes a mirror that doubles the sky’s soft gray-blue — a "
+    removed: "This balancing act between tranquility and the encroaching modern world echoes the tension you saw i"
+    removed: "After this moment of serenity, the tour will lead you to a landscape that takes a sly turn — where t"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Landscape with Cottages and Pond is held at Boston Athenaeum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Blind-Man’s Bluff' — 334w → 235w after gates, 4 sentence(s) removed
+    removed: ""Blind-Man’s Bluff," created by Jean-Honoré Fragonard around 1750 in oil on canvas, bursts with play"
+    removed: "This work’s journey to the collection involved Books, who gave it as part of a larger collection to "
+    removed: "Where so many works guard their mysteries behind formality or allegory, "Blind-Man’s Bluff" lays bar"
+    removed: "In the next room, you will see how this celebration of innocence left its mark—prompting artists and"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Blind-Man’s Bluff is held at Boston Athenaeum."
+
+  [LOCAL-474] PHASE 5.17: retry 'Boys Come Over Here You're Wanted' — 408w → 388w after gates, 7 sentence(s) removed
+    removed: "In response, the Committee commissioned the creation of the poster "Boys Come Over Here You're Wante"
+    removed: "This action aimed to boost recruitment numbers by appealing to a sense of duty and urgency among pot"
+    removed: "This particular work was produced by David Allen and Sons Ltd, a firm whose printing facilities in H"
+    removed: "The very process of lithography used here—drawing onto limestone with oily ink, then fixed by chemic"
+    removed: "Elsewhere in the Athenaeum, the unfinished portraits of George and Martha Washington recall a nation"
+    removed: "The gallery in which this poster stands takes its name from the National Portrait, foregrounding the"
+    removed: "In other stops, you have encountered the texts of Manos and Audubon—Manos authored the text that was"
+    [LOCAL-491] step 7b: rotating to the venue fact — institutional context; weakest, but it scopes the search
+      focus: "Boys Come Over Here You're Wanted is held at Boston Athenaeum."
+
+  [LOCAL-526] PHASE 5.17: regenerating 5 eligible stop(s) concurrently (max_workers=5)
+
+Generating description for Stop 1: Annie Adams Fields by , ...
+
+Generating description for Stop 2: Hudson River from Fort Putnam by , ...
+
+Generating description for Stop 3: Landscape with Cottages and Pond by , ...
+  [LOCAL-381] stop='Hudson River from Fort Putnam' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 2 beats: Athenæum, He
+  [LOCAL-411] Stop 2 snippet ranking: input=18 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Hudson River from Fort Putnam', 18, ''), ('Cross-model lead (openai)', 10, ''), ('Hudson River from Fort Putnam', 10, '')]
+  [LOCAL-402] Stop 2: injected 5 snippets as reference material
+  [D533] Stop 2 corpus-gate restriction LIFTED — 18 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 2: SUPPRESSED 1 required names (no snippet evidence): ['Athenæum']
+  [LOCAL-411] Stop 2 prompt size: before_snippets=11879 after=27207 (+15328 from snippets+instructions, facts_first=yes)  [LOCAL-381] stop='Annie Adams Fields' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 1 beats: Athenaeum, What, Goya
+  [LOCAL-411] Stop 1 snippet ranking: input=33 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=0, t3=0, market=0)
+    Top scores: [('Annie Adams Fields in Later Life, Including a “Bos', 16, 'unverified'), ('Annie Adams Fields in Later Life, Including a “Bos', 16, 'unverified'), ('April | 2023 | Beehive', 11, '')]
+  [LOCAL-402] Stop 1: injected 5 snippets as reference material
+  [D533] Stop 1 corpus-gate restriction LIFTED — 33 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 1: SUPPRESSED 2 required names (no snippet evidence): ['What', 'Goya']
+  [LOCAL-411] Stop 1 prompt size: before_snippets=11367 after=26719 (+15352 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26719)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27207)
+  [D498] Stop 2 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [LOCAL-381] stop='Landscape with Cottages and Pond' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 3 beats: King, Phineas Adams
+  [D498] Stop 1 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-411] Stop 3 snippet ranking: input=17 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=4 (t1t2=1, t3=0, market=0)
+    Top scores: [('Landscape with Cottages and Pond', 16, ''), ('Landscape with Cottages and Pond', 8, ''), ('Landscape with Cottages and Pond', 8, '')]
+  [LOCAL-402] Stop 3: injected 5 snippets as reference material
+  [D533] Stop 3 corpus-gate restriction LIFTED — 17 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 3: SUPPRESSED 2 required names (no snippet evidence): ['King', 'Phineas Adams']
+
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+
+Generating description for Stop 4: Blind-Man’s Bluff by , ...
+  [LOCAL-411] Stop 3 prompt size: before_snippets=12193 after=26587 (+14394 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26587)
+  [D498] Stop 3 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-381] stop='Blind-Man’s Bluff' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 4 beats: Books, Commonwealth
+
+Generating description for Stop 5: Boys Come Over Here You're Wanted by , ...
+  [LOCAL-381] stop='Boys Come Over Here You're Wanted' matched_work=False medium='' work_identity_chars=0
+  [LOCAL-383] Stop 5 beats: Manos, Audubon, National Portrait
+  [LOCAL-411] Stop 5 snippet ranking: input=29 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=1, t3=0, market=0)
+    Top scores: [("'Boys Come over here you're wanted', 1915 | Online", 19, 'tier1'), ("Boys Come Over Here You're Wanted", 18, ''), ("Boys come over here, you're wanted.", 13, '')]
+  [LOCAL-411] Stop 4 snippet ranking: input=35 bio_rejected=0 tier3_demoted=0 market_demoted=0 cap=5 output=5 usable=5 (t1t2=3, t3=0, market=0)
+    Top scores: [('Blind-Man’s Bluff', 9, ''), ('Charles Dickens', 9, 'unverified'), ('Jean-Baptiste Pater (French, 1695–1736) Archives', 8, 'tier1')]
+  [LOCAL-402] Stop 4: injected 5 snippets as reference material
+  [D533] Stop 4 corpus-gate restriction LIFTED — 35 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 4: SUPPRESSED 2 required names (no snippet evidence): ['Books', 'Commonwealth']
+  [LOCAL-411] Stop 4 prompt size: before_snippets=11591 after=26431 (+14840 from snippets+instructions, facts_first=no)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (26431)
+  [D498] Stop 4 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-407] Stop 5: 1 candidate specifics extracted: ['publisher/printer: David Allen and Sons ']
+  [LOCAL-402] Stop 5: injected 5 snippets as reference material
+  [D533] Stop 5 corpus-gate restriction LIFTED — 29 source item(s) arrived after the gate ran
+  [LOCAL-417] Stop 5: SUPPRESSED 3 required names (no snippet evidence): ['Manos', 'Audubon', 'National Portrait']
+  [LOCAL-411] Stop 5 prompt size: before_snippets=12251 after=27233 (+14982 from snippets+instructions, facts_first=yes)
+  [LOCAL-411] WARNING: prompt exceeds 20K chars (27233)
+  [D498] Stop 5 matrix: 4/9 slots filled — empty: ['artist', 'publisher', 'printed_by', 'medium', 'credit_line']
+  [D500] agents 0/3: hero=—, sponsor=—, builder=—
+  [LOCAL-490] Stop 1 story pass: ok=True (3 sentences), $0.0059
+    story: "In 1890, John Singer Sargent painted a portrait of Annie Adams Fields. This portrait was later acquired by the Boston Athenaeum, becoming a significan"
+  [LOCAL-408] Prompt dump written to: /app/prompt_dump_stop1.txt
+  [LOCAL-490] Stop 3 story pass: ok=True (3 sentences), $0.0057
+    story: "In 1982, the Misses Aimee and Rosamond Lamb made a significant decision to donate 'Landscape with Cottages and Pond' to the Boston Athenaeum. This act"
+  [LOCAL-490] Stop 2 story pass: ok=True (4 sentences), $0.0053
+    story: "Hudson River from Fort Putnam found its home at the Boston Athenaeum because, in 1950, Margaret H. Jewell gifted it to the institution. Before this do"  [LOCAL-490] Stop 4 story pass: ok=True (3 sentences), $0.0057
+    story: "The painting "Blind-Man's Bluff," created by Jean-Baptiste Pater around 1730, found its way into the Boston Athenaeum's collection by 1835. Although t"
+
+  [LOCAL-490] Stop 5 story pass: ok=True (6 sentences), $0.0063
+    story: "In 1915, the color lithograph "Boys Come Over Here You're Wanted" was created. Originally published by the South Australian Government and printed by "
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 1 API call cost: $0.0363 (7650 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 2/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 3 API call cost: $0.0351 (7380 tokens, model=gpt-4.1)
+Stop 3 description word count: 288 words
+  [LOCAL-407] Stop 3: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0355 (7467 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 2: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 5 API call cost: $0.0362 (7627 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 5 description word count: 358 words
+  [LOCAL-407] Stop 5 snippet-specifics audit:
+    offered: 1
+    used:    0 — []
+    ignored: 1 — ['publisher/printer: David Allen and Sons Ltd']
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0353 (7424 tokens, model=gpt-4.1)
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=1 < 3, need 2 more, retrying (attempt 2/5)
+Stop 1 API call cost: $0.0380 (8006 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+  [LOCAL-432] Stop 1: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 2 API call cost: $0.0374 (7866 tokens, model=gpt-4.1)
+Stop 2 description word count: 304 words
+  [LOCAL-407] Stop 2: snippets injected but no candidate specifics extracted
+Stop 4 API call cost: $0.0369 (7757 tokens, model=gpt-4.1)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+  [LOCAL-432] Stop 4: STORY RETRY — story_count=2 < 3, need 1 more, retrying (attempt 3/5)
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 1 API call cost: $0.0403 (8488 tokens, model=gpt-4.1)
+Stop 1 description word count: 275 words
+  [LOCAL-407] Stop 1: snippets injected but no candidate specifics extracted
+[LOCAL-197] Unknown model 'gpt-4.1' — pricing at most expensive known rate (input=$2.5/1M, output=$10.0/1M). Error direction: we absorb the difference, never overcharge.
+Stop 4 API call cost: $0.0388 (8170 tokens, model=gpt-4.1)
+Stop 4 description word count: 271 words
+  [LOCAL-407] Stop 4: snippets injected but no candidate specifics extracted
+  [LOCAL-526] PHASE 5.17 regeneration wall: 14.8s for 5 stop(s) at max_workers=5
+    [LOCAL-474] regenerated and re-gated: 275w (was 103w)
+    [LOCAL-474] regenerated and re-gated: 304w (was 288w)
+    [LOCAL-474] regenerated and re-gated: 287w (was 255w)
+    [LOCAL-474] regenerated and re-gated: 271w (was 235w)
+    [D498] step 7c judged on the index, not on length: 72 -> 74, accepted=True
+    [LOCAL-474] regenerated and re-gated: 347w (was 388w)
+  [D534] no repeated sentences left after the retries
+
+  [LOCAL-474] retry summary: 5 eligible, 5 retried, 5 improved, 0 kept original
+  [LOCAL-487] triggers: 1 hollowed by gates, 1 storyless (step 7a — Michael's bar, independent of length), 1 top-value (step 7c — larger allowance), 0 repeating an earlier stop (D534), 4 thin enough for another story (D534, floor=300w). Triggers overlap and are counted separately; they do not sum to 'eligible'.
+  [LOCAL-474] each regenerated stop was re-gated before being accepted; a retry can only replace text it beats after gating.
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false
+  [LOCAL-427] HTTP 200 from https://bostonathenaeum.org/library-collections/special-collections/prints-drawings-photographs/ (attempt 1)
+  [LOCAL-459] R5: Fetched 2455 chars from https://bostonathenaeum.org/library-collections/sp
+  [LOCAL-427] HTTP 200 from https://www.youtube.com/watch?v=lNoRrp17SJ4 (attempt 1)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 2.3s (attempt 1, 30s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 3.6s (attempt 2, 27s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 7.7s (attempt 3, 24s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — retrying in 14.5s (attempt 4, 16s budget remaining)
+  [LOCAL-427] HTTP 429 from https://www.metmuseum.org/perspectives/series/materials-and-techniques — budget exhausted after 5 attempt(s), 30s elapsed
+  [LOCAL-427] HTTP 200 from https://www.ljathenaeum.org/print-studio (attempt 1)
+  [LOCAL-459] R5: Fetched 1615 chars from https://www.ljathenaeum.org/print-studio
+  [LOCAL-427] HTTP 200 from https://gelpress.com/blogs/art-and-inspiration/printmaking-techniques?srsltid=AU7gw4Unjw6086nD1uVRjelOYiWdRCL2eBqMNlM5CPTtavoqE_ThxeKv (attempt 1)
+  [LOCAL-459] R5: Fetched 1846 chars from https://gelpress.com/blogs/art-and-inspiration/pri
+  [LOCAL-427] HTTP 200 from https://www.khanacademy.org/humanities/special-topics-art-history/creating-conserving/printmaking/v/moma-printmaking-01 (attempt 1)
+  [LOCAL-459] R5: Fetched 323 chars from https://www.khanacademy.org/humanities/special-top
+  [LOCAL-427] HTTP 200 from https://bostonathenaeum.org/whats-on/exhibitions/pressing-matters-the-impact-of-print-across-the-atlantic/ (attempt 1)
+  [LOCAL-459] R5: Fetched 3003 chars from https://bostonathenaeum.org/whats-on/exhibitions/p
+  [LOCAL-427] HTTP 200 from https://theartofeducation.edu/2024/07/back-to-basics-how-to-teach-printmaking-with-four-processes-for-newbies/ (attempt 1)
+  [LOCAL-459] R5: Fetched 1932 chars from https://theartofeducation.edu/2024/07/back-to-basi
+  [D512] verb discovery: query='Boston Athenaeum printmaking process how it is made technique st' -> 14 new verb(s): incised, recessed, inked, produced, documented, shaped, represented, pulled, proceed, popularized, captured, pasted
+  [D512] _AGENCY_VERB widened by 14 discovered verb(s)
+
+  [D511] PHASE 5.20: credit_line loop — object record, seeds, challenge, adjudicate, gate
+
+  [D511] stop 1: Annie Adams Fields
+    [D501] no object record for 'Annie Adams Fields' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 2: Hudson River from Fort Putnam
+    [D501] no object record for 'Hudson River from Fort Putnam' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 3: Landscape with Cottages and Pond
+    [D501] no object record for 'Landscape with Cottages and Pond' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 4: Blind-Man’s Bluff
+    [D501] no object record for 'Blind-Man’s Bluff' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] stop 5: Boys Come Over Here You're Wanted
+    [D501] no object record for 'Boys Come Over Here You're Wanted' — matrix unchanged
+    [D511] 4 credit_line(s) to try (0 from the matrix, 4 from the text)
+    [D511] examined 4 credit_line(s), no story passed, ~$0.024, 2s
+    [D511] no story passed the gate — stop keeps its descriptive text and publishes no story
+
+  [D511] PHASE 5.20 summary: 0/5 stops got a gated story (0 with multiple stories), ~$0.120, [D518] 0 duplicated prose sentence(s) replaced
+
+  [LOCAL-485] PHASE 5.21: Story valuation index (report only, never gates)...
+     #  stop                                      idx  hist  detl   soc
+     1  Annie Adams Fields                         65    27    26    61
+     2  Hudson River from Fort Putnam              57    37    14    53
+     3  Landscape with Cottages and Pond           32    32     6    65
+     4  Blind-Man’s Bluff                          61    24    20    27
+     5  Boys Come Over Here You're Wanted          74    46    20    77
+    [LOCAL-485] index mean 57.8 over 5 stop(s), range 32-74
+    [LOCAL-485] weakest: 'Landscape with Cottages and Pond' at 32
+[TIMING] phase=story_first elapsed=180.2s cumulative=374.6s
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'founding': 1}
+  [R2] Prolog saved for Stop 1 (156 words)
+
+  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...
+  [LOCAL-244] Prolog before gates: 156 words
+  [LOCAL-244] Prolog R9: 0 deletions
+  [LOCAL-286] Prolog R7: 0 deletions
+  [LOCAL-244] Prolog R10: 0 deletions
+  [LOCAL-244] Prolog subject: 0 expanded, 0 deleted, cost=$0.0000
+  [LOCAL-244] Prolog after gates: 156 words (delta: 0)
+
+  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...
+  [LOCAL-246] Orientation gating summary:
+    Words before: 354
+    Words after:  354
+    Delta: 0
+    Stops affected: 0/5
+
+  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...
+    Stops with delivered content: 5/5
+    [LOCAL-276] Intrigue ranking completed: 2.3s, $0.0118, 1687 tokens
+    [LOCAL-276] Ranked 5 stops:
+      [Annie Adams Fields] (reversal): The Athenaeum, before it transitioned to card catalogs, printed general-purpose ...
+      [Hudson River from Fort Putnam] (cause): Jewell’s decision brought a French artist’s rendering of a vital American site i...
+      [Landscape with Cottages and Pond] (dated_event): In 1982, the Misses Aimee and Rosamond Lamb made a significant decision to donat...
+      [Blind-Man’s Bluff] (reversal): By 1835, this painting entered the Athenaeum’s collection—a fact recorded with l...
+      [Boys Come Over Here You're Wanted] (reversal): Over time, the poster found its way across continents and eventually became part...
+    [LOCAL-276] 5 intriguing / 0 excluded (celebrity_trivia)
+    [LOCAL-276] Using ranked facts for composition (5 stops)
+    Part 4 LLM cost: $0.0038 (650 tokens) [attempt 1]
+    ✓ Part 4 composed and verified (41 words):
+      "In the stops ahead, you will learn about the Athenaeum's transition to card catalogs at Annie Adams Fields and the 1982 donation of "Landscape with Cottages and Pond" by the Misses Aimee and Rosamond Lamb at Landscape with Cottages and Pond."
+      Stops referenced: 2
+    Part 4 total cost: $0.0038
+
+  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...
+  [LOCAL-286] Deduplication: 0 sentence(s) removed from stop bodies
+
+  [LOCAL-292] Empty stop removal gate: PASSED (all 5 stops have narration)
+  [LOCAL-394] Stop count invariant: OK (5 selected == 5 delivered)
+  [D536] Listener asked for 5 stop(s), delivering 5 — request met
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Boston Athenaeum — next is Hudson River fro...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Landscape with Cottages and Pond....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Blind-Man’s Bluff....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Your final stop in Boston Athenaeum: Boys Come Over Here You...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [LOCAL-280] Recap composition: 0.8s, $0.0025, 437 tokens
+  [LOCAL-280] Recap built: 28 words, 2 composed clauses (0 D177 rejected, 0 navigation rejected)
+    [Annie Adams Fields] (reversal): "The Athenaeum, before it transitioned to card catalogs, printed general-purpose ..."
+      → composed: "Annie Adams Fields, the Athenaeum printed catalogs before transitioning to card catalogs"
+    [Blind-Man’s Bluff] (reversal): "By 1835, this painting entered the Athenaeum’s collection—a fact recorded with l..."
+      → composed: "Blind-Man’s Bluff, entered the Athenaeum’s collection in 1835 with little detail"
+    D177 verified: all 2 source facts present in delivered text
+  [LOCAL-280] Recap added: "That's 5 stops — Annie Adams Fields, the Athenaeum printed catalogs before transitioning to card catalogs and Blind-Man’s Bluff, entered the Athenaeum’s collection in 1835 with little detail."
+  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id=368 'restaurant tour of Buttermilk & Bourbon - Back Bay, Boston, Ma -  Tour' (1.1 km from last stop)
+  [D519] Treat Page: no treat within 1.0 km of any of 5 stop(s) (0 treat(s) with coordinates) — mention OMITTED
+  [LOCAL-275/D519] Part 2: tour offer only — no treat near a stop
+  [LOCAL-275] Part 2 error: name '_venue_parts_used' is not defined
+  [LOCAL-275] Closing offer: 1 sentence(s)
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+  [D533] No cross-stop fact repetition detected
+  [D533] Person-year role guard: no mismatches (27540 chars of corpus checked)
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 1
+    Verified: 1
+    Dropped: 0
+    AUDIT: admission | Free for Métropole residents | http://www.bostonathenaeum.org/visit | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (1 verified)
+
+  [LOCAL-260] PROLOG STRUCTURE VALIDATION: 3 error(s), 0 warning(s)
+    [ERROR] Part 1: PART1_MISSING — Part 1 (Tour name and transportation mode) is not present.
+    [ERROR] Part 2: PART2_INSUFFICIENT_SUBSTANCE — Part 2 has only 1 route indicator(s) (endpoints); need at least 2 of: endpoints, distance, terrain, duration.
+    [ERROR] Part 0: DUPLICATE_TOUR_DESCRIPTION — Tour contains 2 tour-level descriptions (must be exactly 1). Passages found:
+  [1] "You are about to explore the Boston Athenaeum in Boston, Massachusetts, an esteemed institution hous..."
+  [2] "Jean-Baptiste Pater painted "Blind-Man’s Bluff" around 1730 in oil on canvas, capturing the fleeting..."
+
+  [LOCAL-390] FINAL beat verification (measured from delivered text):
+    stop='Annie Adams Fields' beats_assigned=3 beats_in_output=3 dropped=[]
+    stop='Hudson River from Fort Putnam' beats_assigned=2 beats_in_output=2 dropped=[]
+    stop='Landscape with Cottages and Pond' beats_assigned=2 beats_in_output=2 dropped=[]
+    stop='Blind-Man’s Bluff' beats_assigned=2 beats_in_output=2 dropped=[]
+    stop='Boys Come Over Here You're Wanted' beats_assigned=3 beats_in_output=3 dropped=[]
+
+=== Word Count Statistics ===
+Stop 1: Annie Adams Fields - 341 words
+Stop 2: Hudson River from Fort Putnam - 388 words
+Stop 3: Landscape with Cottages and Pond - 331 words
+Stop 4: Blind-Man’s Bluff - 334 words
+Stop 5: Boys Come Over Here You're Wanted - 408 words
+===========================
+
+  [LOCAL-540] scorer ran on assembled tour (14641 chars, 5/5 stops)
+  [LOCAL-540] defects seen: ['unsourced_person_event']
+  [LOCAL-540]   unsourced_person_event [advisory]: 1 unsourced person-event(s); "Colonel Rufus Putnam" placed here in 1778 with no source: "Here, the strategic perch chosen for the fort in 1778 by Colonel Rufus 
+
+Total API cost: $0.5339 (51189 tokens)
+Grounding:      $1.0500 (30 requests)
+Tour total:     $1.5839
+Provenance:     2/60 factual sentences sourced, 58 unsourced (2 corpus, 0 grounded, 58 parametric)
+CACHE STORE: Art and Architectual tour in Boston Athenaeum, boston, ma /  / 5
+
+Tour text generated successfully!
+  [LOCAL-230] Network failures: 0 (all API calls succeeded)
+Saved to: /app/tours/LOCAL591_A.txt
+  [C5-5] Evidence persisted: /app/tours/LOCAL591_A_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Art and Architectual tour in Boston Athenaeum, boston, ma
+Tour-Category: museum
+
+Stop 1: Annie Adams Fields
+
+Address: 10½ Beacon Street, Boston, MA 02108
+
+Coordinates: 42.3572, -71.0635
+
+Museum Information: 20–76. Free for Métropole residents
+
+Orientation: You are about to explore the Boston Athenaeum in Boston, Massachusetts, an esteemed institution housing a captivating collection of art that resonates with the city's rich literary heritage. Within its walls, yo...
+
+
+========================================================================
+  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)
+========================================================================
+    Annie Adams Fields: serp_results=19 snippets_injected=28 beats_in_delivered_text=8
+    Hudson River from Fort Putnam: serp_results=10 snippets_injected=12 beats_in_delivered_text=0
+    Landscape with Cottages and Pond: serp_results=10 snippets_injected=10 beats_in_delivered_text=0
+    Blind-Man’s Bluff: serp_results=23 snippets_injected=30 beats_in_delivered_text=0
+    Boys Come Over Here You're Wanted: serp_results=21 snippets_injected=23 beats_in_delivered_text=0
+========================================================================
+[TIMING] phase=packing elapsed=7.6s cumulative=382.3s
+[TIMING] phase=verification elapsed=0.0s cumulative=382.3s
+[TIMING] TOTAL wall=382.3s phases: story_first=180.2s, external_lookups=95.1s, poi_selection=84.0s, fact_sheets=14.1s, packing=7.6s, intent=1.2s, narration=0.0s, verification=0.0s
+TEXT? True
+STOPS: 5
+  Stop 1 Annie Adams Fields | coord= 42.3572, -71.0635
+  Stop 2 Hudson River from Fort Putnam | coord= 42.3572, -71.0635
+  Stop 3 Landscape with Cottages and Pond | coord= 42.3572, -71.0635
+  Stop 4 Blind-Man’s Bluff | coord= 42.3572, -71.0635
+  Stop 5 Boys Come Over Here You're Wanted | coord= 42.3572, -71.0635
+ALLCOORDS True
