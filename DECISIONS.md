@@ -24460,3 +24460,7 @@ builds exactly N, and only the cache buckets. Tour 394 (Michael's broken Griffin
 explicit authorisation: 5 stop_metrics + 1 audio_tours row, counts 205→204; full backup
 `/Volumes/AudiouraSSD/deleted_tours/`. The bad 4–6 bucket cache row was retired, not deleted (D-note
 2026-10-05).
+Also deleted at Michael's request (2026-10-05 20:2x): tours 391 (en) and 392 (ru), the junk Griffin pair
+with website menu items as stops; their 5 stop_metrics; and share code NCyh65N7 (pointed at 392). Counts
+204 → 202 (real 60 → 58). Backups: `/Volumes/AudiouraSSD/deleted_tours/` (audio_tours_391/392.json incl.
+ZIPs, stop_metrics_391_392.json, shared_tours_391_392.json).
