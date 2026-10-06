@@ -41,7 +41,7 @@ args=(
 )
 # Own env-file (project .env), so OPENAI_API_KEY / SERP_API_KEY etc. are present.
 [ -f "${ENV_FILE}" ] && args+=(--env-file "${ENV_FILE}")
-args+=("${IMAGE}" python run_local599_container.py)
+args+=("${IMAGE}" python run_local599_massart.py)
 
 echo "[local599] ===== running MassArt Art Museum, Boston, MA (7 stops, cap \$2) ====="
 "${args[@]}" 2>&1 | tee "${LOG}" || true
