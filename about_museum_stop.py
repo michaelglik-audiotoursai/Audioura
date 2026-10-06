@@ -317,6 +317,7 @@ class AboutStop:
     counts_toward_n: bool = False
     practical_facts: str = ""  # [LOCAL-592] gated opening-hours/admission/closed-days
     site_domain: str = ""      # [LOCAL-592 r2] venue domain for the visiting-info fallback pointer
+    as_of: str = ""            # [LOCAL-592 r4] month-year honesty stamp ("October 2026")
 
     def is_empty(self) -> bool:
         return not self.narration.strip()
@@ -577,6 +578,7 @@ def build_about_stop(
     corpus_text: Optional[str] = None,
     max_pages: int = 8,
     practical_facts: str = "",
+    as_of: str = "",
 ) -> Optional[AboutStop]:
     """Build an "About <museum>" story stop, or None when no story can be sourced.
 
@@ -714,6 +716,7 @@ def build_about_stop(
         counts_toward_n=counts,
         practical_facts=(practical_facts or "").strip(),
         site_domain=domain,
+        as_of=(as_of or "").strip() or _default_month_stamp(),
     )
 
 
@@ -983,6 +986,209 @@ def _partial_pointer_sentence(facts: str, domain: str) -> str:
     return ""
 
 
+# ── [LOCAL-592 r4] Spoken visiting composition (sentences, not a note) ───────
+
+_CLOSED_SEG_RE = re.compile(r"(?i)^\s*closed\b")
+_ADMISSION_SEG_RE = re.compile(
+    r"(?i)([$€£]\s?\d|\bfree\b|\badmission\b|\bentry\b|\bticket)")
+# An hours segment names a weekday range or a time, or opens with "open".
+_HOURS_SEG_RE = re.compile(
+    r"(?i)(\bnoon\b|\bmidnight\b|\d\s*(?:am|pm)\b|\bopen\b|\bdaily\b|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday)")
+
+
+def _short_venue(venue_name: str) -> str:
+    """A natural spoken short name: 'the Griffin', 'the Boston Athenaeum'.
+
+    Strips a trailing descriptor ("Museum of Photography", "Library") to the
+    distinctive leading proper noun so the sentence reads aloud, and prefixes
+    "the" when the name is not already article-led. Falls back to the full name.
+    """
+    vn = _venue_core(venue_name) or (venue_name or "").strip()
+    if not vn:
+        return "the museum"
+    # Keep leading proper-noun words up to a generic descriptor.
+    _GENERIC = {"museum", "gallery", "galleries", "library", "collection",
+                "institute", "foundation", "center", "centre", "house", "society",
+                "of", "the", "for", "and", "art", "arts", "photography"}
+    words = vn.split()
+    kept = []
+    for w in words:
+        if w.lower() in _GENERIC and kept:
+            break
+        kept.append(w)
+    short = " ".join(kept) if kept else vn
+    if short.lower().startswith(("the ", "a ", "an ")):
+        return short
+    return f"the {short}"
+
+
+def _lower_lead(seg: str) -> str:
+    """Lower-case the first word of a mid-sentence clause unless it is a proper
+    noun / acronym (keeps weekday names, '$', currency intact)."""
+    s = seg.strip()
+    if not s:
+        return s
+    first = s.split()[0]
+    # Keep capitalised proper nouns (weekdays, Month names) and symbol/number leads.
+    if first[:1].isupper() and not first.isupper() and first[1:].islower():
+        # Weekday/Month proper nouns stay capitalised; a plain word like "Open"
+        # becomes lower-case to continue the sentence.
+        _KEEP = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                 "Saturday", "Sunday", "Daily"}
+        if first in _KEEP:
+            return s
+        return s[:1].lower() + s[1:]
+    return s
+
+
+def _compose_hours_sentence(venue_short: str, hours_segs: List[str],
+                            closed_segs: List[str]) -> str:
+    """One spoken sentence: '<Venue> is open <days, time[; day group…]>, and closed
+    on <day>.' Segments are kept VERBATIM (page-faithful), only stripped of a
+    leading 'Open'/'Opening hours' label so the sentence does not stutter."""
+    if not hours_segs and not closed_segs:
+        return ""
+    hours_body = ""
+    if hours_segs:
+        cleaned = []
+        for seg in hours_segs:
+            s = seg.strip().rstrip(".")
+            # Drop a leading "Open"/"Opening hours"/"Hours" label — the sentence
+            # already says "is open".
+            s = re.sub(r"(?i)^\s*(?:opening\s+hours?|open(?:ing)?|hours?)\s*[:,]?\s*", "", s)
+            if s:
+                cleaned.append(s)
+        hours_body = "; ".join(cleaned)
+    closed_body = ""
+    if closed_segs:
+        parts = []
+        for seg in closed_segs:
+            s = seg.strip().rstrip(".")
+            s = re.sub(r"(?i)^\s*closed\s*(?:on\s+)?", "", s)
+            if s:
+                parts.append(s)
+        closed_body = ", ".join(parts)
+
+    if hours_body and closed_body:
+        return f"{venue_short} is open {hours_body}, and closed on {closed_body}."
+    if hours_body:
+        return f"{venue_short} is open {hours_body}."
+    # Closed-day only: say it plainly (hours themselves were not sourced).
+    return f"{venue_short} is closed on {closed_body}."
+
+
+def _compose_admission_sentence(admission_segs: List[str]) -> str:
+    """One spoken sentence stating admission, categories kept verbatim (never
+    invented). 'Admission is $12 for adults and $8 for seniors, students and
+    teachers.' A bare 'free' reads 'Admission is free.'"""
+    if not admission_segs:
+        return ""
+    body = "; ".join(s.strip().rstrip(".") for s in admission_segs if s.strip())
+    if not body:
+        return ""
+    low = body.lower()
+    # If the segment already begins with "Admission"/"Entry", keep its own lead.
+    if re.match(r"(?i)^\s*(?:admission|entry|tickets?)\b", body):
+        sent = body
+    elif low.startswith("free") or low == "free":
+        sent = f"Admission is {body}"
+    else:
+        sent = f"Admission is {body}"
+    return sent.rstrip(".") + "."
+
+
+def _default_month_stamp() -> str:
+    """The current month-year stamp ('October 2026') for the honesty signal.
+
+    Reuses museum_overview._default_as_of so the Stop-1 visiting signal and the
+    rung-3 overview dateline share one source of truth; falls back to a local
+    strftime if that module is unavailable at import time.
+    """
+    try:
+        from museum_overview import _default_as_of
+        return _default_as_of()
+    except Exception:
+        import datetime
+        return datetime.date.today().strftime("%B %Y")
+
+
+def _source_month_signal(domain: str, as_of: str) -> str:
+    """The D584/D582 honesty signal, spoken: 'as listed on <domain> in <month>'."""
+    where = domain.strip() if domain and domain.strip() else "the museum's website"
+    stamp = (as_of or "").strip()
+    if stamp:
+        return f"as listed on {where} in {stamp}"
+    return f"as listed on {where}"
+
+
+def _compose_visiting_sentences(facts: str, venue_name: str, domain: str,
+                                as_of: str) -> str:
+    """[LOCAL-592 r4] Turn the gated practical-facts string into SPOKEN sentences.
+
+    r3 emitted a note: "Before you go in, a few practical notes. Closed on Monday.
+    Noon–4 PM. $12." r4 composes it as speech, keeps the day range WITH the hours
+    (bound by the extractor), keeps the admission categories the page gives, and
+    closes with the source + month honesty signal:
+
+        "The Griffin is open Tuesday through Sunday, Noon–4 PM, and closed on
+         Monday. Admission is $12 for adults and $8 for seniors, students and
+         teachers, as listed on griffinmuseum.org in October 2026."
+
+    Nothing is invented: every weekday, time, price and category is carried
+    verbatim from the gated ``facts`` (built upstream under the D584 contract).
+    """
+    facts = (facts or "").strip()
+    if not facts:
+        return ""
+    # Split into top-level segments on sentence boundaries. Keep ';' inside a
+    # segment so an hours line with several day groups stays one segment.
+    segs = [s.strip() for s in re.split(r"(?<=[.!?])\s+|\.\s+", facts) if s.strip()]
+    if not segs:
+        segs = [facts]
+
+    hours_segs: List[str] = []
+    closed_segs: List[str] = []
+    admission_segs: List[str] = []
+    for seg in segs:
+        if _CLOSED_SEG_RE.search(seg):
+            closed_segs.append(seg)
+        elif _ADMISSION_SEG_RE.search(seg) and not _HOURS_SEG_RE.search(
+                re.sub(r"(?i)admission|entry|ticket|free", "", seg)):
+            admission_segs.append(seg)
+        elif _HOURS_SEG_RE.search(seg):
+            hours_segs.append(seg)
+        else:
+            # Unclassifiable — keep it as an admission-ish trailing note only if it
+            # carries a price; otherwise drop (never invent).
+            if _ADMISSION_SEG_RE.search(seg):
+                admission_segs.append(seg)
+
+    venue_short = _short_venue(venue_name)
+    hours_sentence = _compose_hours_sentence(venue_short, hours_segs, closed_segs)
+    adm_sentence = _compose_admission_sentence(admission_segs)
+    signal = _source_month_signal(domain, as_of)
+
+    out_sentences: List[str] = []
+    if hours_sentence:
+        out_sentences.append(hours_sentence)
+    if adm_sentence:
+        # Attach the honesty signal to the admission sentence (it carries the price,
+        # the most volatile fact). "… teachers, as listed on <domain> in <month>."
+        adm_sentence = adm_sentence.rstrip(".") + f", {signal}."
+        out_sentences.append(adm_sentence)
+    elif hours_sentence:
+        # No admission to carry the signal → attach it to the hours sentence.
+        out_sentences[-1] = out_sentences[-1].rstrip(".") + f", {signal}."
+    composed = " ".join(out_sentences).strip()
+    # The visiting block opens its own paragraph — capitalise its first letter
+    # ("the Griffin is open" → "The Griffin is open") without touching a leading
+    # price/number or an already-capital proper noun.
+    if composed and composed[0].islower():
+        composed = composed[0].upper() + composed[1:]
+    return composed
+
+
 def build_opening_section(about: Optional["AboutStop"]) -> str:
     """[LOCAL-592] Compose the OPENING SECTION of Stop 1 for a single-venue tour.
 
@@ -1011,6 +1217,14 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
     <site>."), and is omitted entirely when both are known. When ``about`` is None
     the section is empty.
 
+    [r4] IT READS AS SPEECH, with the day range bound to the hours. The gated facts
+    are no longer appended as a note ("… a few practical notes. Noon–4 PM. $12.")
+    but composed into sentences by ``_compose_visiting_sentences``:
+    "<Venue> is open <days, time>, and closed on <day>. Admission is <price> for
+    <categories>, as listed on <domain> in <month>." The source + month honesty
+    signal (D584/D582) and the admission categories the page gives are preserved;
+    nothing is invented.
+
     The caller folds the returned text into Stop 1 as its opening SECTION (rendered
     before the Orientation), so a request for N stops still delivers exactly N: this
     section adds zero stops.
@@ -1023,10 +1237,16 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
         parts.append(narration)
     facts = (about.practical_facts or "").strip()
     domain = getattr(about, "site_domain", "")
+    as_of = getattr(about, "as_of", "") or ""
+    venue_name = getattr(about, "museum_name", "") or ""
     if facts:
-        # Ensure the facts end as a clean sentence group.
-        facts_block = facts if facts.endswith((".", "!", "?")) else facts + "."
-        practical = f"{_PRACTICAL_LEAD} {facts_block}"
+        # [r4] Compose the visiting information as spoken sentences (day range bound
+        # to the hours, source + month honesty signal).
+        practical = _compose_visiting_sentences(facts, venue_name, domain, as_of)
+        if not practical:
+            # Defensive: if composition yields nothing, fall back to a plain
+            # statement of the gated facts (still never invented).
+            practical = facts if facts.endswith((".", "!", "?")) else facts + "."
         # [r3] Point to the site ONLY for the field the page did not give.
         pointer = _partial_pointer_sentence(facts, domain)
         if pointer:
@@ -1041,8 +1261,9 @@ def build_opening_section(about: Optional["AboutStop"]) -> str:
         # Drop only the offending About narration; keep the practical facts, which
         # are page-literal and cannot be artwork-framed.
         if facts:
-            facts_block = facts if facts.endswith((".", "!", "?")) else facts + "."
-            practical = f"{_PRACTICAL_LEAD} {facts_block}"
+            practical = _compose_visiting_sentences(facts, venue_name, domain, as_of)
+            if not practical:
+                practical = facts if facts.endswith((".", "!", "?")) else facts + "."
             pointer = _partial_pointer_sentence(facts, domain)
             return f"{practical} {pointer}".strip() if pointer else practical
         return _visiting_fallback_sentence(domain)
