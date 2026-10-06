@@ -253,16 +253,30 @@ def grant_pack(user_id, level, paid_at=None):
 # Period counting for L2 / Tester (daily & monthly fresh-generation caps)
 # ───────────────────────────────────────────────────────────────────────────
 def _count_fresh_generations(cur, user_id, scope):
-    """Count fresh generations by this device today ('day') or this calendar
+    """Count DELIVERED generations by this device today ('day') or this calendar
     month ('month'). Uses tour_requests rows written by the orchestrator — the
-    single authoritative writer (source='orchestrator')."""
+    single authoritative writer (source='orchestrator').
+
+    [LOCAL-595B defect 2] Count only status='completed' rows. A tour that was
+    requested but never delivered (status 'started' = in flight, or 'failed' =
+    generation/credit/factual-integrity failure) must NOT consume the device's
+    daily/monthly allowance: a listener who hit a failure keeps their tour.
+    The orchestrator reserves a row at 'started', flips it to 'completed' on
+    successful delivery, and to 'failed' on error (see release_reservation).
+
+    [LOCAL-595B defect 3] A cache hit / stop-pool-only tour still reaches
+    'completed' (it was delivered), so it DOES count here — these caps limit
+    volume, not cost. Only the L3 fresh_used / L4 ops_used cost pools are
+    released for a cache hit.
+    """
     if scope == 'day':
         where = "started_at::date = CURRENT_DATE"
     else:  # month
         where = "started_at >= date_trunc('month', CURRENT_DATE)"
     cur.execute(f"""
         SELECT COUNT(*) FROM tour_requests
-        WHERE secret_id = %s AND source = 'orchestrator' AND {where}
+        WHERE secret_id = %s AND source = 'orchestrator'
+          AND status = 'completed' AND {where}
     """, (user_id,))
     return cur.fetchone()[0]
 
@@ -567,20 +581,27 @@ def _check_edit_add_stops(cur, user_id, level, plan, new_stops):
 
 
 # ───────────────────────────────────────────────────────────────────────────
-# Counter consumption — called by callers AFTER a gated op actually proceeds.
+# Pack-counter reservation / release (L3 fresh_used, L4 ops_used).
 # ───────────────────────────────────────────────────────────────────────────
-def consume(user_id, op, new_stops=0):
-    """Increment the appropriate pack counter after a gated op succeeds.
+# [LOCAL-595B defect 2] The orchestrator RESERVES a pack unit at request time
+# (before generation) so that two concurrent requests cannot both pass a limit
+# of 1 — the reservation is the concurrency guard. On successful FRESH delivery
+# the reservation stands (it is the real consumption). On FAILURE, or on a
+# [defect 3] CACHE HIT / stop-pool-only delivery that cost ~$0, the orchestrator
+# RELEASES the reservation so the paid allowance is not spent. L2/Tester period
+# levels are counted from completed tour_requests rows (not these counters), so
+# they neither reserve nor release here.
+def reserve(user_id, op, new_stops=0):
+    """Increment the appropriate pack counter when a gated op is about to run.
 
-    - generate       : L3 fresh_used++, L4 ops_used++ (period levels count via
-                       tour_requests, so no counter bump needed for L2/Tester).
+    - generate       : L3 fresh_used++, L4 ops_used++.
     - edit_add_stops : L3 edits_used++, L4 ops_used++ (only when new_stops>0).
 
-    Idempotency is the caller's concern (one call per completed op). This is a
-    best-effort increment; failure is logged, not raised.
+    Period levels (L2/Tester) count via completed tour_requests, so no bump.
+    Best-effort; failure is logged, not raised.
     """
     if op == 'edit_add_stops' and (not new_stops or new_stops <= 0):
-        return  # text-only edit consumes nothing
+        return  # text-only edit reserves nothing
     conn = _get_conn()
     try:
         cur = conn.cursor()
@@ -603,6 +624,123 @@ def consume(user_id, op, new_stops=0):
         conn.commit()
         cur.close()
     except Exception as e:
-        logger.error(f"[LEVELS] consume error for {user_id} op={op}: {e}")
+        logger.error(f"[LEVELS] reserve error for {user_id} op={op}: {e}")
     finally:
         conn.close()
+
+
+# Backward-compatible name. The orchestrator/editing service historically called
+# `consume_operation` at request time; that call is now a RESERVATION (released
+# on failure / cache hit). Kept as an alias so existing imports keep working.
+consume = reserve
+
+
+def release(user_id, op, new_stops=0):
+    """Give back a pack unit reserved by `reserve`, flooring the counter at 0.
+
+    Called by the orchestrator when a reserved generation did NOT result in a
+    fresh paid delivery:
+      * generation failed  (defect 2), or
+      * the tour was served from cache / the stop pool at ~$0 (defect 3).
+
+    Idempotency / correctness is the caller's concern (one release per reserve).
+    Best-effort; failure is logged, not raised.
+    """
+    if op == 'edit_add_stops' and (not new_stops or new_stops <= 0):
+        return  # nothing was reserved for a text-only edit
+    conn = _get_conn()
+    try:
+        cur = conn.cursor()
+        state = get_device_state(cur, user_id)
+        level = state['level']
+        plan = get_plan_row(cur, level)
+        if plan is None:
+            cur.close()
+            return
+        # GREATEST(x-1, 0) so a double-release or a release with no prior reserve
+        # can never drive a counter negative.
+        if op == 'generate':
+            if plan['fresh_per_pack'] is not None:
+                cur.execute("UPDATE device_entitlement SET fresh_used = GREATEST(fresh_used - 1, 0), updated_at = NOW() WHERE user_id = %s", (user_id,))
+            if plan['ops_per_pack'] is not None:
+                cur.execute("UPDATE device_entitlement SET ops_used = GREATEST(ops_used - 1, 0), updated_at = NOW() WHERE user_id = %s", (user_id,))
+        elif op == 'edit_add_stops':
+            if plan['edits_per_pack'] is not None:
+                cur.execute("UPDATE device_entitlement SET edits_used = GREATEST(edits_used - 1, 0), updated_at = NOW() WHERE user_id = %s", (user_id,))
+            if plan['ops_per_pack'] is not None:
+                cur.execute("UPDATE device_entitlement SET ops_used = GREATEST(ops_used - 1, 0), updated_at = NOW() WHERE user_id = %s", (user_id,))
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        logger.error(f"[LEVELS] release error for {user_id} op={op}: {e}")
+    finally:
+        conn.close()
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Edit (add-stops) gate decision — pure, framework-free, so the editing service
+# AND tests can share one implementation without importing Flask/boto3.
+# ───────────────────────────────────────────────────────────────────────────
+def evaluate_edit_add_stops(data):
+    """[LOCAL-595B defect 4] Decide an edit's add-stops gate from the request body.
+
+    `data` is the parsed edit request body ({'stops': [...], optional 'user_id'
+    or 'secret_id'}).
+
+    Returns a dict:
+        {
+          'new_stops': int,            # stops with action='add'
+          'user_id':   str|None,       # resolved device id, if any
+          'gated':     bool,           # whether the add-stops gate applies
+          'proceed':   bool,           # True => caller may continue the save
+          'status':    int|None,       # HTTP status to return when not proceeding
+          'body':      dict|None,      # response body when not proceeding
+        }
+
+    FAIL CLOSED: an add-stops edit with no user id -> 401 user_id_required.
+    A text-only edit (new_stops == 0) is never gated (proceed=True). When an id
+    is present, the levels check runs; on allow the caller must still consume the
+    pack allowance via consume(user_id, 'edit_add_stops', new_stops).
+    """
+    stops = (data or {}).get('stops', []) or []
+    new_stops = sum(1 for s in stops if str(s.get('action', '')).lower() == 'add')
+    user_id = (data or {}).get('user_id') or (data or {}).get('secret_id')
+
+    # Text-only / re-voice edit — always allowed, never gated.
+    if new_stops <= 0:
+        return {'new_stops': 0, 'user_id': user_id, 'gated': False,
+                'proceed': True, 'status': None, 'body': None}
+
+    # Add-stops edit with no id — refuse, never silently allow (fail-closed).
+    if not user_id or not str(user_id).strip():
+        return {
+            'new_stops': new_stops, 'user_id': None, 'gated': True,
+            'proceed': False, 'status': 401,
+            'body': {
+                'allowed': False,
+                'error_code': 'user_id_required',
+                'error': 'A valid device id is required to add stops to a tour.',
+                'message': 'A valid device id is required to add stops to a tour.',
+                'suggestion': 'Update the app so it sends your device id with edits.',
+            },
+        }
+
+    try:
+        gate = check_operation(user_id, 'edit_add_stops', new_stops=new_stops)
+    except Exception as e:
+        logger.error(f"[LEVELS] edit_add_stops gate error for {user_id}: {e}")
+        return {
+            'new_stops': new_stops, 'user_id': user_id, 'gated': True,
+            'proceed': False, 'status': 503,
+            'body': {
+                'status': 'error', 'error_code': 'generation_failed',
+                'message': 'Could not verify your plan. Please try again.',
+            },
+        }
+
+    if not gate.get('allowed'):
+        return {'new_stops': new_stops, 'user_id': user_id, 'gated': True,
+                'proceed': False, 'status': 429, 'body': gate}
+
+    return {'new_stops': new_stops, 'user_id': user_id, 'gated': True,
+            'proceed': True, 'status': None, 'body': None}

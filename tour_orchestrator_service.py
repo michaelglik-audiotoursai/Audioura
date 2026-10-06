@@ -446,6 +446,48 @@ def log_job_update(job_id, status, progress):
     else:
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
+
+def _set_tour_request_status(job_id, status):
+    """[LOCAL-595B defect 2] Flip the orchestrator's tour_requests row (keyed on
+    tour_id = job_id) to 'completed' or 'failed'. L2/Tester period caps count
+    only 'completed' rows, so a 'failed'/'started' row never spends a daily or
+    monthly allowance. Best-effort; failure is logged, not raised."""
+    try:
+        import psycopg2 as _pg
+        _conn = _pg.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        _cur = _conn.cursor()
+        _cur.execute("""
+            UPDATE tour_requests SET status = %s, finished_at = NOW()
+            WHERE tour_id = %s AND source = 'orchestrator'
+        """, (status, job_id))
+        _conn.commit()
+        _cur.close()
+        _conn.close()
+        print(f"[QUOTA] tour_requests[{job_id}] status -> {status}")
+    except Exception as _e:
+        print(f"[QUOTA] WARNING: could not set tour_requests status={status} for {job_id}: {_e}")
+
+
+def _release_generation_reservation(user_id, job_id, reason):
+    """[LOCAL-595B defect 2/3] Give back the L3 fresh_used / L4 ops_used unit
+    reserved at request time, because the reserved generation did not result in
+    a fresh paid delivery (reason='failed' or reason='cache_hit'). Best-effort."""
+    if not user_id:
+        return
+    try:
+        from entitlements import release_operation
+        release_operation(user_id, 'generate')
+        print(f"[QUOTA] released generation reservation for {user_id} (job={job_id}, reason={reason})")
+    except Exception as _e:
+        print(f"[QUOTA] WARNING: could not release reservation for {user_id} (job={job_id}): {_e}")
+
+
 def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None, tour_kind=None):
     """Store the audio tour in the database with original tour content.
 
@@ -769,6 +811,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
     print(f"  persona: {persona}")
+    # [LOCAL-595B defect 3] Set true if the tour is served from cache / stop pool.
+    # Used at the completed transition to decide whether the reserved pack unit
+    # stands (fresh delivery) or was already released (cache hit).
+    _was_cache_hit = False
     try:
         ACTIVE_JOBS[job_id]["status"] = "processing"
         ACTIVE_JOBS[job_id]["progress"] = "Starting complete tour generation pipeline..."
@@ -1081,6 +1127,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             print(f"ERROR: {error_msg}")
             ACTIVE_JOBS[job_id]["status"] = "error"
             ACTIVE_JOBS[job_id]["error"] = error_msg
+            # [LOCAL-595B defect 2] No tour was delivered — mark 'failed' and give
+            # back the reserved pack unit so the listener's allowance is intact.
+            _set_tour_request_status(job_id, 'failed')
+            _release_generation_reservation(user_id, job_id, reason='no_audio_files')
             try:
                 os.remove(zip_path)
             except Exception:
@@ -1312,6 +1362,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 f"A compensating credit has been issued if applicable."
             )
             ACTIVE_JOBS[job_id]["error_type"] = "store_failed"
+            # [LOCAL-595B defect 2] Delivery did NOT happen — mark the row 'failed'
+            # (so it never counts toward L2/Tester caps) and release the reserved
+            # L3/L4 pack unit. The listener keeps their allowance.
+            _set_tour_request_status(job_id, 'failed')
+            _release_generation_reservation(user_id, job_id, reason='store_failed')
             print(f"Keeping extraction directory due to database storage failure: {extract_path}")
             return  # Do NOT fall through to "completed"
         
@@ -1329,6 +1384,14 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             # Free-tier users are never charged (entitlements gate + _our_cost check
             # in generate_tour_text_service.py skip the charge block entirely).
             print(f"[LOCAL-172] Charge retained for reuse (D47) | user={user_id} | job={job_id}")
+            # [LOCAL-595B defect 3] A cache hit / stop-pool reuse is NOT a fresh
+            # tour (the spec prices L3 as "5 FRESH tours"): it cost ~$0, so RELEASE
+            # the L3 fresh_used / L4 ops_used unit reserved at request time. The
+            # tour_requests row still flips to 'completed' below, so it STILL
+            # counts toward the L2/Tester daily & monthly volume caps. This D47
+            # wallet charge and the LOCAL-595 pack allowance are independent.
+            _was_cache_hit = True
+            _release_generation_reservation(user_id, job_id, reason='cache_hit')
         else:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
             
@@ -1582,6 +1645,15 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         if language != 'en' and 'translated_tour_id' in ACTIVE_JOBS[job_id]:
             final_message += f" Translated tour ID: {ACTIVE_JOBS[job_id]['translated_tour_id']}"
         
+        # [LOCAL-595B defect 2] Delivery succeeded — flip the orchestrator's
+        # tour_requests row to 'completed' so it counts toward L2/Tester volume
+        # caps. For a FRESH tour the reserved L3/L4 pack unit stands (it is the
+        # real consumption); for a cache hit it was already released above, so we
+        # do NOT release again.
+        _set_tour_request_status(job_id, 'completed')
+        if _was_cache_hit:
+            print(f"[QUOTA] job={job_id} delivered from cache/pool — pack unit already released, tour still counts for volume caps")
+
         log_job_update(job_id, "completed", final_message)
         ACTIVE_JOBS[job_id]["netlify_ready"] = True
         ACTIVE_JOBS[job_id]["language"] = language
@@ -1598,24 +1670,14 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         ACTIVE_JOBS[job_id]["status"] = "error"
         ACTIVE_JOBS[job_id]["error"] = str(e)
         
-        # Rollback usage row so a failed generation doesn't permanently consume quota
-        try:
-            import psycopg2 as _pg2
-            _rc = _pg2.connect(
-                host=os.getenv('DB_HOST', 'postgres-2'),
-                database=os.getenv('DB_NAME', 'audiotours'),
-                user=os.getenv('DB_USER', 'admin'),
-                password=os.getenv('DB_PASSWORD', 'password123'),
-                port=os.getenv('DB_PORT', '5432')
-            )
-            _rcur = _rc.cursor()
-            _rcur.execute("DELETE FROM tour_requests WHERE tour_id = %s AND source = 'orchestrator'", (job_id,))
-            _rc.commit()
-            _rcur.close()
-            _rc.close()
-            print(f"[QUOTA] Rolled back usage row for failed job {job_id}")
-        except Exception as rb_err:
-            print(f"[QUOTA] WARNING: Failed to rollback usage row: {rb_err}")
+        # [LOCAL-595B defect 2] A failed generation must not consume the device's
+        # allowance. Mark the orchestrator's tour_requests row 'failed' (L2/Tester
+        # caps count only 'completed' rows) and release the reserved L3/L4 pack
+        # unit (fresh_used / ops_used). We mark 'failed' rather than DELETE so the
+        # attempt stays auditable; completed-only counting makes the effect the
+        # same as the old rollback, and the pack unit is now correctly returned.
+        _set_tour_request_status(job_id, 'failed')
+        _release_generation_reservation(user_id, job_id, reason='exception')
 
 def track_user_tour(user_id, tour_id, request_string):
     """Track a user's tour request in the user tracking service."""
@@ -1917,14 +1979,19 @@ def generate_complete_tour():
         # Non-fatal: usage recording failure shouldn't block generation
         print(f"[QUOTA] WARNING: Failed to record usage (non-fatal): {usage_err}")
 
-    # [LOCAL-595] Consume the device's pack allowance for L3/L4 (fresh_used /
-    # ops_used). Period levels (L2/Tester) count from the tour_requests row just
-    # written, so they need no counter bump. Best-effort; never blocks.
+    # [LOCAL-595 / LOCAL-595B defect 2] RESERVE the device's pack allowance for
+    # L3/L4 (fresh_used / ops_used) BEFORE generation. The reservation is the
+    # concurrency guard: two parallel requests cannot both pass a limit of 1.
+    # It is RELEASED later (orchestrate_tour_async) if the generation fails
+    # (defect 2) or is served from cache / the stop pool at ~$0 (defect 3); it
+    # stands only for a successful FRESH delivery. Period levels (L2/Tester)
+    # count from COMPLETED tour_requests rows, so they neither reserve nor
+    # release here. Best-effort; never blocks.
     try:
-        from entitlements import consume_operation
-        consume_operation(user_id, 'generate')
-    except Exception as _consume_err:
-        print(f"[QUOTA] WARNING: Failed to consume pack allowance (non-fatal): {_consume_err}")
+        from entitlements import reserve_operation
+        reserve_operation(user_id, 'generate')
+    except Exception as _reserve_err:
+        print(f"[QUOTA] WARNING: Failed to reserve pack allowance (non-fatal): {_reserve_err}")
     
     # Initialize job tracking
     ACTIVE_JOBS[job_id] = {

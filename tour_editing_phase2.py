@@ -1706,31 +1706,34 @@ def _bulk_save_core(tour_id, data):
             "suggested_action": "Please ensure tour has at least one stop and try again"
         }), 400
 
-    # [LOCAL-595] Enforce the subscription-levels gate for edits that ADD stops.
-    # Count stops explicitly marked action='add'. An edit that adds no stops is
-    # a text-only / re-voice edit and is always allowed (op='edit_text'), so we
-    # only gate when new_stops > 0. user_id arrives in the request body; absent
-    # it we cannot attribute the edit, so we skip the gate (text edits stay free
-    # and the generate path already requires a user_id).
-    _new_stops = sum(1 for s in stops if str(s.get('action', '')).lower() == 'add')
-    _edit_user_id = data.get('user_id') or data.get('secret_id')
-    if _new_stops > 0 and _edit_user_id:
+    # [LOCAL-595 / LOCAL-595B defect 4] Enforce the subscription-levels gate for
+    # [LOCAL-595 / LOCAL-595B defect 4] Enforce the subscription-levels gate for
+    # edits that ADD stops, via the shared pure decision helper
+    # subscription_levels.evaluate_edit_add_stops (so the service and the tests
+    # agree exactly). The gate FAILS CLOSED: an add-stops edit with NO
+    # user_id/secret_id in the body is refused with 401 user_id_required, never
+    # silently allowed. Previously the gate was skipped when no id was present,
+    # so any add-stops edit without an id was free and unlimited (fail-open). The
+    # current app (tour_editing_service.dart updateMultipleStops) sends only
+    # {'stops': [...]} plus the X-API-Key header and NO user id, so add-stops
+    # edits are refused until LOCAL-598 adds the id to the edit request body.
+    try:
+        from entitlements import evaluate_edit_add_stops, consume_operation
+        _edit_decision = evaluate_edit_add_stops(data)
+    except Exception as _edit_err:
+        print(f"[LOCAL-595] edit_add_stops gate failed — denying (fail-closed): {_edit_err}")
+        return jsonify({
+            "status": "error",
+            "error_code": "generation_failed",
+            "message": "Could not verify your plan. Please try again.",
+        }), 503
+    if not _edit_decision['proceed']:
+        print(f"[LOCAL-595] edit_add_stops refused (status={_edit_decision['status']}): {_edit_decision['body']}")
+        return jsonify(_edit_decision['body']), _edit_decision['status']
+    if _edit_decision['gated']:
+        # Allowed add-stops edit — consume the pack allowance (L3 edits_used / L4 ops_used).
         try:
-            from entitlements import check_operation, consume_operation
-            _edit_gate = check_operation(_edit_user_id, 'edit_add_stops', new_stops=_new_stops)
-        except Exception as _edit_err:
-            print(f"[LOCAL-595] edit_add_stops gate failed — denying (fail-closed): {_edit_err}")
-            return jsonify({
-                "status": "error",
-                "error_code": "generation_failed",
-                "message": "Could not verify your plan. Please try again.",
-            }), 503
-        if not _edit_gate.get('allowed'):
-            print(f"[LOCAL-595] edit_add_stops denied for {_edit_user_id}: {_edit_gate}")
-            return jsonify(_edit_gate), 429
-        # Allowed — consume the pack allowance (L3 edits_used / L4 ops_used).
-        try:
-            consume_operation(_edit_user_id, 'edit_add_stops', new_stops=_new_stops)
+            consume_operation(_edit_decision['user_id'], 'edit_add_stops', new_stops=_edit_decision['new_stops'])
         except Exception as _c_err:
             print(f"[LOCAL-595] WARNING: consume edit allowance failed (non-fatal): {_c_err}")
     

@@ -728,7 +728,10 @@ def truncate_to_word_budget(text, word_budget):
 try:
     from subscription_levels import (
         check_operation,
+        reserve as reserve_operation,
+        release as release_operation,
         consume as consume_operation,
+        evaluate_edit_add_stops,
         record_activity,
         lapse_to_l1,
         grant_pack,
