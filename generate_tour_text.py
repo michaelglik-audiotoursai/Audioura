@@ -4035,6 +4035,37 @@ _LAST_POI_LIST = []
 # Module-level: populated after D1v2 verification with the computed tier
 _LAST_VERIFICATION_TIER = ""
 
+# [LOCAL-593 #4] How PROMINENT is a documented work?
+# The deterministic selector used to order works by source tier only, so within
+# a tier the order was insertion/alphabetical — which is exactly why the Harvard
+# tour's 7 stops were the first 7 works ALPHABETICALLY (A Courtier…, Autumn
+# Landscape…), the museum's obscure holdings rather than its highlights. We now
+# rank by prominence first and fall back to alphabetical only to break ties.
+#
+# Prominence signals, all grounded (no model guess):
+#   * Wikidata sitelinks — how many Wikipedia/Wikimedia editions the work's item
+#     has; a famous work has many, an obscure one has zero.
+#   * Wikipedia / corpus mentions — how often the title appears in the venue's
+#     narrative corpus (its own site + Wikipedia article). A highlight is talked
+#     about; a stored-but-undiscussed object is not.
+#   * On-site "highlight"/"notable works" membership — a catalogue work the
+#     museum itself foregrounds.
+def _work_prominence_score(entry, corpus_text_lower=""):
+    """Higher = more prominent. Deterministic given the inputs."""
+    score = 0
+    try:
+        score += int(entry.get('sitelinks', 0) or 0) * 100
+    except (TypeError, ValueError):
+        pass
+    if corpus_text_lower:
+        for _key in {entry.get('title', ''), entry.get('label_en', '')}:
+            _key = (_key or '').strip().lower()
+            if len(_key) >= 4:
+                score += corpus_text_lower.count(_key) * 5
+    if entry.get('highlight') or entry.get('notable'):
+        score += 50
+    return score
+
 # [LOCAL-60] Module-level: populated after generation with cost breakdown
 # Allows the service layer to read the cost without changing the function signature.
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
@@ -7866,7 +7897,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _t = w.get('label_local', '') or w.get('label_en', '')
                     _tn = _det_norm(_t)
                     if _t and _tn not in _det_seen_titles_norm:
-                        _det_documented.append({'title': _t, 'source': 'sparql'})
+                        _det_documented.append({'title': _t, 'source': 'sparql',
+                                                'sitelinks': int(w.get('sitelinks', 0) or 0),
+                                                'label_en': w.get('label_en', '')})
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 3: Cached canonical titles that survived LOCAL-24 filter
@@ -7921,7 +7954,26 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _det_documented_count >= total_stops:
                     # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
-                    _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
+                    # [LOCAL-593 #4] HIGHLIGHT-FIRST ordering. Within each source
+                    # tier, rank by PROMINENCE (Wikidata sitelinks + corpus/Wikipedia
+                    # mention count + on-site highlight flag) and use alphabetical
+                    # order ONLY to break ties. This replaces the old source-only
+                    # sort whose within-tier order was alphabetical — the cause of
+                    # the Harvard tour opening on its 7 most obscure works.
+                    _det_corpus_text_lower = ""
+                    try:
+                        _dc_pages = (_det_cache or {}).get('pages') or []
+                        if isinstance(_dc_pages, list):
+                            _det_corpus_text_lower = '\n'.join(
+                                p.get('text', '') for p in _dc_pages
+                                if isinstance(p, dict) and p.get('text')).lower()
+                    except Exception:
+                        _det_corpus_text_lower = ""
+                    _det_documented.sort(key=lambda d: (
+                        _priority.get(d['source'], 9),
+                        -_work_prominence_score(d, _det_corpus_text_lower),
+                        d['title'].lower(),
+                    ))
                     
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
@@ -8870,7 +8922,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _t = w.get('label_local', '') or w.get('label_en', '')
                     _tn = _det_norm(_t)
                     if _t and _tn not in _det_seen_titles_norm:
-                        _det_documented.append({'title': _t, 'source': 'sparql'})
+                        _det_documented.append({'title': _t, 'source': 'sparql',
+                                                'sitelinks': int(w.get('sitelinks', 0) or 0),
+                                                'label_en': w.get('label_en', '')})
                         _det_seen_titles_norm.add(_tn)
                 
                 # Source 3: Cached canonical titles that survived LOCAL-24 filter
@@ -8951,10 +9005,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # facts). Quality score = sum of non-sludge passages weighted by
                     # source type yield (museum_official 3.0, wikipedia 2.5, etc.).
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
+                    # [LOCAL-593 #4] Add PROMINENCE (sitelinks + corpus mentions +
+                    # highlight flag) as a tie-break ahead of alphabetical, so that
+                    # when two works have equal corpus-quality the more prominent
+                    # one is chosen — never the alphabetically-first obscure work.
+                    _det_corpus_text_lower = ""
+                    try:
+                        _dc_pages = (_det_cache or {}).get('pages') or []
+                        if isinstance(_dc_pages, list):
+                            _det_corpus_text_lower = '\n'.join(
+                                p.get('text', '') for p in _dc_pages
+                                if isinstance(p, dict) and p.get('text')).lower()
+                    except Exception:
+                        _det_corpus_text_lower = ""
                     _det_documented.sort(key=lambda d: (
                         -_depth_map.get(_det_norm(d['title']), 0),
                         _priority.get(d['source'], 9),
-                        d['title'],
+                        -_work_prominence_score(d, _det_corpus_text_lower),
+                        d['title'].lower(),
                     ))
                     
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)

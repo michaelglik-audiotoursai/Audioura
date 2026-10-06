@@ -469,6 +469,22 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     # 9. Single-venue consistency: for museum tours, stops should not reference other NAMED venues
     # [GAP 3] Exemption: when address-contained (<=2 unique addresses), exempt named-venue refs
     # that are substrings of the tour's own stop titles.
+    # [LOCAL-593 r2] Two regression fixes for the Harvard/McMullen failures, both
+    # reworked IN PLACE (no new mechanism):
+    #   (a) Skip the Stop 1 opening section. Since LOCAL-592/D611 the "About the
+    #       venue" history + visiting-info that stop_pool_assembly folds into
+    #       Stop 1 is scanned here; a museum's own history names its predecessor
+    #       and constituent museums (Harvard's Sackler/Reisinger, McMullen's
+    #       Devlin Gallery), and each was miscounted as a foreign venue. That
+    #       opening section is the tour-level description — found structurally by
+    #       prolog_structure_validator.extract_prolog_from_tour_content — and is
+    #       excluded from the Stop 1 scan.
+    #   (b) Exempt a ref that is a substring of / contains the tour venue's own
+    #       name, or whose distinctive tokens are all part of the venue name
+    #       (its resolver-derived venue_tokens). Covers "College Museum of Art"
+    #       ⊂ "Boston College Museum of Art". Also drop the bare two-word generic
+    #       matches ("Art Gallery", "Art Museum") the regex produces, which carry
+    #       no distinctive proper noun and are not a foreign venue at all.
     is_museum = "Tour-Category: museum" in tour_text
     _other_venue_flags = []
     if is_museum:
@@ -478,7 +494,60 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         
         # [GAP 3] Collect stop titles for exemption check
         _stop_titles = [re.sub(r'^Stop\s+\d+:\s*', '', h).strip().lower() for h in _stop_headers]
-        
+
+        # [LOCAL-593 r2] Generic words that are not distinctive to any single venue.
+        # A ref made up ONLY of these is a bare category phrase ("Art Gallery"),
+        # not a foreign venue, and is dropped. The same set defines which ref
+        # tokens must be matched for the venue-name exemption (b).
+        _GENERIC_VENUE_WORDS_9 = {'musée', 'musee', 'museum', 'museums', 'gallery',
+                                  'galleries', 'galerie', 'palais', 'villa',
+                                  'national', 'municipal', 'royal', 'university',
+                                  'college', 'art', 'arts', 'fine', 'collection',
+                                  'collections', 'the', 'of', 'de', 'du', 'des',
+                                  'le', 'la', 'les', 'and', 'center', 'centre',
+                                  'institute', 'institut'}
+
+        # [LOCAL-593 r2] The venue's own name tokens, from the title AND the
+        # resolver-derived venue_tokens in venue_context (never a hard-coded
+        # list). A named-venue ref whose DISTINCTIVE tokens are all part of this
+        # set is the tour's own venue phrased differently, not drift.
+        _vctx9 = venue_context if venue_context else {}
+        _venue_name_tokens = set(venue_context.get('venue_tokens', set())) if venue_context else set()
+        for _w in re.split(r'[\s,.\-]+', _tour_venue.lower()):
+            _w = _w.strip()
+            if _w:
+                _venue_name_tokens.add(_w)
+
+        def _ref_distinctive_tokens(_ref_lower: str) -> set:
+            """Tokens of a ref that are NOT generic category words — the part
+            that would make it a specific, different venue."""
+            return {t for t in re.split(r'[\s,.\-]+', _ref_lower)
+                    if t and t not in _GENERIC_VENUE_WORDS_9}
+
+        def _is_own_venue_ref(_ref_lower: str) -> bool:
+            """[LOCAL-593 r2 (b)] True when the ref is the tour's own venue:
+            a substring overlap with the venue name, OR every distinctive token
+            of the ref is already part of the venue's own name tokens."""
+            if _tour_venue:
+                _tv = _tour_venue.lower()
+                if _tv[:20] in _ref_lower or _ref_lower[:20] in _tv:
+                    return True
+            _distinct = _ref_distinctive_tokens(_ref_lower)
+            if _distinct and _distinct <= _venue_name_tokens:
+                return True
+            return False
+
+        # [LOCAL-593 r2 (a)] The Stop 1 opening section (About-the-venue history +
+        # visiting info) is the tour-level description. Find it structurally and
+        # exclude it from the Stop 1 scan so the venue's own history naming its
+        # constituents/predecessor is not counted as foreign venues.
+        _opening_section = ""
+        try:
+            from prolog_structure_validator import extract_prolog_from_tour_content
+            _opening_section = extract_prolog_from_tour_content(tour_text) or ""
+        except Exception:
+            _opening_section = ""
+
         # Check address containment (<=2 unique addresses)
         _all_addresses = re.findall(r'^Address:\s*(.+)$', tour_text, re.MULTILINE)
         _unique_addrs = set(a.strip().lower()[:30] for a in _all_addresses if a.strip())
@@ -501,16 +570,26 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                 line for line in stop.split('\n')
                 if line.strip() and not _STRUCT_LINE_RE.match(line.strip())
             )
+            # [LOCAL-593 r2 (a)] Remove the Stop 1 opening/About section from the scan.
+            if i == 0 and _opening_section:
+                _content_only = _content_only.replace(_opening_section, ' ')
             _named_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
             for ref in _named_refs:
-                # If the named venue IS the target venue, skip it
+                _ref_lower = ref.strip().lower()
+                # [LOCAL-593 r2 (c)] Drop bare generic category phrases
+                # ("Art Gallery", "Art Museum") — no distinctive token at all.
+                if not _ref_distinctive_tokens(_ref_lower):
+                    continue
+                # If the named venue IS the target venue (or an alias of it), skip it.
                 # B1 FIX: Compare core venue name (first 2 words) not the full greedy match
                 _ref_core = ' '.join(ref.split()[:2]).lower()
                 if _tour_venue and (_tour_venue.lower()[:20] in ref.lower() or ref.lower()[:20] in _tour_venue.lower() or _ref_core in _tour_venue.lower()):
                     continue  # It's the tour's own venue — not a foreign reference
+                # [LOCAL-593 r2 (b)] Exempt the venue's own name phrased differently.
+                if _is_own_venue_ref(_ref_lower):
+                    continue
                 # [GAP 3] Exemption: if tour is address-contained AND ref matches a stop title
                 if _is_contained:
-                    _ref_lower = ref.strip().lower()
                     _is_stop_title = any(_ref_lower in t or t in _ref_lower for t in _stop_titles)
                     if _is_stop_title:
                         continue  # Exempt — it's the tour's own stop name
@@ -519,8 +598,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         check("Single-venue consistency (no other NAMED venues)",
               _passed_9,
               f"{len(_other_venue_flags)} refs to other named venues: {_other_venue_flags[:3]}")
-        if not _passed_9:
-            FACTUAL_FAIL_COUNT += 1
+        # [D612 r2, LEAD] Advisory only — never release-blocking. Naming another
+        # museum in prose is normal and usually TRUE provenance ("transferred from
+        # the Peabody Museum", "donated to the Fogg"), and a regex cannot tell that
+        # from drift. Drift itself is blocked by check 11 (Venue coherence, FACTUAL)
+        # and by D1v2's verified-works gate. Harvard + McMullen, 2026-10-06.
     else:
         check("Single-venue consistency (no other NAMED venues)", True, "(not a museum tour)")
 
@@ -533,8 +615,7 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
             check("Attribution grounding (no unverified claims when venues are mixed)",
                   _passed_10,
                   f"{len(_artist_patterns)} artist attributions while {len(_other_venue_flags)} other venues flagged")
-            if not _passed_10:
-                FACTUAL_FAIL_COUNT += 1
+            # [D612 r2] Advisory: it only fires when check 9 does (see above).
         else:
             check("Attribution grounding (consistent with venue)", True,
                   "(single-venue tour — attribution is appropriate)")
@@ -561,8 +642,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                         if w.lower() not in _GENERIC_VENUE_WORDS and len(w) > 2]
         
         # Count stops that name a foreign venue (reuse check-9's pattern)
+        # [LOCAL-593 r2] Share check 9's fixes for the same shared regression:
+        # skip the Stop 1 opening/About section, drop bare generic phrases, and
+        # exempt the venue's own name phrased differently.
         _drifted_stops = 0
-        for stop in stops:
+        for _si, stop in enumerate(stops):
             # Extract content lines only (skip structural lines)
             _content_only = '\n'.join(
                 line for line in stop.split('\n')
@@ -571,9 +655,16 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                     r'Operational|Orientation|Museum Information|Directions|Sources|'
                     r'Stop \d+|Please resume):', line.strip())
             )
+            # [LOCAL-593 r2 (a)] Remove the Stop 1 opening/About section from the scan.
+            if _si == 0 and _opening_section:
+                _content_only = _content_only.replace(_opening_section, ' ')
             _foreign_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
             _has_foreign = False
             for ref in _foreign_refs:
+                _ref_lower = ref.lower()
+                # [LOCAL-593 r2 (c)] Drop bare generic category phrases.
+                if not _ref_distinctive_tokens(_ref_lower):
+                    continue
                 _ref_core = ' '.join(ref.split()[:2]).lower()
                 # Skip references that match the tour's own venue
                 if _tour_venue and (_tour_venue.lower()[:20] in ref.lower()
@@ -581,8 +672,10 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                                     or _ref_core in _tour_venue.lower()):
                     continue
                 # Skip if ref contains any distinctive word from the venue
-                _ref_lower = ref.lower()
                 if any(vw in _ref_lower for vw in _venue_words):
+                    continue
+                # [LOCAL-593 r2 (b)] Exempt the venue's own name phrased differently.
+                if _is_own_venue_ref(_ref_lower):
                     continue
                 _has_foreign = True
                 break

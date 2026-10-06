@@ -288,11 +288,12 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
     Includes P170 (creator) for exhibition-scoped filtering (LOCAL-362).
     """
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator ?sitelinks WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
       OPTIONAL {{ ?work wdt:P170 ?creator. }}
+      OPTIONAL {{ ?work wikibase:sitelinks ?sitelinks. }}
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
@@ -324,6 +325,13 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
             creator_label = r.get("creatorLabel", {}).get("value", "")
             creator_uri = r.get("creator", {}).get("value", "")
             creator_qid = creator_uri.split("/")[-1] if creator_uri else ""
+            # [LOCAL-593 #4] Prominence signal: number of Wikipedia/Wikimedia
+            # sitelinks the work's Wikidata item carries. A famous work (many
+            # language editions) outranks an obscure one at the same source tier.
+            try:
+                _sitelinks = int(r.get("sitelinks", {}).get("value", "0") or "0")
+            except (TypeError, ValueError):
+                _sitelinks = 0
             
             # Deduplicate: same work may appear multiple times with different creators
             # (works with multiple creators) — keep first occurrence but merge creator info
@@ -331,9 +339,12 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                 if work_qid in _seen_qids:
                     # Merge creator into existing entry
                     for existing in works:
-                        if existing['qid'] == work_qid and creator_label:
-                            if creator_label not in existing.get('creators', []):
+                        if existing['qid'] == work_qid:
+                            if creator_label and creator_label not in existing.get('creators', []):
                                 existing.setdefault('creators', []).append(creator_label)
+                            # [LOCAL-593 #4] Keep the strongest prominence seen.
+                            if _sitelinks > existing.get('sitelinks', 0):
+                                existing['sitelinks'] = _sitelinks
                             break
                     continue
                 _seen_qids.add(work_qid)
@@ -345,6 +356,7 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
                     "creator": creator_label if creator_label and not creator_label.startswith("Q") else "",
                     "creator_qid": creator_qid if creator_label and not creator_label.startswith("Q") else "",
                     "creators": [creator_label] if creator_label and not creator_label.startswith("Q") else [],
+                    "sitelinks": _sitelinks,  # [LOCAL-593 #4] prominence signal
                 }
                 works.append(entry)
         
@@ -1117,12 +1129,15 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 5  # LOCAL-583: structural chrome rejection added to the
-                    # canonical-title union before write. Bumping from 4 makes
-                    # every row written by the old plaintext extractor (which
-                    # stored site chrome as "canonical titles") a cache MISS, so
-                    # the Griffin chrome row and its kind are ignored without a
-                    # DELETE. New rows are written chrome-free at this version.
+CORPUS_VERSION = 7  # LOCAL-593: the page-ranker excludes policy/admin pages
+                    # (#2), the Wikipedia city-match guard no longer rejects the
+                    # correctly-resolved venue's own article (#2), and SPARQL works
+                    # carry a sitelinks prominence count (#4). Rows written by any
+                    # pre-LOCAL-593 miner (admin-page corpus, Wikipedia wrongly
+                    # dropped, sitelink-less works) must be a cache MISS — bumping
+                    # to 7 ignores them without a DELETE (the LOCAL-583 mechanism).
+                    # Fresh rows are written at v7 with the admin pages excluded,
+                    # the venue Wikipedia article included, and sitelinks present.
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only

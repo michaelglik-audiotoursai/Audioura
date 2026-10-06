@@ -456,9 +456,38 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     break
                 elif content_qa_runner.FACTUAL_FAIL_COUNT > 0:
                     # Factual failure — reject entirely (upstream pipeline bug, not fixable here)
+                    # [LOCAL-593 #5] The internal failure count stays in the LOG.
+                    # The listener gets the LOCAL-580 actionable contract: a stable
+                    # error_code ('factual_integrity'), a plain-language message that
+                    # never mentions an internal check, and a machine-usable
+                    # suggestion the LOCAL-581 "Edit request" button can pre-fill
+                    # (a smaller same-venue tour, which has a real chance of passing).
                     print(f"[BLOCKER4c] FACTUAL QA FAILED (round {_qa_round}): {content_qa_runner.FACTUAL_FAIL_COUNT} factual failure(s)")
+                    _fi_venue = (location or "this museum").split(',')[0].strip() or "this museum"
+                    _fi_message = (
+                        f'We couldn\u2019t verify enough facts about {_fi_venue} to '
+                        f'narrate it safely. Try the museum\u2019s full official name, '
+                        f'or fewer stops.'
+                    )
+                    _fi_extra = {}
+                    try:
+                        from actionable_failure import build_actionable_failure
+                        _fi_af = build_actionable_failure(
+                            {'error_type': 'factual_integrity', 'venue': _fi_venue},
+                            location, _fi_message)
+                        _fi_extra["error_code"] = _fi_af["error_code"]
+                        _fi_extra["message"] = _fi_af["message"]
+                        _fi_extra["suggestion"] = _fi_af["suggestion"]
+                        _svc_logger.info(
+                            f"[LOCAL-593 #5] factual-integrity fail: "
+                            f"{content_qa_runner.FACTUAL_FAIL_COUNT} internal failure(s); "
+                            f"error_code={_fi_af['error_code']} "
+                            f"suggestion={_fi_af['suggestion']}")
+                    except Exception as _fi_err:
+                        _svc_logger.error(
+                            f"[LOCAL-593 #5] actionable-failure build failed (non-fatal): {_fi_err}")
                     ACTIVE_JOBS.update(job_id, status="error",
-                                      error=f"Tour failed factual integrity check ({content_qa_runner.FACTUAL_FAIL_COUNT} factual failures). Please try again.")
+                                      error=_fi_message, **_fi_extra)
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
                     return
