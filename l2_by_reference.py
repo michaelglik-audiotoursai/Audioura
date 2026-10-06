@@ -291,13 +291,14 @@ def _nearby_existing_tours(location: str, db_url: str, limit: int = 3) -> List[D
             entry["distance_km"] = None
         scored.append(entry)
 
-    if anchor:
-        # Nearest first; tours without coordinates already excluded by the query.
-        scored.sort(key=lambda e: (e["distance_km"] if e["distance_km"] is not None
-                                   else float("inf")))
-    else:
-        # No anchor → most popular first, as the actionable fallback.
-        scored.sort(key=lambda e: -e["popularity"])
+    # [LEAD 2026-10-06] "Nearby" must mean nearby. Without an anchor, or beyond
+    # NEARBY_MAX_KM, list nothing: a Boston listener offered Nice and Abu Dhabi
+    # tours as "nearby" (r1 live run) is worse than no list.
+    if not anchor:
+        return []
+    _max_km = float(os.getenv("NEARBY_MAX_KM", "50"))
+    scored = [e for e in scored if e["distance_km"] is not None and e["distance_km"] <= _max_km]
+    scored.sort(key=lambda e: e["distance_km"])
     return scored[:limit]
 
 
