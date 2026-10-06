@@ -944,6 +944,14 @@ def get_job_status(job_id):
             response["error_type"] = job["error_type"]
         if "evidence_summary" in job:
             response["evidence_summary"] = job["evidence_summary"]
+        # [LOCAL-580 / LOCAL-597] Structured, actionable refusal fields. The
+        # orchestrator forwards these to the app's /status (LOCAL-581 reads
+        # message > error and shows suggestion as a button); the L2 by-reference
+        # path additionally carries nearby_tours (id + name) so the app can offer
+        # existing tours when a venue has no reusable material.
+        for _k in ("error_code", "message", "suggestion", "nearby_tours"):
+            if _k in job and job[_k] is not None:
+                response[_k] = job[_k]
     
     return jsonify(response)
 
