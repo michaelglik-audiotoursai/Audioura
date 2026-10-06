@@ -77,11 +77,19 @@ transition-rewritten stop has different text and gets new audio. Translation fol
 The pool delivery writes `reused_stops`, `new_stops`, `rewritten_transitions` into
 `_LAST_GENERATION_COST.breakdown`. `generate_tour_text_service.py:324-341` already passes that
 `breakdown` to `cost_meter.record_operation`, which stores it as the `cost_ledger.breakdown` JSONB —
-so Michael sees the saving per tour with no service change. Verified live:
+so Michael sees the saving per tour with no service change. Verified live (the actual `POOL DELIVERY`
+lines emitted by the two reuse runs):
 
 ```
-COST_LEDGER_BREAKDOWN {"llm": 0.0, "tts": 0.0, "search": 0.0,
-                       "reused_stops": 7, "new_stops": 0, "rewritten_transitions": 0}
+# MFA 5→7 (building, N>K):
+[LOCAL-590] POOL DELIVERY: reused=4 new=3 rewritten_transitions=0 (pool held 4)
+breakdown = {"llm": 0.6317, "tts": 0.0, "search": 0.0,
+             "reused_stops": 4, "new_stops": 3, "rewritten_transitions": 0}
+
+# Boston Common 4→6 (outdoor, N>K):
+[LOCAL-590] POOL DELIVERY: reused=4 new=2 rewritten_transitions=4 (pool held 4)
+breakdown = {"llm": 0.0927, "tts": 0.0, "search": 0.0,
+             "reused_stops": 4, "new_stops": 2, "rewritten_transitions": 4}
 ```
 
 ---
@@ -130,19 +138,45 @@ placed **before** the pooled ones (new-before-pooled confirmed in the delivered 
 |---|---|---|---|---|---|
 | step1 | full generation of 4 | delivered 4 | 341 s | **$0.2064** | pooled 4 |
 | **step2** | **request 6, POOL** | delivered 6 | **211 s** | **$0.0927** | **reused 4, new 2, rewritten_transitions 4** |
+| baseline | full 6, `DISABLE_STOP_POOL=1` | — | — | — | *see note* |
 
-step1 pooled *Massachusetts State House, Boston Common, Parkman Bandstand, The Central Burying Ground*.
-step2 generated **only 2 new** stops — *The Soldiers and Sailors Monument, The Frog Pond* — the **route
-was re-sequenced** (the new stops interleave the pooled ones by geography), and **4 transitions** were
-rewritten (the two neighbours of each of the two insertions — exactly Michael's *"potentially 4
-rewritten for 2 added"*). The four pooled narrations were reused verbatim.
+step1 pooled *Massachusetts State House, Boston Common, Parkman Bandstand, The Central Burying Ground*
+(delivered order: State House → Boston Common → Parkman Bandstand → Central Burying Ground). step2
+generated **only 2 new** stops — *The Soldiers and Sailors Monument, The Frog Pond* — the **route was
+re-sequenced** (delivered order State House → **Soldiers & Sailors Monument** → Parkman Bandstand →
+**Frog Pond** → Boston Common → Central Burying Ground: the new stops interleave the pooled ones by
+geography rather than being appended), and **4 transitions** were rewritten (the two neighbours of each
+of the two insertions — exactly Michael's *"potentially 4 rewritten for 2 added"*). The four pooled
+narrations were reused verbatim. This step2 result (`pool_reuse=true`, reused 4 / new 2 /
+rewritten_transitions 4) is the verified proof of deliverable 3.
 
-### Griffin Museum of Photography (museum) — store + N ≤ K reuse
+> **Baseline caveat (verified from the run log):** the `DISABLE_STOP_POOL=1` baseline for Boston Common
+> did **not** produce a valid full-6 comparison — with pooling off it hit the whole-tour **bucket cache**
+> (`CACHE HIT: Boston Common / walking / 6`) seeded by step1 and returned a **trimmed 4-stop** tour at
+> $0.00 / 0 s. So the outdoor scenario proves the reuse mechanics and the $0.0927 pool cost, but it does
+> **not** have a clean full-generation cost/time to subtract against. The clean cost/time saving is the
+> **MFA building** scenario above (step2 $0.6317 / 403 s vs baseline $1.1286 / 740 s), where the baseline
+> ran a true full generation. A clean outdoor baseline needs a fresh venue (empty bucket cache) or
+> `DISABLE_TOUR_CACHE=1` on the baseline step; it was not re-run to stay under the OpenAI cap.
 
-Griffin has only ~7–8 real exhibition stops, so its pool saturates — which is why the clean building
-**N > K** proof used the MFA (a venue with room for new stops). Griffin did prove, live, the store and
-the **N ≤ K** path: a request for 7 against a 7-stop pool served **reused = 7, new = 0, $0.00,
-`pool_reuse=true`** — the whole tour from the pool, no LLM.
+### Griffin Museum of Photography (museum) — store seeded; N ≤ K reuse NOT captured live
+
+Griffin was used to seed and exercise the store, but the captured Griffin runs do **not** demonstrate the
+N ≤ K pool-reuse path, and an earlier draft of this write-up over-claimed that they did. What the logs
+actually show:
+
+- **step1** (request 5): full generation, delivered 5, $1.0128, `pool_reuse=false` — seeds the pool.
+- **step2** (request 7): **full generation, delivered 7, $1.5092, `pool_reuse=false`, reused 0** — the
+  pool was *not* reused on this run. The first Griffin run had stored the pool under the **location**
+  key (the QID lookup failed that time) while step2 **resolved** the QID and read the **QID** key, so it
+  saw `pooled=0` and regenerated. That split is exactly the D582 bug described below.
+
+The D582 union-read fix (reading both the QID and location keys) addresses the root cause, and the
+**MFA** scenario — a clean empty-pool-first run on this fixed code — is the live proof of pooled reuse
+(step2 `pool_reuse=true`, reused 4). The **N ≤ K serve-from-pool-only** path is covered by unit tests
+(`test_local590_orchestrator.py`: request ≤ pool size serves from the pool with the generator asserted
+**not called**, $0 LLM) but was **not** reproduced in a captured live Griffin run. Re-running Griffin
+step2 on the fixed code to capture a live N ≤ K / N > K reuse was deferred to stay under the OpenAI cap.
 
 ---
 
