@@ -445,6 +445,16 @@ def assemble_building_tour(
     except Exception as _dd_e:  # pragma: no cover
         logger.info(f"[LOCAL-607] fact dedupe skipped ({_dd_e})")
         _dd_dropped = []
+    # [LOCAL-616 item 4] Strip phantom cross-references: a pooled stop reused from
+    # an earlier tour can carry a reference to a stop that is NOT in THIS tour
+    # (414: "the earlier stops of this tour, such as La Vue du village"). Drop any
+    # sentence that cross-references a title not present among the delivered stops.
+    try:
+        from cross_stop_reference_guard import strip_phantom_references as _spr
+        ordered, _phantom_dropped = _spr(ordered)
+    except Exception as _spr_e:  # pragma: no cover
+        logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
+        _phantom_dropped = []
     # [LOCAL-592] Resolve the opening-section text. Prefer the explicit
     # ``opening_section``; fall back to folding a legacy ``about_stop`` unit's
     # narration (+ practical facts) so no caller path can resurrect an extra stop.
@@ -502,10 +512,14 @@ def assemble_building_tour(
         rewritten_transitions=0,  # building directions are templates, not LLM rewrites
         order=[s["title"] for s in ordered],
         about_stops=1 if folded_opening else 0,
-        dedupe_dropped=len(_dd_dropped),
+        dedupe_dropped=len(_dd_dropped) + len(_phantom_dropped),
         dedupe_log=[
             f"[LOCAL-607] dedupe: dropped from Stop {d['stop']} "
-            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped],
+            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped]
+        + [
+            f"[LOCAL-616] phantom-ref: dropped from Stop {d['stop']} "
+            f"(names {d['phantom']!r}, not in tour): \"{d['sentence'][:90]}\""
+            for d in _phantom_dropped],
     )
 
 
@@ -603,6 +617,13 @@ def assemble_outdoor_tour(
     except Exception as _dd_e:  # pragma: no cover
         logger.info(f"[LOCAL-607] fact dedupe skipped ({_dd_e})")
         _dd_dropped = []
+    # [LOCAL-616 item 4] Strip phantom cross-references for the outdoor route too.
+    try:
+        from cross_stop_reference_guard import strip_phantom_references as _spr
+        ordered, _phantom_dropped = _spr(ordered)
+    except Exception as _spr_e:  # pragma: no cover
+        logger.info(f"[LOCAL-616] phantom-reference guard skipped ({_spr_e})")
+        _phantom_dropped = []
 
     # [LOCAL-612 / D616] Lead Stop 1 with the honest shortfall sentence when the
     # route delivered fewer stops than asked. It is placed on the first walked
@@ -645,10 +666,14 @@ def assemble_outdoor_tour(
         new_stops=len(new_stops),
         rewritten_transitions=rewritten,
         order=[s["title"] for s in ordered],
-        dedupe_dropped=len(_dd_dropped),
+        dedupe_dropped=len(_dd_dropped) + len(_phantom_dropped),
         dedupe_log=[
             f"[LOCAL-607] dedupe: dropped from Stop {d['stop']} "
-            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped],
+            f"({d['reason']}): \"{d['sentence'][:90]}\"" for d in _dd_dropped]
+        + [
+            f"[LOCAL-616] phantom-ref: dropped from Stop {d['stop']} "
+            f"(names {d['phantom']!r}, not in tour): \"{d['sentence'][:90]}\""
+            for d in _phantom_dropped],
     )
 
 
