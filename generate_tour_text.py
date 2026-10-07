@@ -3715,7 +3715,8 @@ def _build_unclassifiable_evidence(location, tour_type):
 
 
 def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
-                                 coord_fetch=None, headers=None):
+                                 coord_fetch=None, headers=None,
+                                 requested_stops=None):
     """[LOCAL-582] Render a museum OVERVIEW (rung 3) as a finished, single-stop tour.
 
     The venue resolved and its own site was reachable, but no works/exhibitions
@@ -3767,6 +3768,22 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
     # (and the live runner's `^\s*Stop\s+\d+\s*[:\-]` regex) expects.
     lines.append(f"Stop 1: {_vn} — Overview")
     lines.append("")
+    # [LOCAL-602 / D616] A 1-stop overview for an N-stop request is acceptable
+    # ONLY with the honest shortfall sentence. Lead the stop with it when the ask
+    # was for more than this single overview stop (absent when the ask was met).
+    _shortfall = ""
+    try:
+        from about_museum_stop import build_shortfall_sentence
+        _shortfall = build_shortfall_sentence(
+            venue_name=_vn,
+            exhibitions_on_view=len(getattr(overview, 'exhibitions', []) or []),
+            delivered_stops=1, requested_stops=requested_stops)
+    except Exception:
+        _shortfall = ""
+    if _shortfall:
+        lines.append(_shortfall)
+        lines.append("")
+        print(f"  [LOCAL-602] D616 shortfall sentence on overview: {_shortfall!r}")
     lines.append(overview.narration.strip())
     lines.append("")
 
@@ -3848,7 +3865,7 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
     }
     ov_text = _assemble_overview_tour_text(
         venue_name or location, location, tour_type, overview,
-        headers=_ov_headers)
+        headers=_ov_headers, requested_stops=requested_stops)
     if ov_text is None:
         print(f"  [LOCAL-602] overview delivery aborted (no coordinates) — "
               f"falling to rung 4 so the tour never ships without a map point.")
