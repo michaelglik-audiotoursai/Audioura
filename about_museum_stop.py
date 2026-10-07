@@ -1237,8 +1237,11 @@ def _compose_admission_sentence(admission_segs: List[str]) -> str:
     # If the segment already begins with "Admission"/"Entry", keep its own lead.
     if re.match(r"(?i)^\s*(?:admission|entry|tickets?)\b", body):
         sent = body
-    elif low.startswith("free") or low == "free":
-        sent = f"Admission is {body}"
+    elif low.startswith("free"):
+        # "Free admission (the museum charges no admission fee)" → "Admission is free."
+        # (LEAD 2026-10-06: the preflight phrased it as a noun phrase and the tour
+        # said "Admission is Free admission (…)".)
+        sent = "Admission is free"
     else:
         sent = f"Admission is {body}"
     return sent.rstrip(".") + "."
