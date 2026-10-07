@@ -385,6 +385,9 @@ def _pooled_unit(row: Dict) -> Dict:
         "specific_examples": row.get("specific_examples", ""),
         "operational_details": row.get("operational_details", ""),
         "sources": row.get("sources", []) or [],
+        # [LOCAL-609] carry the stored per-stop research cost so a by-reference
+        # delivery can report research_cost_reused.
+        "research_cost_usd": float(row.get("research_cost_usd", 0.0) or 0.0),
         "_pool_reused": True,
     }
 
@@ -511,6 +514,10 @@ def build_by_reference_tour(
             "grounding": grounding,
             "served_from_pool_only": True,
             "new_cost": 0.0,
+            # [LOCAL-609] sum of the reused stops' original research cost
+            "research_cost_reused": sum(
+                float(u.get("research_cost_usd", 0.0) or 0.0) for u in chosen
+            ),
         }
 
 

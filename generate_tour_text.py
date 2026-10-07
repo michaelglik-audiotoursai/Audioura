@@ -7384,25 +7384,37 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             return None, output_file, (None, None)
 
         if result.get("allowed"):
+            # [LOCAL-609] A by-reference delivery is zero-research (reuses stored
+            # material, zero Serper/grounded Gemini). Carry the full 7-key provider
+            # breakdown (all $0 — nothing new was generated), the grounding counts
+            # (0), and research_cost_reused = sum of the reused stops' original
+            # research cost.
+            _br_grounding = result.get("grounding", {"requests": 0, "queries": 0}) or {}
+            _br_breakdown = _provider_breakdown_skeleton(
+                grounding_usd=0.0,
+                grounding_queries=_br_grounding.get("queries", 0),
+                grounding_requests=_br_grounding.get("requests", 0),
+            )
             _LAST_GENERATION_COST = {
                 "total_cost": 0.0,
                 "total_tokens": 0,
                 "cache_hit": False,
                 "pool_reuse": True,
                 "by_reference": True,
-                "grounding": result.get("grounding", {"requests": 0, "queries": 0}),
-                "breakdown": {
-                    "llm": 0.0, "tts": 0.0, "search": 0.0,
-                    "reused_stops": result.get("reused_stops", 0),
-                    "new_stops": 0,
-                    "rewritten_transitions": result.get("rewritten_transitions", 0),
-                    "about_stops": result.get("about_stops", 0),
-                },
+                "tour_total_cost": 0.0,
+                "research_cost_reused": result.get("research_cost_reused", 0.0) or 0.0,
+                "grounding": _br_grounding,
+                "reused_stops": result.get("reused_stops", 0),
+                "new_stops": 0,
+                "rewritten_transitions": result.get("rewritten_transitions", 0),
+                "about_stops": result.get("about_stops", 0),
+                "breakdown": _br_breakdown,
             }
             _g = result.get("grounding", {})
             print(f"  [LOCAL-597] BY-REFERENCE DELIVERY: reused={result.get('reused_stops')} "
                   f"rewritten_transitions={result.get('rewritten_transitions')} "
                   f"about_stops={result.get('about_stops', 0)} "
+                  f"research_reused=${result.get('research_cost_reused', 0.0):.4f} "
                   f"grounding(requests={_g.get('requests', 0)}, queries={_g.get('queries', 0)})")
             _LAST_DELIVERY_PATH = 'by_reference'
             return result["text"], output_file, (None, None)
@@ -7506,25 +7518,41 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 )
                 if _pool_out is not None:
                     # Record the ledger cost with reuse metering (LOCAL-590 step 6).
+                    # [LOCAL-609] A pool delivery's `breakdown` carries the SAME
+                    # 7 provider keys as a fresh row (the new stops' counted
+                    # breakdown, if any new stops were generated; all-zero on a
+                    # pool-only delivery), PLUS research_cost_reused — the sum of
+                    # the reused stops' original research cost (what the reuse
+                    # saved). pool_reuse/reused_stops/etc. are kept for callers.
+                    _pool_new_cost = _pool_out.get("new_cost", 0.0) or 0.0
+                    _pool_reused_research = _pool_out.get("research_cost_reused", 0.0) or 0.0
+                    _pool_breakdown = _pool_out.get("new_breakdown") or {}
+                    if not _pool_breakdown:
+                        _pool_breakdown = _provider_breakdown_skeleton()
+                        # Reflect the scalar new_cost on the OpenAI line when we
+                        # have no richer per-provider split for the new stops.
+                        if _pool_new_cost and isinstance(_pool_breakdown.get("openai"), dict):
+                            _pool_breakdown["openai"]["usd"] = _pool_new_cost
                     _LAST_GENERATION_COST = {
-                        "total_cost": _pool_out.get("new_cost", 0.0),
+                        "total_cost": _pool_new_cost,
                         "total_tokens": 0,
                         "cache_hit": False,
                         "pool_reuse": True,
-                        "breakdown": {
-                            "llm": _pool_out.get("new_cost", 0.0),
-                            "tts": 0.0, "search": 0.0,
-                            "reused_stops": _pool_out.get("reused_stops", 0),
-                            "new_stops": _pool_out.get("new_stops", 0),
-                            "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
-                            "about_stops": _pool_out.get("about_stops", 0),
-                        },
+                        "tour_total_cost": _pool_new_cost,
+                        # [LOCAL-609] reused-research total, reported on the row
+                        "research_cost_reused": _pool_reused_research,
+                        "reused_stops": _pool_out.get("reused_stops", 0),
+                        "new_stops": _pool_out.get("new_stops", 0),
+                        "rewritten_transitions": _pool_out.get("rewritten_transitions", 0),
+                        "about_stops": _pool_out.get("about_stops", 0),
+                        "breakdown": _pool_breakdown,
                     }
                     print(f"  [LOCAL-590] POOL DELIVERY: reused={_pool_out.get('reused_stops')} "
                           f"new={_pool_out.get('new_stops')} "
                           f"rewritten_transitions={_pool_out.get('rewritten_transitions')} "
                           f"about_stops={_pool_out.get('about_stops', 0)} "
-                          f"(pool held {_pool_out.get('pooled_before')})")
+                          f"(pool held {_pool_out.get('pooled_before')}); "
+                          f"research reused ${_pool_reused_research:.4f}")
                     _LAST_DELIVERY_PATH = 'pool'
                     return _pool_out["text"], output_file, (None, None)
             except Exception as _pool_err:
