@@ -3714,7 +3714,9 @@ def _build_unclassifiable_evidence(location, tour_type):
 
 
 
-def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
+def _assemble_overview_tour_text(venue_name, location, tour_type, overview,
+                                 coord_fetch=None, headers=None,
+                                 requested_stops=None):
     """[LOCAL-582] Render a museum OVERVIEW (rung 3) as a finished, single-stop tour.
 
     The venue resolved and its own site was reachable, but no works/exhibitions
@@ -3737,11 +3739,59 @@ def _assemble_overview_tour_text(venue_name, location, tour_type, overview):
     tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Overview"
     lines = [tour_title, "Tour-Category: Museum", ""]
 
+    # [LOCAL-602] A delivered stop MUST carry coordinates (LOCAL-591 #4), including
+    # on this overview path. Use the coordinates the overview already carries, else
+    # geocode the venue's own address (preferred — it binds to the BUILDING), else
+    # the location string. If no coordinate can be produced, return None so the
+    # caller clean-fails rather than shipping a map-less, tours-near-invisible tour.
+    _coords = (getattr(overview, 'coordinates', '') or '').strip()
+    if not _COORD_PAIR_RE.search(_coords):
+        _addr = (getattr(overview, 'address', '') or '').strip()
+        _poi = {'name': _vn, 'address': _addr}
+        try:
+            n_fixed, _still, _tok = _geocode_missing_coordinates(
+                [_poi], _addr or location, headers=headers or {},
+                coord_fetch=coord_fetch)
+        except Exception as _ce:
+            print(f"  [LOCAL-602] overview coordinate geocode failed: {_ce}")
+            n_fixed = 0
+        _coords = (_poi.get('coordinates', '') or '').strip()
+        if n_fixed <= 0 or not _COORD_PAIR_RE.search(_coords):
+            print(f"  [LOCAL-602] overview for {_vn!r} could not be geocoded "
+                  f"(addr={_addr!r}) — clean-failing rather than delivering a tour "
+                  f"with no coordinates (LOCAL-591 #4).")
+            return None
+    print(f"  [LOCAL-602] overview stop coordinates: {_coords} "
+          f"(from {'address' if getattr(overview, 'address', '') else 'location'})")
+
     # The single orientation stop. Keep the "Stop 1:" shape the whole pipeline
     # (and the live runner's `^\s*Stop\s+\d+\s*[:\-]` regex) expects.
     lines.append(f"Stop 1: {_vn} — Overview")
     lines.append("")
+    # [LOCAL-602 / D616] A 1-stop overview for an N-stop request is acceptable
+    # ONLY with the honest shortfall sentence. Lead the stop with it when the ask
+    # was for more than this single overview stop (absent when the ask was met).
+    _shortfall = ""
+    try:
+        from about_museum_stop import build_shortfall_sentence
+        _shortfall = build_shortfall_sentence(
+            venue_name=_vn,
+            exhibitions_on_view=len(getattr(overview, 'exhibitions', []) or []),
+            delivered_stops=1, requested_stops=requested_stops)
+    except Exception:
+        _shortfall = ""
+    if _shortfall:
+        lines.append(_shortfall)
+        lines.append("")
+        print(f"  [LOCAL-602] D616 shortfall sentence on overview: {_shortfall!r}")
     lines.append(overview.narration.strip())
+    lines.append("")
+
+    # [LOCAL-602] The map point for this stop. Address line too when the venue
+    # stated one (binds the stop to the building, D611).
+    if getattr(overview, 'address', ''):
+        lines.append(f"Address: {overview.address}")
+    lines.append(f"Coordinates: {_coords}")
     lines.append("")
 
     # Mirror the sourced practical sentence onto a Museum Information line so the
@@ -3806,7 +3856,20 @@ def _try_deliver_museum_overview(venue_name, location, tour_type, site_url,
     if overview is None or overview.is_empty():
         return None
 
-    ov_text = _assemble_overview_tour_text(venue_name or location, location, tour_type, overview)
+    # [LOCAL-602] Build OpenAI headers for the coordinate geocode (the overview
+    # stop must ship a map point — LOCAL-591 #4). Overview delivery clean-fails if
+    # no coordinate can be produced (ov_text is None).
+    _ov_headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY', '')}",
+    }
+    ov_text = _assemble_overview_tour_text(
+        venue_name or location, location, tour_type, overview,
+        headers=_ov_headers, requested_stops=requested_stops)
+    if ov_text is None:
+        print(f"  [LOCAL-602] overview delivery aborted (no coordinates) — "
+              f"falling to rung 4 so the tour never ships without a map point.")
+        return None
     _LAST_TOUR_KIND = 'overview'
     _LAST_OVERVIEW_SOURCES = list(overview.sources)
     try:
@@ -8971,11 +9034,27 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         try:
             from exhibition_site_first import build_site_first_candidates, SiteFirstResult
             _sf_diagnostics = {}
+            # [LOCAL-602] Pass the requested city (from the location tail) and a
+            # Serper caller so a JS-only / chain venue can be read from its branch
+            # page / embedded JSON / site:<domain> <city> instead of failing.
+            _sf_city = ''
+            try:
+                _loc_parts = [p.strip() for p in (location or '').split(',')[1:] if p.strip()]
+                if _loc_parts:
+                    _sf_city = _loc_parts[0]
+            except Exception:
+                _sf_city = ''
+            try:
+                from exhibition_site_js import default_serper as _sf_serper
+            except Exception:
+                _sf_serper = None
             _sf_candidates = build_site_first_candidates(
                 base_site_url=_museum_site_url,
                 venue_language=_museum_site_language,
                 total_stops=total_stops,
                 diagnostics=_sf_diagnostics,
+                city=_sf_city,
+                serper=_sf_serper,
             )
             if _sf_candidates:
                 poi_list = [_new_poi(c['name'], page_sourced=True) for c in _sf_candidates]

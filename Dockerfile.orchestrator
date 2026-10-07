@@ -24,6 +24,13 @@ COPY build_manifest.py /app/
 COPY quality_guardrails.py /app/
 COPY swipe_preference_service.py /app/
 COPY tour_scoring_service.py /app/
+# [LOCAL-602] tour_scoring_service imports tour_evaluator, which imports
+# tour_rubric_scorer; both were missing, so the orchestrator logged
+# "[SCORING] Non-fatal error: No module named 'tour_evaluator'" and skipped all
+# scoring. tour_scoring_service also reads tour_rubric_scorer.py's source at
+# runtime (_get_code_sha), so the file itself must be present, not just importable.
+COPY tour_evaluator.py /app/
+COPY tour_rubric_scorer.py /app/
 COPY user_quality_index.py /app/
 COPY user_stops_flag.py /app/
 

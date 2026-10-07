@@ -227,11 +227,18 @@ class TestEngineOverviewEnvelope(unittest.TestCase):
         cls.text = g._assemble_overview_tour_text(
             'Griffin Museum of Photography',
             'Griffin Museum of Photography, Winchester, MA',
-            'museum', cls.ov)
+            'museum', cls.ov,
+            # [LOCAL-602] The overview stop now carries coordinates (LOCAL-591 #4).
+            # Inject a deterministic geocoder so this text-envelope test stays offline.
+            coord_fetch=lambda poi: (poi, "42.4523, -71.1370", 0))
 
     def test_has_single_stop_header(self):
         headers = re.findall(r'(?mi)^\s*Stop\s+(\d+)\s*[:\-]', self.text)
         self.assertEqual(['1'], headers, "overview must render exactly one Stop")
+
+    def test_overview_stop_has_coordinates(self):
+        # [LOCAL-602] #3: a delivered overview stop MUST carry a map point.
+        self.assertRegex(self.text, r'(?mi)^Coordinates:\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*')
 
     def test_has_sourced_museum_information_line(self):
         self.assertRegex(self.text, r'(?mi)^Museum Information:\s*.+')
