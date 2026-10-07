@@ -267,7 +267,7 @@ def maybe_generate_with_pool(
                 opening_section=opening_section,
                 venue_address=_resolve_venue_address(location),
             )
-            _write(output_file, result.tour_text)
+            _emit_result(output_file, result)
             # Store the exhibition stops to seed the pool (the opening section is
             # NOT pooled; it is a sequence-level opener, regenerated per tour like
             # orientation — LOCAL-590/592).
@@ -328,7 +328,7 @@ def maybe_generate_with_pool(
                 transport_mode=_transport_mode(tour_type),
                 sources_block=sources_block,
             )
-        _write(output_file, result.tour_text)
+        _emit_result(output_file, result)
         pool.bump_hit_counts(location, tour_type, [u["title"] for u in pooled_units], db_url, qid=qid)
         return {
             "text": result.tour_text,
@@ -390,7 +390,7 @@ def maybe_generate_with_pool(
             opening_section=opening_section or "",
             venue_address=_resolve_venue_address(location),
         )
-        _write(output_file, result.tour_text)
+        _emit_result(output_file, result)
         pool.bump_hit_counts(location, tour_type,
                              [u["title"] for u in pooled_units], db_url, qid=qid)
         return {
@@ -484,7 +484,7 @@ def maybe_generate_with_pool(
             directions_fn=_dir_fn, api_key=api_key,
         )
 
-    _write(output_file, result.tour_text)
+    _emit_result(output_file, result)
     # Store the delivered tour back: adds the new stops to the pool (additive).
     pool.store_delivered_tour(location, tour_type, result.tour_text, db_url, qid=qid)
     pool.bump_hit_counts(location, tour_type, [u["title"] for u in pooled_units], db_url, qid=qid)
@@ -560,6 +560,19 @@ def _write(output_file, text):
                 f.write(text)
         except Exception as e:
             logger.warning(f"[POOL] could not write {output_file}: {e}")
+
+
+def _emit_result(output_file, result):
+    """[LOCAL-607] Write the assembled tour and print the cross-stop dedupe log.
+
+    Michael asked for the dedupe log lines in the live run. The pure assembly
+    module records what it dropped on the AssemblyResult; the orchestrator (which
+    owns stdout for a generation) prints them here, next to the write."""
+    _write(output_file, result.tour_text)
+    _dropped = getattr(result, "dedupe_dropped", 0)
+    print(f"  [LOCAL-607] cross-stop fact dedupe: {_dropped} sentence(s) removed")
+    for ln in getattr(result, "dedupe_log", []) or []:
+        print("  " + ln)
 
 
 def _sources_from_rows(rows: List[Dict]) -> str:
@@ -816,6 +829,38 @@ def _build_opening_section(location: str, tour_type: str, request_text: str,
     # yields "" so the opening section carries only the About story (silence is
     # correct — never invent hours/prices).
     practical_facts = _source_practical_facts(venue, site_url, address)
+
+    # [LOCAL-607 defect 5] When live site extraction gives NO hours/admission, fold
+    # in the LOCAL-603 venue-preflight Plan B practicals (Michael: "LOCAL-603's
+    # preflight now supplies hours"). The preflight ran once in the wrapper BEFORE
+    # the pool path and stored its result on generate_tour_text._LAST_VENUE_PREFLIGHT;
+    # its spoken sentence is the SAME real hours the non-pool path folds into Stop 1.
+    # This replaces the generic "Check opening hours … on <site> before you go."
+    # fallback with the actual hours whenever the preflight has them.
+    if not (practical_facts or "").strip():
+        try:
+            import generate_tour_text as _gtt
+            import venue_preflight as _vpf
+            _pf = getattr(_gtt, "_LAST_VENUE_PREFLIGHT", None) or {}
+            if _pf and not _pf.get("skipped") and not _pf.get("error"):
+                _planb = _vpf.plan_b_opening_practicals(_pf)
+                # Pass the RAW hours/admission segments (not the pre-composed
+                # "The museum is open …" sentence) in the same ". "-joined shape
+                # _source_practical_facts returns, so about_museum_stop composes a
+                # single clean spoken sentence (no "is open … is open …" seam).
+                _bits = []
+                _h = (_planb or {}).get("hours", "").strip()
+                _a = (_planb or {}).get("admission", "").strip()
+                if _h:
+                    _bits.append(_h)
+                if _a:
+                    _bits.append(_a)
+                if _bits:
+                    practical_facts = ". ".join(_bits)
+                    print(f"  [LOCAL-607] Stop-1 hours from LOCAL-603 preflight: "
+                          f"{practical_facts!r}")
+        except Exception as _pf_e:
+            logger.info(f"[LOCAL-607] preflight practicals fold skipped ({_pf_e})")
 
     try:
         about = build_about_stop(

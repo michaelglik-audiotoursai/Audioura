@@ -158,6 +158,121 @@ _SOURCES_LINE = re.compile(r'(?ms)^\s*Sources:\s.*\Z')
 _RECAP_FROM_TO = re.compile(r'\bFrom\s+.+?\s+to\s+.+?,\s+you have followed the thread\b')
 
 
+# ── Epilog stripping (LOCAL-607 defect 1) ────────────────────────────────────
+#
+# A tour's EPILOG — the closing recap, the stop-count line, the "this journey
+# comes to a close" sign-off and the restaurant offer — is a property of the
+# WHOLE tour, not of any one stop. It must never ride inside a pooled stop's
+# narration. The last stop of an EARLIER tour was stored with that tour's full
+# epilog attached (Ideal Portrait, tour 399), so when it is reused mid-tour the
+# listener hears "That's 7 stops … If you would like to eat nearby …" in the
+# MIDDLE of the new tour (Michael's defect 1).
+#
+# Unlike `_RECAP_FROM_TO`/`_SOURCES_LINE`, which are applied only to the LAST
+# block's trailing tail at parse time, these patterns are swept out of EVERY
+# stored narration (and out of existing pooled rows via the migration below),
+# because a pooled stop may have been the last stop of some prior tour and so
+# carries the epilog embedded in its own body. Each pattern matches from its
+# opener to the end of that sentence/line so only the epilog is removed and the
+# stop's real last sentence is preserved.
+#
+# The openers mirror the generator's own epilog wording (generate_tour_text
+# `_build_closing_recap` / `_build_closing_offer`, theme_thread_discoverer,
+# icon_evaluator, content_qa_runner):
+#   * "From X to Y, you have followed the thread …"   (closing recap)
+#   * "That's N stops …"                               (scale line; may trail a recap)
+#   * "As this journey comes to a close …"             (sign-off)
+#   * "If you would like to eat nearby …"              (restaurant offer)
+_EPILOG_PATTERNS = (
+    # Recap: "From X to Y, you have followed the thread …" through the sentence end.
+    re.compile(r'\bFrom\s+.+?\s+to\s+.+?,\s+you have followed the thread\b.*?(?:\.|$)',
+               re.IGNORECASE | re.DOTALL),
+    # Scale line: "That's 7 stops" and anything that trails it on the same
+    # sentence (e.g. "— Dura-Europos …, Ideal Portrait …, and Grace Hoops ….").
+    re.compile(r"\bThat['\u2019]s\s+\d+\s+stops?\b.*?(?:\.|$)",
+               re.IGNORECASE | re.DOTALL),
+    # Sign-off opener used by other closing builders.
+    re.compile(r'\bAs this journey comes to a close\b.*?(?:\.|$)',
+               re.IGNORECASE | re.DOTALL),
+    # Restaurant offer (the exact house wording and small variants).
+    re.compile(r'\bIf you would like to eat nearby\b.*?(?:\.|$)',
+               re.IGNORECASE | re.DOTALL),
+)
+
+
+def strip_epilog(text: str) -> str:
+    """Remove any tour EPILOG that leaked into a stop narration body.
+
+    Deterministic, idempotent and conservative: it only deletes spans that begin
+    with a known epilog opener and runs each to the end of its sentence, so a
+    stop's own last real sentence is kept. Collapses the whitespace the removal
+    leaves behind. Safe to call on text that has no epilog (returns it unchanged
+    apart from whitespace normalisation).
+    """
+    if not text:
+        return text
+    out = text
+    for pat in _EPILOG_PATTERNS:
+        out = pat.sub("", out)
+    # Collapse the gaps the removals leave: trailing spaces before newlines, and
+    # runs of 3+ blank lines down to a paragraph break.
+    out = re.sub(r'[ \t]+\n', '\n', out)
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    return out.strip()
+
+
+# ── Opening-section stripping (LOCAL-607 defect 5 / LOCAL-592) ───────────────
+#
+# The OPENING SECTION of Stop 1 — the museum's About prolog ("Before we look at
+# anything on the walls, here is the story of … what it is known for.") and the
+# practical-facts line (real hours, or the "Check opening hours and admission on
+# <site> before you go." fallback) — is a SEQUENCE-level opener, regenerated per
+# tour by about_museum_stop.build_opening_section and prepended fresh by the
+# orchestrator. It must NOT also live inside the pooled Stop-1 narration: tour
+# 399 was stored before that separation was enforced, so its Stop-1 narration
+# still carries the About prolog AND a STALE "Check … on bc.edu before you go."
+# (Michael's defect 5 — LOCAL-603's preflight now supplies real hours). Left in,
+# the reused tour would duplicate the About and speak the stale pointer.
+#
+# These openers are deterministic (about_museum_stop composes them verbatim), so
+# the whole About-prolog paragraph and the practical-fallback paragraph are
+# removed from a narration. Only paragraphs that MATCH an opener are dropped, so a
+# work narration is never touched.
+_ABOUT_PROLOG_RE = re.compile(
+    r'(?is)Before we look at anything on the walls,\s*here is the story of\b')
+_PRACTICAL_FALLBACK_RE = re.compile(
+    r'(?i)Check opening hours and admission on\b.*?before you go\.?')
+_PRACTICAL_LEAD_RE = re.compile(r'(?i)Before you go in, a few practical notes\.?')
+
+
+def strip_opening_section(text: str) -> str:
+    """Remove the regenerated-per-tour opening section from a pooled narration.
+
+    Drops the About-prolog paragraph (the museum's own story, which is rebuilt
+    fresh for the delivered tour) and the practical-facts fallback / lead lines
+    (real hours are supplied fresh by the opening section). Operates on whole
+    paragraphs so a work's narration is never partially cut. Idempotent and safe
+    on text that has no opening section.
+    """
+    if not text:
+        return text
+    paras = re.split(r'\n{2,}', text)
+    kept = []
+    for p in paras:
+        ps = p.strip()
+        if not ps:
+            continue
+        if _ABOUT_PROLOG_RE.search(ps):
+            continue  # the whole About prolog paragraph — regenerated per tour
+        # Strip the practical fallback / lead lines wherever they appear.
+        ps2 = _PRACTICAL_FALLBACK_RE.sub("", ps)
+        ps2 = _PRACTICAL_LEAD_RE.sub("", ps2).strip()
+        if not ps2:
+            continue
+        kept.append(ps2)
+    return "\n\n".join(kept).strip()
+
+
 def _strip_title_decorations(raw_title: str) -> str:
     """Return the bare stop title from a 'Stop N:' header value.
 
@@ -242,6 +357,18 @@ def parse_delivered_stops(tour_content: str) -> List[Dict]:
         # Drop any trailing recap/sources that leaked into the last block.
         narration = _RECAP_FROM_TO.split(narration)[0]
         narration = _SOURCES_LINE.sub("", narration)
+        # [LOCAL-607 defect 1] Strip any tour EPILOG that leaked into the body.
+        # The recap/sources cut above only trims the LAST block's trailing tail;
+        # a stop that was the LAST stop of an EARLIER tour carries that tour's
+        # full epilog ("That's 7 stops … If you would like to eat nearby …")
+        # embedded mid-body, so it is swept out of EVERY stop here. The stop ends
+        # at the stop.
+        narration = strip_epilog(narration)
+        # [LOCAL-607 defect 5] Strip the OPENING SECTION (About prolog + practical
+        # fallback) — it is a sequence-level opener regenerated per tour, not a
+        # stop's own narration. Keeping it would duplicate the About and speak a
+        # stale "Check … bc.edu" pointer when real hours are now supplied.
+        narration = strip_opening_section(narration)
         unit["narration"] = re.sub(r'\n{3,}', '\n\n', narration).strip()
 
         units.append(unit)
@@ -455,7 +582,14 @@ def get_pool_stops(
             "title": r[0],
             "artist": r[1] or "",
             "year": r[2] or "",
-            "narration": r[3],
+            # [LOCAL-607 defect 1] Strip any epilog on READ too: existing rows were
+            # stored before this fix and may still carry an earlier tour's epilog
+            # inside their narration. The migration below cleans them in place, but
+            # stripping on read guarantees a clean body even if the migration has
+            # not run against this database yet. Idempotent on already-clean rows.
+            # [LOCAL-607 defect 5] Also strip the opening section (About prolog +
+            # stale "Check … bc.edu" fallback), regenerated fresh per tour.
+            "narration": strip_opening_section(strip_epilog(r[3])),
             "raw_block": r[4] or "",
             "address": r[5] or "",
             "coordinates": r[6] or "",
@@ -517,3 +651,57 @@ def bump_hit_counts(
         conn.close()
     except Exception as e:
         logger.warning(f"[POOL] hit-count update error: {e}")
+
+
+# ── Epilog-strip migration (LOCAL-607 defect 1; in-place UPDATE only) ─────────
+
+def migrate_strip_epilog_in_pool(db_url: str) -> Dict[str, int]:
+    """Clean existing pooled rows in place: strip any tour epilog + opening section.
+
+    Old rows (stored before LOCAL-607) may carry an earlier tour's epilog inside
+    their narration — the Ideal Portrait / tour-399 defect — and the Stop-1
+    About-prolog + stale "Check … bc.edu" opening section (defect 5). This walks
+    every `stop_pool` row, applies `strip_epilog` then `strip_opening_section`,
+    and issues an in-place UPDATE for each row whose narration actually changes.
+    It never DELETEs or DROPs anything (the task's "no DELETE; UPDATE of the
+    narration only" rule): a row's identity, order_seq, sources and story elements
+    are untouched; only the narration text is rewritten, and only when it still
+    contains an epilog or opening section.
+
+    Returns a counts dict for the before/after report:
+        {"scanned": N, "with_epilog": M, "updated": M}
+    where `with_epilog` is how many rows carried an epilog before the run and
+    `updated` is how many were rewritten (equal to `with_epilog` on success).
+    Idempotent: a second run finds `with_epilog == 0` and updates nothing.
+    """
+    counts = {"scanned": 0, "with_epilog": 0, "updated": 0}
+    try:
+        conn = psycopg2.connect(db_url)
+        _ensure_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("SELECT pool_key, title_norm, narration FROM stop_pool")
+            rows = cur.fetchall()
+            counts["scanned"] = len(rows)
+            to_update = []
+            for pool_key, title_norm, narration in rows:
+                cleaned = strip_opening_section(strip_epilog(narration or ""))
+                if cleaned != (narration or "").strip():
+                    to_update.append((cleaned, pool_key, title_norm))
+            counts["with_epilog"] = len(to_update)
+            for cleaned, pool_key, title_norm in to_update:
+                cur.execute(
+                    "UPDATE stop_pool SET narration = %s "
+                    "WHERE pool_key = %s AND title_norm = %s",
+                    (cleaned, pool_key, title_norm),
+                )
+                counts["updated"] += 1
+        conn.commit()
+        conn.close()
+        logger.info(
+            f"[POOL] epilog-strip migration: scanned={counts['scanned']} "
+            f"with_epilog={counts['with_epilog']} updated={counts['updated']}"
+        )
+        return counts
+    except Exception as e:
+        logger.error(f"[POOL] epilog-strip migration error: {e}")
+        return counts
