@@ -771,6 +771,19 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         existing_tour = cur.fetchone()
         print(f"Existing tour (unique-index-aware check): {existing_tour[0] if existing_tour else None}")
 
+        # [LEAD 2026-10-07] A TEST request must never touch a real tour. The LOCAL-611
+        # canary's McMullen run (is_test) replaced Michael's tour 399 via the LOCAL-606
+        # replace-on-change branch and nulled its coordinates. When the request is a
+        # test and the matching row is real (is_test IS NOT TRUE), store the test under
+        # its own name instead of replacing/incrementing the real one.
+        if existing_tour and is_test:
+            cur.execute("SELECT is_test FROM audio_tours WHERE id = %s", (existing_tour[0],))
+            _ex_is_test = (cur.fetchone() or [None])[0]
+            if _ex_is_test is not True:
+                tour_name = f"{tour_name} [TEST {(job_id or 'x')[:8]}]"
+                print(f"[LEAD] test request matched REAL tour id={existing_tour[0]} — storing as separate test row {tour_name!r}")
+                existing_tour = None
+
         # [LOCAL-50] persist zip_filename for deterministic resolution
         zip_filename = os.path.basename(zip_path)
 
