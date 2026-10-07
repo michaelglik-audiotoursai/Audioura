@@ -13,9 +13,26 @@ is touched. Proves the reuse economics Michael asked for:
   * Classifier routes museum → building (new-before-pooled) and walking → outdoor
     (route re-sequenced).
 
-Requires DATABASE_URL (defaults to the dev Postgres on localhost:5433). If the DB
-is unreachable the test SKIPS rather than fails — the pure logic is covered by
-the no-DB suites.
+ZERO PRODUCTION WRITES (LOCAL-601).
+===================================
+This suite used to store a fresh ``loc:zz_isolated_*`` venue into the SHARED
+``public.stop_pool`` on every run (two explicit ``store_delivered_tour`` seeds
+plus the ones ``maybe_generate_with_pool`` issues internally) and never cleaned
+up — the dominant source of the 927 test rows that accumulated in the dev
+Postgres pool Michael's app reads from. It now:
+
+  * resolves the DB via ``db_connection.get_db_config`` (``audiotours_test`` under
+    pytest — never production), and
+  * runs every DB test inside a private throwaway schema (LOCAL-597B's mechanism,
+    extracted to ``tests/_isolated_db.py``): ``PGOPTIONS=-c search_path=<schema>,
+    public`` routes every connection — the ones this file opens AND the ones
+    ``stop_pool_store`` / the orchestrator open internally — at a schema whose
+    ``stop_pool`` shadows ``public.stop_pool``. ``tearDownModule`` drops the
+    schema (CASCADE) and asserts ``public`` row counts are identical before and
+    after. No row ever lands in ``public``; there is no DELETE anywhere.
+
+If the DB is unreachable the DB classes SKIP rather than fail — the pure logic is
+covered by the no-DB suites.
 """
 import os
 import sys
@@ -23,21 +40,51 @@ import uuid
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# tests/ holds the shared isolation helper and db_connection resolver.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests"))
 
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://admin:password123@localhost:5433/audiotours")
+from db_connection import get_db_config
+from _isolated_db import IsolatedSchema
+
+# Resolve the DB the shared helper picks (audiotours_test under pytest) and point
+# BOTH this file's DB_URL AND any env-var-based connection at it, so the pool
+# store (which connects via the passed db_url) and the orchestrator hit the same
+# database. The throwaway schema makes the choice doubly safe: even if this
+# resolved to production, the writes would land in the schema, not public.
+_cfg = get_db_config()
+os.environ.setdefault("DB_HOST", _cfg["host"])
+os.environ.setdefault("DB_PORT", _cfg["port"])
+DB_URL = os.environ.get(
+    "DATABASE_URL",
+    f"postgresql://{_cfg['user']}:{_cfg['password']}@{_cfg['host']}:{_cfg['port']}/{_cfg['dbname']}")
 
 import stop_pool_store as pool
 import stop_pool_orchestrator as orch
 
+# ─── Throwaway-schema isolation (LOCAL-601) ──────────────────────────────────
+# Only stop_pool is written by this suite (directly and via the orchestrator's
+# internal store_delivered_tour), so that is the single table to clone and prove
+# unchanged. db_url is passed explicitly so the proof/admin connection targets
+# the exact DB the pool store writes to.
+_ISO = IsolatedSchema(
+    prefix="t590",
+    clone_tables=["stop_pool"],
+    proof_tables=["stop_pool"],
+    db_url=DB_URL,
+    banner="LOCAL-590",
+)
+
+
+def setUpModule():
+    _ISO.setup()
+
+
+def tearDownModule():
+    _ISO.teardown()
+
 
 def _db_up():
-    try:
-        import psycopg2
-        c = psycopg2.connect(DB_URL, connect_timeout=4)
-        c.close()
-        return True
-    except Exception:
-        return False
+    return _ISO.db_up()
 
 
 # A delivered 5-stop museum tour to seed the pool (current format).
