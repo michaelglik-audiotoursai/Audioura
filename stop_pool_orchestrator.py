@@ -278,17 +278,30 @@ def maybe_generate_with_pool(
                 return None
             # [LOCAL-600 / D616] If the site-first exhibition path could not reach
             # the requested N from verified on-view material, say so in Stop 1's
-            # opening section — one honest sentence from the real counts. Rebuild
-            # the opening section WITH the sentence now the delivered count is known.
+            # opening section — one honest sentence from the real counts.
             _shortfall_sentence = _site_first_shortfall_sentence(
                 location, len(new_units), N)
+            # [LOCAL-615 item 2] Fold the LOCAL-603 preflight hours into the FRESH
+            # path's opening section. The opening section was first built ABOVE,
+            # BEFORE generate_fn ran — and generate_fn is where the venue preflight
+            # runs and populates generate_tour_text._LAST_VENUE_PREFLIGHT. So the
+            # first build could not see the preflight hours and fell back to
+            # "Check opening hours and admission on <domain> before you go."
+            # (D626 Bilbao: hours=y admission=y preflight, yet the fallback shipped).
+            # Now that generation is done and the preflight result is populated,
+            # rebuild the opening section unconditionally: _build_opening_section's
+            # LOCAL-607 fold now sees the preflight and composes the real hours.
+            # The shortfall sentence (if any) is folded in by the same rebuild, so
+            # this replaces the former shortfall-only rebuild without losing it.
+            _rebuilt_opening = _build_opening_section(
+                location, tour_type, request_text=location,
+                available_exhibition_stops=len(new_units), requested_stops=N,
+                shortfall_sentence=_shortfall_sentence or "")
+            if _rebuilt_opening:
+                opening_section = _rebuilt_opening
+                print(f"  [LOCAL-615] opening section rebuilt post-generation "
+                      f"(preflight hours now available)")
             if _shortfall_sentence:
-                _opening_with_shortfall = _build_opening_section(
-                    location, tour_type, request_text=location,
-                    available_exhibition_stops=len(new_units), requested_stops=N,
-                    shortfall_sentence=_shortfall_sentence)
-                if _opening_with_shortfall:
-                    opening_section = _opening_with_shortfall
                 print(f"  [LOCAL-600] D616 shortfall sentence folded into Stop 1: "
                       f"{_shortfall_sentence!r}")
             sources_block = _extract_sources_block(gen_text)
@@ -301,6 +314,10 @@ def maybe_generate_with_pool(
                 opening_section=opening_section,
                 venue_address=_resolve_venue_address(location),
             )
+            # [LOCAL-615 item 2] Final guard on the delivered text: never ship the
+            # "Check opening hours and admission on <domain>" fallback when the
+            # preflight (just run inside generate_fn) has real hours.
+            result.tour_text = _fold_preflight_hours_into_text(result.tour_text)
             _emit_result(output_file, result)
             # Store the exhibition stops to seed the pool (the opening section is
             # NOT pooled; it is a sequence-level opener, regenerated per tour like
@@ -863,6 +880,45 @@ def _site_first_shortfall_sentence(location, delivered_count, requested_n):
             requested_stops=_sfc.get('requested_stops', requested_n))
     except Exception:
         return ""
+
+
+# [LOCAL-615 item 2] "Never say 'check… on <domain>' when the preflight has hours."
+_CHECK_HOURS_FALLBACK_RE = re.compile(
+    r'(?i)Check opening hours and admission on\b[^\n]*?before you go\.?')
+
+
+def _fold_preflight_hours_into_text(tour_text: str) -> str:
+    """Belt-and-braces: replace a surviving "Check opening hours and admission on
+    <domain> before you go." fallback with the LOCAL-603 preflight's real hours.
+
+    The opening-section rebuild (above) is the primary fix — it composes the real
+    hours into Stop 1 before assembly. This is the final guard that enforces
+    Michael's rule literally on the delivered text: if the fallback sentence is
+    STILL present AND the preflight has hours/admission, swap the fallback for the
+    preflight's spoken sentence. Idempotent and non-fatal: when the preflight has
+    no hours, or the fallback is absent, the text is returned unchanged (an honest
+    pointer with no sourced hours is correct — never invent).
+    """
+    if not tour_text or not _CHECK_HOURS_FALLBACK_RE.search(tour_text):
+        return tour_text
+    try:
+        import generate_tour_text as _gtt
+        import venue_preflight as _vpf
+        _pf = getattr(_gtt, "_LAST_VENUE_PREFLIGHT", None) or {}
+        if not _pf or _pf.get("skipped") or _pf.get("error"):
+            return tour_text
+        _planb = _vpf.plan_b_opening_practicals(_pf)
+        _speak = (_planb or {}).get("speak", "").strip()
+        if not _speak:
+            return tour_text
+        _new_text, _n = _CHECK_HOURS_FALLBACK_RE.subn(_speak, tour_text)
+        if _n:
+            print(f"  [LOCAL-615] replaced {_n} 'check hours on <domain>' fallback(s) "
+                  f"with preflight hours: {_speak!r}")
+        return _new_text
+    except Exception as _e:
+        logger.info(f"[LOCAL-615] preflight-hours text fold skipped ({_e})")
+        return tour_text
 
 
 def _build_opening_section(location: str, tour_type: str, request_text: str,
