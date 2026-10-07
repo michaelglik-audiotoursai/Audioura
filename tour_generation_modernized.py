@@ -439,6 +439,16 @@ def parse_tour_content_to_modernized(tour_content):
                 lines = stop_content.split('\n')
                 if lines:
                     # Use the full content for text
+                    # [D617, LEAD 2026-10-06] This is the LIVE packer (audio_N.txt is
+                    # spoken). LOCAL-602 r2 put the URL/Sources strip in
+                    # break_text_to_pois.py, which the live path never calls.
+                    try:
+                        from spoken_text_hygiene import strip_sources_and_urls as _strip_spoken
+                        stop_content, _sp_rep = _strip_spoken(stop_content)
+                        if _sp_rep.get('urls') or _sp_rep.get('sources_blocks'):
+                            print(f"[D617] stop {stop_num}: stripped {_sp_rep} from spoken text")
+                    except Exception as _sp_err:
+                        print(f"[D617] spoken-text strip unavailable: {_sp_err}")
                     text_content.append(stop_content)
     
     return {

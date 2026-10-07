@@ -5,6 +5,7 @@ RUN pip install --no-cache-dir -r requirements-modernized.txt
 COPY tour_generation_modernized.py /app/
 COPY job_store.py /app/
 COPY build_manifest.py /app/
+COPY spoken_text_hygiene.py /app/
 RUN mkdir -p /app/tours
 
 # Build-time manifest: record checksums of all Python sources + git SHA

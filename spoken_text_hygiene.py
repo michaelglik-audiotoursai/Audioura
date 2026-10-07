@@ -25,7 +25,8 @@ import re
 from collections import defaultdict
 
 __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
-           'DANGLING_PHRASE_RE', 'normalize_proper_noun_spellings']
+           'DANGLING_PHRASE_RE', 'normalize_proper_noun_spellings',
+           'strip_sources_and_urls', 'SOURCES_HEADING_RE', 'URL_RE']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -291,3 +292,66 @@ def clean_spoken_text(text: str, verbose: bool = False) -> tuple:
             print(f"  [LOCAL-529] name spelling normalised near '{g['head']}': "
                   f"{froms}")
     return out, report
+
+
+# -------- [LOCAL-602 r2 / D617 item 9] No URL, no "Sources" in spoken text ----
+#
+# A listener never hears a URL. The r1 WNDR run's spoken audio_N.txt files carried
+# the venue's own-page URLs and a trailing "Sources:" block verbatim, because the
+# packer (break_text_to_pois.process_tour_file) writes each stop's text to disk
+# unchanged. A speech synthesiser reads "https colon slash slash wndrmuseum dot
+# com slash installations slash boston slash flex" aloud — unlistenable. Sources
+# belong in the TEXT view (the web page / full tour text), as one short line; they
+# are never spoken.
+#
+# This strip is deterministic and runs in the packer, on each stop's spoken text,
+# AFTER every content gate has had its say. It removes:
+#   * a trailing "Sources:" / "Sources (…):" block to the next blank line / end
+#     (the block the generator folds after the last stop, and any per-stop variant);
+#   * every bare http(s):// or www. URL token anywhere in the body;
+#   * a now-empty bullet / "Source:" label left behind.
+
+# A "Sources" heading in any of the shapes the pipeline emits:
+#   "Sources:", "Sources (the museum's own pages):", "Source:".
+SOURCES_HEADING_RE = re.compile(
+    r'(?is)^[\t ]*sources?\b[^\n:]*:.*?(?=\n[\t ]*\n|\Z)', re.MULTILINE)
+
+# A URL: http(s):// … or a bare www. … up to whitespace or a closing bracket.
+URL_RE = re.compile(r'(?i)\b(?:https?://|www\.)[^\s<>()\[\]"\']+')
+
+# A list bullet or inline "Source:" label whose URL we just removed.
+_EMPTY_SOURCE_LINE_RE = re.compile(
+    r'(?im)^[\t ]*(?:[-*\u2022]\s*)?(?:source\s*:)?\s*$')
+
+
+def strip_sources_and_urls(text: str) -> tuple:
+    """Remove every URL and any 'Sources:' block from SPOKEN text.
+
+    Returns ``(cleaned, report)`` with ``report = {'urls': n, 'sources_blocks': n}``.
+    Deterministic and side-effect free. Used by the packer so no spoken
+    ``audio_N.txt`` ever contains ``http``/``www.`` or a read-aloud source list
+    (D617 item 9). The full-text / web view keeps its Sources line; only the
+    SPOKEN file is stripped.
+    """
+    report = {'urls': 0, 'sources_blocks': 0}
+    if not text:
+        return text or '', report
+
+    ends_nl = text.endswith('\n')
+    out = text
+    # 1. "Sources:" block(s) — heading to the next blank line or end of text.
+    report['sources_blocks'] = len(SOURCES_HEADING_RE.findall(out))
+    out = SOURCES_HEADING_RE.sub('', out)
+
+    # 2. Any remaining bare URLs anywhere in the body.
+    report['urls'] = len(URL_RE.findall(out))
+    out = URL_RE.sub('', out)
+
+    # 3. Tidy up bullets / "Source:" labels orphaned by the URL removal and
+    #    collapse the blank-line gaps the removals leave behind.
+    out = _EMPTY_SOURCE_LINE_RE.sub('', out)
+    out = re.sub(r'(?im)^[\t ]*source\s*:\s*$', '', out)
+    out = re.sub(r'[ \t]+\n', '\n', out)
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    out = out.strip()
+    return (out + '\n') if ends_nl else out, report
