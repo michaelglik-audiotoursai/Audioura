@@ -98,6 +98,51 @@ class TestFilterDropsForeign(unittest.TestCase):
         self.assertEqual(out, [])
 
 
+class TestFilterForeignSentencesInText(unittest.TestCase):
+    """[LOCAL-616 item 3] The delivered-text sweep used by the every-path guard:
+    drops a genuinely-foreign sentence wherever it entered (the fresh-path closing
+    recap leaked untranslated French), keeps English, never disturbs structural
+    lines."""
+
+    def setUp(self):
+        self._saved_key = os.environ.pop("OPENAI_API_KEY", None)
+
+    def tearDown(self):
+        if self._saved_key is not None:
+            os.environ["OPENAI_API_KEY"] = self._saved_key
+
+    def test_french_recap_fragment_dropped(self):
+        text = (
+            "Stop 1: Portrait de Madame Cézanne\n\n"
+            "Address: Place Saint-Jean, Aix-en-Provence\n\n"
+            "From Portrait de Madame Cézanne to Leicester Square, you have followed "
+            "the thread of the collection. "
+            "Il faut cependant attendre 1838 pour que le musée d'Aix soit "
+            "officiellement inauguré, à l'occasion de la remise des prix. "
+            "That's 3 stops in all.\n"
+        )
+        new, dropped = lg.filter_foreign_sentences_in_text(text, "en")
+        self.assertEqual(len(dropped), 1)
+        self.assertNotIn("Il faut cependant", new)
+        self.assertIn("you have followed the thread", new)
+        self.assertIn("That's 3 stops in all.", new)
+        self.assertIn("Stop 1: Portrait de Madame Cézanne", new)
+        self.assertIn("Address: Place Saint-Jean, Aix-en-Provence", new)
+
+    def test_structural_lines_never_judged(self):
+        text = ("Stop 2: Jupiter et Thétis\n\n"
+                "Directions: Continue through Musée Granet — next is Jupiter et Thétis.\n")
+        new, dropped = lg.filter_foreign_sentences_in_text(text, "en")
+        self.assertEqual(dropped, [])
+        self.assertIn("Directions: Continue through Musée Granet", new)
+
+    def test_english_recap_with_french_titles_kept(self):
+        text = "This tour covered Jupiter et Thétis and Leicester Square, la nuit.\n"
+        new, dropped = lg.filter_foreign_sentences_in_text(text, "en")
+        self.assertEqual(dropped, [])
+        self.assertIn("This tour covered", new)
+
+
 class TestBuildAboutStopIntegration(unittest.TestCase):
     """The scraped-story collector in build_about_stop must route through the
     language guard, so a French sentence on the venue's page never reaches
